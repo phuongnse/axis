@@ -54,3 +54,19 @@
       }
     },
 </#macro>
+
+<#-- Proposed: <@axis.realmName/> writes the realm's display name for the heading, left out when it is empty or equals
+     the realm id, so the page then names Axis, never the tenant id. -->
+<#macro realmName>
+    <#if (realm.displayName)?has_content && realm.displayName != realm.name>
+    "realmName": "${realm.displayName?json_string?no_esc}",
+    </#if>
+</#macro>
+
+<#-- Proposed: <@axis.backToApplication/> writes the link back to the application that started the flow, as a message
+     page's last action, when Keycloak knows the application and does not skip the link. -->
+<#macro backToApplication>
+    <#if !(skipLink??) && (client.baseUrl)?has_content>
+      { "kind": "link", "label": "${msg("axisBackToApplication")?json_string?no_esc}", "href": "${client.baseUrl?json_string?no_esc}" }
+    </#if>
+</#macro>

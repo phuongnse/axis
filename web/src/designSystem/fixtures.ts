@@ -31,6 +31,9 @@ import type {
   UpdatePasswordContext,
   UpdatePasswordTexts,
   TermsContext,
+  MessageContext,
+  ChooseMethodContext,
+  ProfileContext,
   TermsTexts,
 } from '../identitySignIn/signInContext'
 
@@ -956,6 +959,87 @@ export const identityTermsContext: TermsContext = {
   preferences: identitySignInContext.preferences,
   legal: identitySignInContext.legal,
   texts: identityTermsTexts,
+}
+
+/** Proposed: the sign-out question, a message page with a post action and a link. */
+export const identitySignOutContext: MessageContext = {
+  page: 'message',
+  title: 'Sign out',
+  realmName: identitySignInContext.realmName,
+  message: 'Do you want to sign out?',
+  actions: [
+    { kind: 'post', primary: true, label: 'Sign out', href: '#sign-out', fields: { session_code: 'code' } },
+    { kind: 'link', label: 'Back to the application', href: '#back' },
+  ],
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+}
+
+/** Proposed: the notice after "Send link". */
+export const identityNoticeContext: MessageContext = {
+  ...identitySignOutContext,
+  title: 'Notice',
+  message: 'You should receive an email shortly with further instructions.',
+  actions: [{ kind: 'link', label: 'Back to the application', href: '#back' }],
+}
+
+/** Proposed: the error of an invitation link that expired. */
+export const identityErrorContext: MessageContext = {
+  ...identitySignOutContext,
+  title: 'Something went wrong',
+  message: 'Action expired. Please continue with login now.',
+  tone: 'error',
+  actions: [{ kind: 'link', label: 'Back to the application', href: '#back' }],
+}
+
+/** Proposed: the page that "Try another way" opens. */
+export const identityChooseMethodContext: ChooseMethodContext = {
+  page: 'chooseMethod',
+  title: 'Choose how to sign in',
+  realmName: identitySignInContext.realmName,
+  loginAction: '#choose',
+  methods: [
+    {
+      id: 'otp',
+      label: 'Authenticator application',
+      help: 'Enter a verification code from your authenticator application.',
+    },
+    { id: 'password', label: 'Password', help: 'Sign in by entering your password.' },
+  ],
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+}
+
+/** Proposed: the profile page, after an administrator asked for it. */
+export const identityProfileContext: ProfileContext = {
+  page: 'profile',
+  title: 'Update your profile',
+  realmName: identitySignInContext.realmName,
+  loginAction: '#profile',
+  fields: [
+    { name: 'username', label: 'Username', value: 'alex.morgan', required: true, readOnly: true, type: 'text' },
+    {
+      name: 'email',
+      label: 'Email',
+      value: 'alex.morgan@contoso.example',
+      required: true,
+      readOnly: false,
+      type: 'email',
+    },
+    { name: 'firstName', label: 'First name', value: 'Alex', required: true, readOnly: false, type: 'text' },
+    { name: 'lastName', label: 'Last name', value: '', required: true, readOnly: false, type: 'text' },
+  ],
+  hidden: {},
+  cancellable: false,
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+  texts: {
+    title: 'Update your profile',
+    message: 'Check your details before you continue.',
+    required: 'Fill in this field.',
+    submit: 'Save and continue',
+    cancel: 'Cancel',
+  },
 }
 
 /** The texts of the page that adds an authenticator, in English. */

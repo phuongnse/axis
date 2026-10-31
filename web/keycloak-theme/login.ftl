@@ -51,6 +51,10 @@
     <#elseif message?? && message.type == 'error'>
     "error": "${message.summary?json_string?no_esc}",
     </#if>
+    <#-- Proposed: a notice that Keycloak brings back to the sign-in page, such as the one after "Send link". -->
+    <#if message?? && message.type != 'error'>
+    "notice": "${message.summary?json_string?no_esc}",
+    </#if>
     "loginAction": "${url.loginAction?json_string?no_esc}",
     "rememberMe": ${(realm.rememberMe)?c},
     <#if realm.resetPasswordAllowed>

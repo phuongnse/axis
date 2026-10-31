@@ -3,6 +3,9 @@ import { AddAuthenticatorPage } from '../src/identitySignIn/AddAuthenticatorPage
 import { ResetPasswordPage } from '../src/identitySignIn/ResetPasswordPage'
 import { SignInPage } from '../src/identitySignIn/SignInPage'
 import { TermsPage } from '../src/identitySignIn/TermsPage'
+import { MessagePage } from '../src/identitySignIn/MessagePage'
+import { ChooseMethodPage } from '../src/identitySignIn/ChooseMethodPage'
+import { ProfilePage } from '../src/identitySignIn/ProfilePage'
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { TwoStepPage } from '../src/identitySignIn/TwoStepPage'
 import { UpdatePasswordPage } from '../src/identitySignIn/UpdatePasswordPage'
@@ -22,6 +25,12 @@ function ThemePage({ context }: { context: IdentityContext }) {
       return <UpdatePasswordPage context={context} />
     case 'terms':
       return <TermsPage context={context} />
+    case 'message':
+      return <MessagePage context={context} />
+    case 'chooseMethod':
+      return <ChooseMethodPage context={context} />
+    case 'profile':
+      return <ProfilePage context={context} />
   }
 }
 

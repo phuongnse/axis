@@ -2,6 +2,9 @@ import { AddAuthenticatorPage } from '../identitySignIn/AddAuthenticatorPage'
 import { ResetPasswordPage } from '../identitySignIn/ResetPasswordPage'
 import { SignInPage } from '../identitySignIn/SignInPage'
 import { TermsPage } from '../identitySignIn/TermsPage'
+import { MessagePage } from '../identitySignIn/MessagePage'
+import { ChooseMethodPage } from '../identitySignIn/ChooseMethodPage'
+import { ProfilePage } from '../identitySignIn/ProfilePage'
 import { TwoStepPage } from '../identitySignIn/TwoStepPage'
 import { UpdatePasswordPage } from '../identitySignIn/UpdatePasswordPage'
 import {
@@ -9,6 +12,11 @@ import {
   identityInvalid,
   identityResetPasswordContext,
   identityTermsContext,
+  identitySignOutContext,
+  identityNoticeContext,
+  identityErrorContext,
+  identityChooseMethodContext,
+  identityProfileContext,
   identitySignInContext,
   identityTwoStepContext,
   identityUpdatePasswordContext,
@@ -24,6 +32,11 @@ export type IdentitySignInPage =
   | 'updatePassword'
   | 'addAuthenticator'
   | 'terms'
+  | 'signOut'
+  | 'notice'
+  | 'error'
+  | 'chooseMethod'
+  | 'profile'
 
 /** The identity provider's sign-in page in one of its states, built from fixtures through the shared sign-in components. */
 export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
@@ -46,5 +59,15 @@ export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
       return <AddAuthenticatorPage context={identityAddAuthenticatorContext} />
     case 'terms':
       return <TermsPage context={identityTermsContext} />
+    case 'signOut':
+      return <MessagePage context={identitySignOutContext} />
+    case 'notice':
+      return <MessagePage context={identityNoticeContext} />
+    case 'error':
+      return <MessagePage context={identityErrorContext} />
+    case 'chooseMethod':
+      return <ChooseMethodPage context={identityChooseMethodContext} />
+    case 'profile':
+      return <ProfilePage context={identityProfileContext} />
   }
 }

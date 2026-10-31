@@ -364,6 +364,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
       ),
       frameHeight: 600,
     },
+    // Proposed: the pages that were still Keycloak's own.
+    { caption: 'Sign out', draw: () => <IdentitySignIn page="signOut" />, frameHeight: 480 },
+    { caption: 'Notice', draw: () => <IdentitySignIn page="notice" />, frameHeight: 480 },
+    { caption: 'Error', draw: () => <IdentitySignIn page="error" />, frameHeight: 480 },
+    { caption: 'Choose how to sign in', draw: () => <IdentitySignIn page="chooseMethod" />, frameHeight: 520 },
+    { caption: 'Update your profile', draw: () => <IdentitySignIn page="profile" />, frameHeight: 760 },
   ],
 }
 

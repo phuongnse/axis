@@ -109,6 +109,8 @@ export interface SignInContext {
   username?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
+  /** Proposed: a notice Keycloak brings back to the page, such as the one after "Send link", shown as a success alert. */
+  notice?: string
   loginAction: string
   /** Whether the "Keep me signed in" checkbox shows. */
   rememberMe: boolean
@@ -227,6 +229,112 @@ export interface TermsContext {
   texts: TermsTexts
 }
 
+/** Proposed: one way out of a message page: a link, or a form that posts its fields, such as Sign out. */
+export interface MessageAction {
+  kind: 'link' | 'post'
+  label: string
+  href: string
+  /** The hidden fields that a `post` action sends. */
+  fields?: Record<string, string>
+  /** The page's one solid button. The others are links. */
+  primary?: boolean
+}
+
+/**
+ * Proposed: what a message page draws: a title, a message and its ways out. Keycloak's sign-out question, notices,
+ * errors, the expired page, the front-channel sign-out and the SAML redirect all use it.
+ */
+export interface MessageContext {
+  page: 'message'
+  title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
+  /** The message under the title. An error shows it as an error alert. */
+  message?: string
+  tone?: 'error'
+  actions: MessageAction[]
+  /** The front-channel sign-out addresses, each loaded in a hidden frame. */
+  frames?: string[]
+  /** Where the page goes once its frames have loaded. */
+  redirect?: string
+  /** Whether the page posts its first `post` action at once, as the SAML redirect does. */
+  autoSubmit?: boolean
+  preferences: SignInPreferences
+  legal: SignInLegal
+}
+
+/** Proposed: one way to sign in that "Try another way" offers. */
+export interface SignInMethod {
+  id: string
+  label: string
+  help?: string
+}
+
+/** Proposed: what the page that "Try another way" opens draws: each way to sign in as a button. */
+export interface ChooseMethodContext {
+  page: 'chooseMethod'
+  title: string
+  realmName?: string
+  /** Where each button posts `authenticationExecution`. */
+  loginAction: string
+  methods: SignInMethod[]
+  preferences: SignInPreferences
+  legal: SignInLegal
+}
+
+/** Proposed: one field of the person's profile, from Keycloak's user profile. */
+export interface ProfileField {
+  name: string
+  label: string
+  value: string
+  required: boolean
+  readOnly: boolean
+  /** `email` for an email address, otherwise text. */
+  type: 'text' | 'email'
+  /** Keycloak's message for the field, after a refused post. */
+  error?: string
+}
+
+/** Proposed: the texts of the profile page. */
+export interface ProfileTexts {
+  title: string
+  message: string
+  required: string
+  submit: string
+  cancel: string
+}
+
+/**
+ * Proposed: what the profile page draws: the fields Keycloak asks a person to fill in or review, such as their name
+ * and email, after an administrator asks for it or a brokered provider leaves one out.
+ */
+export interface ProfileContext {
+  page: 'profile'
+  title: string
+  realmName?: string
+  error?: string
+  /** Keycloak's reminder of why the step shows, such as "You need to update your user profile", as an info alert. */
+  notice?: string
+  /** Where the form posts each field by its name. */
+  loginAction: string
+  fields: ProfileField[]
+  /** Fields the form posts as they are, such as the page's locale. */
+  hidden: Record<string, string>
+  /** Whether the person may leave, which posts `cancel-aia=true`: only when an application asked for the step. */
+  cancellable: boolean
+  preferences: SignInPreferences
+  legal: SignInLegal
+  texts: ProfileTexts
+}
+
 /** What the page of the identity provider's theme draws, told apart by `page`. */
 export type IdentityContext =
-  SignInContext | TwoStepContext | AddAuthenticatorContext | ResetPasswordContext | UpdatePasswordContext | TermsContext
+  | SignInContext
+  | TwoStepContext
+  | AddAuthenticatorContext
+  | ResetPasswordContext
+  | UpdatePasswordContext
+  | TermsContext
+  | MessageContext
+  | ChooseMethodContext
+  | ProfileContext

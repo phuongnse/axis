@@ -19,7 +19,7 @@ export function SignInPage({ context }: { context: SignInContext }) {
 }
 
 function SignInBody({ context }: { context: SignInContext }) {
-  const { site, texts, error } = context
+  const { site, texts, error, notice } = context
   const providers = site
     ? context.providers.filter((provider) => site.providers.includes(provider.alias))
     : context.providers
@@ -39,6 +39,8 @@ function SignInBody({ context }: { context: SignInContext }) {
         </Button>
       ))}
       {accounts && providers.length > 0 && <Divider plain>{texts.or}</Divider>}
+      {/* Proposed: the notice after "Send link" confirms that the email is on its way. */}
+      {notice && !error && <Alert type="success" showIcon title={notice} />}
       {accounts && error && <Alert type="error" showIcon title={error} />}
       {accounts && <AccountForm context={context} />}
     </>
