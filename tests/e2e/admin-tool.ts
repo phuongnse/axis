@@ -8,11 +8,13 @@ const adminDll = path.resolve(import.meta.dirname, '..', '..', 'src', 'Axis.Admi
 /**
  * The settings of `Axis.Admin` for this run. scripts/e2e.sh gives Playwright only the `AXIS_E2E_*` names, so the
  * server, the worker and the publisher never inherit these. The tool runs in Development, which allows the plain
- * http address of Keycloak and plain SMTP. Keycloak reaches Mailpit by its alias on the run's network.
+ * http address of Keycloak and plain SMTP, and reads tenants from the tenant directory, as the tenant setting commands such
+ * as `tenant host add` need. Keycloak reaches Mailpit by its alias on the run's network.
  */
 function adminEnv(): Record<string, string> {
   return {
     DOTNET_ENVIRONMENT: 'Development',
+    Tenancy__Source: 'directory',
     Admin__ConnectionString: required('AXIS_E2E_ADMIN_DATABASE', 'the PostgreSQL connection string of the axis_admin role'),
     ConnectionStrings__PlatformSchema: required('AXIS_E2E_SCHEMA_DATABASE', 'the PostgreSQL connection string of the schema role'),
     Platform__SecretKey: platformSecretKey,
