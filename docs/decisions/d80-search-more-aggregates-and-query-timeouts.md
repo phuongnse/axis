@@ -41,6 +41,9 @@ these points on 2026-10-25. It is built in M15. See
     complete and an inbound endpoint call runs with
     `SET LOCAL statement_timeout` from `Data:WriteTimeout`, 15 seconds by
     default.
+  - Activation runs with `SET LOCAL statement_timeout` from
+    `Data:ActivationTimeout`, 30 minutes by default. An activation past it
+    rolls back and keeps the previous release.
   - A statement that runs past it, SQLSTATE `57014`, is a `503` with a fixed
     title. A write that ran past its limit rolled back and wrote nothing, and
     its title says to try again. The server logs the data source or entity name and the duration,

@@ -361,7 +361,9 @@ limit and seeding as
 [startup activation](host-settings.md#startup-activation), and does not repeat
 them here. Packages come from `Extensions:Path` and modules from `Modules:Path`.
 `Activation:InlineRecomputeLimit` applies as it does there, and a value that is
-not a positive whole number is a settings error. An unset `Extensions:Path` or
+not a positive whole number is a settings error. `Data:ActivationTimeout` limits
+each statement of a tenant's activation transaction, and a value that is not a
+duration of at least one millisecond is a settings error. An unset `Extensions:Path` or
 `Modules:Path` gives an empty catalog, as on the server. A set path whose folder
 does not exist is a settings error that names the setting and not the path.
 A problem of an installed package or module is written to standard error.
@@ -469,6 +471,7 @@ agrees. See [test](authoring.md#test) for the route.
   gives an empty catalog, and a set path whose folder does not exist is a
   settings error.
 - `Activation:InlineRecomputeLimit`, as for `activate`.
+- `Data:ActivationTimeout`, as for `activate`.
 - `Scenarios:ServerConnectionString`, the role that creates
   the scenario databases of `test` requests. It is optional. The publisher
   starts without it, and a `test` request then fails with `AXC0217`, which

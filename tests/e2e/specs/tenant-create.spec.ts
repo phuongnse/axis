@@ -1,7 +1,11 @@
 import { spawnSync } from 'node:child_process'
+import { chromium } from '@playwright/test'
 import { expect, test } from '../test'
 import { runAdmin } from '../admin-tool'
+import { startDirectoryServer } from '../directory-server'
+import { submitCode, submitPassword } from '../keycloak'
 import { addRealmAccount, realmClientIds, userCredentialTypes } from '../tenant-realm'
+import { totp } from '../totp'
 
 // tenant create makes a database, two roles and a realm, and the realm step waits on Keycloak.
 test.setTimeout(180_000)
@@ -51,4 +55,31 @@ test('an account added to the realm has a password and an authenticator', async 
   const account = await addRealmAccount(tenant, { email: `agent@${tenant}.test` })
 
   expect(await userCredentialTypes(tenant, account.id)).toEqual(expect.arrayContaining(['password', 'otp']))
+})
+
+test('a person signs in over https on the host of the new tenant and reaches the home page', async () => {
+  const account = await addRealmAccount(tenant, { email: `person@${tenant}.test` })
+  const host = `${tenant}.localhost`
+  const server = await startDirectoryServer()
+  // The browser sends the host on port 443 to the server's https port. Node's own requests would ignore this rule.
+  const browser = await chromium.launch({
+    args: [`--host-resolver-rules=MAP ${host}:443 127.0.0.1:${server.httpsPort}`],
+  })
+  try {
+    const context = await browser.newContext({ ignoreHTTPSErrors: true })
+    const page = await context.newPage()
+
+    await page.goto(`https://${host}/api/auth/sign-in?returnUrl=/`)
+    await submitPassword(page, account.username, account.password)
+    await submitCode(page, totp(account.secret))
+    await page.waitForURL(`https://${host}/`)
+    await expect(page.getByRole('banner')).toBeVisible()
+
+    const me = await page.goto(`https://${host}/api/me`)
+    expect(me?.status()).toBe(200)
+    expect(await me?.json()).toMatchObject({ id: account.id, displayName: 'Test Account' })
+  } finally {
+    await browser.close()
+    await server.stop()
+  }
 })

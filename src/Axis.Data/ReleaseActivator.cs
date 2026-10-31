@@ -7,6 +7,8 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data.Records;
 using Axis.Data.Storage;
+using Axis.Tenancy;
+using Microsoft.Extensions.Configuration;
 
 namespace Axis.Data;
 
@@ -38,7 +40,9 @@ namespace Axis.Data;
 /// Provisioning, the pending migrations and the active release write run in one transaction under
 /// the schema lock, so the migration history check and the write see the same history: no other
 /// activation can commit a rename or drop between them. A refused name or site path, or any failure,
-/// rolls everything back and the previous release stays active. The store and
+/// rolls everything back and the previous release stays active. Each statement of the transaction, and each wait
+/// for a lock, runs under <c>statement_timeout</c> (<see cref="ActivationTimeoutSetting"/>, 30 minutes by default). A statement
+/// past the limit fails the activation, which rolls back like any other failure. The store and
 /// <see cref="DataDbContext"/> must share one open tenant connection, or the store throws before
 /// anything commits.
 /// </para>
@@ -57,6 +61,17 @@ public static class ReleaseActivator
 {
     /// <summary>The default most rows of one entity that activation recomputes inline.</summary>
     public const int DefaultInlineRecomputeLimit = 10_000;
+
+    /// <summary>The host setting that limits each statement of the activation transaction.</summary>
+    public const string ActivationTimeoutSetting = "Data:ActivationTimeout";
+
+    /// <summary>The default limit of each statement of the activation transaction.</summary>
+    public static readonly TimeSpan DefaultActivationTimeout = TimeSpan.FromMinutes(30);
+
+    /// <summary>The duration in <see cref="ActivationTimeoutSetting"/>, or <see cref="DefaultActivationTimeout"/> when it is missing.</summary>
+    /// <exception cref="InvalidOperationException">The value is not a duration of at least one millisecond that PostgreSQL accepts.</exception>
+    public static TimeSpan ReadActivationTimeout(IConfiguration configuration) =>
+        StatementTimeout.Read(configuration, ActivationTimeoutSetting, DefaultActivationTimeout);
 
     /// <summary>
     /// Activates the release in <paramref name="compiled"/> with the default inline recompute limit,
@@ -85,6 +100,21 @@ public static class ReleaseActivator
         ActivateAsync(compiled, store, data, bindings, openInstances, inlineRecomputeLimit, ActivationActor.Startup, cancellationToken);
 
     /// <summary>
+    /// Activates the release in <paramref name="compiled"/> under the default activation timeout,
+    /// <see cref="DefaultActivationTimeout"/>. See the overload with a timeout.
+    /// </summary>
+    public static Task<ActivationResult> ActivateAsync(
+        ReleaseCompilationResult compiled,
+        IActiveReleaseStore store,
+        DataDbContext data,
+        ActivationBindings bindings,
+        IOpenInstanceCounter openInstances,
+        int inlineRecomputeLimit,
+        ActivationActor actor,
+        CancellationToken cancellationToken = default) =>
+        ActivateAsync(compiled, store, data, bindings, openInstances, inlineRecomputeLimit, DefaultActivationTimeout, actor, cancellationToken);
+
+    /// <summary>
     /// Activates the release in <paramref name="compiled"/>, which must have a release and a model
     /// with the same application id, for the tenant whose deployment bindings are
     /// <paramref name="bindings"/>. <paramref name="openInstances"/> counts the process instances that are
@@ -92,7 +122,8 @@ public static class ReleaseActivator
     /// and the release is active when it holds no error. When a changed computed definition, or a migration
     /// <c>fill</c> or <c>convert</c>, affects more than <paramref name="inlineRecomputeLimit"/> rows of an entity,
     /// activation marks the entity pending and queues a <c>computed.backfill</c> work item instead of recomputing
-    /// the rows. The release history records <paramref name="actor"/> for the activation. It also runs in a
+    /// the rows. Each statement of the provisioning transaction runs under <paramref name="activationTimeout"/>, and a
+    /// statement past it fails the activation, so nothing commits. The release history records <paramref name="actor"/> for the activation. It also runs in a
     /// transaction that the caller enlisted <paramref name="data"/> and the store's context in. The
     /// caller then commits or rolls back the activation.
     /// </summary>
@@ -103,6 +134,7 @@ public static class ReleaseActivator
         ActivationBindings bindings,
         IOpenInstanceCounter openInstances,
         int inlineRecomputeLimit,
+        TimeSpan activationTimeout,
         ActivationActor actor,
         CancellationToken cancellationToken = default)
     {
@@ -175,6 +207,7 @@ public static class ReleaseActivator
             ReadActiveComputedFingerprintsAsync = token => ReadActiveComputedFingerprintsAsync(store, manifest.Id, token),
             CheckModuleUpgradeAsync = token => CheckModuleUpgradeAsync(store, manifest.Id, release, token),
             InlineRecomputeLimit = inlineRecomputeLimit,
+            ActivationTimeout = activationTimeout,
             TenantId = bindings.TenantId,
             Cipher = bindings.Sensitive is { } values ? new RecordCipher(values, bindings.TenantId) : null,
         };
