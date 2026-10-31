@@ -1,6 +1,7 @@
 import { Alert, Card, Flex, Result, Table, Tag } from 'antd'
 import { useEffect, useState } from 'react'
 import { fetchConsoleTenant, type ConsoleApplication, type ConsoleTenant } from '../platform/console'
+import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
@@ -8,7 +9,7 @@ import { usePlatform } from './context'
 
 /**
  * The operator console for the platform operator. It shows the Tenant view: the status of the tenant of the host and a
- * table of its applications with each active release. A user without the operator role sees the forbidden page.
+ * table of its applications with each active release. Under it is the Webhook deliveries view. A user without the operator role sees the forbidden page.
  */
 export function ConsolePage() {
   const t = useText()
@@ -84,6 +85,7 @@ export function ConsolePage() {
           </Flex>
         </Card>
       )}
+      {tenant && !forbidden && <ConsoleWebhookDeliveries applications={tenant.applications} locale={locale} />}
     </PageLayout>
   )
 }

@@ -14,7 +14,7 @@ in the application, so it is part of the release. There is no API through
 which another system subscribes itself. The webhook resource, its compile
 checks, the activation check of its bindings, the delivery, the rotation by two
 secrets and the dead letter of a delivery that keeps failing are built. The
-console view is _(planned for M23)_.
+console lists recent deliveries (built). Its Dead letters view is _(planned for M23)_.
 
 ### Webhook resource
 
@@ -124,6 +124,6 @@ The delivery is built, apart from the part marked _(planned for M23)_.
   record's history.
 - **Test scenarios.** A [scenario](test-scenarios.md) tenant sends no webhook.
   Its deliveries stay queued.
-- **Seen in the console.** _(planned for M23)_ The
-  [operator console](operator-console.md#views) lists recent deliveries and
-  dead letters.
+- **Seen in the console.** The [operator console](operator-console.md#views)
+  lists recent deliveries with their state, attempts and status code (built).
+  Its Dead letters view is _(planned for M23)_.
