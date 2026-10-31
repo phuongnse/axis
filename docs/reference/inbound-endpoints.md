@@ -119,7 +119,7 @@ When any part fails, nothing is written. After the commit, an endpoint with
   stops waiting as soon as it reads `failed`.
 
 - **Actor.** The actor of both audit records is the caller's id, from the
-  token's user id claim (`sub`). The display name is stored with them, see
+  token's user id claim (`sub`). They store no display name, see
   [Machine callers](security.md#machine-callers).
 - **Details.** Both details add `"endpoint": "<name>"`. So
   `record.created` holds `{ "version": 1, "endpoint": "SubmitPurchaseRequest" }`,

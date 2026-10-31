@@ -108,7 +108,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
         Assert.All(items, item =>
         {
             Assert.Equal("reporting-system", item.GetProperty("actor").GetString());
-            Assert.Equal("reporting-system", item.GetProperty("actorName").GetString());
+            Assert.Equal(JsonValueKind.Null, item.GetProperty("actorName").ValueKind);
         });
 
         using var deleted = await SendAsync(HttpMethod.Delete, $"{Reports}/{id:D}", token);
@@ -119,7 +119,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
         Assert.All(audits, audit =>
         {
             Assert.Equal("reporting-system", audit.Actor);
-            Assert.Equal("reporting-system", audit.ActorName);
+            Assert.Null(audit.ActorName);
         });
     }
 
@@ -173,7 +173,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
 
         var audit = Assert.Single(await ProcessStartAuditsAsync(report));
         Assert.Equal("reporting-system", audit.Actor);
-        Assert.Equal("reporting-system", audit.ActorName);
+        Assert.Null(audit.ActorName);
     }
 
     [Fact]
@@ -310,7 +310,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
         Assert.All(firstAudits.Concat(secondAudits).Where(audit => audit.Action != "process.started"), audit =>
         {
             Assert.Equal("reporting-system", audit.Actor);
-            Assert.Equal("reporting-system", audit.ActorName);
+            Assert.Null(audit.ActorName);
         });
 
         foreach (var (report, actions) in new[]
@@ -327,7 +327,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
             {
                 var item = Assert.Single(items, candidate => candidate.GetProperty("action").GetString() == action);
                 Assert.Equal("reporting-system", item.GetProperty("actor").GetString());
-                Assert.Equal("reporting-system", item.GetProperty("actorName").GetString());
+                Assert.Equal(JsonValueKind.Null, item.GetProperty("actorName").ValueKind);
             }
         }
     }

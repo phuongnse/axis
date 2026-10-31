@@ -96,7 +96,7 @@ public sealed class EndpointCallTests(EndpointCallFixture fixture) : IClassFixtu
             """
             SELECT count(*) FROM axis.audit_records
             WHERE action = 'record.created' AND record_id = @record AND entity_id = @entity AND process_instance_id IS NULL
-              AND actor = 'importer-system' AND actor_name = 'Importer System'
+              AND actor = 'importer-system' AND actor_name IS NULL
               AND details = jsonb_build_object('version', 1, 'endpoint', 'ImportNote')
             """,
             ("record", recordId), ("entity", note.Id)));
@@ -104,7 +104,7 @@ public sealed class EndpointCallTests(EndpointCallFixture fixture) : IClassFixtu
             """
             SELECT count(*) FROM axis.audit_records
             WHERE action = 'process.started' AND record_id = @record AND process_instance_id = @instance
-              AND actor = 'importer-system' AND actor_name = 'Importer System'
+              AND actor = 'importer-system' AND actor_name IS NULL
               AND details = jsonb_build_object('processId', @process::text, 'releaseId', @release::text, 'endpoint', 'ImportNote')
             """,
             ("record", recordId), ("instance", instanceId), ("process", process.Id), ("release", fixture.ReleaseId)));

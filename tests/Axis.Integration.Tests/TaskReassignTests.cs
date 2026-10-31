@@ -46,7 +46,7 @@ public sealed class TaskReassignTests(TaskApiFixture fixture) : IClassFixture<Ta
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
 
         var (actor, actorName, details) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskReassigned));
-        Assert.Equal(("ines", "Ines Inspector"), (actor, actorName));
+        Assert.Equal(("ines", null), (actor, actorName));
         using var audit = JsonDocument.Parse(details);
         Assert.Equal(task, audit.RootElement.GetProperty("taskId").GetGuid());
         Assert.Equal("finance", audit.RootElement.GetProperty("from").GetProperty("role").GetString());

@@ -140,10 +140,10 @@ public sealed class TaskClaimTests(TaskApiFixture fixture) : IClassFixture<TaskA
         Assert.Equal(JsonValueKind.Null, Item(fionaList, task).GetProperty("claimedBy").ValueKind);
 
         var (claimedActor, claimedName, claimedDetails) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskClaimed));
-        Assert.Equal(("maria", "Maria Manager"), (claimedActor, claimedName));
+        Assert.Equal(("maria", null), (claimedActor, claimedName));
         Assert.Equal(task, JsonDocument.Parse(claimedDetails).RootElement.GetProperty("taskId").GetGuid());
         var (releasedActor, releasedName, _) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskReleased));
-        Assert.Equal(("maria", "Maria Manager"), (releasedActor, releasedName));
+        Assert.Equal(("maria", null), (releasedActor, releasedName));
 
         using var completed = await PostAsync(fiona, task, "complete", TenantA, """{ "outcome": "approve" }""");
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
@@ -165,7 +165,7 @@ public sealed class TaskClaimTests(TaskApiFixture fixture) : IClassFixture<TaskA
         using var released = await ReadJsonAsync(release);
         Assert.Equal(JsonValueKind.Null, released.RootElement.GetProperty("claimedBy").ValueKind);
         var (actor, actorName, _) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskReleased));
-        Assert.Equal(("ines", "Ines Inspector"), (actor, actorName));
+        Assert.Equal(("ines", null), (actor, actorName));
         using var completed = await PostAsync(fiona, task, "complete", TenantA, """{ "outcome": "approve" }""");
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
     }

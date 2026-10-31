@@ -67,7 +67,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
         var audit = Assert.Single(await fixture.AuditRecordsAsync(TenantId, result.Record!.Id));
         Assert.Equal("record.created", audit.Action);
         Assert.Equal("cmd-actor", audit.Actor);
-        Assert.Equal("Command Actor", audit.ActorName);
+        Assert.Null(audit.ActorName);
     }
 
     [Fact]

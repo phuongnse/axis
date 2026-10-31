@@ -194,8 +194,7 @@ public static class CallResolveCommand
                 instance.SubjectEntityId,
                 instance.SubjectId,
                 instanceId,
-                details,
-                userName),
+                details),
             cancellationToken);
         return result with { ReleaseId = instance.ReleaseId, SubjectId = instance.SubjectId };
     }
@@ -348,8 +347,7 @@ public static class CallResolveCommand
                 {
                     ["version"] = stored.Version,
                     ["fields"] = new JsonArray([.. values.Select(value => JsonValue.Create(value.Key.Name))]),
-                },
-                userName);
+                });
         }
 
         if (!await ProcessSteps.TryResumeCallAsync(transaction, instance.Id, target.Step, instance.Revision, target.Next, cancellationToken))
@@ -440,8 +438,7 @@ public static class CallResolveCommand
                 instance.SubjectEntityId,
                 instance.SubjectId,
                 instance.Id,
-                new JsonObject { ["step"] = target.Step },
-                userName),
+                new JsonObject { ["step"] = target.Step }),
             cancellationToken);
         return new CallResolveResult(CallResolveOutcome.Resolved, State: ProcessStarts.Failed);
     }

@@ -42,14 +42,14 @@ public static class UserInvitations
             {
                 await AuditRecords.AppendAsync(
                     transaction,
-                    new AuditEntry(actor, AuditActions.UserRoleGiven, role.ApplicationId, null, null, null, RoleDetails(userId, role.ApplicationId, role.Role), actorName),
+                    new AuditEntry(actor, AuditActions.UserRoleGiven, role.ApplicationId, null, null, null, RoleDetails(userId, role.ApplicationId, role.Role)),
                     cancellationToken);
             }
         }
 
         await AuditRecords.AppendAsync(
             transaction,
-            new AuditEntry(actor, AuditActions.UserInvited, null, null, null, null, new JsonObject { ["userId"] = userId, ["email"] = email }, actorName),
+            new AuditEntry(actor, AuditActions.UserInvited, null, null, null, null, new JsonObject { ["userId"] = userId, ["email"] = email }),
             cancellationToken);
     }
 }

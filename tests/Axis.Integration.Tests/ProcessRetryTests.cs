@@ -217,7 +217,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
             command.Parameters.AddWithValue("id", instance);
             await using var reader = await command.ExecuteReaderAsync(CancellationToken);
             Assert.True(await reader.ReadAsync(CancellationToken));
-            Assert.Equal(("finance-reviewer", "Finance Reviewer User", subject), (reader.GetString(0), reader.GetString(1), reader.GetGuid(2)));
+            Assert.Equal(("finance-reviewer", null, subject), (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetGuid(2)));
         }
 
         using var details = JsonDocument.Parse((string)(await fixture.ScalarAsync(

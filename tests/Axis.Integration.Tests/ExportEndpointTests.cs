@@ -65,7 +65,7 @@ public sealed class ExportEndpointTests(RecordApiFixture fixture) : IClassFixtur
         Assert.Equal(before + 1, await AuditCountAsync());
         var audit = await LatestAuditAsync();
         Assert.Equal("eve", audit.Actor);
-        Assert.Equal("Eve Exporter", audit.ActorName);
+        Assert.Null(audit.ActorName);
         Assert.Equal(EntityId("Item"), audit.EntityId);
         Assert.Equal($$"""{"format": "{{format}}", "rowCount": 3, "truncated": false}""", audit.Details);
     }

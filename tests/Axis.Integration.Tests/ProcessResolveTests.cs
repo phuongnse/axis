@@ -70,7 +70,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
             0L,
             await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'connector.called'", ("id", instance)));
         Assert.Equal(
-            ("finance-reviewer", "Finance Reviewer User", subject),
+            ("finance-reviewer", null, subject),
             await AuditActorAsync(instance, "connector.callResolved"));
         using var details = JsonDocument.Parse((string)(await fixture.ScalarAsync(
             "SELECT details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = 'connector.callResolved'", ("id", instance)))!);
@@ -85,7 +85,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal("Checked in the purchasing system", details.RootElement.GetProperty("reason").GetString());
 
         // The record update names the user too, and the history row says the call was resolved by hand.
-        Assert.Equal(("finance-reviewer", "Finance Reviewer User", subject), await AuditActorAsync(instance, "record.updated", "details->'fields' = '[\"purchaseOrderNumber\"]'::jsonb"));
+        Assert.Equal(("finance-reviewer", null, subject), await AuditActorAsync(instance, "record.updated", "details->'fields' = '[\"purchaseOrderNumber\"]'::jsonb"));
         Assert.Equal(
             1L,
             await fixture.CountAsync(
@@ -180,7 +180,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal(
             1L,
             await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'process.failed'", ("id", instance)));
-        Assert.Equal(("finance-reviewer", "Finance Reviewer User", subject), await AuditActorAsync(instance, "process.failed"));
+        Assert.Equal(("finance-reviewer", null, subject), await AuditActorAsync(instance, "process.failed"));
         Assert.Equal(
             1L,
             await fixture.CountAsync(
@@ -345,6 +345,6 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
         command.Parameters.AddWithValue("action", action);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         Assert.True(await reader.ReadAsync(CancellationToken));
-        return (reader.GetString(0), reader.GetString(1), reader.GetGuid(2));
+        return (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetGuid(2));
     }
 }

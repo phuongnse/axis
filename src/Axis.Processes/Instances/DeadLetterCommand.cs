@@ -145,8 +145,7 @@ public static class DeadLetterCommand
                 null,
                 null,
                 null,
-                details,
-                userName),
+                details),
             cancellationToken);
         return new DeadLetterResult(DeadLetterOutcome.Settled, settled);
     }

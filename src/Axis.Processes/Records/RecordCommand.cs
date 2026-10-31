@@ -1034,7 +1034,6 @@ public static class RecordCommand
             model.Id,
             recordId,
             ProcessInstanceId: null,
-            details,
-            actor.DisplayName);
+            details);
     }
 }

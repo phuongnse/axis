@@ -362,8 +362,8 @@ One transaction records the decision:
    written over, or `null` when there are no values. Its output is
    `{ "taskId", "outcome", "next" }`, plus `subjectVersion`, the version the
    values wrote, when there are any.
-6. It writes the audit record `task.completed`, with the user and their
-   display name as its actor, and details `{ "outcome", "fields" }`.
+6. It writes the audit record `task.completed`, with the user as its
+   actor, and details `{ "outcome", "fields" }`.
    `fields` names the changed fields in declaration order and holds no
    values. A completion writes no `record.updated`.
 7. It deletes the task's pending `task.escalate` and `task.deadline` work items, see

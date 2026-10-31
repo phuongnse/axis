@@ -13,8 +13,8 @@ public static class AuditRecords
     private const string InsertSql =
         """
         INSERT INTO "axis"."audit_records"
-            ("id", "occurred_at", "actor", "actor_name", "action", "application_id", "entity_id", "record_id", "process_instance_id", "details")
-        VALUES (@id, now(), @actor, @actorName, @action, @application, @entity, @record, @process, @details)
+            ("id", "occurred_at", "actor", "action", "application_id", "entity_id", "record_id", "process_instance_id", "details")
+        VALUES (@id, now(), @actor, @action, @application, @entity, @record, @process, @details)
         """;
 
     private const string RecordFilter = """WHERE "entity_id" = @entity AND "record_id" = @record""";
@@ -47,7 +47,6 @@ public static class AuditRecords
         await using var command = new NpgsqlCommand(InsertSql, connection, transaction);
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
         command.Parameters.AddWithValue("actor", entry.Actor);
-        command.Parameters.Add(new NpgsqlParameter("actorName", NpgsqlDbType.Text) { Value = entry.ActorName is { } name ? name : DBNull.Value });
         command.Parameters.AddWithValue("action", entry.Action);
         command.Parameters.Add(Uuid("application", entry.ApplicationId));
         command.Parameters.Add(Uuid("entity", entry.EntityId));

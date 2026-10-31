@@ -256,8 +256,7 @@ internal static class RecordEndpoints
                     model.Id,
                     null,
                     null,
-                    new JsonObject { ["format"] = exportFormat.Name(), ["rowCount"] = rows, ["truncated"] = truncated },
-                    user.DisplayName),
+                    new JsonObject { ["format"] = exportFormat.Name(), ["rowCount"] = rows, ["truncated"] = truncated }),
                 cancellationToken);
         }
         catch (PostgresException exception) when (condition is not null && exception.SqlState.StartsWith("22", StringComparison.Ordinal))

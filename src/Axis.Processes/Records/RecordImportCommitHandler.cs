@@ -97,8 +97,7 @@ internal sealed partial class RecordImportCommitHandler(
                         entity.Id,
                         RecordId: null,
                         ProcessInstanceId: null,
-                        new JsonObject { ["created"] = created, ["updated"] = updated },
-                        import.UploaderName),
+                        new JsonObject { ["created"] = created, ["updated"] = updated }),
                     cancellationToken);
             }
         }

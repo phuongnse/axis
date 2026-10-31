@@ -521,7 +521,7 @@ One transaction then does the rest:
 5. It inserts the instance's first work item.
 6. It writes the audit record `process.started` for the subject record, with
    details `{ "processId", "releaseId" }`. The actor is the
-   [current user](task-api.md) with their display name.
+   [current user](task-api.md).
 
 When any part fails, nothing is written. The instance then waits for the
 worker to run its steps.

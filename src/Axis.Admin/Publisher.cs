@@ -297,7 +297,7 @@ internal sealed class Publisher(
         {
             if (request.Kind is "publish" or "rollback" && request.Target == "tenant")
             {
-                await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, false, request.ReleaseId);
+                await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, false, request.ReleaseId);
             }
 
             _output.WriteLine($"{tenant} claim failed: {DiagnosticCodes.PublishClaimsExhausted} {message}");
@@ -558,7 +558,7 @@ internal sealed class Publisher(
 
         if (audit)
         {
-            await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, request.RequestedByName, run.Succeeded, ReleaseOf(request, run));
+            await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, run.Succeeded, ReleaseOf(request, run));
         }
 
         await transaction.CommitAsync();
@@ -576,7 +576,6 @@ internal sealed class Publisher(
         Guid requestId,
         Guid applicationId,
         string requestedBy,
-        string? requestedByName,
         bool succeeded,
         Guid? releaseId)
     {
@@ -603,8 +602,7 @@ internal sealed class Publisher(
                 null,
                 null,
                 null,
-                new JsonObject { ["requestId"] = requestId, ["releaseId"] = releaseId, ["number"] = number },
-                requestedByName));
+                new JsonObject { ["requestId"] = requestId, ["releaseId"] = releaseId, ["number"] = number }));
     }
 
     // Each entry has the shape of a Studio diagnostic.

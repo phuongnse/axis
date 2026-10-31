@@ -49,7 +49,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         Assert.Equal(1L, await fixture.CountAsync(
             """
             SELECT count(*) FROM axis.audit_records
-            WHERE process_instance_id = @id AND record_id = @subject AND actor = 'requester' AND actor_name = 'Requester User'
+            WHERE process_instance_id = @id AND record_id = @subject AND actor = 'requester' AND actor_name IS NULL
               AND action = 'process.started'
               AND details = jsonb_build_object('processId', @process::text, 'releaseId', @release::text)
             """,
@@ -120,7 +120,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         Assert.Equal(1L, await CountInstancesAsync(subject));
         Assert.Equal(1L, await CountWorkItemsAsync(subject));
         Assert.Equal(1L, await fixture.CountAsync(
-            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'requester' AND actor_name = 'Requester User'",
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'requester' AND actor_name IS NULL",
             ("id", instance)));
         Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE record_id = @subject", ("subject", subject)));
         Assert.Equal(1L, await CountReceiptsAsync(subject));

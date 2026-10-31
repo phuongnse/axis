@@ -282,8 +282,7 @@ public static class ProcessTasks
                 {
                     ["outcome"] = completion.Outcome,
                     ["fields"] = new JsonArray([.. completion.Fields.Select(field => JsonValue.Create(field))]),
-                },
-                completion.UserName),
+                }),
             cancellationToken);
         await WorkItemQueue.EnqueueAsync(
             connection,

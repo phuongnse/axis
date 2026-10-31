@@ -90,7 +90,7 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal(
             0L,
             await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'operation.called'", ("id", instance)));
-        Assert.Equal(("finance-reviewer", "Finance Reviewer User", subject), await AuditActorAsync(instance, "operation.callResolved"));
+        Assert.Equal(("finance-reviewer", null, subject), await AuditActorAsync(instance, "operation.callResolved"));
         using var details = JsonDocument.Parse((string)(await fixture.ScalarAsync(
             "SELECT details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = 'operation.callResolved'", ("id", instance)))!);
 
@@ -110,7 +110,7 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
                 "SELECT count(*) FROM axis.process_step_history WHERE process_instance_id = @id AND step = 'assignPaymentReference' AND output->>'resolved' = 'true' AND output->>'outcome' = 'failed'",
                 ("id", instance)));
         Assert.Equal(
-            ("finance-reviewer", "Finance Reviewer User", subject),
+            ("finance-reviewer", null, subject),
             await AuditActorAsync(instance, "process.failed"));
     }
 
@@ -250,6 +250,6 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
         command.Parameters.AddWithValue("action", action);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         Assert.True(await reader.ReadAsync(CancellationToken));
-        return (reader.GetString(0), reader.GetString(1), reader.GetGuid(2));
+        return (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetGuid(2));
     }
 }
