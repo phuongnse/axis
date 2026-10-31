@@ -2,6 +2,7 @@ import { ConfigProvider } from 'antd'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { antThemeFor } from './antTheme'
 import { choiceAlignment } from './choiceAlignment'
+import { choiceErrorStyles } from './choiceErrors'
 import { designTokensFor } from './designTokens'
 import { dialogButtons } from './dialogButtons'
 import { fieldErrors } from './fieldErrors'
@@ -47,6 +48,7 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
   const reducedMotion = useReducedMotion()
   const config = useMemo(() => antThemeFor(mode, undefined, reducedMotion), [mode, reducedMotion])
   const choices = useMemo(() => choiceAlignment(config), [config])
+  const choiceErrors = useMemo(() => choiceErrorStyles(designTokensFor(mode).colour.dangerText), [mode])
 
   useEffect(() => {
     document.body.style.backgroundColor = designTokensFor(mode).colour.canvas
@@ -65,6 +67,8 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
         checkbox={choices.checkbox}
         radio={choices.radio}
       >
+        {/* Proposed: a checkbox or radio in a field with an error has the error border an input gets. */}
+        <style>{choiceErrors}</style>
         {children}
       </ConfigProvider>
     </ThemeModeContext.Provider>
