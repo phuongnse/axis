@@ -179,11 +179,11 @@ agree. Each step ends the milestone that builds it.
    slot to the manager role.
 2. _(planned for M22)_ The author drags a packaged "budget usage" widget onto
    a purchase request page in Studio.
-3. _(planned for M19)_ An approved request reaches the purchasing system
+3. An approved request reaches the purchasing system
    through a connector that signs in with client credentials and sends the
    line items as a list.
 4. _(planned for M21)_ The payment reference package runs out of process.
-5. _(planned for M19)_ A signed webhook announces the approval, and a receiver
+5. A signed webhook announces the approval, and a receiver
    that fails leaves a dead letter. _(planned for M23)_ The platform operator
    redelivers the dead letter from the console.
 

@@ -26,6 +26,7 @@
   "specs/purchase-request-access.spec.ts": 24,
   "specs/purchase-request-approval.spec.ts": 71,
   "specs/purchase-request-endpoint.spec.ts": 5,
+  "specs/purchase-request-extensibility-journey.spec.ts": 45,
   "specs/purchase-request-inspector.spec.ts": 20,
   "specs/purchase-request-phone.spec.ts": 3,
   "specs/purchase-request-release.spec.ts": 145,

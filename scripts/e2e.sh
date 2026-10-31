@@ -316,6 +316,8 @@ if affected playwright; then
   # writes its pid to the pid file for the spec to stop. A worker stopped in the middle of a step
   # keeps its claim until the lease runs out, so the lease is 5 seconds instead of 30, and a restart
   # delays the other specs' work only briefly.
+  # A delivery dead-letters after 2 failures instead of 5, so the webhook journey waits one 30 second
+  # backoff for the dead letter of a failing receiver instead of four.
   # The worker runs in Development, as the server does, because only Development lets a connector
   # call the stub over http. It gets the same purchasing system bindings as the server.
   # Its health endpoints listen on a free port, so a worker under scripts/dev.sh does not hold the address.
@@ -331,7 +333,7 @@ if affected playwright; then
         Tenants__default__DataKeys__1=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE= Tenants__default__LookupKeys__1=AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= \
         Tenants__journey__Hosts__0=127.0.0.2 Tenants__journey__ConnectionString="$AXIS_E2E_JOURNEY_DATABASE" \
         DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
-        Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \
+        Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 Worker__DeliveryAttempts=2 \
         Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
         Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
         Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \

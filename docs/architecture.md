@@ -747,7 +747,8 @@ spec opens itself, and fails the test that caused a violation. `tests/e2e/policy
 listener and fails when a spec imports `test` from `@playwright/test` instead.
 
 The E2E run also starts the worker against the same database, with a 5 second
-lease. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
+lease and a delivery limit of 2, so that a failing webhook becomes a dead letter after one 30 second
+backoff instead of about 7.5 minutes. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
 the worker: it writes the restart file that `scripts/e2e.sh` names, then stops
 the worker process, and the script starts a new one. A worker that stops with
 no restart request fails the run.

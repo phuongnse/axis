@@ -6,8 +6,9 @@ The owner agreed this on 2026-10-25. The end-to-end journey of the
 extensibility milestone extends the purchase request sample. It needs no new
 sample. [D101](d101-the-extensibility-milestone-is-split-into-six.md) splits
 that milestone into M19 to M23, and each one ends with its own step of the
-journey. The module with a dependency is built. The rest is planned, and each
-point below names the milestone that builds it. See [extensibility](../product-brief.md#extensibility) in the
+journey. The module with a dependency, the OAuth2 connector and the webhook are
+built. The rest is planned, and each point below names the milestone that
+builds it. See [extensibility](../product-brief.md#extensibility) in the
 product brief.
 
 - **Why this sample:** purchase requests already have a connector, an
@@ -35,14 +36,14 @@ product brief.
   ([D88](d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md)).
   The author drags it from the palette onto a purchase request page in Studio.
   This is the only Studio step of the journey.
-- **OAuth2 and a structured payload**: the purchasing
+- **OAuth2 and a structured payload** _(built)_: the purchasing
   system connector signs in with client credentials and sends the approved
   order with its line items as a list
   ([D91](d91-connector-oauth2-and-structured-payloads.md)). The
   purchasing system stub checks the token and the list.
 - **A package out of process** _(planned for M21)_: the payment reference
   package runs in the package host ([D90](d90-extension-packages-run-out-of-process.md)).
-- **A webhook** _(planned for M19)_: an approved request raises an event that
+- **A webhook** _(built)_: an approved request raises an event that
   a webhook delivers, signed ([D92](d92-outbound-webhooks.md)). In the journey
   the receiver first fails, so the delivery becomes a dead letter.
 - **The console** _(planned for M23)_: the platform operator finds that dead
