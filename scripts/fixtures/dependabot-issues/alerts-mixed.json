@@ -1,0 +1,94 @@
+[
+  [
+    {
+      "number": 2,
+      "state": "open",
+      "created_at": "2026-10-21T08:00:00Z",
+      "html_url": "https://github.com/phuongnse/axis/security/dependabot/2",
+      "dependency": {
+        "package": {
+          "ecosystem": "npm",
+          "name": "postcss"
+        },
+        "manifest_path": "web/package-lock.json",
+        "scope": "runtime"
+      },
+      "security_advisory": {
+        "ghsa_id": "GHSA-aaaa-bbbb-cccc",
+        "summary": "Advisory for postcss",
+        "severity": "medium"
+      },
+      "security_vulnerability": {
+        "package": {
+          "ecosystem": "npm",
+          "name": "postcss"
+        },
+        "severity": "medium",
+        "vulnerable_version_range": "< 8.4.31",
+        "first_patched_version": {
+          "identifier": "8.4.31"
+        }
+      }
+    },
+    {
+      "number": 3,
+      "state": "open",
+      "created_at": "2026-10-21T09:00:00Z",
+      "html_url": "https://github.com/phuongnse/axis/security/dependabot/3",
+      "dependency": {
+        "package": {
+          "ecosystem": "npm",
+          "name": "left-pad"
+        },
+        "manifest_path": "web/package-lock.json",
+        "scope": "runtime"
+      },
+      "security_advisory": {
+        "ghsa_id": "GHSA-dddd-eeee-ffff",
+        "summary": "Advisory for left-pad",
+        "severity": "low"
+      },
+      "security_vulnerability": {
+        "package": {
+          "ecosystem": "npm",
+          "name": "left-pad"
+        },
+        "severity": "low",
+        "vulnerable_version_range": "<= 1.3.0",
+        "first_patched_version": null
+      }
+    }
+  ],
+  [
+    {
+      "number": 4,
+      "state": "open",
+      "created_at": "2026-10-22T10:00:00Z",
+      "html_url": "https://github.com/phuongnse/axis/security/dependabot/4",
+      "dependency": {
+        "package": {
+          "ecosystem": "nuget",
+          "name": "Newtonsoft.Json"
+        },
+        "manifest_path": "src/Axis.Api/packages.lock.json",
+        "scope": "runtime"
+      },
+      "security_advisory": {
+        "ghsa_id": "GHSA-gggg-hhhh-iiii",
+        "summary": "Advisory for Newtonsoft.Json",
+        "severity": "high"
+      },
+      "security_vulnerability": {
+        "package": {
+          "ecosystem": "nuget",
+          "name": "Newtonsoft.Json"
+        },
+        "severity": "high",
+        "vulnerable_version_range": "< 13.0.1",
+        "first_patched_version": {
+          "identifier": "13.0.1"
+        }
+      }
+    }
+  ]
+]

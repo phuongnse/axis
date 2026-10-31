@@ -34,6 +34,7 @@ node --test scripts/check-bundle.test.mjs || status=1
 node --test scripts/check-fonts.test.mjs || status=1
 node --test scripts/check-design-system.test.mjs || status=1
 node --test scripts/scan.test.mjs || status=1
+node --test scripts/dependabot-issues.test.mjs || status=1
 node --test scripts/setup.test.mjs || status=1
 node --test scripts/e2e.test.mjs || status=1
 node --test scripts/e2e-shard.test.mjs || status=1
