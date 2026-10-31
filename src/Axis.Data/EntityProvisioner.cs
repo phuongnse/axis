@@ -62,6 +62,11 @@ namespace Axis.Data;
 /// stamp, unless it already recomputed the whole entity.
 /// </para>
 /// <para>
+/// A field that gains or loses <c>sensitive</c>, and a <c>renameField</c> of a sensitive field, rewrite the stored values in this
+/// transaction with the tenant's data keys from <see cref="MigrationContext.Cipher"/>. Without them, or for a value that does
+/// not decrypt, the activation throws and nothing changes. The recompute reads and writes sensitive values with the same keys.
+/// </para>
+/// <para>
 /// A new non-unique index on an existing table that has more rows than the inline limit is not created in this
 /// transaction. The activation commits without it, leaves it out of <see cref="ProvisioningResult.Statements"/>, and
 /// <see cref="EntityIndexBuilder"/> creates it later without blocking writes.
@@ -212,6 +217,13 @@ public static class EntityProvisioner
                 }
 
                 applied.Add(command.Sql);
+                if (command.Rewrite is not null)
+                {
+                    // Runs in C# with the tenant's data keys. A value that does not decrypt throws and the transaction rolls back.
+                    await SensitiveRewriter.RunAsync(connection, npgsqlTransaction, migrations.Cipher, command, cancellationToken);
+                    continue;
+                }
+
                 long counted;
                 try
                 {
@@ -359,7 +371,7 @@ public static class EntityProvisioner
 
                 if (await CountRowsAsync(connection, transaction, entity, unstampedOnly: false, cancellationToken) <= limit)
                 {
-                    await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken);
+                    await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken, cipher: migrations.Cipher);
                 }
                 else
                 {
@@ -383,7 +395,7 @@ public static class EntityProvisioner
             }
             else if (await CountRowsAsync(connection, transaction, entity, unstampedOnly: true, cancellationToken) <= limit)
             {
-                await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken, unstampedOnly: true);
+                await ComputedRecompute.RecomputeAsync(connection, transaction, model, entity, releaseId, cancellationToken, unstampedOnly: true, cipher: migrations.Cipher);
             }
             else
             {
@@ -430,7 +442,7 @@ public static class EntityProvisioner
         if (await ComputedBackfill.CountOutOfDateAsync(connection, transaction, entity, current, cancellationToken) <= migrations.InlineRecomputeLimit)
         {
             var ids = await ComputedBackfill.ReadOutOfDateIdsAsync(connection, transaction, entity, current, cancellationToken);
-            await ComputedRecompute.RecomputeIdsAsync(connection, transaction, model, entity, releaseId, ids, cancellationToken);
+            await ComputedRecompute.RecomputeIdsAsync(connection, transaction, model, entity, releaseId, ids, cancellationToken, migrations.Cipher);
             if (await ComputedBackfill.TryEndAsync(connection, transaction, entity, cancellationToken, current))
             {
                 await using var delete = new NpgsqlCommand("DELETE FROM axis.process_work_items WHERE kind = @kind AND entity_id = @entity", connection, transaction);

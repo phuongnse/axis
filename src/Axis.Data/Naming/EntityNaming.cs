@@ -35,6 +35,12 @@ public static class EntityNaming
     /// <summary>The linked record's id in a junction table, with a foreign key that refuses a delete of the target.</summary>
     public const string TargetColumn = "target_id";
 
+    /// <summary>
+    /// The column that holds the encrypted or decrypted values of a field while it gains or loses <c>sensitive</c>, until it takes the
+    /// field's column name. It has no <c>f_</c> prefix, so no field column can be named so.
+    /// </summary>
+    public const string SensitiveStagingColumn = "axis_sensitive";
+
     /// <summary>The prefix of every index the planner owns. The planner drops an index with this prefix that the release does not declare.</summary>
     public const string IndexPrefix = "ix_";
 

@@ -77,20 +77,41 @@ the record API.
 
 ## Changing the flag
 
-A sensitive field's column is `bytea`, in a new table and in a new column, whatever the field's type. This is built.
-Until the change below is built, the planner refuses to add or remove `sensitive` on a field that already has a column.
-It reports `AXC0016` at `/fields/{i}/type`, even when a `convert` migration covers the field, so plain values are never
-cast into a `bytea` column.
-
-_(planned for M27)_ Adding or removing `sensitive` or `exactLookup` will be a schema change that activation applies in its transaction, as
+A sensitive field's column is `bytea`, in a new table and in a new column, whatever the field's type. Adding or removing
+`sensitive` on a field that already has a column is a schema change that activation applies in its transaction, as
 [schema planning](storage.md#schema-planning) describes for other changes:
 
 - **Marked `sensitive`.** Activation adds a `bytea` column, writes each row's encrypted value into it, drops the
-  plain column and renames the new one. A field index or unique constraint goes with the plain column.
+  plain column and renames the new one. A field index or unique constraint goes with the plain column. The new column
+  is not unique, so a field that is also `unique` is `AXC0016` at `/fields/{i}/unique`.
 - **No longer `sensitive`.** Activation does the same the other way, and decrypts each value into a column of the
   field's type.
-- **`exactLookup` added or removed.** Activation adds the lookup column and fills it, or drops it.
-- A stored value that does not decrypt fails the activation, and nothing changes.
+- **Renamed.** A `renameField` migration of a sensitive field encrypts each value again under the new field name,
+  because the field name is part of the associated data.
+- **Keys.** The planner does not see keys or values. It plans the new column, a marked step that fills it, the drop and
+  the rename, and activation runs the marked step in the same transaction with the tenant's data keys: it reads each row,
+  encrypts or decrypts the value in C# and writes it back in batches. Every new encryption uses the newest data key.
+  PostgreSQL never sees a key or a plain sensitive value.
+- **Failure.** A stored value that does not decrypt fails the activation with a
+  `SensitiveValueDecryptionException` that names the tenant, entity, field and key number, never a value. A decrypted
+  value that does not fit the field's type fails it too. Activation without the tenant's data keys fails when a flag
+  change or a sensitive rename needs them, and a plain value is never written into an encrypted column. The
+  transaction rolls back, so the table and the active release stay as they were.
+- **One change at a time.** A field that becomes `sensitive` and changes its type in the same release is `AXC0016` at
+  `/fields/{i}/type`, except that text may widen. The old type behind a `bytea` column is not known, so when the mark
+  goes the planner cannot see a type change. The cast of each decrypted value fails the activation when it does not
+  fit, and converts a value that does. Change the type in a release of its own.
+- **A required field.** A field that becomes `required` during the change follows the rules of
+  [schema planning](storage.md#schema-planning): the column must already be `NOT NULL`.
+- **Limits.** The rewrite runs inline in the activation transaction with no row limit, so a large table stays locked for
+  as long as the encryption takes. Process instances pinned to an older release are not checked, so one that reads the
+  field after the change fails with a type error. Values that record history or exports already hold in plain text stay
+  plain after a field is marked.
+
+Test: `SensitiveFlagActivationTests` for the flag change, the rename, a value that does not decrypt and a missing key,
+and `SchemaPlannerTests` for the planned statements.
+
+_(planned for M27)_ Adding or removing `exactLookup` will add the lookup column and fill it, or drop it.
 
 ## Tenant keys
 

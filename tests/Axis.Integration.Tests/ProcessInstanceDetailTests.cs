@@ -352,17 +352,15 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     }
 
     [Fact]
-    public async Task Marking_an_existing_field_sensitive_is_refused_and_changes_no_table()
+    public async Task Marking_an_existing_field_sensitive_without_data_keys_fails_and_changes_no_table()
     {
         Assert.True(fixture.Model.TryGetEntity("Request", out var request));
         var before = await fixture.ReadTableAsync(TenantB, request.Id);
 
-        var diagnostics = await fixture.TryActivateEditedAsync(TenantB, MarkSensitive("amount"));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.TryActivateEditedAsync(TenantB, MarkSensitive("amount")));
 
-        var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(
-            (DiagnosticCodes.IncompatibleFieldChange, "entities/request.json", "/fields/1/type"),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("data keys", error.Message, StringComparison.Ordinal);
         var after = await fixture.ReadTableAsync(TenantB, request.Id);
         Assert.Equal(before.Columns, after.Columns);
     }

@@ -461,6 +461,17 @@ internal sealed class MigrationPlanning
             Commands.Add(new SchemaCommand($"{alterTable} RENAME CONSTRAINT {EntityNaming.Quote(EntityNaming.ForeignKey(table.Name, from))} TO {EntityNaming.Quote(EntityNaming.ForeignKey(table.Name, to))}"));
         }
 
+        // The associated data of an encrypted value holds the field name, so activation encrypts each value again under the new one.
+        if (column.Type == ColumnTypes.Encrypted)
+        {
+            Commands.Add(new SchemaCommand(
+                $"UPDATE {EntityNaming.QualifiedTable(table.Name)} AS t SET {EntityNaming.Quote(to)} = v.value "
+                + $"FROM unnest(@ids, @values) AS v(id, value) WHERE t.{EntityNaming.Quote(EntityNaming.IdColumn)} = v.id")
+            {
+                Rewrite = new SensitiveRewrite(SensitiveRewriteKind.Rename, entityId, table.Name, to, to, null, change.To!, change.From),
+            });
+        }
+
         // An index is named after its columns, so each index over the column gets the name its renamed column list has.
         var indexes = new List<CatalogIndex>();
         foreach (var index in table.Indexes)

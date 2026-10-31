@@ -5,6 +5,7 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Realms;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
+using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Tenancy;
 using Microsoft.Extensions.Configuration;
@@ -208,6 +209,7 @@ public static class ReleaseActivator
             InlineRecomputeLimit = inlineRecomputeLimit,
             ActivationTimeout = activationTimeout,
             TenantId = bindings.TenantId,
+            Cipher = bindings.Sensitive is { } values ? new RecordCipher(values, bindings.TenantId) : null,
         };
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
         var diagnostics = new List<Diagnostic>([.. bindingDiagnostics, .. provisioned.Diagnostics]);
