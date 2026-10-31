@@ -418,7 +418,7 @@ internal static class ProcessOperatorEndpoints
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var (entity, read) = SubjectAccess(application, user, model);
         return await RunResolveAsync(
-            database, resolver, packages, tenantId, active, model, entity, read, instanceId, operationId, user.Id, body!, loggerFactory, cancellationToken);
+            database, resolver, packages, tenantId, active, model, entity, read, instanceId, operationId, user.Id, body!, new RecordCipher(sensitive, tenantId), loggerFactory, cancellationToken);
     }
 
     /// <summary>
@@ -440,6 +440,7 @@ internal static class ProcessOperatorEndpoints
         Guid operationId,
         string userId,
         ResolveBody body,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -472,7 +473,7 @@ internal static class ProcessOperatorEndpoints
             body.Output,
             resolver.GetReleaseModelAsync,
             packages,
-            RecordEndpoints.Cipher(sensitive, tenants),
+            cipher,
             loggerFactory,
             cancellationToken);
         if (result.Outcome != CallResolveOutcome.Resolved)

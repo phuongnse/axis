@@ -1,6 +1,7 @@
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Server.Applications;
@@ -139,6 +140,7 @@ internal static class ConsoleOperatorEndpoints
         TenantDatabase database,
         ITenantContextAccessor tenants,
         PackageCatalog packages,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -189,6 +191,7 @@ internal static class ConsoleOperatorEndpoints
                 operationId,
                 user.Id,
                 body!,
+                new RecordCipher(sensitive, tenantId),
                 loggerFactory,
                 cancellationToken) is { } result)
             {
