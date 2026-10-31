@@ -769,7 +769,10 @@ export interface StudioRequest {
   scenarios: StudioScenarioResult[] | null
 }
 
-/** One activation in the release history. `actor` is a user id, `startup`, `operator` or `unknown`. */
+/**
+ * One activation in the release history. `actor` is a user id, `startup`, `operator` or `unknown`. `actorName` is the
+ * name in the actor's user profile, else the one stored with the activation, else `null`.
+ */
 export interface StudioReleaseItem {
   releaseId: string
   number: number

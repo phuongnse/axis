@@ -3,6 +3,7 @@ using System.Text.Json;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Tests;
 using Axis.Data;
+using Axis.Data.Profiles;
 using Axis.Processes.Instances;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -75,6 +76,46 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         using var anonymous = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Forbidden, (await requester.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_activations_actor_name_is_the_one_in_the_profile_else_the_stored_one_else_null()
+    {
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_names", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
+        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Author User", null, null, null));
+        await EditTextAsync(folder.Path, "\"Teams\"", "\"Groups\"");
+        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("gone", null, null, null, null));
+        await UpsertProfileAsync(connectionString, "author", "Renamed Author");
+        await UpsertProfileAsync(connectionString, "gone", "Gone User");
+        await UpsertProfileAsync(connectionString, "startup", "Mallory");
+
+        var renamed = await GetAsync(author, ReleasesUrl);
+
+        Assert.Equal("Renamed Author", ActorName(renamed, "author"));
+        Assert.Equal("Gone User", ActorName(renamed, "gone"));
+        Assert.Null(ActorName(renamed, "startup"));
+
+        await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.user_profiles WHERE user_id IN ('author', 'gone')", CancellationToken);
+        var deleted = await GetAsync(author, ReleasesUrl);
+
+        Assert.Equal("Author User", ActorName(deleted, "author"));
+        Assert.Null(ActorName(deleted, "gone"));
+        Assert.Contains(deleted.GetProperty("items").EnumerateArray(), item => item.GetProperty("actor").GetString() == "gone");
+    }
+
+    private static string? ActorName(JsonElement history, string actor) =>
+        history.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("actor").GetString() == actor).GetProperty("actorName").GetString();
+
+    private static async Task UpsertProfileAsync(string connectionString, string userId, string displayName)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await UserProfiles.UpsertAsync(connection, userId, displayName, null, null, CancellationToken);
     }
 
     private static async Task EditTextAsync(string folder, string from, string to)

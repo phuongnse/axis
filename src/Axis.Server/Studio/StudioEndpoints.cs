@@ -6,6 +6,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Data.Profiles;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -359,9 +360,11 @@ internal static class StudioEndpoints
             : activations.FirstOrDefault(row => row.ReleaseId == active.ReleaseId) is { } current
                 ? new StudioActiveRelease(current.ReleaseId, current.Number, current.ContentHash)
                 : null;
+        var names = await UserProfiles.FindDisplayNamesAsync(
+            await database.GetConnectionAsync(cancellationToken), [.. activations.Select(row => row.Actor)], cancellationToken);
         var items = activations
             .Select(row => new StudioReleaseItem(
-                row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, row.ActorName, row.Label, row.Note, row.RequestId))
+                row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId))
             .ToList();
         return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, items));
     }
@@ -842,7 +845,10 @@ internal sealed record StudioReleaseHistoryResponse(
 /// <summary>The active release: its id, its number and its content hash.</summary>
 internal sealed record StudioActiveRelease(Guid ReleaseId, int Number, string ContentHash);
 
-/// <summary>One activation in the history. <c>Actor</c> is a user id, <c>startup</c>, <c>operator</c> or <c>unknown</c>.</summary>
+/// <summary>
+/// One activation in the history. <c>Actor</c> is a user id, <c>startup</c>, <c>operator</c> or <c>unknown</c>. <c>ActorName</c> is
+/// the name in the actor's user profile, else the one stored with the activation, else null.
+/// </summary>
 internal sealed record StudioReleaseItem(
     Guid ReleaseId,
     int Number,

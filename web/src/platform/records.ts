@@ -175,8 +175,8 @@ export async function saveRecord(
 }
 
 /**
- * One audit record of a record's history. `actorName` is the display name stored with the audit
- * record, or `null` for `system`, `anonymous` and audit records written before names were stored.
+ * One audit record of a record's history. `actorName` is the display name in the actor's user
+ * profile, else the one stored with the audit record, else `null`. It is always `null` for `system` and `anonymous`.
  * `details` depends on the action and never holds a field value. `inspectPath` is the detail path of
  * the process instance that wrote the entry, or `null` when the signed-in user may not inspect its
  * process or it has no instance. The server decides.

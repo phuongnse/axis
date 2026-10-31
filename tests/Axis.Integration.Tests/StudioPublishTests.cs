@@ -2,10 +2,12 @@ using System.Net;
 using System.Text.Json;
 using Axis.Admin;
 using Axis.Configuration.Tests;
+using Axis.Data.Profiles;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -54,6 +56,10 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.Equal("Teams", request.RootElement.GetProperty("label").GetString());
         Assert.Equal("Renamed.", request.RootElement.GetProperty("note").GetString());
         Assert.Equal("author", request.RootElement.GetProperty("requestedBy").GetString());
+        Assert.Equal("Author User", request.RootElement.GetProperty("requestedByName").GetString());
+        Assert.Equal(
+            "requestedBy,requestedByName",
+            string.Join(',', request.RootElement.EnumerateObject().Select(property => property.Name).SkipWhile(name => name != "requestedBy").Take(2)));
         Assert.Equal(0, request.RootElement.GetProperty("diagnostics").GetArrayLength());
 
         // The call has answered, so this edit is not in the request.
@@ -66,6 +72,40 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.String, finished.RootElement.GetProperty("finishedAt").ValueKind);
         using var texts = await GetJsonAsync(client, "/api/sites/purchasing/texts/en", HostA);
         Assert.Equal("Teams", texts.RootElement.GetProperty("texts").GetProperty("nav.departments").GetString());
+    }
+
+    [Fact]
+    public async Task The_request_shows_the_requesters_current_profile_name_else_the_stored_one_else_null()
+    {
+        using var folder = NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("studio_publish_names", CancellationToken);
+        await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
+        using var client = factory.CreateClient().SignedInAs("author");
+        using var accepted = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        var location = accepted.Headers.Location!.OriginalString;
+        await using (var connection = new NpgsqlConnection(connectionString))
+        {
+            await connection.OpenAsync(CancellationToken);
+            await UserProfiles.UpsertAsync(connection, "author", "Renamed Author", null, null, CancellationToken);
+        }
+
+        using (var renamed = await GetJsonAsync(client, location, HostA))
+        {
+            Assert.Equal("author", renamed.RootElement.GetProperty("requestedBy").GetString());
+            Assert.Equal("Renamed Author", renamed.RootElement.GetProperty("requestedByName").GetString());
+        }
+
+        await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.user_profiles WHERE user_id = 'author'", CancellationToken);
+        using (var stored = await GetJsonAsync(client, location, HostA))
+        {
+            Assert.Equal("Author User", stored.RootElement.GetProperty("requestedByName").GetString());
+        }
+
+        await PostgreSqlServer.AdminScalarAsync(connectionString, "UPDATE axis.publish_requests SET requested_by_name = NULL", CancellationToken);
+        using var none = await GetJsonAsync(client, location, HostA);
+        Assert.Equal("author", none.RootElement.GetProperty("requestedBy").GetString());
+        Assert.Equal(JsonValueKind.Null, none.RootElement.GetProperty("requestedByName").ValueKind);
     }
 
     [Fact]

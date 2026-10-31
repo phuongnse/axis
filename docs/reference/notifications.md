@@ -251,9 +251,9 @@ sign-in and the last sign-in. A later sign-in updates it.
   email in the ID token.
 - A failure to write the profile does not refuse the sign-in. The server logs a
   warning that does not include the email.
-- The profiles are not a directory. They serve email addresses, locales and the
-  user picker of a [reassign](task-deadlines.md#reassign), and no other route
-  lists them.
+- The profiles are not a directory. They serve email addresses, locales, the
+  user picker of a [reassign](task-deadlines.md#reassign) and the actor names
+  of the history views, and no other route lists them.
 
 ## Mail settings
 

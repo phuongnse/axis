@@ -244,7 +244,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - Each entry shows its action, who did it, its time and a short summary.
       The action is a platform text, such as "Updated" or "Task decided". An
       action without a text shows as it is.
-    - Who did it is the stored `actorName`. Without one, it is "System" for
+    - Who did it is the `actorName` the history answers. Without one, it is "System" for
       `system`, "Anonymous" for `anonymous`, or else the raw user id.
     - The time uses the user's locale, with the medium date and time styles.
     - The summary is built from the details. It lists the labels of the
