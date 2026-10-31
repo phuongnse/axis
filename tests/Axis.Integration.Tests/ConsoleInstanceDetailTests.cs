@@ -32,7 +32,7 @@ public sealed class ConsoleInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("DepartmentOrder", root.GetProperty("process").GetString());
         Assert.Equal("failed", root.GetProperty("state").GetString());
         Assert.NotEmpty(root.GetProperty("graph").GetProperty("steps").EnumerateArray());
-        Assert.Empty(root.GetProperty("commands").EnumerateArray());
+        Assert.Equal(["retry"], root.GetProperty("commands").EnumerateArray().Select(command => command.GetString()));
 
         // The operator holds no grant of the application: its own inspection route refuses the same user.
         using var client = fixture.CreateClient().SignedInAs("pia");

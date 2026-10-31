@@ -49,7 +49,9 @@ namespace Axis.Server.Console;
 /// <c>fields</c> list, and the instance's subject record need not exist. A call's stored input is hidden by the masking
 /// rule of process inspection: when its mapping reads or writes a sensitive field, or a field the active release no longer
 /// has. The active release is the pinned release when the application has no active release. A malformed id and an unknown
-/// id are one 404. <c>commands</c> is empty and no call is resolvable, because the console has no command routes yet.
+/// id are one 404. <c>commands</c> lists the commands that apply, and a call is resolvable, only when the application has an
+/// active release that still has the instance's process, because the console's command routes run against that release, see
+/// <see cref="ConsoleOperatorEndpoints"/>.
 /// </para>
 /// <para>
 /// <c>GET /api/console/applications/{id}/publishing</c> answers one application's release history and publish requests, read
@@ -70,6 +72,7 @@ internal static class ConsoleEndpoints
         console.MapGet("/webhook-deliveries", ListWebhookDeliveriesAsync);
         console.MapGet("/instances/{id}", GetInstanceAsync);
         console.MapConsoleDeadLetterEndpoints();
+        console.MapConsoleOperatorEndpoints();
         console.MapConsolePublishingEndpoints();
         console.MapConsoleScheduleEndpoints();
     }
@@ -272,8 +275,13 @@ internal static class ConsoleEndpoints
         var subject = row.SubjectEntityId is { } subjectEntityId
             ? active.FindEntity(subjectEntityId) ?? pinned.FindEntity(subjectEntityId)
             : null;
+
+        // The commands run against the active release, so they are offered only when it has the process.
+        var viewer = activeRelease is not null && active.Processes.Any(candidate => candidate.Id == row.ProcessId)
+            ? InspectionViewer.Operator
+            : InspectionViewer.OperatorReadOnly;
         return Results.Ok(await ProcessInspectionEndpoints.DetailAsync(
-            connection, resolver, packages, active, process, subject, row, InspectionViewer.Operator, cancellationToken));
+            connection, resolver, packages, active, process, subject, row, viewer, cancellationToken));
     }
 }
 
