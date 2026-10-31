@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type {
+  ConsoleDeadLetterPage,
   ConsoleFailedWorkPage,
   ConsoleTenant,
   ConsoleWebhookDelivery,
@@ -130,17 +131,70 @@ const failedWork: ConsoleFailedWorkPage = {
   totalCount: 45,
 }
 
-/** Answers the webhook deliveries route with `deliveries`, filtered by the `webhook` parameter, and every other route with `answer`. */
-function stubServer(answer: (url: string) => Response, deliveries = [leaveDelivery, orderDelivery]) {
-  const fetchMock = vi.fn(async (url: string) => {
-    if (url.startsWith('/api/console/webhook-deliveries')) {
-      const webhook = new URL(url, 'http://localhost').searchParams.get('webhook')
+const deadLettersPath = '/api/console/dead-letters'
+
+const emptyDeadLetters: ConsoleDeadLetterPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
+
+function deadLetter(id: string, applicationId: string, kind: string, processId: string | null, state = 'open') {
+  return {
+    id,
+    kind,
+    applicationId,
+    processId,
+    eventId: 'e-' + id,
+    triggerId: kind === 'webhook.deliver' ? null : 't-' + id,
+    processInstanceId: null,
+    emailId: null,
+    webhookId: kind === 'webhook.deliver' ? 'w-' + id : null,
+    occurrenceAt: null,
+    attempts: 5,
+    lastError: 'Npgsql.PostgresException with SQLSTATE P0001',
+    state,
+    reason: null,
+    settledBy: null,
+    createdAt: '2026-10-30T09:00:00Z',
+    settledAt: null,
+    commands: state === 'open' ? ['redeliver', 'discard'] : [],
+  }
+}
+
+const allLetters: ConsoleDeadLetterPage = {
+  items: [
+    deadLetter('d1', 'a1', 'event.deliver', 'p1'),
+    deadLetter('d2', 'a2', 'webhook.deliver', null),
+    deadLetter('d3', 'a1', 'trigger.fanOut', 'p1', 'discarded'),
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 3,
+}
+
+/**
+ * Answers the dead letter routes with `letters`, the webhook deliveries route with `deliveries`, filtered by the `webhook`
+ * parameter, and every other route with `answer`, and records every request.
+ */
+function stubServer(
+  answer: (url: string) => Response,
+  letters: () => Response = () => json(emptyDeadLetters),
+  deliveries = [leaveDelivery, orderDelivery],
+) {
+  const requests: string[] = []
+  const bodies: (string | undefined)[] = []
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    requests.push(`${init?.method ?? 'GET'} ${input}`)
+    bodies.push(typeof init?.body === 'string' ? init.body : undefined)
+    if (input.startsWith('/api/console/webhook-deliveries')) {
+      const webhook = new URL(input, 'http://localhost').searchParams.get('webhook')
       return json(deliveryPage(deliveries.filter((row) => !webhook || row.webhookId === webhook)))
     }
-    return answer(url)
+    return input.startsWith(deadLettersPath) ? letters() : answer(input)
   })
   vi.stubGlobal('fetch', fetchMock)
-  return fetchMock
+  return Object.assign(fetchMock, { requests, bodies })
+}
+
+function tenantAndFailedWork(url: string) {
+  return json(url.startsWith('/api/console/tenant') ? tenant : failedWork)
 }
 
 function renderPage() {
@@ -267,8 +321,81 @@ describe('ConsolePage', () => {
     fireEvent.mouseDown(within(view).getByRole('combobox', { name: 'Webhook' }))
     fireEvent.click(await screen.findByText('Purchasing / OrderHook'))
 
-    await waitFor(() => expect(fetchMock.mock.calls.at(-1)?.[0]).toContain('webhook=w2'))
+    await waitFor(() =>
+      expect(fetchMock.requests.filter((request) => request.includes('webhook-deliveries')).at(-1)).toContain(
+        'webhook=w2',
+      ),
+    )
     await waitFor(() => expect(within(view).queryByText('LeaveHook')).toBeNull())
     expect(within(view).getByText('OrderHook')).toBeVisible()
+  })
+
+  it('lists the dead letters of every application, including one with no process', async () => {
+    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
+    renderPage()
+
+    const view = await screen.findByTestId('console-dead-letters')
+    expect(await within(view).findByText('webhook.deliver')).toBeVisible()
+    expect(server.requests).toContain(`GET ${deadLettersPath}`)
+    for (const title of ['Application', 'Kind', 'Event', 'Trigger or webhook', 'Attempts', 'Last error', 'State']) {
+      expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
+    }
+    const webhook = within(view).getByText('webhook.deliver').closest('tr')!
+    expect(within(webhook).getByText('Purchasing')).toBeVisible()
+    expect(within(webhook).getByText('w-d2')).toBeVisible()
+    expect(within(webhook).getByText('Open')).toBeVisible()
+    expect(within(view).getByTestId('console-dead-letter-redeliver-d2')).toBeVisible()
+    const discarded = within(view).getByText('trigger.fanOut').closest('tr')!
+    expect(within(discarded).getByText('Discarded')).toBeVisible()
+    expect(within(discarded).queryByRole('button')).toBeNull()
+  })
+
+  it('asks for the dead letters of the chosen application', async () => {
+    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
+    const user = userEvent.setup()
+    renderPage()
+
+    const view = await screen.findByTestId('console-dead-letters')
+    await within(view).findByText('webhook.deliver')
+    await user.click(within(view).getByRole('combobox', { name: 'Application' }))
+    await user.click(await screen.findByTitle('Purchasing'))
+
+    await waitFor(() => expect(server.requests).toContain(`GET ${deadLettersPath}?application=a2`))
+  })
+
+  it.each([
+    ['redeliver', 'Redeliver'],
+    ['discard', 'Discard'],
+  ])('asks for a reason before it sends %s', async (command, title) => {
+    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByTestId(`console-dead-letter-${command}-d2`))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(title, { selector: '.ant-modal-title' })).toBeInTheDocument()
+    expect(server.requests.filter((request) => request.startsWith('POST'))).toEqual([])
+
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }))
+    expect(await within(dialog).findByText('Enter a reason.')).toBeInTheDocument()
+    expect(server.requests.filter((request) => request.startsWith('POST'))).toEqual([])
+
+    await user.type(within(dialog).getByLabelText('Reason'), 'The receiver is back')
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const post = server.requests.indexOf(`POST ${deadLettersPath}/d2/${command}`)
+    expect(post).toBeGreaterThan(0)
+    expect(server.bodies[post]).toBe('{"reason":"The receiver is back"}')
+    await waitFor(() => expect(server.requests.slice(post + 1)).toContain(`GET ${deadLettersPath}`))
+  })
+
+  it('shows an error in the card when the dead letters cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer(tenantAndFailedWork, () => new Response(null, { status: 500 }))
+    renderPage()
+
+    expect(await screen.findByTestId('console-dead-letters-error')).toBeVisible()
+    expect(screen.getByTestId('console-tenant')).toBeVisible()
   })
 })
