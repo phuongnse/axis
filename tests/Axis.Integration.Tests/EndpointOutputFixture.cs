@@ -56,6 +56,12 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
     /// <summary>The receiver that stands in for the outside system of the <c>AnnounceHook</c> webhook, at <c>/announce</c>.</summary>
     public WebhookReceiver Receiver => _receiver ?? throw new InvalidOperationException("The fixture is not initialized.");
 
+    /// <summary>The id of the release of the EndpointApp fixture, which is active.</summary>
+    public Guid ReleaseId { get; private set; }
+
+    /// <summary>The factory of the server, for a test that changes its settings.</summary>
+    internal WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
+
     private NpgsqlDataSource DataSource => _dataSource ?? throw new InvalidOperationException("The fixture is not initialized.");
 
     /// <summary>A new client of the server with no caller and no user. The caller disposes it.</summary>
@@ -96,6 +102,7 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
                 OpenInstanceCounter.Instance);
             Assert.Empty(activated.Diagnostics);
             _model = compiled.Model!;
+            ReleaseId = compiled.Release!.Id;
         }
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

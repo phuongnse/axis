@@ -2,8 +2,8 @@
 
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
-list of the Failed work view, the instance detail it opens, the Dead letters view and the redeliver and discard
-commands are built. Everything else in this file is _(planned for M23)_. The design follows
+list of the Failed work view, the instance detail it opens, the Webhook deliveries view, the Dead letters view and
+the redeliver and discard commands are built. Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -49,6 +49,18 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     time of a failed instance is its `ended_at`, and its error is the newest history error of the
     instance. The time of a call with an unknown outcome is the finish of its newest attempt, or its
     `created_at` when it has no attempt row, and its error is the call's `last_error`.
+  - **`GET /api/console/webhook-deliveries`.** Answers one page of the webhook deliveries of the
+    tenant, newest first. The query parameters are `page` and `pageSize`, read as the other list
+    routes read them, and the optional `application` and `webhook` ids, each a hyphenated UUID. A
+    malformed parameter answers one `400` validation problem. An item has its `id`,
+    `applicationId`, `application`, `webhookId`, `webhook`, `eventId` and `event`, the names of
+    the application, the webhook and the event as the release the delivery was staged with holds
+    them (`null` when that release no longer holds the webhook), then the `state`, the `attempts`,
+    the last `statusCode`, `createdAt` and `deliveredAt`. The `state` is `delivered`, `pending`,
+    `deadLettered` (an open dead letter of the delivery) or `discarded` (a discarded one). A
+    redelivered dead letter is queued again and shows as `pending`. The answer also lists
+    `webhooks`, the webhooks of every active release with their application, for the view's
+    filter, and `totalCount`. It never holds a body, a URL, a secret or a binding value.
   - **`GET /api/console/instances/{id}`.** Answers one instance of the tenant, whatever its
     application or process, in the shape of the
     [process inspection detail](process-inspection.md#instance-detail). An id that is not a
@@ -92,6 +104,8 @@ Each view lists the newest items first, pages through them and filters by applic
   application, the kind, the event, the trigger or webhook, the attempts, the last error and the
   state. An `open` letter offers redeliver and discard. Built.
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
+  A table under the Tenant view with the application, webhook, event, state, attempts, status
+  code and delivery time, and two filters, one for the application and one for the webhook. Built.
 - **Schedules.** Each schedule trigger of each active release, with its last and next
   occurrence, see [schedules](process-events.md#schedules).
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,

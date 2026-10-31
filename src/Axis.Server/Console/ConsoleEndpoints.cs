@@ -33,6 +33,13 @@ namespace Axis.Server.Console;
 /// error. It never holds a call input, a history input or output, or a record value.
 /// </para>
 /// <para>
+/// <c>GET /api/console/webhook-deliveries</c> answers one page of the webhook deliveries of the tenant, newest first,
+/// filtered by the <c>application</c> and <c>webhook</c> ids. An item names its application, webhook and event from the
+/// release the delivery was staged with, or <see langword="null"/> when that release no longer holds the webhook. It
+/// gives the state, the attempts, the last status code and when it was delivered. The answer also lists the webhooks of
+/// every active release for the view's filter. It never holds a body, a URL, a secret or a binding value.
+/// </para>
+/// <para>
 /// <c>GET /api/console/instances/{id}</c> answers one instance, whatever its application or process, with the shape of the
 /// process inspection detail. The operator role stands in for the <c>inspect</c> grant and for a <c>read</c> grant with no
 /// <c>fields</c> list, and the instance's subject record need not exist. A call's stored input is hidden by the masking
@@ -52,6 +59,7 @@ internal static class ConsoleEndpoints
         console.AddEndpointFilter(RequireOperatorAsync);
         console.MapGet("/tenant", GetTenantAsync);
         console.MapGet("/failed-work", ListFailedWorkAsync);
+        console.MapGet("/webhook-deliveries", ListWebhookDeliveriesAsync);
         console.MapGet("/instances/{id}", GetInstanceAsync);
         console.MapConsoleDeadLetterEndpoints();
     }
@@ -153,6 +161,73 @@ internal static class ConsoleEndpoints
         return Results.Ok(new ConsoleFailedWorkResponse(items, pageNumber, size, work.TotalCount));
     }
 
+    private static async Task<IResult> ListWebhookDeliveriesAsync(
+        string? application,
+        string? webhook,
+        string? page,
+        string? pageSize,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
+        var applicationId = ReadId(application, "application", errors);
+        var webhookId = ReadId(webhook, "webhook", errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        var result = await WebhookDeliveryList.ListAsync(connection, applicationId, webhookId, pageNumber, size, cancellationToken);
+
+        // A delivery is named by the release it was staged with. That model is cached, so each release is read once.
+        var releases = new Dictionary<(Guid Application, Guid Release), ApplicationModel?>();
+        var items = new List<ConsoleWebhookDelivery>();
+        foreach (var row in result.Items)
+        {
+            var key = (row.ApplicationId, row.ReleaseId);
+            if (!releases.TryGetValue(key, out var model))
+            {
+                model = await resolver.FindReleaseModelAsync(row.ApplicationId, row.ReleaseId, cancellationToken);
+                releases[key] = model;
+            }
+
+            var hook = model?.Webhooks.FirstOrDefault(candidate => candidate.Id == row.WebhookId);
+            var @event = hook is null ? null : model!.Events.FirstOrDefault(candidate => candidate.Id == hook.Event.Id);
+            items.Add(new ConsoleWebhookDelivery(
+                row.Id, row.ApplicationId, model?.Manifest.Name, row.WebhookId, hook?.Name, row.EventId, @event?.Name,
+                row.State, row.Attempts, row.StatusCode, row.CreatedAt, row.DeliveredAt));
+        }
+
+        var webhooks = new List<ConsoleWebhook>();
+        foreach (var model in await resolver.ListAsync(cancellationToken))
+        {
+            webhooks.AddRange(model.Webhooks
+                .OrderBy(hook => hook.Name, StringComparer.Ordinal)
+                .Select(hook => new ConsoleWebhook(hook.Id, hook.Name, model.Manifest.Id, model.Manifest.Name)));
+        }
+
+        return Results.Ok(new ConsoleWebhookDeliveryListResponse(items, pageNumber, size, result.TotalCount, webhooks));
+    }
+
+    private static Guid? ReadId(string? value, string name, SortedDictionary<string, string[]> errors)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (Guid.TryParseExact(value, "D", out var id))
+        {
+            return id;
+        }
+
+        errors[name] = ["Must be a hyphenated UUID."];
+        return null;
+    }
+
     private static async Task<IResult> GetInstanceAsync(
         string id,
         ActiveApplicationResolver resolver,
@@ -211,3 +286,26 @@ internal sealed record ConsoleFailedWorkItem(
     string? Operation,
     DateTime FailedAt,
     string? Error);
+
+internal sealed record ConsoleWebhookDeliveryListResponse(
+    IReadOnlyList<ConsoleWebhookDelivery> Items,
+    int Page,
+    int PageSize,
+    long TotalCount,
+    IReadOnlyList<ConsoleWebhook> Webhooks);
+
+internal sealed record ConsoleWebhookDelivery(
+    Guid Id,
+    Guid ApplicationId,
+    string? Application,
+    Guid WebhookId,
+    string? Webhook,
+    Guid EventId,
+    string? Event,
+    string State,
+    int Attempts,
+    int? StatusCode,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DeliveredAt);
+
+internal sealed record ConsoleWebhook(Guid Id, string Name, Guid ApplicationId, string Application);
