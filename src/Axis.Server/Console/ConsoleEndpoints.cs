@@ -54,6 +54,7 @@ internal static class ConsoleEndpoints
         console.MapGet("/failed-work", ListFailedWorkAsync);
         console.MapGet("/instances/{id}", GetInstanceAsync);
         console.MapConsoleDeadLetterEndpoints();
+        console.MapConsoleOperatorEndpoints();
     }
 
     private static async ValueTask<object?> RequireOperatorAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -187,8 +188,13 @@ internal static class ConsoleEndpoints
         var subject = row.SubjectEntityId is { } subjectEntityId
             ? active.FindEntity(subjectEntityId) ?? pinned.FindEntity(subjectEntityId)
             : null;
+
+        // The commands run against the active release, so they are offered only when it has the process.
+        var viewer = activeRelease is not null && active.Processes.Any(candidate => candidate.Id == row.ProcessId)
+            ? InspectionViewer.Operator
+            : InspectionViewer.OperatorReadOnly;
         return Results.Ok(await ProcessInspectionEndpoints.DetailAsync(
-            connection, resolver, packages, active, process, subject, row, InspectionViewer.Operator, cancellationToken));
+            connection, resolver, packages, active, process, subject, row, viewer, cancellationToken));
     }
 }
 

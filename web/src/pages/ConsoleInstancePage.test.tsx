@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -116,6 +117,31 @@ describe('ConsoleInstancePage', () => {
     expect(within(screen.getByTestId('inspector-call-c-1')).getByText('Input: Hidden')).toBeVisible()
     expect(screen.queryByTestId('inspector-command-retry')).toBeNull()
     expect(screen.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
+  })
+
+  it('posts the reason of a retry to the console route and shows the instance read again', async () => {
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    let reads = 0
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return json({ id: instanceId })
+      }
+      reads += 1
+      return json(reads === 1 ? { ...detail, commands: ['retry'] } : { ...detail, state: 'running', commands: [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderPage()
+
+    await userEvent.click(await screen.findByTestId('inspector-command-retry'))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'The manager is set now' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.queryByTestId('inspector-command-retry')).toBeNull())
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
+    expect(post[0]).toBe(`/api/console/instances/${instanceId}/retry`)
+    expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'The manager is set now' })
   })
 
   it('shows a not-found message when the instance does not exist', async () => {

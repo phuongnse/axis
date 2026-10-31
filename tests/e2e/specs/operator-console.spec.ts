@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import type { Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import { appPath, createRequest, env } from '../purchase-requests'
 import { expect, test } from '../test'
 import { useSession } from '../sessions'
@@ -81,5 +83,24 @@ test('the platform operator opens a failed instance from Failed work and sees it
   const failed = page.getByTestId('inspector-step-managerApproval')
   await expect(failed).toContainText('Current')
   await expect(page.getByRole('row', { name: /managerApproval.*System\.InvalidOperationException/ })).toBeVisible()
-  await expect(page.getByTestId(/^inspector-command-/)).toHaveCount(0)
+  await expect(page.getByTestId('inspector-command-retry')).toBeVisible()
+})
+
+test('the platform operator retries a failed instance from the console with a reason and it leaves Failed work', async ({
+  page,
+}) => {
+  const instanceId = await failedInstance(page)
+
+  await useSession(page, 'platform-operator')
+  await page.goto(`/console/instances/${instanceId}`)
+  await page.getByTestId('inspector-command-retry').click()
+  const dialog = await waitForDialog(page)
+  await dialog.getByLabel(fieldLabel('Reason')).fill('The manager is set now')
+  await dialog.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByTestId('inspector-command-retry')).toHaveCount(0)
+
+  await page.goto('/console')
+  await expect(page.getByTestId('console-failed-work')).toBeVisible()
+  await expect(page.getByTestId(`console-failed-work-open-${instanceId}`)).toHaveCount(0)
 })

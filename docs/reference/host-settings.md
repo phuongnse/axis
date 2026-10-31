@@ -213,7 +213,8 @@ One server setting controls the
   Application policies play no part. `GET /api/me` answers `console: true` for
   a user who holds it, and `console: false` for everyone when no value is set. That endpoint
   already reads the setting. The routes `GET /api/console/tenant`, `GET /api/console/failed-work` and
-  `GET /api/console/instances/{id}` and the Tenant and Failed work views of the
+  `GET /api/console/instances/{id}`, the retry, cancel and resolve routes under
+  `/api/console/instances/{id}` and the Tenant and Failed work views of the
   console are built, and the other views are planned for M23.
 
 ## Users settings

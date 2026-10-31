@@ -2,8 +2,8 @@
 
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
-list of the Failed work view, the instance detail it opens, the Dead letters view and the redeliver and discard
-commands are built. Everything else in this file is _(planned for M23)_. The design follows
+list of the Failed work view, the instance detail it opens, the retry, cancel and resolve commands, the Dead letters
+view and the redeliver and discard commands are built. Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -57,9 +57,26 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     that is no longer active opens too, and its subject record need not exist. The operator reads
     fields like a `read` grant with no `fields` list, so a call's `input` is hidden only by the
     [masking rules](process-inspection.md#values-and-masking), when its mapping uses a `sensitive`
-    field or a field the active release no longer has. `commands` is empty and no call is
-    `resolvable` until the console's command routes are built. When the application has no active
-    release, the release the instance is pinned to stands in for the active one.
+    field or a field the active release no longer has. `commands` lists the commands that apply to
+    the instance and a call is `resolvable`, as for a user who holds the grants, because the
+    operator role stands in for them. They are listed only when the application has an active
+    release that still has the instance's process, and an instance of a process without a subject
+    lists none, as in the process inspector. Otherwise `commands` is empty and no call is
+    `resolvable`. When the application has no active release, the release the instance is pinned
+    to stands in for the active one.
+  - **`POST /api/console/instances/{id}/retry`, `…/cancel` and `…/calls/{callId}/resolve`.**
+    Check, in order, the content type (`415`), the body (`400`), which is the body of the
+    [process route](process-inspection.md#operator-commands), the `id` and then the `callId`
+    (`404` when it is not a hyphenated UUID), the instance (`404` when none has the id), the
+    active release of its application (`409` when it has none) and the instance's process in
+    that release (`409` when it is no longer there). The CSRF middleware refuses a write without
+    its header with `403`. Then the command runs against the active release, in the same
+    transaction and under the same start lock as the process route, with the operator as actor.
+    The operator needs no grant in the application, and the operator role also stands in for the
+    `read` check on the subject record, so a command runs even when the operator could not read
+    that record. The rules, bodies and `409` errors are those of the process routes. A command
+    that is refused writes nothing. A success answers `200` with the instance, as the process
+    routes do.
   - **`GET /api/console/dead-letters`.** Answers one page of the dead letters of every
     application of the tenant, newest first, as the instance list pages, including the letters
     that belong to no process. An optional `application` (an application id) keeps one
@@ -85,7 +102,7 @@ Each view lists the newest items first, pages through them and filters by applic
   application filter are built. An entry opens the
   [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`, with the
   graph, the history, the tasks and the calls. The page is outside every site, so it has no
-  release texts and shows step names, not their labels. It offers no command yet.
+  release texts and shows step names, not their labels. It offers the commands that the detail lists. Built.
 - **Dead letters.** Event deliveries that reached the event delivery limit,
   including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
   no process. The view lists them in every state, with an application filter. Each shows the
@@ -103,7 +120,7 @@ Each view lists the newest items first, pages through them and filters by applic
 
 - **Retry, cancel and resolve.** The [operator commands](process-inspection.md#operator-commands)
   with their rules, run from the instance detail. The operator role stands in for the `process`
-  grants `retry`, `cancel` and `resolve`.
+  grants `retry`, `cancel` and `resolve`. Built.
 - **Redeliver and discard.** The commands on [dead letters](process-events.md#dead-letters), run
   from the Dead letters view. The operator role stands in for the `process` grant `retry`. Built.
 - **A reason each time.** Every command needs a reason. It writes the same history rows and audit

@@ -130,6 +130,25 @@ internal static class ProcessOperatorEndpoints
         }
 
         var (entity, read) = SubjectAccess(application, user, model);
+        return await RunCancelAsync(database, application, model, entity, read, instanceId, user.Id, reason!, loggerFactory, cancellationToken);
+    }
+
+    /// <summary>
+    /// Cancels the instance in one transaction and maps the outcome to the response. The caller has checked the grant and the
+    /// body, and passes the read access of the actor on the subject record, or none for a process without a subject.
+    /// </summary>
+    internal static async Task<IResult> RunCancelAsync(
+        TenantDatabase database,
+        ApplicationModel application,
+        ProcessModel model,
+        EntityModel? entity,
+        RecordAccess? read,
+        Guid instanceId,
+        string userId,
+        string reason,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var result = await ProcessCancelCommand.CancelAsync(
@@ -140,8 +159,8 @@ internal static class ProcessOperatorEndpoints
             entity,
             instanceId,
             read,
-            user.Id,
-            reason!,
+            userId,
+            reason,
             loggerFactory,
             cancellationToken);
         if (result.Outcome != ProcessCancelOutcome.Cancelled)
@@ -241,12 +260,36 @@ internal static class ProcessOperatorEndpoints
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var (entity, read) = SubjectAccess(application, user, model);
+        return await RunRetryAsync(
+            database, tenantId, application, active.ReleaseId, model, entity, read, instanceId, user.Id, reason!, loggerFactory, cancellationToken);
+    }
+
+    /// <summary>
+    /// Retries the instance in one transaction under the application's shared start lock and maps the outcome to the response.
+    /// Null when the active release is not <paramref name="activeReleaseId"/> once the lock is held, and nothing was written.
+    /// The caller has checked the grant and the body, and passes the read access of the actor on the subject record, or none
+    /// for a process without a subject.
+    /// </summary>
+    internal static async Task<IResult?> RunRetryAsync(
+        TenantDatabase database,
+        string tenantId,
+        ApplicationModel application,
+        Guid activeReleaseId,
+        ProcessModel model,
+        EntityModel? entity,
+        RecordAccess? read,
+        Guid instanceId,
+        string userId,
+        string reason,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         // The start lock comes first, before any entity table is touched, so a migrating activation
         // cannot deadlock with this retry. The release is read again under it.
-        if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != active.ReleaseId)
+        if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != activeReleaseId)
         {
             await transaction.RollbackAsync(cancellationToken);
             return null;
@@ -261,8 +304,8 @@ internal static class ProcessOperatorEndpoints
             entity,
             instanceId,
             read,
-            user.Id,
-            reason!,
+            userId,
+            reason,
             loggerFactory,
             cancellationToken);
         if (result.Outcome != ProcessRetryOutcome.Retried)
@@ -371,6 +414,33 @@ internal static class ProcessOperatorEndpoints
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var (entity, read) = SubjectAccess(application, user, model);
+        return await RunResolveAsync(
+            database, resolver, packages, tenantId, active, model, entity, read, instanceId, operationId, user.Id, body!, loggerFactory, cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves the call in one transaction under the application's shared start lock and maps the outcome to the response.
+    /// Null when the active release is not <paramref name="active"/> once the lock is held, and nothing was written.
+    /// The caller has checked the grant and the body, and passes the read access of the actor on the subject record, or none
+    /// for a process without a subject.
+    /// </summary>
+    internal static async Task<IResult?> RunResolveAsync(
+        TenantDatabase database,
+        ActiveApplicationResolver resolver,
+        PackageCatalog packages,
+        string tenantId,
+        ActiveApplication active,
+        ProcessModel model,
+        EntityModel? entity,
+        RecordAccess? read,
+        Guid instanceId,
+        Guid operationId,
+        string userId,
+        ResolveBody body,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var application = active.Model;
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -393,8 +463,8 @@ internal static class ProcessOperatorEndpoints
             instanceId,
             operationId,
             read,
-            user.Id,
-            body!.Reason,
+            userId,
+            body.Reason,
             body.Succeeded,
             body.Output,
             resolver.GetReleaseModelAsync,
@@ -437,7 +507,7 @@ internal static class ProcessOperatorEndpoints
     /// with <c>succeeded</c>, an optional <c>output</c> object. Every problem is reported in one pass, keyed
     /// by JSON Pointer into the body. Whether the output fits the operation is checked later.
     /// </summary>
-    private static (ResolveBody? Body, SortedDictionary<string, string[]>? Errors) ReadResolve(byte[] utf8Body) =>
+    internal static (ResolveBody? Body, SortedDictionary<string, string[]>? Errors) ReadResolve(byte[] utf8Body) =>
         ReadObject(
             utf8Body,
             [ReasonProperty, OutcomeProperty, OutputProperty],
