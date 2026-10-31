@@ -35,9 +35,10 @@ these points on 2026-10-25. It is built in M15. See
 - **Query timeouts:**
   - Every interactive read runs with `SET LOCAL statement_timeout` from
     `Data:QueryTimeout`, 10 seconds by default. Exports use
-    `Data:ExportQueryTimeout`, and imports run on the worker under its own
-    limits. The write transaction of record create, update and delete, process
-    start, task complete and an inbound endpoint call runs with
+    `Data:ExportQueryTimeout`. Every work item on the worker, imports among
+    them, runs under `Worker:StatementTimeout`, one minute by default. The
+    write transaction of record create, update and delete, process start, task
+    complete and an inbound endpoint call runs with
     `SET LOCAL statement_timeout` from `Data:WriteTimeout`, 15 seconds by
     default.
   - A statement that runs past it, SQLSTATE `57014`, is a `503` with a fixed

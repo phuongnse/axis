@@ -5,6 +5,7 @@ using Axis.Core.Telemetry;
 using Axis.Data.Records;
 using Axis.Processes;
 using Axis.Processes.Instances;
+using Axis.Processes.Work;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
@@ -20,7 +21,8 @@ public static class WorkerServiceCollectionExtensions
     /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
     /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
     /// <c>Tenancy:RefreshInterval</c>. The dry run of an import fails a file with more data rows than
-    /// <c>Data:ImportMaxRows</c>, which defaults to 10000. The worker deletes in-app notifications older than
+    /// <c>Data:ImportMaxRows</c>, which defaults to 10000. Every statement of a work item runs under <c>Worker:StatementTimeout</c>,
+    /// which defaults to one minute. The worker deletes in-app notifications older than
     /// <c>Notifications:RetentionDays</c>, which defaults to 90. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL. The worker sends the emails that
     /// <c>notify</c> steps staged over the SMTP server of the <c>Email</c> section, which a tenant's own <c>Email</c> block
@@ -28,7 +30,7 @@ public static class WorkerServiceCollectionExtensions
     /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker or health configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -56,6 +58,8 @@ public static class WorkerServiceCollectionExtensions
         {
             throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.DeliveryAttempts)}' must be at least 1.");
         }
+
+        var statementTimeout = StatementTimeout.Read(configuration, "Worker:StatementTimeout", WorkItemSettings.DefaultStatementTimeout);
 
         var health = new HealthOptions();
         configuration.GetSection(HealthOptions.SectionName).Bind(health);
@@ -104,7 +108,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);
-        services.AddProcesses(environment.IsDevelopment(), environment.IsDevelopment(), options.DeliveryAttempts, ImportMaxRows(configuration), EmailDefaults.Load(configuration));
+        services.AddProcesses(environment.IsDevelopment(), environment.IsDevelopment(), options.DeliveryAttempts, statementTimeout, ImportMaxRows(configuration), EmailDefaults.Load(configuration));
         services.AddSingleton(options);
         services.AddSingleton(new NotificationOptions { RetentionDays = RetentionDays(configuration) });
         services.AddSingleton(health);
