@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
+    <ProjectReference Include="..\Axis.Tenancy\Axis.Tenancy.csproj" />
   </ItemGroup>
 
   <ItemGroup>

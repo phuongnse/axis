@@ -1,0 +1,151 @@
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json.Nodes;
+using Axis.Configuration.Model;
+using Axis.Tenancy.Keys;
+
+namespace Axis.Data.Records;
+
+/// <summary>Where a sensitive value lives: the tenant, the entity and the record. The field comes with the call.</summary>
+public readonly record struct SensitiveValueScope(string TenantId, Guid EntityId, Guid RecordId);
+
+/// <summary>
+/// Encrypts and decrypts the value of a sensitive field with AES-256-GCM under the data keys of its tenant. The plain text
+/// is the value as the record API shows it. A stored value is the number of the data key (4 bytes, big-endian), a 12-byte
+/// nonce, the ciphertext and a 16-byte tag. The associated data is the tenant id, the entity id, the record id and the
+/// lower-cased field name, each as UTF-8 bytes followed by one zero byte, so a value moved to another tenant, entity,
+/// record or field does not decrypt. No message holds a value or a key.
+/// </summary>
+public sealed class SensitiveValues(TenantKeys keys)
+{
+    /// <summary>The size of the key number at the start of a stored value.</summary>
+    public const int NumberSize = 4;
+
+    public const int NonceSize = 12;
+
+    public const int TagSize = 16;
+
+    /// <summary>
+    /// Returns the stored bytes of the value under the newest data key of the tenant, or <see langword="null"/> for a null value.
+    /// </summary>
+    /// <exception cref="TenantDataKeyMissingException">The tenant has no data key.</exception>
+    public async Task<byte[]?> EncryptAsync(SensitiveValueScope scope, RecordValue value, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentException.ThrowIfNullOrEmpty(scope.TenantId);
+
+        if (value.Value is null)
+        {
+            return null;
+        }
+
+        var key = await keys.NewestAsync(scope.TenantId, TenantKeyKind.Data, cancellationToken)
+            ?? throw new TenantDataKeyMissingException(scope.TenantId);
+
+        var plain = Encoding.UTF8.GetBytes(ToText(value));
+        var stored = new byte[NumberSize + NonceSize + plain.Length + TagSize];
+        BinaryPrimitives.WriteInt32BigEndian(stored, key.Number);
+        var nonce = stored.AsSpan(NumberSize, NonceSize);
+        RandomNumberGenerator.Fill(nonce);
+
+        using var aes = new AesGcm(key.Reveal(), TagSize);
+        aes.Encrypt(
+            nonce,
+            plain,
+            stored.AsSpan(NumberSize + NonceSize, plain.Length),
+            stored.AsSpan(NumberSize + NonceSize + plain.Length, TagSize),
+            AssociatedData(scope, value.Field.Name));
+        return stored;
+    }
+
+    /// <summary>Returns the value as <c>RecordQueries.ReadValue</c> gives it for a plain column of the field.</summary>
+    /// <exception cref="SensitiveValueDecryptionException">
+    /// The value is too short, names a key the tenant does not hold, was encrypted for another tenant, entity, record or field,
+    /// or was changed. The message names the tenant, the entity, the field and the key number.
+    /// </exception>
+    public async Task<JsonValue> DecryptAsync(SensitiveValueScope scope, FieldModel field, byte[] stored, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(stored);
+        ArgumentException.ThrowIfNullOrEmpty(scope.TenantId);
+
+        if (stored.Length < NumberSize + NonceSize + TagSize)
+        {
+            throw new SensitiveValueDecryptionException(Failure(scope, field, "is too short"));
+        }
+
+        var number = BinaryPrimitives.ReadInt32BigEndian(stored);
+        var key = number < 1 ? null : await keys.FindAsync(scope.TenantId, TenantKeyKind.Data, number, cancellationToken);
+        if (key is null)
+        {
+            throw new SensitiveValueDecryptionException(Failure(scope, field, $"names data key {number}, which the tenant does not hold"));
+        }
+
+        var cipherLength = stored.Length - NumberSize - NonceSize - TagSize;
+        var plain = new byte[cipherLength];
+        try
+        {
+            using var aes = new AesGcm(key.Reveal(), TagSize);
+            aes.Decrypt(
+                stored.AsSpan(NumberSize, NonceSize),
+                stored.AsSpan(NumberSize + NonceSize, cipherLength),
+                stored.AsSpan(NumberSize + NonceSize + cipherLength, TagSize),
+                plain,
+                AssociatedData(scope, field.Name));
+        }
+        catch (CryptographicException exception)
+        {
+            throw new SensitiveValueDecryptionException(Failure(scope, field, $"does not decrypt with data key {number}"), exception);
+        }
+
+        return FromText(field, Encoding.UTF8.GetString(plain));
+    }
+
+    private static string Failure(SensitiveValueScope scope, FieldModel field, string reason) =>
+        $"The stored value of field '{field.Name}' of entity '{scope.EntityId}' of tenant '{scope.TenantId}' {reason}.";
+
+    // The text form is the record API value. A file field shows its file id.
+    private static string ToText(RecordValue value)
+    {
+        if (value.Field.Type == FieldType.File)
+        {
+            return ((Guid)value.Value!).ToString("D");
+        }
+
+        var node = RecordValueJson.ToJson(value)!;
+        return node is JsonValue json && json.TryGetValue<string>(out var text) ? text : node.ToJsonString();
+    }
+
+    // Mirrors RecordQueries.ReadValue.
+    private static JsonValue FromText(FieldModel field, string text) =>
+        field.Type switch
+        {
+            FieldType.Text or FieldType.Enum or FieldType.Date or FieldType.DateTime or FieldType.Reference or FieldType.File => JsonValue.Create(text),
+            FieldType.Integer or FieldType.Decimal or FieldType.Money or FieldType.Boolean => (JsonValue)JsonNode.Parse(text)!,
+            _ => throw new ArgumentOutOfRangeException(nameof(field), field.Type, "A field of this type cannot be sensitive."),
+        };
+
+    private static byte[] AssociatedData(SensitiveValueScope scope, string fieldName)
+    {
+        var parts = new[] { scope.TenantId, scope.EntityId.ToString("D"), scope.RecordId.ToString("D"), fieldName.ToLowerInvariant() };
+        var data = new List<byte>();
+        foreach (var part in parts)
+        {
+            data.AddRange(Encoding.UTF8.GetBytes(part));
+            data.Add(0);
+        }
+
+        return [.. data];
+    }
+}
+
+/// <summary>A tenant has no data key, so a sensitive value cannot be written. It is never written in clear.</summary>
+public sealed class TenantDataKeyMissingException(string tenantId)
+    : InvalidOperationException($"Tenant '{tenantId}' has no data key, so a sensitive value cannot be written.")
+{
+    public string TenantId { get; } = tenantId;
+}
+
+/// <summary>A stored sensitive value does not decrypt. The message never holds the value or a key.</summary>
+public sealed class SensitiveValueDecryptionException(string message, Exception? inner = null) : InvalidOperationException(message, inner);
