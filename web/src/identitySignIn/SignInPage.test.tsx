@@ -36,7 +36,7 @@ const context: SignInContext = {
       label: 'Legal',
       privacy: 'Privacy',
       terms: 'Terms',
-      licences: 'Open source licences',
+      licences: 'Licences',
     },
   },
   texts: {

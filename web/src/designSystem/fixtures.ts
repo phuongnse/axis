@@ -855,7 +855,7 @@ export const identitySignInContext: SignInContext = {
       label: 'Legal',
       privacy: 'Privacy',
       terms: 'Terms',
-      licences: 'Open source licences',
+      licences: 'Licences',
     },
   },
   texts: identitySignInTexts,
