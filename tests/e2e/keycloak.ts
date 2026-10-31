@@ -24,6 +24,19 @@ export async function submitCode(page: Page, code: string) {
 }
 
 /**
+ * Adds an authenticator on the Axis add-authenticator page that `page` shows: reads the key that the page gives to
+ * type by hand, types the code for it and the device name, and submits. Returns the Base32 secret, for `totp`.
+ */
+export async function addAuthenticator(page: Page): Promise<string> {
+  const key = await page.locator("#root code").first().innerText();
+  const secret = key.replace(/\s+/g, "");
+  await page.locator("#root form input").first().pressSequentially(totp(secret));
+  await page.getByLabel("Device name", { exact: true }).fill("Test");
+  await page.locator('#root form button[type="submit"]').first().click();
+  return secret;
+}
+
+/**
  * Signs `user` in on the Keycloak login page that `page` shows: the password `axis`, then the code that the user's
  * authenticator in the development realm gives.
  */

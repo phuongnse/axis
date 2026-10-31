@@ -99,3 +99,27 @@ export async function addRealmAccount(
   if (!id) throw new Error(`Creating ${email} in ${realm} returned no Location header.`)
   return { id, username: email, password, secret }
 }
+
+/**
+ * Gives the user with `email` in `realm` a new password that is not temporary, through the admin API. That removes the
+ * `UPDATE_PASSWORD` required action of an invited account and leaves `CONFIGURE_TOTP` for the first sign-in.
+ */
+export async function setRealmPassword(
+  realm: string,
+  email: string,
+): Promise<{ id: string; username: string; password: string }> {
+  const found = await admin(
+    `Finding ${email} in ${realm}`,
+    'GET',
+    `/${realm}/users?email=${encodeURIComponent(email)}&exact=true`,
+  )
+  const id = ((await found.json()) as { id: string }[])[0]?.id
+  if (!id) throw new Error(`${email} is not in ${realm}.`)
+  const password = randomBytes(18).toString('hex')
+  await admin(`Setting the password of ${email}`, 'PUT', `/${realm}/users/${id}/reset-password`, {
+    type: 'password',
+    value: password,
+    temporary: false,
+  })
+  return { id, username: email, password }
+}
