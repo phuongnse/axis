@@ -2,7 +2,7 @@
 
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. The route, the access rules and the Tenant view
-are built. Everything else in this file is _(planned for M23)_. The design follows
+are built, and so are the Dead letters view and the redeliver and discard commands. Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -35,6 +35,21 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     release history, as Studio shows them) and `activatedAt`. The applications are the ones with an
     active release, in name order. The `status` is `active`, because a host serves only active
     tenants: the hosts of a suspended tenant answer `503`.
+  - **`GET /api/console/dead-letters`.** Answers one page of the dead letters of every
+    application of the tenant, newest first, as the instance list pages, including the letters
+    that belong to no process. An optional `application` (an application id) keeps one
+    application and an optional `state` (`open`, `redelivered` or `discarded`) keeps one state.
+    An invalid `application`, `state`, `page` or `pageSize` is a `400` that names each. An item is
+    a [process's dead letter](process-events.md#dead-letters) with its `applicationId` and
+    `processId` (null for a letter with no process). Its `commands` are `redeliver` and `discard`
+    while the letter is `open` and empty otherwise.
+  - **`POST /api/console/dead-letters/{id}/redeliver` and `…/discard`.** Check, in order, the
+    content type (`415`), the body, which is exactly `{ "reason": "<text>" }` (`400`), the `id`
+    (`404` when it is not a hyphenated UUID or no dead letter has it) and the active release of
+    the letter's application (`409` when it has none). Then one transaction runs the same command
+    as the process routes, with the operator as actor. It answers `409` for a letter that is not
+    `open`, for a trigger that is not in the active release and for a kind that cannot be
+    redelivered, and writes nothing then. A success answers `200` with the settled letter.
 
 ## Views
 
@@ -44,9 +59,11 @@ Each view lists the newest items first, pages through them and filters by applic
   outcome is `unknown`, across every process of every application. An entry opens the
   [instance detail](process-inspection.md#instance-detail), with the graph, the history, the
   tasks and the calls.
-- **Dead letters.** Event deliveries that reached the event delivery limit that M14 adds,
-  including [webhook deliveries](outbound-webhooks.md#outbound-webhooks). Each shows the
-  event, the trigger or webhook, the attempts and the last error.
+- **Dead letters.** Event deliveries that reached the event delivery limit,
+  including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
+  no process. The view lists them in every state, with an application filter. Each shows the
+  application, the kind, the event, the trigger or webhook, the attempts, the last error and the
+  state. An `open` letter offers redeliver and discard. Built.
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
 - **Schedules.** Each schedule trigger of each active release, with its last and next
   occurrence, see [schedules](process-events.md#schedules).
@@ -60,7 +77,8 @@ Each view lists the newest items first, pages through them and filters by applic
 - **Retry, cancel and resolve.** The [operator commands](process-inspection.md#operator-commands)
   with their rules, run from the instance detail. The operator role stands in for the `process`
   grants `retry`, `cancel` and `resolve`.
-- **Redeliver and discard.** The commands that M14 adds for dead letters.
+- **Redeliver and discard.** The commands on [dead letters](process-events.md#dead-letters), run
+  from the Dead letters view. The operator role stands in for the `process` grant `retry`. Built.
 - **A reason each time.** Every command needs a reason. It writes the same history rows and audit
   records as from the process inspector, with the operator as actor.
 - **Nothing else.** The console has no command that creates, suspends, backs up or restores a

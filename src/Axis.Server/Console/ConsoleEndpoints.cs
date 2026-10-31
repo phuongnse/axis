@@ -16,6 +16,10 @@ namespace Axis.Server.Console;
 /// application in name order, its active release with the release <c>number</c> and <c>label</c> from the release history
 /// and the time it was activated. The status is always <c>active</c>, because a host serves only active tenants.
 /// </para>
+/// <para>
+/// The dead letter routes under <c>/api/console/dead-letters</c> list, redeliver and discard the dead letters of every
+/// application of the tenant, see <see cref="ConsoleDeadLetterEndpoints"/>.
+/// </para>
 /// </summary>
 internal static class ConsoleEndpoints
 {
@@ -27,6 +31,7 @@ internal static class ConsoleEndpoints
         var console = endpoints.MapGroup("/api/console");
         console.AddEndpointFilter(RequireOperatorAsync);
         console.MapGet("/tenant", GetTenantAsync);
+        console.MapConsoleDeadLetterEndpoints();
     }
 
     private static async ValueTask<object?> RequireOperatorAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
