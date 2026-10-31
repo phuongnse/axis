@@ -294,6 +294,7 @@ public static class DiagnosticCodes
     public const string ModuleSlotMappingConflict = "AXC0306";
     public const string ModuleTaskRoleNotSlot = "AXC0307";
     public const string SensitiveFieldUse = "AXC0308";
+    public const string ExactLookupUse = "AXC0309";
     public const string ConnectorBindingKind = "AXC0310";
     public const string InvalidOutputSource = "AXC0311";
     public const string MisplacedConnectorInput = "AXC0312";

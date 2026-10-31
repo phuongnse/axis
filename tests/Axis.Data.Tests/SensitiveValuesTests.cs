@@ -222,6 +222,48 @@ public sealed class SensitiveValuesTests
         await Assert.ThrowsAsync<SensitiveValueDecryptionException>(() => cipher.ReEncryptAsync(_scope, "note", "memo", stored, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task A_lookup_hash_is_the_newest_lookup_key_number_and_the_hmac_of_the_message()
+    {
+        var cipher = CipherWith(Key(TenantKeyKind.Data, 1), Key(TenantKeyKind.Lookup, 1), Key(TenantKeyKind.Lookup, 2));
+        var message = Encoding.UTF8.GetBytes($"{Tenant}\0{_entityId:D}\0note\0Ngô Thị Hạnh");
+
+        var hash = await cipher.LookupAsync(_scope, new RecordValue(_text, "Ngô Thị Hạnh"), CancellationToken.None);
+
+        Assert.NotNull(hash);
+        Assert.Equal(SensitiveValues.LookupSize, hash.Length);
+        Assert.Equal([0, 0, 0, 2], hash[..4]);
+        Assert.Equal(System.Security.Cryptography.HMACSHA256.HashData(Key(TenantKeyKind.Lookup, 2).Reveal(), message), hash[4..]);
+    }
+
+    [Fact]
+    public async Task A_lookup_hash_is_the_same_for_every_record_and_differs_between_fields_and_values()
+    {
+        var cipher = CipherWith(Key(TenantKeyKind.Lookup, 1));
+        var other = Models.Field("memo", FieldType.Text);
+
+        var first = await cipher.LookupAsync(_scope, new RecordValue(_text, "x"), CancellationToken.None);
+        var again = await cipher.LookupAsync(_scope with { RecordId = Guid.NewGuid() }, new RecordValue(_text, "x"), CancellationToken.None);
+        var otherField = await cipher.LookupAsync(_scope, new RecordValue(other, "x"), CancellationToken.None);
+        var otherValue = await cipher.LookupAsync(_scope, new RecordValue(_text, "y"), CancellationToken.None);
+
+        Assert.Equal(first, again);
+        Assert.NotEqual(first, otherField);
+        Assert.NotEqual(first, otherValue);
+    }
+
+    [Fact]
+    public async Task A_null_value_has_no_lookup_hash_and_a_tenant_without_a_lookup_key_refuses_a_value()
+    {
+        var withoutLookup = CipherWith(Key(TenantKeyKind.Data, 1));
+
+        Assert.Null(await withoutLookup.LookupAsync(_scope, new RecordValue(_text, null), CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<TenantDataKeyMissingException>(
+            () => withoutLookup.LookupAsync(_scope, new RecordValue(_text, "x"), CancellationToken.None));
+        Assert.Equal(TenantKeyKind.Lookup, exception.Kind);
+        Assert.Contains("lookup key", exception.Message, StringComparison.Ordinal);
+    }
+
     private static async Task AssertFailsAsync(SensitiveValues cipher, SensitiveValueScope scope, FieldModel field, byte[] stored) =>
         await Assert.ThrowsAsync<SensitiveValueDecryptionException>(() => cipher.DecryptAsync(scope, field, stored, CancellationToken.None));
 

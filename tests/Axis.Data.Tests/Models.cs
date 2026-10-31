@@ -84,6 +84,8 @@ internal static class Models
                     field.Required,
                     field.Unique,
                     field.Target is not null ? EntityNaming.Table(field.Target.Id) : field.Type == FieldType.File ? "files" : null)),
+                .. entity.Fields.Where(field => field.HasColumn && field.ExactLookup).Select(field => new CatalogColumn(
+                    EntityNaming.LookupColumn(field.Name), "bytea", NotNull: false, Unique: false, ReferencedTable: null)),
             ],
             hasRows)
         {

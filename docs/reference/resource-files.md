@@ -445,18 +445,18 @@ Value ranges follow what PostgreSQL accepts, so an invalid value fails at
 compile time rather than when the table is created; a value outside the range
 is `AXC0013`.
 
-| Type | `required` | `unique` | `maxLength` | `minLength` | `min`, `max` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `text` | yes | yes | 1..10485760 | 1..`maxLength` | | | | | | yes | yes | yes | yes |
-| `integer` | yes | yes | | | yes | | | | | yes | | | yes |
-| `decimal` | yes | yes | | | yes | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes |
-| `boolean` | yes | yes | | | | | | | | yes | | | yes |
-| `date` | yes | yes | | | yes | | | | | yes | | | yes |
-| `date-time` | yes | yes | | | yes | | | | | yes | | | yes |
-| `enum` | yes | yes | | | | | | | needed | yes | | | yes |
-| `reference` | yes | yes | | | | | | needed | | | | | |
-| `child-collection` | | | | | | | | needed | | | | | |
-| `money` | yes | yes | | | yes | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes |
+| Type | `required` | `unique` | `maxLength` | `minLength` | `min`, `max` | `precision` | `scale` | `target` | `values` | `expression` | `sequence` | `creator` | `sensitive` | `exactLookup` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `text` | yes | yes | 1..10485760 | 1..`maxLength` | | | | | | yes | yes | yes | yes | yes |
+| `integer` | yes | yes | | | yes | | | | | yes | | | yes | yes |
+| `decimal` | yes | yes | | | yes | 1..1000 | 0..`precision`, only with `precision` | | | yes | | | yes | yes |
+| `boolean` | yes | yes | | | | | | | | yes | | | yes | yes |
+| `date` | yes | yes | | | yes | | | | | yes | | | yes | yes |
+| `date-time` | yes | yes | | | yes | | | | | yes | | | yes | yes |
+| `enum` | yes | yes | | | | | | | needed | yes | | | yes | yes |
+| `reference` | yes | yes | | | | | | needed | | | | | | |
+| `child-collection` | | | | | | | | needed | | | | | | |
+| `money` | yes | yes | | | yes | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes | yes |
 - `required` and `unique` default to `false`.
 - `maxLength` is capped at 10485760, the largest `varchar` length.
 - `min` and `max` are literals of the field's type, written as the record API
@@ -510,10 +510,10 @@ is `AXC0013`.
   `required: true`, `expression` or `sequence`, and a child entity's field
   cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
   [Record creator](roles-and-policies.md#record-creator).
-- `sensitive` is allowed on `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and
-  `money`, and defaults to `false`. `true` on a `reference`, `references` or `file` field is `AXC0308`
-  at `/fields/{i}/sensitive`, on the `displayField` at `/displayField`, on `child-collection` `AXC0013`. See
-  [Sensitive fields](roles-and-policies.md#sensitive-fields).
+- `sensitive` is allowed on `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `money`, and defaults to
+  `false`. `true` on a `reference`, `references` or `file` field is `AXC0308` at `/fields/{i}/sensitive`, on the `displayField`
+  at `/displayField`, on `child-collection` `AXC0013`. `exactLookup` needs `sensitive` and a name of at most 54 characters,
+  else [`AXC0309`](diagnostic-codes.md). See [Sensitive fields](roles-and-policies.md#sensitive-fields), [exact lookup](data-encryption.md#exact-lookup).
 
 ### Types and properties added in M15
 
