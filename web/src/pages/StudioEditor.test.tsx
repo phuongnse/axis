@@ -754,14 +754,14 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
     await openFormTab()
 
-    const name = within(await screen.findByTestId('studio-step-9', {}, slow)).getByRole('textbox', {
+    const name = within(await screen.findByTestId('studio-step-10', {}, slow)).getByRole('textbox', {
       name: 'Step name',
     })
     await userEvent.type(name, '2')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
-    expect(sentPatch(fetchMock)).toEqual([{ op: 'replace', path: '/steps/9/name', value: 'done2' }])
+    expect(sentPatch(fetchMock)).toEqual([{ op: 'replace', path: '/steps/10/name', value: 'done2' }])
   })
 
   it('adds a step of the chosen type with its required keys empty', async () => {
@@ -775,9 +775,9 @@ describe('StudioEditor for a process', () => {
 
     await screen.findByTestId('studio-saved')
     const steps = sentSteps(fetchMock)
-    expect(steps).toHaveLength(11)
-    expect(steps.slice(0, 10)).toEqual(processContent.steps)
-    expect(steps[10]).toEqual({ name: '', type: 'decision', branches: [], otherwise: '' })
+    expect(steps).toHaveLength(12)
+    expect(steps.slice(0, 11)).toEqual(processContent.steps)
+    expect(steps[11]).toEqual({ name: '', type: 'decision', branches: [], otherwise: '' })
   })
 
   it('removes a step and leaves the transitions that name it', async () => {
@@ -804,9 +804,9 @@ describe('StudioEditor for a process', () => {
 
     const first = await screen.findByTestId('studio-step-0', {}, slow)
     expect(within(first).getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(within(screen.getByTestId('studio-step-9')).getByRole('button', { name: 'Move down' })).toBeDisabled()
+    expect(within(screen.getByTestId('studio-step-10')).getByRole('button', { name: 'Move down' })).toBeDisabled()
     await userEvent.click(within(first).getByRole('button', { name: 'Move down' }))
-    await userEvent.click(within(screen.getByTestId('studio-step-9')).getByRole('button', { name: 'Move up' }))
+    await userEvent.click(within(screen.getByTestId('studio-step-10')).getByRole('button', { name: 'Move up' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -904,7 +904,7 @@ describe('StudioEditor for a process', () => {
     await userEvent.paste(JSON.stringify(withExtraStep, null, 2))
     await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
 
-    expect(await screen.findByTestId('studio-graph-node-10', {}, slow)).toHaveAccessibleName('notify · end')
+    expect(await screen.findByTestId('studio-graph-node-11', {}, slow)).toHaveAccessibleName('notify · end')
     expect(requests(fetchMock, 'PATCH')).toBe(0)
   })
 
@@ -1003,30 +1003,30 @@ describe('StudioEditor for a process', () => {
     stubResource(processItem, processContent)
     renderResource(processItem)
 
-    const node = await screen.findByTestId('studio-graph-node-9', {}, slow)
+    const node = await screen.findByTestId('studio-graph-node-10', {}, slow)
     expect(node).toHaveAccessibleName('done · end')
-    for (const source of [6, 7, 8]) {
+    for (const source of [7, 8, 9]) {
       expect(screen.getByTestId(`rf__edge-/steps/${source}/next`)).toBeInTheDocument()
     }
     fireEvent.click(node)
     act(() => node.focus())
     await userEvent.keyboard('{Delete}')
 
-    expect(screen.queryByTestId('studio-graph-node-9')).not.toBeInTheDocument()
-    for (const source of [6, 7, 8]) {
+    expect(screen.queryByTestId('studio-graph-node-10')).not.toBeInTheDocument()
+    for (const source of [7, 8, 9]) {
       expect(screen.queryByTestId(`rf__edge-/steps/${source}/next`)).not.toBeInTheDocument()
     }
     expect(screen.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step done')
     expect(screen.getByText('Select a step on the canvas.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
     const named = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
-    expect(named.steps).toHaveLength(9)
-    expect(named.steps[6].next).toBe('done')
+    expect(named.steps).toHaveLength(10)
+    expect(named.steps[7].next).toBe('done')
     await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(await screen.findByTestId('studio-graph-node-9')).toBeInTheDocument()
-    for (const source of [6, 7, 8]) {
+    expect(await screen.findByTestId('studio-graph-node-10')).toBeInTheDocument()
+    for (const source of [7, 8, 9]) {
       expect(screen.getByTestId(`rf__edge-/steps/${source}/next`)).toBeInTheDocument()
     }
   })
@@ -1079,7 +1079,7 @@ describe('StudioEditor for a process', () => {
     stubResource(processItem, processContent)
     renderResource(processItem)
 
-    const node = await screen.findByTestId('studio-graph-node-8', {}, slow)
+    const node = await screen.findByTestId('studio-graph-node-9', {}, slow)
     fireEvent.click(node)
     act(() => node.focus())
     const design = within(screen.getByTestId('studio-process-design'))
@@ -1087,7 +1087,7 @@ describe('StudioEditor for a process', () => {
     await userEvent.keyboard('{Delete}')
 
     expect(screen.queryByRole('button', { name: 'markRejected · operation' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('studio-graph-node-8')).toHaveAccessibleName('done · end')
+    expect(screen.getByTestId('studio-graph-node-9')).toHaveAccessibleName('done · end')
     expect(design.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step markRejected')
   })
 
@@ -1095,12 +1095,12 @@ describe('StudioEditor for a process', () => {
     stubResource(processItem, processContent)
     renderResource(processItem)
 
-    fireEvent.click(await screen.findByTestId('studio-graph-node-8', {}, slow))
+    fireEvent.click(await screen.findByTestId('studio-graph-node-9', {}, slow))
     const design = within(screen.getByTestId('studio-process-design'))
     await userEvent.click(design.getByRole('textbox', { name: 'Step name' }))
     await userEvent.keyboard('{Backspace}{Delete}')
 
-    expect(screen.getByTestId('studio-graph-node-8')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-graph-node-9')).toBeInTheDocument()
     expect(design.getByTestId('studio-process-announcement')).toHaveTextContent('')
   })
 

@@ -62,6 +62,7 @@ public sealed class ServiceAccountRouteTests(KeycloakFixture keycloak) : IAsyncL
                 "GET /api/apps/{app}/data-sources/{dataSource}/rows",
                 "GET /api/apps/{app}/data-sources/{module}/{dataSource}/rows",
                 "POST /api/apps/{app}/processes/{process}/instances",
+                "POST /api/apps/{app}/processes/{module}/{process}/instances",
                 "GET /api/apps/{app}/processes/{process}/instances",
                 "GET /api/apps/{app}/processes/{process}/instances/{id}",
                 "POST /api/apps/{app}/processes/{process}/instances/{id}/cancel",

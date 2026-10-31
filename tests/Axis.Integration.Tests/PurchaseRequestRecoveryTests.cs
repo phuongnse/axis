@@ -20,7 +20,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(500, "completed", "markApproved,createPurchaseOrder,createPurchaseOrder,assignPaymentReference,assignPaymentReference,done", "approved")]
+    [InlineData(500, "completed", "markApproved,announceApproved,createPurchaseOrder,createPurchaseOrder,assignPaymentReference,assignPaymentReference,done", "approved")]
     [InlineData(10000, "waiting", "financeApproval", "submitted")]
     public async Task A_decision_made_while_no_worker_runs_is_taken_up_by_the_next_worker(int unitPrice, string state, string steps, string status)
     {
