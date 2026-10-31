@@ -340,7 +340,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
     },
     { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
     {
-      // Proposed: the language and theme menu at the card's top right, open.
+      // Proposed: the language and theme menu at the page's top right, open.
       caption: 'Language and theme',
       draw: () => (
         <ClickOnMount selector='button[aria-label="Language and theme"]'>

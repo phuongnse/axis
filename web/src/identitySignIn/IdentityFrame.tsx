@@ -10,8 +10,8 @@ import { useDesignTokens } from '../platform/themeMode'
 import type { SignInPreferences } from './signInContext'
 
 /**
- * The frame of the identity provider's pages: the organization's mark and name above one card, whose title row holds
- * the language and theme button, and the copyright line below.
+ * The frame of the identity provider's pages: the organization's mark and name above one card, the copyright line
+ * below, and the language and theme button at the page's top right.
  */
 export function IdentityFrame({
   title,
@@ -38,8 +38,28 @@ export function IdentityFrame({
         background: colour.canvas,
         minHeight: 'var(--shell-min-height, 100%)',
         boxSizing: 'border-box',
+        position: 'relative',
       }}
     >
+      {/* Proposed: the shell's language and theme button sits at the page's top right, where the shell header has it,
+          as far from the top edge as from the right one and level with the organization's heading. The card holds
+          only the sign-in. Its menu holds every language, named in its own language, and System, Light and Dark, so
+          more languages only add rows. */}
+      <div style={{ position: 'absolute', top: spacing.lg, insetInlineEnd: spacing.lg }}>
+        <PreferencesDropdown
+          languages={preferences.locales.map((entry) => ({ tag: entry.tag, label: nativeLanguageName(entry.tag) }))}
+          language={preferences.locale}
+          texts={preferences.texts}
+          onLanguageChange={(tag) => {
+            const target = preferences.locales.find((entry) => entry.tag === tag)
+            if (target) {
+              window.location.assign(target.url)
+            }
+          }}
+        >
+          <NamedIconButton name={preferences.texts.label} icon={<SettingOutlined />} />
+        </PreferencesDropdown>
+      </div>
       <OrganizationHeading name={organization} />
       <Card
         style={{
@@ -52,27 +72,9 @@ export function IdentityFrame({
         styles={{ body: { padding: spacing.xl } }}
       >
         <Flex vertical gap={spacing.md}>
-          {/* Proposed: the shell's language and theme button sits at the card's top right, on the title's row, so it is
-              as far from the top edge as from the right one. Its menu holds every language, named in its own language,
-              and System, Light and Dark, so more languages only add rows. */}
-          <Flex align="center" justify="space-between" gap={spacing.sm}>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {title}
-            </Typography.Title>
-            <PreferencesDropdown
-              languages={preferences.locales.map((entry) => ({ tag: entry.tag, label: nativeLanguageName(entry.tag) }))}
-              language={preferences.locale}
-              texts={preferences.texts}
-              onLanguageChange={(tag) => {
-                const target = preferences.locales.find((entry) => entry.tag === tag)
-                if (target) {
-                  window.location.assign(target.url)
-                }
-              }}
-            >
-              <NamedIconButton name={preferences.texts.label} icon={<SettingOutlined />} />
-            </PreferencesDropdown>
-          </Flex>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            {title}
+          </Typography.Title>
           {children}
         </Flex>
       </Card>
