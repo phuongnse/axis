@@ -42,6 +42,7 @@ the [roadmap](../roadmap.md#milestones).
   - Storage: database size and file size.
   - Users and applications.
   - Emails a day, so one tenant cannot get the cell's mail domain marked as spam.
+  - [D119](d119-ai-authoring-in-studio.md) adds AI authoring requests.
   - Work at once: imports, exports, connector calls and data source queries.
   - The worker shares its time between tenants, so a tenant with a large backlog does not hold
     back the others.

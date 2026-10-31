@@ -129,3 +129,5 @@ files agree, title and status included.
 | [D116](decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md) | How sensitive fields and backups are encrypted | **Agreed** |
 | [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) | Small businesses first, and the milestones in three phases | **Agreed** |
 | [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) | Axis SaaS in cells, with sign-up, quotas and billing | **Agreed** |
+| [D119](decisions/d119-ai-authoring-in-studio.md) | AI authoring in Studio | **Agreed** |
+| [D120](decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md) | Axis is AGPL licensed, with a commercial licence | **Agreed** |

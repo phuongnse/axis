@@ -70,6 +70,8 @@ the [roadmap](../roadmap.md#milestones).
   states the goal only. Migrating live business data between installations stays out of scope.
   - [D118](d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) designs it, renames it M31 Axis SaaS, and adds M33 Sign-up and trials and
     M34 Plans and billing to phase 1.
+  - [D119](d119-ai-authoring-in-studio.md) adds M35 AI changes an application to phase 1 and
+    M36 AI builds applications and modules to phase 2.
 - **Order inside phase 1:**
   - M19, M20 and M27 finish first.
   - M24, M25 and M26 follow M20, one after the other, and M26 waits for M27, as before.

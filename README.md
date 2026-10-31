@@ -16,10 +16,10 @@ too. A Playwright journey builds, tests and publishes it with Studio only. See
 
 ## Status
 
-Milestones **M14, Workflow, automation and notifications**, and **M15, Data modeling and data management**, are complete. The current milestone is
-**M16, Hardening**.
-The [roadmap](docs/roadmap.md) says what each milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
-the commands.
+Axis serves individuals and small and medium businesses first, as
+[D117](docs/decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. The
+[roadmap](docs/roadmap.md) groups the milestones in phases and says what each one delivers and its
+status. See [AGENTS.md](AGENTS.md#commands) for the commands.
 
 ## Run Axis
 
@@ -54,3 +54,10 @@ start with [AGENTS.md](AGENTS.md).
   SPA, see
   [D58](docs/decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md).
 - Storage: PostgreSQL.
+
+## Licence
+
+Axis is under the [GNU Affero General Public License, version 3 only](LICENSE). The extension
+contract in `src/Axis.Extensions` and everything under `samples/` are under the MIT licence, in
+their own `LICENSE` files. A commercial licence is available for those who cannot use the AGPL. See
+[D120](docs/decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md).

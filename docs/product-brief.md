@@ -52,7 +52,9 @@ this order, see the [roadmap](roadmap.md#milestones).
   - their data kept safe as Vietnam's personal data rules ask, see
     [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 - **What sets Axis apart for them:** they change a standard process anywhere, keep its upgrades,
-  and its core rules still hold on every write.
+  and its core rules still hold on every write. They can describe a change in words, and an agent
+  makes it under the same rules _(planned for M35)_, see
+  [D119](decisions/d119-ai-authoring-in-studio.md).
 - **Later, large organizations, banks and government:** what only they ask for, such as
   conformance runs, signed images and alert rules for their own operations teams, is
   _(planned for M32)_.
