@@ -71,9 +71,11 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         var items = history.RootElement.GetProperty("items").EnumerateArray().ToList();
         Assert.Equal([1, 2, 1], items.Select(item => item.GetProperty("number").GetInt32()));
         var newest = items[0];
+
+        // The new row keeps no name, and this author has no user profile to show one from.
         Assert.Equal(
-            (first, "author", "Author User", requestId, JsonValueKind.Null, JsonValueKind.Null),
-            (newest.GetProperty("releaseId").GetGuid(), newest.GetProperty("actor").GetString(), newest.GetProperty("actorName").GetString(),
+            (first, "author", JsonValueKind.Null, requestId, JsonValueKind.Null, JsonValueKind.Null),
+            (newest.GetProperty("releaseId").GetGuid(), newest.GetProperty("actor").GetString(), newest.GetProperty("actorName").ValueKind,
              newest.GetProperty("requestId").GetGuid(), newest.GetProperty("label").ValueKind, newest.GetProperty("note").ValueKind));
         Assert.NotEqual(active.GetProperty("contentHash").GetString(), history.RootElement.GetProperty("folderContentHash").GetString());
         Assert.Equal(folderHash, history.RootElement.GetProperty("folderContentHash").GetString());
