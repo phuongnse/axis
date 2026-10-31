@@ -1,0 +1,11 @@
+{
+  "id": "5a82a574-4daa-4450-9bfd-1ff215172233",
+  "kind": "event",
+  "name": "PurchaseRequestApproved",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "fields": [
+    { "name": "number", "type": "text" },
+    { "name": "totalAmount", "type": "decimal" }
+  ]
+}

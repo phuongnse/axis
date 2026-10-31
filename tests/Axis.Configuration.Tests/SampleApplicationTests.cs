@@ -23,6 +23,9 @@ public sealed class SampleApplicationTests
         Assert.Equal("SubmitPurchaseRequest", Assert.Single(result.Model.Endpoints).Name);
 
         Assert.True(result.Model.TryGetEntity("PurchaseRequest", out var purchaseRequest));
+        var approved = Assert.Single(result.Model.Events);
+        Assert.Equal(("PurchaseRequestApproved", new EntityReference(purchaseRequest.Id, "PurchaseRequest")), (approved.Name, approved.Entity));
+        Assert.Equal([new EventFieldModel("number", FieldType.Text), new EventFieldModel("totalAmount", FieldType.Decimal)], approved.Fields);
         Assert.True(purchaseRequest.TryGetField("number", out var number));
         Assert.NotNull(number.Sequence);
         Assert.Equal("PurchaseRequestNumber", number.Sequence.Name);

@@ -26,7 +26,7 @@ test.describe("Studio edits a process in the process editor", () => {
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), "axis-studio-process-editor-"));
     await cp(purchaseRequests, copy, { recursive: true });
-    // No sample application defines an event, and the wait for event journey needs one about the subject entity.
+    // The sample's only event is raised by its own process, so the wait for event journey adds one of its own about the subject entity.
     await mkdir(path.join(copy, "events"), { recursive: true });
     await writeFile(
       path.join(copy, "events", "payment-received.json"),
@@ -107,18 +107,18 @@ test.describe("Studio edits a process in the process editor", () => {
     await pickAction(
       page.getByRole("combobox", { name: "Add step", exact: true }),
       "decision",
-      page.getByTestId("studio-step-10"),
+      page.getByTestId("studio-step-11"),
     );
-    const card = page.getByTestId("studio-step-10");
+    const card = page.getByTestId("studio-step-11");
     await card
       .getByRole("textbox", { name: "Step name", exact: true })
       .fill("checkTotal");
     await card.getByRole("button", { name: "Add branch", exact: true }).click();
-    const when = page.getByTestId("studio-field-/steps/10/branches/0/when");
+    const when = page.getByTestId("studio-field-/steps/11/branches/0/when");
     await expect(when.locator(".cm-editor")).toBeVisible();
     await when.getByRole("textbox").fill("totalAmount > 0");
-    await pick(page, "/steps/10/branches/0/next", "managerApproval");
-    await pick(page, "/steps/10/otherwise", "markRejected");
+    await pick(page, "/steps/11/branches/0/next", "managerApproval");
+    await pick(page, "/steps/11/otherwise", "markRejected");
     await pick(page, "/steps/0/next", "checkTotal");
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -128,7 +128,7 @@ test.describe("Studio edits a process in the process editor", () => {
       steps: Record<string, unknown>[];
     };
     expect(saved.steps[0].next).toBe("checkTotal");
-    expect(saved.steps[10]).toEqual({
+    expect(saved.steps[11]).toEqual({
       name: "checkTotal",
       type: "decision",
       branches: [{ when: "totalAmount > 0", next: "managerApproval" }],
@@ -146,10 +146,10 @@ test.describe("Studio edits a process in the process editor", () => {
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`);
     await openFormTab(page);
-    await expect(page.getByTestId("studio-step-8")).toContainText(
+    await expect(page.getByTestId("studio-step-9")).toContainText(
       "markRejected",
     );
-    const status = page.getByTestId("studio-field-/steps/8/set/status");
+    const status = page.getByTestId("studio-field-/steps/9/set/status");
     await expect(status.locator(".cm-editor")).toBeVisible();
     await status
       .getByRole("textbox", { name: "Expression", exact: true })
@@ -161,7 +161,7 @@ test.describe("Studio edits a process in the process editor", () => {
     const expected = JSON.parse(original) as {
       steps: { set: Record<string, string> }[];
     };
-    expected.steps[8].set.status = "'returned'";
+    expected.steps[9].set.status = "'returned'";
     expect(JSON.parse(await readFile(path.join(copy, file), "utf8"))).toEqual(
       expected,
     );

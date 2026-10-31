@@ -137,7 +137,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         // The connector step writes a row when it stages the call and another when the call settles.
         // The retry writes neither a history row nor an audit record.
         Assert.Equal(
-            "submit,managerApproval,managerApproval,financeCheck,markApproved,createPurchaseOrder,createPurchaseOrder,assignPaymentReference,assignPaymentReference,done",
+            "submit,managerApproval,managerApproval,financeCheck,markApproved,announceApproved,createPurchaseOrder,createPurchaseOrder,assignPaymentReference,assignPaymentReference,done",
             (string?)await fixture.ScalarAsync(
                 "SELECT string_agg(step, ',' ORDER BY revision) FROM axis.process_step_history WHERE process_instance_id = @instance",
                 ("instance", instance)));

@@ -16,12 +16,16 @@ namespace Axis.Processes.Work;
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "It is the queue of ready work items.")]
 public static class WorkItemQueue
 {
+    // The claim is a materialized CTE and not a subquery in FROM: the planner may run such a subquery again for each row it
+    // joins, and then the update leases more than one item while the reader returns only the first.
     internal const string ClaimSql = $"""
+        WITH c AS MATERIALIZED (
+            SELECT id FROM axis.process_work_items
+            WHERE {ClaimFilterSql}
+            ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED)
         UPDATE axis.process_work_items w
         SET claim_token = gen_random_uuid(), lease_expires_at = now() + @lease
-        FROM (SELECT id FROM axis.process_work_items
-              WHERE {ClaimFilterSql}
-              ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
+        FROM c
         WHERE w.id = c.id
         RETURNING {ClaimedColumnsSql}, {ClaimDelaySql}
         """;
@@ -29,11 +33,13 @@ public static class WorkItemQueue
     // The scenario runner claims in queue order. A due time comes from the clock, which can step back
     // during a run, and then an item queued later would run before an earlier one.
     internal const string ClaimInQueueOrderSql = $"""
+        WITH c AS MATERIALIZED (
+            SELECT id FROM axis.process_work_items
+            WHERE {ClaimFilterSql}
+            ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED)
         UPDATE axis.process_work_items w
         SET claim_token = gen_random_uuid(), lease_expires_at = now() + @lease
-        FROM (SELECT id FROM axis.process_work_items
-              WHERE {ClaimFilterSql}
-              ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED) c
+        FROM c
         WHERE w.id = c.id
         RETURNING {ClaimedColumnsSql}, {ClaimDelaySql}
         """;

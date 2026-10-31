@@ -160,7 +160,7 @@ in any state. The body has these parts:
   by `id`. Each is
   `{ "step", "startedAt", "finishedAt", "decision", "output", "error" }`.
   - `decision` and `output` are the stored values, see
-    [Tables](processes.md#tables). `output` holds no field values.
+    [Tables](process-tables.md#tables). `output` holds no field values.
   - `error` is the stored error, see
     [Step errors](#step-errors-in-inspection).
   - The history's `input` is not returned. It holds only the subject id and
@@ -369,7 +369,7 @@ keep today's rule: their input is cleared when the call settles, see
 ### Attempts
 
 `axis.process_call_attempts` holds one row per attempt and per lookup of a
-connector or package call, see [Tables](processes.md#tables). The call row counts its
+connector or package call, see [Tables](process-tables.md#tables). The call row counts its
 attempts and keeps only the last status and error, so the attempt rows hold the
 earlier ones.
 
@@ -789,8 +789,9 @@ and then the `409` checks.
 Suppose the `PurchasingSystem` connector declares neither `idempotency` nor a
 `lookup`. The request still ends with exactly one purchase order.
 
-1. The finance reviewer approves request `PR-2026-00042`. `markApproved` runs
-   and queues `createPurchaseOrder`.
+1. The finance reviewer approves request `PR-2026-00042`. `markApproved` runs,
+   `announceApproved` raises `PurchaseRequestApproved`, and it queues
+   `createPurchaseOrder`.
 2. The step stages call C as `pending` and sets the instance `waiting`. Worker
    A marks C `sending` and sends `POST /purchase-orders`.
 3. The purchasing system creates `PO-2026-0001`. Its response is lost, and the

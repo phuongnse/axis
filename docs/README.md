@@ -38,7 +38,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [File fields](reference/file-fields.md)                                | The `file` field type: values, upload, download, storage and clean-up                |
 | [Import and export](reference/import-export.md)                        | Exporting records to CSV and spreadsheets, and importing them under policies          |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency          |
-| [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, states, process tables |
+| [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, states                 |
+| [Process tables](reference/process-tables.md)                          | The tables that `Axis.Processes` owns                                                 |
 | [Process states](reference/process-states.md)                          | The states of a process instance and of a task                                        |
 | [Task API](reference/task-api.md)                                      | Listing, reading and completing tasks                                                 |
 | [Process execution](reference/process-execution.md)                    | How the worker runs steps, connector calls, package operations, worker settings       |

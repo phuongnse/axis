@@ -566,7 +566,7 @@ The [log inventory](reference/log-inventory.md) lists every log.
 - **Problem details.** Every problem details answer carries
   a `traceId`, see [Errors](reference/record-api.md#errors).
 - **Stored history.** Step history rows and call attempt rows store the
-  `trace_id` of their run, see [Tables](reference/processes.md#tables). A
+  `trace_id` of their run, see [Tables](reference/process-tables.md#tables). A
   row written with no current span stores null. `traceId` and `trace_id` hold
   the same value, the 32-hex W3C trace id.
 
