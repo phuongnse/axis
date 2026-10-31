@@ -67,5 +67,6 @@
   "specs/table.spec.ts": 4,
   "specs/task-inbox.spec.ts": 3,
   "specs/task-page.spec.ts": 9,
+  "specs/tenant-create.spec.ts": 40,
   "specs/worker-roles.spec.ts": 0
 }

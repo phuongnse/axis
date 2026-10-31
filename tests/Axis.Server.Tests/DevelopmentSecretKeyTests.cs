@@ -15,9 +15,9 @@ public sealed class DevelopmentSecretKeyTests
         var developmentKey = settings.RootElement.GetProperty("Platform").GetProperty("SecretKey").GetString();
 
         var e2eSettings = File.ReadAllText(Path.Combine(root, "tests", "e2e", "server-settings.ts"));
-        var match = Regex.Match(e2eSettings, @"Platform__SecretKey:\s*'([^']+)'");
+        var match = Regex.Match(e2eSettings, @"platformSecretKey\s*=\s*'([^']+)'");
 
-        Assert.True(match.Success, "tests/e2e/server-settings.ts sets no Platform__SecretKey.");
+        Assert.True(match.Success, "tests/e2e/server-settings.ts holds no platformSecretKey.");
         Assert.Equal(developmentKey, match.Groups[1].Value);
 
         var configuration = new ConfigurationBuilder()
