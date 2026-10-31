@@ -1,9 +1,11 @@
 using Axis.Configuration.Model;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Processes.Instances;
 using Axis.Server.Applications;
 using Axis.Server.Http;
+using Axis.Server.Processes;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 
@@ -34,6 +36,14 @@ namespace Axis.Server.Console;
 /// <c>GET /api/console/schedules</c> lists the schedule triggers of every active release with their last and next
 /// occurrence, see <see cref="ConsoleScheduleEndpoints"/>.
 /// </para>
+/// <para>
+/// <c>GET /api/console/instances/{id}</c> answers one instance, whatever its application or process, with the shape of the
+/// process inspection detail. The operator role stands in for the <c>inspect</c> grant and for a <c>read</c> grant with no
+/// <c>fields</c> list, and the instance's subject record need not exist. A call's stored input is hidden by the masking
+/// rule of process inspection: when its mapping reads or writes a sensitive field, or a field the active release no longer
+/// has. The active release is the pinned release when the application has no active release. A malformed id and an unknown
+/// id are one 404. <c>commands</c> is empty and no call is resolvable, because the console has no command routes yet.
+/// </para>
 /// </summary>
 internal static class ConsoleEndpoints
 {
@@ -46,6 +56,7 @@ internal static class ConsoleEndpoints
         console.AddEndpointFilter(RequireOperatorAsync);
         console.MapGet("/tenant", GetTenantAsync);
         console.MapGet("/failed-work", ListFailedWorkAsync);
+        console.MapGet("/instances/{id}", GetInstanceAsync);
         console.MapConsoleDeadLetterEndpoints();
         console.MapConsoleScheduleEndpoints();
     }
@@ -145,6 +156,44 @@ internal static class ConsoleEndpoints
         }
 
         return Results.Ok(new ConsoleFailedWorkResponse(items, pageNumber, size, work.TotalCount));
+    }
+
+    private static async Task<IResult> GetInstanceAsync(
+        string id,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        PackageCatalog packages,
+        CancellationToken cancellationToken)
+    {
+        var notFound = Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No instance exists with this id.");
+        if (id is not { Length: 36 } || !Guid.TryParseExact(id, "D", out var instanceId))
+        {
+            return notFound;
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        if (await InstanceQueries.FindByIdAsync(connection, instanceId, cancellationToken) is not { } row
+            || await resolver.FindReleaseModelAsync(row.ApplicationId, row.ReleaseId, cancellationToken) is not { } pinned)
+        {
+            return notFound;
+        }
+
+        // The active release gives the fields the operator may read, so an application with no active release uses the pinned one.
+        var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
+        var activeRelease = (await store.ListAsync(cancellationToken)).FirstOrDefault(candidate => candidate.ApplicationId == row.ApplicationId);
+        var active = activeRelease is null ? pinned : await resolver.GetReleaseModelAsync(activeRelease.ReleaseId, cancellationToken);
+        var process = active.Processes.FirstOrDefault(candidate => candidate.Id == row.ProcessId)
+            ?? pinned.Processes.FirstOrDefault(candidate => candidate.Id == row.ProcessId);
+        if (process is null)
+        {
+            return notFound;
+        }
+
+        var subject = row.SubjectEntityId is { } subjectEntityId
+            ? active.FindEntity(subjectEntityId) ?? pinned.FindEntity(subjectEntityId)
+            : null;
+        return Results.Ok(await ProcessInspectionEndpoints.DetailAsync(
+            connection, resolver, packages, active, process, subject, row, InspectionViewer.Operator, cancellationToken));
     }
 }
 
