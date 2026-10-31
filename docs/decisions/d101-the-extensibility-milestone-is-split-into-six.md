@@ -51,6 +51,7 @@ M17 does not change. See the [roadmap](../roadmap.md#milestones).
   each one is broken down.
   - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
     puts M24 to M26, the built-in modules, after M20 and before M21 and M22.
+  - [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) puts M21 and M22 in phase 2 and M23 in phase 1.
 
 _Why:_ M18 held six designs and the work carried over from M16, so one
 milestone would stay open while most of its parts were long done, and its docs

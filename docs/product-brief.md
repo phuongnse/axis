@@ -28,10 +28,33 @@ through Studio, without editing JSON or code. Files stay the source of truth
 (D5). No domain gets platform code. See [D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
 
 _(planned for M24 to M26)_ Axis ships built-in modules: standard processes,
-such as approvals, a service desk or an asset register, that a business
-builds its application from instead of starting from scratch. A business changes any part of a module in a layer of its own
+such as approvals, that a business
+builds its application from instead of starting from scratch. A service desk and an asset register
+follow _(planned for M30)_. A business changes any part of a module in a layer of its own
 application, while the module's contract, bound to its data, holds on every
 write. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+
+## Who Axis serves first
+
+Axis serves individuals and small and medium businesses first, and large organizations, banks and
+government later, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. The roadmap's phases follow
+this order, see the [roadmap](roadmap.md#milestones).
+
+- **Who they are:** an individual, or a small or medium business, that runs its
+  internal work on Axis, such as approvals, requests and registers.
+- **What they lack:** an IT team and an operations team. A business analyst, an office manager or
+  the owner of the business sets the application up in Studio.
+- **What they need:**
+  - a built-in application to start from, changed to fit in Studio, that keeps its upgrades;
+  - Vietnamese and English;
+  - Axis as a service, with nothing to install _(planned for M31)_;
+  - their data kept safe as Vietnam's personal data rules ask, see
+    [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+- **What sets Axis apart for them:** they change a standard process anywhere, keep its upgrades,
+  and its core rules still hold on every write.
+- **Later, large organizations, banks and government:** what only they ask for, such as
+  conformance runs, signed images and alert rules for their own operations teams, is
+  _(planned for M32)_.
 
 ## Who uses it
 
@@ -69,9 +92,11 @@ the agreed extension points (see [decisions](decisions.md)).
 
 - Formal security certification. The FAPI 2.0 profile and the ASVS work are in the
   Hardening milestone, M16. The conformance run and the ASVS sign-off are
-  _(planned for M28)_ (see the [roadmap](roadmap.md#milestones)).
-- Provisioning many tenants self-service, and Axis-hosted SaaS operations.
-- Custom UI widgets. They come after the visual designers (D8, D46).
+  _(planned for M32)_, for large and regulated customers (see the
+  [roadmap](roadmap.md#milestones)).
+- Self-service sign-up for many tenants, until the decision of M31, Hosted Axis, settles it
+  ([D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md)).
+- Custom UI widgets. They come after the visual designers (D8, D46), in phase 2.
 - Migrating live business data between installations.
 
 ## First application: purchase requests
@@ -343,7 +368,7 @@ its access rules and a maintenance entry, a warranty reminder process and its
 weekday trigger. It is active in development, Compose and E2E. The Studio
 journey builds the whole folder, compares it with the sample, runs its scenarios
 from Studio, publishes it and uses its site to register, import and export
-assets. Only the import and attachment scenarios are _(planned for M26)_.
+assets. Only the import and attachment scenarios are _(planned for M30)_.
 
 ### Data
 
@@ -397,10 +422,10 @@ SPA serves its bundle there. Texts are in `en` and `vi`.
 - Built: an asset is registered, an employee and an auditor cannot write, a
   negative cost is refused, an asset with a maintenance entry with a vendor, and
   software is recorded, and a user without a role is denied.
-- _(planned for M26)_ An import of valid assets, and an import whose dry run
+- _(planned for M30)_ An import of valid assets, and an import whose dry run
   reports a bad row and writes nothing.
-- _(planned for M26)_ An asset with an attachment.
-- _(planned for M26)_ Denied access for an employee to another holder's asset,
+- _(planned for M30)_ An asset with an attachment.
+- _(planned for M30)_ Denied access for an employee to another holder's asset,
   to its attachment's download and to an export, and for an auditor to an
   import.
 

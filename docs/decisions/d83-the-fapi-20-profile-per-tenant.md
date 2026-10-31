@@ -5,7 +5,7 @@ Status: **Agreed**
 M16 adds the FAPI 2.0 Security Profile as a sign-in profile that a tenant can
 turn on. It is the step that
 [D9](d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) left for
-later. It is built, except the conformance run of the verification point, which is _(planned for M28)_. See
+later. It is built, except the conformance run of the verification point, which is _(planned for M32)_. See
 [FAPI 2.0 profile](../reference/security.md#fapi-20-profile) for the detail.
 The owner agreed these points on 2026-10-25.
 
