@@ -304,6 +304,11 @@ see the Data sources bullet of the Resolve step in
   (`AXC0045`).
 - `sort` and a `groupBy` entry cannot name a projected `file` field
   (`AXC0259`, at `/sort` or `/aggregate/groupBy/{i}`).
+- `sort`, a `groupBy` entry and a measure's `field` cannot name a projected
+  field whose path ends at a `sensitive` field, and neither can a `filter`
+  or a measure's `filter` read one (`AXC0308`, at `/sort`,
+  `/aggregate/groupBy/{i}`, `/aggregate/measures/{i}/field`, `/filter` or
+  `/aggregate/measures/{i}/filter`).
 
 ## Endpoint
 
@@ -367,7 +372,7 @@ grants, the record filters, the fields and the joined targets are built.
   `pageSize` default is the data source's own. `sort` names an entry of
   `fields`, or a group field or measure when the data source is grouped. It
   matches exactly, so letter case matters. A `sort` cannot name a projected
-  field whose path ends at a `reference`.
+  field whose path ends at a `reference` or at a `sensitive` field.
 - **`search`.** It needs `"search": true`. It keeps only the rows where a
   searched field contains the text, ignoring letter case, and follows the
   [record API's rules](record-api.md#paging-and-sorting): given at most once,

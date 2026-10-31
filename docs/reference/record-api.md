@@ -152,9 +152,9 @@ covers reads the whole entity table.
 - **`page`.** An integer of at least 1. It defaults to 1.
 - **`pageSize`.** An integer from 1 to 100. It defaults to 20.
 - **`sort`.** A declared field name, or `-` and the name for descending
-  order. The name matches exactly, so letter case matters. A
-  `child-collection` field is not a valid `sort`. A field the user may not
-  read is not a valid `sort` either, as for an unknown field.
+  order. The name matches exactly, so letter case matters. A `child-collection`
+  or `sensitive` field is not a valid `sort`, nor is a field the user may not
+  read, as for an unknown field.
 - **`search`.** Keeps only the records where the display field or any
   `searchable` field the user may read contains the text, ignoring letter
   case. Both sides go through PostgreSQL `lower()`, so case folding follows the

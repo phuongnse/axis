@@ -336,16 +336,21 @@ user:
 
 - **Effect.** A call input that reads or writes the field is hidden in
   inspection, as [Values and masking](process-inspection.md#values-and-masking) says.
-  The record API ignores the flag and still shows the field to users whose
-  grants cover it.
+  The record API still shows the field to users whose grants cover it, but it
+  refuses a `sort` on it.
 - **Default.** `sensitive` defaults to `false`. It changes no table, so adding
   or removing it needs no migration.
+- **Uses it cannot serve.** A filter, sort, aggregate, group field, index,
+  `unique`, `searchable`, stored computed field, migration value or other
+  expression that runs as SQL on the field is
+  [`AXC0308`](diagnostic-codes.md), and a caller's `sort` on it in the record
+  API or a data source is a `400`. See
+  [what a sensitive field cannot do](data-encryption.md#what-a-sensitive-field-cannot-do).
 - **Encrypted at rest** _(planned for M27)_. The value is stored encrypted under
   its tenant's data key, and adding or removing the flag encrypts or decrypts the
-  stored values in a migration. A filter, sort, aggregate, index, `unique`, stored
-  computed field or expression that runs as SQL on the field is a compile error,
-  and a field that declares an exact lookup may be filtered for equality. The
-  record API still shows the field to users whose grants cover it. See
+  stored values in a migration. A field that declares an exact lookup may be
+  filtered for equality. The record API still shows the field to users whose
+  grants cover it. See
   [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
   [data encryption](data-encryption.md), which also describes `exactLookup`.
 - **Allowed fields.** `sensitive` is allowed on every type except

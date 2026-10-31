@@ -52,7 +52,8 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
 ## What a sensitive field cannot do
 
 Compilation refuses each of these on a sensitive field with [`AXC0308`](diagnostic-codes.md), at the path of the use.
-The message names the field and the use.
+The message names the field and the use. The refusals and the run-time `400` for `sort` below are built, and hold
+before the values are encrypted. The exact lookup exception is planned.
 
 - A filter, other than the equality of an exact lookup.
 - A sort, in a data source or a table.
@@ -60,11 +61,12 @@ The message names the field and the use.
 - An index, `unique` or `searchable`.
 - A stored computed field that reads it.
 - An expression that runs as SQL, such as a data source `filter` or a policy grant's `filter`, other than the
-  equality of an exact lookup.
+  equality of an exact lookup. A migration `fill` or `convert` value is one, so it may not read a sensitive field.
 
 `exactLookup` on a field that is not `sensitive` is [`AXC0309`](diagnostic-codes.md) at `/fields/{i}/exactLookup`. A
-filter on a sensitive field that a caller sends at run time, through the record API or a data source's parameters,
-is a `400` problem keyed at the filter. Import and export read and write the plain values, under the same grants as
+caller's `sort` on a sensitive field, in the record API or a data source, is a `400` problem keyed `sort`. The record
+API has no other filter, and a data source's parameters only reach its `filter`, which cannot read a sensitive field.
+Import and export read and write the plain values, under the same grants as
 the record API.
 
 ## Changing the flag

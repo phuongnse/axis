@@ -282,7 +282,7 @@ internal static class RecordEndpoints
         RecordSearch? searched = null;
         if (sort is not null && (!RecordSort.TryParse(sort, model, out order) || !fields.CanRead(order.Field.Name)))
         {
-            errors["sort"] = ["Must be a declared field name, optionally preceded by '-'."];
+            errors["sort"] = ["Must be a declared field name that is not sensitive, optionally preceded by '-'."];
         }
 
         if (SearchQuery.IsRepeated(request))

@@ -14,7 +14,7 @@ public sealed record DataSourceSort(DataSourceFieldModel? Field, bool Descending
     /// <summary>
     /// Parses a name, optionally preceded by one <c>-</c> for descending order. The name is matched
     /// exactly. It names a projected field, or a group field or a measure when the data source is
-    /// grouped. A reference or child collection field cannot be sorted by.
+    /// grouped. A reference, a child collection field or a sensitive field cannot be sorted by.
     /// </summary>
     public static bool TryParse(string text, DataSourceModel dataSource, [NotNullWhen(true)] out DataSourceSort? sort)
     {
@@ -46,7 +46,7 @@ public sealed record DataSourceSort(DataSourceFieldModel? Field, bool Descending
         var field = dataSource.Aggregate is { } aggregate
             ? aggregate.GroupBy.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal))
             : dataSource.TryGetField(name, out var projected) ? projected : null;
-        return field is not null && field.Field.HasColumn && field.Field.Type != FieldType.Reference
+        return field is not null && field.Field.HasColumn && field.Field.Type != FieldType.Reference && !field.Field.Sensitive
             ? new DataSourceSort(field, descending)
             : null;
     }

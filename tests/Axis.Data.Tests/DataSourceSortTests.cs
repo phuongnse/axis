@@ -147,4 +147,26 @@ public sealed class DataSourceSortTests
         Assert.True(sort.Descending);
         Assert.Null(DataSourceSort.Default(_dataSource with { Sort = null }));
     }
+
+    [Theory]
+    [InlineData("secret")]
+    [InlineData("-secret")]
+    public void Sensitive_field_does_not_parse_and_the_same_field_that_is_not_sensitive_does(string text)
+    {
+        var plain = _dataSource with { Fields = [new DataSourceFieldModel("secret", _order.Fields[0])] };
+        var sensitive = _dataSource with { Fields = [new DataSourceFieldModel("secret", _order.Fields[0] with { Sensitive = true })] };
+
+        Assert.False(DataSourceSort.TryParse(text, sensitive, out var refused));
+        Assert.Null(refused);
+        Assert.True(DataSourceSort.TryParse(text, plain, out var accepted));
+        Assert.Equal(text.StartsWith('-'), accepted.Descending);
+    }
+
+    [Fact]
+    public void Sensitive_field_reached_through_a_path_does_not_parse()
+    {
+        var path = new DataSourceFieldModel("customerName", [_order.Fields[2], _customer.Fields[0] with { Sensitive = true }]);
+
+        Assert.False(DataSourceSort.TryParse("customerName", _dataSource with { Fields = [path] }, out _));
+    }
 }
