@@ -502,6 +502,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("Studio:Folders:0", Folder);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");

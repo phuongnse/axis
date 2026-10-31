@@ -22,11 +22,13 @@
 
   <ItemGroup>
     <Compile Include="..\Axis.Configuration.Tests\SamplePackages.cs" Link="SamplePackages.cs" />
+    <Compile Include="..\Axis.Configuration.Tests\SampleModules.cs" Link="SampleModules.cs" />
     <Compile Include="..\Axis.Expressions.Tests\Fuzz.cs" Link="Fuzz.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\..\samples\apps\purchase-requests\**\*" Link="Samples\purchase-requests\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\modules\departments\**\*" Link="SampleModules\departments\1.1.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Axis.Integration.Tests\Fixtures\FilesApp\**\*" Link="Fixtures\FilesApp\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\web\src\platform\studioStarters.json" Link="Starters\studioStarters.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

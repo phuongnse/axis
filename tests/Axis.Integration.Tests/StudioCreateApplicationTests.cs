@@ -287,6 +287,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                 builder.UseSetting("Tenants:default:ConnectionString", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
                 builder.UseSetting("Tenants:default:SchemaConnectionString", database.ConnectionString);
                 builder.UseSetting("Studio:Folders:0", setup._folder.Path);
+                builder.UseSetting("Modules:Path", SampleModules.Path);
                 builder.UseSetting("Studio:AuthorRole", "author");
                 if (applicationsPath)
                 {

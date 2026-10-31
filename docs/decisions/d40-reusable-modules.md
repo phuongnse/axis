@@ -73,7 +73,7 @@ confirmed these points on issue #571 on 2026-10-18.
     Modules ship no migrations, so an application also cannot stop using
     a module once its tables exist.
     - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
-      replaces this point in M25: a module ships migrations, which activation
+      replaces this point in M29, as [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves it: a module ships migrations, which activation
       runs on each application's copy.
 - **Texts:**
   - A module's text keys start with `<module id>.`. A module ships one text

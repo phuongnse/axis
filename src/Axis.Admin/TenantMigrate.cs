@@ -6,7 +6,8 @@ namespace Axis.Admin;
 
 /// <summary>
 /// <c>migrate</c>: brings each tenant database to the schema of this build, on its own. For each tenant it grants, migrates,
-/// grants again, checks the runtime role and records the schema version in the directory. A tenant stops at its first failed
+/// grants again, checks the runtime role and records the schema version in the directory, in the same save that makes the tenant's
+/// data key 1 or lookup key 1 when it has none. A tenant stops at its first failed
 /// step and keeps its old schema version, and the other tenants go on. Each step writes one line that names the tenant and
 /// never a password, a host or a connection string. A tenant is migrated as its own schema role, over the host and port that the
 /// directory records for it.
@@ -68,6 +69,9 @@ internal sealed class TenantMigrate(
         var tenant = await platform.Tenants.SingleAsync(row => row.Id == id, cancellationToken);
         tenant.SchemaVersion = version;
         tenant.Version++;
+
+        // A tenant that this build serves has its keys, so the save that records the version also makes any that are missing.
+        await TenantKeyRows.AddMissingAsync(platform, id, settings.Cipher, cancellationToken);
         await platform.SaveChangesAsync(cancellationToken);
     }
 

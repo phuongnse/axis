@@ -10,11 +10,12 @@ kept current and how they are split is in
 | Doc                               | What it holds                                                    | Read it when                                                |
 | --------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
 | [Product brief](product-brief.md) | What Axis is, who uses it, the proving samples                   | You do product or architecture work                         |
-| [Roadmap](roadmap.md)             | Milestones, what each delivers and its status                    | You need the current milestone or a milestone's scope       |
+| [Roadmap](roadmap.md)             | Milestones in their phases, what each delivers and its status    | You need the current milestone or a milestone's scope       |
 | [Decisions](decisions.md)         | The index of decisions, each in its own file under `decisions/`  | A change touches a design choice; read only those decisions |
 | [Concepts](domain/concepts.md)    | The vocabulary and what each resource does                       | You name anything in code, APIs, UI or issues               |
 | [Knowledge](domain/knowledge.md)  | What business applications need and the pitfalls to avoid        | You change configuration, execution, storage or security    |
 | [Architecture](architecture.md)   | Modules, hosts, tenancy, security, execution, telemetry, testing | You add a module or host, or change how they fit together   |
+| [Repository layout](repository-layout.md) | The folders of the repository and the rules that modules follow | You add a project, a folder or a module |
 
 ## Reference
 

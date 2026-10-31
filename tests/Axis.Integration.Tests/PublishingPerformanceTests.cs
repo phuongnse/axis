@@ -357,6 +357,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
                 builder.UseSetting(key, value);
             }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");

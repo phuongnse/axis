@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
@@ -26,6 +28,12 @@ public static class TenantSecretFields
 
     /// <summary>The field of a data protection key. It is bound with an empty tenant id.</summary>
     public static string DataProtectionKey(Guid id) => "data_protection_key:" + id.ToString("D");
+
+    /// <summary>The field of a tenant data key. It is part of the stored format, so the number is in the name.</summary>
+    public static string DataKey(int number) => "data_key:" + number.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>The field of a tenant lookup key. It is part of the stored format, so the number is in the name.</summary>
+    public static string LookupKey(int number) => "lookup_key:" + number.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>The field of a <c>secret</c> binding. The name is lower case, because binding names ignore letter case.</summary>
     public static string Binding(string name)

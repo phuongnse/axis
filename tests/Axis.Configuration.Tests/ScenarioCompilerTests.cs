@@ -14,7 +14,7 @@ public sealed class ScenarioCompilerTests
     {
         using var folder = SampleCopy().With("scenarios/finance-approval.json", DocsScenario());
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
@@ -57,7 +57,7 @@ public sealed class ScenarioCompilerTests
             ]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Null(result.Model);
         Assert.Equal(
@@ -110,7 +110,7 @@ public sealed class ScenarioCompilerTests
             ]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Equal(
             [("AXC0180", "/steps/0/recipient/role"), ("AXC0181", "/steps/1/recipient/user")],
@@ -133,7 +133,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{{step}}]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Null(result.Model);
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
@@ -158,7 +158,7 @@ public sealed class ScenarioCompilerTests
                 ]
                 """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Equal(
             [("AXC0184", "/steps/1/process"), ("AXC0184", "/steps/2/process")],
@@ -183,7 +183,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{{step}}]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File) == (DiagnosticCodes.SchemaViolation, ScenarioFile));
         Assert.Null(result.Model);
@@ -204,7 +204,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "advanceTime", "by": "{{by}}" }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Null(result.Model);
         var diagnostic = Assert.Single(result.Diagnostics);
@@ -219,7 +219,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "advanceTime", "by": "P1D" }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Null(result.Model);
         var diagnostic = Assert.Single(result.Diagnostics);
@@ -234,7 +234,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "advanceTime", "by": "P1M" }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Equal(
             new[] { ("AXC0193", "/steps/0/by"), ("AXC0194", "/steps/0") },
@@ -254,7 +254,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "advanceTime", "by": "{{by}}" }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
@@ -272,7 +272,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
@@ -290,7 +290,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File) == (DiagnosticCodes.SchemaViolation, ScenarioFile));
         Assert.Null(result.Model);
@@ -312,7 +312,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path) == (DiagnosticCodes.SchemaViolation, ScenarioFile, "/now"));
         Assert.Null(result.Model);
@@ -329,7 +329,7 @@ public sealed class ScenarioCompilerTests
             "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
     }
@@ -347,7 +347,7 @@ public sealed class ScenarioCompilerTests
             ]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Equal(
             [
@@ -362,13 +362,13 @@ public sealed class ScenarioCompilerTests
     public void Adding_or_changing_a_scenario_keeps_the_content_hash_and_the_resources()
     {
         using var folder = SampleCopy();
-        var before = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var before = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
         Assert.Empty(before.Diagnostics);
 
         folder.With(ScenarioFile, ValidScenario("Laptops"));
-        var added = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var added = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
         folder.With(ScenarioFile, ValidScenario("Monitors"));
-        var changed = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var changed = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(added.Diagnostics);
         Assert.Empty(changed.Diagnostics);
@@ -400,7 +400,7 @@ public sealed class ScenarioCompilerTests
             ]
             """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
     }
@@ -416,7 +416,7 @@ public sealed class ScenarioCompilerTests
                 "steps": [{ "type": "createRecord", "entity": "Broken", "as": "requester", "values": {} }]
                 """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.File == ScenarioFile);
         Assert.NotEmpty(result.Diagnostics);
@@ -458,7 +458,7 @@ public sealed class ScenarioCompilerTests
                 ]
                 """));
 
-        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Equal(
             new[]

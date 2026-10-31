@@ -9,9 +9,9 @@ namespace Axis.Administration;
 public sealed record PlatformRekeyResult(int Exit, string? Problem, int TenantSecrets, int DataProtectionKeys);
 
 /// <summary>
-/// Re-encrypts every secret of the platform database with <c>Platform:SecretKey</c>. It decrypts each tenant secret and each
-/// data protection key with the current key or else the previous key, and encrypts it again with the current key, in one
-/// transaction. The stored format and the associated data do not change. The command line and a later web console both call it.
+/// Re-encrypts every secret of the platform database with <c>Platform:SecretKey</c>. It decrypts each tenant secret, which
+/// includes each tenant's data keys and lookup keys, and each data protection key with the current key or else the previous
+/// key, and encrypts it again with the current key, in one transaction. The stored format and the associated data do not change. The command line and a later web console both call it.
 /// </summary>
 public static class PlatformRekey
 {
@@ -36,11 +36,12 @@ public static class PlatformRekey
         // A concurrent admin command or a server key insert waits for the commit, instead of writing a row that this run overwrites.
         // Readers are not blocked.
         await platform.Database.ExecuteSqlRawAsync(
-            "LOCK TABLE platform.tenants, platform.tenant_bindings, platform.data_protection_keys IN EXCLUSIVE MODE",
+            "LOCK TABLE platform.tenants, platform.tenant_bindings, platform.tenant_data_keys, platform.data_protection_keys IN EXCLUSIVE MODE",
             cancellationToken);
 
         var tenants = await platform.Tenants.ToListAsync(cancellationToken);
         var bindings = await platform.TenantBindings.Where(binding => binding.Kind == "secret").ToListAsync(cancellationToken);
+        var tenantKeys = await platform.TenantDataKeys.ToListAsync(cancellationToken);
         var keys = await platform.DataProtectionKeys.ToListAsync(cancellationToken);
 
         // Every value decrypts before anything is written, so a value that neither key opens stops the run with no change.
@@ -66,6 +67,13 @@ public static class PlatformRekey
             {
                 var row = binding;
                 Plan(steps, versions, row.TenantId, row.SecretValue, TenantSecretFields.Binding(row.Name), value => row.SecretValue = value);
+            }
+
+            foreach (var tenantKey in tenantKeys)
+            {
+                var row = tenantKey;
+                var field = row.Kind == TenantKeyKinds.Data ? TenantSecretFields.DataKey(row.Number) : TenantSecretFields.LookupKey(row.Number);
+                Plan(steps, versions, row.TenantId, row.Key, field, value => row.Key = value);
             }
 
             tenantSecrets = steps.Count;

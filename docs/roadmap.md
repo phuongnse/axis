@@ -23,6 +23,15 @@
 
 ## Milestones
 
+Axis serves individuals and small and medium businesses first, and large organizations, banks and
+government later, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. The milestones after M18 are in three
+phases, and each phase lists its milestones in the order they run. The
+[direction](#direction) says why.
+
+### Done
+
+The closed milestones are on [GitHub](https://github.com/phuongnse/axis/milestones?state=closed).
+
 | | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | **M0** | Foundation | Done | The solution builds; CI runs build, lint, unit, PostgreSQL integration and Playwright E2E for real; NexKit is installed with those checks. |
@@ -43,127 +52,93 @@
 | **M15** | Data modeling and data management | Done | New field types: file (with storage bindings), money and enum labels. Indexes, defaults and ranges. References from child rows, and many-to-many. CSV and spreadsheet import and export under policies. Full-text search, more aggregates and query timeouts. |
 | **M16** | Hardening | Done | The FAPI 2.0 profile, ASVS 5.0 Level 2 tracking with a server-side session, rate limits and security headers, service accounts for the record API, data source rows, process start and inspection, tenant setting commands and key rotation with platform audit records, and the shell and platform home page of D98. Carried over from M10 and built: restoring a preview tenant's archive is refused. |
 | **M17** | Axis's identity provider | Done | Every installation runs Keycloak with the Axis theme as Axis's identity provider, with a realm for each tenant. An application declares its identity providers, accounts with a required second step, OIDC or SAML, with their claim and role mapping, and each site lists the ones it allows. Activation keeps the realm in step with the release, and a site may have a host of its own. The tenant's platform sign-in serves the home page, Studio and the console. An administrator invites accounts and gives roles on a users page. The end-to-end journey signs one person in to a site through a brokered identity provider and another in to a second site with an account and a code from an authenticator app, and refuses a provider the site does not allow. Carried over to M28: the users page's disable, enable and reset authenticator buttons, and keeping the realm's redirect addresses in step with `tenant host add`, `remove` and `move`. See [D99](decisions/d99-axis-ships-its-own-identity-provider.md) and [D100](decisions/d100-identity-providers-per-application-and-sign-in-per-site.md). |
-| **M18** | Verification and threat model | Done | Carried over from M16, with no new feature, as [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md) agrees, and built: performance objectives and the load test, `scripts/load.sh`, the email channel of a task escalation's `notify`, Mailpit in Docker Compose and `scripts/dev.sh`, dead letters for waking a waiting instance, the process designer's live region for moves, the threat model and its check, added by [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md), authentication by default with a test that calls every route without a session, added by [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md), and fuzz tests for the expression language, the record API's request bodies and import. The dependency scan in CI is no longer in M18: a hand-made change runs it now, as [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees. Carried over to M28: the FAPI 2.0 conformance run, the final ASVS sign-off, the first SAMM rating, the weekly CI run of the load test and the final query limits. Carried over to M26: the asset management scenarios for import and attachments, with their denied cases. |
-| **M19** | Connector OAuth2 and outbound webhooks | Next | A connector signs in with OAuth2 client credentials and sends inputs in the path, query and headers, nested inputs and nested outputs. An application tells another system about an event through a signed outbound webhook, delivered at least once, with dead letters. An inbound endpoint call raises an event, as [D115](decisions/d115-an-inbound-endpoint-call-raises-an-event.md) agrees. The journey: an approved purchase request reaches the purchasing system with its line items as a list, and a webhook whose receiver fails leaves a dead letter. See [D91](decisions/d91-connector-oauth2-and-structured-payloads.md) and [D92](decisions/d92-outbound-webhooks.md). |
-| **M20** | Modules that ship working features | Planned | A module holds processes, pages, policies and triggers, names role slots that each application maps to its own roles, names connector slots that each application maps to its own connectors, and depends on other modules. An application's endpoint starts a module process. The journey: purchase requests declare the `department-budgets` module, which depends on the `departments` module, and map its approver slot to the manager role. See [D89](decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md) and [D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md). |
+| **M18** | Verification and threat model | Done | Carried over from M16, with no new feature, as [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md) agrees, and built: performance objectives and the load test, `scripts/load.sh`, the email channel of a task escalation's `notify`, Mailpit in Docker Compose and `scripts/dev.sh`, dead letters for waking a waiting instance, the process designer's live region for moves, the threat model and its check, added by [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md), authentication by default with a test that calls every route without a session, added by [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md), and fuzz tests for the expression language, the record API's request bodies and import. The dependency scan in CI is no longer in M18: a hand-made change runs it now, as [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees. Carried over to M28: the weekly CI run of the load test and the final query limits. Carried over to M32, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves them: the FAPI 2.0 conformance run, the final ASVS sign-off and the first SAMM rating. Carried over to M30: the asset management scenarios for import and attachments, with their denied cases. |
+
+### Phase 1: the first small businesses
+
+Done when a small business runs its approvals on Axis as a service, changed to fit in Studio,
+while the module's contract holds: M26's journey passes and M31 is built.
+
+| | Milestone | Status | Done when |
+| --- | --- | --- | --- |
+| **M19** | Connector OAuth2 and outbound webhooks | In progress | A connector signs in with OAuth2 client credentials and sends inputs in the path, query and headers, nested inputs and nested outputs. An application tells another system about an event through a signed outbound webhook, delivered at least once, with dead letters. An inbound endpoint call raises an event, as [D115](decisions/d115-an-inbound-endpoint-call-raises-an-event.md) agrees. The journey: an approved purchase request reaches the purchasing system with its line items as a list, and a webhook whose receiver fails leaves a dead letter. See [D91](decisions/d91-connector-oauth2-and-structured-payloads.md) and [D92](decisions/d92-outbound-webhooks.md). |
+| **M20** | Modules that ship working features | In progress | A module holds processes, pages, policies and triggers, names role slots that each application maps to its own roles, names connector slots that each application maps to its own connectors, and depends on other modules. An application's endpoint starts a module process. The journey: purchase requests declare the `department-budgets` module, which depends on the `departments` module, and map its approver slot to the manager role. See [D89](decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md) and [D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md). |
+| **M27** | Data protection | In progress | A field marked `sensitive` is stored encrypted under a data key of its tenant, with an exact lookup when the field declares one, and compilation refuses a filter, sort, aggregate, index or SQL expression on it. A command rotates a tenant's data key. Tenant backups are encrypted with a backup key the operator keeps outside the installation. New history rows keep the user id and no display name, and session audit records keep a shortened client address. The journey: the leave request sample marks the reason `sensitive`, an employee submits a sick leave, the manager reads the reason, a query over the tenant database as its runtime role sees no clear text, and a restore without the backup key is refused. It follows M18 and runs beside M19 to M21, and M26 waits for it. See [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md). |
+| **M24** | Module contracts | Planned | A module declares a contract on its entities: a lifecycle of states and transitions with guards, core validations, the effects of a transition and a grant ceiling. The engine checks it on every write, whatever makes the write. A module holds test scenarios whose users hold role slots ([D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md)). Contract scenarios run on every publish of an application that uses the module, and a failing one stops the publish. An application relaxes a named point of a module's contract with a reason, and its release is marked off-standard. The journey: a process change that moves a module record to a state without meeting its guard is refused, and a relax entry lets it through with the off-standard mark. It follows M20. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
+| **M25** | Customization layers | Planned | An application changes a module through a layer under `customizations/<module id>/` that names elements by name and holds only its changes. Compilation applies the layer and checks the contract. Studio shows each module resource with the layer applied, writes the layer and marks what it changed. The journey: an author adds a step to a module's process in Studio and publishes, the layer file holds only that step, and a change that breaks the module's contract is refused. Module upgrades and eject are in M29, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. It follows M24. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
+| **M26** | The first built-in modules | Planned | The built-in modules `organization` and `approvals` under `modules/`, and a built-in application that uses them under `applications/`. The `departments` sample module and the `request-approval` template become them. The journey: two businesses customize `approvals` differently, one adds a director's approval above a threshold and the other adds a request type of its own, and the contract holds for both: nobody decides their own request, and each step is decided once. `service-desk` and `assets` are in M30, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. It follows M25 and waits for M27. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
+| **M23** | Operator console | Planned | The platform operator sees a tenant's failed work, dead letters, webhook deliveries, schedules and publishing at `/console`, and retries, cancels, resolves, redelivers and discards with a reason. The journey: the operator redelivers the dead letter of the failed webhook and sees it delivered. It waits for M19. See [D93](decisions/d93-an-operator-web-console.md). |
+| **M28** | Security operations | Planned | Axis's images are scanned with Trivy in CI. The hourly driver turns each high or critical Dependabot alert into a NexKit issue. An administrator disables, enables and resets an authenticator from the users page, and `tenant host add`, `remove` and `move` keep the realm's redirect addresses in step. CI runs the load test once a week, and the query limits get their final values. The journey: an administrator disables an account on the users page and its next sign-in is refused, and after `tenant host add` a person signs in on the new host. Carried over from M18: the weekly CI run of the load test and the final query limits. Carried over from M17: the users page's buttons and the realm's redirect addresses. Image signing, the alert rules and the hardening checklist are in M32, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. It can run beside any other milestone. See [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
+| **M31** | Hosted Axis | Planned | Axis runs one installation that hosts the tenants of many small customers, and the owner operates it. A decision of its own sets how a customer gets a tenant, whether sign-up is self-service and what the platform operator watches, and then the "Done when" of this row. It runs beside M24 to M26 once that decision is agreed. See [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md). |
+
+### Phase 2: growth
+
+More built-in modules, module upgrades, and extension work for developers and partners. It starts
+when every milestone of phase 1 is broken down.
+
+| | Milestone | Status | Done when |
+| --- | --- | --- | --- |
+| **M29** | Module upgrades | Planned | A module ships migrations, and a module build fails when an element is gone without one. An upgrade merges an application's layer three ways, property by property, and Studio shows the conflicts. An application ejects a module. The journey: a module is upgraded and an author's added step stays, and a property both changed is resolved in Studio. It follows M25, and must be done before Axis ships a new version of a built-in module to a business that has a layer over it. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) and [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md). |
+| **M30** | More built-in modules | Planned | The built-in modules `service-desk` and `assets`, which the service desk and the asset management samples become, with built-in applications that use them. Carried over from M18: the asset management scenarios for import and attachments, with their denied cases. The journey: a business starts from the built-in service desk, adds a category of its own in Studio, and a request in it reaches the right team. It follows M26. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md), [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md) and [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md). |
 | **M21** | Package runners | Planned | Outside Development, package operations run in the package runners of `Axis.PackageHost`, with an empty environment, a read-only file system, CPU and memory limits, one network route through an egress proxy, and a kill at the operation's timeout. The journey: the payment reference package of purchase requests runs in the package host. See [D90](decisions/d90-extension-packages-run-out-of-process.md). |
 | **M22** | Custom widgets and the published SDK | Planned | An extension package holds custom widgets that the SPA loads through an import map, and the page designer offers them in its palette with a property panel. `Axis.Extensions` and `@axis/widgets-sdk` are published, with a package template and a test harness. The journey: the author drags the "budget usage" widget onto a purchase request page in Studio. It waits for M20. See [D88](decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md). |
-| **M23** | Operator console | Planned | The platform operator sees a tenant's failed work, dead letters, webhook deliveries, schedules and publishing at `/console`, and retries, cancels, resolves, redelivers and discards with a reason. The journey: the operator redelivers the dead letter of the failed webhook and sees it delivered. It waits for M19. See [D93](decisions/d93-an-operator-web-console.md). |
-| **M24** | Module contracts | Planned | A module declares a contract on its entities: a lifecycle of states and transitions with guards, core validations, the effects of a transition and a grant ceiling. The engine checks it on every write, whatever makes the write. A module holds test scenarios whose users hold role slots ([D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md)). Contract scenarios run on every publish of an application that uses the module, and a failing one stops the publish. An application relaxes a named point of a module's contract with a reason, and its release is marked off-standard. The journey: a process change that moves a module record to a state without meeting its guard is refused, and a relax entry lets it through with the off-standard mark. It follows M20. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
-| **M25** | Customization layers | Planned | An application changes a module through a layer under `customizations/<module id>/` that names elements by name and holds only its changes. Compilation applies the layer and checks the contract. A module ships migrations, and a module build fails when an element is gone without one. An upgrade merges the layer three ways, property by property, and Studio shows the conflicts. Studio writes the layer and marks what it changed. An application ejects a module. The journey: an author adds a step to a module's process in Studio, the module is upgraded and the step stays, and a property both changed is resolved in Studio. It follows M24. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
-| **M26** | The workflow modules | Planned | The built-in modules `organization`, `approvals`, `service-desk` and `assets` under `modules/`, and built-in applications that use them under `applications/`. The `departments` sample module, the `request-approval` template, the service desk sample and the asset management sample become them. The journey: two businesses customize `approvals` differently, one adds a director's approval above a threshold and the other adds a request type of its own, and the contract holds for both: nobody decides their own request, and each step is decided once. Carried over from M18: the asset management scenarios for import and attachments, with their denied cases. It follows M25. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
-| **M27** | Data protection | Planned | A field marked `sensitive` is stored encrypted under a data key of its tenant, with an exact lookup when the field declares one, and compilation refuses a filter, sort, aggregate, index or SQL expression on it. A command rotates a tenant's data key. Tenant backups are encrypted with a backup key the operator keeps outside the installation. New history rows keep the user id and no display name, and session audit records keep a shortened client address. The journey: the leave request sample marks the reason `sensitive`, an employee submits a sick leave, the manager reads the reason, a query over the tenant database as its runtime role sees no clear text, and a restore without the backup key is refused. It follows M18 and runs beside M19 to M21, and M26 waits for it. See [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md). |
-| **M28** | Security operations | Planned | Axis's images are scanned with Trivy in CI, and a release workflow publishes them signed with cosign, each with a CycloneDX SBOM. The hourly driver turns each high or critical Dependabot alert into a NexKit issue. The Helm chart ships alert rules for security events, the installation page holds a hardening checklist of every control delegated to the operator, and the server and the worker warn at start about a missing one. The journey: an operator checks an image's signature, installs with the alert rules on, sees an alert fire on a burst of refused sign-ins, and sees the startup warning for a missing control. Carried over from M18: the FAPI 2.0 conformance run, the final ASVS sign-off, the first SAMM rating, the weekly CI run of the load test and the final query limits. Carried over from M17: the users page's disable, enable and reset authenticator buttons, and keeping the realm's redirect addresses in step with `tenant host add`, `remove` and `move`. It can run beside any other milestone. See [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) and [D110](decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md). |
 
-M3 is complete. See the closed
-[M3 milestone](https://github.com/phuongnse/axis/milestone/3?closed=1) on
-GitHub.
+### Phase 3: large organizations and government
 
-M4 is complete. See the closed
-[M4 milestone](https://github.com/phuongnse/axis/milestone/4?closed=1) on
-GitHub.
+What only a large or regulated customer's procurement asks for. It starts when the owner names a
+first such customer.
 
-M5 is complete. See the closed
-[M5 milestone](https://github.com/phuongnse/axis/milestone/5?closed=1) on
-GitHub.
-
-M6 is complete. See the closed
-[M6 milestone](https://github.com/phuongnse/axis/milestone/6?closed=1) on
-GitHub.
-
-M7 is complete. See the closed
-[M7 milestone](https://github.com/phuongnse/axis/milestone/7?closed=1) on
-GitHub.
-
-M8 is complete. See the closed
-[M8 milestone](https://github.com/phuongnse/axis/milestone/8?closed=1) on
-GitHub.
-
-M9 is complete. See the closed
-[M9 milestone](https://github.com/phuongnse/axis/milestone/9?closed=1) on
-GitHub.
-
-M10 is complete. See the closed
-[M10 milestone](https://github.com/phuongnse/axis/milestone/10?closed=1) on
-GitHub.
-
-M11 is complete. See the closed
-[M11 milestone](https://github.com/phuongnse/axis/milestone/11?closed=1) on
-GitHub.
-
-M12 is complete. See the closed
-[M12 milestone](https://github.com/phuongnse/axis/milestone/12?closed=1) on
-GitHub.
-
-M13 is complete. See the closed
-[M13 milestone](https://github.com/phuongnse/axis/milestone/13?closed=1) on
-GitHub.
-
-M14 is complete. See the closed
-[M14 milestone](https://github.com/phuongnse/axis/milestone/14?closed=1) on
-GitHub.
-
-M15 is complete. See the closed
-[M15 milestone](https://github.com/phuongnse/axis/milestone/15?closed=1) on
-GitHub.
-
-M16 is complete. See the closed
-[M16 milestone](https://github.com/phuongnse/axis/milestone/16?closed=1) on
-GitHub.
-
-M18 is complete, so M27 can now start. See the closed
-[M18 milestone](https://github.com/phuongnse/axis/milestone/18?closed=1) on
-GitHub.
-
-M17 is complete. See the closed
-[M17 milestone](https://github.com/phuongnse/axis/milestone/17?closed=1) on
-GitHub.
-
-M19 is next. See the [milestones](https://github.com/phuongnse/axis/milestones) on GitHub.
+| | Milestone | Status | Done when |
+| --- | --- | --- | --- |
+| **M32** | Assurance for large and regulated customers | Planned | A release workflow publishes Axis's images signed with cosign, each with a CycloneDX SBOM. The Helm chart ships alert rules for security events, the installation page holds a hardening checklist of every control delegated to the operator, and the server and the worker warn at start about a missing one. The FAPI 2.0 conformance run, the final ASVS sign-off and the first SAMM rating are done. The journey: an operator checks an image's signature, installs with the alert rules on, sees an alert fire on a burst of refused sign-ins, and sees the startup warning for a missing control. Carried over from M18 and M28, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves them. It starts when the owner names a first large or regulated customer. See [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md), [D110](decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md), [D83](decisions/d83-the-fapi-20-profile-per-tenant.md) and [D84](decisions/d84-asvs-level-2-and-a-server-side-session.md). |
 
 Milestones after M4 may be reordered when business needs require it. M0–M4
 stay in this order.
 
-## Direction after M9
+## Direction
 
-[D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) records the direction.
+[D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) records the
+direction after M9, and [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) the customers it serves first.
 
 - **A general-purpose low-code platform.** An author creates, configures, tests,
   publishes and runs an application through Studio, without editing JSON or
   code.
-- **No domain gets platform code.** Samples prove the platform. Built-in
-  modules _(planned for M26)_ serve real businesses as configuration, not
-  platform code, see
+- **Small businesses first.** Individuals and small and medium businesses have no IT team and
+  do not install software. They start from a built-in application, change it in Studio and use
+  Axis as a service _(planned for M31)_. Large organizations, banks and government come in phase 3.
+- **What sets Axis apart.** Built-in modules _(planned for M26)_ that a business changes anywhere,
+  that keep their upgrades, and whose contract holds on every write, see
   [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+- **No domain gets platform code.** Samples prove the platform. Built-in
+  modules serve real businesses as configuration, not platform code.
 - **Order.** M10 to M16 and M18 to M26 follow the vertical slice: create an
   application, then its data and UI, logic and workflow, permissions, try it
   out, validate and test, publish and operate. Each ends with an end-to-end
   journey. M17 gives every tenant Axis's own identity provider before
   extensibility, so every sign-in looks and works the same, see
-  [D99](decisions/d99-axis-ships-its-own-identity-provider.md).
-- **Parallel work.** M11 and M12 can run in parallel, and so can M14 and M15.
-  M18, M19 and M20 can run in parallel, see
-  [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md).
-  M24, M25 and M26 follow M20, one after the other, and M21 and M22 come
-  after them, see
-  [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
-  M23 waits for M19. M27 follows M18 and runs beside M19 to M21, and M26 waits
-  for it, see
+  [D99](decisions/d99-axis-ships-its-own-identity-provider.md). From M19 the
+  phases order the work, see [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md).
+- **Parallel work.** M19, M20 and M27 run at once and finish first. M24, M25
+  and M26 follow M20, one after the other, see [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+  M26 waits for M27, see
   [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
-  M28 can run beside any of them, see
-  [D110](decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md).
+  M23 waits for M19, see
+  [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md).
+  M28 can run beside any of them, and M31 runs beside M24 to M26 once its
+  decision is agreed. In phase 2, M29 follows M25, M30 follows M26, and M22
+  waits for M20.
 - **Proving it is general.** From M11 on, each milestone extends a sample of a
   new shape: a service desk, then asset management. Neither needs platform
   code.
   M19 to M23 extend the purchase request sample instead, as
   [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
   agrees. From M26 the samples become built-in modules that real businesses
-  customize, as
-  [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
-  agrees.
+  customize, and phase 1 proves its work on them wherever it can.
 - **Planning.** A milestone is broken into issues when it passes the readiness
   check of [D68](decisions/d68-issues-of-several-milestones-run-at-once.md).
-  The decisions and doc sections it lacks are written first, in the owner's
+  Only the milestones of the current phase are broken down, unless the owner
+  asks for another, see [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md).
+  The decisions and doc sections a milestone lacks are written first, in the owner's
   local session, as [the life of a milestone](delivery.md#the-life-of-a-milestone)
   describes.
 
@@ -172,7 +147,7 @@ stay in this order.
 This milestone is done directly, not through NexKit, because NexKit needs
 working checks before it can verify anything.
 
-1. Create the .NET 10 solution following the [repository layout](architecture.md#repository-layout).
+1. Create the .NET 10 solution following the [repository layout](repository-layout.md#repository-layout).
    Include `Directory.Build.props` (nullable enabled, warnings as errors,
    analyzers on), central package management and an `.editorconfig`.
 2. `Axis.Server` serves `/health` and a placeholder SPA page.

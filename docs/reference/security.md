@@ -618,7 +618,7 @@ It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
 can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
 The tenant setting, the client key, the startup check, the machine callers, and
 PAR, `private_key_jwt`, the `iss` check, DPoP at sign-in and the client key rotation are built. The
-verification bullet below is _(planned for M28)_.
+verification bullet below is _(planned for M32)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
@@ -704,7 +704,7 @@ verification bullet below is _(planned for M28)_.
   that signs in through its own realm, the command registers each key in the realm's clients and removes a
   retired one, so the operator only adds, waits for the refresh and retires. A tenant that still signs in
   through an outside identity provider, such as a restored one, has the operator register the public keys there.
-- **Verification** _(planned for M28)_. The OpenID Foundation's conformance suite runs by hand
+- **Verification** _(planned for M32)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
 - **Keycloak.** The development realm has a second client, `axis-fapi`, so

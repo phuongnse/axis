@@ -302,6 +302,14 @@ As environment variables they are `Tenancy__Source`,
   hosts for one site stop the start. Under `directory`, `tenant host add --site` gives it. The E2E server
   uses this for its site host.
 
+- **Tenant keys.** Under `configuration`, `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}`
+  give a tenant's data keys and lookup keys, each 32 bytes in base64, as the environment variables
+  `Tenants__<id>__DataKeys__<number>` and `Tenants__<id>__LookupKeys__<number>`. A number is an integer of at least 1.
+  A value that is not 32 bytes in base64, or a bad number, makes the host fail when it first reads that
+  tenant's keys, with a message that names the setting and never the value. The development settings, `scripts/dev.sh`,
+  Docker Compose and the E2E settings set them for the sample tenants. Under `directory` the keys come from
+  `platform.tenant_data_keys`, see [tenant keys](data-encryption.md#tenant-keys).
+
 ### Preview tenants
 
 A tenant can be the preview tenant of another tenant, as

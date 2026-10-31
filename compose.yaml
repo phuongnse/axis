@@ -169,6 +169,9 @@ services:
       Extensions__Path: /extensions
       Modules__Path: /modules
       Tenants__default__Hosts__0: localhost
+      # The development tenant keys, as in appsettings.Development.json of the server.
+      Tenants__default__DataKeys__1: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+      Tenants__default__LookupKeys__1: AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
       Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis
       Tenants__default__Bindings__PurchasingSystemUrl__Kind: url
@@ -189,6 +192,8 @@ services:
       # The preview tenant default-preview, where preview requests run.
       Tenants__default-preview__PreviewOf: default
       Tenants__default-preview__Hosts__0: preview.localhost
+      Tenants__default-preview__DataKeys__1: AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=
+      Tenants__default-preview__LookupKeys__1: BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=
       Tenants__default-preview__ConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_runtime;Password=axis
       Tenants__default-preview__SchemaConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_schema;Password=axis
       # The role that creates the databases of test scenarios. Only the publisher gets it, and it connects to

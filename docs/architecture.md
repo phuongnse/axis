@@ -86,75 +86,9 @@ flowchart LR
 - **Tenant databases** hold everything else for one tenant: releases, system
   tables, process state, audit and the generated entity tables (D10).
 
-## Repository layout
+## Repository layout and module rules
 
-```text
-src/
-  Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
-  Axis.Worker/            background host
-  Axis.Scenarios.Runner/  library that runs an application's test scenarios, from a folder or from files in memory;
-                          used by Axis.Scenarios and, later, by the publisher
-  Axis.Scenarios/         console host over Axis.Scenarios.Runner that runs an application's test scenarios
-  Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and restore
-  Axis.Administration/    library behind the Axis.Admin commands: the platform audit records so far
-  Axis.PackageHost/       package runner host that runs extension package operations out of process (planned for M21)
-  Axis.Core/              shared primitives: ids, results, clock, tenant context
-  Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases, extension package catalog
-  Axis.Expressions/       expression parser, type checker, interpreter, SQL translation (M2)
-  Axis.Data/              entity storage mapping, schema planning, record commands, data sources
-  Axis.Processes/         work items, decision, task, operation, end and timer steps, task API, the record command, connector calls, package operations, events, triggers and schedules, inbound endpoint starts
-  Axis.Policy/            policy evaluation: entity, data source and process grants, record filters, field sets
-  Axis.Presentation/      site/page/widget metadata served to the SPA
-  Axis.Tenancy/           tenant resolution, connection factory, platform schema
-  Axis.Extensions/        contracts for extension packages: operation interface, operation context
-web/                      React + TypeScript SPA (Vite), Ant Design
-tests/
-  Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
-  Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
-  Axis.LoadData/          generator of the load test's typical-size application with seeds
-  Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
-  packages/               test-only extension package, built as three versions; covers the capability limits
-  e2e/                    Playwright journeys against the running server
-    fixtures/e2e-app/     generic test application the E2E server activates
-    fixtures/release-app/ application a spec activates during the run, to test releases
-    fixtures/subprocess-app/ parent and child sub-process the E2E server activates, for the inspector journey
-samples/
-  apps/purchase-requests/ the first sample application, as configuration only
-  keycloak/               the development Keycloak realm with the sample's users
-  postgres/               init-roles.sql, which creates the axis_schema, axis_runtime and axis_scenario database roles, and the preview tenant's database and roles
-  packages/               the sample extension package payment-references and its unit tests
-deploy/
-  compose/                production Compose example
-  helm/axis/              Helm chart for Kubernetes
-```
-
-Projects are created when the first issue needs them. The solution holds
-`Axis.Server`, `Axis.Core` (only the tenant context so far),
-`Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
-checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
-for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
-`Axis.Presentation` (the platform site, its texts and the shapes of application site metadata), `Axis.Processes` (work items, the
-`decision`, `task`, `operation`, `end` and `timer` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
-`PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
-
-## Module rules
-
-- **Ownership.** Each module owns its tables and its public contracts. Other
-  modules use only those contracts and never read another module's tables
-  directly.
-- **Dependency direction.** Dependencies point inward:
-  - Hosts depend on modules.
-  - Modules depend on `Axis.Core` and on other modules' contracts.
-  - Nothing depends on a host.
-- **Shared transactions.** A module that takes part in a step transaction
-  receives the shared connection and transaction through a unit-of-work
-  contract. Writes through EF Core and through Npgsql commit together.
-- **Persistence boundary.** Engine logic does not depend on ASP.NET Core or on
-  persistence details. It depends on small interfaces with infrastructure
-  implementations (ports and adapters).
-- **Commands and queries.** Commands enforce state transitions. Queries return
-  authorized projections. Both use the same tenant database (no separate read
-  store).
+The [repository layout](repository-layout.md#repository-layout) and the [module rules](repository-layout.md#module-rules) are in their own doc.
 
 ## Configuration pipeline
 
@@ -454,7 +388,7 @@ bindings work. Status rules and publishing are built too.
     repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
   - Axis is checked against ASVS 5.0 Level 2, tracked in [ASVS](reference/asvs.md).
-    The final sign-off is _(planned for M28)_.
+    The final sign-off is _(planned for M32)_.
   - Authentication by default (D111), `.github/CODEOWNERS` and a threat model (D106) are built, see
     [authorization](reference/security.md#authorization) and [ASVS](reference/asvs.md#other-evidence).
   - Performance objectives and the load test are built, except the weekly CI run _(planned for M28)_.
@@ -874,7 +808,8 @@ order there.
 `tests/Axis.PurchasingStub` stands in for the external purchasing system that
 the purchase request sample's connector calls. It is a test fixture, not
 platform code, and references nothing under `src/`. The E2E run,
-`scripts/dev.sh` and Docker Compose start it. Its orders live in memory only.
+`scripts/dev.sh` and Docker Compose start it. Its orders and webhook deliveries
+live in memory only.
 
 - `POST /oauth/token` is the token route of the OAuth2 client credentials
   grant. It reads the form field `grant_type` and the client from the
@@ -891,7 +826,8 @@ platform code, and references nothing under `src/`. The E2E run,
   need an `Authorization: Bearer` header with a token the stub issued and that
   has not expired. Without one the stub answers `401` with
   `WWW-Authenticate: Bearer error="invalid_token"` and stores nothing. The
-  order list, `/health` and the `/test/*` switches need no token.
+  order list, the webhook routes, `/health` and the `/test/*` switches need no
+  token.
 - `POST /purchase-orders` with an `Idempotency-Key` header and a body with
   `requestNumber`, `supplierCode`, `amount` and `lines` creates an order. Each
   line has a `description`, a `quantity`, a `unitPrice` and an `amount`. It
@@ -905,6 +841,27 @@ platform code, and references nothing under `src/`. The E2E run,
   order shows its `lines` in the order sent and the `clientId` of the token
   that created it, so a test can tell that the order came after a token request
   with the sample's credentials.
+- `POST /webhooks/purchase-request-approved` receives a
+  [webhook delivery](reference/outbound-webhooks.md#webhook-delivery) and
+  checks its Standard Webhooks signature. The headers `webhook-id`,
+  `webhook-timestamp` and `webhook-signature` are all required. A missing
+  header, a signature that matches no secret, or a timestamp more than 5 minutes
+  from the stub's clock is a `401` and stores nothing. The header may hold two
+  signatures separated by a space, and one matching signature is enough.
+- The body must be JSON with a string at `data.fields.number`. Otherwise the
+  route answers `400`. A valid delivery is stored once per `webhook-id` and
+  answers `204`. A repeat with the same `webhook-id` also answers `204` and
+  stores nothing new.
+- The stub checks the signature against the secret of the `Webhook:Secret`
+  setting. Its default is `whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA==`,
+  and a `whsec_` secret is the key after base64-decoding the rest.
+- `GET /webhooks/purchase-request-approved` lists the stored deliveries in
+  arrival order. Each shows its `webhookId`, its `type`, its `requestNumber`,
+  taken from `data.fields.number`, and its `receivedAt` time.
+- `POST /test/fail-webhook/{requestNumber}` makes every delivery for that
+  request number answer `500` and store nothing, while other request numbers
+  are unaffected. The switch stays on and has no off endpoint, as the
+  `unknown-request` switch does.
 - `POST /test/drop-next` drops the response of the next create.
   `POST /test/drop/{idempotencyKey}` drops the response of the first create
   with that key. A dropped create stores the order, then closes the connection

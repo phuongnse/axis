@@ -67,8 +67,17 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
                 Decrypt(newCipher, field, after[field]));
         }
 
+        // Every tenant key opens with the new key alone and no longer with the old key alone.
+        var keyRows = after.Where(pair => pair.Key.StartsWith("tenant_data_keys.key:", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, keyRows.Count);
+        foreach (var (field, stored) in keyRows)
+        {
+            Assert.Equal(32, Convert.FromBase64String(Decrypt(CipherFor(_newKey), field, stored)).Length);
+            Assert.Throws<InvalidOperationException>(() => Decrypt(CipherFor(TestPlatform.SecretKey), field, stored));
+        }
+
         Assert.Equal(versionBefore + 1, await VersionAsync(scenario.Platform, id));
-        Assert.Equal(["platform rekey ok: 11 tenant secrets, 2 data protection keys"], result.Output);
+        Assert.Equal(["platform rekey ok: 13 tenant secrets, 2 data protection keys"], result.Output);
         await scenario.AssertNoSecretsAsync(CipherFor(_newKey, TestPlatform.SecretKey));
     }
 
@@ -190,7 +199,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         Assert.True(reader.IsDBNull(1));
         Assert.Equal(Environment.UserName, reader.GetString(2));
         Assert.Equal(Environment.MachineName, reader.GetString(3));
-        Assert.Equal(["tenant secrets: 11", "data protection keys: 2"], (string[])reader[4]);
+        Assert.Equal(["tenant secrets: 13", "data protection keys: 2"], (string[])reader[4]);
         Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
@@ -343,6 +352,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
             {
                 "tenants" => "id",
                 "tenant_bindings" => "tenant_id || '|' || name",
+                "tenant_data_keys" => "tenant_id || '|' || kind || '|' || number",
                 "data_protection_keys" => "id::text",
                 _ => throw new InvalidOperationException($"The table '{table}' has an encrypted column and this test does not know its row."),
             };
@@ -373,9 +383,19 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
             "tenants.realm_users_client_secret" => cipher.Decrypt(row, TenantSecretFields.RealmUsersClientSecret, stored).Reveal(),
             "tenants.oidc_client_key" or "tenants.oidc_previous_client_key" => cipher.Decrypt(row, TenantSecretFields.OidcClientKey, stored).Reveal(),
             "tenant_bindings.secret_value" => cipher.Decrypt(row.Split('|')[0], TenantSecretFields.Binding(row.Split('|')[1]), stored).Reveal(),
+            "tenant_data_keys.key" => DecryptTenantKey(cipher, row, stored),
             "data_protection_keys.xml" => cipher.DecryptDataProtectionKey(Guid.Parse(row), stored).Reveal(),
             _ => throw new InvalidOperationException($"The column '{column}' is encrypted and this test does not know how to decrypt it."),
         };
+    }
+
+    // The row is tenant id, kind and number, joined by a bar. The field is built from the kind and the number.
+    private static string DecryptTenantKey(TenantSecretCipher cipher, string row, byte[] stored)
+    {
+        var parts = row.Split('|');
+        var number = int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture);
+        var field = parts[1] == TenantKeyKinds.Data ? TenantSecretFields.DataKey(number) : TenantSecretFields.LookupKey(number);
+        return cipher.Decrypt(parts[0], field, stored).Reveal();
     }
 
     private static TenantSecretCipher CipherFor(string key, string? previous = null) =>

@@ -72,7 +72,7 @@ defaults to `0.0.0-dev`.
   as `pg_dump`, for backup and restore.
 - **Version.** Every image carries the Axis version in the OCI label
   `org.opencontainers.image.version`. `axis-admin version` prints it.
-- **Signed images** _(planned for M28)_. A release workflow publishes the images
+- **Signed images** _(planned for M32)_. A release workflow publishes the images
   to the GitHub container registry, each signed with cosign and with a CycloneDX
   SBOM. Check the signature before an install or an upgrade, see
   [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md).
@@ -824,7 +824,7 @@ The proxy follows
 
 ## Hardening checklist
 
-_(planned for M28)_ A list of every control that the [ASVS](asvs.md) tracking or the threat model
+_(planned for M32)_ A list of every control that the [ASVS](asvs.md) tracking or the threat model
 delegates to the operator, such as disk encryption, malware scanning of uploads and access to the
 logs, with how to meet each one and how to check it. Outside Development, the server and the
 worker warn at start about each item they can see is missing, see

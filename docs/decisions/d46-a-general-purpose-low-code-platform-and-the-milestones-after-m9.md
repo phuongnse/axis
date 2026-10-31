@@ -5,7 +5,7 @@ Status: **Agreed**
 Axis aims to be a general-purpose low-code platform. People build applications
 of any business domain on it, not one domain such as ERP. This decision records
 the direction, the scope changes and the milestones after M9. See the
-[roadmap](../roadmap.md#direction-after-m9) for the milestone table.
+[roadmap](../roadmap.md#direction) for the milestone table.
 The owner confirmed these points on issue #702 on 2026-10-19.
 
 - **Direction:**
@@ -27,6 +27,9 @@ The owner confirmed these points on issue #702 on 2026-10-19.
   - FAPI 2.0 and ASVS verification move to the Hardening milestone, M16.
   - Still out of scope: self-service SaaS provisioning, Axis-hosted SaaS
     operations, and migrating live business data between installations.
+    - [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) brings Axis-hosted operations into scope in M31, which
+      decides about self-service sign-up. Migrating live business data stays
+      out of scope.
 - **One format, changed in place:**
   - Until the first production release, each resource kind has one format.
   - A change edits that format in place. There is no second version of a kind,
@@ -59,6 +62,8 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
       adds M24 Module contracts, M25 Customization layers and M26 The workflow
       modules.
+    - [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) orders the milestones after M18 in three phases,
+      adds M29 to M32 and renames M26 The first built-in modules.
   - M11 and M12 can run in parallel, and so can M14 and M15.
   - The "Done when" text of each milestone is in the
     [roadmap](../roadmap.md#milestones).
