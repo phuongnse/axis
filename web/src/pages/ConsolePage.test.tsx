@@ -171,7 +171,7 @@ const allLetters: ConsoleDeadLetterPage = {
 
 /**
  * Answers the dead letter routes with `letters`, the webhook deliveries route with `deliveries`, filtered by the `webhook`
- * parameter, and every other route with `answer`, and records every request.
+ * parameter, the publishing route with an empty answer, and every other route with `answer`, and records every request.
  */
 function stubServer(
   answer: (url: string) => Response,
@@ -186,6 +186,9 @@ function stubServer(
     if (input.startsWith('/api/console/webhook-deliveries')) {
       const webhook = new URL(input, 'http://localhost').searchParams.get('webhook')
       return json(deliveryPage(deliveries.filter((row) => !webhook || row.webhookId === webhook)))
+    }
+    if (input.startsWith('/api/console/applications/')) {
+      return json({ active: null, releases: [], requests: [], page: 1, pageSize: 20, totalCount: 0 })
     }
     return input.startsWith(deadLettersPath) ? letters() : answer(input)
   })

@@ -164,3 +164,73 @@ export async function fetchConsoleDeadLetters(
 ): Promise<ConsoleDeadLetterPage | typeof forbidden> {
   return (await fetchDeadLetters(consoleDeadLettersPath, query, signal)) as ConsoleDeadLetterPage | typeof forbidden
 }
+
+/** The active release of an application, as served by `GET /api/console/applications/{id}/publishing`. */
+export interface ConsoleActiveRelease {
+  releaseId: string
+  number: number
+  contentHash: string
+}
+
+/** One activation in the release history of an application, newest first. */
+export interface ConsoleReleaseItem {
+  releaseId: string
+  number: number
+  contentHash: string
+  /** When the release was activated, as an ISO 8601 time. */
+  activatedAt: string
+  /** A user id, `startup`, `operator` or `unknown`. */
+  actor: string
+  actorName: string | null
+  label: string | null
+  note: string | null
+  requestId: string | null
+}
+
+/** One publish request of an application. It never holds the file snapshot, the diagnostics or the test results. */
+export interface ConsolePublishRequest {
+  id: string
+  kind: 'publish' | 'rollback' | 'test'
+  target: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  label: string | null
+  note: string | null
+  requestedBy: string
+  requestedByName: string | null
+  requestedAt: string
+  startedAt: string | null
+  finishedAt: string | null
+  releaseId: string | null
+}
+
+/** The publishing of one application: its release history and one page of its publish requests, newest first. */
+export interface ConsolePublishing {
+  active: ConsoleActiveRelease | null
+  releases: ConsoleReleaseItem[]
+  requests: ConsolePublishRequest[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/** The answer of the publishing route: the publishing, or the refusal that the page shows. */
+export type ConsolePublishingResult = { kind: 'ok'; publishing: ConsolePublishing } | { kind: 'forbidden' }
+
+/** Loads the release history and one page of the publish requests of the application with the id `application`. */
+export async function fetchConsolePublishing(
+  application: string,
+  page: number,
+  signal?: AbortSignal,
+): Promise<ConsolePublishingResult> {
+  const response = await apiFetch(
+    `/api/console/applications/${encodeURIComponent(application)}/publishing?page=${page}&pageSize=20`,
+    { signal },
+  )
+  if (response.status === 403) {
+    return { kind: 'forbidden' }
+  }
+  if (!response.ok) {
+    throw new Error(`Loading the console publishing failed with status ${response.status}.`)
+  }
+  return { kind: 'ok', publishing: (await response.json()) as ConsolePublishing }
+}

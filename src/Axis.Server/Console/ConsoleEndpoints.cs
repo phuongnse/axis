@@ -47,6 +47,10 @@ namespace Axis.Server.Console;
 /// has. The active release is the pinned release when the application has no active release. A malformed id and an unknown
 /// id are one 404. <c>commands</c> is empty and no call is resolvable, because the console has no command routes yet.
 /// </para>
+/// <para>
+/// <c>GET /api/console/applications/{id}/publishing</c> answers one application's release history and publish requests, read
+/// only, see <see cref="ConsolePublishingEndpoints"/>.
+/// </para>
 /// </summary>
 internal static class ConsoleEndpoints
 {
@@ -62,6 +66,7 @@ internal static class ConsoleEndpoints
         console.MapGet("/webhook-deliveries", ListWebhookDeliveriesAsync);
         console.MapGet("/instances/{id}", GetInstanceAsync);
         console.MapConsoleDeadLetterEndpoints();
+        console.MapConsolePublishingEndpoints();
     }
 
     private static async ValueTask<object?> RequireOperatorAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)

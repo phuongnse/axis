@@ -58,6 +58,7 @@ test('the platform operator opens the operator console from the app switcher and
   await expect(tenant.getByRole('cell', { name: 'E2eApp', exact: true })).toBeVisible()
   await expect(tenant.getByRole('cell', { name: 'PurchaseRequests', exact: true })).toBeVisible()
   await expect(page.getByTestId('console-webhook-deliveries')).toBeVisible()
+  await expect(page.getByTestId('console-publishing')).toBeVisible()
 })
 
 test('a person without the operator role is told the page is for operators', async ({ page }) => {

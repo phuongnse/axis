@@ -9,6 +9,7 @@ import {
   type ConsoleFailedWorkPage,
   type ConsoleTenant,
 } from '../platform/console'
+import { ConsolePublishing } from '../platform/ConsolePublishing'
 import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
@@ -22,8 +23,9 @@ const pageSize = 20
  * The operator console for the platform operator. It shows the Tenant view: the status of the tenant of the host and a
  * table of its applications with each active release. Below it, the Failed work view lists the failed instances and the
  * calls with an unknown outcome, newest first, with paging and an application filter. Under it, the Webhook deliveries
- * view lists the recent webhook deliveries, then the Dead letters view lists the dead letters of every application and
- * redelivers or discards each. A user without the operator role sees the forbidden page.
+ * view lists the recent webhook deliveries, then the Publishing view lists the release history and the publish requests of
+ * one application, read only, and the Dead letters view lists the dead letters of every application and redelivers or
+ * discards each. A user without the operator role sees the forbidden page.
  */
 export function ConsolePage() {
   const t = useText()
@@ -203,6 +205,7 @@ export function ConsolePage() {
         </Card>
       )}
       {tenant && !forbidden && <ConsoleWebhookDeliveries applications={tenant.applications} locale={locale} />}
+      {tenant && !forbidden && <ConsolePublishing applications={tenant.applications} locale={locale} />}
       {tenant && !forbidden && <ConsoleDeadLetters applications={tenant.applications} locale={locale} />}
     </PageLayout>
   )

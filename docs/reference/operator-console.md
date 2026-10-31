@@ -2,8 +2,8 @@
 
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
-list of the Failed work view, the instance detail it opens, the Webhook deliveries view, the Dead letters view and
-the redeliver and discard commands are built. Everything else in this file is _(planned for M23)_. The design follows
+list of the Failed work view, the instance detail it opens, the Webhook deliveries view, the Publishing view, the
+Dead letters view and the redeliver and discard commands are built. Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -72,6 +72,20 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     field or a field the active release no longer has. `commands` is empty and no call is
     `resolvable` until the console's command routes are built. When the application has no active
     release, the release the instance is pinned to stands in for the active one.
+  - **`GET /api/console/applications/{id}/publishing`.** Answers one application, named by its id,
+    with its release history and its publish requests, read-only. The group's checks apply (`401`,
+    `403`) and the Studio author and publisher roles play no part. An `id` that is not a hyphenated
+    UUID is a `404`. A valid `id` that no release or request names answers empty lists. `active` is
+    the active release (`releaseId`, `number` and `contentHash`), or `null`. `releases` is the
+    whole history, newest first, with the rows and fields of Studio's
+    [releases route](studio.md): `releaseId`, `number`, `contentHash`, `activatedAt`, `actor`,
+    `actorName`, `label`, `note` and `requestId`. It leaves out the folder's content hash, because
+    the console has no Studio folders. `requests` is one page of the publish requests, newest
+    first, and the answer has `page`, `pageSize` and `totalCount`. The optional `page` and
+    `pageSize` are read as the other list routes read them, and an invalid one is a `400`. A
+    request has its `id`, `kind`, `target`, `status`, `label`, `note`, `requestedBy`,
+    `requestedByName`, `requestedAt`, `startedAt`, `finishedAt` and `releaseId`. It never holds the
+    file snapshot, the diagnostics or the test results.
   - **`GET /api/console/dead-letters`.** Answers one page of the dead letters of every
     application of the tenant, newest first, as the instance list pages, including the letters
     that belong to no process. An optional `application` (an application id) keeps one
@@ -109,7 +123,11 @@ Each view lists the newest items first, pages through them and filters by applic
 - **Schedules.** Each schedule trigger of each active release, with its last and next
   occurrence, see [schedules](process-events.md#schedules).
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
-  read-only. Publishing and rollback stay in Studio.
+  read-only. Publishing and rollback stay in Studio. A card under the Webhook deliveries view with
+  a picker of the applications of the Tenant view, which starts on the first one. A releases table
+  shows the number, label, note, who activated it and when, and marks the active release. A paged
+  table shows each publish request with its kind, target, status, label, who asked, when it was
+  asked and when it finished. It offers no publish, activate or rollback button. Built.
 - **Tenant.** The tenant's status and each application's active release, as a table with the
   application, the release number and label, and the activation time. Built.
 
