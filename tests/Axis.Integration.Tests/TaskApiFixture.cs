@@ -64,6 +64,9 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// <summary>The title <see cref="InsertRequestAsync"/> gives the request <paramref name="id"/>.</summary>
     public static string RequestTitle(Guid id) => $"Request {id:N}";
 
+    /// <summary>The factory of the test host, for a test that adds settings with <c>WithWebHostBuilder</c>.</summary>
+    internal WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
+
     /// <summary>A new client of the server with its own cookies. The caller disposes it.</summary>
     public HttpClient CreateClient() =>
         (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient();

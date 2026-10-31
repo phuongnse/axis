@@ -110,6 +110,11 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     as the process routes, with the operator as actor. It answers `409` for a letter that is not
     `open`, for a trigger that is not in the active release and for a kind that cannot be
     redelivered, and writes nothing then. A success answers `200` with the settled letter.
+- **The test.** `ConsoleRouteGuardTests` reads every route under `/api/console/` from the
+  endpoint data source, so a route added later is checked without a list. It expects `401` signed
+  out, `403` without the role and, for a write, `403` without the CSRF header. Every read must
+  answer the operator `200` without a seeded sensitive value, secret, binding value or webhook
+  body. `ConsoleRouteGuardSelfTests` shows the guard reports a route that breaks each rule.
 
 ## Views
 
