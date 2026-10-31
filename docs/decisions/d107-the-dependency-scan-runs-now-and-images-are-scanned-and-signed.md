@@ -22,7 +22,8 @@ dependencies at once and extends the watch to its images.
     checks and review. The [`axis-nexkit-routine` skill](../../.claude/skills/axis-nexkit-routine/SKILL.md)
     gets that step.
   - The time frames of dependency updates start on the alert's date.
-- **Images are scanned, described and signed:** the scan is _(planned for M28)_, and the release
+- **Images are scanned, described and signed:** the scan is built as `scripts/scan-images.sh`, which
+  CI runs on its triggers and once a week, and the release
   workflow with its SBOMs and signatures is _(planned for M32)_, as
   [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves it.
   - CI builds the three Axis images and scans each one, and the identity provider's image that

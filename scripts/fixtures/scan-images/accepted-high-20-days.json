@@ -1,0 +1,5 @@
+{
+  "accepted": [
+    { "advisory": "CVE-2023-4911", "package": "libc6", "found": "2026-10-08", "reason": "No fixed glibc in the .NET base image yet" }
+  ]
+}

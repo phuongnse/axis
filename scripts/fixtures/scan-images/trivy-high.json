@@ -1,0 +1,30 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "axis-server:scan",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "axis-server:scan (debian 12.7)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2023-4911",
+          "PkgName": "libc6",
+          "InstalledVersion": "2.36-9+deb12u1",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-4911",
+          "Title": "glibc: buffer overflow in ld.so leading to privilege escalation"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-4911",
+          "PkgName": "libc6",
+          "InstalledVersion": "2.36-9+deb12u1",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-4911",
+          "Title": "glibc: buffer overflow in ld.so leading to privilege escalation"
+        }
+      ]
+    }
+  ]
+}
