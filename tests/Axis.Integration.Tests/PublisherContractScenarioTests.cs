@@ -136,6 +136,64 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         Assert.Equal(0L, await ScenarioDatabasesAsync());
     }
 
+    [Fact]
+    public async Task A_publish_skips_a_contract_scenario_that_covers_a_relaxed_point_and_runs_the_others()
+    {
+        using var modules = ModulesWithScenario("approved");
+        File.WriteAllText(
+            System.IO.Path.Combine(modules.Path, "requests", "1.0.0", "scenarios", "create-draft.json"),
+            """
+            {
+              "id": "9c3f5e17-2a64-4d8b-b0e9-6f1a8c4d2b73",
+              "kind": "scenario",
+              "name": "CreateDraft",
+              "formatVersion": 1,
+              "users": { "requester": ["requester"] },
+              "contract": { "covers": ["Request/transitions/approve"] },
+              "steps": [
+                { "type": "createRecord", "entity": "Request", "as": "requester", "save": "request", "values": { "title": "Chairs", "amount": 5, "status": "draft" } },
+                { "type": "expectRecord", "record": "request", "values": { "status": "draft" } }
+              ]
+            }
+            """);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var relax = new JsonArray(new JsonObject { ["point"] = "Request/transitions/submit", ["reason"] = "Tests skip it." });
+        var request = await QueueAsync(scenario, tenant, "publish", relax);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, modules.Path, withScenarioServer: true);
+
+        var status = await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+        Assert.True(status is "succeeded", string.Join('\n', result.Output));
+        var items = await ResultsAsync(scenario, tenant, request);
+        var skipped = Assert.Single(items, item => item!["name"]!.GetValue<string>() == "requests/SubmitRequest")!;
+        Assert.Equal("skipped", skipped["outcome"]!.GetValue<string>());
+        Assert.Equal("Request/transitions/submit", skipped["point"]!.GetValue<string>());
+        Assert.Equal(ScenarioFile, skipped["file"]!.GetValue<string>());
+        var ran = Assert.Single(items, item => item!["name"]!.GetValue<string>() == "requests/CreateDraft")!;
+        Assert.Equal("passed", ran["outcome"]!.GetValue<string>());
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} scenario requests/SubmitRequest skipped:", StringComparison.Ordinal));
+        Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3).ToArray());
+        Assert.Equal(0L, await ScenarioDatabasesAsync());
+    }
+
+    [Fact]
+    public async Task A_publish_whose_contract_scenarios_are_all_skipped_needs_no_scenario_server()
+    {
+        using var modules = ModulesWithScenario("approved");
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var relax = new JsonArray(new JsonObject { ["point"] = "Request/transitions/submit", ["reason"] = "Tests skip it." });
+        var request = await QueueAsync(scenario, tenant, "publish", relax);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, modules.Path, withScenarioServer: false);
+
+        var status = await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+        Assert.True(status is "succeeded", string.Join('\n', result.Output));
+        var item = Assert.Single(await ResultsAsync(scenario, tenant, request))!;
+        Assert.Equal("skipped", item["outcome"]!.GetValue<string>());
+    }
+
     // A copy of the test modules whose requests module has a contract scenario. It submits a draft request, and then expects the
     // given status, so "approved" makes it fail at its last step.
     private static TempModules ModulesWithScenario(string expected)
@@ -218,15 +276,24 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
     }
 
     // Stores a request over the runtime role, as the server will. The snapshot is every JSON file of the ModuleContractApp fixture.
-    private static async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string kind)
+    // With relax, the manifest in the snapshot gets those relax entries on its first module.
+    private static async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string kind, JsonArray? relax = null)
     {
         var items = new JsonArray();
         foreach (var path in Directory.EnumerateFiles(_app, "*.json", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
         {
             var bytes = await File.ReadAllBytesAsync(path, CancellationToken);
+            var file = System.IO.Path.GetRelativePath(_app, path).Replace('\\', '/');
+            if (relax is not null && file == "application.json")
+            {
+                var manifestNode = JsonNode.Parse(Encoding.UTF8.GetString(bytes))!;
+                manifestNode["modules"]![0]!["relax"] = relax.DeepClone();
+                bytes = Encoding.UTF8.GetBytes(manifestNode.ToJsonString());
+            }
+
             items.Add(new JsonObject
             {
-                ["file"] = System.IO.Path.GetRelativePath(_app, path).Replace('\\', '/'),
+                ["file"] = file,
                 ["version"] = Convert.ToHexStringLower(SHA256.HashData(bytes)),
                 ["content"] = Encoding.UTF8.GetString(bytes),
             });

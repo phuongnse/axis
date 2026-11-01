@@ -78,6 +78,13 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
             .Where(row => row.ReleaseId == releaseId)
             .ToDictionaryAsync(row => row.EntityId, row => row.Fingerprint, cancellationToken);
 
+    /// <summary>The stored <c>application.json</c> of each of the releases that has one, in one query.</summary>
+    public async Task<IReadOnlyDictionary<Guid, string>> GetManifestsAsync(IReadOnlyCollection<Guid> releaseIds, CancellationToken cancellationToken = default) =>
+        await context.ReleaseResources
+            .AsNoTracking()
+            .Where(row => releaseIds.Contains(row.ReleaseId) && row.Path == "application.json")
+            .ToDictionaryAsync(row => row.ReleaseId, row => row.Content, cancellationToken);
+
     public async Task<SetActiveReleaseResult> TrySetAsync(
         Guid applicationId,
         string name,
