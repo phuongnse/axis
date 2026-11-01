@@ -261,7 +261,9 @@ realm imported from `samples/keycloak/axis-realm.json`. The folder `samples/keyc
 for every user. After the password, the Keycloak login page asks for a 6-digit code, as D99 requires of every account.
 The password page is the Axis sign-in theme, built into `artifacts/keycloak-theme` and set as the realm's `loginTheme`.
 The code, forgot-password and set-password pages are the Axis theme too. The realm allows "Forgot password?" but sends no
-email.
+email. _(planned for M31)_: every other page of the identity provider is the Axis theme too, the realm's `emailTheme` is `axis`
+and it sends its emails to Mailpit, and it sets the example legal links and the terms step of [legal](reference/legal.md)
+so every link and the terms page show.
 Each user has a fixed secret in the realm file, the `secretData` value of the user's `otp` credential. It is Base32, and it is test data like
 the password. To get a code, add the secret to an authenticator app as a time-based account (SHA-1, 6 digits, 30 seconds), or run
 `oathtool --totp -b <secret>`. The realm accepts a code more than once, so tests can sign in the same user several times within 30 seconds.
@@ -288,7 +290,9 @@ The same Keycloak also imports the realm `company` (Example Company) from `sampl
 organization's own identity provider, which the `axis` realm can broker to. It asks for no code at sign-in. Its confidential
 client `axis-broker` has the secret `axis-broker-development-secret`, a redirect to the `axis` realm's broker endpoint for
 `oidc-companyissuer` and a `groups` claim of plain group names, such as `employees` rather than `/employees`. The realm holds the
-group `employees` and one person in it, `pat` (Pat Example, `pat@company.example`), with the password `axis`. In E2E, Keycloak
+group `employees` and one person in it, `pat` (Pat Example, `pat@company.example`), with the password `axis`. _(planned for M31)_:
+its login theme `example-company`, in `samples/keycloak/themes`, looks like another company's sign-in on purpose, so a
+person sees that they left Axis, and `scripts/dev.sh` copies it beside the Axis theme. It is sample data and never ships. In E2E, Keycloak
 listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its container, so the `axis` realm reaches the `company` realm
 at the address the browser uses. Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant the deployment
 bindings `CompanyIssuer` (the realm's issuer URL), `CompanyClientId` (`axis-broker`) and `CompanyClientSecret`. The purchase request
@@ -345,6 +349,8 @@ works on a fresh clone:
   `web/package-lock.json` changed since the last install. It installs no
   Playwright browser.
 - It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service mounts.
+  _(planned for M31)_: with it the email theme and the sample themes of `samples/keycloak/themes`, and the list of
+  [open source licences](reference/legal.md#open-source-licences) that `/licences` shows.
 - It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker
   Compose. It waits until PostgreSQL accepts connections, Keycloak's `axis`
   realm answers, Mailpit answers and the stub answers. The first run builds the stub's image.
@@ -489,7 +495,8 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   Every preview has at least one state, and a preview with only one shows it as "Typical". A state can
   bring its own fixtures, on its own paths in the fixture application. The names are `table`, `form`,
   `taskInbox`, `processInspector`, `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`,
-  `tabs`, `section`, `states`, `field-<type>` for each field type, and `shell`, `signIn` and `identitySignIn`. The
+  `tabs`, `section`, `states`, `field-<type>` for each field type, `shell`, `signIn` and `identitySignIn`, and
+  `studio`, `studioPageDesign`, `studioFormDesign` and `studioProcessDesign` _(planned for M31)_. The
   `shell`, `signIn` and `identitySignIn` previews draw each state in a frame at least as tall as its height, which
   grows to hold the whole shell, so the state's menus and dialogs open inside it. The `states` preview draws, once,
   the states every widget shares: a table while it loads and a table whose request fails. The `table`,
@@ -519,11 +526,12 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   artifact scales the card to fit its frame, so every card shares one scale and shows the desktop layout. A card
   never scrolls sideways at that width. The states of a card share one `minmax(0, 1fr)` column, so a wide table
   scrolls inside its widget, as it does on a page.
-- The line's `components` name every card once, in the order of seven groups in `web/src/designSystem/cardOrder.ts`:
+- The line's `components` name every card once, in the order of seven groups, eight with Studio _(planned for M31)_, in `web/src/designSystem/cardOrder.ts`:
   Field inputs (each `field-<type>`, named `<Type>Field`), Data widgets (`table`, `form`, `detail`), Charts and KPIs
   (each `chart-<kind>`, named `Chart<Kind>`, and `kpi`), Process widgets (`taskInbox`, `processInspector`),
   Containers (`columns`, `tabs`, `section`), Shared states (`states`) and Shell (`shell`, `signIn`,
-  `identitySignIn`, see [shell](reference/shell.md#design-system-previews)). Every other card takes its PascalCase
+  `identitySignIn`, see [shell](reference/shell.md#design-system-previews)), then Studio (`studio`,
+  `studioPageDesign`, `studioFormDesign`, `studioProcessDesign`). Every other card takes its PascalCase
   name, such as `Table` or `TaskInbox`. `scripts/design-system.sh` writes the line with
   `scripts/design-system-header.mjs` after the build, so a sync keeps it. `scripts/check-design-system.mjs` rejects a
   bundle whose line has no format 4, another namespace, or a card missing, named twice or matching no preview.
