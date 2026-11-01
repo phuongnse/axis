@@ -252,7 +252,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
@@ -738,6 +738,32 @@ public static partial class ApplicationCompiler
             references,
             diagnostics);
 
+        // A module scenario names the module's own entities and processes and its role slots. It adds no
+        // reference, because a module file is not an editable resource. A connector stub names a connector slot,
+        // and a package stub a package the module itself lists.
+        foreach (var moduleScenarios in moduleResources.Scenarios.GroupBy(entry => entry.ModuleId, StringComparer.Ordinal))
+        {
+            var moduleId = moduleScenarios.Key;
+            var pin = modules.First(candidate => candidate.Id == moduleId);
+            var modulePins = modulePackages.GetValueOrDefault(moduleId)?.ToDictionary(package => package.Id, OperationsOf, StringComparer.Ordinal);
+            ScenarioChecker.Check(
+                [.. moduleScenarios.Select(entry => entry.Scenario)],
+                _ => null,
+                new HashSet<string>(),
+                FindEntity,
+                name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+                loaded.UnloadedEntityNames,
+                [.. loaded.Processes.Where(process => IsModuleResource(process) && ModuleIdOf(process.Name) == moduleId)],
+                loaded.UnloadedProcessNames,
+                name => pin.Connectors.TryGetValue(name, out var mapped) ? FindConnector(mapped) : null,
+                new HashSet<string>(),
+                id => modulePins?.GetValueOrDefault(id),
+                new HashSet<string>(moduleManifests[moduleId].Packages.Select(package => package.Id), StringComparer.Ordinal),
+                new ReferenceIndexBuilder(textKeys, loaded.Rules, false),
+                diagnostics,
+                (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()));
+        }
+
         if (probe is not null)
         {
             return new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
@@ -762,6 +788,16 @@ public static partial class ApplicationCompiler
         {
             return result;
         }
+
+        // Each slot becomes the role the application maps it to, so the scenario's user acts with that role's grants.
+        // The scenarios come in pin order and then by path, after the application's own.
+        result = result with
+        {
+            ModuleScenarios = [.. modules.SelectMany(pin => moduleResources.Scenarios
+                .Where(entry => entry.ModuleId == pin.Id)
+                .OrderBy(entry => entry.Scenario.File, StringComparer.Ordinal)
+                .Select(entry => MapScenarioSlots(pin, entry.Scenario)))],
+        };
 
         // The derived ids apply only now, so a diagnostic in a module file keeps the id written in that file.
         var applicationId = loaded.Application.Id;
@@ -853,6 +889,30 @@ public static partial class ApplicationCompiler
             Model = model,
             ContentHash = ContentHash.Compute(resources, allPackages),
             Resources = resources,
+        };
+    }
+
+    /// <summary>
+    /// Names a module's scenario <c>&lt;module id&gt;/&lt;name&gt;</c> and maps each role slot of its users, assignees and
+    /// recipients to the application role of the pin, and each connector stub's slot to the application connector.
+    /// A name the pin does not map is left as written, and the pin check has reported it already.
+    /// </summary>
+    private static ScenarioResource MapScenarioSlots(PinnedModuleModel pin, ScenarioResource scenario)
+    {
+        string Role(string slot) => pin.Roles.GetValueOrDefault(slot, slot);
+
+        return scenario with
+        {
+            Name = $"{pin.Id}/{scenario.Name}",
+            Users = scenario.Users.ToDictionary(user => user.Key, user => (IReadOnlyList<string>)[.. user.Value.Select(Role)]),
+            Stubs = [.. scenario.Stubs.Select(stub => stub.Connector is { } connector
+                ? stub with { Connector = connector with { Name = pin.Connectors.GetValueOrDefault(connector.Name, connector.Name) } }
+                : stub)],
+            Steps = [.. scenario.Steps.Select(step => step with
+            {
+                Assignee = step.Assignee?.Role is { } assignee ? step.Assignee with { Role = Role(assignee) } : step.Assignee,
+                Recipient = step.Recipient?.Role is { } recipient ? step.Recipient with { Role = Role(recipient) } : step.Recipient,
+            })],
         };
     }
 

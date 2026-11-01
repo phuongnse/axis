@@ -1304,7 +1304,7 @@ public sealed class ScenarioRunnerTests
         Assert.True(exitCode == 0, output.ToString());
         var suites = new Dictionary<string, (string Name, string Tests)>
         {
-            ["purchase-requests"] = ("PurchaseRequests", "6"),
+            ["purchase-requests"] = ("PurchaseRequests", "7"),
             ["leave-requests"] = ("LeaveRequests", "5"),
             ["service-desk"] = ("ServiceDesk", "12"),
             ["asset-management"] = ("AssetManagement", "6"),
@@ -1315,6 +1315,98 @@ public sealed class ScenarioRunnerTests
             Assert.Equal(expected.Tests, suite.Attribute("tests")!.Value);
             Assert.Equal("0", suite.Attribute("failures")!.Value);
         }
+    }
+
+    [Fact]
+    public async Task A_module_scenario_runs_for_the_application_after_its_own_and_its_result_names_the_module()
+    {
+        var root = RepositoryRoot();
+        using var results = new TemporaryFolder();
+        var output = new StringWriter();
+
+        var exitCode = await ScenarioCommand.RunAsync(
+            [
+                Path.Combine(root, "samples", "apps", "purchase-requests"),
+                "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
+                "--extensions", SamplePackages.Path,
+                "--modules", SampleModules.Path,
+                "--results", results.Path,
+            ],
+            output,
+            CancellationToken);
+
+        Assert.True(exitCode == 0, output.ToString());
+        var lines = output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        var passed = lines.Where(line => line.StartsWith("PASS ", StringComparison.Ordinal)).ToList();
+        Assert.Equal(7, passed.Count);
+        Assert.Equal("PASS department-budgets/ApproverCreatesBudget", passed[^1]);
+        var suite = XDocument.Load(Path.Combine(results.Path, "scenarios-PurchaseRequests.xml")).Root!.Element("testsuite")!;
+        Assert.Equal("7", suite.Attribute("tests")!.Value);
+        Assert.Equal("0", suite.Attribute("failures")!.Value);
+        Assert.Contains(suite.Descendants("testcase"), testCase => testCase.Attribute("name")!.Value == "department-budgets/ApproverCreatesBudget");
+    }
+
+    [Fact]
+    public async Task A_module_scenario_user_acts_with_the_role_the_application_maps_the_slot_to()
+    {
+        using var folder = new TemporaryFolder();
+        var source = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            folder.With(Path.GetRelativePath(source, file), File.ReadAllText(file));
+        }
+
+        // Both slots that chain to the same role move together, so the pins do not disagree.
+        const string manifest = "application.json";
+        var remapped = File.ReadAllText(Path.Combine(folder.Path, manifest)).Replace("department-manager\" }", "employee\" }");
+        Assert.Equal(2, remapped.Split("employee\" }").Length - 1);
+        folder.With(manifest, remapped);
+        using var results = new TemporaryFolder();
+
+        await ScenarioCommand.RunAsync(
+            [folder.Path, "--server", await PostgreSqlServer.AdminConnectionStringAsync(), "--extensions", SamplePackages.Path, "--modules", SampleModules.Path, "--results", results.Path],
+            new StringWriter(),
+            CancellationToken);
+
+        // The application's own manager scenario no longer holds its role, but the module scenario's approver acts as the employee.
+        var cases = XDocument.Load(Path.Combine(results.Path, "scenarios-PurchaseRequests.xml")).Descendants("testcase").ToList();
+        var module = Assert.Single(cases, testCase => testCase.Attribute("name")!.Value == "department-budgets/ApproverCreatesBudget");
+        Assert.Empty(module.Elements("failure"));
+    }
+
+    [Fact]
+    public async Task A_module_scenario_fails_at_the_step_that_the_policy_of_the_mapped_role_denies()
+    {
+        using var modules = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(SampleModules.Path, "*", SearchOption.AllDirectories))
+        {
+            modules.With(Path.GetRelativePath(SampleModules.Path, file), File.ReadAllText(file));
+        }
+
+        // The module's policy no longer lets its approver create a budget. The manager scenario of the application fails for the same reason.
+        const string policy = "department-budgets/1.0.0/policies/approver-access.json";
+        var narrowed = File.ReadAllText(Path.Combine(modules.Path, policy)).Replace("[\"read\", \"create\", \"update\"]", "[\"read\", \"update\"]");
+        Assert.DoesNotContain("create", narrowed, StringComparison.Ordinal);
+        modules.With(policy, narrowed);
+        using var results = new TemporaryFolder();
+
+        var exitCode = await ScenarioCommand.RunAsync(
+            [
+                Path.Combine(RepositoryRoot(), "samples", "apps", "purchase-requests"),
+                "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
+                "--extensions", SamplePackages.Path,
+                "--modules", modules.Path,
+                "--results", results.Path,
+            ],
+            new StringWriter(),
+            CancellationToken);
+
+        Assert.Equal(1, exitCode);
+        var cases = XDocument.Load(Path.Combine(results.Path, "scenarios-PurchaseRequests.xml")).Descendants("testcase").ToList();
+        var failing = Assert.Single(cases, testCase => testCase.Attribute("name")!.Value == "department-budgets/ApproverCreatesBudget");
+        var message = Assert.Single(failing.Elements("failure")).Attribute("message")!.Value;
+        Assert.StartsWith("Step 2 (createRecord): ", message, StringComparison.Ordinal);
+        Assert.Contains("denied", message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

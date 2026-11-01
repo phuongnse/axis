@@ -386,7 +386,7 @@ A module holds test scenarios, as
 [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees, and marks
 some of them as contract scenarios.
 
-- **Module scenarios.** A `scenario` file in a module names entities and processes of its module by
+- **Module scenarios** _(built)_. A `scenario` file in a module names entities and processes of its module by
   their plain names, and its `users` give role slots of the module instead of roles. When it runs
   for an application, each slot becomes the role the application maps it to, and it runs against
   the application as compiled. It runs with the application's own scenarios, in Studio and with

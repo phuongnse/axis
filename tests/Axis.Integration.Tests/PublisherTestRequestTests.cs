@@ -18,6 +18,9 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     private const string Passing = "ApprovalBelowThreshold";
     private const string FailingFile = "scenarios/failing.json";
 
+    // The scenario of the department-budgets module, which runs after the application's own, named by its module.
+    private const string ModuleScenario = "department-budgets/ApproverCreatesBudget";
+
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
     // A sample has several scenarios, and each one creates, migrates and drops a database.
@@ -64,6 +67,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         var results = await ResultsAsync(scenario, tenant, request);
         var names = Directory.EnumerateFiles(Path.Combine(_sample, "scenarios"), "*.json")
             .Select(path => JsonNode.Parse(File.ReadAllText(path))!["name"]!.GetValue<string>())
+            .Append(ModuleScenario)
             .Order(StringComparer.Ordinal)
             .ToArray();
         Assert.True(names.Length > 1);
@@ -75,7 +79,10 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
             Assert.Null(item["path"]);
             Assert.Null(item["message"]);
             Assert.True(item["durationMs"]!.GetValue<long>() >= 0);
-            Assert.StartsWith("scenarios/", item["file"]!.GetValue<string>());
+            Assert.StartsWith(
+                item["name"]!.GetValue<string>() == ModuleScenario ? "modules/department-budgets/scenarios/" : "scenarios/",
+                item["file"]!.GetValue<string>(),
+                StringComparison.Ordinal);
             Assert.True(Guid.TryParseExact(item["resourceId"]!.GetValue<string>(), "D", out _));
         });
         Assert.Equal(names, results.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray());

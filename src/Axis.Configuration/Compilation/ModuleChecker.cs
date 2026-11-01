@@ -46,7 +46,10 @@ namespace Axis.Configuration.Compilation;
 /// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
 /// a role of the application, and the pin keeps that map. The <c>connectors</c> of an entry must map
 /// each connector slot of the pinned version to a connector of the application that fits it, see
-/// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too.
+/// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too. A module may hold scenarios.
+/// A scenario's steps name the module's own entities and processes without <c>/</c>, rewritten to the
+/// qualified name, and anything else is reported as for a process. The scenario files are checked but are not
+/// returned with the files of the release, so they stay out of its content hash.
 /// </summary>
 internal static class ModuleChecker
 {
@@ -66,6 +69,7 @@ internal static class ModuleChecker
         ResourceKinds.Seed,
         ResourceKinds.Policy,
         ResourceKinds.Trigger,
+        ResourceKinds.Scenario,
     };
 
     /// <summary>
@@ -602,6 +606,12 @@ internal static class ModuleChecker
                     }
 
                     resources.Add(module.Manifest.Id, declared, path, root, diagnostics);
+
+                    // A module scenario is a test. It is not part of the release or its content hash.
+                    if (root.GetProperty("kind").GetString() == ResourceKinds.Scenario)
+                    {
+                        continue;
+                    }
                 }
 
                 files.Add(new ResourceContent(path, JsonCanonicalizer.Canonicalize(root)));
@@ -644,7 +654,7 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies, triggers and texts of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies, triggers, texts and scenarios of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
@@ -659,6 +669,7 @@ internal static class ModuleChecker
         private readonly List<PolicyResource> _policies = [];
         private readonly List<TriggerResource> _triggers = [];
         private readonly List<ModuleText> _texts = [];
+        private readonly List<ModuleScenario> _scenarios = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedSequenceNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedEventNames = new(StringComparer.OrdinalIgnoreCase);
@@ -684,6 +695,7 @@ internal static class ModuleChecker
                 _processes,
                 _triggers,
                 _texts,
+                _scenarios,
                 _unloadedEntityNames,
                 _unloadedSequenceNames,
                 _unloadedEventNames,
@@ -733,7 +745,7 @@ internal static class ModuleChecker
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy, a trigger or a text.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy, a trigger, a text or a scenario.</summary>
         public void Add(string moduleId, IReadOnlySet<string> declared, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -821,6 +833,20 @@ internal static class ModuleChecker
                 case ResourceKinds.Text:
                     var text = root.Deserialize<TextResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _texts.Add(new ModuleText(moduleId, text));
+                    break;
+                case ResourceKinds.Scenario:
+                    var scenario = root.Deserialize<ScenarioResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+
+                    // A step names the module's own entities and processes by plain name, and a user's roles stay
+                    // slot names. ScenarioChecker reports a role that is not a slot.
+                    _scenarios.Add(new ModuleScenario(moduleId, scenario with
+                    {
+                        Steps = [.. scenario.Steps.Select((step, index) => step with
+                        {
+                            Entity = Rewrite(moduleId, _noModules, step.Entity, scenario.File, scenario.Id, $"/steps/{index}/entity", _unloadedEntityNames, diagnostics),
+                            Process = Rewrite(moduleId, _noModules, step.Process, scenario.File, scenario.Id, $"/steps/{index}/process", _unloadedProcessNames, diagnostics),
+                        })],
+                    }));
                     break;
             }
         }
@@ -1009,7 +1035,7 @@ internal static class ModuleChecker
 
 /// <summary>
 /// The entities, sequences, seeds, events, data sources, forms, pages, processes, policies, triggers and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
-/// carrying the ids written in the module files. The rules come by module, in pin order, each in path
+/// carrying the ids written in the module files. The scenarios keep their plain names. The rules come by module, in pin order, each in path
 /// order and under its plain name. <c>DeclaredModules</c> maps each pinned module to the ids in its
 /// manifest's <c>modules</c>, and <c>RoleSlots</c> to the names of the slots in its manifest's <c>roles</c>,
 /// matched exactly. A policy's <c>Roles</c> still name slots here, and a grant's <c>Entity</c> and
@@ -1030,6 +1056,7 @@ internal sealed record ModuleResources(
     IReadOnlyList<ProcessResource> Processes,
     IReadOnlyList<TriggerResource> Triggers,
     IReadOnlyList<ModuleText> Texts,
+    IReadOnlyList<ModuleScenario> Scenarios,
     IReadOnlySet<string> UnloadedEntityNames,
     IReadOnlySet<string> UnloadedSequenceNames,
     IReadOnlySet<string> UnloadedEventNames,
@@ -1042,3 +1069,10 @@ internal sealed record ModuleResources(
 
 /// <summary>A text resource of a pinned module, with the id of that module.</summary>
 internal sealed record ModuleText(string ModuleId, TextResource Text);
+
+/// <summary>
+/// A scenario of a pinned module, with the id of that module. Its name is the plain name written in the file,
+/// its steps name the module's own entities and processes qualified with the module id, and its users, assignees
+/// and recipients still name role slots.
+/// </summary>
+internal sealed record ModuleScenario(string ModuleId, ScenarioResource Scenario);

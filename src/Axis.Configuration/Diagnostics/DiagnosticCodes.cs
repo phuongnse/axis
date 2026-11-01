@@ -305,4 +305,5 @@ public static class DiagnosticCodes
     public const string ConnectorInputTooDeep = "AXC0317";
     public const string MismatchedInputMapping = "AXC0318";
     public const string InvalidMappingSource = "AXC0319";
+    public const string ModuleScenarioRoleNotSlot = "AXC0320";
 }

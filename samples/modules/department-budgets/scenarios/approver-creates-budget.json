@@ -1,0 +1,41 @@
+{
+  "id": "29905c0b-920b-4c0f-b2c4-29279cc65671",
+  "kind": "scenario",
+  "name": "ApproverCreatesBudget",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "approver": ["approver"],
+    "outsider": []
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Budget",
+      "as": "outsider",
+      "expect": "denied",
+      "values": {
+        "name": "Engineering 2027",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
+        "year": 2027,
+        "amount": 50000,
+        "status": "draft"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Budget",
+      "as": "approver",
+      "save": "budget",
+      "values": {
+        "name": "Engineering 2027",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
+        "year": 2027,
+        "amount": 50000,
+        "status": "draft"
+      }
+    },
+    { "type": "updateRecord", "record": "budget", "as": "approver", "values": { "amount": 60000 } },
+    { "type": "expectRecord", "record": "budget", "values": { "amount": 60000, "status": "draft" } }
+  ]
+}
