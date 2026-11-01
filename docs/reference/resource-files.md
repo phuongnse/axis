@@ -626,7 +626,7 @@ instead of being written, as
   `child-collection`, `references` or `file` field is `AXC0276`. A `references`
   field has no column, because a junction table holds its links.
 - **Compile diagnostics.** Each is reported in the entity file:
-  - `AXC0342`: an index has the name of an earlier one, ignoring letter case,
+  - `AXC0343`: an index has the name of an earlier one, ignoring letter case,
     at `/indexes/{j}/name`.
   - `AXC0274`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
@@ -712,7 +712,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
   - `name`, which is required, so a
     [customization layer](customization-layers.md#list-keys) can find the
     validation. It is a name like a field's, and it is unique in the entity's
-    validations, ignoring letter case (`AXC0342`, at `/validations/{i}/name`).
+    validations, ignoring letter case (`AXC0343`, at `/validations/{i}/name`).
     A missing `name` breaks the JSON Schema (`AXC0004`).
   - `expression`, which must be boolean.
   - `message`, a label that is checked like other labels (`AXC0028`). Its text
