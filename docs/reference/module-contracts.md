@@ -402,7 +402,7 @@ some of them as contract scenarios.
   the application as compiled. It runs with the application's own scenarios, in Studio and with
   `Axis.Scenarios`, see [test scenarios](test-scenarios.md). A module's scenario files stay out of
   the release, as an application's do.
-- **Contract scenarios** _(built for the compile check)_. A module scenario with
+- **Contract scenarios** _(built)_. A module scenario with
   `"contract": { "covers": [<points>] }` is a contract scenario. `covers` lists at least one
   [named point](#named-points) of the module that the scenario tests, and an empty list fails the
   schema. The points come from the module's own contracts and are matched exactly, with the letter
@@ -410,11 +410,13 @@ some of them as contract scenarios.
   module's scenario file. An application's own scenario with `contract` is `AXC0340` at
   `/contract`. The compiled module scenarios keep their `covers`. Whether the scenario really
   tests its points is not checked.
-- **On publish.** Every publish and every validate request of an application runs the contract
+- **On publish** _(built)_. Every publish and every validate request of an application runs the contract
   scenarios of every module it pins, before activation, through the
   [publisher](authoring.md#publishing). A failing one fails the request, which names the
-  module, the scenario and its failing step. Nothing is activated.
-- **Relaxed points.** A contract scenario that covers a relaxed point is skipped. The publish result
+  module, the scenario and its failing step, with `AXC0341`, once for each failing scenario. Nothing is
+  stored or activated. The run is the `contracts` step of the request, see [the
+  publisher](administration.md#publisher). Without scenarios to run, nothing changes.
+- **Relaxed points** _(planned for M29)_. A contract scenario that covers a relaxed point is skipped. The publish result
   lists each skipped scenario with the point that skipped it.
 
 ## In Studio

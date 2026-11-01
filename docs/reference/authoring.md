@@ -745,17 +745,17 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   still accepted with `202`. The request then ends `failed` with those
   diagnostics. There is one path for diagnostics, and the snapshot shows what
   the author sent.
-- **`validate`.** The publisher runs every activation check against the
-  tenant inside a transaction that it rolls back. It returns the codes of
-  [startup activation](host-settings.md#startup-activation), including the
-  checks that the in-memory diagnostics skip: bindings, name and site path
-  conflicts, and storage changes. It stores no release and changes nothing.
-  It ends `succeeded` when there is no error.
-- **`publish`.** The publisher compiles the snapshot against the tenant,
-  stores the release and activates it, then seeds, with the same steps as
-  [`axis-admin activate`](administration.md#activate). A `seed` failure
-  happens after activation has committed, so the request ends `failed` with
-  `releaseId` set, and the release stays active and stays in the history.
+- **`validate`.** The publisher first runs the [contract scenarios](module-contracts.md#contract-scenarios)
+  of the pinned modules. It then runs every activation check against the tenant inside a transaction that
+  it rolls back. It returns the codes of [startup activation](host-settings.md#startup-activation),
+  including the checks that the in-memory diagnostics skip: bindings, name and site path conflicts, and
+  storage changes. It stores no release and changes nothing. It ends `succeeded` when there is no error.
+- **`publish`.** The publisher first runs the contract scenarios, as for `validate`. A failing one ends
+  the request `failed` with `AXC0341`, and nothing is stored or activated. Their outcomes are stored
+  with the request, and `scenarios` stays null. Then it compiles the snapshot against the tenant, stores
+  the release and activates it, then seeds, with the same steps as
+  [`axis-admin activate`](administration.md#activate). A `seed` failure happens after activation has
+  committed, so the request ends `failed` with `releaseId` set, and the release stays active.
 - **`test`.** The server stores the request with the snapshot, taken as for
   `validate`. The publisher runs the scenarios as the [publisher](administration.md#publisher)
   describes, and stores their outcomes in `scenarios`. The request ends
@@ -861,8 +861,8 @@ stateDiagram-v2
 - A request that has been claimed three times, and whose lease runs out again,
   ends `failed` with `AXC0215` in place of a fourth claim. A request that
   crashes the publisher cannot block the queue for good.
-- A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and one that a
-  stop of the publisher ends fails with `AXC0220`, see [Test](#test).
+- A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and one that a stop ends fails with
+  `AXC0220`, see [Test](#test). Contract scenarios can end a `publish` or `validate` with `AXC0219` too.
 - `succeeded` and `failed` are final. Studio polls
   `GET .../requests/{id}` until the status is one of them.
 - A request that runs again does no harm. Activating the same content hash

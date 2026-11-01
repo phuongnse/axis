@@ -68,7 +68,8 @@ internal sealed class TenantReleaseActivation(
         List<Diagnostic> diagnostics,
         ActivationActor actor,
         string loadStep = "compile",
-        Func<RealmPlan, Task>? syncRealm = null)
+        Func<RealmPlan, Task>? syncRealm = null,
+        Func<Task<bool>>? contracts = null)
     {
         ConfigurationDbContext? configuration = null;
         DataDbContext? data = null;
@@ -76,6 +77,7 @@ internal sealed class TenantReleaseActivation(
         try
         {
             var succeeded = await Step(id, "version", () => CheckVersionAsync(schemaVersion))
+                && (contracts is null || await contracts())
                 && await Step(id, loadStep, async () =>
                 {
                     var connection = await connections.SchemaConnectionAsync();
@@ -154,9 +156,11 @@ internal sealed class TenantReleaseActivation(
         ITenantConnections connections,
         ActivationBindings bindings,
         Func<ConfigurationDbContext, Task<ReleaseCompilationResult>>? compile,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        Func<Task<bool>>? contracts = null)
     {
         return await Step(id, "version", () => CheckVersionAsync(schemaVersion))
+            && (contracts is null || await contracts())
             && await Step(id, "validate", async () =>
             {
                 if (compile is null)
@@ -265,74 +269,171 @@ internal sealed class TenantReleaseActivation(
                     scenarios = scenarios.Where(scenario => names.Contains(scenario.Name, StringComparer.Ordinal)).ToList();
                 }
 
-                // The limit counts from here, so a claim that runs again gets the whole time again.
-                using var limited = CancellationTokenSource.CreateLinkedTokenSource(stopping);
-                limited.CancelAfter(limit);
-
-                // A stop is what ended the run when both happened, because the operator caused it and the test did not.
-                Exception Cut(ScenarioResource? cut, TimeSpan elapsed)
-                {
-                    var stoppedByOperator = stopping.IsCancellationRequested;
-                    var (code, message) = stoppedByOperator
-                        ? (DiagnosticCodes.ScenarioStopped, "The publisher stopped while the test request ran.")
-                        : (DiagnosticCodes.ScenarioTimeLimit, $"The test request ran past its time limit of {limit.TotalMinutes:0.##} minutes.");
-                    if (cut is not null)
-                    {
-                        results.Add(ScenarioJson(cut.Id, new ScenarioResult(cut.Name, cut.File, "", elapsed, null, null, message)));
-                        output.WriteLine($"{id} scenario {cut.Name} failed: {message}");
-                    }
-
-                    var diagnostic = new Diagnostic(code, message, "", "");
-                    diagnostics.Add(diagnostic);
-                    return new DiagnosticsFailure([diagnostic]);
-                }
-
-                var failed = 0;
-                foreach (var scenario in scenarios)
-                {
-                    var started = Stopwatch.StartNew();
-                    ScenarioResult? result = null;
-                    if (!limited.IsCancellationRequested)
-                    {
-                        try
-                        {
-                            result = await ScenarioRunner.RunAsync(
-                                files, scenario, scenarioServer, NullLoggerFactory.Instance, limited.Token, packages: packages, modules: modules);
-                        }
-                        catch (OperationCanceledException) when (limited.IsCancellationRequested)
-                        {
-                            // The runner has dropped its database.
-                        }
-                    }
-
-                    if (result is null)
-                    {
-                        throw Cut(scenario, started.Elapsed);
-                    }
-
-                    results.Add(ScenarioJson(scenario.Id, result));
-                    if (result.Failure is { } failure)
-                    {
-                        failed++;
-                        output.WriteLine($"{id} scenario {result.Name} failed: {failure}");
-                        if (limited.IsCancellationRequested)
-                        {
-                            // The cancel surfaced as a failure of the scenario, not as a cancel.
-                            throw Cut(null, started.Elapsed);
-                        }
-                    }
-                    else
-                    {
-                        output.WriteLine($"{id} scenario {result.Name} passed");
-                    }
-                }
-
+                var failed = await RunScenariosAsync(id, files, scenarios, scenarioServer, packages, modules, diagnostics, results, limit, "test request", stopping);
                 if (failed > 0)
                 {
                     throw new ScenariosFailure($"{failed} of {scenarios.Count} scenarios failed.");
                 }
             });
         return new ScenarioTestRun(succeeded, results);
+    }
+
+    /// <summary>
+    /// Runs the <c>contracts</c> step for the tenant <paramref name="id"/>: the contract scenarios of the pinned modules, each in its
+    /// own temporary database on <paramref name="scenarioServer"/>, before the compile. It compiles <paramref name="files"/> in memory
+    /// to find them. When the snapshot cannot be read, which is a null <paramref name="files"/>, or does not compile, and when
+    /// there is no contract scenario, it runs nothing, writes no line and returns <c>true</c>, so the next step reports the
+    /// compile problem. Otherwise it fails with <c>AXC0217</c> when <paramref name="scenarioServer"/> is null, and with one
+    /// <c>AXC0341</c> for each scenario that failed, after every scenario ran. Each outcome is added to <paramref name="results"/>.
+    /// The scenarios may run for at most <paramref name="limit"/>, and then fail with <c>AXC0219</c>. A stop never cuts them short.
+    /// Returns whether the step passed.
+    /// </summary>
+    public async Task<bool> ContractsAsync(
+        string id,
+        string? scenarioServer,
+        IReadOnlyList<ResourceContent>? files,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        List<Diagnostic> diagnostics,
+        JsonArray results,
+        TimeSpan limit)
+    {
+        if (files is null)
+        {
+            return true;
+        }
+
+        var compiled = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules);
+        if (compiled.HasErrors || compiled.Model is null)
+        {
+            return true;
+        }
+
+        var scenarios = compiled.ModuleScenarios.Where(scenario => scenario.Contract is not null).ToList();
+        if (scenarios.Count == 0)
+        {
+            return true;
+        }
+
+        return await Step(id, "contracts", async () =>
+        {
+            if (scenarioServer is null)
+            {
+                const string message = "The setting Scenarios:ServerConnectionString is not set, so contract scenarios cannot run.";
+                var missing = new Diagnostic(DiagnosticCodes.ScenarioServerMissing, message, "", "");
+                diagnostics.Add(missing);
+                throw new DiagnosticsFailure([missing]);
+            }
+
+            var first = results.Count;
+            await RunScenariosAsync(id, files, scenarios, scenarioServer, packages, modules, diagnostics, results, limit, "contract scenarios", CancellationToken.None);
+            var failures = new List<Diagnostic>();
+            for (var index = 0; index < scenarios.Count; index++)
+            {
+                if (results[first + index] is not JsonObject outcome || outcome["outcome"]?.GetValue<string>() != "failed")
+                {
+                    continue;
+                }
+
+                // A name is <module id>/<name>.
+                var name = scenarios[index].Name;
+                var slash = name.IndexOf('/');
+                var (module, plain) = slash < 0 ? ("", name) : (name[..slash], name[(slash + 1)..]);
+                var step = outcome["step"]?.GetValue<int>();
+                failures.Add(new Diagnostic(
+                    DiagnosticCodes.ContractScenarioFailed,
+                    $"The contract scenario '{plain}' of the module '{module}' failed: {outcome["message"]?.GetValue<string>()}",
+                    outcome["file"]?.GetValue<string>() ?? "",
+                    step is { } i ? $"/steps/{i}" : "",
+                    scenarios[index].Id));
+            }
+
+            if (failures.Count > 0)
+            {
+                diagnostics.AddRange(failures);
+                throw new DiagnosticsFailure(failures);
+            }
+        });
+    }
+
+    // Runs the scenarios one at a time, in their own databases, and adds each outcome to results and one line to the output.
+    // Returns the number that failed. A run that passes the limit, or that stopping ends, adds its diagnostic and throws.
+    private async Task<int> RunScenariosAsync(
+        string id,
+        IReadOnlyList<ResourceContent> files,
+        IReadOnlyList<ScenarioResource> scenarios,
+        string server,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        List<Diagnostic> diagnostics,
+        JsonArray results,
+        TimeSpan limit,
+        string what,
+        CancellationToken stopping)
+    {
+        // The limit counts from here, so a claim that runs again gets the whole time again.
+        using var limited = CancellationTokenSource.CreateLinkedTokenSource(stopping);
+        limited.CancelAfter(limit);
+
+        // A stop is what ended the run when both happened, because the operator caused it and the test did not.
+        Exception Cut(ScenarioResource? cut, TimeSpan elapsed)
+        {
+            var stoppedByOperator = stopping.IsCancellationRequested;
+            var (code, message) = stoppedByOperator
+                ? (DiagnosticCodes.ScenarioStopped, $"The publisher stopped while the {what} ran.")
+                : (DiagnosticCodes.ScenarioTimeLimit, $"The {what} ran past its time limit of {limit.TotalMinutes:0.##} minutes.");
+            if (cut is not null)
+            {
+                results.Add(ScenarioJson(cut.Id, new ScenarioResult(cut.Name, cut.File, "", elapsed, null, null, message)));
+                output.WriteLine($"{id} scenario {cut.Name} failed: {message}");
+            }
+
+            var diagnostic = new Diagnostic(code, message, "", "");
+            diagnostics.Add(diagnostic);
+            return new DiagnosticsFailure([diagnostic]);
+        }
+
+        var failed = 0;
+        foreach (var scenario in scenarios)
+        {
+            var started = Stopwatch.StartNew();
+            ScenarioResult? result = null;
+            if (!limited.IsCancellationRequested)
+            {
+                try
+                {
+                    result = await ScenarioRunner.RunAsync(
+                        files, scenario, server, NullLoggerFactory.Instance, limited.Token, packages: packages, modules: modules);
+                }
+                catch (OperationCanceledException) when (limited.IsCancellationRequested)
+                {
+                    // The runner has dropped its database.
+                }
+            }
+
+            if (result is null)
+            {
+                throw Cut(scenario, started.Elapsed);
+            }
+
+            results.Add(ScenarioJson(scenario.Id, result));
+            if (result.Failure is { } failure)
+            {
+                failed++;
+                output.WriteLine($"{id} scenario {result.Name} failed: {failure}");
+                if (limited.IsCancellationRequested)
+                {
+                    // The cancel surfaced as a failure of the scenario, not as a cancel.
+                    throw Cut(null, started.Elapsed);
+                }
+            }
+            else
+            {
+                output.WriteLine($"{id} scenario {result.Name} passed");
+            }
+        }
+
+        return failed;
     }
 
     // The shape of a scenario result in the authoring API. The path is that of the failing step in the scenario file.
