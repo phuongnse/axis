@@ -348,7 +348,8 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
 /// <summary>
 /// One platform database with one active tenant, <c>t-…</c>, made by <c>tenant create</c> and served by the real server on
 /// <see cref="Host"/>. The tenant has a <c>url</c> binding and a <c>secret</c> binding for the purchasing system, and the
-/// Company sign-in bindings. The server activates the purchase request and leave request samples in it, so releases pin the
+/// Company sign-in bindings. The server holds the tenant's data and lookup keys of the directory, so it can save a sensitive value, and the
+/// archive of the tenant carries the keys that encrypted it. The server activates the purchase request and leave request samples in it, so releases pin the
 /// payment references package and the departments and department-budgets modules.
 /// </summary>
 public sealed class AdminBackupFixture : IAsyncLifetime
@@ -391,6 +392,12 @@ public sealed class AdminBackupFixture : IAsyncLifetime
         var runtime = AdminScenario.Cipher.Decrypt(TenantId, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
         _schemaConnection = Scenario.TenantConnectionString(TenantId, row.SchemaUser, schema);
         var runtimeConnection = Scenario.TenantConnectionString(TenantId, row.RuntimeUser, runtime);
+        var keys = (await Scenario.KeysAsync(TenantId)).Select(key => (
+            Setting: $"Tenants:{TenantId}:{(key.Kind == TenantKeyKinds.Data ? "DataKeys" : "LookupKeys")}:{key.Number}",
+            Value: AdminScenario.Cipher.Decrypt(
+                TenantId,
+                key.Kind == TenantKeyKinds.Data ? TenantSecretFields.DataKey(key.Number) : TenantSecretFields.LookupKey(key.Number),
+                key.Key).Reveal())).ToList();
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -399,6 +406,11 @@ public sealed class AdminBackupFixture : IAsyncLifetime
             builder.UseSetting($"Tenants:{TenantId}:ConnectionString", runtimeConnection);
             builder.UseSetting($"Tenants:{TenantId}:SchemaConnectionString", _schemaConnection);
             builder.UseTestOidc(TenantId);
+            foreach (var (setting, value) in keys)
+            {
+                builder.UseSetting(setting, value);
+            }
+
             builder.UseSetting($"Tenants:{TenantId}:Bindings:{UrlBinding}:Kind", "url");
             builder.UseSetting($"Tenants:{TenantId}:Bindings:{UrlBinding}:Value", "https://purchasing.example.test");
             foreach (var (key, value) in PurchasingBindings.Settings(TenantId))
