@@ -1,0 +1,22 @@
+{
+  "id": "7b3d1f58-9a4e-4c20-8e6b-2d5f0a9c4e03",
+  "kind": "entity",
+  "name": "Ticket",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "amount", "type": "integer" },
+    { "name": "step", "type": "integer" },
+    { "name": "stepDecision", "type": "text", "maxLength": 100 },
+    { "name": "status", "type": "enum", "required": true, "values": ["draft", "submitted"] }
+  ],
+  "validations": [
+    {
+      "name": "amountNotNegative",
+      "expression": "amount == null or amount >= 0",
+      "message": { "textKey": "stages.ticket.amountNotNegative" },
+      "field": "amount"
+    }
+  ]
+}

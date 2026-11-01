@@ -429,7 +429,7 @@ argument is `null`.
 | `toDate(date-time)` | date | The calendar date of an instant in the application's time zone. `null` gives `null`. Not allowed in a computed field (`AXC0086`). | Yes |
 | `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
 | `previous(field)` | type of the field | The field's value before the write, `null` on a create. Allowed only in a module contract (`AXC0336`), and its argument must be an own field (`AXC0337`). See [previous values](module-contracts.md#previous-values). | No |
-| `accountableUser()` | text | The user who answers for the write, or `null`. Allowed only in a module contract's guard and in the `set` of an `updateRecord` or `createRecord` step (`AXC0341`). A contract's core validation and effect value will allow it when they are built. See [the accountable user](module-contracts.md#the-accountable-user). | No |
+| `accountableUser()` | text | The user who answers for the write, or `null`. Allowed only in a module contract's guard and core validation and in the `set` of an `updateRecord` or `createRecord` step (`AXC0341`). A contract's effect value will allow it when it is built. See [the accountable user](module-contracts.md#the-accountable-user). | No |
 | `decisionTask()` | text | The id of the task whose completion the write follows, as a lowercase GUID with hyphens, or `null`. Allowed where `accountableUser()` is (`AXC0341`). See [the deciding task](module-contracts.md#the-deciding-task). | No |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
@@ -853,11 +853,10 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   entity's own fields, at the call. A child collection, a `references` field,
   an unknown name, any other expression, and a call inside an aggregate's item
   expression are all this.
-- **`AXC0341`.** An expression that is not a module contract's guard or the `set` of an `updateRecord` or
-  `createRecord` step calls `accountableUser()` or `decisionTask()`, at the
+- **`AXC0341`.** An expression that is not a module contract's guard or core validation, or the `set` of an
+  `updateRecord` or `createRecord` step, calls `accountableUser()` or `decisionTask()`, at the
   call. This includes a decision condition, a computed field, a policy filter
-  and a rule body. A contract's core validation and effect value are this too, until
-  they are built.
+  and a rule body. A contract's effect value is this too, until it is built.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).

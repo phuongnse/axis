@@ -23,7 +23,9 @@ public enum RecordWriteOutcome
 
     /// <summary>
     /// A value does not fit its field, a computed field could not be computed, or a validation
-    /// failed; the errors say which. Only <see cref="RecordCommands.SetAsync"/> returns it.
+    /// failed; the errors say which. <see cref="RecordCommands.SetAsync"/> returns it for any of these.
+    /// <see cref="RecordCommands.CreateAsync"/> and <see cref="RecordCommands.UpdateAsync"/> return it for a
+    /// core validation of the entity's module contract that failed, with its point.
     /// </summary>
     Invalid,
 
@@ -41,7 +43,7 @@ public enum RecordWriteOutcome
 /// keyed by RFC 6901 JSON Pointer such as <c>/values/category</c>, with fixed messages that
 /// never name a table, column or constraint.
 /// <see cref="Point"/> is the named point of the module contract that refused the write, such as
-/// <c>Request/transitions/submit</c>, or <see langword="null"/> when none is named.
+/// <c>Request/transitions/submit</c> or <c>Request/validations/amountFrozen</c>, or <see langword="null"/> when none is named.
 /// </summary>
 public sealed record RecordWriteResult(
     RecordWriteOutcome Outcome,

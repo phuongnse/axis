@@ -105,6 +105,82 @@ public static class RecordValidator
         return result.Succeeded && result.Value is true;
     }
 
+    /// <summary>
+    /// Runs the core validations of the entity's module contract on the record as it will be stored: the
+    /// <paramref name="stored"/> record, or none on a create, with <paramref name="values"/> and
+    /// <paramref name="rows"/> on top. <c>previous(field)</c> reads the stored record as it was before the
+    /// write, and is <c>null</c> for every field on a create. <c>accountableUser()</c> and
+    /// <c>decisionTask()</c> read <paramref name="accountability"/>. A validation fails when its expression is
+    /// <c>false</c>, <c>null</c> or stops with a run-time error. A failure is keyed <c>/values/&lt;field&gt;</c>
+    /// and the first in declaration order wins a key. Returns the failures in ordinal key order, or
+    /// <see langword="null"/> when every validation passes. <paramref name="point"/> is the named point of the
+    /// first failed validation, or <see langword="null"/> when a value could not be evaluated.
+    /// </summary>
+    internal static SortedDictionary<string, string[]>? ValidateCore(
+        ApplicationModel application,
+        EntityModel entity,
+        Record? stored,
+        IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
+        DateTimeOffset now,
+        RecordSets sets,
+        ExpressionAccountability accountability,
+        out string? point)
+    {
+        point = null;
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        if (entity.Contract is not { Validations.Count: > 0 } contract)
+        {
+            return null;
+        }
+
+        var record = BuildRecord(entity, stored, values);
+        var before = BuildRecord(entity, stored, []);
+        if (!RecordCollections.TryAdd(application, entity, stored, rows, record, errors, sets))
+        {
+            return errors;
+        }
+
+        var inexact = record.Where(pair => !pair.Value.Exact).Select(pair => pair.Key).ToList();
+        if (inexact.Count > 0)
+        {
+            foreach (var name in inexact)
+            {
+                entity.TryGetField(name, out var field);
+                errors.TryAdd($"/values/{field!.Name}", [RecordInputMessages.NotEvaluable]);
+            }
+
+            return errors;
+        }
+
+        // A stored value that cannot be held exactly leaves previous() without a record to read, so every validation fails.
+        var storedExact = before.Values.All(pair => pair.Exact);
+        var current = new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)));
+        var previous = new ExpressionValues(before.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)));
+        string? firstPoint = null;
+        foreach (var validation in contract.Validations)
+        {
+            var holds = storedExact
+                && ExpressionInterpreter.Evaluate(
+                    validation.Expression.Syntax,
+                    validation.Expression.Check,
+                    current,
+                    records: null,
+                    now: now,
+                    timeZone: application.TimeZone,
+                    previous: previous,
+                    accountability: accountability) is { Succeeded: true, Value: true };
+            if (!holds)
+            {
+                errors.TryAdd($"/values/{validation.Field}", [validation.Message.TextKey]);
+                firstPoint ??= $"{entity.Name[(entity.Name.LastIndexOf('/') + 1)..]}/validations/{validation.Name}";
+            }
+        }
+
+        point = firstPoint;
+        return errors.Count == 0 ? null : errors;
+    }
+
     private static SortedDictionary<string, string[]>? Validate(
         ApplicationModel application,
         EntityModel entity,
