@@ -5,11 +5,11 @@
   "formatVersion": 1,
   "roles": ["department-manager"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "dataSource": "RequestsByDepartment", "actions": ["read"] },
-    { "process": "department-budgets/BudgetApproval", "actions": ["start"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] },
+    { "name": "budgetApprovalStart", "process": "department-budgets/BudgetApproval", "actions": ["start"] }
   ]
 }

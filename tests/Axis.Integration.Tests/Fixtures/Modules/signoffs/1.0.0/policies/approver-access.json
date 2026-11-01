@@ -4,5 +4,5 @@
   "name": "ApproverAccess",
   "formatVersion": 1,
   "roles": ["approver"],
-  "grants": [{ "entity": "Request", "actions": ["read", "update"] }]
+  "grants": [{ "name": "requestRead", "entity": "Request", "actions": ["read", "update"] }]
 }

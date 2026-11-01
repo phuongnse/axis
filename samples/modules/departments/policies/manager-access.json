@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["manager"],
   "grants": [
-    { "entity": "Department", "actions": ["read"], "filter": "manager == currentUser()" },
-    { "dataSource": "Departments", "actions": ["read"] }
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"], "filter": "manager == currentUser()" },
+    { "name": "departmentsRead", "dataSource": "Departments", "actions": ["read"] }
   ]
 }

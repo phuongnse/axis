@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "Claim", "actions": ["read", "create", "update", "import", "export"] },
-    { "entity": "Specimen", "actions": ["read", "create", "update"] },
-    { "entity": "SpecimenTag", "actions": ["read", "create"] },
-    { "dataSource": "Claims", "actions": ["read"] }
+    { "name": "claimRead", "entity": "Claim", "actions": ["read", "create", "update", "import", "export"] },
+    { "name": "specimenRead", "entity": "Specimen", "actions": ["read", "create", "update"] },
+    { "name": "specimenTagRead", "entity": "SpecimenTag", "actions": ["read", "create"] },
+    { "name": "claimsRead", "dataSource": "Claims", "actions": ["read"] }
   ]
 }

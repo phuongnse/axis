@@ -156,16 +156,16 @@ public sealed class PendingComputedRefusalTests(TaskApiFixture fixture) : IClass
     private static string ReviewerReadsDoubled(string path, string content) =>
         path == Path.Combine("policies", "reviewer-access.json")
             ? content.Replace(
-                """{ "entity": "Request", "actions": ["read"], "fields": ["title", "department"] }""",
-                """{ "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }""",
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read"], "fields": ["title", "department"] }""",
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }""",
                 StringComparison.Ordinal)
             : content;
 
     private static string ReviewerStartsAndInspectsDecide(string path, string content) =>
         path == Path.Combine("policies", "reviewer-access.json")
             ? ReviewerReadsDoubled(path, content).Replace(
-                """{ "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }""",
-                """{ "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }, { "process": "Decide", "actions": ["start", "inspect"] }""",
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }""",
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }, { "process": "Decide", "actions": ["start", "inspect"] }""",
                 StringComparison.Ordinal)
             : content;
 
@@ -180,8 +180,8 @@ public sealed class PendingComputedRefusalTests(TaskApiFixture fixture) : IClass
     private static string FinanceDeletesDoubled(string path, string content) =>
         path == Path.Combine("policies", "finance-access.json")
             ? content.Replace(
-                """{ "entity": "Request", "actions": ["read", "create", "delete"] },""",
-                """{ "entity": "Request", "actions": ["read", "create"] }, { "entity": "Request", "actions": ["delete"], "filter": "doubled > 0" },""",
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read", "create", "delete"] },""",
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read", "create"] }, { "entity": "Request", "actions": ["delete"], "filter": "doubled > 0" },""",
                 StringComparison.Ordinal)
             : content;
 

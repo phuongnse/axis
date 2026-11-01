@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["clerk"],
   "grants": [
-    { "entity": "Ticket", "actions": ["read", "create", "update", "import"] },
-    { "entity": "Asset", "actions": ["read", "create"] },
-    { "entity": "Asset", "actions": ["delete"], "filter": "tag != 'locked'" },
-    { "entity": "AssetNote", "actions": ["read", "create"] }
+    { "name": "ticketRead", "entity": "Ticket", "actions": ["read", "create", "update", "import"] },
+    { "name": "assetRead", "entity": "Asset", "actions": ["read", "create"] },
+    { "name": "assetDelete", "entity": "Asset", "actions": ["delete"], "filter": "tag != 'locked'" },
+    { "name": "assetNoteRead", "entity": "AssetNote", "actions": ["read", "create"] }
   ]
 }

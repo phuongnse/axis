@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["auditor"],
   "grants": [
-    { "entity": "claims/Claim", "actions": ["read", "export"] },
-    { "dataSource": "claims/Claims", "actions": ["read", "export"] }
+    { "name": "claimRead", "entity": "claims/Claim", "actions": ["read", "export"] },
+    { "name": "claimsRead", "dataSource": "claims/Claims", "actions": ["read", "export"] }
   ]
 }

@@ -286,13 +286,13 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
             return path switch
             {
                 _ when path == Path.Combine("policies", "finance-access.json") => content.Replace(
-                    """{ "process": "Decide", "actions": ["start"] },""",
-                    $$"""{{sources}} { "process": "Decide", "actions": ["start"] },""",
+                    """{ "name": "decideStart", "process": "Decide", "actions": ["start"] },""",
+                    $$"""{{sources}} { "name": "decideStart", "process": "Decide", "actions": ["start"] },""",
                     StringComparison.Ordinal),
                 _ when path == Path.Combine("policies", "reviewer-access.json") && tenant == TenantA => content.Replace(
-                    """{ "entity": "Request", "actions": ["read"], "fields": ["title", "department"] }""",
+                    """{ "name": "requestRead", "entity": "Request", "actions": ["read"], "fields": ["title", "department"] }""",
                     """
-                    { "entity": "Request", "actions": ["read"], "filter": "doubled > 0" },
+                    { "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "doubled > 0" },
                     { "dataSource": "DoubledRequests", "actions": ["read"] }
                     """,
                     StringComparison.Ordinal),

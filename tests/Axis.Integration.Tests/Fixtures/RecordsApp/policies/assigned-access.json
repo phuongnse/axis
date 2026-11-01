@@ -5,6 +5,6 @@
   "formatVersion": 1,
   "roles": ["assigned"],
   "grants": [
-    { "entity": "Job", "actions": ["read"], "filter": "any(assignees, userId == currentUser())" }
+    { "name": "jobRead", "entity": "Job", "actions": ["read"], "filter": "any(assignees, userId == currentUser())" }
   ]
 }

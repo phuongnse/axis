@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["operator"],
   "grants": [
-    { "process": "ParentJob", "actions": ["start", "inspect"] },
-    { "process": "ChildJob", "actions": ["inspect"] }
+    { "name": "parentJobStart", "process": "ParentJob", "actions": ["start", "inspect"] },
+    { "name": "childJobInspect", "process": "ChildJob", "actions": ["inspect"] }
   ]
 }

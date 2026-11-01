@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["operator"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"] },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["inspect"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestApprovalInspect", "process": "PurchaseRequestApproval", "actions": ["inspect"] }
   ]
 }

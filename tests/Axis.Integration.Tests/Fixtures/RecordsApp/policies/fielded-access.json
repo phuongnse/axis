@@ -5,17 +5,17 @@
   "formatVersion": 1,
   "roles": ["fielded"],
   "grants": [
-    { "entity": "Item", "actions": ["read"], "fields": ["name", "department"] },
-    { "entity": "Item", "actions": ["create", "update"], "fields": ["name", "quantity"] },
-    { "entity": "Item", "actions": ["import"] },
-    { "entity": "Ticket", "actions": ["read", "create"], "fields": ["title"] },
-    { "entity": "Ticket", "actions": ["import"] },
-    { "entity": "Order", "actions": ["read"], "fields": ["lineCount"] },
-    { "entity": "Reminder", "actions": ["read", "create", "update"], "fields": ["title", "state"] },
-    { "entity": "Bundle", "actions": ["read", "create", "update"], "fields": ["title"] },
-    { "dataSource": "ItemsByName", "actions": ["read"] },
-    { "dataSource": "ItemTotals", "actions": ["read"] },
-    { "dataSource": "ItemsByDepartment", "actions": ["read"] },
-    { "dataSource": "ItemNames", "actions": ["read"] }
+    { "name": "itemRead", "entity": "Item", "actions": ["read"], "fields": ["name", "department"] },
+    { "name": "itemCreate", "entity": "Item", "actions": ["create", "update"], "fields": ["name", "quantity"] },
+    { "name": "itemImport", "entity": "Item", "actions": ["import"] },
+    { "name": "ticketRead", "entity": "Ticket", "actions": ["read", "create"], "fields": ["title"] },
+    { "name": "ticketImport", "entity": "Ticket", "actions": ["import"] },
+    { "name": "orderRead", "entity": "Order", "actions": ["read"], "fields": ["lineCount"] },
+    { "name": "reminderRead", "entity": "Reminder", "actions": ["read", "create", "update"], "fields": ["title", "state"] },
+    { "name": "bundleRead", "entity": "Bundle", "actions": ["read", "create", "update"], "fields": ["title"] },
+    { "name": "itemsByNameRead", "dataSource": "ItemsByName", "actions": ["read"] },
+    { "name": "itemTotalsRead", "dataSource": "ItemTotals", "actions": ["read"] },
+    { "name": "itemsByDepartmentRead", "dataSource": "ItemsByDepartment", "actions": ["read"] },
+    { "name": "itemNamesRead", "dataSource": "ItemNames", "actions": ["read"] }
   ]
 }

@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["keyed"],
   "grants": [
-    { "entity": "Ticket", "actions": ["read", "create", "import"] },
-    { "entity": "Ticket", "actions": ["update"], "filter": "priority == 1", "fields": ["title"] }
+    { "name": "ticketRead", "entity": "Ticket", "actions": ["read", "create", "import"] },
+    { "name": "ticketUpdate", "entity": "Ticket", "actions": ["update"], "filter": "priority == 1", "fields": ["title"] }
   ]
 }

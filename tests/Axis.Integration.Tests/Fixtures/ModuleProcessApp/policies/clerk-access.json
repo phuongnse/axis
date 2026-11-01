@@ -5,10 +5,10 @@
   "formatVersion": 1,
   "roles": ["clerk"],
   "grants": [
-    { "entity": "Order", "actions": ["read"] },
-    { "entity": "reviews/Review", "actions": ["read"] },
-    { "process": "CloseReview", "actions": ["start"] },
-    { "process": "FlagReview", "actions": ["start"] },
-    { "endpoint": "ImportReview", "actions": ["invoke"] }
+    { "name": "orderRead", "entity": "Order", "actions": ["read"] },
+    { "name": "reviewRead", "entity": "reviews/Review", "actions": ["read"] },
+    { "name": "closeReviewStart", "process": "CloseReview", "actions": ["start"] },
+    { "name": "flagReviewStart", "process": "FlagReview", "actions": ["start"] },
+    { "name": "importReviewInvoke", "endpoint": "ImportReview", "actions": ["invoke"] }
   ]
 }

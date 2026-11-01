@@ -5,8 +5,8 @@
   "formatVersion": 1,
   "roles": ["clerk"],
   "grants": [
-    { "entity": "Request", "actions": ["read"], "fields": ["title", "amount", "department"] },
-    { "entity": "Department", "actions": ["read"], "fields": ["name"] },
-    { "process": "DepartmentOrder", "actions": ["inspect"] }
+    { "name": "requestRead", "entity": "Request", "actions": ["read"], "fields": ["title", "amount", "department"] },
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"], "fields": ["name"] },
+    { "name": "departmentOrderInspect", "process": "DepartmentOrder", "actions": ["inspect"] }
   ]
 }
