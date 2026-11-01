@@ -714,7 +714,7 @@ internal static class ProcessChecker
                     .Where(field => values.ContainsKey(field.Name))
                     .Select(field => new RecordAssignmentModel(
                         field.Name,
-                        ExpressionModel.Compile(values[field.Name], scope, ExpressionScopes.TypeOf(field)!))),
+                        ExpressionModel.Compile(values[field.Name], scope, ExpressionScopes.TypeOf(field)!, stepSet: true))),
             ];
         }
 
@@ -1255,8 +1255,8 @@ internal static class ProcessChecker
     /// problem, or null. When it type-checks, the rules it calls are added to <paramref name="references"/> at <paramref name="path"/>.
     /// </summary>
     private static ExpressionDiagnostic? CheckExpression(
-        Resource process, string expression, ExpressionScope scope, ExpressionType expected, string path, ReferenceIndexBuilder references) =>
-        CheckExpression(process, expression, scope, expected, path, references, out _, out _);
+        Resource process, string expression, ExpressionScope scope, ExpressionType expected, string path, ReferenceIndexBuilder references, bool stepSet = false) =>
+        CheckExpression(process, expression, scope, expected, path, references, out _, out _, stepSet);
 
     /// <summary>
     /// Like the overload without outputs, and also gives the parsed expression and its check result
@@ -1270,7 +1270,8 @@ internal static class ProcessChecker
         string path,
         ReferenceIndexBuilder references,
         out ExpressionNode? node,
-        out ExpressionCheckResult? result)
+        out ExpressionCheckResult? result,
+        bool stepSet = false)
     {
         node = null;
         result = null;
@@ -1281,7 +1282,7 @@ internal static class ProcessChecker
             return parsed.Diagnostic;
         }
 
-        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected, stepSet: stepSet);
         if (check.Succeeded)
         {
             references.AddRuleCalls(process, path, check);
@@ -1505,7 +1506,7 @@ internal static class ProcessChecker
                 continue;
             }
 
-            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field)!, path, references);
+            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field)!, path, references, stepSet: true);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, path);

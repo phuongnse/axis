@@ -297,6 +297,63 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Theory]
+    [InlineData("accountableUser()", "text")]
+    [InlineData("decisionTask()", "text")]
+    [InlineData("t == accountableUser()", "boolean")]
+    [InlineData("decisionTask() is null", "boolean")]
+    [InlineData("ACCOUNTABLEUSER() != null", "boolean")]
+    public void Accountability_in_a_step_set_is_text(string text, string type)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), stepSet: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(Expected(type), result.Type);
+    }
+
+    [Fact]
+    public void Accountability_in_the_item_of_an_aggregate_of_a_step_set_is_text()
+    {
+        var parsed = ExpressionParser.Parse("any(lineItems, name == accountableUser())");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.Boolean, stepSet: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Theory]
+    [InlineData("accountableUser()", "text", "accountableUser", 0)]
+    [InlineData("decisionTask()", "text", "decisionTask", 0)]
+    [InlineData("t == accountableUser()", "boolean", "accountableUser", 5)]
+    [InlineData("concat(t, decisionTask())", "text", "decisionTask", 10)]
+    public void Accountability_outside_a_step_set_is_reported_at_the_call(string text, string type, string function, int offset)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        // The default, a stored value, a policy filter and a contract are all outside a step's set.
+        var results = new[]
+        {
+            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type)),
+            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), storedValue: true),
+            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), policyFilter: true),
+            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), contract: true),
+        };
+
+        foreach (var diagnostic in results.Select(result => result.Diagnostic))
+        {
+            Assert.NotNull(diagnostic);
+            Assert.Equal((ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, offset), (diagnostic.Code, diagnostic.Offset));
+            Assert.Equal(
+                $"Function '{function}' is allowed only in the set of an updateRecord or createRecord step at character {offset + 1}.",
+                diagnostic.Message);
+        }
+    }
+
+    [Theory]
     [InlineData("text", "t")]
     [InlineData("integer", "i")]
     [InlineData("decimal", "d")]

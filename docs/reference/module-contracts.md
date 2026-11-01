@@ -268,8 +268,8 @@ does. It is how a guard knows who decided.
   the same user.
 - **Allowed where.** In a contract's guards, core validations and effect values, and in the `set` of
   an `updateRecord` or `createRecord` step, which writes it as the value the write will be judged
-  by, such as who decided a step. Anywhere else it is a diagnostic, as `currentUser()` outside a
-  policy filter is.
+  by, such as who decided a step. Anywhere else it is a diagnostic (`AXC0341`), as `currentUser()`
+  outside a policy filter is. A contract's expression is the diagnostic until contracts allow it.
 
 ## The deciding task
 
@@ -284,7 +284,7 @@ promise that each step is decided once.
   value a step stores with the one it held before: `stepDecision == decisionTask() and stepDecision
   != previous(stepDecision)`. A layer that adds a second write after one decision then cannot move
   the counter twice.
-- **Allowed where.** Where `accountableUser()` is allowed.
+- **Allowed where.** Where `accountableUser()` is allowed, and `AXC0341` elsewhere.
 - **Why not `currentUser()`.** `currentUser()` is the session's user and binds a SQL parameter.
   A process step has no session, and its write must still be judged by who decided it. So a step
   that sets `approved` before any task was decided runs with the starter as its accountable user,
