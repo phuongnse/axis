@@ -1,0 +1,8 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3c04",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": { "role.employee": "Employee" }
+}

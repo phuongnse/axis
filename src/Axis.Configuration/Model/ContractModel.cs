@@ -4,7 +4,7 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled module contract on an entity of a pinned module. Only the lifecycle is compiled so far.
-/// Nothing enforces it yet.
+/// Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
 /// </summary>
 public sealed record ContractModel
 {

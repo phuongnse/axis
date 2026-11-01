@@ -43,7 +43,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
 | [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |
 | [Data sources](reference/data-sources.md)                              | The `dataSource` resource and its endpoint                                            |
-| [Record API](reference/record-api.md)                                  | Record routes, values, paging, errors, child rows, audit history                      |
+| [Record API](reference/record-api.md)                                  | Record routes, values, paging, errors, child rows                                     |
+| [Record audit](reference/record-audit.md)                              | The audit records every record write leaves, and the history endpoint                 |
 | [File fields](reference/file-fields.md)                                | The `file` field type: values, upload, download, storage and clean-up                |
 | [Import and export](reference/import-export.md)                        | Exporting records to CSV and spreadsheets, and importing them under policies          |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency          |

@@ -11,4 +11,7 @@ public enum RecordDeleteOutcome
 
     /// <summary>Another record references the record through a foreign key, so it was kept.</summary>
     Referenced,
+
+    /// <summary>The entity's lifecycle does not allow a delete in the stored state, so the record was kept.</summary>
+    LifecycleRefused,
 }

@@ -783,7 +783,7 @@ schema of the tenant database.
     the file stopped at `Data:ExportMaxRows`. They never hold a field value.
 
   - An index on `(entity_id, record_id, occurred_at desc, id desc)` serves
-    the [record history](record-api.md#audit-records-and-history).
+    the [record history](record-audit.md#audit-records-and-history).
   - A `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE TRUNCATE`
     statement trigger raise an exception with SQLSTATE `23001`
     (`restrict_violation`), so no row can be changed or removed, even by

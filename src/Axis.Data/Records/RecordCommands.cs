@@ -13,6 +13,12 @@ namespace Axis.Data.Records;
 /// identifier comes from <see cref="EntityNaming"/> and is quoted, and every value is a typed
 /// parameter. Storage failures the request can cause become a <see cref="RecordWriteResult"/> or
 /// <see cref="RecordDeleteResult"/> that never names a table, column or constraint.
+/// Every write follows the entity's lifecycle, when a module contract gives it one: a create only in
+/// an initial state, a state change only along a transition whose guard is <c>true</c>, and a delete
+/// only in a deletable state. The check sits in <see cref="CreateAsync"/>, <see cref="UpdateAsync"/>
+/// and <see cref="DeleteAsync"/>, so <see cref="SetAsync"/> and <see cref="CreateFromAsync"/> reach it
+/// through them. A refusal is <see cref="RecordWriteOutcome.LifecycleRefused"/> or
+/// <see cref="RecordDeleteOutcome.LifecycleRefused"/> and writes nothing.
 /// </summary>
 public static class RecordCommands
 {
@@ -35,7 +41,8 @@ public static class RecordCommands
     /// A file value also needs the caller's transaction: the file is attached to the record after the
     /// reference check. It must be a pending file that <paramref name="uploader"/> uploaded for the same
     /// entity and field path. Without an <paramref name="uploader"/> nothing attaches, so any file id is
-    /// <see cref="RecordWriteOutcome.Invalid"/>.
+    /// <see cref="RecordWriteOutcome.Invalid"/>. A create outside an initial state of the entity's
+    /// lifecycle is <see cref="RecordWriteOutcome.LifecycleRefused"/>, checked first.
     /// </summary>
     public static async Task<RecordWriteResult> CreateAsync(
         NpgsqlConnection connection,
@@ -56,6 +63,11 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
+
+        if (RecordLifecycle.CheckCreate(entity, values) is { } lifecycleRefusal)
+        {
+            return lifecycleRefusal;
+        }
 
         if (await FindMissingReferencesAsync(connection, values, rows, links, cancellationToken) is { } missing)
         {
@@ -113,7 +125,9 @@ public static class RecordCommands
     /// Without an <paramref name="uploader"/> nothing new attaches, so any other file id is
     /// <see cref="RecordWriteOutcome.Invalid"/>. After a write, a file that the record no longer holds
     /// at a written file field, or at the file field of a written collection, becomes <c>deleted</c>
-    /// in the caller's transaction.
+    /// in the caller's transaction. An update that sends the lifecycle's state field and changes the state
+    /// reads the stored record first, and is <see cref="RecordWriteOutcome.LifecycleRefused"/> unless a
+    /// transition from the stored state to the new one has a guard that is <c>true</c>, or has none.
     /// </summary>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
@@ -135,6 +149,11 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
+
+        if (await RecordLifecycle.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, cipher, cancellationToken) is { } lifecycleRefusal)
+        {
+            return lifecycleRefusal;
+        }
 
         if (await FindMissingReferencesAsync(connection, values, rows, links, cancellationToken) is { } missing)
         {
@@ -370,7 +389,9 @@ public static class RecordCommands
     /// Deletes the record with <paramref name="id"/> and returns the version it had. Every file
     /// attached to it, also a file of a child row, becomes <c>deleted</c> in the same statement. A
     /// record that another record references is kept with its files and is
-    /// <see cref="RecordDeleteOutcome.Referenced"/>.
+    /// <see cref="RecordDeleteOutcome.Referenced"/>. When the entity has a lifecycle, the stored state is
+    /// read with <c>FOR UPDATE</c> first, and a state that is not deletable is
+    /// <see cref="RecordDeleteOutcome.LifecycleRefused"/>.
     /// </summary>
     public static async Task<RecordDeleteResult> DeleteAsync(
         NpgsqlConnection connection,
@@ -382,6 +403,11 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+
+        if (await RecordLifecycle.CheckDeleteAsync(connection, entity, id, cancellationToken) is { } lifecycleRefusal)
+        {
+            return lifecycleRefusal;
+        }
 
         var versionColumn = EntityNaming.Quote(EntityNaming.VersionColumn);
         await using var command = new NpgsqlCommand(

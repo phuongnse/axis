@@ -386,7 +386,7 @@ internal sealed class ScenarioSteps(
             TaskCompletionOutcome.WriteFailed => write switch
             {
                 RecordWriteOutcome.NotFound => "notFound",
-                RecordWriteOutcome.UniqueViolation or RecordWriteOutcome.SchemaConflict => "conflict",
+                RecordWriteOutcome.UniqueViolation or RecordWriteOutcome.SchemaConflict or RecordWriteOutcome.LifecycleRefused => "conflict",
                 RecordWriteOutcome.MissingReference or RecordWriteOutcome.Invalid => "invalid",
                 _ => null,
             },
