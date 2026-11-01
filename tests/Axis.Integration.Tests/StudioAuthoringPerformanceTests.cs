@@ -131,7 +131,9 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var tenant = await PublisherTestRequestTests.CreateTenantAsync(scenario);
-        var request = await QueueAsync(scenario, tenant, await SnapshotAsync());
+        var (snapshot, names) = await SnapshotAsync();
+        // The request names its 20 scenarios, so the modules' scenarios, which a request without names also runs, do not count.
+        var request = await QueueAsync(scenario, tenant, snapshot, JsonSerializer.Serialize(names));
         var settings = new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = "directory",
@@ -169,7 +171,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         Assert.True(status == "succeeded", string.Join('\n', result.Output));
         Assert.Equal(0, result.Exit);
         var results = JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT scenario_results::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
-        Assert.Equal(Scenarios, results.Count);
+        Assert.Equal(names.Order(StringComparer.Ordinal), results.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal));
         Assert.All(results, item => Assert.Equal("passed", item!["outcome"]!.GetValue<string>()));
         Assert.True(elapsed < _testTime, $"The test request took {elapsed}.");
     }
@@ -292,7 +294,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
     }
 
     // The sample's scenarios, filled up to 20 by copying them in turn, each copy with a new id and name. Every file is versioned as the publish route stores it.
-    private static async Task<string> SnapshotAsync()
+    private static async Task<(string Snapshot, List<string> Names)> SnapshotAsync()
     {
         var items = new JsonArray();
         foreach (var path in Directory.EnumerateFiles(_sample, "*.json", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
@@ -303,6 +305,12 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
 
         var originals = Directory.EnumerateFiles(Path.Combine(_sample, "scenarios"), "*.json").Order(StringComparer.Ordinal).ToList();
         Assert.True(originals.Count <= Scenarios, $"The sample holds {originals.Count} scenarios, more than the {Scenarios} of the test.");
+        var names = new List<string>();
+        foreach (var path in originals)
+        {
+            names.Add(JsonNode.Parse(await File.ReadAllTextAsync(path, CancellationToken))!["name"]!.GetValue<string>());
+        }
+
         for (var k = 0; k < Scenarios - originals.Count; k++)
         {
             var path = originals[k % originals.Count];
@@ -313,10 +321,12 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
             var copy = JsonNode.Parse(original.ToJsonString())!.AsObject();
             copy["id"] = Guid.NewGuid().ToString();
             copy["name"] = $"{name}Copy{n}";
+            names.Add($"{name}Copy{n}");
             items.Add(Item($"scenarios/{stem}-copy-{n}.json", Encoding.UTF8.GetBytes(copy.ToJsonString())));
         }
 
-        return items.ToJsonString();
+        Assert.Equal(Scenarios, names.Count);
+        return (items.ToJsonString(), names);
     }
 
     private static JsonObject Item(string file, byte[] bytes) =>
@@ -328,7 +338,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         };
 
     // Stores a test request over the runtime role, as the server will.
-    private static async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string snapshot)
+    private static async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string snapshot, string scenarioNames)
     {
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
@@ -338,12 +348,13 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, target, status, snapshot, requested_by, requested_by_name, requested_at, scenario_names)
-            VALUES (@id, @application, 'test', 'tenant', 'queued', @snapshot, 'author', 'Author User', clock_timestamp(), NULL)
+            VALUES (@id, @application, 'test', 'tenant', 'queued', @snapshot, 'author', 'Author User', clock_timestamp(), @scenarios)
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", Guid.Parse(await ApplicationIdAsync()));
         command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = snapshot });
+        command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = scenarioNames });
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
     }
