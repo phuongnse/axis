@@ -8,7 +8,8 @@ named point of it with a `relax` entry and a reason, and its release is then mar
 idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked.md) agrees the
 shapes below. The `contract` resource and the compile checks of its `lifecycle` and its `ceiling`
 are built. So is the lifecycle check on every record write, with the record API's `409` and its log
-line. A refusal on another write path fails as that path already fails, and logs nothing yet. The
+line. So is the compile check of a module scenario's `contract.covers`. A refusal on another write
+path fails as that path already fails, and logs nothing yet. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
 
@@ -401,9 +402,14 @@ some of them as contract scenarios.
   the application as compiled. It runs with the application's own scenarios, in Studio and with
   `Axis.Scenarios`, see [test scenarios](test-scenarios.md). A module's scenario files stay out of
   the release, as an application's do.
-- **Contract scenarios.** A module scenario with `"contract": { "covers": [<points>] }` is a
-  contract scenario. `covers` lists at least one named point of the module that the scenario tests.
-  An unknown point is a diagnostic.
+- **Contract scenarios** _(built for the compile check)_. A module scenario with
+  `"contract": { "covers": [<points>] }` is a contract scenario. `covers` lists at least one
+  [named point](#named-points) of the module that the scenario tests, and an empty list fails the
+  schema. The points come from the module's own contracts and are matched exactly, with the letter
+  case the contract writes. A point the module lacks is `AXC0339` at `/contract/covers/{i}` of the
+  module's scenario file. An application's own scenario with `contract` is `AXC0340` at
+  `/contract`. The compiled module scenarios keep their `covers`. Whether the scenario really
+  tests its points is not checked.
 - **On publish.** Every publish and every validate request of an application runs the contract
   scenarios of every module it pins, before activation, through the
   [publisher](authoring.md#publishing). A failing one fails the request, which names the

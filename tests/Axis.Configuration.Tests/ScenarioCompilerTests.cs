@@ -21,6 +21,23 @@ public sealed class ScenarioCompilerTests
     }
 
     [Fact]
+    public void An_application_scenario_with_contract_is_axc0340_at_contract()
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario("""
+            "users": { "requester": ["employee"] },
+            "contract": { "covers": ["Request/transitions/approve"] },
+            "steps": [
+              { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Laptops" } }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.File == ScenarioFile);
+        Assert.Equal((DiagnosticCodes.ContractOnApplicationScenario, "/contract"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
     public void Every_problem_of_a_scenario_gets_its_own_code_at_its_path_in_one_compile()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""

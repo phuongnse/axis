@@ -13,6 +13,7 @@ public sealed class ModuleContractTests
     private const string SecondContractId = "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b72";
     private const string SeedId = "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b73";
     private const string ContractFile = "modules/approvals/Contract.json";
+    private const string ScenarioPath = "scenarios/Covers.json";
 
     private const string DefaultStates = """
         [ { "name": "draft", "initial": true, "deletable": true }, { "name": "submitted" }, { "name": "approved" } ]
@@ -438,6 +439,83 @@ public sealed class ModuleContractTests
         Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code);
         Assert.Equal(ContractFile, diagnostic.File);
     }
+
+    private const string ScenarioFile = "modules/approvals/scenarios/Covers.json";
+
+    private const string CoveredPointsExtra = """
+        , "validations": [ { "name": "amountPositive", "expression": "amount >= 0", "message": { "textKey": "approvals.request.small" }, "field": "amount" } ],
+          "effects": [ { "name": "submitted", "on": "submit", "create": { "entity": "Line", "values": { "quantity": "1" } } } ],
+          "ceiling": { "slots": { "requester": [{ "actions": ["read"], "fields": ["title"] }] }, "others": [{ "actions": ["read"], "fields": ["title"] }] }
+        """;
+
+    [Fact]
+    public void A_module_scenario_covering_one_point_of_each_form_compiles_and_keeps_its_covers()
+    {
+        string[] covers =
+        [
+            "Request/transitions/approve",
+            "Request/states/approved/initial",
+            "Request/states/approved/deletable",
+            "Request/validations/amountPositive",
+            "Request/effects/submitted",
+            "Request/ceiling/requester",
+            "Request/ceiling/others",
+        ];
+        using var modules = Modules(Contract(Lifecycle(), extra: CoveredPointsExtra), (ScenarioPath, CoversScenario(covers)));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var scenario = Assert.Single(compiled.ModuleScenarios);
+        Assert.Equal(covers, scenario.Contract!.Covers);
+    }
+
+    [Fact]
+    public void A_covered_point_the_contract_lacks_is_axc0339_at_its_index()
+    {
+        using var modules = Modules(
+            Contract(Lifecycle()),
+            (ScenarioPath, CoversScenario("Request/transitions/approve", "Request/transitions/publish", "Request/states/draft/initial")));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(
+            [(DiagnosticCodes.UnknownCoveredPoint, ScenarioFile, "/contract/covers/1"), (DiagnosticCodes.UnknownCoveredPoint, ScenarioFile, "/contract/covers/2")],
+            compiled.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)));
+    }
+
+    [Fact]
+    public void A_covered_point_is_matched_with_the_letter_case_of_the_contract()
+    {
+        using var modules = Modules(Contract(Lifecycle()), (ScenarioPath, CoversScenario("request/transitions/approve")));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal((DiagnosticCodes.UnknownCoveredPoint, "/contract/covers/0"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_empty_covers_list_is_a_schema_violation_of_the_scenario()
+    {
+        using var modules = Modules(Contract(Lifecycle()), (ScenarioPath, CoversScenario()));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Path == "/contract/covers");
+        Assert.Equal((DiagnosticCodes.SchemaViolation, ScenarioFile), (diagnostic.Code, diagnostic.File));
+    }
+
+    private static string CoversScenario(params string[] covers) => $$"""
+        { "id": "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b80", "kind": "scenario", "name": "Covers", "formatVersion": 1,
+          "users": { "u1": ["requester"] },
+          "contract": { "covers": [{{string.Join(", ", covers.Select(point => $"\"{point}\""))}}] },
+          "steps": [ { "type": "createRecord", "entity": "Request", "save": "request", "values": { "title": "x", "status": "draft", "locked": "a" }, "as": "u1" } ] }
+        """;
 
     private static void AssertDiagnostic(string code, string path, Diagnostic diagnostic)
     {
