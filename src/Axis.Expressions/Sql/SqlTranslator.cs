@@ -334,7 +334,7 @@ public static class SqlTranslator
             {
                 case "date" or "dateTime":
                     return DateLiteral(call, name);
-                case "lower" or "upper" or "trim" or "previous":
+                case "lower" or "upper" or "trim" or "previous" or "accountableUser" or "decisionTask":
                     throw NotTranslated(name, call.Offset);
             }
 

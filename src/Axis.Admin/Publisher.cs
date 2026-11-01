@@ -35,7 +35,7 @@ namespace Axis.Admin;
 /// <c>rollback</c> with target <c>preview</c> is never claimed.
 /// A <c>publish</c> and a <c>validate</c> first run the contract scenarios of the pinned modules in a <c>contracts</c> step, after
 /// <c>version</c> and before the compile, in the same way and with the same limit as a <c>test</c>, except that a stop never cuts
-/// them short. A failing scenario fails the request with <c>AXC0341</c>, so nothing is stored or activated, and the outcomes go on
+/// them short. A failing scenario fails the request with <c>AXC0342</c>, so nothing is stored or activated, and the outcomes go on
 /// the request. Without the setting and with scenarios to run, the step fails with <c>AXC0217</c>. A request without contract
 /// scenarios has no such step.
 /// A <c>test</c> compiles the snapshot and runs its test scenarios, each in its own temporary database that the scenario role

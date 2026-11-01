@@ -467,6 +467,58 @@ public sealed class ExpressionInterpreterTests
         Assert.Throws<InvalidOperationException>(() => Evaluate("now()"));
     }
 
+    [Fact]
+    public void Accountable_user_and_decision_task_give_the_accountability_the_caller_supplies()
+    {
+        var accountability = new ExpressionAccountability("jordan", "0d2c5a39-52f1-4a0b-8d0e-5a2f7c1b9e11");
+
+        Assert.Equal("jordan", EvaluateAccountability("accountableUser()", accountability).Value);
+        Assert.Equal("0d2c5a39-52f1-4a0b-8d0e-5a2f7c1b9e11", EvaluateAccountability("decisionTask()", accountability).Value);
+        Assert.Equal("jordan:0d2c5a39-52f1-4a0b-8d0e-5a2f7c1b9e11", EvaluateAccountability("concat(accountableUser(), ':', decisionTask())", accountability).Value);
+    }
+
+    [Fact]
+    public void Accountable_user_and_decision_task_give_null_when_the_instance_has_none()
+    {
+        var accountability = new ExpressionAccountability(null, null);
+
+        Assert.Null(EvaluateAccountability("accountableUser()", accountability).Value);
+        Assert.Null(EvaluateAccountability("decisionTask()", accountability).Value);
+        Assert.Equal(true, EvaluateAccountability("decisionTask() is null", accountability).Value);
+    }
+
+    [Fact]
+    public void Accountable_user_and_decision_task_without_the_accountability_are_a_bug_to_evaluate()
+    {
+        Assert.Throws<InvalidOperationException>(() => EvaluateAccountability("accountableUser()", null));
+        Assert.Throws<InvalidOperationException>(() => EvaluateAccountability("decisionTask()", null));
+    }
+
+    [Fact]
+    public void Accountable_user_in_an_aggregate_item_gives_the_accountability()
+    {
+        var items = new ExpressionScope(new Dictionary<string, ExpressionType> { ["name"] = ExpressionType.Text });
+        var scope = new ExpressionScope(_fields, collections: [new ExpressionCollection("software", "Software", items)]);
+        var parsed = ExpressionParser.Parse("any(software, name == accountableUser())");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null, stepSet: true);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+
+        var result = ExpressionInterpreter.Evaluate(
+            parsed.Expression, checkedType, Values([("software", Software("alpha", "jordan"))]), accountability: new ExpressionAccountability("jordan", null));
+
+        Assert.Equal(true, result.Value);
+    }
+
+    private static ExpressionEvaluationResult EvaluateAccountability(string text, ExpressionAccountability? accountability)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null, stepSet: true);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([]), accountability: accountability);
+    }
+
     private static readonly TimeZoneInfo _saigon = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
 
     private static readonly DateTimeOffset _newYearsEveEvening = new(2026, 12, 31, 18, 0, 0, TimeSpan.Zero);

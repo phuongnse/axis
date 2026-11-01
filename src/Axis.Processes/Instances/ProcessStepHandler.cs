@@ -159,6 +159,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             throw Failure($"The process '{process.Name}' has no step '{instance.Step}'.", instance, input);
         }
 
+        // The step's set can write the instance's stored accountable user and deciding task, so a retry
+        // writes what the first run would have, not the operator who retried it.
+        var accountability = new ExpressionAccountability(instance.AccountableUser, instance.DecisionTask?.ToString("D"));
+
         // With a subject, the step's expressions read the record. Without one, they read the stored
         // parameter values, and no record is locked, read or written.
         EntityModel? entity = null;
@@ -208,7 +212,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 ? await PendingComputedReads.ApplyAsync(context.Connection, context.Transaction, release.Model, subjectEntity, stored, cancellationToken, model)
                 : stored;
             var subject = record;
-            evaluate = expression => RecordExpressions.EvaluateAsync(context.Connection, model, subjectEntity, subject, expression, instance.Now, cancellationToken);
+            evaluate = expression => RecordExpressions.EvaluateAsync(context.Connection, model, subjectEntity, subject, expression, instance.Now, accountability, cancellationToken);
             rowSource = collection => ReadRowsAsync(context, model, subjectEntity, subject, collection, instance, step, input, cancellationToken);
         }
         else
@@ -235,7 +239,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             }
 
             var values = ProcessParameters.Values(process, instance.Parameters);
-            evaluate = expression => Task.FromResult(ProcessParameters.Evaluate(expression, values, instance.Now, model.TimeZone));
+            evaluate = expression => Task.FromResult(ProcessParameters.Evaluate(expression, values, instance.Now, model.TimeZone, accountability));
         }
 
         string state;

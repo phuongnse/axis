@@ -284,7 +284,7 @@ internal sealed class TenantReleaseActivation(
     /// to find them. When the snapshot cannot be read, which is a null <paramref name="files"/>, or does not compile, and when
     /// there is no contract scenario, it runs nothing, writes no line and returns <c>true</c>, so the next step reports the
     /// compile problem. Otherwise it fails with <c>AXC0217</c> when <paramref name="scenarioServer"/> is null, and with one
-    /// <c>AXC0341</c> for each scenario that failed, after every scenario ran. Each outcome is added to <paramref name="results"/>.
+    /// <c>AXC0342</c> for each scenario that failed, after every scenario ran. Each outcome is added to <paramref name="results"/>.
     /// The scenarios may run for at most <paramref name="limit"/>, and then fail with <c>AXC0219</c>. A stop never cuts them short.
     /// Returns whether the step passed.
     /// </summary>

@@ -557,7 +557,7 @@ role unless it says otherwise.
    the next step reports the problem as before. Otherwise the step fails with `AXC0217`
    when the setting is empty. If not, it runs every contract scenario in its own database, as
    for a `test`, whatever the outcome of the ones before. Each failing scenario adds
-   one `AXC0341`, and the step writes `<tenant> contracts failed: AXC0341 …` for
+   one `AXC0342`, and the step writes `<tenant> contracts failed: AXC0342 …` for
    each, then ends the request with nothing stored or activated. Each scenario writes
    a `<tenant> scenario <name> passed` or `failed` line, and its outcome goes
    in the request's `scenario_results`. The scenarios may run for 10 minutes, counted from the

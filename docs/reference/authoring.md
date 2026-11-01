@@ -751,7 +751,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   including the checks that the in-memory diagnostics skip: bindings, name and site path conflicts, and
   storage changes. It stores no release and changes nothing. It ends `succeeded` when there is no error.
 - **`publish`.** The publisher first runs the contract scenarios, as for `validate`. A failing one ends
-  the request `failed` with `AXC0341`, and nothing is stored or activated. Their outcomes are stored
+  the request `failed` with `AXC0342`, and nothing is stored or activated. Their outcomes are stored
   with the request, and `scenarios` stays null. Then it compiles the snapshot against the tenant, stores
   the release and activates it, then seeds, with the same steps as
   [`axis-admin activate`](administration.md#activate). A `seed` failure happens after activation has

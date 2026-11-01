@@ -49,7 +49,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
     }
 
     [Fact]
-    public async Task A_publish_whose_contract_scenario_fails_fails_with_AXC0341_and_stores_nothing()
+    public async Task A_publish_whose_contract_scenario_fails_fails_with_AXC0342_and_stores_nothing()
     {
         using var modules = ModulesWithScenario("approved");
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -60,13 +60,13 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
 
         Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         var error = Assert.Single(await DiagnosticsAsync(scenario, tenant, request), diagnostic => diagnostic["severity"]!.GetValue<string>() == "error");
-        Assert.Equal("AXC0341", error["code"]!.GetValue<string>());
+        Assert.Equal("AXC0342", error["code"]!.GetValue<string>());
         Assert.Equal(ScenarioFile, error["file"]!.GetValue<string>());
         Assert.Equal("/steps/2", error["path"]!.GetValue<string>());
         var message = error["message"]!.GetValue<string>();
         Assert.Contains("'requests'", message, StringComparison.Ordinal);
         Assert.Contains("'SubmitRequest'", message, StringComparison.Ordinal);
-        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} contracts failed: AXC0341 ", StringComparison.Ordinal));
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} contracts failed: AXC0342 ", StringComparison.Ordinal));
         Assert.Equal(["version ok"], StepLines(result, tenant).Where(line => line.EndsWith(" ok", StringComparison.Ordinal)).ToArray());
         Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
@@ -100,7 +100,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
     }
 
     [Fact]
-    public async Task A_validate_whose_contract_scenario_fails_fails_with_AXC0341()
+    public async Task A_validate_whose_contract_scenario_fails_fails_with_AXC0342()
     {
         using var modules = ModulesWithScenario("approved");
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -111,8 +111,8 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
 
         Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         var error = Assert.Single(await DiagnosticsAsync(scenario, tenant, request), diagnostic => diagnostic["severity"]!.GetValue<string>() == "error");
-        Assert.Equal("AXC0341", error["code"]!.GetValue<string>());
-        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} contracts failed: AXC0341 ", StringComparison.Ordinal));
+        Assert.Equal("AXC0342", error["code"]!.GetValue<string>());
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} contracts failed: AXC0342 ", StringComparison.Ordinal));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
         Assert.Equal(0L, await ScenarioDatabasesAsync());
     }

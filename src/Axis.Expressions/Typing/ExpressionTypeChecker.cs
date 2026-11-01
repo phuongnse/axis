@@ -18,13 +18,15 @@ namespace Axis.Expressions.Typing;
 /// <c>now()</c>, <c>today()</c> or <c>toDate</c>, because the value would go stale. Only a policy filter can call <c>currentUser()</c>,
 /// including as a rule argument there, because no other expression runs for a signed-in user. A
 /// rule body is checked on its own, so it cannot call it. Only a module contract's expression can call
-/// <c>previous</c>, and its argument must be a bare name of one of the entity's own fields. It stops at
+/// <c>previous</c>, and its argument must be a bare name of one of the entity's own fields. Only the set
+/// of an <c>updateRecord</c> or <c>createRecord</c> step can call <c>accountableUser()</c> or
+/// <c>decisionTask()</c>, also inside an aggregate's item expression. It stops at
 /// the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
     public static ExpressionCheckResult Check(
-        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool policyFilter = false, bool contract = false)
+        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool policyFilter = false, bool contract = false, bool stepSet = false)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(scope);
@@ -39,7 +41,8 @@ public static class ExpressionTypeChecker
                 new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance),
                 storedValue,
                 policyFilter,
-                contract);
+                contract,
+                stepSet);
             var actual = Infer(expression, context);
             if (!Fits(expression, actual, expected))
             {
@@ -254,6 +257,14 @@ public static class ExpressionTypeChecker
                     : throw Fail(
                         ExpressionDiagnosticCodes.CurrentUserOutsidePolicyFilter,
                         "Function 'currentUser' is allowed only in a policy filter",
+                        call.Offset);
+
+            case "accountableUser" or "decisionTask":
+                return context.StepSet
+                    ? ExpressionType.Text
+                    : throw Fail(
+                        ExpressionDiagnosticCodes.AccountabilityOutsideStepSet,
+                        $"Function '{name}' is allowed only in the set of an updateRecord or createRecord step",
                         call.Offset);
 
             case "length":
@@ -692,7 +703,7 @@ public static class ExpressionTypeChecker
     /// <summary>
     /// What one check carries down the tree: the scope, the decimal calls, rule calls and path
     /// steps found so far, whether the expression computes a stored value, whether it is a
-    /// policy filter, whether it is a module contract's expression, and whether it is an aggregate's
+    /// policy filter, whether it is a module contract's expression, whether it is the set of a step that writes a record, and whether it is an aggregate's
     /// item expression.
     /// </summary>
     private sealed record Context(
@@ -703,6 +714,7 @@ public static class ExpressionTypeChecker
         bool StoredValue,
         bool PolicyFilter,
         bool Contract,
+        bool StepSet,
         bool InAggregateItem = false);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>

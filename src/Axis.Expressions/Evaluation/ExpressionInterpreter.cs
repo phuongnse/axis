@@ -36,6 +36,8 @@ public static class ExpressionInterpreter
     /// <paramref name="previous"/> holds the stored values before the write, which <c>previous(field)</c>
     /// reads. It is <c>null</c> when no record exists before the write, as on a create, and then
     /// <c>previous</c> gives <c>null</c>.
+    /// <paramref name="accountability"/> is what <c>accountableUser()</c> and <c>decisionTask()</c> give: the
+    /// write's accountable user and deciding task. Either evaluated without it is a bug in the caller too.
     /// </summary>
     public static ExpressionEvaluationResult Evaluate(
         ExpressionNode expression,
@@ -44,8 +46,9 @@ public static class ExpressionInterpreter
         ExpressionRecordResolver? records = null,
         DateTimeOffset? now = null,
         TimeZoneInfo? timeZone = null,
-        ExpressionValues? previous = null) =>
-        EvaluateCountingSteps(expression, checkResult, values, records, now, timeZone, previous).Result;
+        ExpressionValues? previous = null,
+        ExpressionAccountability? accountability = null) =>
+        EvaluateCountingSteps(expression, checkResult, values, records, now, timeZone, previous, accountability).Result;
 
     /// <summary>
     /// Evaluates like <see cref="Evaluate"/> and also gives the steps used, so a test can show that
@@ -58,7 +61,8 @@ public static class ExpressionInterpreter
         ExpressionRecordResolver? records = null,
         DateTimeOffset? now = null,
         TimeZoneInfo? timeZone = null,
-        ExpressionValues? previous = null)
+        ExpressionValues? previous = null,
+        ExpressionAccountability? accountability = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(checkResult);
@@ -71,7 +75,7 @@ public static class ExpressionInterpreter
         var budget = new Budget();
         try
         {
-            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now, timeZone, previous).Eval(expression), null), budget.Steps);
+            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now, timeZone, previous, accountability).Eval(expression), null), budget.Steps);
         }
         catch (EvaluationFailure failure)
         {
@@ -92,7 +96,8 @@ public static class ExpressionInterpreter
         ExpressionRecordResolver? records,
         DateTimeOffset? now,
         TimeZoneInfo? timeZone,
-        ExpressionValues? previous = null)
+        ExpressionValues? previous = null,
+        ExpressionAccountability? accountability = null)
     {
         public object? Eval(ExpressionNode node)
         {
@@ -250,6 +255,12 @@ public static class ExpressionInterpreter
                 case "now":
                     return now ?? throw new InvalidOperationException("now() was evaluated without the transaction's time.");
 
+                case "accountableUser":
+                    return (accountability ?? throw new InvalidOperationException("accountableUser() was evaluated without the write's accountability.")).AccountableUser;
+
+                case "decisionTask":
+                    return (accountability ?? throw new InvalidOperationException("decisionTask() was evaluated without the write's accountability.")).DecisionTask;
+
                 case "today":
                     return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(
                         now ?? throw new InvalidOperationException("today() was evaluated without the transaction's time."), Zone()).DateTime);
@@ -317,7 +328,7 @@ public static class ExpressionInterpreter
             var items = new object?[rows.Count];
             for (var i = 0; i < items.Length; i++)
             {
-                items[i] = new Evaluator(rows[i], checkResult, budget, records, now, timeZone).Eval(item);
+                items[i] = new Evaluator(rows[i], checkResult, budget, records, now, timeZone, accountability: accountability).Eval(item);
             }
 
             switch (name)

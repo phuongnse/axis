@@ -268,8 +268,8 @@ does. It is how a guard knows who decided.
   the same user.
 - **Allowed where.** In a contract's guards, core validations and effect values, and in the `set` of
   an `updateRecord` or `createRecord` step, which writes it as the value the write will be judged
-  by, such as who decided a step. Anywhere else it is a diagnostic, as `currentUser()` outside a
-  policy filter is.
+  by, such as who decided a step. Anywhere else it is a diagnostic (`AXC0341`), as `currentUser()`
+  outside a policy filter is. A contract's expression is the diagnostic until contracts allow it.
 
 ## The deciding task
 
@@ -284,7 +284,7 @@ promise that each step is decided once.
   value a step stores with the one it held before: `stepDecision == decisionTask() and stepDecision
   != previous(stepDecision)`. A layer that adds a second write after one decision then cannot move
   the counter twice.
-- **Allowed where.** Where `accountableUser()` is allowed.
+- **Allowed where.** Where `accountableUser()` is allowed, and `AXC0341` elsewhere.
 - **Why not `currentUser()`.** `currentUser()` is the session's user and binds a SQL parameter.
   A process step has no session, and its write must still be judged by who decided it. So a step
   that sets `approved` before any task was decided runs with the starter as its accountable user,
@@ -413,7 +413,7 @@ some of them as contract scenarios.
 - **On publish** _(built)_. Every publish and every validate request of an application runs the contract
   scenarios of every module it pins, before activation, through the
   [publisher](authoring.md#publishing). A failing one fails the request, which names the
-  module, the scenario and its failing step, with `AXC0341`, once for each failing scenario. Nothing is
+  module, the scenario and its failing step, with `AXC0342`, once for each failing scenario. Nothing is
   stored or activated. The run is the `contracts` step of the request, see [the
   publisher](administration.md#publisher). Without scenarios to run, nothing changes.
 - **Relaxed points** _(planned for M29)_. A contract scenario that covers a relaxed point is skipped. The publish result

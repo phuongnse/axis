@@ -35,6 +35,8 @@ public static class ExpressionFunctions
         new("toDate", 1, 1),
         new("currentUser", 0, 0),
         new("previous", 1, 1),
+        new("accountableUser", 0, 0),
+        new("decisionTask", 0, 0),
     ];
 
     private static readonly FunctionSignature[] _aggregates =
