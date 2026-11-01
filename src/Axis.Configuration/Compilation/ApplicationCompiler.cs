@@ -535,6 +535,17 @@ public static partial class ApplicationCompiler
             FilterRulesFor,
             diagnostics);
 
+        // From here on a contract is the copy without the points its module's entry relaxes. Seed checks, grant
+        // ceilings and the compiled model see that copy. The named points and the relax checks keep the originals.
+        foreach (var pin in modules.Where(pin => pin.Relaxed.Count > 0))
+        {
+            var points = pin.Relaxed.Select(entry => entry.Point).ToHashSet(StringComparer.Ordinal);
+            foreach (var name in contracts.Keys.Where(name => ModuleIdOf(name) == pin.Id).ToList())
+            {
+                contracts[name] = ContractRelaxations.Apply(contracts[name], points);
+            }
+        }
+
         PresentationChecker.Check(
             loaded,
             FindEntity,

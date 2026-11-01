@@ -267,6 +267,32 @@ public sealed class GrantCeilingTests
         Assert.Empty(compiled.Diagnostics);
     }
 
+    [Fact]
+    public void A_grant_past_a_relaxed_slot_or_a_relaxed_others_compiles_and_the_relaxed_slot_adds_no_filter()
+    {
+        var update = """{ "name": "orderUpdate5", "entity": "shop/Order", "actions": ["update"] }""";
+        using var modules = Shop(Ceiling);
+        using var unrelaxed = Application(Policy("lead", update), Policy("guest", update));
+        using var relaxed = Application(
+            [Policy("clerk", update), Policy("lead", update), Policy("guest", update)],
+            "",
+            """
+            [ { "id": "shop", "version": "1.0.0", "roles": { "buyer": "clerk", "seller": "lead" },
+                "relax": [ { "point": "Order/ceiling/buyer", "reason": "A" }, { "point": "Order/ceiling/seller", "reason": "B" }, { "point": "Order/ceiling/others", "reason": "C" } ] } ]
+            """);
+        var catalog = ModuleCatalog.Load(modules.Path).Modules;
+
+        var before = ApplicationCompiler.Compile(unrelaxed.Path, null, catalog);
+        var after = ApplicationCompiler.Compile(relaxed.Path, null, catalog);
+
+        Assert.Equal([DiagnosticCodes.GrantPastCeiling, DiagnosticCodes.GrantPastCeiling], before.Diagnostics.Select(diagnostic => diagnostic.Code));
+        Assert.Empty(after.Diagnostics);
+        var order = Assert.Single(after.Model!.Entities, entity => entity.Name == "shop/Order");
+        var access = PolicyEvaluator.Access(after.Model!, ["lead"], order, PolicyAction.Update);
+        Assert.True(access.Granted);
+        Assert.Null(access.Filters);
+    }
+
     /// <summary>Asserts a grant past the ceiling at a grant of the policy written at <paramref name="policy"/> of the application's policies.</summary>
     private static void AssertPast(Diagnostic diagnostic, int grant, int policy = 0)
     {

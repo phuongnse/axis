@@ -157,6 +157,36 @@ public sealed class ModuleRelaxTests
         Assert.Empty(Assert.Single(compiled.Model!.Modules).Relaxed);
     }
 
+    [Fact]
+    public void A_relaxed_initial_rule_lets_a_seed_record_in_that_state_compile()
+    {
+        using var modules = Modules("1.0.0", Contract(SubmitTransition, ApproveTransition), SubmittedSeed);
+        using var refused = Application("^1.0.0", relax: null);
+        using var relaxed = Application("^1.0.0", """[ { "point": "Request/states/submitted/initial", "reason": "Imported requests." } ]""");
+
+        var catalog = ModuleCatalog.Load(modules.Path).Modules;
+        var before = ApplicationCompiler.Compile(refused.Path, null, catalog);
+        var after = ApplicationCompiler.Compile(relaxed.Path, null, catalog);
+
+        Assert.Equal([DiagnosticCodes.SeedStateNotInitial], before.Diagnostics.Select(diagnostic => diagnostic.Code));
+        Assert.Empty(after.Diagnostics);
+        Assert.Single(after.Model!.Seeds);
+    }
+
+    [Fact]
+    public void A_relaxed_transition_compiles_without_its_guard_and_the_others_keep_theirs()
+    {
+        using var modules = Modules("1.0.0", Contract(SubmitTransition, ApproveTransition));
+        using var folder = Application("^1.0.0", $$"""[ { "point": "{{Submit}}", "reason": "No amount rule." } ]""");
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var transitions = compiled.Model!.Entities.Single(entity => entity.Name == "approvals/Request").Contract!.Lifecycle!.Transitions;
+        Assert.Null(transitions.Single(transition => transition.Name == "submit").Guard);
+        Assert.NotNull(transitions.Single(transition => transition.Name == "approve").Guard);
+    }
+
     private static IReadOnlyList<Diagnostic> CompileFailing(string relax)
     {
         using var modules = Modules("1.0.0", Contract(SubmitTransition, ApproveTransition));
@@ -192,12 +222,22 @@ public sealed class ModuleRelaxTests
           "texts": { "approvals.slot": "Slot" } }
         """;
 
-    private static TemporaryFolder Modules(string version, string? contract)
+    private const string SubmittedSeed = """
+        { "id": "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b73", "kind": "seed", "name": "Requests", "formatVersion": 1, "entity": "Request",
+          "records": [ { "id": "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b74", "values": { "title": "A", "status": "submitted" } } ] }
+        """;
+
+    private static TemporaryFolder Modules(string version, string? contract, string? seed = null)
     {
         var folder = new TemporaryFolder()
             .With($"approvals/{version}/module.json", ModuleManifest(version))
             .With($"approvals/{version}/Request.json", Request)
             .With($"approvals/{version}/TextsEn.json", Texts);
+        if (seed is not null)
+        {
+            folder.With($"approvals/{version}/Seed.json", seed);
+        }
+
         return contract is null ? folder : folder.With($"approvals/{version}/Contract.json", contract);
     }
 

@@ -1,0 +1,32 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3e01",
+  "kind": "application",
+  "name": "ModuleRelaxApp",
+  "formatVersion": 1,
+  "modules": [
+    {
+      "id": "requests",
+      "version": "^1.0.0",
+      "roles": { "requester": "employee" },
+      "relax": [{ "point": "Request/transitions/submit", "reason": "This application accepts requests without an amount." }]
+    },
+    {
+      "id": "stages",
+      "version": "^1.0.0",
+      "roles": { "requester": "employee" },
+      "relax": [{ "point": "Ticket/validations/amountFrozenAfterSubmit", "reason": "This application corrects the amount of a submitted ticket." }]
+    },
+    {
+      "id": "ledgers",
+      "version": "^1.0.0",
+      "roles": { "clerk": "clerk" },
+      "relax": [{ "point": "Claim/effects/entryRecorded", "reason": "This application books entries somewhere else." }]
+    },
+    {
+      "id": "claims",
+      "version": "^1.0.0",
+      "roles": { "filer": "clerk", "viewer": "auditor" },
+      "relax": [{ "point": "Claim/ceiling/viewer", "reason": "Auditors here may change every claim." }]
+    }
+  ]
+}
