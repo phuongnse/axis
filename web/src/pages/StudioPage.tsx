@@ -7,6 +7,7 @@ import {
   fetchStudioApps,
   fetchStudioDiagnostics,
   fetchStudioNames,
+  fetchStudioResource,
   fetchStudioResources,
   filterResources,
   groupByKind,
@@ -17,6 +18,7 @@ import {
   type StudioApplication,
   type StudioDiagnostic,
   type StudioNames,
+  type StudioResource,
   type StudioResourceItem,
   waitForServer,
 } from '../platform/studio'
@@ -33,6 +35,7 @@ import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
+import { hasRelaxEntry } from './relaxEntries'
 import { StudioReferences } from './StudioReferences'
 
 /** The titles and test ids of the module resource groups in the list. */
@@ -52,7 +55,19 @@ const moduleGroupTestIds = {
 } as const
 
 /** The read-only view of a module resource, by its kind. */
-function ModuleResourceView({ application, item }: { application: string; item: ModuleResourceItem }) {
+function ModuleResourceView({
+  application,
+  item,
+  manifest,
+  onManifestSaved,
+  onManifestStale,
+}: {
+  application: string
+  item: ModuleResourceItem
+  manifest?: StudioResource
+  onManifestSaved: (manifest: StudioResource, diagnostics: StudioDiagnostic[]) => void
+  onManifestStale: () => void
+}) {
   switch (item.kind) {
     case 'entity':
       return <StudioModuleEntity application={application} module={item.module} id={item.id} />
@@ -61,7 +76,16 @@ function ModuleResourceView({ application, item }: { application: string; item: 
     case 'policy':
       return <StudioModulePolicy application={application} module={item.module} id={item.id} />
     case 'contract':
-      return <StudioModuleContract application={application} module={item.module} id={item.id} />
+      return (
+        <StudioModuleContract
+          application={application}
+          module={item.module}
+          id={item.id}
+          manifest={manifest}
+          onManifestSaved={onManifestSaved}
+          onManifestStale={onManifestStale}
+        />
+      )
     case 'page':
       return <StudioModulePage application={application} module={item.module} id={item.id} />
   }
@@ -77,6 +101,9 @@ type FolderState =
 
 /** The names of one application, or null when they did not load. `application` says which one they were loaded for. */
 type NamesState = { application: string; names: StudioNames | null }
+
+/** The `application.json` of one application, or null when it did not load. `application` says which one it was loaded for. */
+type ManifestState = { application: string; resource: StudioResource | null }
 
 /**
  * Studio, the authoring page. The address holds the picked application and the selected resource, as
@@ -110,7 +137,9 @@ type NamesState = { application: string; names: StudioNames | null }
  * uses, from the names, by their `<module>/<name>`. One opens read-only, with no editor, no Uses and no Used by lists: an
  * entity in the entity designer, a process as its graph alone, a policy as a table of its grants, a contract as its lifecycle in a state diagram with tables of its named points and a page on the page
  * canvas with no palette, data panel, widget tree or moves, each under a read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
- * entry open it too, when the id is not one of the folder's.
+ * entry open it too, when the id is not one of the folder's. The folder's `application.json` loads with the
+ * application and again after a write. An Off-standard tag shows beside the application picker while it has a relax
+ * entry. A module contract, which the application declares directly, has Relax and Undo relax, which write it.
  */
 export function StudioPage() {
   const t = useText()
@@ -159,6 +188,8 @@ function StudioWorkspace() {
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
+  const [manifestState, setManifestState] = useState<ManifestState>()
+  const [manifestReload, setManifestReload] = useState(0)
   const publishing = useRef<StudioPublishingHandle>(null)
   const [requestBusy, setRequestBusy] = useState(false)
 
@@ -253,7 +284,37 @@ function StudioWorkspace() {
     return () => controller.abort()
   }, [application, generation, folderRevision, lost])
 
+  const manifestId = useMemo(
+    () =>
+      (folder?.application === application && 'resources' in folder ? folder.resources : []).find(
+        (item) => item.kind === 'application',
+      )?.id,
+    [folder, application],
+  )
+  useEffect(() => {
+    if (application === null || manifestId === undefined) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioResource(application, manifestId, controller.signal).then(
+      (resource) => setManifestState({ application, resource }),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the application.json of '${application}' failed`, error)
+        setManifestState({ application, resource: null })
+      },
+    )
+    return () => controller.abort()
+  }, [application, manifestId, generation, folderRevision, manifestReload, lost])
+
   const loaded = folder?.application === application ? folder : undefined
+  const manifest = manifestState?.application === application ? (manifestState.resource ?? undefined) : undefined
   const names = namesState?.application === application ? namesState.names : null
   const resources = useMemo(() => (loaded && 'resources' in loaded ? loaded.resources : []), [loaded])
   const diagnosticPaths = useMemo(
@@ -302,6 +363,11 @@ function StudioWorkspace() {
         : current,
     )
     setFolderRevision((value) => value + 1)
+  }
+
+  function onManifestSaved(saved: StudioResource, diagnostics: StudioDiagnostic[]) {
+    setManifestState({ application: application!, resource: saved })
+    onWritten(diagnostics)
   }
 
   function onApplicationCreated(name: string) {
@@ -355,6 +421,11 @@ function StudioWorkspace() {
           onChange={pickApplication}
         />
         {canCreate && <StudioNewApplication onCreated={onApplicationCreated} />}
+        {manifest && hasRelaxEntry(manifest.content) && (
+          <Tag data-testid="studio-off-standard" color="warning">
+            {t('shell.studio.offStandard')}
+          </Tag>
+        )}
       </Flex>
       {application !== null && loaded && 'resources' in loaded && (
         <StudioPublishing
@@ -533,6 +604,9 @@ function StudioWorkspace() {
                         key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
                         application={application!}
                         item={selectedModuleItem}
+                        manifest={manifest}
+                        onManifestSaved={onManifestSaved}
+                        onManifestStale={() => setManifestReload((value) => value + 1)}
                       />
                     </StudioNamesContext.Provider>
                   </Flex>
