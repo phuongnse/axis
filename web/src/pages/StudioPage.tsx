@@ -354,23 +354,12 @@ function StudioWorkspace() {
   // Proposed: the application is named by its title, as on the home page, never by its technical name.
   const openApp = apps.find((app) => app.name === application)
   const appTitle = openApp ? studioApplicationTitle(openApp, locale) : application
-  // Proposed: the band names only what the sidebar does not: the kind as a link to its list, then the title. Studio and
-  // the application head the sidebar, where its menu leads back to every application.
-  const steps: BreadcrumbStep[] = []
+  // Proposed: the band names nothing: the sidebar names the list or the view, and the page's content names the open
+  // resource, so the band holds the application's state and actions alone. The title stays its hidden heading.
   let title = appTitle
   if (selected) {
-    if (selected.kind !== 'application') {
-      steps.push({
-        label: kindLabel(selected.kind),
-        to: studioAddress(application, { name: 'kind', kind: selected.kind }),
-      })
-    }
     title = resourceTitle(selected)
   } else if (selectedModuleItem) {
-    steps.push({
-      label: kindLabel(selectedModuleItem.kind),
-      to: studioAddress(application, { name: 'kind', kind: selectedModuleItem.kind }),
-    })
     title = selectedModuleItem.name
   } else if (view.name === 'kind') {
     title = kindLabel(view.kind)
@@ -379,7 +368,7 @@ function StudioWorkspace() {
   } else if (view.name === 'releases') {
     title = t('shell.studio.nav.releases')
   }
-  steps.push({ label: title })
+  const steps: BreadcrumbStep[] = [{ label: title }]
 
   function kindLabel(kind: string) {
     const key = `shell.studio.kind.${kind}`
@@ -422,13 +411,7 @@ function StudioWorkspace() {
         compact
         title={title}
         breadcrumb={steps}
-        // Proposed: the sidebar names a list or a view, so the band shows the application's state in its place, and
-        // names only a resource, which the sidebar does not.
-        titleShown={
-          steps.length > 1 ||
-          (selected !== undefined && selected.kind !== 'application') ||
-          selectedModuleItem !== undefined
-        }
+        titleShown={false}
         status={
           loaded && 'resources' in loaded && !(view.name === 'overview' && !selected && !selectedModuleItem) ? (
             <StudioStatus
