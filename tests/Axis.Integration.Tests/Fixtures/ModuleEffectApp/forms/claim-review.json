@@ -1,0 +1,13 @@
+{
+  "id": "ad680e21-8c9e-47fb-88b0-53a51675437e",
+  "kind": "form",
+  "name": "ClaimReview",
+  "formatVersion": 1,
+  "entity": "ledgers/Claim",
+  "sections": [
+    {
+      "title": { "textKey": "claim.main" },
+      "fields": [{ "field": "status" }]
+    }
+  ]
+}

@@ -12,10 +12,11 @@ shapes below. The `contract` resource and the compile checks of its `lifecycle`,
 API's `400`. So is the compile check of a module scenario's `contract.covers`. A guard, a core
 validation and an effect value read `accountableUser()` and `decisionTask()`, the values of the write
 they check. The shared record update runs the effects of the transition it makes, in its own transaction.
-The record API answers a failing effect, audits the effect records and fires the data change triggers for
-them. The same steps are still _(planned for M24)_ for the effect records of a task completion, a process step
-and an inbound endpoint call. A refusal on another write
-path fails as that path already fails, and logs nothing yet. The
+The record API, a task completion, a process step, a connector or package output and a call
+resolution answer a failing effect, audit the effect records and fire the data change triggers for
+them. The same steps are still _(planned for M24)_ for an inbound endpoint call, which only creates
+records. Each of them fails as it already fails for a lifecycle refusal and logs the named point and
+the record id. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
 
@@ -184,7 +185,7 @@ the [`previous`](#previous-values), [`accountableUser`](#the-accountable-user) a
 
 An effect creates one record when a transition happens, in the transaction of the write that made
 the transition. The compile checks of effects are built, and the compiled contract holds each effect
-with its compiled values. The shared record update runs them. The record API answers a failing effect, audits the effect records and fires the data change triggers for them. The answer, the audit entries and the triggers on a task completion, a process step and an inbound endpoint call are _(planned for M24)_. A name that repeats an earlier one,
+with its compiled values. The shared record update runs them. The record API answers a failing effect, audits the effect records and fires the data change triggers for them. A task completion, a process step, a connector or package output and a call resolution do the same. The answer, the audit entries and the triggers on an inbound endpoint call are _(planned for M24)_. A name that repeats an earlier one,
 ignoring letter case, is `AXC0328`. An `on` that names no transition of the contract, with the same
 letter case, is `AXC0344`. A `create.entity` that is not the plain name of a root entity of the module
 is `AXC0345`. A `values` key that names no writable field, or an expression that does not fit its
@@ -218,7 +219,9 @@ field, is `AXC0346` or the expression's own code.
   opposite entry.
 - **Audit and triggers.** The created record writes `record.created`, with the actor of the write
   that made the transition and details `{ "version", "effect" }`, where `effect` is the effect's
-  named point. Data change triggers fire for it as for any create.
+  named point. The actor is the completing user for a task completion and the operator for a call
+  resolution, and `system` for a process step or a connector or package output. Data change
+  triggers fire for it as for any create.
 
 ## Grant ceiling
 
@@ -327,6 +330,8 @@ promise that each step is decided once.
   transition, and its guard runs with a `null` accountable user. A refusal is `AXC0033`: it stops
   startup seeding, rolls back every seed write, and the log names the point that refused it. A seed
   record that fails a core validation is `AXC0033` at the validation's field, without the point.
+  A seed record whose transition has a failing effect is `AXC0033` naming the effect's point. A seed
+  writes no audit records and starts no triggers for effect records.
 - **Order in a write.** Computed fields, the entity's validations, the core validations, then the
   lifecycle check, then storage, then the effects. The record API's grant checks come before, as
   [the record API](record-api.md#errors) orders them. In Axis SaaS, the tenant's quota check of
@@ -343,6 +348,9 @@ promise that each step is decided once.
   required change could not be recorded." and the effect's named point in a `point` member, such as
   `Claim/effects/entryRecorded`. It has no `errors`. Nothing is written.
 - **Task completion.** The completion is refused with the same answers, and the task stays open.
+- **Connector or package output and call resolution.** A refused output fails the call as a refused
+  `updateRecord` does. A refused call resolution is a `400` keyed `/output`, and its message
+  names the point.
 - **Process step.** The step fails, as a refused `createRecord` does, and the instance ends
   `failed`. The [process inspector](process-inspection.md#step-errors-in-inspection) and the
   [operator console](operator-console.md#views) show the error with the named point, such as

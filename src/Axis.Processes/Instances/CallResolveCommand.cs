@@ -320,6 +320,7 @@ public static class CallResolveCommand
             ["resolved"] = true,
         };
         AuditEntry? recordAudit = null;
+        IReadOnlyList<EffectRecord> effects = [];
         if (values.Count > 0)
         {
             if (subject is null || record is null)
@@ -336,6 +337,7 @@ public static class CallResolveCommand
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, pinned, subject, target.ReleaseId, cancellationToken);
             updated = stored;
+            effects = written.Effects;
             output["subjectVersion"] = stored.Version;
             recordAudit = new AuditEntry(
                 userId,
@@ -387,6 +389,19 @@ public static class CallResolveCommand
                 record,
                 updated,
                 [],
+                write,
+                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                cancellationToken);
+            await EffectRecordWrites.AppendAsync(
+                transaction,
+                tenantId,
+                active,
+                activeReleaseId,
+                target.ReleaseId,
+                instance.ApplicationId,
+                instance.Id,
+                userId,
+                effects,
                 write,
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
@@ -571,7 +586,7 @@ public static class CallResolveCommand
 
         if (errors.Count == 0)
         {
-            errors[OutputPointer] = [result.Outcome.ToString()];
+            errors[OutputPointer] = [ProcessStepHandler.Describe(result)];
         }
 
         return errors;

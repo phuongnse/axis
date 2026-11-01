@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
-    "role.clerk": "Clerk"
+    "role.clerk": "Clerk",
+    "claim.main": "Claim",
+    "claim.review": "Review the claim",
+    "claim.done": "Done"
   }
 }

@@ -369,9 +369,10 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <summary>
     /// Starts <paramref name="process"/> for the record <paramref name="subjectId"/> of the process's own
     /// entity, pinned to <paramref name="releaseId"/>, as <see cref="StartAsync"/> does. The process may be
-    /// a module process, which works on the application's copy of a module entity.
+    /// a module process, which works on the application's copy of a module entity. The instance's
+    /// accountable user is <paramref name="accountableUser"/>, or nobody.
     /// </summary>
-    public async Task<Guid> StartOnSubjectAsync(string process, Guid subjectId, Guid releaseId)
+    public async Task<Guid> StartOnSubjectAsync(string process, Guid subjectId, Guid releaseId, string? accountableUser = null)
     {
         Assert.True(Model.TryGetProcess(process, out var model));
         var entity = Model.FindEntity(model.Entity!.Id)!;
@@ -391,6 +392,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
                 State = ProcessStarts.Running,
                 Revision = 1,
                 Step = model.Start,
+                AccountableUser = accountableUser,
             }));
         await WorkItemQueue.EnqueueAsync(
             connection,

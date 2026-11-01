@@ -922,6 +922,7 @@ internal sealed partial class ConnectorCallHandler(
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Succeeded, ["next"] = target.Step.Next };
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (values.Count > 0)
         {
@@ -934,6 +935,7 @@ internal sealed partial class ConnectorCallHandler(
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity!, call.ReleaseId, cancellationToken);
             updated = written;
+            effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
                 AuditActors.System,
@@ -960,19 +962,36 @@ internal sealed partial class ConnectorCallHandler(
             await AuditRecords.AppendAsync(transaction, recordAudit, cancellationToken);
         }
 
-        if (updated is not null
-            && await models.FindActiveAsync(new WorkItemContext(item, connection, transaction), instance.ApplicationId, cancellationToken) is { } active)
+        if (updated is not null)
         {
-            await DataChangeTriggerStarts.StartAfterUpdateAsync(
+            var active = await models.FindActiveAsync(new WorkItemContext(item, connection, transaction), instance.ApplicationId, cancellationToken);
+            if (active is { } activeNow)
+            {
+                await DataChangeTriggerStarts.StartAfterUpdateAsync(
+                    transaction,
+                    item.TenantId,
+                    activeNow.Model,
+                    activeNow.ReleaseId,
+                    call.ReleaseId,
+                    entity!,
+                    record!,
+                    updated,
+                    [],
+                    write,
+                    logger,
+                    cancellationToken);
+            }
+
+            await EffectRecordWrites.AppendAsync(
                 transaction,
                 item.TenantId,
-                active.Model,
-                active.ReleaseId,
+                active?.Model,
+                active?.ReleaseId ?? call.ReleaseId,
                 call.ReleaseId,
-                entity!,
-                record!,
-                updated,
-                [],
+                instance.ApplicationId,
+                instance.Id,
+                AuditActors.System,
+                effects,
                 write,
                 logger,
                 cancellationToken);

@@ -1,0 +1,19 @@
+{
+  "id": "ac4cf56f-7c8d-4d73-a934-bd880666c6f8",
+  "kind": "process",
+  "name": "ReviewClaim",
+  "formatVersion": 1,
+  "entity": "ledgers/Claim",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "claim.review" },
+      "assignee": { "role": "clerk" },
+      "form": "ClaimReview",
+      "outcomes": [{ "name": "done", "label": { "textKey": "claim.done" }, "next": "finished" }]
+    },
+    { "name": "finished", "type": "end" }
+  ]
+}
