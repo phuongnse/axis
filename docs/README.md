@@ -33,6 +33,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Modules and templates](reference/modules-and-templates.md)            | Reusable modules and application templates                                            |
 | [Module contracts](reference/module-contracts.md)                      | The `contract` resource: lifecycles, core validations, effects, grant ceilings, relax entries and contract scenarios |
 | [Customization layers](reference/customization-layers.md)              | The `layer` resource: changes to a module by keys, list keys, extending a lifecycle, and Studio writing the layer |
+| [Built-in modules](reference/built-in-modules.md)                      | The `organization` and `approvals` modules, the `approvals` application, request types, delegation and the approval contract |
 | [Extension packages](reference/extension-packages.md)                  | Custom C# code: manifest, contracts, installation, loading, capabilities              |
 | [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
 | [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |

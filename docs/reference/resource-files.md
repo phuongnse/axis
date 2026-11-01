@@ -576,6 +576,34 @@ new check is a new compile diagnostic.
   field, which is always searched. See
   [paging and sorting](record-api.md#paging-and-sorting).
 
+### Matched references
+
+_(planned for M26)_ A `reference` field may have `match`, which finds its record by a unique field
+instead of being written, as
+[D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees:
+
+```json
+{
+  "name": "requesterEmployee",
+  "type": "reference",
+  "target": "organization/Employee",
+  "match": { "field": "user", "from": "requester" }
+}
+```
+
+- **Shape.** `match.field` names a `unique` field of the target entity. `match.from` names a field
+  of this entity with the same type. Neither may be `sensitive`, unless the target field has
+  `exactLookup`. A bad name or type is a diagnostic at `/fields/{i}/match`.
+- **Value.** On every create and update, after defaults and creator fields and before computed
+  fields and validations, the write sets the field to the target record whose `field` equals the
+  value of `from`, or to `null` when `from` is empty or no record matches. The lookup reads as the
+  system, so it needs no grant. A later change to the target does not change the stored reference
+  until this record is written again.
+- **Not writable.** Clients, process `set`, imports and seeds cannot write it. A value for it is a
+  `400` at its pointer with "Cannot be set.", as for a creator field.
+- **Allowed fields.** `match` cannot be combined with `required`, `expression`, `default` or
+  `sequence`, and a child entity's field cannot have it.
+
 ### Indexes
 
 `indexes` is built. On the entity, it is a list of

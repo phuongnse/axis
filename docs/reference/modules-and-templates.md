@@ -536,7 +536,9 @@ The manifest is `template.json` at the root of the folder:
 - **Manifest.** `template.json` has `kind: applicationTemplate`, an `id`
   (lower-case letters, digits and `-`, starting with a letter), a SemVer
   `version`, a `title` and a `description`. The title and the description each
-  have an `en` and a `vi` text.
+  have an `en` and a `vi` text. _(planned for M26)_ `"builtIn": true` marks a
+  [built-in application](built-in-modules.md#where-they-live), which Studio lists
+  first.
 - **One site.** A template holds exactly one site. The site path of a copy
   follows the new name, and that rule is only clear for a single site.
 - **Installation.** Templates are installed per installation under
