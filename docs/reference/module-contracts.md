@@ -84,14 +84,19 @@ module's `Decision` entity:
   ],
   "ceiling": {
     "slots": {
-      "requester": {
-        "actions": ["read", "create", "update", "delete"],
-        "fields": ["title", "amount", "description", "status"],
-        "filter": "requester == currentUser()"
-      },
-      "approver": { "actions": ["read", "update"], "fields": ["status", "note"] }
+      "requester": [
+        {
+          "actions": ["read", "create", "update", "delete"],
+          "fields": ["title", "amount", "description", "status"],
+          "filter": "requester == currentUser()"
+        }
+      ],
+      "approver": [
+        { "actions": ["read"] },
+        { "actions": ["update"], "fields": ["status", "note"], "filter": "status == 'submitted'" }
+      ]
     },
-    "others": { "actions": ["read"] }
+    "others": [{ "actions": ["read"] }]
   }
 }
 ```
@@ -109,8 +114,8 @@ module's `Decision` entity:
 - **Expressions.** A guard, a core validation and an effect's values use the
   [expression language](expressions.md). They read the record's own fields and its child rows
   through aggregates, as an entity validation does, and call the rules of the contract's own
-  module. They may also call [`previous`](#previous-values) and
-  [`accountableUser`](#the-accountable-user). A ceiling filter is a policy filter, see
+  module. They may also call [`previous`](#previous-values),
+  [`accountableUser`](#the-accountable-user) and [`decisionTask`](#the-deciding-task). A ceiling filter is a policy filter, see
   [grant ceiling](#grant-ceiling).
 
 ## Lifecycle
@@ -194,8 +199,10 @@ the transition.
 `ceiling` sets the widest grants each role may get on the entity, from application policies and
 module policies alike.
 
-- **Shape.** `slots` maps a role slot of the module to `{ "actions", "fields", "filter" }`. `others`
-  has the same shape and covers every role mapped to no slot of the module.
+- **Shape.** `slots` maps a role slot of the module to a list of ceiling entries. `others` is a list
+  of the same entries and covers every role mapped to no slot of the module. An entry has the shape
+  of a grant without a target, `{ "actions", "fields", "filter" }`, so one slot may read every
+  record and update only some:
   - `actions` lists entity actions: `read`, `create`, `update`, `delete`, `export` and `import`.
   - `fields`, when present, lists the fields grants may cover. Without it, every field may be
     covered.
@@ -204,15 +211,17 @@ module policies alike.
   - Without `others`, a role mapped to no slot may get no grant on the entity at all, as default
     deny asks.
 - **Which ceiling a role gets.** A role the application maps to one or more slots of the module gets
-  the union of their ceilings. A role mapped to none gets `others`. A role in a module the
+  the entries of all of them. A role mapped to none gets `others`. A role in a module the
   application reaches only through a dependency gets the slots the chain gives it.
-- **Checked when the application compiles.** A grant on the entity that gives a role an action the
-  role's ceiling lacks, or a field outside its `fields`, is a diagnostic at the grant. A grant with
-  no `fields` list is outside a ceiling that has one. A module policy that goes past its own
-  module's ceiling is reported the same way.
-- **Applied when a request runs.** A filter cannot be compared with another at compile time, so the
-  engine adds the ceiling's `filter` to every grant of the role on the entity, with `and`. The
-  record API, the data source endpoint, import and export then answer as for any grant filter.
+- **Checked when the application compiles.** For each action of a grant on the entity, the role's
+  entries that list the action must exist, and the grant's fields must be within the union of their
+  `fields`. Otherwise it is a diagnostic at the grant. A grant with no `fields` list is outside
+  entries that all have one. A module policy that goes past its own module's ceiling is reported
+  the same way.
+- **Applied when a request runs.** A filter cannot be compared with another at compile time, so for
+  each action the engine adds to every grant of the role the `or` of the filters of the entries
+  that list the action, with `and`. An entry without a filter adds no condition. The record API,
+  the data source endpoint, import and export then answer as for any grant filter.
 - **What it does not cover.** Process `start` grants, data source grants and endpoints are outside
   the ceiling. A data source still reaches only the records and fields that the root entity's read
   grants reach.
@@ -250,8 +259,25 @@ does. It is how a guard knows who decided.
 - **Kept by the instance.** The instance keeps its accountable user. Each task completion replaces
   it with the user who completed the task, in the completion's transaction, so a retried step reads
   the same user.
-- **Allowed where.** In a contract's guards, core validations and effect values. Anywhere else it is
-  a diagnostic, as `currentUser()` outside a policy filter is.
+- **Allowed where.** In a contract's guards, core validations and effect values, and in the `set` of
+  an `updateRecord` or `createRecord` step, which writes it as the value the write will be judged
+  by, such as who decided a step. Anywhere else it is a diagnostic, as `currentUser()` outside a
+  policy filter is.
+
+## The deciding task
+
+`decisionTask()` gives, as `text`, the id of the task whose completion the write follows, or `null`
+when no task decision led to it. It lets a contract tell one decision from the next, so a module can
+promise that each step is decided once.
+
+- **Value.** For a task completion, the task it completes. For a process step, the instance's last
+  completed task, kept with the [accountable user](#the-accountable-user) and replaced at the same
+  time. For every other write, `null`.
+- **Use.** A core validation that allows a counter to move only with a new decision compares the
+  value a step stores with the one it held before: `stepDecision == decisionTask() and stepDecision
+  != previous(stepDecision)`. A layer that adds a second write after one decision then cannot move
+  the counter twice.
+- **Allowed where.** Where `accountableUser()` is allowed.
 - **Why not `currentUser()`.** `currentUser()` is the session's user and binds a SQL parameter.
   A process step has no session, and its write must still be judged by who decided it. So a step
   that sets `approved` before any task was decided runs with the starter as its accountable user,
@@ -307,7 +333,7 @@ point is written `<entity>/<part>/<name>`:
 | `Request/states/approved/deletable` | The rule that no record is deleted while `approved`, because the state is not deletable |
 | `Request/validations/amountFrozenAfterSubmit` | A core validation |
 | `Request/effects/approvalRecorded` | An effect |
-| `Request/ceiling/requester` | The ceiling of the `requester` slot |
+| `Request/ceiling/requester` | The ceiling entries of the `requester` slot |
 | `Request/ceiling/others` | The ceiling of roles mapped to no slot |
 
 The list of states and transitions is no point. It never relaxes.

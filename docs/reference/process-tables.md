@@ -29,7 +29,9 @@ database, with history in `axis.__processes_migrations` (see
   instance. An index on `parent_instance_id` finds the children of a parent.
   _(planned for M24)_ An `accountable_user` `text` column, null for none, holds the instance's
   [accountable user](module-contracts.md#the-accountable-user): its starter at the start, then the
-  user of each task completion, written in the completion's transaction.
+  user of each task completion, written in the completion's transaction. A `decision_task` `uuid`
+  column, null before any task, holds the [deciding task](module-contracts.md#the-deciding-task),
+  replaced with it.
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.

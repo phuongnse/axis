@@ -27,11 +27,16 @@ the detail.
     starter before any task.
   - For a schedule, seed data and migrations it is `null`.
   - The instance keeps it, so a retried step reads the same user.
+  - `decisionTask()` gives the task whose completion the write follows, kept the same way, so a
+    contract can require a new decision for each step.
+  - A step's `set` may write both, so a module records who decided.
 - **Effects only create records:** an effect creates a record in an entity of the same module, in
   the transaction of the transition, as an entry in a ledger. It never updates or deletes, and
   effects never chain.
-- **Grant ceiling:** each role slot gets actions and fields, checked when the application compiles,
-  and an optional record filter that the engine adds to every grant of the role with `and`.
+- **Grant ceiling:** each role slot gets a list of entries shaped like grants: actions and fields,
+  checked when the application compiles, and an optional record filter. For each action, the
+  engine adds the `or` of the filters of the entries that list it to every grant of the role, with
+  `and`.
   - Roles mapped to no slot get the ceiling's `others` entry.
   - Without `others`, such roles get no grant on the entity, as default deny asks.
 - **Named points:** each guard, `initial` and `deletable` rule, core validation, effect and slot
