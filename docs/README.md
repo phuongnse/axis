@@ -34,6 +34,11 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Module contracts](reference/module-contracts.md)                      | The `contract` resource: lifecycles, core validations, effects, grant ceilings, relax entries and contract scenarios |
 | [Customization layers](reference/customization-layers.md)              | The `layer` resource: changes to a module by keys, list keys, extending a lifecycle, and Studio writing the layer |
 | [Built-in modules](reference/built-in-modules.md)                      | The `organization` and `approvals` modules, the `approvals` application, request types, delegation and the approval contract |
+| [MCP server](reference/mcp-server.md)                                  | The MCP server for agents: route, sign-in, client registration, tools, limits and audit |
+| [Authoring requests](reference/authoring-requests.md)                  | The agent host and the request loop: states, plans, checks, review, budgets and accepting |
+| [Revisions and drafts](reference/revisions-and-drafts.md)              | The git repository of each application folder: revisions, drafts, accepts and undo |
+| [Model bindings](reference/model-bindings.md)                          | The `Ai` settings, model bindings, a tenant's own key and the authoring eval |
+| [AI authoring in Studio](reference/ai-authoring-in-studio.md)          | The request panel, plan approval, the diff, accept and drop, auto-accept and the history |
 | [Extension packages](reference/extension-packages.md)                  | Custom C# code: manifest, contracts, installation, loading, capabilities              |
 | [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
 | [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |

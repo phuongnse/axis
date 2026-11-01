@@ -82,6 +82,7 @@ The server uses the ASP.NET Core rate limiter.
 | Session      | Every other route that takes a session                                  | Tenant and user             | `RateLimits:Session`        |
 | Bearer       | Inbound endpoints and [service accounts](security.md#service-accounts)  | Tenant and caller id        | `RateLimits:Bearer`         |
 | Publishing   | Studio validate, publish, preview, rollback and test requests           | Tenant and user             | `RateLimits:Publishing`     |
+| MCP          | `/mcp`, the [MCP server](mcp-server.md) _(planned for M35)_             | Tenant and client           | `RateLimits:Mcp`            |
 
 - **Client address.** It follows the [forwarded headers](host-settings.md#forwarded-headers) rules.
   Requests with no client address, such as those on a Unix socket, share one sign-in count.
@@ -104,7 +105,7 @@ The server uses the ASP.NET Core rate limiter.
 - **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `/health` and the SPA's static files
   and pages have no limit.
 - **Metric.** `axis.rate_limits.refused` counts the refused requests, with the attribute
-  `axis.partition`: `sign_in`, `session`, `bearer` or `publishing`. It carries no tenant, user or
+  `axis.partition`: `sign_in`, `session`, `bearer`, `publishing` or, _(planned for M35)_, `mcp`. It carries no tenant, user or
   address.
 - **Tests.** An integration test sends requests past each partition's limit and expects the `429` with
   `Retry-After`, and a request in another partition, of another user, from another client address or
