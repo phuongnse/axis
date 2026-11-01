@@ -6,7 +6,8 @@ slot, and its contract scenarios. The engine checks it on every write. An applic
 named point of it with a `relax` entry and a reason, and its release is then marked off-standard.
 [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees the
 idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked.md) agrees the
-shapes below. Everything here is _(planned for M24)_.
+shapes below. The `contract` resource and the compile checks of its `lifecycle` are built. Nothing
+enforces a contract on a write yet. The rest of this page is _(planned for M24)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.

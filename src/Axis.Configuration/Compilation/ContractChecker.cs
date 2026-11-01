@@ -1,0 +1,293 @@
+using System.Globalization;
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Model;
+using Axis.Configuration.Resources;
+using Axis.Expressions.Parsing;
+using Axis.Expressions.Typing;
+
+namespace Axis.Configuration.Compilation;
+
+/// <summary>
+/// Checks the contracts of the pinned modules and returns the ones without a problem, by the qualified
+/// name of their entity. A contract names a plain-named, non-child entity of its own module, and a
+/// module has at most one contract for each entity. A contract has at least one of its four parts. Only
+/// the lifecycle is checked so far: its state field is a required, plain, non-computed <c>enum</c>, its
+/// states are the field's values, one is initial, and each transition names states of the lifecycle. A
+/// guard is a boolean expression in the entity's validation scope with the module's rules, and a
+/// message text key starts with the module's prefix. Every problem of a contract is reported in one
+/// pass. The validations, effects and ceiling are not checked yet.
+/// </summary>
+internal static class ContractChecker
+{
+    /// <summary>
+    /// Checks <paramref name="contracts"/>, which come in path order. <paramref name="ownerOf"/> names the
+    /// owner of a child entity, or gives null for a root entity. <paramref name="rulesFor"/> and
+    /// <paramref name="modulesFor"/> give the rules and the declared module ids a contract's expressions see.
+    /// </summary>
+    public static Dictionary<string, ContractResource> Check(
+        IReadOnlyList<ModuleContract> contracts,
+        Func<string, EntityResource?> findEntity,
+        Func<string, string?> ownerOf,
+        IReadOnlySet<string> unloadedEntityNames,
+        Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
+        Func<Resource, IReadOnlySet<string>> modulesFor,
+        List<Diagnostic> diagnostics)
+    {
+        var checkedContracts = new Dictionary<string, ContractResource>(StringComparer.OrdinalIgnoreCase);
+        var firstFileByEntity = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (moduleId, contract) in contracts)
+        {
+            var before = diagnostics.Count;
+            void Report(string code, string message, string path) =>
+                diagnostics.Add(new Diagnostic(code, message, contract.File, path, contract.Id));
+
+            if (CheckEntity(moduleId, contract, findEntity, ownerOf, unloadedEntityNames, firstFileByEntity, Report) is { } entity)
+            {
+                if (contract.Lifecycle is { } lifecycle)
+                {
+                    CheckLifecycle(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, Report);
+                }
+
+                if (diagnostics.Count == before)
+                {
+                    checkedContracts[entity.Name] = contract;
+                }
+            }
+        }
+
+        return checkedContracts;
+    }
+
+    /// <summary>Finds the contract's entity and checks the contract's shape. Gives null when the lifecycle cannot be checked.</summary>
+    private static EntityResource? CheckEntity(
+        string moduleId,
+        ContractResource contract,
+        Func<string, EntityResource?> findEntity,
+        Func<string, string?> ownerOf,
+        IReadOnlySet<string> unloadedEntityNames,
+        Dictionary<string, string> firstFileByEntity,
+        Action<string, string, string> report)
+    {
+        if (contract.Lifecycle is null && contract.Validations is null && contract.Effects is null && contract.Ceiling is null)
+        {
+            report(
+                DiagnosticCodes.EmptyContract,
+                "A contract needs at least one of 'lifecycle', 'validations', 'effects' and 'ceiling'.",
+                "");
+        }
+
+        if (contract.Entity.Contains('/', StringComparison.Ordinal))
+        {
+            report(
+                DiagnosticCodes.UnknownContractEntity,
+                $"The entity '{contract.Entity}' is not a plain name. A contract names an entity of its own module without '/'.",
+                "/entity");
+            return null;
+        }
+
+        var qualified = $"{moduleId}/{contract.Entity}";
+        var entity = findEntity(qualified);
+        if (entity is null)
+        {
+            // An entity file that was not loaded because of its own errors is not reported again.
+            if (!unloadedEntityNames.Contains(qualified))
+            {
+                report(
+                    DiagnosticCodes.UnknownContractEntity,
+                    $"The module '{moduleId}' has no entity '{contract.Entity}'.",
+                    "/entity");
+            }
+
+            return null;
+        }
+
+        if (ownerOf(entity.Name) is { } owner)
+        {
+            report(
+                DiagnosticCodes.ContractOnChildEntity,
+                $"The entity '{entity.Name}' is a child entity owned by '{owner}'. A contract covers an owner entity, and a child entity has none of its own.",
+                "/entity");
+            return null;
+        }
+
+        if (!firstFileByEntity.TryAdd(entity.Name, contract.File))
+        {
+            report(
+                DiagnosticCodes.DuplicateContract,
+                $"The entity '{entity.Name}' already has a contract in '{firstFileByEntity[entity.Name]}'. A module has at most one contract for each entity.",
+                "/entity");
+            return null;
+        }
+
+        return entity;
+    }
+
+    private static void CheckLifecycle(
+        string moduleId,
+        ContractResource contract,
+        ContractLifecycleDefinition lifecycle,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
+        Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, string> report)
+    {
+        var field = ApplicationCompiler.FindField(entity, lifecycle.Field);
+        var problem = FieldProblem(field);
+        if (problem is not null)
+        {
+            report(
+                DiagnosticCodes.InvalidLifecycleField,
+                $"The state field '{lifecycle.Field}' {problem}. The state field is a required, non-computed enum field that is not sensitive.",
+                "/lifecycle/field");
+        }
+
+        CheckStates(lifecycle, problem is null ? field!.Values ?? [] : null, report);
+        CheckTransitions(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, report);
+    }
+
+    /// <summary>Says why a field cannot hold a state, or gives null when it can.</summary>
+    private static string? FieldProblem(FieldDefinition? field) =>
+        field is null ? "names no field of the entity"
+        : FieldTypes.Parse(field.Type) != FieldType.Enum ? $"is a {field.Type} field, not an enum"
+        : field.Required != true ? "is not required"
+        : field.Expression is not null ? "is computed"
+        : field.Sensitive == true ? "is sensitive"
+        : null;
+
+    /// <summary>Checks the states. <paramref name="values"/> is the state field's values, or null when the field is not valid.</summary>
+    private static void CheckStates(
+        ContractLifecycleDefinition lifecycle,
+        IReadOnlyList<string>? values,
+        Action<string, string, string> report)
+    {
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < lifecycle.States.Count; index++)
+        {
+            var name = lifecycle.States[index].Name;
+            var path = $"/lifecycle/states/{index}/name";
+            if (!firstIndexByName.TryAdd(name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateContractName,
+                    $"The state '{name}' repeats the state at index {firstIndexByName[name].ToString(CultureInfo.InvariantCulture)}. State names are unique, ignoring letter case.",
+                    path);
+            }
+
+            if (values is not null && !values.Contains(name, StringComparer.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.LifecycleStatesMismatch,
+                    $"The state '{name}' is not a value of the field '{lifecycle.Field}'. A state is exactly one of its values.",
+                    path);
+            }
+        }
+
+        if (values is not null)
+        {
+            foreach (var value in values.Where(value => !lifecycle.States.Any(state => string.Equals(state.Name, value, StringComparison.Ordinal))))
+            {
+                report(
+                    DiagnosticCodes.LifecycleStatesMismatch,
+                    $"The value '{value}' of the field '{lifecycle.Field}' has no state. The states list every value of the field.",
+                    "/lifecycle/states");
+            }
+        }
+
+        if (!lifecycle.States.Any(state => state.Initial == true))
+        {
+            report(
+                DiagnosticCodes.NoInitialState,
+                "No state is initial. Mark at least one state 'initial', so a record can be created.",
+                "/lifecycle/states");
+        }
+    }
+
+    private static void CheckTransitions(
+        string moduleId,
+        ContractResource contract,
+        ContractLifecycleDefinition lifecycle,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
+        Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, string> report)
+    {
+        var stateNames = lifecycle.States.Select(state => state.Name).ToHashSet(StringComparer.Ordinal);
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var transitionByPair = new Dictionary<(string From, string To), string>();
+        ExpressionScope? scope = null;
+        for (var index = 0; index < lifecycle.Transitions.Count; index++)
+        {
+            var transition = lifecycle.Transitions[index];
+            var path = $"/lifecycle/transitions/{index}";
+
+            if (!firstIndexByName.TryAdd(transition.Name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateContractName,
+                    $"The transition '{transition.Name}' repeats the transition at index {firstIndexByName[transition.Name].ToString(CultureInfo.InvariantCulture)}. Transition names are unique, ignoring letter case.",
+                    $"{path}/name");
+            }
+
+            var toKnown = stateNames.Contains(transition.To);
+            if (!toKnown)
+            {
+                report(
+                    DiagnosticCodes.UnknownTransitionState,
+                    $"The state '{transition.To}' of the transition '{transition.Name}' is not a state of the lifecycle.",
+                    $"{path}/to");
+            }
+            else if (transition.From.Contains(transition.To, StringComparer.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.TransitionToSameState,
+                    $"The transition '{transition.Name}' enters '{transition.To}', which is also in 'from'. Staying in a state is no transition.",
+                    $"{path}/to");
+            }
+
+            for (var from = 0; from < transition.From.Count; from++)
+            {
+                var state = transition.From[from];
+                if (!stateNames.Contains(state))
+                {
+                    report(
+                        DiagnosticCodes.UnknownTransitionState,
+                        $"The state '{state}' of the transition '{transition.Name}' is not a state of the lifecycle.",
+                        $"{path}/from/{from.ToString(CultureInfo.InvariantCulture)}");
+                }
+                else if (toKnown && !transitionByPair.TryAdd((state, transition.To), transition.Name))
+                {
+                    report(
+                        DiagnosticCodes.DuplicateTransitionPair,
+                        $"The transition '{transitionByPair[(state, transition.To)]}' already goes from '{state}' to '{transition.To}'. One transition at most belongs to each pair of states.",
+                        $"{path}/from/{from.ToString(CultureInfo.InvariantCulture)}");
+                }
+            }
+
+            if (transition.Message is { } message && !message.TextKey.StartsWith($"{moduleId}.", StringComparison.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.ModuleTextKeyWithoutPrefix,
+                    $"The text key '{message.TextKey}' lacks the prefix '{moduleId}.'. Start each text key of the module with it.",
+                    $"{path}/message/textKey");
+            }
+
+            if (transition.Guard is { } guard)
+            {
+                scope ??= ExpressionScopes.ForEntity(
+                    entity.Fields,
+                    rules: rulesFor(contract),
+                    findEntity: findEntity,
+                    modules: modulesFor(contract),
+                    undeclaredModuleIsUnknown: true);
+                var parsed = ExpressionParser.Parse(guard);
+                var problem = parsed.Succeeded ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean).Diagnostic : parsed.Diagnostic;
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, $"{path}/guard");
+                }
+            }
+        }
+    }
+}

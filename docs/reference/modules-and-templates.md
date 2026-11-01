@@ -82,9 +82,9 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
   [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
-  `form`, `page`, `process`, `event`, `text`, `seed`, `policy` and `trigger`
+  `form`, `page`, `process`, `event`, `text`, `seed`, `policy`, `contract` and `trigger`
   of type `event`, `dataChange` or `schedule`. Roles are not allowed.
-  _(planned for M24)_ `scenario` and `contract` are allowed too, see
+  _(planned for M24)_ `scenario` is allowed too. See
   [module contracts](module-contracts.md). Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner

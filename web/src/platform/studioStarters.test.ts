@@ -21,8 +21,8 @@ const schemaByKind = new Map(
     schema,
   ]),
 )
-// The manifest is not created from Studio.
-const notCreatedKinds = ['application']
+// The manifest is not created from Studio, and only a module holds a contract.
+const notCreatedKinds = ['application', 'contract']
 const createdKinds = [...schemaByKind.keys()].filter((kind) => !notCreatedKinds.includes(kind)).toSorted()
 
 function resolvePointer(root: unknown, pointer: string): unknown {
