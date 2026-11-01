@@ -1,6 +1,6 @@
 # Data encryption
 
-Axis encrypts tenant backup archives, and _(planned for M27)_ the values of fields marked `sensitive`, as
+Axis encrypts tenant backup archives and the values of fields marked `sensitive`, as
 [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
 [D116](../decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md) agree. The keys are in the
 [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory). Secrets in the platform tables are
@@ -54,7 +54,7 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
   in either order, and nothing else. Axis hashes the value under every lookup key the tenant holds, as far as the
   server has read them, and matches any of the hashes. A server that read the keys before a rotation can miss a record that the
   rotation re-hashed in an exact lookup search until it reads a value under the new key or restarts, and a search that reads
-  the keys again _(planned for M27)_ closes that window, see [rotating the keys](#rotating-the-keys). `!=` also holds for a record whose field is empty.
+  the keys again _(planned for M24)_ closes that window, see [rotating the keys](#rotating-the-keys). `!=` also holds for a record whose field is empty.
   The record list and its export, the data source rows and their export, process inspection and every
   single-record check apply the grant this way. A filter that reaches Axis without the tenant's keys throws, and
   never compares plain text. A tenant with no lookup key has no hashes, so `==` matches no record and `!=` matches
@@ -65,16 +65,15 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
   under every lookup key the tenant holds, as for a grant. A parameter that was not given is `null` in the `filter`,
   so `==` matches the records whose field is empty and `!=` matches the records whose field has a value. The rows,
   their export and the trigger fan-out of a schedule trigger apply the `filter` this way, and a read that reaches it
-  without the tenant's keys throws. A caller's filter may test the field the same way _(planned for M27)_.
+  without the tenant's keys throws. A caller's filter may test the field the same way _(planned for M24)_.
 - Two records with the same value have the same hash, so whoever reads the table can see that they match. That is
   the cost of the lookup.
 
 ## What a sensitive field cannot do
 
 Compilation refuses each of these on a sensitive field with [`AXC0308`](diagnostic-codes.md), at the path of the use.
-The message names the field and the use. The refusals and the run-time `400` for `sort` below are built, and hold
-before the values are encrypted. The exact lookup exception is built for a policy grant's `filter`, a data source
-`filter` and a measure's `filter`.
+The message names the field and the use. The refusals and the run-time `400` for `sort` below are built. The exact lookup exception is built for a policy
+grant's `filter`, a data source `filter` and a measure's `filter`.
 
 - A filter, other than the equality of an exact lookup in a policy grant's, data source's or measure's `filter`.
 - A sort, in a data source or a table.
@@ -196,10 +195,10 @@ steps, task completions, seeds and process steps use the cipher, so a value is n
 grant whose `filter` tests an exact lookup field matches through the lookup hashes. Test: `ScenarioRunnerTests`. A data source `filter` and a measure's `filter` that test an exact lookup field match the same
 way, in the rows, the export and the id read of the trigger fan-out. Test: `ExactLookupFilterTests`. The
 trigger and starter reads do not use it yet _(planned for
-M27)_: a data change trigger, an event trigger start, a task escalation, or an inbound endpoint's start condition
+M24)_: a data change trigger, an event trigger start, a task escalation, or an inbound endpoint's start condition
 that reads a record holding a stored sensitive value fails. Activation's inline recompute of computed fields and the worker's
 `computed.backfill` do not use the cipher either: on an entity that holds a stored sensitive value they fail and write
-nothing, until they do _(planned for M27)_.
+nothing, until they do _(planned for M24)_.
 
 The leave request sample marks its `reason` `sensitive` and shows each request by a required `title`, its display
 field, because a sensitive field cannot be one. The department manager reads the reason on the review task, and another
@@ -224,7 +223,7 @@ counts the values it re-encrypted and the hashes it recomputed, so `0` means tha
   hold, so it reads the keys again.
 - **A stale search.** A server with cached keys hashes an exact lookup search value only under the lookup keys it has read, so
   until it reads a value under the new key or restarts, its search can miss a record that rotate re-hashed. The search that
-  reads the keys again _(planned for M27)_ closes the window, and [D116](../decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md)
+  reads the keys again _(planned for M24)_ closes the window, and [D116](../decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md)
   stays the agreed target.
 - **A failure.** A value that does not decrypt stops rotate at its table, with the line
   `<id> data-key rotate failed: <message>` and exit code `1`. The message holds no value and no key. The tables before it stay
@@ -269,7 +268,6 @@ never a key. A refused `retire` writes none. Both need `Tenancy:Source=directory
   The `check` step decrypts only as far as the manifest and the start of `tenant.dump`. The `restore` step decrypts to
   the end of the file, so a chunk that fails to decrypt later fails that step. The entry stays `provisioning`, nothing
   is restored, and a rerun with a good archive finishes the restore.
-- **What the encryption does not do yet.** A `sensitive` field has a `bytea` column. The record API, forms and the
-  detail widget, an import, an inbound endpoint, a seed, a process step, a connector or package call output, the process
-  start endpoint, task completion, the task form state, a scenario and the operator's call resolve encrypt and decrypt a value with the tenant keys. A value's associated data names the tenant id, so that work
-  has to handle a restore under a new id.
+- **What the encryption does not do yet.** A restore under a new tenant id. A value's associated data names the tenant
+  id, and `tenant restore` keeps the stored values as they are, so they do not decrypt under the new id. Re-encrypting
+  them is _(planned for M24)_.
