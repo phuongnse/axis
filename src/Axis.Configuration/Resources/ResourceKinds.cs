@@ -24,4 +24,5 @@ public static class ResourceKinds
     public const string Migration = "migration";
     public const string Scenario = "scenario";
     public const string Contract = "contract";
+    public const string Layer = "layer";
 }

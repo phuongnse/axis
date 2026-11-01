@@ -116,6 +116,7 @@ public static class ApplicationLoader
         var triggers = new List<TriggerResource>();
         var webhooks = new List<WebhookResource>();
         var migrations = new List<MigrationResource>();
+        var layers = new List<LayerResource>();
         var scenarios = new List<ScenarioResource>();
         var resources = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
@@ -320,6 +321,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Migration:
                         migrations.Add(root.Deserialize<MigrationResource>(SerializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.Layer:
+                        layers.Add(root.Deserialize<LayerResource>(SerializerOptions)! with { File = file });
+                        break;
                     case ResourceKinds.Scenario:
                         scenarios.Add(root.Deserialize<ScenarioResource>(SerializerOptions)! with { File = file });
                         break;
@@ -364,6 +368,7 @@ public static class ApplicationLoader
             Triggers = triggers,
             Webhooks = webhooks,
             Migrations = migrations,
+            Layers = layers,
             Scenarios = scenarios,
         };
     }
@@ -528,7 +533,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.IdentityProvider}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}', '{ResourceKinds.Scenario}', '{ResourceKinds.Trigger}' or '{ResourceKinds.Webhook}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.IdentityProvider}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}', '{ResourceKinds.Scenario}', '{ResourceKinds.Trigger}', '{ResourceKinds.Layer}' or '{ResourceKinds.Webhook}'.",
                 file,
                 "/kind",
                 resourceId));

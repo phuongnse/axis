@@ -47,8 +47,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - The starters live in the SPA, in `web/src/platform/studioStarters.json`.
     Each lists the pointers of its empty references. A Vitest test checks each
     one against its bundled schema, so a schema file without a starter fails
-    (the manifest is exempt), and every error must be at a listed pointer. A server test reads the same
-    file, sends each starter through the create route, and checks that its
+    (the manifest, the contract and the layer are exempt), and every error must be at a listed
+    pointer. A server test reads the same file, sends each starter through the create route, and checks that its
     diagnostics are at the listed pointers only.
   - A new text resource copies every key and text of the default locale of the
     first site in file order, or `en` when there is no site, so every label still

@@ -257,6 +257,7 @@ public static partial class ApplicationCompiler
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
             (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames);
+            LayerChecker.Check(loaded.Layers, manifest, modules, installedModules, diagnostics);
             var pinnedManifests = modules
                 .Select(pin => (pin.Id, installedModules.First(candidate => candidate.Manifest.Id == pin.Id && candidate.Manifest.Version == pin.Version).Manifest))
                 .ToList();

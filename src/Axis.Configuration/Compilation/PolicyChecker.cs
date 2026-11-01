@@ -23,7 +23,7 @@ namespace Axis.Configuration.Compilation;
 /// a grant whose target is unknown or a child entity. A role or target file that was not loaded
 /// because of its own errors is not reported again. A data source grant that names a module the
 /// application does not declare is <c>AXC0207</c>, in place of the unknown-target diagnostic. A grant's
-/// optional <c>name</c> is unique in its policy, ignoring letter case (<c>AXC0347</c>).
+/// optional <c>name</c> is unique in its policy, ignoring letter case (<c>AXC0353</c>).
 /// </summary>
 /// <remarks>
 /// A module policy is named <c>&lt;module id&gt;/&lt;name&gt;</c>. Each role it names is a role slot of
