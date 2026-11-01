@@ -508,6 +508,19 @@ Open, waiting for an issue:
 
 Each becomes a **Gap** row, linked to its issue, once that issue exists.
 
+Planned with [D128](../decisions/d128-rules-from-the-studio-review.md) _(planned for M31)_, each to become a row with
+its test when it is built:
+
+- (Denial of service, Medium) sign-out ends the identity provider's session through the admin API by `sid`. The
+  server ends only the `sid` stored with the caller's own session, on the CSRF-checked sign-out route, so no request
+  names a session to end.
+- (Elevation of privilege, Low) Keycloak's account console is a second self-service surface. `tenant create` turns it
+  off and drops `manage-account`, and Axis's account page starts only Keycloak's own application-initiated actions.
+- (Repudiation, Low) a person denies accepting the terms. Keycloak records when each person accepted, and a new terms
+  version asks everyone again.
+- (Information disclosure, Low) the public `/licences` page shows which libraries Axis ships. It shows versions only to
+  a signed-in person, as the footer does.
+
 ### Personal data
 
 Axis holds personal data about the people who use it: user profiles with email addresses, records and

@@ -110,7 +110,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - `POST /api/auth/sign-out` ends the session and returns `200` with
     `{ "signOutUrl" }`. The SPA sends the browser there, and the identity
-    provider returns it to `/?signedOut`, see
+    provider returns it to `/?signedOut` (_(planned for M31)_: the server first ends the identity provider's session by the stored `sid` through the admin API, as the realm's `axis-users` client, and then answers `/?signedOut` itself, so no question is asked; only when that call fails does it answer the end-session address as now), see
     [platform home page](shell.md#platform-home-page). The SPA calls sign-out
     with `fetch` to send the CSRF header, which cannot follow a redirect to the
     identity provider as a page. A successful sign-out also
@@ -187,7 +187,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     session, null for the tenant's own hosts, and the alias of the provider that
     signed the person in, from the ID token's `identity_provider` claim, none for
     accounts, and the roles that each application's provider mapping gave, by application id. Given roles are not in the row, the session reads them from `axis.given_roles` at every request. On a preview tenant it reads those of its main tenant, from the main tenant's database. A session from before a column existed holds none of it and counts
-    as a sign-in through accounts on the tenant's own hosts. The table never holds the session id or a token, and none reaches the browser.
+    as a sign-in through accounts on the tenant's own hosts. The table never holds the session id or a token, and none reaches the browser. _(planned for M31)_: it holds the identity provider's session id, the ID token's `sid` claim, which names that session for sign-out and grants nothing, so [D9](../decisions/d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) holds.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
     session id, 256 bits, wrapped and protected by the key ring below. It
     holds no claim. The row's key is the SHA-256 hash of the id.
@@ -362,7 +362,7 @@ sign-out address. This holds under both
 | -------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
 | What starts it       | The callback creates the row in `axis.sessions`                  | A login on the identity provider's page                     |
 | How long it lasts    | 8 hours after sign-in, or 1 hour without requests                | Set at the identity provider                                |
-| What ends it         | Sign-out, expiry, a new sign-in, an administrator's disable or authenticator reset, an operator or a tenant restore | Its own expiry, the `signOutUrl` that Axis sign-out uses, or an administrator's disable or authenticator reset |
+| What ends it         | Sign-out, expiry, a new sign-in, an administrator's disable or authenticator reset, an operator or a tenant restore | Its own expiry, the `signOutUrl` that Axis sign-out uses (the admin API call by `sid`, _(planned for M31)_), or an administrator's disable or authenticator reset |
 
 - **Axis's session.** The lifetimes are those of the
   [session](#sign-in-and-the-session). A new sign-in ends the old session, an
@@ -375,7 +375,7 @@ sign-out address. This holds under both
   provider. The development realm sets none, so it keeps Keycloak's defaults.
   Axis sets them in every realm that `tenant create` makes: at most 8 hours, the lifetime of Axis's session.
   Sign-out from Axis ends both sessions: it deletes the row and sends the
-  browser to the `signOutUrl`, which ends the identity provider's session.
+  browser to the `signOutUrl`, which ends the identity provider's session (_(planned for M31)_: the server ends it by `sid` before it deletes the row).
 - **When a person signs in again.** When Axis's session ends, the next request
   has no session, and the shell starts a sign-in. At the identity provider,
   the person logs in again whenever the last login there is older than 8 hours.

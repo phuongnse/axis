@@ -62,7 +62,7 @@ in the application. File names and names can change.
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
+| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. Each item also gives `titles` and `descriptions` by locale, from the manifest's `label` and `description` _(planned for M31)_, see [Studio workspace](studio-workspace.md#applications). A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
 | `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) |
 | `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](modules-and-templates.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
@@ -589,7 +589,7 @@ This route has its own order of checks. The first failure is the response:
    - a `name` that does not match `^[A-Za-z][A-Za-z0-9]*$` or is longer than 60
      characters;
    - a `name` whose [kebab-case](#writes) form is longer than 60 characters, or
-     is a reserved site path: `api`, `health`, `assets`, `studio`, `account` or `users`;
+     is a reserved site path: `api`, `health`, `assets`, `studio`, `account`, `users` or `licences` _(planned for M31)_;
    - a `template` that is not a string.
 7. An unknown template, `404`. It is an `id` that no installed template has.
 8. A write lock that cannot be taken, `503`. See [Versions](#versions).

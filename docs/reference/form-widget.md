@@ -100,7 +100,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       Only a form shows it, not a table or a detail.
     - **Validation messages.** A message is 14px at a 20px line height, 4px
       under its input, followed by a whole field gap (`spacing-lg`, 24px)
-      before the next field, so the layout grows when a message appears.
+      before the next field, so the layout grows when a message appears. Every form follows the same
+      rule, see [fields](actions-and-controls.md#fields) _(planned for M31)_.
     - **Read-only values.** A field the form makes read-only, by `readOnly` or
       `readOnlyWhen`, and a `computed`, `sequence` or `creator` field show
       plain text, not an input. A boolean shows Yes or No. The value starts
@@ -192,7 +193,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - Each row has a remove row button: a trash icon button in `dangerText`,
       with its name as a tooltip on hover and on focus. Add row sits above the
       table on the right, outlined at the *main* level of
-      [buttons](frontend.md). It appends a row with every child field `null`,
+      [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`,
       and focus moves to the row's first input. Rows cannot be reordered.
     - When rows were added, removed or edited, the form sends the whole row
       list, as [record-api.md](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
@@ -281,8 +282,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     does not show appears above the form.
   - **Start process action**. A `form` widget can declare
     `startProcess` actions. On a saved record, each is shown as a button
-    next to Save and Cancel, with its label. It is outlined at the *main*
-    level of [buttons](frontend.md), and Save is the solid *finish* button. For a signed-in user, page
+    next to Save and Cancel, with its label. Save is the solid *finish* button, and beside it the action is a
+    text button, see [buttons](actions-and-controls.md#buttons) _(planned for M31)_. For a signed-in user, page
     metadata lists only the actions whose process the user holds a `start`
     grant on. A new record shows no action buttons, so a failed start never
     leaves a record behind on a form that still says new.
