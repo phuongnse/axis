@@ -178,6 +178,7 @@ public sealed class SqlTranslatorTests
     [InlineData("lower(t) == 'a'", 0, "Function 'lower'")]
     [InlineData("UPPER(t) == 'a'", 0, "Function 'upper'")]
     [InlineData("b and trim(t) == 'a'", 6, "Function 'trim'")]
+    [InlineData("previous(i) == i", 0, "Function 'previous'")]
     [InlineData("i / 2 > 1", 2, "Operator '/'")]
     [InlineData("i > 0 and lower(t).x", 18, "Paths")]
     [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date")]

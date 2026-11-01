@@ -269,7 +269,7 @@ A `seed` holds records with fixed ids for one entity:
   [Request bodies and values](record-api.md#request-bodies-and-values)).
   A seed cannot set a `file` field, in a record or in a child row (`AXC0259`).
   A record of an entity whose [module contract](module-contracts.md#where-the-contract-is-checked)
-  has a lifecycle must give an initial state when it gives a state as text (`AXC0336`). A synced
+  has a lifecycle must give an initial state when it gives a state as text (`AXC0338`). A synced
   seed that changes a stored state must follow a transition.
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.

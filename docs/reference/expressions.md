@@ -428,7 +428,7 @@ argument is `null`.
 | `today()` | date | The calendar date of the transaction's time in the application's time zone. Not allowed in a computed field (`AXC0086`). | Yes |
 | `toDate(date-time)` | date | The calendar date of an instant in the application's time zone. `null` gives `null`. Not allowed in a computed field (`AXC0086`). | Yes |
 | `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
-| `previous(field)` | type of the field | _(planned for M24)_ The field's value before the write, `null` on a create. Allowed only in a module contract. See [previous values](module-contracts.md#previous-values). | No |
+| `previous(field)` | type of the field | The field's value before the write, `null` on a create. Allowed only in a module contract (`AXC0336`), and its argument must be an own field (`AXC0337`). See [previous values](module-contracts.md#previous-values). | No |
 | `accountableUser()` | text | _(planned for M24)_ The user who answers for the write, or `null`. Allowed only in a module contract and a step's `set`. See [the accountable user](module-contracts.md#the-accountable-user). | No |
 | `decisionTask()` | text | _(planned for M24)_ The task whose completion the write follows, or `null`. Allowed where `accountableUser()` is. See [the deciding task](module-contracts.md#the-deciding-task). | No |
 
@@ -846,6 +846,13 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   `currentUser()`, at the call. This includes a validation, a computed field,
   a data source filter, a process expression and a rule body. A rule
   argument inside a policy filter may call it.
+- **`AXC0336`.** An expression that is not a module contract's expression calls
+  `previous`, at the call. This includes an entity validation, a computed
+  field, a policy filter, a process expression and a rule body.
+- **`AXC0337`.** The argument of `previous` is not the bare name of one of the
+  entity's own fields, at the call. A child collection, a `references` field,
+  an unknown name, any other expression, and a call inside an aggregate's item
+  expression are all this.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).

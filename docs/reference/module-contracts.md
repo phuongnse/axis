@@ -235,8 +235,10 @@ module policies alike.
 
 - On a create it gives `null`.
 - It reads only the entity's own fields, not a child collection or a computed field's expression.
+  A child collection, a `references` field, an unknown name or any argument that is not a bare field
+  name is `AXC0337`. An aggregate's item expression cannot call it.
 - It is allowed only in a contract's guards, core validations and effect values. Anywhere else it is
-  a diagnostic.
+  `AXC0336`.
 - It is evaluated in the server and the worker, never translated to SQL.
 
 ## The accountable user
@@ -297,7 +299,7 @@ promise that each step is decided once.
   computed fields, a data key rotation and a restore change stored values in bulk and check no
   contract.
 - **Seed data.** A seed record of an entity with a lifecycle must be in an initial state, or the
-  seed is a diagnostic (`AXC0336`). A synced seed that changes a stored state must follow a
+  seed is a diagnostic (`AXC0338`). A synced seed that changes a stored state must follow a
   transition, and its guard runs with a `null` accountable user. A refusal is `AXC0033`: it stops
   startup seeding, rolls back every seed write, and the log names the point that refused it.
 - **Order in a write.** Computed fields, the entity's validations, the core validations, then the

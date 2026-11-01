@@ -297,6 +297,104 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Theory]
+    [InlineData("text", "t")]
+    [InlineData("integer", "i")]
+    [InlineData("decimal", "d")]
+    [InlineData("boolean", "b")]
+    [InlineData("date", "dt")]
+    [InlineData("date-time", "ts")]
+    [InlineData("enum", "e")]
+    [InlineData("reference", "r")]
+    public void Previous_in_a_contract_has_the_type_of_its_field(string type, string field)
+    {
+        var parsed = ExpressionParser.Parse($"previous({field})");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null, contract: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(Expected(type), result.Type);
+    }
+
+    [Theory]
+    [InlineData("previous(i) == i", "boolean")]
+    [InlineData("PREVIOUS(i) + 1 > 0", "boolean")]
+    [InlineData("previous(t) is null", "boolean")]
+    [InlineData("previous(f) is null", "boolean")]
+    [InlineData("previous(f) is not null", "boolean")]
+    public void Previous_in_a_contract_composes_like_the_field(string text, string type)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), contract: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Fact]
+    public void Previous_of_a_file_allows_only_a_null_check()
+    {
+        var parsed = ExpressionParser.Parse("previous(f) == null");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, contract: true).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal(ExpressionDiagnosticCodes.TypeMismatch, diagnostic.Code);
+    }
+
+    [Theory]
+    [InlineData("previous(lineItems) == null", 0, "'lineItems' is a child collection, previous reads only the entity's own fields at character 1.")]
+    [InlineData("title == previous(missing)", 9, "Unknown field 'missing' at character 10.")]
+    [InlineData("previous(1) == 1", 0, "Function 'previous' needs the name of one of the entity's own fields, outside an aggregate's item expression at character 1.")]
+    [InlineData("previous(title + 'a') == 'a'", 0, "Function 'previous' needs the name of one of the entity's own fields, outside an aggregate's item expression at character 1.")]
+    [InlineData("any(lineItems, previous(ok))", 15, "Function 'previous' needs the name of one of the entity's own fields, outside an aggregate's item expression at character 16.")]
+    public void A_bad_previous_argument_is_reported_at_the_call(string text, int offset, string message)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.Null, contract: true).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.InvalidPreviousArgument, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal(message, diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("previous(t)", "text", false, 0)]
+    [InlineData("i == previous(i)", "boolean", false, 5)]
+    // A stored value is not a contract expression either.
+    [InlineData("concat(t, previous(t))", "text", true, 10)]
+    public void Previous_outside_a_contract_is_reported_at_the_call(string text, string type, bool storedValue, int offset)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), storedValue).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.PreviousOutsideContract, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal(
+            $"Function 'previous' is allowed only in a module contract's guards, core validations and effect values at character {offset + 1}.",
+            diagnostic.Message);
+    }
+
+    [Fact]
+    public void Previous_in_a_rule_body_is_reported_because_a_body_is_checked_on_its_own()
+    {
+        var parsed = ExpressionParser.Parse("previous(value) > 0");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var scope = new ExpressionScope(new Dictionary<string, ExpressionType> { ["value"] = ExpressionType.Integer });
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.PreviousOutsideContract, 0), (diagnostic.Code, diagnostic.Offset));
+    }
+
+    [Theory]
     [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date at character 7.")]
     [InlineData("dt == date('2026-02-29')", 6, "'2026-02-29' is not a valid date at character 7.")]
     [InlineData("ts == dateTime('2026-10-08T09:30:00')", 6, "'2026-10-08T09:30:00' is not a valid date-time at character 7.")]

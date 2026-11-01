@@ -33,6 +33,9 @@ public static class ExpressionInterpreter
     /// A <c>now()</c> evaluated without it is a bug in the caller too.
     /// <paramref name="timeZone"/> is the application's time zone, which <c>today()</c> and <c>toDate</c>
     /// use to take the calendar date of an instant. Either evaluated without it is a bug in the caller too.
+    /// <paramref name="previous"/> holds the stored values before the write, which <c>previous(field)</c>
+    /// reads. It is <c>null</c> when no record exists before the write, as on a create, and then
+    /// <c>previous</c> gives <c>null</c>.
     /// </summary>
     public static ExpressionEvaluationResult Evaluate(
         ExpressionNode expression,
@@ -40,8 +43,9 @@ public static class ExpressionInterpreter
         ExpressionValues values,
         ExpressionRecordResolver? records = null,
         DateTimeOffset? now = null,
-        TimeZoneInfo? timeZone = null) =>
-        EvaluateCountingSteps(expression, checkResult, values, records, now, timeZone).Result;
+        TimeZoneInfo? timeZone = null,
+        ExpressionValues? previous = null) =>
+        EvaluateCountingSteps(expression, checkResult, values, records, now, timeZone, previous).Result;
 
     /// <summary>
     /// Evaluates like <see cref="Evaluate"/> and also gives the steps used, so a test can show that
@@ -53,7 +57,8 @@ public static class ExpressionInterpreter
         ExpressionValues values,
         ExpressionRecordResolver? records = null,
         DateTimeOffset? now = null,
-        TimeZoneInfo? timeZone = null)
+        TimeZoneInfo? timeZone = null,
+        ExpressionValues? previous = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(checkResult);
@@ -66,7 +71,7 @@ public static class ExpressionInterpreter
         var budget = new Budget();
         try
         {
-            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now, timeZone).Eval(expression), null), budget.Steps);
+            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now, timeZone, previous).Eval(expression), null), budget.Steps);
         }
         catch (EvaluationFailure failure)
         {
@@ -86,7 +91,8 @@ public static class ExpressionInterpreter
         Budget budget,
         ExpressionRecordResolver? records,
         DateTimeOffset? now,
-        TimeZoneInfo? timeZone)
+        TimeZoneInfo? timeZone,
+        ExpressionValues? previous = null)
     {
         public object? Eval(ExpressionNode node)
         {
@@ -126,9 +132,11 @@ public static class ExpressionInterpreter
             budget.Steps += (int)steps;
         }
 
-        private object? Name(NameNode name)
+        private object? Name(NameNode name) => Read(values, name);
+
+        private static object? Read(ExpressionValues source, NameNode name)
         {
-            if (!values.TryGetValue(name.Name, out var value))
+            if (!source.TryGetValue(name.Name, out var value))
             {
                 throw new InvalidOperationException($"No value was given for field '{name.Name}'.");
             }
@@ -202,6 +210,10 @@ public static class ExpressionInterpreter
             var arguments = call.Arguments;
             switch (signature.Name)
             {
+                case "previous":
+                    // The argument is never evaluated, because that would give the new value.
+                    return previous is null ? null : Read(previous, (NameNode)arguments[0]);
+
                 case "if":
                     // Only the picked branch is evaluated. A null condition picks the else branch.
                     return Widen(call, Eval(Boolean(Eval(arguments[0])) == true ? arguments[1] : arguments[2]));
