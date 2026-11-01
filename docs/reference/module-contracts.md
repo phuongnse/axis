@@ -12,8 +12,9 @@ shapes below. The `contract` resource and the compile checks of its `lifecycle`,
 API's `400`. So is the compile check of a module scenario's `contract.covers`. A guard, a core
 validation and an effect value read `accountableUser()` and `decisionTask()`, the values of the write
 they check. The shared record update runs the effects of the transition it makes, in its own transaction.
-The record API's answer, the audit entries and the data change triggers for effect records are still
-_(planned for M24)_. A refusal on another write
+The record API answers a failing effect, audits the effect records and fires the data change triggers for
+them. The same steps are still _(planned for M24)_ for the effect records of a task completion, a process step
+and an inbound endpoint call. A refusal on another write
 path fails as that path already fails, and logs nothing yet. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
@@ -183,7 +184,7 @@ the [`previous`](#previous-values), [`accountableUser`](#the-accountable-user) a
 
 An effect creates one record when a transition happens, in the transaction of the write that made
 the transition. The compile checks of effects are built, and the compiled contract holds each effect
-with its compiled values. The shared record update runs them. The record API's answer, the audit entries and the data change triggers for effect records are _(planned for M24)_. A name that repeats an earlier one,
+with its compiled values. The shared record update runs them. The record API answers a failing effect, audits the effect records and fires the data change triggers for them. The answer, the audit entries and the triggers on a task completion, a process step and an inbound endpoint call are _(planned for M24)_. A name that repeats an earlier one,
 ignoring letter case, is `AXC0328`. An `on` that names no transition of the contract, with the same
 letter case, is `AXC0344`. A `create.entity` that is not the plain name of a root entity of the module
 is `AXC0345`. A `values` key that names no writable field, or an expression that does not fit its
@@ -339,7 +340,8 @@ promise that each step is decided once.
   change." and `errors` keyed `/values/<state field>`, whose message is the transition's `message`,
   or names the states when no transition matches. A delete in a state that is not deletable is the
   same `409`, keyed by the state field. A failing effect is a `409` with the fixed title "A
-  required change could not be recorded." and the effect's named point. Nothing is written.
+  required change could not be recorded." and the effect's named point in a `point` member, such as
+  `Claim/effects/entryRecorded`. It has no `errors`. Nothing is written.
 - **Task completion.** The completion is refused with the same answers, and the task stays open.
 - **Process step.** The step fails, as a refused `createRecord` does, and the instance ends
   `failed`. The [process inspector](process-inspection.md#step-errors-in-inspection) and the

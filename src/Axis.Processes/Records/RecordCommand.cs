@@ -77,17 +77,22 @@ public enum RecordConflict
 
     /// <summary>The entity's lifecycle refuses the write, and <see cref="RecordCommandResult.Errors"/> says why.</summary>
     Lifecycle,
+
+    /// <summary>An effect of the transition could not be written, and <see cref="RecordCommandResult.Point"/> names it.</summary>
+    Effect,
 }
 
 /// <summary>
 /// The result of a record command. <see cref="Record"/> is the full stored record after a write,
 /// whatever the actor may read of it. <see cref="Errors"/> hold the problems by JSON Pointer.
+/// <see cref="Point"/> names the effect of a transition that could not be written, such as <c>Claim/effects/entryRecorded</c>.
 /// </summary>
 public sealed record RecordCommandResult(
     RecordCommandOutcome Outcome,
     Record? Record = null,
     IDictionary<string, string[]>? Errors = null,
-    RecordConflict? Conflict = null);
+    RecordConflict? Conflict = null,
+    string? Point = null);
 
 /// <summary>The parsed body of a create: the input, or the failure the create answers with. Never both.</summary>
 public sealed record RecordCreateParse(RecordInput? Input, RecordCommandResult? Failure);
@@ -124,6 +129,10 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// that fails leaves none.
 /// A create or update also starts the processes of the data change triggers that match it, in the
 /// same transaction, as <c>system</c>. A write that fails starts none.
+/// An update that makes a transition creates the records of its effects in the same transaction. Each gets a
+/// <c>record.created</c> audit record, with the actor and the details <c>version</c> and <c>effect</c>, and starts the
+/// processes of the create triggers on its entity, after the updated record's own audit record and starts.
+/// An effect that cannot be written is a conflict that names its point, and nothing is written.
 /// A delete starts the processes of the delete triggers on the entity, in the same transaction, after the
 /// audit record. Each starts a process without a subject, with parameters worked out from the record as it
 /// was before the delete. A delete that is refused starts none.
@@ -721,7 +730,8 @@ public static class RecordCommand
     }
 
     // The write steps of an update after the checks, in the transaction of the caller, which commits on a written
-    // result and rolls back otherwise.
+    // result and rolls back otherwise. The records that the effects of a transition created are audited and start
+    // the create triggers of their entities after the record itself, in declaration order.
     private static async Task<RecordCommandResult> WriteUpdateAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -775,6 +785,23 @@ public static class RecordCommand
             write,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
+        foreach (var effect in result.Effects)
+        {
+            await AuditRecords.AppendAsync(transaction, RecordAudit(actor, AuditActions.RecordCreated, application, effect.Entity, effect.Record.Id, effect.Record.Version, effect: effect.Point), cancellationToken);
+            await DataChangeTriggerStarts.StartAsync(
+                transaction,
+                tenantId,
+                application,
+                releaseId,
+                effect.Entity,
+                DataChangeKinds.Create,
+                effect.Record,
+                changedFields: null,
+                write,
+                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                cancellationToken);
+        }
+
         return WriteResult(result);
     }
 
@@ -1003,7 +1030,7 @@ public static class RecordCommand
     // Logs a refusal by the lifecycle: the entity, the named point and the record, never a value.
     private static void LogRefusal(ILoggerFactory loggerFactory, EntityModel model, RecordWriteResult result, Guid? recordId)
     {
-        if (result.Outcome == RecordWriteOutcome.LifecycleRefused)
+        if (result.Outcome is RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused)
         {
             RecordLifecycleLog.Refused(loggerFactory, model.Id, result.Point, recordId);
         }
@@ -1023,6 +1050,8 @@ public static class RecordCommand
             RecordWriteOutcome.SchemaConflict => new RecordCommandResult(RecordCommandOutcome.Conflict, Conflict: RecordConflict.Schema),
             RecordWriteOutcome.LifecycleRefused => new RecordCommandResult(
                 RecordCommandOutcome.Conflict, Errors: result.Errors, Conflict: RecordConflict.Lifecycle),
+            RecordWriteOutcome.EffectRefused => new RecordCommandResult(
+                RecordCommandOutcome.Conflict, Conflict: RecordConflict.Effect, Point: result.Point),
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unexpected write outcome."),
         };
 
@@ -1075,8 +1104,9 @@ public static class RecordCommand
 
     /// <summary>
     /// The audit record of a record write. Its details hold the record's version, and on update
-    /// the names of the fields the body sets. They never hold a field value. Its actor is
-    /// <paramref name="actor"/>, with their display name.
+    /// the names of the fields the body sets. For a record that an effect created they also hold the
+    /// effect's named point. They never hold a field value. Its actor is <paramref name="actor"/>, with
+    /// their display name.
     /// </summary>
     private static AuditEntry RecordAudit(
         RecordActor actor,
@@ -1085,9 +1115,15 @@ public static class RecordCommand
         EntityModel model,
         Guid recordId,
         long version,
-        IEnumerable<string>? fields = null)
+        IEnumerable<string>? fields = null,
+        string? effect = null)
     {
         var details = new JsonObject { ["version"] = version };
+        if (effect is not null)
+        {
+            details["effect"] = effect;
+        }
+
         if (fields is not null)
         {
             details["fields"] = new JsonArray([.. fields.Select(name => JsonValue.Create(name))]);

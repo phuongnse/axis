@@ -773,6 +773,7 @@ internal static class RecordEndpoints
                 // Names no process, instance or step: the process is not part of the response.
                 RecordConflict.RunningProcess => Conflict("A running process works on this record."),
                 RecordConflict.Lifecycle => LifecycleRefused(result.Errors!),
+                RecordConflict.Effect => EffectRefused(result.Point!),
                 var conflict => throw new InvalidOperationException($"Unexpected conflict {conflict}."),
             },
             var outcome => throw new InvalidOperationException($"Unexpected record command outcome {outcome}."),
@@ -791,6 +792,7 @@ internal static class RecordEndpoints
             // Names no column or constraint: the storage names are not part of the API.
             RecordWriteOutcome.SchemaConflict => Conflict("The stored schema does not match the active model."),
             RecordWriteOutcome.LifecycleRefused => LifecycleRefused(result.Errors!),
+            RecordWriteOutcome.EffectRefused => EffectRefused(result.Point!),
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unexpected write outcome."),
         };
 
@@ -800,6 +802,13 @@ internal static class RecordEndpoints
             errors,
             statusCode: StatusCodes.Status409Conflict,
             title: "The record's state does not allow this change.");
+
+    // Names the effect's point, such as Claim/effects/entryRecorded, never a value.
+    private static IResult EffectRefused(string point) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            title: "A required change could not be recorded.",
+            extensions: new Dictionary<string, object?> { ["point"] = point });
 
     private static IResult Conflict(string title) =>
         Results.Problem(statusCode: StatusCodes.Status409Conflict, title: title);
