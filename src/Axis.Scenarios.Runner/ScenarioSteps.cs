@@ -154,7 +154,7 @@ internal sealed class ScenarioSteps(
         }
 
         var started = await ProcessStarter.StartAsync(
-            connection, transaction, ScenarioRunner.TenantId, model, releaseId, process, entity, id, record, Guid.CreateVersion7(), user, null, cancellationToken);
+            connection, transaction, ScenarioRunner.TenantId, model, releaseId, process, entity, id, record, Guid.CreateVersion7(), user, user, null, cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)
         {
             await transaction.CommitAsync(cancellationToken);

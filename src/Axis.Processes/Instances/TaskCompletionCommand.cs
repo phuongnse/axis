@@ -234,6 +234,7 @@ public static class TaskCompletionCommand
                 previous,
                 updated,
                 saved.Rows.Select(rows => rows.Collection.Name).Concat(saved.Links.Select(links => links.Field.Name)),
+                actor.Id,
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
         }

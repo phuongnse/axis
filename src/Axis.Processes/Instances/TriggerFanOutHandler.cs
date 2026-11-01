@@ -313,6 +313,7 @@ internal sealed partial class TriggerFanOutHandler(
             record,
             instanceId,
             AuditActors.System,
+            accountableUser: null,
             new JsonObject { ["trigger"] = trigger.Name, ["occurrenceAt"] = occurrence },
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)
@@ -371,6 +372,7 @@ internal sealed partial class TriggerFanOutHandler(
             parameters,
             instanceId,
             AuditActors.System,
+            accountableUser: null,
             new JsonObject { ["trigger"] = trigger.Name, ["occurrenceAt"] = occurrence },
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)

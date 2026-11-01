@@ -79,6 +79,7 @@ public sealed class TriggerSkipLogTests(DataDatabaseFixture database) : IClassFi
             DataChangeKinds.Create,
             created.Record!,
             null,
+            null,
             loggerFactory.CreateLogger("test"),
             CancellationToken);
 

@@ -748,6 +748,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 stored!,
                 updated,
                 [],
+                instance.AccountableUser,
                 logger,
                 cancellationToken);
         }
@@ -762,6 +763,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 instance.ReleaseId,
                 created!,
                 createdRecord,
+                instance.AccountableUser,
                 logger,
                 cancellationToken);
         }
@@ -953,6 +955,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             child.Id,
             instance.Id,
             stepName,
+            instance.AccountableUser,
+            instance.DecisionTask,
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.AlreadyRunning)
         {

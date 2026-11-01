@@ -79,6 +79,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.Step).HasColumnName("step");
             instance.Property(i => i.ParentInstanceId).HasColumnName("parent_instance_id");
             instance.Property(i => i.ParentStep).HasColumnName("parent_step");
+            instance.Property(i => i.AccountableUser).HasColumnName("accountable_user");
+            instance.Property(i => i.DecisionTask).HasColumnName("decision_task");
             instance.Property(i => i.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             instance.Property(i => i.EndedAt).HasColumnName("ended_at");
 
