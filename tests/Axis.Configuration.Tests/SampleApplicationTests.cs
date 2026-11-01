@@ -32,6 +32,35 @@ public sealed class SampleApplicationTests
         Assert.Equal("PR-{yyyy}-{n:5}", number.Sequence.Format);
     }
 
+    // A field named outer is reserved, so every sample must still compile.
+    [Theory]
+    [InlineData("purchase-requests")]
+    [InlineData("leave-requests")]
+    [InlineData("service-desk")]
+    [InlineData("asset-management")]
+    public void Every_sample_application_compiles_without_diagnostics(string sample)
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", sample), SamplePackages.Versions, SampleModules.Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void The_request_approval_template_compiles_without_diagnostics()
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "SampleTemplates", "request-approval");
+        var files = Directory.EnumerateFiles(folder, "*.json", SearchOption.AllDirectories)
+            .Select(file => new ResourceContent(Path.GetRelativePath(folder, file).Replace('\\', '/'), File.ReadAllText(file)))
+            .Where(file => file.Path != "template.json")
+            .ToList();
+
+        var result = ApplicationCompiler.CompileFiles(files, null, null);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
     [Fact]
     public void Purchase_request_sample_held_in_memory_compiles_to_the_content_hash_of_its_folder()
     {

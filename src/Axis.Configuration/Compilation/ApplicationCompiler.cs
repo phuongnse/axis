@@ -1146,6 +1146,14 @@ public static partial class ApplicationCompiler
                     $"{path}/name");
             }
 
+            if (string.Equals(field.Name, ExpressionTypeChecker.OuterName, StringComparison.OrdinalIgnoreCase))
+            {
+                Report(
+                    DiagnosticCodes.ReservedFieldName,
+                    $"The field name '{field.Name}' is reserved, because an item expression reads the outer record with outer.<field>.",
+                    $"{path}/name");
+            }
+
             CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
             CheckTextKey(field.Help, entity, $"{path}/help", references, diagnostics);
             CheckValueLabels(field, entity, path, references, diagnostics);

@@ -335,37 +335,44 @@ internal static class PresentationChecker
     /// <summary>
     /// The first field of the entity that <paramref name="node"/> reads and <paramref name="listed"/>
     /// lacks, or null. A path reads its first field. An aggregate reads its collection field, and
-    /// its item expression reads the child row, so it is skipped. A rule body sees only its
-    /// arguments, so a rule call reads what its arguments read.
+    /// its item expression reads the child row, so only its <c>outer.field</c> reads, which read a field of
+    /// the entity, count. A rule body sees only its arguments, so a rule call reads what its arguments read.
+    /// <paramref name="inItem"/> is true inside an aggregate's item expression, where a bare name is a field of the child row.
     /// </summary>
-    private static string? FirstUnlistedField(ExpressionNode node, ExpressionCheckResult check, IReadOnlySet<string> listed)
+    private static string? FirstUnlistedField(ExpressionNode node, ExpressionCheckResult check, IReadOnlySet<string> listed, bool inItem = false)
     {
         switch (node)
         {
             case NameNode name:
-                return listed.Contains(name.Name) ? null : name.Name;
+                return inItem || listed.Contains(name.Name) ? null : name.Name;
 
             case MemberNode member:
-                return FirstUnlistedField(member.Target, check, listed);
+                if (check.OuterReads.Contains(member))
+                {
+                    return listed.Contains(member.Name) ? null : member.Name;
+                }
+
+                return FirstUnlistedField(member.Target, check, listed, inItem);
 
             case UnaryNode unary:
-                return FirstUnlistedField(unary.Operand, check, listed);
+                return FirstUnlistedField(unary.Operand, check, listed, inItem);
 
             case BinaryNode binary:
-                return FirstUnlistedField(binary.Left, check, listed) ?? FirstUnlistedField(binary.Right, check, listed);
+                return FirstUnlistedField(binary.Left, check, listed, inItem) ?? FirstUnlistedField(binary.Right, check, listed, inItem);
 
             case IsNullNode isNull:
-                return FirstUnlistedField(isNull.Operand, check, listed);
+                return FirstUnlistedField(isNull.Operand, check, listed, inItem);
 
             case InNode inList:
-                return FirstUnlistedField(inList.Operand, check, listed)
-                    ?? inList.Items.Select(item => FirstUnlistedField(item, check, listed)).FirstOrDefault(name => name is not null);
+                return FirstUnlistedField(inList.Operand, check, listed, inItem)
+                    ?? inList.Items.Select(item => FirstUnlistedField(item, check, listed, inItem)).FirstOrDefault(name => name is not null);
 
             case CallNode call:
                 var isAggregate = !check.RuleCalls.ContainsKey(call)
                     && ExpressionFunctions.AggregateNames.Contains(call.Name, StringComparer.OrdinalIgnoreCase);
-                var arguments = isAggregate ? call.Arguments.Take(1) : call.Arguments;
-                return arguments.Select(argument => FirstUnlistedField(argument, check, listed)).FirstOrDefault(name => name is not null);
+                return call.Arguments
+                    .Select((argument, index) => FirstUnlistedField(argument, check, listed, inItem || (isAggregate && index > 0)))
+                    .FirstOrDefault(name => name is not null);
 
             default:
                 return null;

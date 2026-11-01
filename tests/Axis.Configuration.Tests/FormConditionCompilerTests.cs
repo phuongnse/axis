@@ -155,6 +155,39 @@ public sealed class FormConditionCompilerTests
     }
 
     [Fact]
+    public void Condition_that_reads_an_unlisted_field_through_outer_is_reported_at_the_condition()
+    {
+        using var folder = Folder($$"""
+            "sections": [ { "title": { "textKey": "orderLayout.main" },
+              "fields": [ { "field": "number", "requiredWhen": "count(lines, amount > outer.quantity) > 0" }, { "field": "lines" } ] } ]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnlistedFormConditionField, FormFile, "/sections/0/fields/0/requiredWhen"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'quantity'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Condition_may_read_a_listed_field_through_outer_and_the_child_row_fields_unlisted()
+    {
+        using var folder = Folder($$"""
+            "sections": [ { "title": { "textKey": "orderLayout.main" },
+              "fields": [ { "field": "number", "requiredWhen": "count(lines, amount > outer.quantity) > 0" },
+                          { "field": "lines" }, { "field": "quantity" } ] } ]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
     public void Condition_may_read_a_field_listed_in_another_section_and_an_aggregate_over_a_listed_collection()
     {
         using var folder = Folder($$"""

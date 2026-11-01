@@ -923,6 +923,74 @@ public sealed class ExpressionInterpreterTests
         }
     }
 
+    [Fact]
+    public void An_item_expression_compares_each_row_with_the_outer_record()
+    {
+        var rows = Rows((1, null, null), (5, null, null), (7, null, null));
+
+        Assert.Equal(2L, EvaluateOuter("count(lines, qty > outer.i)", rows).Value);
+        Assert.Equal(12L, EvaluateOuter("sum(lines, if(qty > outer.i, qty, 0))", rows).Value);
+        Assert.Equal(true, EvaluateOuter("any(lines, qty == OUTER.I + 1)", rows).Value);
+        Assert.Equal(0L, EvaluateOuter("count(lines, qty > outer.i)", []).Value);
+    }
+
+    [Fact]
+    public void An_outer_read_costs_one_step_like_a_bare_name()
+    {
+        var parsed = ExpressionParser.Parse("count(lines, qty > outer.i)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var items = new ExpressionScope(new Dictionary<string, ExpressionType> { ["qty"] = ExpressionType.Integer });
+        var scope = new ExpressionScope(_fields, collections: [new ExpressionCollection("lines", "Line", items)]);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+
+        var (result, steps) = ExpressionInterpreter.EvaluateCountingSteps(
+            parsed.Expression, checkedType, Values([("lines", Rows((1, null, null), (5, null, null))), ("i", 4L)]));
+
+        Assert.Equal(1L, result.Value);
+        // The call, then for each row the comparison, the name and the outer read.
+        Assert.Equal(1 + (2 * 3), steps);
+    }
+
+    [Theory]
+    [InlineData("any(lines, outer.r.name == 'Sales')", true)]
+    [InlineData("any(lines, outer.r.name == 'Support')", false)]
+    [InlineData("any(lines, outer.r.manager.name == 'Binh')", true)]
+    public void An_outer_path_follows_the_references_of_the_outer_record(string text, bool expected)
+    {
+        Assert.Equal(expected, EvaluateOuter(text, Rows((1, null, null)), _sales).Value);
+    }
+
+    [Fact]
+    public void An_outer_path_gives_null_when_a_reference_is_null()
+    {
+        Assert.Equal(0L, EvaluateOuter("count(lines, outer.r.name is not null)", Rows((1, null, null))).Value);
+        Assert.Equal(0L, EvaluateOuter("count(lines, outer.r.manager.name is not null)", Rows((1, null, null)), _support).Value);
+    }
+
+    [Fact]
+    public void An_outer_read_in_a_nested_aggregate_reads_the_top_level_record()
+    {
+        var items = new ExpressionScope(
+            new Dictionary<string, ExpressionType> { ["qty"] = ExpressionType.Integer },
+            collections: [new ExpressionCollection("parts", "Part", new ExpressionScope(new Dictionary<string, ExpressionType> { ["weight"] = ExpressionType.Integer }))]);
+        var scope = new ExpressionScope(_fields, collections: [new ExpressionCollection("lines", "Line", items)]);
+        var parsed = ExpressionParser.Parse("count(lines, any(parts, weight > outer.i))");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        ExpressionValues Line(long weight) => new(new Dictionary<string, object?>
+        {
+            ["qty"] = 1L,
+            ["parts"] = new List<ExpressionValues> { new(new Dictionary<string, object?> { ["weight"] = weight }) },
+        });
+
+        var result = ExpressionInterpreter.Evaluate(
+            parsed.Expression, checkedType, Values([("lines", new List<ExpressionValues> { Line(3), Line(5), Line(9) }), ("i", 4L)]));
+
+        Assert.Equal(2L, result.Value);
+    }
+
     /// <summary>
     /// The field <c>r</c> of <see cref="_fields"/> names a department with a name and a manager,
     /// and a manager is an employee with a name and a department.
@@ -948,17 +1016,51 @@ public sealed class ExpressionInterpreterTests
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
         var checkedType = ExpressionTypeChecker.Check(parsed.Expression, PathScope(), ExpressionType.Null);
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
-        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("r", department)]), (entity, id) =>
-            (entity.ToLowerInvariant(), id) switch
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("r", department)]), Departments);
+    }
+
+    /// <summary>The stored departments and employees: Sales is managed by Binh, who works in Sales, and Support has no manager.</summary>
+    private static ExpressionValues? Departments(string entity, Guid id) =>
+        (entity.ToLowerInvariant(), id) switch
+        {
+            ("department", var found) when found == _sales => new ExpressionValues(
+                new Dictionary<string, object?> { ["name"] = "Sales", ["manager"] = _binh }),
+            ("department", var found) when found == _support => new ExpressionValues(
+                new Dictionary<string, object?> { ["name"] = "Support", ["manager"] = null }),
+            ("employee", var found) when found == _binh => new ExpressionValues(
+                new Dictionary<string, object?> { ["name"] = "Binh", ["department"] = _sales }),
+            _ => null,
+        };
+
+    /// <summary>
+    /// Evaluates <paramref name="text"/> over a record with <c>i</c> set to 4, <c>r</c> set to
+    /// <paramref name="department"/> and a collection <c>lines</c> of <paramref name="lines"/>, in a scope that resolves paths.
+    /// </summary>
+    private static ExpressionEvaluationResult EvaluateOuter(string text, IReadOnlyList<ExpressionValues> lines, Guid? department = null)
+    {
+        var items = new ExpressionScope(new Dictionary<string, ExpressionType>
+        {
+            ["qty"] = ExpressionType.Integer,
+            ["amount"] = ExpressionType.Decimal,
+            ["ok"] = ExpressionType.Boolean,
+            ["due"] = ExpressionType.Date,
+        });
+        var scope = new ExpressionScope(
+            _fields,
+            collections: [new ExpressionCollection("lines", "Line", items)],
+            referenceFields: (entity, field) => (entity.ToLowerInvariant(), field.ToLowerInvariant()) switch
             {
-                ("department", var found) when found == _sales => new ExpressionValues(
-                    new Dictionary<string, object?> { ["name"] = "Sales", ["manager"] = _binh }),
-                ("department", var found) when found == _support => new ExpressionValues(
-                    new Dictionary<string, object?> { ["name"] = "Support", ["manager"] = null }),
-                ("employee", var found) when found == _binh => new ExpressionValues(
-                    new Dictionary<string, object?> { ["name"] = "Binh", ["department"] = _sales }),
+                ("department", "name") => ExpressionType.Text,
+                ("department", "manager") => ExpressionType.Reference("Employee"),
+                ("employee", "name") => ExpressionType.Text,
                 _ => null,
             });
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(
+            parsed.Expression, checkedType, Values([("lines", lines), ("i", 4L), ("r", department)]), Departments);
     }
 
     private static ExpressionScope CollectionPathScope() => new(

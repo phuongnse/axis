@@ -187,6 +187,11 @@ public static class SqlTranslator
                 throw Fail("Paths that do not start at a field are not translated to SQL", member.Offset);
             }
 
+            if (string.Equals(first.Name, ExpressionTypeChecker.OuterName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw Fail("'outer' is not translated to SQL", member.Offset);
+            }
+
             names.Add(first.Name);
             names.Reverse();
             return names;

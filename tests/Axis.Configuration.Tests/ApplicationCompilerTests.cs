@@ -494,6 +494,46 @@ public sealed class ApplicationCompilerTests
     }
 
     [Theory]
+    [InlineData("outer")]
+    [InlineData("Outer")]
+    [InlineData("OUTER")]
+    public void A_field_named_outer_is_reserved_in_any_letter_case(string name)
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity(
+                "Order",
+                $$"""{ "name": "number", "type": "text" }, { "name": "{{name}}", "type": "integer" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ReservedFieldName, "order.json", "/fields/1/name", Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains($"'{name}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_field_named_outer_is_reserved_in_a_child_entity()
+    {
+        const string LineId = "11111111-1111-4111-8111-111111111119";
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", Entity("Order", """{ "name": "lines", "type": "child-collection", "target": "Line" }"""))
+            .With("line.json", Entity("Line", """{ "name": "outer", "type": "integer" }""", LineId));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ReservedFieldName, "line.json", "/fields/0/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
     [InlineData("[]")]
     [InlineData("""["draft", "draft"]""")]
     public void Enum_values_must_be_a_non_empty_list_without_duplicates(string values)

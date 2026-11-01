@@ -46,6 +46,7 @@ public sealed class SensitiveUseCompilerTests
         { "unique", OrderFile, "/fields/5/unique" },
         { "searchable", OrderFile, "/fields/5/searchable" },
         { "a stored computed field", OrderFile, "/fields/5/expression" },
+        { "a stored computed field that reads the outer record", OrderFile, "/fields/5/expression" },
         { "a migration value", "migrations/0001-fill.json", "/changes/0/value" },
         { "a migration fill target", "migrations/0001-fill.json", "/changes/0/field" },
         { "a migration convert target", "migrations/0001-fill.json", "/changes/0/field" },
@@ -84,6 +85,7 @@ public sealed class SensitiveUseCompilerTests
     [InlineData("a data source sort through a reference path", "Customer.ssn")]
     [InlineData("a filter through a reference path", "Customer.ssn")]
     [InlineData("a filter over a child collection", "Line.note")]
+    [InlineData("a stored computed field that reads the outer record", "Order.cost")]
     public void The_message_names_the_entity_that_owns_the_field(string use, string name)
     {
         using var folder = Folder(use, sensitive: true);
@@ -178,6 +180,7 @@ public sealed class SensitiveUseCompilerTests
             "unique" => $$""", { "name": "code", "type": "text"{{flag}}, "unique": true }""",
             "searchable" => $$""", { "name": "memo", "type": "text"{{flag}}, "searchable": true }""",
             "a stored computed field" => """, { "name": "double", "type": "decimal", "precision": 10, "scale": 2, "expression": "cost * 2" }""",
+            "a stored computed field that reads the outer record" => """, { "name": "heavy", "type": "integer", "expression": "count(lines, outer.cost > 0)" }""",
             _ => "",
         };
         var indexes = use == "an index" ? """, "indexes": [{ "name": "titleSecret", "fields": ["title", "secret"] }]""" : "";

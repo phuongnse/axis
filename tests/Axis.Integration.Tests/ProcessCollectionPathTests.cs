@@ -5,9 +5,9 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// A process expression aggregates the rows of a collection on a referenced record, such as
 /// <c>count(shipment.lines)</c>. A decision on that count takes its branch by how many lines the
-/// request's shipment has, and a request with no shipment counts 0. The test activates a copy of
-/// StepApp whose Request has the <c>shipment</c> field, so the schema change stays in this class's
-/// database.
+/// request's shipment has, and a request with no shipment counts 0. An item expression reads the
+/// request itself with <c>outer</c>. The tests activate a copy of StepApp whose Request has the
+/// <c>shipment</c> field, so the schema change stays in this class's database.
 /// </summary>
 public sealed class ProcessCollectionPathTests(ProcessStepFixture fixture) : IClassFixture<ProcessStepFixture>
 {
@@ -32,6 +32,29 @@ public sealed class ProcessCollectionPathTests(ProcessStepFixture fixture) : ICl
             { "name": "many", "type": "end" },
             { "name": "none", "type": "end" },
             { "name": "one", "type": "end" }
+          ]
+        }
+        """;
+
+    private const string CountLinesAboveDivisor = """
+        {
+          "id": "b4c8e2a3-59d7-4f1c-8e26-83f7d1b9a042",
+          "kind": "process",
+          "name": "CountLinesAboveDivisor",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "check",
+          "steps": [
+            {
+              "name": "check",
+              "type": "decision",
+              "branches": [
+                { "when": "count(shipment.lines, quantity >= outer.divisor) > 1", "next": "many" }
+              ],
+              "otherwise": "few"
+            },
+            { "name": "many", "type": "end" },
+            { "name": "few", "type": "end" }
           ]
         }
         """;
@@ -69,6 +92,34 @@ public sealed class ProcessCollectionPathTests(ProcessStepFixture fixture) : ICl
         Assert.Equal(("many", true), (withManyLines.Step, withManyLines.Ended));
         Assert.Equal(("one", true), (withOneLine.Step, withOneLine.Ended));
         Assert.Equal(("none", true), (withNoShipment.Step, withNoShipment.Ended));
+    }
+
+    [Fact]
+    public async Task A_decision_compares_each_line_of_a_referenced_record_with_the_request_through_outer()
+    {
+        var request = (await File.ReadAllTextAsync(Path.Combine(ProcessStepFixture.StepAppFolder, "entities", "request.json"), CancellationToken))
+            .Replace(
+                "\"fields\": [",
+                "\"fields\": [\n    { \"name\": \"shipment\", \"type\": \"reference\", \"target\": \"Shipment\" },",
+                StringComparison.Ordinal);
+        var (releaseId, model) = await fixture.ActivateCopyWithFilesAsync(
+            ("entities/request.json", request),
+            ("processes/count-lines-above-divisor.json", CountLinesAboveDivisor));
+        Assert.True(model.TryGetEntity("Request", out var entity));
+        var shipment = await fixture.InsertShipmentAsync(("A", 1), ("B", 2), ("C", 3));
+        var lowDivisor = await fixture.InsertRequestAsync(null, 2);
+        var highDivisor = await fixture.InsertRequestAsync(null, 3);
+        await SetShipmentAsync(entity.Id, lowDivisor, shipment);
+        await SetShipmentAsync(entity.Id, highDivisor, shipment);
+
+        var many = await fixture.StartAsync("CountLinesAboveDivisor", lowDivisor, releaseId, model);
+        var few = await fixture.StartAsync("CountLinesAboveDivisor", highDivisor, releaseId, model);
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        var withLowDivisor = await fixture.InstanceAsync(many);
+        var withHighDivisor = await fixture.InstanceAsync(few);
+        Assert.Equal(("many", true), (withLowDivisor.Step, withLowDivisor.Ended));
+        Assert.Equal(("few", true), (withHighDivisor.Step, withHighDivisor.Ended));
     }
 
     private async Task SetShipmentAsync(Guid entityId, Guid id, Guid shipment)

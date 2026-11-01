@@ -334,6 +334,22 @@ public sealed class SqlTranslatorTests
         Assert.Equal(["product|name", "qty"], inner);
     }
 
+    [Theory]
+    [InlineData("any(lines, qty > outer.i)")]
+    [InlineData("count(lines, OUTER.i == qty) > 0")]
+    [InlineData("any(lines, outer.i.name == 'x')")]
+    public void Outer_inside_an_aggregate_is_outside_the_subset(string expression)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, collection: Lines);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionDiagnosticCodes.OutsideSqlSubset, result.Diagnostic.Code);
+        Assert.Contains("'outer' is not translated to SQL", result.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Aggregate_inside_an_aggregate_is_reported_at_it()
     {
