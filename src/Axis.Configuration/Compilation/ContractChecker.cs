@@ -363,7 +363,7 @@ internal static class ContractChecker
                     modules: modulesFor(contract),
                     undeclaredModuleIsUnknown: true);
                 var parsed = ExpressionParser.Parse(guard);
-                var problem = parsed.Succeeded ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean).Diagnostic : parsed.Diagnostic;
+                var problem = parsed.Succeeded ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, contract: true).Diagnostic : parsed.Diagnostic;
                 if (problem is not null)
                 {
                     report(problem.Code, problem.Message, $"{path}/guard");

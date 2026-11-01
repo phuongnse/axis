@@ -20,7 +20,7 @@
         "guard": "amount > 0",
         "message": { "textKey": "requests.request.amountRequired" }
       },
-      { "name": "approve", "from": ["submitted"], "to": "approved", "guard": "100 / amount > 0" },
+      { "name": "approve", "from": ["submitted"], "to": "approved", "guard": "100 / amount > 0 and previous(amount) == amount" },
       { "name": "archive", "from": ["approved"], "to": "archived" }
     ]
   }

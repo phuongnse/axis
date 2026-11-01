@@ -2813,7 +2813,7 @@ public static partial class ApplicationCompiler
                         Name = transition.Name,
                         From = transition.From,
                         To = transition.To,
-                        Guard = transition.Guard is null ? null : ExpressionModel.Compile(transition.Guard, scope, ExpressionType.Boolean),
+                        Guard = transition.Guard is null ? null : ExpressionModel.Compile(transition.Guard, scope, ExpressionType.Boolean, contract: true),
                         Message = transition.Message,
                     })],
                 },

@@ -7,7 +7,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The <c>requests</c> module holds a contract with a lifecycle on its <c>Request</c> entity: a request is
 /// created as a draft, a draft goes to submitted when its amount is above zero, a submitted request goes to
-/// approved by a guard that divides by the amount, and an approved one goes to archived without a guard. Only a
+/// approved by a guard that divides by the amount and reads <c>previous(amount)</c>, so a transition that also
+/// changes the amount is refused, and an approved one goes to archived without a guard. Only a
 /// draft and an archived request can be deleted. The record API refuses every other write with a 409 and
 /// writes nothing.
 /// </summary>
@@ -92,6 +93,34 @@ public sealed class ModuleContractWriteTests(ModuleAppFixture fixture) : IClassF
         using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Conflict);
         AssertRefusal(problem, "The transition 'approve' does not allow this change.");
         await AssertUnchangedAsync(client, id, version, "submitted");
+    }
+
+    [Fact]
+    public async Task A_guard_that_reads_the_previous_amount_refuses_a_transition_that_also_changes_it()
+    {
+        using var client = fixture.CreateClient().SignedInAs("requester");
+        var (id, version) = await CreateAsync(client, "draft", amount: 5);
+        version = await PatchAsync(client, id, version, "submitted");
+
+        using var response = await SendAsync(
+            client, HttpMethod.Patch, $"{Records}/{id}", $$"""{ "version": {{version}}, "values": { "status": "approved", "amount": 7 } }""");
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Conflict);
+        AssertRefusal(problem, "The transition 'approve' does not allow this change.");
+        await AssertUnchangedAsync(client, id, version, "submitted");
+    }
+
+    [Fact]
+    public async Task A_guard_that_reads_the_previous_amount_writes_a_transition_that_keeps_it()
+    {
+        using var client = fixture.CreateClient().SignedInAs("requester");
+        var (id, version) = await CreateAsync(client, "draft", amount: 5);
+        version = await PatchAsync(client, id, version, "submitted");
+
+        var next = await PatchAsync(client, id, version, "approved", """{ "amount": 5 }""");
+
+        Assert.Equal(version + 1, next);
+        await AssertUnchangedAsync(client, id, next, "approved");
     }
 
     [Fact]

@@ -67,8 +67,10 @@ public static class RecordValidator
 
     /// <summary>
     /// Whether a lifecycle guard is <c>true</c> on the <paramref name="stored"/> record with
-    /// <paramref name="values"/> and <paramref name="rows"/> on top. A <c>false</c>, a <c>null</c>, a
-    /// run-time error and a value that cannot be held exactly are all <see langword="false"/>.
+    /// <paramref name="values"/> and <paramref name="rows"/> on top. <c>previous(field)</c> reads the
+    /// <paramref name="stored"/> record as it was before the write. A <c>false</c>, a <c>null</c>, a
+    /// run-time error and a value that cannot be held exactly, in the new record or the stored one,
+    /// are all <see langword="false"/>.
     /// </summary>
     internal static bool GuardHolds(
         ApplicationModel application,
@@ -81,8 +83,10 @@ public static class RecordValidator
         RecordSets sets)
     {
         var record = BuildRecord(entity, stored, values);
+        var before = BuildRecord(entity, stored, []);
         if (!RecordCollections.TryAdd(application, entity, stored, rows, record, new SortedDictionary<string, string[]>(StringComparer.Ordinal), sets)
-            || record.Values.Any(pair => !pair.Exact))
+            || record.Values.Any(pair => !pair.Exact)
+            || before.Values.Any(pair => !pair.Exact))
         {
             return false;
         }
@@ -93,7 +97,8 @@ public static class RecordValidator
             new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
             records: null,
             now: now,
-            timeZone: application.TimeZone);
+            timeZone: application.TimeZone,
+            previous: new ExpressionValues(before.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))));
         return result.Succeeded && result.Value is true;
     }
 

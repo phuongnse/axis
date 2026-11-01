@@ -34,6 +34,7 @@ public static class ExpressionFunctions
         new("today", 0, 0),
         new("toDate", 1, 1),
         new("currentUser", 0, 0),
+        new("previous", 1, 1),
     ];
 
     private static readonly FunctionSignature[] _aggregates =

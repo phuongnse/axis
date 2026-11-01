@@ -17,13 +17,14 @@ namespace Axis.Expressions.Typing;
 /// date-time under <see cref="DateLiterals"/>. A stored value, such as a computed field, cannot call
 /// <c>now()</c>, <c>today()</c> or <c>toDate</c>, because the value would go stale. Only a policy filter can call <c>currentUser()</c>,
 /// including as a rule argument there, because no other expression runs for a signed-in user. A
-/// rule body is checked on its own, so it cannot call it. It stops at the first problem and reports
-/// only that one.
+/// rule body is checked on its own, so it cannot call it. Only a module contract's expression can call
+/// <c>previous</c>, and its argument must be a bare name of one of the entity's own fields. It stops at
+/// the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
     public static ExpressionCheckResult Check(
-        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool policyFilter = false)
+        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool policyFilter = false, bool contract = false)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(scope);
@@ -37,7 +38,8 @@ public static class ExpressionTypeChecker
                 new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance),
                 new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance),
                 storedValue,
-                policyFilter);
+                policyFilter,
+                contract);
             var actual = Infer(expression, context);
             if (!Fits(expression, actual, expected))
             {
@@ -208,6 +210,11 @@ public static class ExpressionTypeChecker
             return InferAggregate(call, name, context);
         }
 
+        if (name == "previous")
+        {
+            return InferPrevious(call, context);
+        }
+
         var types = new ExpressionType[count];
         for (var i = 0; i < count; i++)
         {
@@ -340,7 +347,7 @@ public static class ExpressionTypeChecker
             return ExpressionType.Integer;
         }
 
-        ExpressionType[] types = [ExpressionType.Null, Infer(call.Arguments[1], context with { Scope = collection.Items })];
+        ExpressionType[] types = [ExpressionType.Null, Infer(call.Arguments[1], context with { Scope = collection.Items, InAggregateItem = true })];
         ExpressionType result;
         switch (name)
         {
@@ -382,6 +389,43 @@ public static class ExpressionTypeChecker
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// <c>previous(field)</c>: the value the entity's own field held before the write, with the
+    /// field's type. Only a module contract's expression can call it. The argument is never inferred as
+    /// a name, because that would read the new value, and a child collection or an aggregate's item
+    /// expression has no previous value.
+    /// </summary>
+    private static ExpressionType InferPrevious(CallNode call, Context context)
+    {
+        if (!context.Contract)
+        {
+            throw Fail(
+                ExpressionDiagnosticCodes.PreviousOutsideContract,
+                "Function 'previous' is allowed only in a module contract's guards, core validations and effect values",
+                call.Offset);
+        }
+
+        if (context.InAggregateItem || call.Arguments[0] is not NameNode field)
+        {
+            throw Fail(
+                ExpressionDiagnosticCodes.InvalidPreviousArgument,
+                "Function 'previous' needs the name of one of the entity's own fields, outside an aggregate's item expression",
+                call.Offset);
+        }
+
+        if (context.Scope.TryGetField(field.Name, out var type))
+        {
+            return type;
+        }
+
+        throw Fail(
+            ExpressionDiagnosticCodes.InvalidPreviousArgument,
+            context.Scope.TryGetCollection(field.Name, out _)
+                ? $"'{field.Name}' is a child collection, previous reads only the entity's own fields"
+                : $"Unknown field '{field.Name}'",
+            call.Offset);
     }
 
     /// <summary>
@@ -647,8 +691,9 @@ public static class ExpressionTypeChecker
 
     /// <summary>
     /// What one check carries down the tree: the scope, the decimal calls, rule calls and path
-    /// steps found so far, whether the expression computes a stored value, and whether it is a
-    /// policy filter.
+    /// steps found so far, whether the expression computes a stored value, whether it is a
+    /// policy filter, whether it is a module contract's expression, and whether it is an aggregate's
+    /// item expression.
     /// </summary>
     private sealed record Context(
         ExpressionScope Scope,
@@ -656,7 +701,9 @@ public static class ExpressionTypeChecker
         Dictionary<CallNode, ExpressionRule> RuleCalls,
         Dictionary<MemberNode, string> PathTargets,
         bool StoredValue,
-        bool PolicyFilter);
+        bool PolicyFilter,
+        bool Contract,
+        bool InAggregateItem = false);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>
     private sealed class CheckFailure(ExpressionDiagnostic diagnostic) : Exception(diagnostic.Message)

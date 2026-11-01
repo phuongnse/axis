@@ -969,6 +969,45 @@ public sealed class ExpressionInterpreterTests
     private static ExpressionValues Row(long? qty, decimal? amount, bool? ok, DateOnly? due) =>
         new(new Dictionary<string, object?> { ["qty"] = qty, ["amount"] = amount, ["ok"] = ok, ["due"] = due });
 
+    [Fact]
+    public void Previous_gives_the_stored_value_and_not_the_new_one()
+    {
+        var result = EvaluatePrevious("previous(i)", new ExpressionValues(new Dictionary<string, object?> { ["i"] = 5L }), ("i", 7L));
+
+        Assert.Equal(5L, result.Value);
+        Assert.Equal(false, EvaluatePrevious("previous(i) == i", new ExpressionValues(new Dictionary<string, object?> { ["i"] = 5L }), ("i", 7L)).Value);
+        Assert.Equal(true, EvaluatePrevious("previous(i) == i", new ExpressionValues(new Dictionary<string, object?> { ["i"] = 5L }), ("i", 5L)).Value);
+    }
+
+    [Fact]
+    public void Previous_gives_null_when_no_previous_values_are_given()
+    {
+        Assert.Null(EvaluatePrevious("previous(i)", null).Value);
+        Assert.Equal(true, EvaluatePrevious("previous(i) is null", null).Value);
+    }
+
+    [Fact]
+    public void Previous_of_a_field_missing_from_the_previous_values_is_a_bug_in_the_caller()
+    {
+        var parsed = ExpressionParser.Parse("previous(i)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null, contract: true);
+
+        Assert.Throws<InvalidOperationException>(() => ExpressionInterpreter.Evaluate(
+            parsed.Expression, checkedType, Values([]), previous: new ExpressionValues(new Dictionary<string, object?>())));
+    }
+
+    /// <summary>Evaluates <paramref name="text"/> as a contract expression with <paramref name="previous"/> as the stored values.</summary>
+    private static ExpressionEvaluationResult EvaluatePrevious(
+        string text, ExpressionValues? previous, params (string Name, object? Value)[] overrides)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null, contract: true);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values(overrides), previous: previous);
+    }
+
     private static ExpressionRuntimeError EvaluateFails(string text, params (string Name, object? Value)[] overrides)
     {
         var result = Evaluate(text, overrides);
