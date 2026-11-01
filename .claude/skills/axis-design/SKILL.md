@@ -66,7 +66,7 @@ are under "Several changes are a design review" in Design changes.
    never only in a temporary folder. Never open a pull request from it, and
    never give it a NexKit branch name. CI leaves `design/` branches out, so a
    push starts no run.
-3. Keep the owner's rules, in their words, in `design-review.md` at the root
+3. Keep the owner's rules, in English, in `design-review.md` at the root
    of the branch, so the review can go on from another machine.
 
 ### Each change
@@ -94,7 +94,8 @@ seen this one.
 7. Commit the change on the branch with a message that says what it shows,
    so the branch history lists the review's changes in order. Push the branch.
 8. Show the owner the card and ask for a verdict. Keep, change or drop the
-   change as they say. Write down each rule they agree, in their words, in
+   change as they say. Write down each rule they agree, in English as all
+   committed text is, in
    `design-review.md` for the docs change at the end, then commit and push it.
 
 ### Checking a card
