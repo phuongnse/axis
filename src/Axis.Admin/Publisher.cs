@@ -33,6 +33,11 @@ namespace Axis.Admin;
 /// where its final status and diagnostics go, and it writes no audit record. Without a preview tenant it fails with
 /// <c>AXC0216</c>. While the preview tenant exists but is not served, the request stays queued. A <c>validate</c> or
 /// <c>rollback</c> with target <c>preview</c> is never claimed.
+/// A <c>publish</c> and a <c>validate</c> first run the contract scenarios of the pinned modules in a <c>contracts</c> step, after
+/// <c>version</c> and before the compile, in the same way and with the same limit as a <c>test</c>, except that a stop never cuts
+/// them short. A failing scenario fails the request with <c>AXC0342</c>, so nothing is stored or activated, and the outcomes go on
+/// the request. Without the setting and with scenarios to run, the step fails with <c>AXC0217</c>. A request without contract
+/// scenarios has no such step.
 /// A <c>test</c> compiles the snapshot and runs its test scenarios, each in its own temporary database that the scenario role
 /// of <c>Scenarios:ServerConnectionString</c> creates, and stores each scenario's outcome on the request. It touches no
 /// tenant database except to store the request's status and results, and writes no audit record and no release id. Without the
@@ -358,6 +363,7 @@ internal sealed class Publisher(
             return;
         }
 
+        var contractResults = new JsonArray();
         if (request.Kind == "validate")
         {
             var valid = await activation.ValidateAsync(
@@ -368,9 +374,10 @@ internal sealed class Publisher(
                 files is null
                     ? null
                     : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
-                diagnostics);
+                diagnostics,
+                contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, contractResults, testLimit));
             await StopRenewalAsync(renewing, renewal);
-            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(valid, null), diagnostics, audit: false);
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(valid, null), diagnostics, audit: false, ContractResultsJson(contractResults));
             return;
         }
 
@@ -411,13 +418,17 @@ internal sealed class Publisher(
                 configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, request.Label, request.Note, request.Id),
-                syncRealm: target.SyncRealm);
+                syncRealm: target.SyncRealm,
+                contracts: () => activation.ContractsAsync(target.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, contractResults, testLimit));
         }
 
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
-        await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview);
+        await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview, ContractResultsJson(contractResults));
     }
+
+    // The outcomes of the contract scenarios of a publish or validate, or null when none ran.
+    private static string? ContractResultsJson(JsonArray results) => results.Count > 0 ? results.ToJsonString() : null;
 
     // The release of a rollback, rebuilt from its stored files as the server does when it serves a release. A release that
     // is missing, or that belongs to another application, is a failure of the step, and so is a failure to rebuild it.

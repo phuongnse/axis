@@ -45,7 +45,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` or `Scenarios:ServerConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
-| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
+| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests and the contract scenarios of `publish` and `validate` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request, or a `publish` or `validate` with contract scenarios to run, fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
@@ -474,8 +474,10 @@ agrees. See [test](authoring.md#test) for the route.
 - `Activation:InlineRecomputeLimit`, as for `activate`.
 - `Data:ActivationTimeout`, as for `activate`.
 - `Scenarios:ServerConnectionString`, the role that creates
-  the scenario databases of `test` requests. It is optional. The publisher
-  starts without it, and a `test` request then fails with `AXC0217`, which
+  the scenario databases of `test` requests and of the contract scenarios of
+  `publish` and `validate` requests. It is optional. The publisher
+  starts without it, and a `test` request, or a `publish` or `validate` with
+  contract scenarios to run, then fails with `AXC0217`, which
   names the setting. An empty value counts as not set. A value that is not a
   connection string exits with code 2, and the message names the setting and
   never holds the value.
@@ -548,7 +550,21 @@ role unless it says otherwise.
    no line. A claim that fails writes `<tenant> claim failed: <message>`, and the
    publisher goes on with the next tenant.
 2. `version`: check that the tenant's schema version is the one of this build.
-3. For `publish`: `compile` the snapshot against the tenant database and store
+3. For `publish` and `validate`: `contracts`, the contract scenarios of every pinned
+   module, between `version` and the next step. It compiles the snapshot in memory to
+   find them. A snapshot that cannot be read or does not compile, and an application
+   whose modules have no contract scenario, run nothing and write no `contracts` line, so
+   the next step reports the problem as before. Otherwise the step fails with `AXC0217`
+   when the setting is empty. If not, it runs every contract scenario in its own database, as
+   for a `test`, whatever the outcome of the ones before. Each failing scenario adds
+   one `AXC0342`, and the step writes `<tenant> contracts failed: AXC0342 …` for
+   each, then ends the request with nothing stored or activated. Each scenario writes
+   a `<tenant> scenario <name> passed` or `failed` line, and its outcome goes
+   in the request's `scenario_results`. The scenarios may run for 10 minutes, counted from the
+   first one of each claim, and past that the request fails with `AXC0219`. A stop of
+   the publisher does not cut them short. `rollback` and `activate` run no
+   contract scenario.
+   For `publish`: `compile` the snapshot against the tenant database and store
    its release, `activate` the release, then `seed` and `indexes`. These are the
    steps of [activate](#activate) and report the same diagnostics. `seed` runs
    as the runtime role, and `indexes` as the schema role. The `activate` step also updates the tenant's realm after the
@@ -665,7 +681,7 @@ test may run for 10 minutes, which is longer than the stop grace period of both
 installs. The publisher stops it at once. The running scenario fails, its
 scenario database is dropped, and the request ends `failed` with `AXC0220`. The
 step writes `<tenant> test failed: AXC0220 …`. A `publish`, `validate` or
-`rollback` still finishes first. A stop that comes mid-request leaves a lease
+`rollback` still finishes first, and so do the contract scenarios of a `publish` or `validate`. A stop that comes mid-request leaves a lease
 that runs out. Another publisher then claims the request again. The platform's shutdown grace period must be longer than the longest
 `publish`, `validate` or `rollback`, or the request is claimed twice.
 
