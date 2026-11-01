@@ -18,10 +18,17 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     private const string Passing = "ApprovalBelowThreshold";
     private const string FailingFile = "scenarios/failing.json";
 
-    // The scenario of the department-budgets module, which runs after the application's own, named by its module.
-    private const string ModuleScenario = "department-budgets/ApproverCreatesBudget";
+    // The prefix of the department-budgets scenarios, which run after the application's own, named by their module.
+    private const string ModulePrefix = "department-budgets/";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
+
+    // The scenarios of the department-budgets module, the contract scenarios among them.
+    private static readonly string[] _moduleScenarios =
+    [
+        .. Directory.EnumerateFiles(Path.Combine(SampleModules.Path, "department-budgets", "1.1.0", "scenarios"), "*.json")
+            .Select(path => ModulePrefix + JsonNode.Parse(File.ReadAllText(path))!["name"]!.GetValue<string>()),
+    ];
 
     // A sample has several scenarios, and each one creates, migrates and drops a database.
     private static readonly TimeSpan _limit = TimeSpan.FromSeconds(180);
@@ -67,10 +74,10 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         var results = await ResultsAsync(scenario, tenant, request);
         var names = Directory.EnumerateFiles(Path.Combine(_sample, "scenarios"), "*.json")
             .Select(path => JsonNode.Parse(File.ReadAllText(path))!["name"]!.GetValue<string>())
-            .Append(ModuleScenario)
+            .Concat(_moduleScenarios)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        Assert.True(names.Length > 1);
+        Assert.Equal(4, _moduleScenarios.Length);
         Assert.Equal(names.Length, results.Count);
         Assert.All(results, item =>
         {
@@ -80,7 +87,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
             Assert.Null(item["message"]);
             Assert.True(item["durationMs"]!.GetValue<long>() >= 0);
             Assert.StartsWith(
-                item["name"]!.GetValue<string>() == ModuleScenario ? "modules/department-budgets/scenarios/" : "scenarios/",
+                item["name"]!.GetValue<string>().StartsWith(ModulePrefix, StringComparison.Ordinal) ? "modules/department-budgets/scenarios/" : "scenarios/",
                 item["file"]!.GetValue<string>(),
                 StringComparison.Ordinal);
             Assert.True(Guid.TryParseExact(item["resourceId"]!.GetValue<string>(), "D", out _));
@@ -94,6 +101,33 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records"));
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_publish_of_the_purchase_request_sample_runs_the_department_budgets_contract_scenarios_and_activates()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, await SnapshotAsync(failing: false), "publish");
+
+        var result = await RunPublisherAsync(scenario, tenant, request, withScenarioServer: true);
+
+        var status = (string?)await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+        Assert.True(status == "succeeded", string.Join('\n', result.Output));
+        Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3));
+
+        // Only the contract scenarios run on a publish, not the other scenarios of the module or the application.
+        var results = await ResultsAsync(scenario, tenant, request);
+        Assert.Equal(
+            ["ApprovalRecordsDecision", "DecidedAmountIsFrozen", "RequesterCannotDecideOwnBudget"],
+            results.Select(item => item!["name"]!.GetValue<string>().Replace(ModulePrefix, string.Empty, StringComparison.Ordinal)).Order(StringComparer.Ordinal));
+        Assert.All(results, item =>
+        {
+            Assert.Equal("passed", item!["outcome"]!.GetValue<string>());
+            Assert.StartsWith("modules/department-budgets/scenarios/", item["file"]!.GetValue<string>(), StringComparison.Ordinal);
+        });
+        Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
+        Assert.Equal(0L, await ScenarioDatabasesAsync());
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Admin;
 using Axis.Configuration.Tests;
 using Axis.Data.Profiles;
@@ -15,6 +16,7 @@ namespace Axis.Integration.Tests;
 /// The validate and publish routes of the authoring API store a snapshot of the folder as a publish request in the
 /// database of the host's tenant, and the publisher runs it. The server and the publisher run together here.
 /// </summary>
+[Collection("Test scenario runs")]
 public sealed class StudioPublishTests : IAsyncLifetime
 {
     internal const string HostA = "a.example.test";
@@ -82,6 +84,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
             connectionString,
             $"SELECT count(*) FROM axis.release_activations WHERE request_id = '{id}' AND actor = 'author' AND actor_name IS NULL",
             CancellationToken));
+        await AssertContractScenariosPassedAsync(connectionString, id);
     }
 
     [Fact]
@@ -138,12 +141,15 @@ public sealed class StudioPublishTests : IAsyncLifetime
         using var accepted = await SendAsync(employee, HttpMethod.Post, ValidateUrl, HostA);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         Assert.NotNull(accepted.Headers.Location);
-        Assert.Equal("validate", (await ReadAsync(accepted)).RootElement.GetProperty("kind").GetString());
+        using var validated = await ReadAsync(accepted);
+        Assert.Equal("validate", validated.RootElement.GetProperty("kind").GetString());
+        var validateId = validated.RootElement.GetProperty("id").GetString()!;
         await using var publisher = RunPublisher("a", HostA, connectionString);
         using var finished = await WaitForFinalAsync(employee, accepted.Headers.Location!.OriginalString, HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, finished.RootElement.GetProperty("releaseId").ValueKind);
         Assert.Equal(1L, await CountRequestsAsync(connectionString));
+        await AssertContractScenariosPassedAsync(connectionString, validateId);
 
         foreach (var url in new[] { ValidateUrl, PublishUrl })
         {
@@ -329,6 +335,13 @@ public sealed class StudioPublishTests : IAsyncLifetime
             [$"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Value"] = "https://purchasing.example.test",
             ["Extensions:Path"] = SamplePackages.Path,
             ["Modules:Path"] = SampleModules.Path,
+            // The sample's modules hold contract scenarios, which every publish and validate runs in a database of their own.
+            ["Scenarios:ServerConnectionString"] = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                Database = "postgres",
+                Username = PostgreSqlServer.ScenarioRole,
+                Password = PostgreSqlServer.RolePassword,
+            }.ConnectionString,
         };
         foreach (var (key, value) in PurchasingBindings.Settings(tenant))
         {
@@ -367,7 +380,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
     // Polls the request through the API until it is succeeded or failed.
     internal static async Task<JsonDocument> WaitForFinalAsync(HttpClient client, string location, string host)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(60);
+        var deadline = DateTime.UtcNow.AddSeconds(180);
         while (DateTime.UtcNow < deadline)
         {
             var status = await GetJsonAsync(client, location, host);
@@ -409,6 +422,21 @@ public sealed class StudioPublishTests : IAsyncLifetime
 
     internal static async Task<JsonDocument> ReadAsync(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+
+    // The publisher stores the outcome of the department budgets contract scenarios that the request ran, and nothing else.
+    private static async Task AssertContractScenariosPassedAsync(string connectionString, string request)
+    {
+        var stored = (string?)await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT scenario_results::text FROM axis.publish_requests WHERE id = '{request}'", CancellationToken);
+        Assert.NotNull(stored);
+        var results = JsonNode.Parse(stored)!.AsArray();
+        Assert.Equal(3, results.Count);
+        Assert.All(results, item =>
+        {
+            Assert.Equal("passed", item!["outcome"]!.GetValue<string>());
+            Assert.StartsWith("department-budgets/", item["name"]!.GetValue<string>(), StringComparison.Ordinal);
+        });
+    }
 
     internal static async Task<long> CountRequestsAsync(string connectionString) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(connectionString, "SELECT count(*) FROM axis.publish_requests", CancellationToken))!;

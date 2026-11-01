@@ -1,0 +1,44 @@
+{
+  "id": "72e50bb3-1564-4318-ad74-a84e32947a94",
+  "kind": "scenario",
+  "name": "RequesterCannotDecideOwnBudget",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "contract": { "covers": ["Budget/transitions/approve", "Budget/transitions/reject"] },
+  "users": {
+    "approver": ["approver"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Budget",
+      "as": "approver",
+      "save": "budget",
+      "values": {
+        "name": "Engineering 2027",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
+        "year": 2027,
+        "amount": 50000,
+        "status": "draft"
+      }
+    },
+    {
+      "type": "updateRecord",
+      "record": "budget",
+      "as": "approver",
+      "values": { "status": "approved" },
+      "expect": "conflict"
+    },
+    {
+      "type": "updateRecord",
+      "record": "budget",
+      "as": "approver",
+      "values": { "status": "rejected" },
+      "expect": "conflict"
+    },
+    { "type": "startProcess", "process": "BudgetApproval", "record": "budget", "as": "approver" },
+    { "type": "completeTask", "record": "budget", "step": "review", "outcome": "approve", "as": "approver" },
+    { "type": "expectInstance", "process": "BudgetApproval", "record": "budget", "state": "failed" },
+    { "type": "expectRecord", "record": "budget", "values": { "status": "draft" } }
+  ]
+}

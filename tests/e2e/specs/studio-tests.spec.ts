@@ -41,9 +41,9 @@ test.describe('author runs the test scenarios of the purchase request sample fro
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 240_000,
     })
-    await expect(page.getByTestId('studio-test-result')).toHaveCount(7)
-    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(7)
-    // The module's scenario runs with the application's own, named by its module.
+    await expect(page.getByTestId('studio-test-result')).toHaveCount(10)
+    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(10)
+    // The module's four scenarios, its three contract scenarios among them, run with the application's own, named by their module.
     await expect(page.getByTestId('studio-test-result').filter({ hasText: 'department-budgets/ApproverCreatesBudget' })).toHaveCount(1)
   })
 

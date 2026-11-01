@@ -9,6 +9,7 @@ namespace Axis.Integration.Tests;
 /// The test route of the authoring API stores a <c>test</c> publish request with a snapshot of the folder and the
 /// scenario names. Until a publisher runs it, it stays queued.
 /// </summary>
+[Collection("Test scenario runs")]
 public sealed class StudioTestRequestTests : IAsyncLifetime
 {
     private const string TestUrl = "/api/studio/apps/PurchaseRequests/test";
@@ -119,7 +120,7 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_status_route_answers_scenarios_null_for_a_validate_and_an_empty_list_for_a_test_before_and_after_it_runs()
+    public async Task The_status_route_answers_scenarios_null_for_a_validate_and_an_empty_list_for_a_test_before_it_runs_and_its_results_after()
     {
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_test_status", CancellationToken);
@@ -139,7 +140,7 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Array, queued.RootElement.GetProperty("scenarios").ValueKind);
         Assert.Equal(0, queued.RootElement.GetProperty("scenarios").GetArrayLength());
 
-        // This publisher has no scenario server, so the test ends failed, with no scenario result.
+        // The publisher has a scenario server. The validate runs the contract scenarios and keeps its results to itself.
         await using var publisher = StudioPublishTests.RunPublisher("a", StudioPublishTests.HostA, connectionString);
         using var finished = await StudioPublishTests.WaitForFinalAsync(
             author, validate.Headers.Location!.OriginalString, StudioPublishTests.HostA);
@@ -148,9 +149,13 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
 
         using var ended = await StudioPublishTests.WaitForFinalAsync(
             author, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
-        Assert.Equal("failed", ended.RootElement.GetProperty("status").GetString());
+        Assert.Equal("succeeded", ended.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Array, ended.RootElement.GetProperty("scenarios").ValueKind);
-        Assert.Equal(0, ended.RootElement.GetProperty("scenarios").GetArrayLength());
+
+        // The scenarios of the application and of its module: the purchase request sample has 10.
+        var results = ended.RootElement.GetProperty("scenarios").EnumerateArray().ToList();
+        Assert.Equal(10, results.Count);
+        Assert.All(results, item => Assert.Equal("passed", item.GetProperty("outcome").GetString()));
     }
 
     private static async Task<string?> StoredRowAsync(string connectionString) =>
