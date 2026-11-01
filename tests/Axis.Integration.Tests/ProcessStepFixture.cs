@@ -328,9 +328,10 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <paramref name="releaseId"/>, as the start endpoint does: the instance is <c>running</c> at
     /// revision 1 on the process's start step, with its first work item due a minute ago. Returns
     /// the instance id. The process comes from <paramref name="applicationModel"/>, or from StepApp
-    /// when none is given.
+    /// when none is given. The instance's accountable user is <paramref name="accountableUser"/>, its starter.
     /// </summary>
-    public async Task<Guid> StartAsync(string process, Guid subjectId, Guid releaseId, ApplicationModel? applicationModel = null)
+    public async Task<Guid> StartAsync(
+        string process, Guid subjectId, Guid releaseId, ApplicationModel? applicationModel = null, string? accountableUser = null)
     {
         applicationModel ??= Model;
         Assert.True(applicationModel.TryGetProcess(process, out var model));
@@ -351,6 +352,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
                 State = ProcessStarts.Running,
                 Revision = 1,
                 Step = model.Start,
+                AccountableUser = accountableUser,
             }));
         await WorkItemQueue.EnqueueAsync(
             connection,
@@ -428,6 +430,28 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             NullLoggerFactory.Instance,
             cancellationToken);
         Assert.Equal(ProcessRetryOutcome.Retried, result.Outcome);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Completes the one task of the instance <paramref name="instanceId"/> as the user <paramref name="userId"/>
+    /// with the outcome <paramref name="outcome"/>, which goes to the step <paramref name="next"/>, as a task
+    /// completion does: the user becomes the instance's accountable user and the task its deciding task.
+    /// </summary>
+    public async Task CompleteTaskAsync(Guid instanceId, string outcome, string next, string userId, CancellationToken cancellationToken)
+    {
+        var taskId = Assert.Single(await TasksAsync(instanceId)).Id;
+        await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
+        Assert.NotNull(task);
+        Assert.True(await ProcessTasks.TryCompleteAsync(transaction, taskId, outcome, userId, cancellationToken));
+        await ProcessTasks.ResumeAsync(
+            transaction,
+            task,
+            new TaskCompletion(outcome, next, userId, null, null, []),
+            Tenant,
+            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 

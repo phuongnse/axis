@@ -776,6 +776,67 @@ public sealed class ProcessCompilerTests
         Assert.Equal(20m, Evaluate(submit.Set[0].Value, 10m));
     }
 
+    [Theory]
+    [InlineData("accountableUser() == 'jordan'", "accountableUser")]
+    [InlineData("decisionTask() is null", "decisionTask")]
+    public void Accountability_in_a_decision_condition_is_reported_at_the_call(string expression, string function)
+    {
+        using var folder = Folder(Process("Order", $$"""
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "{{expression}}", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "processes/order-review.json", "/steps/0/branches/0/when"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal($"Function '{function}' is allowed only in the set of an updateRecord or createRecord step at character 1.", diagnostic.Message);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_update_record_set_can_write_the_accountable_user_and_the_deciding_task()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "stamp", "type": "operation", "operation": "updateRecord",
+                "set": { "status": "concat(accountableUser(), ' ', decisionTask())" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "stamp"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var stamp = Assert.IsType<OperationStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal("text", Assert.Single(stamp.Set).Value.Check.Type?.ToString());
+    }
+
+    [Fact]
+    public void A_create_record_set_can_write_the_accountable_user_and_the_deciding_task()
+    {
+        using var folder = Folder(Process("Customer", """
+            [
+              { "name": "log", "type": "operation", "operation": "createRecord", "entity": "Note",
+                "set": { "text": "accountableUser()", "kind": "decisionTask()" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "log"))
+            .With("entities/note.json", Note);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var create = Assert.IsType<CreateRecordStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.All(create.Set, assignment => Assert.Equal("text", assignment.Value.Check.Type?.ToString()));
+    }
+
     [Fact]
     public void A_start_condition_and_a_set_expression_can_use_the_current_time()
     {

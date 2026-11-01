@@ -24,7 +24,22 @@ public static class RecordExpressions
     /// <see cref="ExpressionRuntimeErrorKind.DecimalOverflow"/> error, as no value is rounded.
     /// <c>now()</c> gives <paramref name="now"/>, which is the start time of the caller's transaction.
     /// <c>today()</c> and <c>toDate</c> take the date in the application's time zone.
-    /// <c>id</c> gives the record's id.
+    /// <c>id</c> gives the record's id. An expression that calls <c>accountableUser()</c> or
+    /// <c>decisionTask()</c> needs the overload with <see cref="ExpressionAccountability"/>.
+    /// </summary>
+    public static Task<ExpressionEvaluationResult> EvaluateAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        Record record,
+        ExpressionModel expression,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        EvaluateAsync(connection, application, entity, record, expression, now, null, cancellationToken);
+
+    /// <summary>
+    /// Evaluates like the overload without <paramref name="accountability"/>, and
+    /// <c>accountableUser()</c> and <c>decisionTask()</c> give its values.
     /// </summary>
     public static async Task<ExpressionEvaluationResult> EvaluateAsync(
         NpgsqlConnection connection,
@@ -33,6 +48,7 @@ public static class RecordExpressions
         Record record,
         ExpressionModel expression,
         DateTimeOffset now,
+        ExpressionAccountability? accountability,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -147,7 +163,8 @@ public static class RecordExpressions
             new ExpressionValues(subject.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
             Resolve,
             now,
-            application.TimeZone);
+            application.TimeZone,
+            accountability: accountability);
     }
 
     /// <summary>The field names of a path's target, from the subject's field to the last reference, such as <c>department, manager</c>.</summary>
