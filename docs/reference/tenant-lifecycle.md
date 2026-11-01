@@ -40,6 +40,8 @@ implementation.
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
 | `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does. |
 | `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does. |
+| `POST /api/cell/tenants/{id}/read-only` | _(planned for M33)_ Makes a tenant read-only, as [`tenant read-only`](tenant-status-commands.md#tenant-read-only) does. `resume` ends it. |
+| `GET /api/cell/tenants/{id}/administrators` | _(planned for M33)_ Lists the accounts that hold the [administrator role](user-administration.md#the-administrator-role) in the tenant's realm: email, display name and language. The [control plane](control-plane.md) mails them. |
 | `PUT /api/cell/tenants/{id}/quotas` | Sets or clears the tenant's quota rows, see [quotas](tenant-quotas.md#quotas). It applies at once, with no job. |
 | `POST /api/cell/tenants/{id}/hosts` | Asks for a host of the tenant's own, see [hosts](#hosts). |
 | `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant). |
@@ -50,7 +52,9 @@ implementation.
 
 ## Creating a tenant
 
-`POST /api/cell/tenants` takes `{ "id", "application", "administrator" }`.
+`POST /api/cell/tenants` takes `{ "id", "application", "administrator" }`, and _(planned for M33)_
+an optional `quotas`, which the `tenant` step writes as the tenant's quota rows, so a tenant of the
+[sign-up](sign-up.md#provisioning) never runs with the cell's defaults.
 
 - `id` follows the rule of [`tenant create`](administration.md#tenant-create). An id that a tenant
   of the cell has, or that a deleted tenant had, answers `409`.
@@ -92,6 +96,25 @@ tenant administrator can run it in M33.
 - **Sensitive fields.** The export holds their values in clear, because the data is the owner's. The
   ZIP is [restricted](keys-and-data-protection.md#restricted) data, and the console says so before
   the download.
+
+## Exports by a tenant administrator
+
+_(planned for M33)_ A tenant administrator exports their own tenant from the application, with the
+same job and the same ZIP as the provisioning API, as
+[D126](../decisions/d126-sign-up-trials-and-the-control-plane.md) agrees.
+
+- **Who.** A person who holds the [administrator role](user-administration.md#the-administrator-role),
+  on the users page's "Export data" section.
+- **Routes.** `POST /api/tenant/exports` on the tenant's host starts it, and
+  `GET /api/tenant/exports/{exportId}` answers it and its download, for 7 days. They are platform
+  routes, in the session partition, with the CSRF header on the `POST`.
+- **When.** While the tenant is `active` or `readOnly`, so a business whose trial ended or that
+  stopped paying can still take its data, see [subscriptions](subscriptions.md#the-timeline). One
+  export of a tenant runs at a time, whoever started it.
+- **Warning.** Before it starts, the page says that the file holds every value in clear, sensitive
+  ones included, and must be kept safe.
+- **Audit.** The start and each download write a platform audit record with the administrator as
+  actor.
 
 **ZIP layout.**
 

@@ -99,6 +99,14 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Worker scheduling](reference/worker-scheduling.md)                    | How the worker shares its time between tenants, and wakes an idle tenant               |
 | [Tenant lifecycle in a cell](reference/tenant-lifecycle.md)            | The cell's provisioning API: create a tenant, hosts, the export ZIP, deletion          |
 | [Cell console](reference/cell-console.md)                              | The page where the platform operator sees and provisions every tenant of a cell, and its operator realm |
+| [Control plane](reference/control-plane.md) | The service apart from the cells that runs sign-up, trials, plans and billing, and how it reaches the cells |
+| [Region directory](reference/region-directory.md) | Which cell holds each tenant and host, picking a cell, DNS routing and reserved names |
+| [Sign-up](reference/sign-up.md) | The public sign-up page, the subdomain, bot checks, email verification, provisioning and terms acceptance |
+| [Subscriptions](reference/subscriptions.md) | A tenant's trial and paid states, the read-only tenant, the dunning timeline and the control plane's emails |
+| [Plans](reference/plans.md) | The plan catalogue, versions, quotas from a plan, user packs and changing a plan |
+| [Payments](reference/payments.md) | Billing invoices, PayOS and VietQR, Paddle, webhooks, the daily reconciliation and the ledger |
+| [E-invoices](reference/e-invoices.md) | Vietnamese e-invoices issued on payment through a provider adapter |
+| [Billing portal](reference/billing-portal.md) | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
 | [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
 
