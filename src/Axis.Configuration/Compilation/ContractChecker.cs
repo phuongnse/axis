@@ -14,8 +14,11 @@ namespace Axis.Configuration.Compilation;
 /// the lifecycle is checked so far: its state field is a required, plain, non-computed <c>enum</c>, its
 /// states are the field's values, one is initial, and each transition names states of the lifecycle. A
 /// guard is a boolean expression in the entity's validation scope with the module's rules, and a
-/// message text key starts with the module's prefix. Every problem of a contract is reported in one
-/// pass. The validations, effects and ceiling are not checked yet.
+/// message text key starts with the module's prefix. The ceiling is checked too: each key of its
+/// <c>slots</c> is a role slot of the module, each entry field is a field of the entity, and each entry
+/// filter type-checks as a policy filter in the scope of a module policy filter. A grant that goes past
+/// the ceiling is checked later, by <see cref="GrantCeilings"/>. Every problem of a contract is reported
+/// in one pass. The validations and effects are not checked yet.
 /// </summary>
 internal static class ContractChecker
 {
@@ -23,6 +26,8 @@ internal static class ContractChecker
     /// Checks <paramref name="contracts"/>, which come in path order. <paramref name="ownerOf"/> names the
     /// owner of a child entity, or gives null for a root entity. <paramref name="rulesFor"/> and
     /// <paramref name="modulesFor"/> give the rules and the declared module ids a contract's expressions see.
+    /// <paramref name="moduleSlots"/> holds the role slot names of each pinned module, and
+    /// <paramref name="filterRulesFor"/> gives the rules a ceiling filter sees.
     /// </summary>
     public static Dictionary<string, ContractResource> Check(
         IReadOnlyList<ModuleContract> contracts,
@@ -31,6 +36,8 @@ internal static class ContractChecker
         IReadOnlySet<string> unloadedEntityNames,
         Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
         Func<Resource, IReadOnlySet<string>> modulesFor,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> moduleSlots,
+        Func<Resource, IReadOnlyList<ExpressionRule>> filterRulesFor,
         List<Diagnostic> diagnostics)
     {
         var checkedContracts = new Dictionary<string, ContractResource>(StringComparer.OrdinalIgnoreCase);
@@ -48,6 +55,18 @@ internal static class ContractChecker
                     CheckLifecycle(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, Report);
                 }
 
+                if (contract.Ceiling is { } ceiling)
+                {
+                    CheckCeiling(
+                        ceiling,
+                        entity,
+                        findEntity,
+                        moduleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>(),
+                        filterRulesFor(contract),
+                        modulesFor(contract),
+                        Report);
+                }
+
                 if (diagnostics.Count == before)
                 {
                     checkedContracts[entity.Name] = contract;
@@ -56,6 +75,68 @@ internal static class ContractChecker
         }
 
         return checkedContracts;
+    }
+
+    private static void CheckCeiling(
+        ContractCeilingDefinition ceiling,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        IReadOnlySet<string> slots,
+        IReadOnlyList<ExpressionRule> filterRules,
+        IReadOnlySet<string> modules,
+        Action<string, string, string> report)
+    {
+        // A ceiling filter is a policy filter, so it is checked as a module policy filter of the same module is.
+        ExpressionScope? scope = null;
+        foreach (var (slot, entries) in ceiling.Slots)
+        {
+            var slotPath = $"/ceiling/slots/{ModuleChecker.Escape(slot)}";
+            if (!slots.Contains(slot))
+            {
+                report(
+                    DiagnosticCodes.UnknownCeilingSlot,
+                    slots.Count == 0
+                        ? $"The ceiling names the slot '{slot}', but the module has no role slots."
+                        : $"'{slot}' is not a role slot of the module. The slots are {string.Join(", ", slots.Order(StringComparer.Ordinal).Select(name => $"'{name}'"))}.",
+                    slotPath);
+            }
+
+            CheckEntries(entries, slotPath);
+        }
+
+        if (ceiling.Others is { } others)
+        {
+            CheckEntries(others, "/ceiling/others");
+        }
+
+        void CheckEntries(IReadOnlyList<CeilingEntryDefinition> entries, string path)
+        {
+            for (var index = 0; index < entries.Count; index++)
+            {
+                var entry = entries[index];
+                var entryPath = $"{path}/{index.ToString(CultureInfo.InvariantCulture)}";
+                for (var fieldIndex = 0; fieldIndex < (entry.Fields?.Count ?? 0); fieldIndex++)
+                {
+                    var name = entry.Fields![fieldIndex];
+                    if (ApplicationCompiler.FindField(entity, name) is null)
+                    {
+                        report(
+                            DiagnosticCodes.UnknownCeilingField,
+                            $"The field '{name}' is not a field of the entity '{entity.Name}'.",
+                            $"{entryPath}/fields/{fieldIndex.ToString(CultureInfo.InvariantCulture)}");
+                    }
+                }
+
+                if (entry.Filter is { } filter)
+                {
+                    scope ??= ExpressionScopes.ForDataSource(entity.Fields, [], findEntity, filterRules, modules, undeclaredModuleIsUnknown: true);
+                    if (ApplicationCompiler.CheckFilter(filter, scope, policyFilter: true, entity, findEntity, out _) is { } problem)
+                    {
+                        report(problem.Code, problem.Message, $"{entryPath}/filter");
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>Finds the contract's entity and checks the contract's shape. Gives null when the lifecycle cannot be checked.</summary>
