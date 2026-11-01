@@ -134,7 +134,7 @@ public sealed class MoneyFieldCompilerTests
                 {
                   "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Expense", "formatVersion": 1,
                   "fields": [{ "name": "amount", "type": "money", "currency": "VND" }],
-                  "validations": [{ "field": "amount", "expression": "amount > 0", "message": { "textKey": "expense.amountPositive" } }]
+                  "validations": [{ "name": "amountPositive", "field": "amount", "expression": "amount > 0", "message": { "textKey": "expense.amountPositive" } }]
                 }
                 """);
 

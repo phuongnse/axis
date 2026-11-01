@@ -1216,7 +1216,7 @@ public sealed class ModuleCompilerTests
             .With("departments/1.0.0/Department.json", $$"""
                 { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1,
                   "fields": [ { "name": "value", "type": "integer" } ],
-                  "validations": [ { "expression": "{{expression}}", "message": { "textKey": "departments.department.invalid" }, "field": "value" } ] }
+                  "validations": [ { "name": "check1", "expression": "{{expression}}", "message": { "textKey": "departments.department.invalid" }, "field": "value" } ] }
                 """)
             .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department.invalid": "Not valid." }"""));
         var folder = Folder(DepartmentsModule).With("texts/en.json", RequestTexts);
@@ -1335,7 +1335,7 @@ public sealed class ModuleCompilerTests
     private const string DepartmentsModule = """[{ "id": "departments", "version": "1.0.0" }]""";
 
     private static string RequestValidation(string expression) =>
-        $$"""[{ "expression": "{{expression}}", "message": { "textKey": "request.invalid" }, "field": "quantity" }]""";
+        $$"""[{ "name": "check2", "expression": "{{expression}}", "message": { "textKey": "request.invalid" }, "field": "quantity" }]""";
 
     private static object? EvaluateRequest(Model.ValidationModel validation, long quantity)
     {

@@ -7,6 +7,9 @@ namespace Axis.Configuration.Resources;
 /// </summary>
 public sealed record ValidationDefinition
 {
+    /// <summary>The name of the validation, unique in the entity's validations ignoring letter case.</summary>
+    public required string Name { get; init; }
+
     public required string Expression { get; init; }
 
     /// <summary>The text whose key is the message of a failure.</summary>

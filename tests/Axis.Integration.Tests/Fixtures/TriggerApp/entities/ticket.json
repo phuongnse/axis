@@ -11,6 +11,6 @@
     { "name": "stage", "type": "text" }
   ],
   "validations": [
-    { "expression": "amount is null or amount >= 0", "message": { "textKey": "ticket.amountNotNegative" }, "field": "amount" }
+    { "name": "amountNotNegative", "expression": "amount is null or amount >= 0", "message": { "textKey": "ticket.amountNotNegative" }, "field": "amount" }
   ]
 }

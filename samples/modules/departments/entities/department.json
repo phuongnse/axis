@@ -11,6 +11,6 @@
     { "name": "manager", "type": "text", "maxLength": 100, "label": { "textKey": "departments.department.manager" } }
   ],
   "validations": [
-    { "expression": "IsDepartmentCode(code)", "message": { "textKey": "departments.department.codeUpperCase" }, "field": "code" }
+    { "name": "codeUpperCase", "expression": "IsDepartmentCode(code)", "message": { "textKey": "departments.department.codeUpperCase" }, "field": "code" }
   ]
 }

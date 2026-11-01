@@ -97,13 +97,13 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
         Assert.Equal(["f_customer", "f_parent"], await ReadIndexColumnListsAsync(orderTable));
 
-        folder.With("entities/order.json", OrderFile("""[{ "fields": ["a", "b"] }]"""));
+        folder.With("entities/order.json", OrderFile("""[{ "name": "aB", "fields": ["a", "b"] }]"""));
         Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
         var added = await ReadIndexesAsync(orderTable);
         Assert.Equal(["f_a,f_b", "f_customer", "f_parent"], ColumnLists(added));
         Assert.Contains(EntityNaming.Index(orderTable, ["f_a", "f_b"]), added.Select(index => index.Name));
 
-        folder.With("entities/order.json", OrderFile("""[{ "fields": ["a", "c"] }]"""));
+        folder.With("entities/order.json", OrderFile("""[{ "name": "aC", "fields": ["a", "c"] }]"""));
         Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
         var replaced = await ReadIndexesAsync(orderTable);
         Assert.Equal(["f_a,f_c", "f_customer", "f_parent"], ColumnLists(replaced));
@@ -125,7 +125,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         await InsertOrderAsync();
         var orderTable = EntityNaming.Table(_orderId);
 
-        folder.With("entities/order.json", OrderFile("""[{ "fields": ["a"], "unique": true }]"""));
+        folder.With("entities/order.json", OrderFile("""[{ "name": "a", "fields": ["a"], "unique": true }]"""));
         var result = await ActivateAsync(await CompileAsync(folder));
 
         var diagnostic = Assert.Single(result.Diagnostics);
@@ -144,7 +144,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
     [Fact]
     public async Task A_declared_unique_index_on_an_empty_table_refuses_a_second_record_with_the_same_values_at_its_first_field()
     {
-        using var folder = ApplicationFolder("""[{ "fields": ["a", "b"], "unique": true }]""");
+        using var folder = ApplicationFolder("""[{ "name": "aB", "fields": ["a", "b"], "unique": true }]""");
         var compiled = await CompileAsync(folder);
         Assert.Empty((await ActivateAsync(compiled)).Diagnostics);
         Assert.NotNull(compiled.Model);
@@ -168,13 +168,13 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
     [Fact]
     public async Task Renaming_a_field_renames_its_unique_index_and_dropping_a_field_drops_its_index_on_a_table_with_rows()
     {
-        using var folder = ApplicationFolder("""[{ "fields": ["a", "b"], "unique": true }, { "fields": ["c"] }]""");
+        using var folder = ApplicationFolder("""[{ "name": "aB", "fields": ["a", "b"], "unique": true }, { "name": "c", "fields": ["c"] }]""");
         var orderTable = EntityNaming.Table(_orderId);
         Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
         await InsertOrderAsync();
 
         folder
-            .With("entities/order.json", OrderFile("""[{ "fields": ["alpha", "b"], "unique": true }, { "fields": ["c"] }]""", aName: "alpha"))
+            .With("entities/order.json", OrderFile("""[{ "name": "aB", "fields": ["alpha", "b"], "unique": true }, { "name": "c", "fields": ["c"] }]""", aName: "alpha"))
             .With("migrations/0001-rename-a.json", Migration("""[{ "type": "renameField", "from": "a", "to": "alpha" }]"""));
         Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
 
@@ -184,7 +184,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         Assert.Equal(["f_alpha", "f_b"], unique.Columns);
 
         folder
-            .With("entities/order.json", OrderFile("""[{ "fields": ["alpha", "b"], "unique": true }]""", aName: "alpha", withoutC: true))
+            .With("entities/order.json", OrderFile("""[{ "name": "aB", "fields": ["alpha", "b"], "unique": true }]""", aName: "alpha", withoutC: true))
             .With("migrations/0002-drop-c.json", Migration("""[{ "type": "dropField", "field": "c" }]"""));
         Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
 
@@ -299,7 +299,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
         await InsertOrdersAsync(25);
 
-        folder.With("entities/order.json", OrderFile("""[{ "fields": ["a"] }]"""));
+        folder.With("entities/order.json", OrderFile("""[{ "name": "a", "fields": ["a"] }]"""));
         var compiled = await CompileAsync(folder);
         Assert.Empty((await ActivateAsync(compiled, limit: 10)).Diagnostics);
         folder.Dispose();

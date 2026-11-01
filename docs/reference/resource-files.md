@@ -610,10 +610,15 @@ instead of being written, as
 ### Indexes
 
 `indexes` is built. On the entity, it is a list of
-`{ "fields": [ ... ] }` with an optional `"unique": true`. See
+`{ "name": ..., "fields": [ ... ] }` with an optional `"unique": true`. See
 [D77](../decisions/d77-indexes-defaults-and-ranges.md) and
 [schema planning](storage.md#schema-planning).
 
+- **`name`.** Required, so a [customization layer](customization-layers.md#list-keys)
+  can find the index. It is a name like a field's, and it is unique in the
+  entity's indexes, ignoring letter case. A missing `name` breaks the JSON
+  Schema (`AXC0004`). It is not the PostgreSQL index name, which the platform
+  builds from the table and the columns.
 - **`fields`.** One to 32 distinct field names of the entity, matched
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
@@ -621,6 +626,8 @@ instead of being written, as
   `child-collection`, `references` or `file` field is `AXC0276`. A `references`
   field has no column, because a junction table holds its links.
 - **Compile diagnostics.** Each is reported in the entity file:
+  - `AXC0343`: an index has the name of an earlier one, ignoring letter case,
+    at `/indexes/{j}/name`.
   - `AXC0274`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
   - `AXC0275`: a name in `fields` is no field of the entity, at
@@ -662,6 +669,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
   ],
   "validations": [
     {
+      "name": "needsLineItem",
       "expression": "count(lineItems) >= 1",
       "message": { "textKey": "purchaseRequest.needsLineItem" },
       "field": "lineItems"
@@ -691,6 +699,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
   ],
   "validations": [
     {
+      "name": "quantityPositive",
       "expression": "IsPositive(quantity)",
       "message": { "textKey": "lineItem.quantityPositive" },
       "field": "quantity"
@@ -700,6 +709,11 @@ validation calls the rules of its own module, see [modules](modules-and-template
 ```
 
 - **Validations.** `validations` is a list on the entity. Each entry has:
+  - `name`, which is required, so a
+    [customization layer](customization-layers.md#list-keys) can find the
+    validation. It is a name like a field's, and it is unique in the entity's
+    validations, ignoring letter case (`AXC0343`, at `/validations/{i}/name`).
+    A missing `name` breaks the JSON Schema (`AXC0004`).
   - `expression`, which must be boolean.
   - `message`, a label that is checked like other labels (`AXC0028`). Its text
     key is the message of a failure.

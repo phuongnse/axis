@@ -402,7 +402,7 @@ public sealed class PolicyCompilerTests
 
     public static TheoryData<string, string, string, string> CurrentUserOutsidePolicyFilters => new()
     {
-        { "entities/request.json", Request("""[{ "expression": "owner == currentUser()", "message": { "textKey": "request.invalid" }, "field": "owner" }]"""), "/validations/0/expression", "at character 10." },
+        { "entities/request.json", Request("""[{ "name": "check1", "expression": "owner == currentUser()", "message": { "textKey": "request.invalid" }, "field": "owner" }]"""), "/validations/0/expression", "at character 10." },
         { "data-sources/request-list.json", RequestList("owner == currentUser()"), "/filter", "at character 10." },
         { "processes/request-review.json", RequestReview("currentUser() != null"), "/startCondition/expression", "at character 1." },
         { "rules/is-owner.json", IsOwner("owner == currentUser()"), "/expression", "at character 10." },

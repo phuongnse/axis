@@ -180,7 +180,7 @@ public sealed class SensitiveUseCompilerTests
             "a stored computed field" => """, { "name": "double", "type": "decimal", "precision": 10, "scale": 2, "expression": "cost * 2" }""",
             _ => "",
         };
-        var indexes = use == "an index" ? """, "indexes": [{ "fields": ["title", "secret"] }]""" : "";
+        var indexes = use == "an index" ? """, "indexes": [{ "name": "titleSecret", "fields": ["title", "secret"] }]""" : "";
 
         var folder = new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)

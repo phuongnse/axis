@@ -274,7 +274,7 @@ test.describe('Studio creates a resource from a starter', () => {
       { name: 'count', type: 'integer', min: 0 },
       { name: 'code', type: 'text', searchable: true },
     ])
-    expect(backlog.indexes).toEqual([{ fields: ['stage', 'count'], unique: true }])
+    expect(backlog.indexes).toEqual([{ name: 'index1', fields: ['stage', 'count'], unique: true }])
   })
 
   test('an author creates a second oidc identity provider and lets the Purchasing site allow it', async ({ page }) => {

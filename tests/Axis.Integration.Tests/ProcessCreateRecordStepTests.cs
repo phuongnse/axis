@@ -37,7 +37,7 @@ public sealed class ProcessCreateRecordStepTests(ProcessStepFixture fixture) : I
             { "name": "author", "type": "text", "creator": true }
           ],
           "validations": [
-            { "expression": "text != 'bad'", "message": { "textKey": "request.amountNegative" }, "field": "text" }
+            { "name": "check1", "expression": "text != 'bad'", "message": { "textKey": "request.amountNegative" }, "field": "text" }
           ]
         }
         """;

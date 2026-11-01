@@ -13,7 +13,7 @@
     { "name": "requester", "type": "text", "maxLength": 100, "creator": true }
   ],
   "validations": [
-    { "expression": "priority is null or priority > 0", "message": { "textKey": "ticket.priorityPositive" }, "field": "priority" },
-    { "expression": "dueAt is null or dueAt > now()", "message": { "textKey": "ticket.dueInPast" }, "field": "dueAt" }
+    { "name": "priorityPositive", "expression": "priority is null or priority > 0", "message": { "textKey": "ticket.priorityPositive" }, "field": "priority" },
+    { "name": "dueInPast", "expression": "dueAt is null or dueAt > now()", "message": { "textKey": "ticket.dueInPast" }, "field": "dueAt" }
   ]
 }

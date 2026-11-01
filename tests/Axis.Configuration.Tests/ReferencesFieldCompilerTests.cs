@@ -235,7 +235,7 @@ public sealed class ReferencesFieldCompilerTests
         """;
 
     private static string Validation(string expression) =>
-        $$"""[{ "expression": "{{expression}}", "message": { "textKey": "request.rule" }, "field": "title" }]""";
+        $$"""[{ "name": "check1", "expression": "{{expression}}", "message": { "textKey": "request.rule" }, "field": "title" }]""";
 
     private static string Process(string? startCondition) =>
         $$"""

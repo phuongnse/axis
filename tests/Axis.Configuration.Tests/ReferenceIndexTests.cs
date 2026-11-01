@@ -459,7 +459,7 @@ public sealed class ReferenceIndexTests
                     { "name": "quantity", "type": "integer" },
                     { "name": "customer", "type": "reference", "target": "Customer" },
                     { "name": "lines", "type": "child-collection", "target": "OrderLine" } ],
-                  "validations": [ { "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
+                  "validations": [ { "name": "check1", "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
                 """)
             .With("entities/order-line.json", """
                 { "id": "11111111-1111-4111-8111-111111111112", "kind": "entity", "name": "OrderLine", "formatVersion": 1,
@@ -682,7 +682,7 @@ public sealed class ReferenceIndexTests
                     { "name": "number", "type": "text", "sequence": "OrderNumber" },
                     { "name": "quantity", "type": "integer" },
                     { "name": "customer", "type": "reference", "target": "Customer" } ],
-                  "validations": [ { "expression": "{{validation}}", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
+                  "validations": [ { "name": "check2", "expression": "{{validation}}", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
                 """)
             .With("entities/customer.json", Customer)
             .With("entities/region.json", Region)

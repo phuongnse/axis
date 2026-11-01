@@ -325,4 +325,5 @@ public static class DiagnosticCodes
     public const string UnknownCoveredPoint = "AXC0339";
     public const string ContractOnApplicationScenario = "AXC0340";
     public const string ContractScenarioFailed = "AXC0342";
+    public const string DuplicateEntityElementName = "AXC0343";
 }

@@ -8,6 +8,6 @@
     { "name": "code", "type": "text", "maxLength": 100, "expression": "upper(name)" }
   ],
   "validations": [
-    { "expression": "name is null or not startsWith(name, ' ')", "message": { "textKey": "itemPart.noLeadingSpace" }, "field": "name" }
+    { "name": "noLeadingSpace", "expression": "name is null or not startsWith(name, ' ')", "message": { "textKey": "itemPart.noLeadingSpace" }, "field": "name" }
   ]
 }

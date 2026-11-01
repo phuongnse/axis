@@ -13,6 +13,6 @@
     { "name": "createdBy", "type": "text", "maxLength": 100, "creator": true }
   ],
   "validations": [
-    { "expression": "quantity is null or quantity >= 1", "message": { "textKey": "note.quantityPositive" }, "field": "quantity" }
+    { "name": "quantityPositive", "expression": "quantity is null or quantity >= 1", "message": { "textKey": "note.quantityPositive" }, "field": "quantity" }
   ]
 }
