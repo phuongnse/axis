@@ -509,7 +509,7 @@ public sealed class ModuleContractTests
 
     private const string CoveredPointsExtra = """
         , "validations": [ { "name": "amountPositive", "expression": "amount >= 0", "message": { "textKey": "approvals.request.small" }, "field": "amount" } ],
-          "effects": [ { "name": "submitted", "on": "submit", "create": { "entity": "Line", "values": { "quantity": "1" } } } ],
+          "effects": [ { "name": "submitted", "on": "submit", "create": { "entity": "Decision", "values": { "outcome": "'x'" } } } ],
           "ceiling": { "slots": { "requester": [{ "actions": ["read"], "fields": ["title"] }] }, "others": [{ "actions": ["read"], "fields": ["title"] }] }
         """;
 
@@ -573,6 +573,109 @@ public sealed class ModuleContractTests
 
         var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Path == "/contract/covers");
         Assert.Equal((DiagnosticCodes.SchemaViolation, ScenarioFile), (diagnostic.Code, diagnostic.File));
+    }
+
+    private static string Effects(string effects) => $$""", "effects": {{effects}}""";
+
+    private static string Effect(string name = "decided", string on = "approve", string entity = "Decision", string values = """{ "outcome": "'x'" }""") => $$"""
+        [ { "name": "{{name}}", "on": "{{on}}", "create": { "entity": "{{entity}}", "values": {{values}} } } ]
+        """;
+
+    [Fact]
+    public void An_effect_name_that_repeats_ignoring_letter_case_is_axc0328_at_the_later_effect()
+    {
+        var effects = """
+            [
+              { "name": "decided", "on": "approve", "create": { "entity": "Decision", "values": {} } },
+              { "name": "Decided", "on": "submit", "create": { "entity": "Decision", "values": {} } }
+            ]
+            """;
+
+        var diagnostic = Single(Contract(Lifecycle(), extra: Effects(effects)));
+
+        AssertDiagnostic(DiagnosticCodes.DuplicateContractName, "/effects/1/name", diagnostic);
+    }
+
+    [Fact]
+    public void An_effect_on_a_transition_the_contract_does_not_have_is_axc0344()
+    {
+        var diagnostic = Single(Contract(Lifecycle(), extra: Effects(Effect(on: "Approve"))));
+
+        AssertDiagnostic(DiagnosticCodes.UnknownEffectTransition, "/effects/0/on", diagnostic);
+    }
+
+    [Fact]
+    public void An_effect_in_a_contract_without_a_lifecycle_is_axc0344()
+    {
+        var diagnostic = Single(Contract(null, extra: Effects(Effect())));
+
+        AssertDiagnostic(DiagnosticCodes.UnknownEffectTransition, "/effects/0/on", diagnostic);
+        Assert.Contains("no lifecycle", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Missing")]
+    [InlineData("approvals/Decision")]
+    [InlineData("Line")]
+    public void An_effect_entity_that_is_not_a_plain_name_of_a_root_entity_of_the_module_is_axc0345(string entity)
+    {
+        var diagnostic = Single(Contract(Lifecycle(), extra: Effects(Effect(entity: entity))));
+
+        AssertDiagnostic(DiagnosticCodes.InvalidEffectEntity, "/effects/0/create/entity", diagnostic);
+    }
+
+    [Theory]
+    [InlineData("""{ "nope": "'x'" }""", "nope")]
+    [InlineData("""{ "outcome": "'x'", "OUTCOME": "'y'" }""", "OUTCOME")]
+    [InlineData("""{ "total": "1" }""", "total")]
+    [InlineData("""{ "createdBy": "'x'" }""", "createdBy")]
+    [InlineData("""{ "items": "'x'" }""", "items")]
+    [InlineData("""{ "lines": "'x'" }""", "lines")]
+    public void An_effect_value_key_that_names_no_writable_field_is_axc0346(string values, string key)
+    {
+        var diagnostic = Single(Contract(Lifecycle(), extra: Effects(Effect(values: values))));
+
+        AssertDiagnostic(DiagnosticCodes.InvalidEffectValue, $"/effects/0/create/values/{key}", diagnostic);
+    }
+
+    [Fact]
+    public void An_effect_value_that_does_not_fit_its_field_reports_the_expression_code_at_the_value()
+    {
+        var diagnostic = Single(Contract(Lifecycle(), extra: Effects(Effect(values: """{ "outcome": "amount" }"""))));
+
+        AssertDiagnostic(ExpressionDiagnosticCodes.ResultTypeMismatch, "/effects/0/create/values/outcome", diagnostic);
+    }
+
+    [Fact]
+    public void An_effect_value_that_names_an_unknown_name_reports_the_expression_code_at_the_value()
+    {
+        var diagnostic = Single(Contract(Lifecycle(), extra: Effects(Effect(values: """{ "outcome": "missing" }"""))));
+
+        AssertDiagnostic(ExpressionDiagnosticCodes.UnknownName, "/effects/0/create/values/outcome", diagnostic);
+    }
+
+    [Fact]
+    public void A_valid_effect_compiles_and_the_contract_model_holds_it_with_its_compiled_values()
+    {
+        var values = """{ "request": "id", "outcome": "previous(title)", "decidedBy": "accountableUser()" }""";
+        using var modules = Modules(Contract(Lifecycle(), extra: Effects(Effect(values: values))));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+        var rebuilt = ApplicationCompiler.Compile(compiled.Resources);
+
+        Assert.Empty(compiled.Diagnostics);
+        Assert.Empty(rebuilt.Diagnostics);
+        foreach (var model in new[] { compiled.Model!, rebuilt.Model! })
+        {
+            var request = Assert.Single(model.Entities, entity => entity.Name == "approvals/Request");
+            var effect = Assert.Single(request.Contract!.Effects);
+            Assert.Equal(("decided", "approve", "approvals/Decision"), (effect.Name, effect.On, effect.Entity.Name));
+            Assert.Equal(
+                [("request", "id"), ("outcome", "previous(title)"), ("decidedBy", "accountableUser()")],
+                effect.Values.Select(value => (value.Field, value.Value.Expression)));
+            Assert.Empty(Assert.Single(model.Entities, entity => entity.Name == "approvals/Decision").Contract?.Effects ?? []);
+        }
     }
 
     private static string CoversScenario(params string[] covers) => $$"""
@@ -654,9 +757,9 @@ public sealed class ModuleContractTests
                   "roles": [ { "name": "requester", "label": { "textKey": "approvals.slot" } }, { "name": "approver", "label": { "textKey": "approvals.slot" } } ] }
                 """)
             .With("approvals/1.0.0/Request.json", """
-                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21", "kind": "entity", "name": "Request", "formatVersion": 1,
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21", "kind": "entity", "name": "Request", "formatVersion": 1, "displayField": "title",
                   "fields": [
-                    { "name": "title", "type": "text" },
+                    { "name": "title", "type": "text", "required": true },
                     { "name": "amount", "type": "integer" },
                     { "name": "status", "type": "enum", "values": ["draft", "submitted", "approved"], "required": true },
                     { "name": "stage", "type": "enum", "values": ["a", "b"] },
@@ -667,6 +770,22 @@ public sealed class ModuleContractTests
             .With("approvals/1.0.0/Line.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c22", "kind": "entity", "name": "Line", "formatVersion": 1,
                   "fields": [ { "name": "quantity", "type": "integer" } ] }
+                """)
+            .With("approvals/1.0.0/Item.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c25", "kind": "entity", "name": "Item", "formatVersion": 1,
+                  "fields": [ { "name": "label", "type": "text" } ] }
+                """)
+            .With("approvals/1.0.0/Decision.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c24", "kind": "entity", "name": "Decision", "formatVersion": 1,
+                  "fields": [
+                    { "name": "request", "type": "reference", "target": "Request" },
+                    { "name": "outcome", "type": "text" },
+                    { "name": "decidedBy", "type": "text" },
+                    { "name": "note", "type": "text" },
+                    { "name": "total", "type": "integer", "expression": "1 + 1" },
+                    { "name": "createdBy", "type": "text", "creator": true },
+                    { "name": "items", "type": "child-collection", "target": "Item" }
+                  ] }
                 """)
             .With("approvals/1.0.0/IsSmall.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c23", "kind": "rule", "name": "IsSmall", "formatVersion": 1,

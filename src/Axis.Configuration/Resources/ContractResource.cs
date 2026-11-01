@@ -1,12 +1,9 @@
-using System.Text.Json;
-
 namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A <c>contract</c> resource: what a module guarantees about one of its entities. Only a module holds
-/// one. The schema checks its shape. Its entity, its lifecycle, its core validations and its ceiling are
-/// checked by <see cref="Compilation.ContractChecker"/>. The effects pass the schema and are kept as
-/// written, until the checks that build them exist.
+/// one. The schema checks its shape. Its entity, its lifecycle, its core validations, its effects and its
+/// ceiling are checked by <see cref="Compilation.ContractChecker"/>.
 /// </summary>
 public sealed record ContractResource : Resource
 {
@@ -19,11 +16,33 @@ public sealed record ContractResource : Resource
     /// <summary>The core validations as written, or null when the contract has none.</summary>
     public IReadOnlyList<ContractValidationDefinition>? Validations { get; init; }
 
-    /// <summary>The effects of transitions as written, or null when the contract has none.</summary>
-    public JsonElement? Effects { get; init; }
+    /// <summary>The effects of transitions in declaration order, or null when the contract has none.</summary>
+    public IReadOnlyList<ContractEffectDefinition>? Effects { get; init; }
 
     /// <summary>The grant ceiling, or null when the contract has none.</summary>
     public ContractCeilingDefinition? Ceiling { get; init; }
+}
+
+/// <summary>An effect of a contract as written: when a transition happens, it creates a record of another entity.</summary>
+public sealed record ContractEffectDefinition
+{
+    public required string Name { get; init; }
+
+    /// <summary>The name of the transition of the same contract that runs the effect.</summary>
+    public required string On { get; init; }
+
+    /// <summary>The record the effect creates.</summary>
+    public required ContractEffectCreateDefinition Create { get; init; }
+}
+
+/// <summary>The record an effect creates as written.</summary>
+public sealed record ContractEffectCreateDefinition
+{
+    /// <summary>The name of the entity, as written. It must be a plain name of a root entity of the same module.</summary>
+    public required string Entity { get; init; }
+
+    /// <summary>The expression that gives the value of each field, by field name.</summary>
+    public IReadOnlyDictionary<string, string> Values { get; init; } = new Dictionary<string, string>();
 }
 
 /// <summary>A core validation of a contract as written: a boolean rule on the entity that runs on every write.</summary>

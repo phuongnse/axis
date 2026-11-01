@@ -2175,7 +2175,7 @@ internal static class ProcessChecker
         package.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Why a process cannot write <paramref name="field"/>, or null when it can.</summary>
-    private static string? ReadOnlyReason(FieldDefinition field) =>
+    internal static string? ReadOnlyReason(FieldDefinition field) =>
         field.Expression is not null ? "is computed"
         : field.Sequence is not null ? "is numbered by a sequence"
         : FieldTypes.Parse(field.Type) == FieldType.ChildCollection ? "is a child collection"

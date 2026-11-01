@@ -6,12 +6,12 @@ slot, and its contract scenarios. The engine checks it on every write. An applic
 named point of it with a `relax` entry and a reason, and its release is then marked off-standard.
 [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees the
 idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked.md) agrees the
-shapes below. The `contract` resource and the compile checks of its `lifecycle`, its `validations`
-and its `ceiling` are built. So is the lifecycle check on every record write, with the record API's
+shapes below. The `contract` resource and the compile checks of its `lifecycle`, its `validations`, its
+`effects` and its `ceiling` are built. So is the lifecycle check on every record write, with the record API's
 `409` and its log line. So are the core validations on every create and update, with the record
-API's `400`. So is the compile check of a module scenario's `contract.covers`. A guard and a core
-validation read
-`accountableUser()` and `decisionTask()`, the values of the write they check. A refusal on another write
+API's `400`. So is the compile check of a module scenario's `contract.covers`. A guard, a core
+validation and an effect value read `accountableUser()` and `decisionTask()`, the values of the write
+they check. Nothing runs the effects yet. A refusal on another write
 path fails as that path already fails, and logs nothing yet. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
@@ -180,14 +180,21 @@ the [`previous`](#previous-values), [`accountableUser`](#the-accountable-user) a
 ## Effects of a transition
 
 An effect creates one record when a transition happens, in the transaction of the write that made
-the transition.
+the transition. The compile checks of effects are built, and the compiled contract holds each effect
+with its compiled values. Running effects is _(planned for M24)_. A name that repeats an earlier one,
+ignoring letter case, is `AXC0328`. An `on` that names no transition of the contract, with the same
+letter case, is `AXC0344`. A `create.entity` that is not the plain name of a root entity of the module
+is `AXC0345`. A `values` key that names no writable field, or an expression that does not fit its
+field, is `AXC0346` or the expression's own code.
 
 - **Shape.** `name`, `on`, which names a transition of the same contract, and `create`, with an
   `entity` of the same module, by its plain name, and `values`, a map from field name to an
   expression.
 - **Values.** The expressions read the record after the write, so `id` is the record's id, and may
-  call `previous` and `accountableUser`. Each expression's type must fit its field. A field that
-  `values` leaves out gets its default.
+  call `previous`, `accountableUser` and `decisionTask`. They see the record's fields and child rows
+  as an entity validation does, and the rules of the module. Each expression's type must fit its
+  field. A field that `values` leaves out gets its default. A key cannot name a computed, sequence,
+  child collection, `references` or creator field.
 - **The created record:**
   - It gets its defaults, computed fields, sequence numbers and validations, as a
     `createRecord` operation does.
@@ -280,8 +287,8 @@ does. It is how a guard knows who decided.
 - **Allowed where.** In a contract's guards, core validations and effect values, and in the `set` of
   an `updateRecord` or `createRecord` step, which writes it as the value the write will be judged
   by, such as who decided a step. Anywhere else it is a diagnostic (`AXC0341`), as `currentUser()`
-  outside a policy filter is. A guard and a core validation are built and read the values of the
-  write they check. An effect value is still the diagnostic until it is built.
+  outside a policy filter is. A guard, a core validation and an effect value are built and read the values of
+  the write they check.
 
 ## The deciding task
 
