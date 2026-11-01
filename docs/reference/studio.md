@@ -193,11 +193,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
     the outcome, and Studio checks `GET .../requests/{id}` every second until the
     status is `succeeded` or `failed`. A test shows **Tests passed** or
     **Tests failed**, and never a release number.
-  - The **Test results** list shows each scenario of the request's `scenarios`
-    field, with **passed** or **failed**, its time and, for a failure, the failing
-    step and its message. Steps count from 1, as the step cards of the editor do.
-    Selecting a failure opens the scenario resource at the item's `path`, as a
-    diagnostic does.
+  - The **Test results** list shows each scenario of the request's `scenarios` field, with **passed** or **failed**, its time and, for a failure, the failing step and its message. Steps count from 1, as the step cards of the editor do. Selecting a failure opens the scenario resource at the item's `path`, as a diagnostic does.
+  - A **publish**, **validate** or **preview** request shows its contract scenarios under the status line, in a **Contract scenarios** list, when it stored any. A failed row opens as a test failure does. A **skipped** row shows its relaxed point and opens nothing.
   - While the request is queued or running, the list shows a note instead of rows,
     so an empty list never reads as a pass. A failed run with no results says that
     no scenario ran, and points to the diagnostics. Compile errors, a missing

@@ -456,6 +456,7 @@ some of them as contract scenarios.
 - **Relaxed points** _(built)_. A contract scenario that covers a relaxed point of its module is skipped. Its result in
   the request's scenario results is `{ name, file, outcome: "skipped", point }`, with the first relaxed point in its
   `covers`, and the publisher writes a `<tenant> scenario <name> skipped: …` line. The other scenarios run as before.
+  The [request](authoring.md#the-request) returns the skipped item as its `scenarios`, and Studio's results list shows it with its point.
 
 ## In Studio
 
@@ -469,4 +470,5 @@ some of them as contract scenarios.
 - **Mark.** The application's header and its release history show the off-standard mark while any
   entry is present.
 - **Diagnostics.** A grant past a ceiling, a relax entry for an unknown point and a failing contract
-  scenario show where Studio shows other diagnostics and publish results.
+  scenario show where Studio shows other diagnostics and publish results. The contract scenarios of a publish or validate,
+  skipped ones with their relaxed point included, show in a **Contract scenarios** list under the status line.

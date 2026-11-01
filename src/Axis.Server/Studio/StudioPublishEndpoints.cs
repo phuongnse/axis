@@ -32,7 +32,8 @@ namespace Axis.Server.Studio;
 /// The manifest check (409) comes before the body. A body is optional. It must be <c>application/json</c> (415) and a JSON
 /// object with only <c>scenarios</c>, a list of strings (400). No body, no list and an empty list store no names, which
 /// means every scenario. The publisher runs it. The status route answers
-/// <c>scenarios</c> for a <c>test</c>, an empty list until it ends, and null for every other kind.
+/// <c>scenarios</c> for a <c>test</c>, an empty list until it ends. For a <c>publish</c> or <c>validate</c> it answers the
+/// stored contract scenario results, and null when none were stored.
 /// </summary>
 internal static class StudioPublishEndpoints
 {
@@ -368,7 +369,10 @@ internal static class StudioPublishEndpoints
 
         using var diagnostics = JsonDocument.Parse(reader.IsDBNull(9) ? "[]" : reader.GetString(9));
         var kind = reader.GetString(0);
-        using var scenarios = kind == "test" ? JsonDocument.Parse(reader.IsDBNull(11) ? "[]" : reader.GetString(11)) : null;
+        var storedScenarios = reader.IsDBNull(11) ? null : reader.GetString(11);
+        using var scenarios = kind == "test"
+            ? JsonDocument.Parse(storedScenarios ?? "[]")
+            : storedScenarios is null ? null : JsonDocument.Parse(storedScenarios);
         var requestedBy = reader.GetString(4);
         var storedName = reader.IsDBNull(12) ? null : reader.GetString(12);
         var response = new StudioPublishRequestResponse(
@@ -400,9 +404,10 @@ internal static class StudioPublishEndpoints
 
 /// <summary>
 /// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is
-/// <c>tenant</c> or <c>preview</c> and <c>Diagnostics</c> is empty until the request ends. <c>Scenarios</c> is null unless
-/// the kind is <c>test</c>. For a <c>test</c> it is empty until the request ends. <c>RequestedByName</c> is the name in the
-/// requesting user's profile, else the one stored with the request, else null.
+/// <c>tenant</c> or <c>preview</c> and <c>Diagnostics</c> is empty until the request ends. <c>Scenarios</c> holds the stored
+/// results of a <c>test</c>, <c>publish</c> or <c>validate</c>, and is null when none were stored. For a <c>test</c> it is
+/// empty until the request ends. <c>RequestedByName</c> is the name in the requesting user's profile, else the one stored
+/// with the request, else null.
 /// </summary>
 internal sealed record StudioPublishRequestResponse(
     string Id,
