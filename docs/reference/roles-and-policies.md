@@ -192,6 +192,10 @@ outcomes. Operators inspect the approvals and change nothing:
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](security.md#combining-grants).
+- **Ceiling** _(planned for M24)_. A grant on a module entity that has a
+  contract stays within the role's ceiling: an action or field past it is a
+  diagnostic, and the ceiling's filter joins the grant's with `and`. See
+  [grant ceiling](module-contracts.md#grant-ceiling).
 
 The `cancel` action of a `process` grant lets a user cancel that process's
 instances, see [Cancel](process-inspection.md#cancel). The `retry` action lets a user

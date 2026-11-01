@@ -58,6 +58,9 @@ the upgrade merge and eject, _(planned for M29)_, and the `service-desk` and
     run on every publish of an application that uses the module, against the
     application as customized. A failing one stops the publish.
   - Each part of the contract is a named point, so a relax entry can name it.
+  - [D121](d121-how-a-module-contract-is-declared-and-checked.md) sets the shapes: a `contract`
+    resource for each entity, the accountable user that guards read, effects that only create
+    records, and how ceilings, relax entries and contract scenarios are checked.
 - **Two levels of invariants:**
   - **Platform invariants never relax:** server-side default-deny
     authorization, audit records, one decision per task, durable execution and

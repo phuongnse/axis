@@ -30,6 +30,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Connectors, events and endpoints](reference/integration-resources.md) | Connectors and deployment bindings, the `event`, `trigger` and `endpoint` resources |
 | [Outbound webhooks](reference/outbound-webhooks.md)                    | The `webhook` resource, its compile checks, and the signed delivery of an event       |
 | [Modules and templates](reference/modules-and-templates.md)            | Reusable modules and application templates                                            |
+| [Module contracts](reference/module-contracts.md)                      | The `contract` resource: lifecycles, core validations, effects, grant ceilings, relax entries and contract scenarios |
 | [Extension packages](reference/extension-packages.md)                  | Custom C# code: manifest, contracts, installation, loading, capabilities              |
 | [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
 | [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |

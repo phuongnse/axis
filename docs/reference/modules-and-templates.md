@@ -84,7 +84,8 @@ Compose images hold them in `/modules`. The server and the worker read them thro
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `page`, `process`, `event`, `text`, `seed`, `policy` and `trigger`
   of type `event`, `dataChange` or `schedule`. Roles are not allowed.
-  _(planned for M24)_ `scenario` is allowed too. Roles stay out.
+  _(planned for M24)_ `scenario` and `contract` are allowed too, see
+  [module contracts](module-contracts.md). Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
   read them. The scenario runner gets a `--modules` option for the folder.
@@ -447,7 +448,8 @@ An application that declares it maps the slot to one of its own roles:
 - **Scenarios** _(planned for M24)_. A module scenario gives its users role
   slots instead of roles. When it runs for an application, each slot becomes
   the role it maps to, and the scenario runs against the application as
-  customized.
+  customized. A module marks some as contract scenarios, which run on every
+  publish, see [contract scenarios](module-contracts.md#contract-scenarios).
 - **Dependencies.** _(built)_ `module.json` has an optional `modules`, with the `id` and
   `version` entries of an application's `modules`. A bad entry is `AXC0203`,
   `AXC0204` or `AXC0206`, reported in the `module.json` of the module that

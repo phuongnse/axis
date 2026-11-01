@@ -428,6 +428,8 @@ argument is `null`.
 | `today()` | date | The calendar date of the transaction's time in the application's time zone. Not allowed in a computed field (`AXC0086`). | Yes |
 | `toDate(date-time)` | date | The calendar date of an instant in the application's time zone. `null` gives `null`. Not allowed in a computed field (`AXC0086`). | Yes |
 | `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
+| `previous(field)` | type of the field | _(planned for M24)_ The field's value before the write, `null` on a create. Allowed only in a module contract. See [previous values](module-contracts.md#previous-values). | No |
+| `accountableUser()` | text | _(planned for M24)_ The user who answers for the write, or `null`. Allowed only in a module contract. See [the accountable user](module-contracts.md#the-accountable-user). | No |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, so `toDate` does it.
