@@ -234,6 +234,53 @@ public sealed class PolicyCompilerTests
     }
 
     [Fact]
+    public void Two_grants_with_the_same_name_ignoring_letter_case_are_a_duplicate_grant_name_on_the_later_grant()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """
+            [
+              { "name": "requestRead", "entity": "Request", "actions": ["read"] },
+              { "name": "RequestRead", "dataSource": "RequestList", "actions": ["read"] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.DuplicateGrantName, "/grants/1/name", PolicyFile), (diagnostic.Code, diagnostic.Path, diagnostic.File));
+        Assert.Contains("'/grants/0'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_grant_name_that_breaks_the_name_pattern_is_a_schema_violation()
+    {
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "1bad", "entity": "Request", "actions": ["read"] }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.DuplicateGrantName);
+    }
+
+    [Fact]
+    public void Grants_without_names_and_grants_with_different_names_compile_without_diagnostics()
+    {
+        using var unnamed = Folder(Policy("""["employee", "manager"]""", FullPolicyGrants));
+        var unnamedResult = ApplicationCompiler.Compile(unnamed.Path);
+        Assert.Empty(unnamedResult.Diagnostics);
+        Assert.NotNull(unnamedResult.Model);
+
+        using var named = Folder(Policy("""["employee"]""", """
+            [
+              { "name": "requestRead", "entity": "Request", "actions": ["read"] },
+              { "name": "requestList", "dataSource": "RequestList", "actions": ["read"] }
+            ]
+            """));
+        var namedResult = ApplicationCompiler.Compile(named.Path);
+        Assert.Empty(namedResult.Diagnostics);
+        Assert.NotNull(namedResult.Model);
+    }
+
+    [Fact]
     public void An_action_outside_the_schema_enum_is_a_schema_violation()
     {
         using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["frobnicate"] }]"""));

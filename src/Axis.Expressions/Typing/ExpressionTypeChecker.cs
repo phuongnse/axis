@@ -238,10 +238,11 @@ public static class ExpressionTypeChecker
 
         if (target.IsParameter)
         {
-            // A parameter is always a bare name, because no path ends at a parameter.
+            // A parameter is a bare name, or a field of the outer record that is read as outer.<name>.
+            var name = member.Target is MemberNode read ? read.Name : ((NameNode)member.Target).Name;
             throw Fail(
                 ExpressionDiagnosticCodes.TypeMismatch,
-                $"Operator '.' cannot follow the parameter '{((NameNode)member.Target).Name}'. A path starts at a field",
+                $"Operator '.' cannot follow the parameter '{name}'. A path starts at a field",
                 member.Offset);
         }
 

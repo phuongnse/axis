@@ -22,7 +22,8 @@ namespace Axis.Configuration.Compilation;
 /// reported in one pass. A grant without exactly one target is not checked further, and neither is
 /// a grant whose target is unknown or a child entity. A role or target file that was not loaded
 /// because of its own errors is not reported again. A data source grant that names a module the
-/// application does not declare is <c>AXC0207</c>, in place of the unknown-target diagnostic.
+/// application does not declare is <c>AXC0207</c>, in place of the unknown-target diagnostic. A grant's
+/// optional <c>name</c> is unique in its policy, ignoring letter case (<c>AXC0353</c>).
 /// </summary>
 /// <remarks>
 /// A module policy is named <c>&lt;module id&gt;/&lt;name&gt;</c>. Each role it names is a role slot of
@@ -97,8 +98,17 @@ internal static class PolicyChecker
                 }
             }
 
+            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             for (var index = 0; index < policy.Grants.Count; index++)
             {
+                if (policy.Grants[index].Name is { } grantName && !firstIndexByName.TryAdd(grantName, index))
+                {
+                    Report(
+                        DiagnosticCodes.DuplicateGrantName,
+                        $"The grant name '{grantName}' is already used by the grant at '/grants/{firstIndexByName[grantName]}'.",
+                        $"/grants/{index}/name");
+                }
+
                 CheckGrant(
                     policy,
                     policy.Grants[index],

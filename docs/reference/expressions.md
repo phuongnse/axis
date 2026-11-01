@@ -576,8 +576,8 @@ path to a collection and `outer` are built. `first` is _(planned for M26)_.
   a nested aggregate, and the word `outer` is not a hop. A path after it
   resolves only where a path does without `outer`. `outer.<collection>` and a
   bare `outer` are type errors (`AXC0047`). Outside an item expression `outer`
-  is `AXC0353`. An entity field named `outer`, in any letter case, is
-  `AXC0354`, but a parameter named `outer` still works as a bare name. A
+  is `AXC0354`. An entity field named `outer`, in any letter case, is
+  `AXC0355`, but a parameter named `outer` still works as a bare name. A
   sensitive field or an unlisted form field is refused through `outer` too.
 - **Not SQL.** A path to a collection is evaluated in the server and the
   worker, and a data source filter or a policy filter that uses it is
@@ -886,7 +886,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   `set` of an `updateRecord` or `createRecord` step, calls `accountableUser()` or `decisionTask()`, at the
   call. This includes a decision condition, a computed field, a policy filter
   and a rule body.
-- **`AXC0353`.** `outer` is used outside an aggregate's item expression, such
+- **`AXC0354`.** `outer` is used outside an aggregate's item expression, such
   as in a rule body, at the name or the `.` after it.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See

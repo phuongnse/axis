@@ -1003,7 +1003,7 @@ public sealed class ExpressionTypeCheckerTests
     {
         var diagnostic = CheckFails(text, ExpressionType.Boolean, OuterScope());
 
-        Assert.Equal("AXC0353", diagnostic.Code);
+        Assert.Equal("AXC0354", diagnostic.Code);
         Assert.Contains("'outer' is allowed only inside an aggregate's item expression", diagnostic.Message, StringComparison.Ordinal);
     }
 
@@ -1012,7 +1012,7 @@ public sealed class ExpressionTypeCheckerTests
     {
         var diagnostic = CheckFails("outer.amount > 1", ExpressionType.Boolean, CollectionScope());
 
-        Assert.Equal("AXC0353", diagnostic.Code);
+        Assert.Equal("AXC0354", diagnostic.Code);
     }
 
     [Fact]
@@ -1045,6 +1045,17 @@ public sealed class ExpressionTypeCheckerTests
         Assert.Equal("AXC0046", diagnostic.Code);
     }
 
+    [Theory]
+    [InlineData("count(lines, outer.pdept.name == 'x')")]
+    [InlineData("any(lines, outer.pdept.manager.name == 'x')")]
+    public void A_path_after_a_parameter_read_through_outer_is_reported_and_names_the_parameter(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, OuterScope());
+
+        Assert.Equal("AXC0047", diagnostic.Code);
+        Assert.Contains("cannot follow the parameter 'pdept'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_field_named_outer_in_the_scope_still_reads_as_a_bare_name()
     {
@@ -1067,6 +1078,7 @@ public sealed class ExpressionTypeCheckerTests
                 ["minimum"] = ExpressionType.Integer,
                 ["title"] = ExpressionType.Text,
                 ["dept"] = ExpressionType.Reference("department"),
+                ["pdept"] = ExpressionType.ReferenceParameter("department"),
             },
             [],
             [

@@ -11,7 +11,9 @@ shapes below. The `contract` resource and the compile checks of its `lifecycle`,
 `409` and its log line. So are the core validations on every create and update, with the record
 API's `400`. So is the compile check of a module scenario's `contract.covers`. A guard, a core
 validation and an effect value read `accountableUser()` and `decisionTask()`, the values of the write
-they check. Nothing runs the effects yet. A refusal on another write
+they check. The shared record update runs the effects of the transition it makes, in its own transaction.
+The record API's answer, the audit entries and the data change triggers for effect records are still
+_(planned for M24)_. A refusal on another write
 path fails as that path already fails, and logs nothing yet. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
@@ -181,7 +183,7 @@ the [`previous`](#previous-values), [`accountableUser`](#the-accountable-user) a
 
 An effect creates one record when a transition happens, in the transaction of the write that made
 the transition. The compile checks of effects are built, and the compiled contract holds each effect
-with its compiled values. Running effects is _(planned for M24)_. A name that repeats an earlier one,
+with its compiled values. The shared record update runs them. The record API's answer, the audit entries and the data change triggers for effect records are _(planned for M24)_. A name that repeats an earlier one,
 ignoring letter case, is `AXC0328`. An `on` that names no transition of the contract, with the same
 letter case, is `AXC0344`. A `create.entity` that is not the plain name of a root entity of the module
 is `AXC0345`. A `values` key that names no writable field, or an expression that does not fit its

@@ -1,0 +1,20 @@
+{
+  "id": "97701c59-97f4-4916-b656-4b0bc38df73d",
+  "kind": "entity",
+  "name": "Entry",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "claim", "type": "reference", "target": "Claim" },
+    { "name": "amount", "type": "integer" },
+    { "name": "createdBy", "type": "text", "maxLength": 100, "creator": true },
+    { "name": "status", "type": "enum", "required": true, "values": ["open", "closed"] }
+  ],
+  "validations": [
+    {
+      "name": "amountNotNegative",
+      "expression": "amount == null or amount >= 0",
+      "message": { "textKey": "ledgers.entry.amountNotNegative" },
+      "field": "amount"
+    }
+  ]
+}
