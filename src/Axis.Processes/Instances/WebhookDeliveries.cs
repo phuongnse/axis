@@ -73,7 +73,7 @@ internal static class WebhookDeliveries
         await using var command = new NpgsqlCommand(
             """
             SELECT d.application_id, d.release_id, d.webhook_id, d.state, d.attempts,
-                   e.event, e.entity_id, e.subject_id, e.payload::text, e.raised_at, e.process_instance_id, d.event_id
+                   e.event, e.entity_id, e.subject_id, e.payload::text, e.raised_at, e.process_instance_id, d.event_id, e.accountable_user
             FROM axis.webhook_deliveries d
             JOIN axis.events e ON e.id = d.event_id
             WHERE d.id = @id
@@ -94,7 +94,7 @@ internal static class WebhookDeliveries
             reader.GetGuid(2),
             reader.GetString(3),
             reader.GetInt32(4),
-            new StoredEvent(reader.GetGuid(11), reader.GetGuid(0), reader.GetString(5), reader.GetGuid(6), reader.GetGuid(7), JsonNode.Parse(reader.GetString(8)) as JsonObject ?? []),
+            new StoredEvent(reader.GetGuid(11), reader.GetGuid(0), reader.GetString(5), reader.GetGuid(6), reader.GetGuid(7), JsonNode.Parse(reader.GetString(8)) as JsonObject ?? [], reader.IsDBNull(12) ? null : reader.GetString(12)),
             reader.GetFieldValue<DateTimeOffset>(9),
             reader.IsDBNull(10) ? null : reader.GetGuid(10));
     }

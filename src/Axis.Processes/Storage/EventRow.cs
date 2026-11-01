@@ -29,6 +29,13 @@ public sealed class EventRow
     /// <summary>The instance that raised the event, or null when an endpoint without a process raised it.</summary>
     public Guid? ProcessInstanceId { get; init; }
 
+    /// <summary>
+    /// The user who answers for the occurrence: the calling service account of an inbound endpoint, or the
+    /// raising instance's accountable user. An event trigger starts its instance with it. Null when no
+    /// person answers, and for an occurrence stored before the column existed.
+    /// </summary>
+    public string? AccountableUser { get; init; }
+
     /// <summary>The start of the raising step's transaction.</summary>
     public DateTimeOffset RaisedAt { get; init; }
 }

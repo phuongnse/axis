@@ -105,7 +105,7 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
             Assert.True(entity.TryGetField(value.Field, out var field));
             return new RecordValue(field, value.Value);
         });
-        var result = await RecordCommands.CreateAsync(connection, model, entity, Guid.NewGuid(), [.. fields], [], cancellationToken: CancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, model, entity, Guid.NewGuid(), RecordWriteContext.None, [.. fields], [], cancellationToken: CancellationToken);
         Assert.Equal(RecordWriteOutcome.Written, result.Outcome);
         return result.Record!.Id;
     }

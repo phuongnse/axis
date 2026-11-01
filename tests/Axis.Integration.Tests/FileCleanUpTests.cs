@@ -105,6 +105,7 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
             fixture.FilesModel,
             model.Claim,
             fixture.FilesReleaseId,
+            RecordWriteContext.None,
             claim,
             version,
             values,
@@ -208,7 +209,7 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
 
         await using var connection = await OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
-        var result = await RecordCommands.DeleteAsync(connection, fixture.FilesModel, model.Claim, claim, CancellationToken);
+        var result = await RecordCommands.DeleteAsync(connection, fixture.FilesModel, model.Claim, RecordWriteContext.None, claim, CancellationToken);
 
         Assert.Equal(RecordDeleteOutcome.Deleted, result.Outcome);
         foreach (var file in new[] { receipt, first, second })

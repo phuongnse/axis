@@ -37,11 +37,13 @@ public static class RecordCommands
     /// entity and field path. Without an <paramref name="uploader"/> nothing attaches, so any file id is
     /// <see cref="RecordWriteOutcome.Invalid"/>.
     /// </summary>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     public static async Task<RecordWriteResult> CreateAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
         IReadOnlyList<RecordLinks>? links = null,
@@ -53,6 +55,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
@@ -115,11 +118,13 @@ public static class RecordCommands
     /// at a written file field, or at the file field of a written collection, becomes <c>deleted</c>
     /// in the caller's transaction.
     /// </summary>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         Guid id,
         long version,
         IReadOnlyList<RecordValue> values,
@@ -132,6 +137,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
@@ -198,6 +204,7 @@ public static class RecordCommands
     /// transaction back unless the record is <see cref="RecordWriteOutcome.Written"/>.
     /// </summary>
     /// <param name="releaseId">The release the caller runs on, which the written record is stamped with.</param>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
     /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a validation.</param>
     public static async Task<RecordWriteResult> SetAsync(
@@ -205,6 +212,7 @@ public static class RecordCommands
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         Record stored,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
         DateTimeOffset now,
@@ -214,6 +222,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(stored);
         ArgumentNullException.ThrowIfNull(values);
 
@@ -254,7 +263,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await UpdateAsync(connection, application, entity, releaseId, stored.Id, stored.Version, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
+        return await UpdateAsync(connection, application, entity, releaseId, context, stored.Id, stored.Version, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -270,6 +279,7 @@ public static class RecordCommands
     /// is <see cref="RecordWriteOutcome.Written"/>, which hands the sequence numbers back.
     /// </summary>
     /// <param name="releaseId">The release the caller runs on, which the written record is stamped with.</param>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
     /// <param name="creatorId">The id the creator fields are set to.</param>
     /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a default and a validation.</param>
@@ -278,6 +288,7 @@ public static class RecordCommands
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
         string creatorId,
         DateTimeOffset now,
@@ -287,6 +298,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(creatorId);
 
@@ -346,7 +358,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await CreateAsync(connection, application, entity, releaseId, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
+        return await CreateAsync(connection, application, entity, releaseId, context, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -372,16 +384,19 @@ public static class RecordCommands
     /// record that another record references is kept with its files and is
     /// <see cref="RecordDeleteOutcome.Referenced"/>.
     /// </summary>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     public static async Task<RecordDeleteResult> DeleteAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
+        RecordWriteContext context,
         Guid id,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
 
         var versionColumn = EntityNaming.Quote(EntityNaming.VersionColumn);
         await using var command = new NpgsqlCommand(

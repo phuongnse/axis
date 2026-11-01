@@ -535,10 +535,11 @@ internal sealed partial class PackageCallHandler(
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Succeeded, ["next"] = target.Step.Next };
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
+            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, write, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
@@ -585,7 +586,7 @@ internal sealed partial class PackageCallHandler(
                 record!,
                 updated,
                 [],
-                instance.AccountableUser,
+                write,
                 logger,
                 cancellationToken);
         }

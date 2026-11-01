@@ -12,7 +12,8 @@ namespace Axis.Processes.Instances;
 /// Starts the processes of event triggers for an event occurrence, in a transaction the caller owns.
 /// Event delivery uses it for <c>async</c> triggers, and a <c>raiseEvent</c> step uses it for
 /// <c>sync</c> triggers. The triggers and the process come from the application's active release,
-/// and each start runs as <c>system</c>, pinned to that release.
+/// and each start runs as <c>system</c>, pinned to that release. The instance keeps the accountable user of
+/// whatever raised the event, and no deciding task.
 /// </summary>
 internal static class EventTriggerStarts
 {
@@ -114,7 +115,7 @@ internal static class EventTriggerStarts
             record,
             instanceId,
             AuditActors.System,
-            accountableUser: null,
+            occurrence.AccountableUser,
             new JsonObject { ["trigger"] = trigger.Name, ["eventId"] = occurrence.Id },
             cancellationToken);
         return started.Outcome switch

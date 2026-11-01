@@ -231,6 +231,7 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
             fixture.FilesModel,
             entity,
             fixture.FilesReleaseId,
+            RecordWriteContext.None,
             claim,
             1,
             [new RecordValue(field, receipt)],

@@ -235,7 +235,8 @@ internal static class InboundEndpoints
             return new(Results.ValidationProblem(failures));
         }
 
-        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, computed.Values, computed.Rows, id: recordId, cipher: cipher, cancellationToken: cancellationToken);
+        var write = new RecordWriteContext(caller.Id, null);
+        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, write, computed.Values, computed.Rows, id: recordId, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -264,7 +265,7 @@ internal static class InboundEndpoints
             DataChangeKinds.Create,
             record,
             changedFields: null,
-            caller.Id,
+            write,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
 
@@ -317,6 +318,7 @@ internal static class InboundEndpoints
                 record.Id,
                 EventRaiser.Payload(mappedEvent.Fields),
                 instanceId,
+                caller.Id,
                 (active.ReleaseId, application),
                 loggerFactory.CreateLogger(typeof(EventRaiser)),
                 cancellationToken);
