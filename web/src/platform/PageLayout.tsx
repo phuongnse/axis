@@ -3,6 +3,7 @@ import { useContext, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ShellSidebarContext } from './shellSidebar'
 import { useText } from './texts'
+import { visuallyHidden } from './visuallyHidden'
 import { useDesignTokens } from './themeMode'
 
 /** One step of a page's breadcrumb. A step with `to` is a link, and the last step has none. */
@@ -22,6 +23,8 @@ export function PageLayout({
   breadcrumb,
   actions,
   compact: compactProp,
+  status,
+  titleShown = true,
   children,
 }: {
   title: string
@@ -33,6 +36,16 @@ export function PageLayout({
    * is the page's title, then the actions. Without it, a workspace that claimed the shell's sidebar is compact.
    */
   compact?: boolean
+  /**
+   * Proposed: what a compact band shows of the page's state, after the breadcrumb, such as Studio's errors and changes
+   * that are not live.
+   */
+  status?: ReactNode
+  /**
+   * Proposed: false when the sidebar already names the page, as a Studio list or view: a compact band then keeps the
+   * title as its heading for assistive technology only, and shows the status in its place.
+   */
+  titleShown?: boolean
   children: ReactNode
 }) {
   const { spacing } = useDesignTokens()
@@ -56,7 +69,7 @@ export function PageLayout({
     // Proposed: under a compact band the content starts as far from it as from the page area's sides.
     <Flex vertical gap={compact ? contentPadding : 'middle'}>
       {breadcrumb && compact ? (
-        <CompactBand steps={breadcrumb} title={title} actions={actions} />
+        <CompactBand steps={breadcrumb} title={title} actions={actions} status={status} titleShown={titleShown} />
       ) : breadcrumb ? (
         <HeaderBand steps={breadcrumb}>{heading}</HeaderBand>
       ) : (
@@ -81,10 +94,14 @@ function CompactBand({
   steps,
   title,
   actions,
+  status,
+  titleShown,
 }: {
   steps: readonly BreadcrumbStep[]
   title: string
   actions?: ReactNode
+  status?: ReactNode
+  titleShown: boolean
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
@@ -109,22 +126,30 @@ function CompactBand({
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Breadcrumb
-        aria-label={t('shell.breadcrumb.label')}
-        style={{ flex: 1, minWidth: 0 }}
-        items={[
-          ...earlier.map((step) => ({
-            title: step.to ? <Link to={step.to}>{step.label}</Link> : <span>{step.label}</span>,
-          })),
-          {
-            title: (
-              <Typography.Title level={5} aria-current="page" style={{ display: 'inline', margin: 0 }}>
-                {title}
-              </Typography.Title>
-            ),
-          },
-        ]}
-      />
+      {titleShown || earlier.length > 0 ? (
+        <Breadcrumb
+          aria-label={t('shell.breadcrumb.label')}
+          style={{ flex: '0 1 auto', minWidth: 0 }}
+          items={[
+            ...earlier.map((step) => ({
+              title: step.to ? <Link to={step.to}>{step.label}</Link> : <span>{step.label}</span>,
+            })),
+            {
+              title: (
+                <Typography.Title level={5} aria-current="page" style={{ display: 'inline', margin: 0 }}>
+                  {title}
+                </Typography.Title>
+              ),
+            },
+          ]}
+        />
+      ) : (
+        <Typography.Title level={5} style={{ ...visuallyHidden, margin: 0 }}>
+          {title}
+        </Typography.Title>
+      )}
+      {status}
+      <div style={{ flex: 1 }} />
       {actions}
     </div>
   )

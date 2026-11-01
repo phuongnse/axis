@@ -33,6 +33,7 @@ import { StudioModuleProcess } from './StudioModuleProcess'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioOverview } from './StudioOverview'
+import { StudioStatus } from './StudioStatus'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { StudioNavigation } from './StudioNavigation'
@@ -421,6 +422,22 @@ function StudioWorkspace() {
         compact
         title={title}
         breadcrumb={steps}
+        // Proposed: the sidebar names a list or a view, so the band shows the application's state in its place, and
+        // names only a resource, which the sidebar does not.
+        titleShown={
+          steps.length > 1 ||
+          (selected !== undefined && selected.kind !== 'application') ||
+          selectedModuleItem !== undefined
+        }
+        status={
+          loaded && 'resources' in loaded && !(view.name === 'overview' && !selected && !selectedModuleItem) ? (
+            <StudioStatus
+              diagnostics={loaded.diagnostics}
+              releases={releases?.application === application ? releases.history : undefined}
+              overview={studioAddress(application, { name: 'overview' })}
+            />
+          ) : undefined
+        }
         actions={<div ref={setActionsSlot} style={{ display: 'flex' }} />}
       >
         {loaded && 'resources' in loaded && (

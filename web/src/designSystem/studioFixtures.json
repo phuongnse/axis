@@ -1267,7 +1267,8 @@
         },
         "usedBy": 2
       }
-    ]
+    ],
+    "policies": []
   },
   "/api/studio/apps/PurchaseRequests/releases": {
     "active": {

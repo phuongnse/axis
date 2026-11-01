@@ -1223,6 +1223,7 @@ function studioFolder(name: string, items: unknown[], diagnostics: unknown[], re
     sequences: [],
     forms: [],
     pages: [],
+    policies: [],
     texts: [],
   }
   return {

@@ -2,7 +2,6 @@ import { DownOutlined } from '@ant-design/icons'
 import { ConfigProvider, Dropdown, Menu, Typography, type MenuProps } from 'antd'
 import { createElement, useContext } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router'
 import { selectedItemTint } from '../platform/antTheme'
 import { navigationIcon } from '../platform/navigationIcons'
 import { useShellSidebar } from '../platform/shellSidebar'
@@ -50,7 +49,6 @@ export function StudioNavigation({
 }) {
   const t = useText()
   const { slot, collapsed } = useShellSidebar()
-  const navigate = useNavigate()
   const { colour, spacing } = useDesignTokens()
   const { mode } = useThemeMode()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -124,17 +122,15 @@ export function StudioNavigation({
               app.name === application ? { color: colour.primaryText, background: selectedItemTint(mode) } : undefined,
             'aria-current': app.name === application ? ('true' as const) : undefined,
           })),
-          // Proposed: the band names no Studio step, so this menu leads back to the list of applications, when there is
-          // one: with a single application, Studio opens it.
-          ...(applications.length > 1 || canCreate ? [{ type: 'divider' as const }] : []),
-          ...(applications.length > 1 ? [{ key: ':all', label: t('shell.studio.allApplications') }] : []),
-          ...(canCreate ? [{ key: 'new', label: t('shell.studio.newApplication.button') }] : []),
+          // Proposed: the menu holds the applications and New application… only. Studio in the app switcher already
+          // leads back to the list of applications, so the menu repeats no way back.
+          ...(canCreate
+            ? [{ type: 'divider' as const }, { key: 'new', label: t('shell.studio.newApplication.button') }]
+            : []),
         ],
         onClick: ({ key }) => {
           if (key === 'new') {
             show()
-          } else if (key === ':all') {
-            navigate('/studio')
           } else {
             onPickApplication(key)
           }

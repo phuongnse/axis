@@ -303,6 +303,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Entity', draw: () => <ShellPreview />, entry: studioResource(studioEntity), frameHeight: 600 },
+    // Proposed: a list whose application has errors and changes not live: the band shows them, not the list's name.
+    {
+      caption: 'Entities with errors and changes not live',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=LeaveRequests&view=kind&kind=entity',
+      frameHeight: 600,
+    },
     {
       caption: 'Releases',
       draw: () => <ShellPreview />,
