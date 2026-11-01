@@ -262,7 +262,7 @@ test.describe('Studio on a copy of its own', () => {
         name: 'MatrixTesterAccess',
         formatVersion: 1,
         roles: ['matrix-tester'],
-        grants: [{ entity: 'Supplier', actions: ['read'] }],
+        grants: [{ name: 'supplier1', entity: 'Supplier', actions: ['read'] }],
       })
       const diagnosticsAfter = await (
         await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/diagnostics`)
@@ -315,7 +315,7 @@ test.describe('Studio on a copy of its own', () => {
         name: 'MatrixExporterAccess',
         formatVersion: 1,
         roles: ['matrix-exporter'],
-        grants: [{ dataSource: 'PurchaseRequestList', actions: ['read', 'export'] }],
+        grants: [{ name: 'purchaseRequestList1', dataSource: 'PurchaseRequestList', actions: ['read', 'export'] }],
       })
       const diagnosticsAfter = await (
         await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/diagnostics`)

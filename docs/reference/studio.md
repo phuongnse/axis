@@ -428,8 +428,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
     - An entity grant also edits its record filter in the expression editor
       and its fields in a field picker. An empty field list means all fields,
       so clearing the picker removes the `fields` key.
-    - Add grant adds a grant for the cell's target. Remove deletes a grant,
-      but not the policy's last one.
+    - Add grant adds a grant named after the cell's target, such as `purchaseRequest1`, with the first free number in the policy (case is ignored).
+      A grant shows its name read-only. Remove deletes a grant, but not the policy's last one.
     - Save is off while a grant has no ticked action, and while nothing
       changed.
   - A save writes one file. It sends one patch with the version the panel

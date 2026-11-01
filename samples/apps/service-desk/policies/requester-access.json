@@ -6,30 +6,36 @@
   "roles": ["requester"],
   "grants": [
     {
+      "name": "ticket1",
       "entity": "Ticket",
       "actions": ["read"],
       "filter": "requester == currentUser()"
     },
     {
+      "name": "ticket2",
       "entity": "Ticket",
       "actions": ["create", "update"],
       "filter": "requester == currentUser() and status == 'draft'",
       "fields": ["title", "description", "category", "priority", "status"]
     },
     {
+      "name": "ticket3",
       "entity": "Ticket",
       "actions": ["delete"],
       "filter": "requester == currentUser() and status == 'draft'"
     },
     {
+      "name": "category1",
       "entity": "Category",
       "actions": ["read"]
     },
     {
+      "name": "myTicketList1",
       "dataSource": "MyTicketList",
       "actions": ["read"]
     },
     {
+      "name": "ticketHandling1",
       "process": "TicketHandling",
       "actions": ["start"]
     }

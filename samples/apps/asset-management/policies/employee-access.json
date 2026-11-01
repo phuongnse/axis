@@ -8,6 +8,7 @@
   ],
   "grants": [
     {
+      "name": "asset1",
       "entity": "Asset",
       "actions": [
         "read"
@@ -15,24 +16,28 @@
       "filter": "holder == currentUser()"
     },
     {
+      "name": "category1",
       "entity": "Category",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "location1",
       "entity": "Location",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "vendor1",
       "entity": "Vendor",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "software1",
       "entity": "Software",
       "actions": [
         "read"

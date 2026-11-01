@@ -1,5 +1,6 @@
 import type { StudioMatrixRole, StudioMatrixTarget } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
+import { uniqueStepName } from './processPalette'
 
 // The file the server embeds, loaded with the page, so a grant's checkboxes need no loading state.
 const policySchema = Object.values(
@@ -62,7 +63,15 @@ export function newPolicy(role: Pick<StudioMatrixRole, 'name' | 'accessPolicy'>)
   }
 }
 
-/** A grant of a target with no action yet. */
-export function newGrant(target: Pick<StudioMatrixTarget, 'kind' | 'name'>): Record<string, unknown> {
-  return { [grantTargetKey(target.kind)]: target.name, actions: [] }
+/**
+ * A grant of a target with no action yet. Its name is the target's name after its last `/`, with the first letter
+ * lowercased, plus the first free number among the names of `grants`, ignoring letter case.
+ */
+export function newGrant(
+  target: Pick<StudioMatrixTarget, 'kind' | 'name'>,
+  grants: readonly unknown[],
+): Record<string, unknown> {
+  const local = target.name.slice(target.name.lastIndexOf('/') + 1)
+  const base = `${local.slice(0, 1).toLowerCase()}${local.slice(1)}`.slice(0, 56) || 'grant'
+  return { name: uniqueStepName(grants, base), [grantTargetKey(target.kind)]: target.name, actions: [] }
 }

@@ -87,7 +87,7 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
     )
     const policyFile = path.join(folder, 'policies', 'requester-access.json')
     const policy = JSON.parse(await readFile(policyFile, 'utf8')) as { grants: unknown[] }
-    policy.grants.push({ dataSource: name, actions: ['read'] })
+    policy.grants.push({ name: `${name[0].toLowerCase()}${name.slice(1)}1`, dataSource: name, actions: ['read'] })
     await writeFile(policyFile, JSON.stringify(policy, null, 2))
   }
 
