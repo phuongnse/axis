@@ -1,0 +1,7 @@
+{
+  "kind": "module",
+  "id": "ledgers",
+  "version": "1.0.0",
+  "label": "Ledgers",
+  "roles": [{ "name": "clerk", "label": { "textKey": "ledgers.roles.clerk" } }]
+}

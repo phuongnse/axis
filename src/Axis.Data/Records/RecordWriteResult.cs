@@ -1,3 +1,5 @@
+using Axis.Configuration.Model;
+
 namespace Axis.Data.Records;
 
 /// <summary>How a record create or update ended.</summary>
@@ -34,7 +36,16 @@ public enum RecordWriteOutcome
     /// no transition or along one whose guard is not true. The errors say which.
     /// </summary>
     LifecycleRefused,
+
+    /// <summary>
+    /// An effect of the transition the update made could not be written, so the whole write is refused.
+    /// <see cref="RecordWriteResult.Point"/> names the effect, such as <c>Claim/effects/entryRecorded</c>.
+    /// </summary>
+    EffectRefused,
 }
+
+/// <summary>A record that an effect of a transition created. <see cref="Point"/> names the effect, such as <c>Claim/effects/entryRecorded</c>.</summary>
+public sealed record EffectRecord(string Point, EntityModel Entity, Record Record);
 
 /// <summary>
 /// The outcome of a record create or update. <see cref="Errors"/> is set for
@@ -44,9 +55,18 @@ public enum RecordWriteOutcome
 /// never name a table, column or constraint.
 /// <see cref="Point"/> is the named point of the module contract that refused the write, such as
 /// <c>Request/transitions/submit</c> or <c>Request/validations/amountFrozen</c>, or <see langword="null"/> when none is named.
+/// <see cref="RecordWriteOutcome.EffectRefused"/> names its effect in <see cref="Point"/> and has no errors.
+/// <see cref="Effects"/> holds the records the effects of a written update created.
 /// </summary>
 public sealed record RecordWriteResult(
     RecordWriteOutcome Outcome,
     Record? Record = null,
     SortedDictionary<string, string[]>? Errors = null,
-    string? Point = null);
+    string? Point = null)
+{
+    /// <summary>
+    /// The records that the effects of the transition created, in declaration order. It is set on a
+    /// <see cref="RecordWriteOutcome.Written"/> update that made a transition with effects, and empty otherwise.
+    /// </summary>
+    public IReadOnlyList<EffectRecord> Effects { get; init; } = [];
+}

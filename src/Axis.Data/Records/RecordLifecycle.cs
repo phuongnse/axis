@@ -38,8 +38,9 @@ internal static class RecordLifecycle
     /// Checks a state change. An update that does not send the state field is not checked. Otherwise it
     /// reads the stored record, which is <see cref="RecordWriteOutcome.NotFound"/> when there is none and
     /// <see cref="RecordWriteOutcome.StaleVersion"/> when its version is not <paramref name="version"/>.
+    /// An allowed change reports the transition it follows and the stored record it read, for the effects.
     /// </summary>
-    public static async Task<RecordWriteResult?> CheckUpdateAsync(
+    public static async Task<LifecycleUpdateCheck> CheckUpdateAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
@@ -55,46 +56,46 @@ internal static class RecordLifecycle
         if (entity.Contract?.Lifecycle is not { } lifecycle
             || values.FirstOrDefault(value => value.Field.Name == lifecycle.Field) is not { } sent)
         {
-            return null;
+            return default;
         }
 
         var stored = await RecordQueries.GetAsync(connection, application, entity, id, cipher, cancellationToken);
         if (stored is null)
         {
-            return new RecordWriteResult(RecordWriteOutcome.NotFound);
+            return new LifecycleUpdateCheck(new RecordWriteResult(RecordWriteOutcome.NotFound));
         }
 
         if (stored.Version != version)
         {
-            return new RecordWriteResult(RecordWriteOutcome.StaleVersion);
+            return new LifecycleUpdateCheck(new RecordWriteResult(RecordWriteOutcome.StaleVersion));
         }
 
         var from = stored.Values.GetValueOrDefault(lifecycle.Field)?.GetValue<string>();
         var to = sent.Value as string;
         if (string.Equals(from, to, StringComparison.Ordinal))
         {
-            return null;
+            return default;
         }
 
         var transition = lifecycle.Transitions.FirstOrDefault(candidate => from is not null && to is not null && candidate.To == to && candidate.From.Contains(from));
         if (transition is null)
         {
-            return Refused(lifecycle, $"No transition goes from '{from}' to '{to}'.", point: null);
+            return new LifecycleUpdateCheck(Refused(lifecycle, $"No transition goes from '{from}' to '{to}'.", point: null));
         }
 
         if (transition.Guard is not { } guard)
         {
-            return null;
+            return new LifecycleUpdateCheck(null, transition, stored);
         }
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var sets = await RecordSets.ReadAsync(connection, application, entity, stored, links, cancellationToken, cipher);
         return RecordValidator.GuardHolds(application, entity, stored, values, rows, guard, now, sets, new ExpressionAccountability(context.AccountableUser, context.DecisionTask?.ToString("D")))
-            ? null
-            : Refused(
+            ? new LifecycleUpdateCheck(null, transition, stored)
+            : new LifecycleUpdateCheck(Refused(
                 lifecycle,
                 transition.Message?.TextKey ?? $"The transition '{transition.Name}' does not allow this change.",
-                $"{PlainName(entity)}/transitions/{transition.Name}");
+                $"{PlainName(entity)}/transitions/{transition.Name}"));
     }
 
     /// <summary>
@@ -140,5 +141,14 @@ internal static class RecordLifecycle
     private static SortedDictionary<string, string[]> Errors(LifecycleModel lifecycle, string message) =>
         new(StringComparer.Ordinal) { [$"/values/{lifecycle.Field}"] = [message] };
 
-    private static string PlainName(EntityModel entity) => entity.Name[(entity.Name.LastIndexOf('/') + 1)..];
+    /// <summary>The plain name of an entity, after the module id: <c>Claim</c> for <c>ledgers/Claim</c>.</summary>
+    internal static string PlainName(EntityModel entity) => entity.Name[(entity.Name.LastIndexOf('/') + 1)..];
 }
+
+/// <summary>
+/// What <see cref="RecordLifecycle.CheckUpdateAsync"/> found. <see cref="Refusal"/> is the refusal, or
+/// <see langword="null"/> when the update is allowed. <see cref="Transition"/> and <see cref="Stored"/> are set
+/// only when the allowed update changes the state along a transition, and <see cref="Stored"/> is the record
+/// before the write.
+/// </summary>
+internal readonly record struct LifecycleUpdateCheck(RecordWriteResult? Refusal = null, LifecycleTransitionModel? Transition = null, Record? Stored = null);

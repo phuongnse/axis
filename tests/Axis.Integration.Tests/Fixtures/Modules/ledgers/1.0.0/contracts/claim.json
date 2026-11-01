@@ -1,0 +1,25 @@
+{
+  "id": "aab47425-1481-4881-b10e-41da670115ea",
+  "kind": "contract",
+  "name": "ClaimContract",
+  "formatVersion": 1,
+  "entity": "Claim",
+  "lifecycle": {
+    "field": "status",
+    "states": [{ "name": "draft", "initial": true, "deletable": true }, { "name": "submitted" }, { "name": "approved" }],
+    "transitions": [
+      { "name": "submit", "from": ["draft"], "to": "submitted" },
+      { "name": "approve", "from": ["submitted"], "to": "approved" }
+    ]
+  },
+  "effects": [
+    {
+      "name": "entryRecorded",
+      "on": "approve",
+      "create": {
+        "entity": "Entry",
+        "values": { "claim": "id", "amount": "amount", "status": "'open'" }
+      }
+    }
+  ]
+}
