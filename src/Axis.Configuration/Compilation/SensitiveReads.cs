@@ -10,7 +10,8 @@ namespace Axis.Configuration.Compilation;
 /// as <see cref="Model.MappingFields"/> does for a mapping: a bare name is a field of the current
 /// entity, a path step is a field of the entity the step's target resolves to, a rule call reads
 /// the fields its arguments read, because a rule body sees only its parameters, and the item
-/// expression of an aggregate reads the fields of the child entity. An entity that
+/// expression of an aggregate reads the fields of the child entity, also when the aggregate names the
+/// collection by a path, such as <c>type.steps</c>, where the path's reference part reads its own fields. An entity that
 /// <c>findEntity</c> cannot find is skipped. A filter may test an exact lookup
 /// field of its entity with <c>==</c> or <c>!=</c> against a literal other than <c>null</c>, outside
 /// the arguments of a call and outside an item expression: that test runs against the stored
@@ -114,6 +115,21 @@ internal static class SensitiveReads
             && findEntity(collection.Entity) is { } child)
         {
             return FirstOf(call.Arguments.Skip(1), check, child, scope, findEntity, inItem: true, inCall: true, allowExactLookupEquality, isParameter);
+        }
+
+        if (!check.RuleCalls.ContainsKey(call)
+            && !inItem
+            && _aggregateNames.Contains(call.Name)
+            && call.Arguments is [MemberNode path, ..]
+            && check.CollectionPaths.Contains(path)
+            && check.PathTargets.TryGetValue(path, out var ownerName)
+            && findEntity(ownerName) is { } owner
+            && owner.Fields.FirstOrDefault(field => string.Equals(field.Name, path.Name, StringComparison.OrdinalIgnoreCase)) is { Target: { } childName }
+            && findEntity(childName) is { } pathChild)
+        {
+            // The path's reference part is read from the current entity, and the item expression from the collection's rows.
+            return Walk(path.Target, check, entity, scope, findEntity, inItem, inCall: true, allowExactLookupEquality, isParameter)
+                ?? FirstOf(call.Arguments.Skip(1), check, pathChild, scope, findEntity, inItem: true, inCall: true, allowExactLookupEquality, isParameter);
         }
 
         return FirstOf(call.Arguments, check, entity, scope, findEntity, inItem, inCall: true, allowExactLookupEquality, isParameter);

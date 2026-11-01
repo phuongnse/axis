@@ -369,9 +369,15 @@ public static class SqlTranslator
         /// <c>any</c> as <c>EXISTS</c> and <c>count</c> as <c>count(*)</c> over the rows of the collection
         /// that belong to the outer row and, with a condition, make it true, so a null condition keeps no row.
         /// Only the filter's top level translates one: a rule body has no collections, and an item expression has none either.
+        /// A path to a collection is not translated.
         /// </summary>
         private string Aggregate(CallNode call, string name)
         {
+            if (call.Arguments[0] is MemberNode)
+            {
+                throw Fail("A path to a collection is not translated to SQL", call.Offset);
+            }
+
             if (_bindings is not null || !ReferenceEquals(_column, _filterColumn) || call.Arguments[0] is not NameNode list)
             {
                 throw Fail("Aggregates are only translated at the filter's top level", call.Offset);

@@ -30,8 +30,15 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
         new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance);
 
     /// <summary>
+    /// The paths that end at a collection, such as <c>type.steps</c> in <c>count(type.steps)</c>,
+    /// compared by reference. Each one is also in <see cref="PathTargets"/>, which names the entity
+    /// that holds the collection.
+    /// </summary>
+    public IReadOnlySet<MemberNode> CollectionPaths { get; internal init; } = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
     /// The result of a boolean expression built from expressions that <paramref name="results"/>
-    /// checked. It holds every rule call, path target and decimal call of them, so the tables
+    /// checked. It holds every rule call, path target, collection path and decimal call of them, so the tables
     /// still match the nodes the built expression reuses.
     /// </summary>
     public static ExpressionCheckResult Merge(IEnumerable<ExpressionCheckResult> results)
@@ -41,9 +48,11 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
         var decimalCalls = new HashSet<CallNode>(ReferenceEqualityComparer.Instance);
         var ruleCalls = new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
         var pathTargets = new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance);
+        var collectionPaths = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
         foreach (var result in results)
         {
             decimalCalls.UnionWith(result.DecimalCalls);
+            collectionPaths.UnionWith(result.CollectionPaths);
             foreach (var (call, rule) in result.RuleCalls)
             {
                 ruleCalls[call] = rule;
@@ -60,6 +69,7 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
             DecimalCalls = decimalCalls,
             RuleCalls = ruleCalls,
             PathTargets = pathTargets,
+            CollectionPaths = collectionPaths,
         };
     }
 }

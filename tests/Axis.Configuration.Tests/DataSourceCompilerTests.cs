@@ -494,6 +494,36 @@ public sealed class DataSourceCompilerTests
     }
 
     [Theory]
+    [InlineData("count(shipment.lines) > 0")]
+    [InlineData("any(shipment.lines, amount > 1)")]
+    public void Filter_over_a_path_to_a_collection_is_outside_the_sql_subset(string filter)
+    {
+        // The filter type-checks, but a path to a collection cannot become SQL.
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/line-item.json", LineItem)
+            .With("entities/shipment.json", """
+                { "id": "66666666-6666-4666-8666-666666666601", "kind": "entity", "name": "Shipment", "formatVersion": 1,
+                  "displayField": "code", "fields": [ { "name": "code", "type": "text", "required": true }, { "name": "lines", "type": "child-collection", "target": "LineItem" } ] }
+                """)
+            .With("entities/parcel.json", """
+                { "id": "66666666-6666-4666-8666-666666666602", "kind": "entity", "name": "Parcel", "formatVersion": 1,
+                  "fields": [ { "name": "code", "type": "text" }, { "name": "shipment", "type": "reference", "target": "Shipment" } ] }
+                """)
+            .With("data-sources/parcels.json", DataSource(
+                "Parcel",
+                """[{ "name": "code", "path": "code" }]""",
+                $$""", "filter": "{{filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/parcels.json", "/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("A path to a collection is not translated to SQL", diagnostic.Message);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
     // A filter type-checks with the child collections, but only any and count are in the SQL subset.
     [InlineData("sum(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("avg(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]

@@ -25,6 +25,7 @@ public sealed class ExpressionInterpreterTests
 
     private static readonly Guid _sales = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000011");
     private static readonly Guid _support = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000012");
+    private static readonly Guid _shipment = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000031");
     private static readonly Guid _binh = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000021");
 
     /// <summary>A value for every field, so that no result is <c>null</c> unless the expression makes it so.</summary>
@@ -805,6 +806,50 @@ public sealed class ExpressionInterpreterTests
     }
 
     [Fact]
+    public void Each_row_of_an_aggregate_through_a_path_counts_against_the_step_budget()
+    {
+        // The call is one step, the reference part of the path is one more, and each row's item is one more.
+        var within = EvaluateOverPath("sum(r.lines, qty)", _shipment, Rows([.. Enumerable.Repeat<(long?, decimal?, bool?)>((1L, null, null), 9_998)]));
+        var over = EvaluateOverPath("sum(r.lines, qty)", _shipment, Rows([.. Enumerable.Repeat<(long?, decimal?, bool?)>((1L, null, null), 9_999)]));
+
+        Assert.Equal(9_998L, within.Value);
+        Assert.Equal(ExpressionRuntimeErrorKind.StepBudgetExhausted, over.Error?.Kind);
+    }
+
+    [Fact]
+    public void An_aggregate_through_a_path_reads_the_rows_of_the_record_the_reference_names()
+    {
+        var lines = Rows((2L, null, true), (3L, null, false));
+
+        Assert.Equal(2L, EvaluateOverPath("count(r.lines)", _shipment, lines).Value);
+        Assert.Equal(5L, EvaluateOverPath("sum(r.lines, qty)", _shipment, lines).Value);
+        Assert.Equal(true, EvaluateOverPath("any(r.lines, ok)", _shipment, lines).Value);
+    }
+
+    [Fact]
+    public void An_aggregate_through_a_null_or_dangling_reference_gives_the_empty_list_result()
+    {
+        var lines = Rows((2L, null, true));
+
+        Assert.Equal(0L, EvaluateOverPath("count(r.lines)", null, lines).Value);
+        Assert.Equal(0L, EvaluateOverPath("sum(r.lines, qty)", null, lines).Value);
+        Assert.Equal(false, EvaluateOverPath("any(r.lines, ok)", null, lines).Value);
+        Assert.Equal(0L, EvaluateOverPath("count(r.lines)", Guid.Parse("0199a9e5-7c1e-7000-8000-0000000000ff"), lines).Value);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_without_a_record_resolver_is_a_bug()
+    {
+        var parsed = ExpressionParser.Parse("count(r.lines)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, CollectionPathScope(), ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("r", _shipment)])));
+    }
+
+    [Fact]
     public void A_path_reads_the_field_of_the_record_each_reference_names()
     {
         Assert.Equal("Binh", EvaluatePath("r.manager.name", _sales).Value);
@@ -914,6 +959,35 @@ public sealed class ExpressionInterpreterTests
                     new Dictionary<string, object?> { ["name"] = "Binh", ["department"] = _sales }),
                 _ => null,
             });
+    }
+
+    private static ExpressionScope CollectionPathScope() => new(
+        new Dictionary<string, ExpressionType> { ["r"] = ExpressionType.Reference("shipment") },
+        referenceFields: (_, _) => null,
+        referenceCollections: (entity, name) =>
+            (entity.ToLowerInvariant(), name.ToLowerInvariant()) is ("shipment", "lines")
+                ? new ExpressionCollection("lines", "Line", new ExpressionScope(new Dictionary<string, ExpressionType>
+                {
+                    ["qty"] = ExpressionType.Integer,
+                    ["amount"] = ExpressionType.Decimal,
+                    ["ok"] = ExpressionType.Boolean,
+                }))
+                : null);
+
+    /// <summary>
+    /// Evaluates <paramref name="text"/> with <c>r</c> set to <paramref name="shipment"/>. The one
+    /// shipment <see cref="_shipment"/> holds <paramref name="lines"/>, and no other id names a record.
+    /// </summary>
+    private static ExpressionEvaluationResult EvaluateOverPath(string text, Guid? shipment, IReadOnlyList<ExpressionValues> lines)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, CollectionPathScope(), ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("r", shipment)]), (entity, id) =>
+            entity.Equals("shipment", StringComparison.OrdinalIgnoreCase) && id == _shipment
+                ? new ExpressionValues(new Dictionary<string, object?> { ["lines"] = lines })
+                : null);
     }
 
     /// <summary>The values in <see cref="_setValues"/>, with <paramref name="overrides"/> replacing some.</summary>

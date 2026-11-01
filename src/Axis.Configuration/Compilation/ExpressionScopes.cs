@@ -159,7 +159,8 @@ public static class ExpressionScopes
             CollectionsOf(all, findEntity, paths: true),
             ReferenceFieldsOf(findEntity),
             modules,
-            undeclaredModuleIsUnknown);
+            undeclaredModuleIsUnknown,
+            ReferenceCollectionsOf(findEntity));
     }
 
     /// <summary>
@@ -185,7 +186,8 @@ public static class ExpressionScopes
             rules,
             CollectionsOf(all, findEntity),
             ReferenceFieldsOf(findEntity),
-            modules);
+            modules,
+            referenceCollections: ReferenceCollectionsOf(findEntity));
     }
 
     /// <summary>
@@ -310,13 +312,31 @@ public static class ExpressionScopes
             ? TypeOf(field)
             : null;
 
+    /// <summary>
+    /// Finds a child collection or a references field of the entity <paramref name="findEntity"/>
+    /// returns for a reference's target, ignoring letter case. Its item scope is the one
+    /// <see cref="CollectionsOf"/> gives, with no paths.
+    /// </summary>
+    private static ReferenceCollectionResolver ReferenceCollectionsOf(Func<string, EntityResource?> findEntity) =>
+        (target, name) =>
+        {
+            var field = findEntity(target)?.Fields.FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+            return field?.Target is { } childName
+                && FieldTypes.Parse(field.Type) is FieldType.ChildCollection or FieldType.References
+                && findEntity(childName) is { } child
+                    ? new ExpressionCollection(field.Name, child.Name, ForEntity(child.Fields))
+                    : null;
+        };
+
     private static ExpressionScope Build(
         IEnumerable<(string Name, ExpressionType? Type)> fields,
         IEnumerable<ExpressionRule>? rules,
         IEnumerable<ExpressionCollection>? collections,
         ReferenceFieldResolver? referenceFields,
         IEnumerable<string>? modules = null,
-        bool undeclaredModuleIsUnknown = false)
+        bool undeclaredModuleIsUnknown = false,
+        ReferenceCollectionResolver? referenceCollections = null)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -327,7 +347,7 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown);
+        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown, referenceCollections);
     }
 
     /// <summary>

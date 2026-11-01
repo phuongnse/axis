@@ -382,6 +382,10 @@ Paths in validations and computed fields are not built. There a path is
   most once per evaluation. A reference that names no record gives `null`,
   as a `null` reference does. A stored decimal on any record read that .NET
   `decimal` cannot hold exactly stops the evaluation with a run-time error.
+  An aggregate may also name a collection of a referenced record by a path, such
+  as `count(type.steps)`, and the data module then reads that record's
+  collections and `references` sets once. See
+  [collections through a path](#collections-through-a-path-and-the-outer-record).
   An `updateRecord` value sees the same scope, and is type-checked against
   its field's type. A task's `assignee.user` sees the same scope too, and is
   type-checked as `text`. Validations and computed fields keep their scope.
@@ -495,11 +499,14 @@ filter uses it to compare a record with the user, such as
 ### Aggregates
 
 An aggregate works on a child collection or a `references` field. The first
-argument names the field. The second argument is an item expression,
+argument names the field, or, in a process expression, is a path to the field
+of a referenced record, as in
+[collections through a path](#collections-through-a-path-and-the-outer-record). The second argument is an item expression,
 evaluated once per row. Inside it, names refer only to the child row's or the
 target record's fields, computed ones included. Computed fields can use
 aggregates over child collections. Validations and process conditions can use
-them over child collections and `references` fields.
+them over child collections and `references` fields. Only process expressions
+can use them over a path to a collection.
 
 | Function | Result | Empty list |
 | --- | --- | --- |
@@ -541,26 +548,39 @@ them over child collections and `references` fields.
 
 ### Collections through a path and the outer record
 
-_(planned for M26)_ Two additions let a process read the rows of another
-record, such as the approval steps of a request's type, as
-[D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees:
+Two additions let a process read the rows of another record, such as the
+approval steps of a request's type, as
+[D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees. The
+path to a collection is built. `outer` and `first` are _(planned for M26)_.
 
 - **A path to a collection.** The first argument of an aggregate may be a path
   that ends at a child collection or a `references` field of a referenced
-  record, such as `count(type.steps)`, with at most 3 hops. It is allowed in
-  process expressions: conditions, `set`, assignees, inputs and `fields`. The
-  step reads the rows in its transaction. A `null` reference on the path gives
-  the aggregate's empty-list result.
-- **`outer`.** Inside an item expression, `outer.<field>` reads a field of the
-  record the whole expression runs on, and `outer.<path>` follows its
-  references, such as
+  record, such as `count(type.steps)` or `sum(type.steps, minAmount)`, with at
+  most 3 hops. A longer path is `AXC0058`, as for a path to a scalar field. It
+  is allowed in process expressions: conditions, decision branches, `set`,
+  assignees, inputs, notification values and `fields`, and in a data change
+  trigger's `when` and a start condition, which have the same scope. A
+  validation, a computed field and a field default refuse it as an unknown name
+  (`AXC0046`). The step reads the rows in its transaction. A `null` reference
+  on the path, or one that names no record, gives the aggregate's empty-list
+  result, such as 0 for `count`. A path to a collection cannot read a sensitive
+  field in a notification value. Rows are read without the record cipher, as the
+  rows of a `references` field are, so a sensitive value in a row read through a
+  path makes the read fail.
+- **`outer`** _(planned for M26)_. Inside an item expression, `outer.<field>`
+  reads a field of the record the whole expression runs on, and
+  `outer.<path>` follows its references, such as
   `count(type.steps, minAmount == null or outer.amount >= minAmount)`. Outside
   an item expression it is a diagnostic. `outer` becomes a reserved name, so a
   field named `outer` is a diagnostic.
-- **Not SQL.** A path to a collection, `outer` and `first` are evaluated in the
-  server and the worker, and a filter that uses them is `AXC0053`.
+- **Not SQL.** A path to a collection is evaluated in the server and the
+  worker, and a data source filter or a policy filter that uses it is
+  `AXC0053`. `outer` and `first` _(planned for M26)_ are evaluated there too,
+  and a filter that uses them will be `AXC0053`.
 - **Cost.** The rows count against the [cost bounds](#cost-bounds) as the rows
-  of a child collection of the record do.
+  of a child collection of the record do. Following the reference part of the
+  path costs its usual steps, but the collection itself costs none. So
+  `sum(r.lines, qty)` costs 1 step more than `sum(lines, qty)`.
 
 ## Cost bounds
 
@@ -611,9 +631,11 @@ Run-time limit:
 - **Step budget.** Each top-level evaluation has a budget of 10,000 steps.
   Each node evaluated is one step, and evaluation stops as soon as the budget
   runs out. An aggregate's item expression costs its steps once per row. The
-  aggregate call is one step, and its collection argument costs none. So
-  `sum(lines, qty)` costs 1 step plus 1 per row, and runs out of budget at
-  10,000 rows. The steps of a called rule count against the caller's
+  aggregate call is one step, and a collection argument that is a name costs
+  none. A path to a collection costs the steps of its reference part, such as
+  1 step for `r` in `r.lines`. So `sum(lines, qty)` costs 1 step plus 1 per
+  row, and runs out of budget at 10,000 rows. `sum(r.lines, qty)` costs 2
+  steps plus 1 per row, and runs out at 9,999 rows. The steps of a called rule count against the caller's
   budget. A `concat` also costs one step for every full 1,000 characters of
   its result, counted before the text is built. So one evaluation builds at
   most about 10 million characters.

@@ -16,11 +16,19 @@ public sealed record ExpressionCollection(string Name, string Entity, Expression
 public delegate ExpressionType? ReferenceFieldResolver(string targetEntity, string fieldName);
 
 /// <summary>
+/// Finds the child collection or references field <paramref name="name"/> of the entity
+/// <paramref name="targetEntity"/>, or null when the entity has no such collection.
+/// </summary>
+public delegate ExpressionCollection? ReferenceCollectionResolver(string targetEntity, string name);
+
+/// <summary>
 /// The fields an expression may name, with their types, the named rules it may call and the child
 /// collections its aggregates may name. Names match ignoring letter case. A repeated rule or
 /// collection name keeps its first one. A scope with a <see cref="ReferenceFieldResolver"/> also
 /// resolves paths through reference fields, such as <c>department.name</c>. A scope without one
-/// reports every path as an unknown name. A rule with a <see cref="ExpressionRule.Module"/> is
+/// reports every path as an unknown name. A scope with a <see cref="ReferenceCollectionResolver"/> also
+/// resolves a path that ends at a collection, such as <c>type.steps</c>, as an aggregate's first
+/// argument. A rule with a <see cref="ExpressionRule.Module"/> is
 /// called as <c>module:Name(…)</c>, and only when the scope names the modules it may call. For an
 /// application those are its declared modules, and a call to another module is reported as an
 /// undeclared module. For a module with <see cref="UndeclaredModuleIsUnknown"/>, those are the modules
@@ -34,6 +42,7 @@ public sealed class ExpressionScope
     private readonly HashSet<string>? _modules;
     private readonly Dictionary<string, ExpressionCollection> _collections = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReferenceFieldResolver? _referenceFields;
+    private readonly ReferenceCollectionResolver? _referenceCollections;
 
     public ExpressionScope(
         IEnumerable<KeyValuePair<string, ExpressionType>> fields,
@@ -41,7 +50,8 @@ public sealed class ExpressionScope
         IEnumerable<ExpressionCollection>? collections = null,
         ReferenceFieldResolver? referenceFields = null,
         IEnumerable<string>? modules = null,
-        bool undeclaredModuleIsUnknown = false)
+        bool undeclaredModuleIsUnknown = false,
+        ReferenceCollectionResolver? referenceCollections = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
         _fields = new Dictionary<string, ExpressionType>(fields, StringComparer.OrdinalIgnoreCase);
@@ -69,6 +79,7 @@ public sealed class ExpressionScope
         }
 
         _referenceFields = referenceFields;
+        _referenceCollections = referenceCollections;
         _modules = modules is null ? null : new HashSet<string>(modules, StringComparer.Ordinal);
         UndeclaredModuleIsUnknown = undeclaredModuleIsUnknown;
     }
@@ -81,6 +92,9 @@ public sealed class ExpressionScope
 
     /// <summary>Whether paths through reference fields resolve in this scope.</summary>
     public bool ResolvesPaths => _referenceFields is not null;
+
+    /// <summary>Whether a path that ends at a collection resolves in this scope.</summary>
+    public bool ResolvesCollectionPaths => _referenceCollections is not null;
 
     public bool TryGetField(string name, [NotNullWhen(true)] out ExpressionType? type) =>
         _fields.TryGetValue(name, out type);
@@ -117,5 +131,20 @@ public sealed class ExpressionScope
             ? _referenceFields(reference.Source ?? "", name)
             : null;
         return type is not null;
+    }
+
+    /// <summary>
+    /// Finds the child collection or references field <paramref name="name"/> of the entity that
+    /// <paramref name="reference"/> points to. False without a resolver, when
+    /// <paramref name="reference"/> is not a reference, or when the target has no such collection.
+    /// </summary>
+    public bool TryGetReferenceCollection(ExpressionType reference, string name, [NotNullWhen(true)] out ExpressionCollection? collection)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(name);
+        collection = _referenceCollections is not null && reference.Kind == ExpressionTypeKind.Reference
+            ? _referenceCollections(reference.Source ?? "", name)
+            : null;
+        return collection is not null;
     }
 }
