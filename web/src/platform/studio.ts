@@ -342,6 +342,7 @@ export interface StudioNames {
   forms: StudioNameResource[]
   pages: StudioNamePage[]
   policies: StudioNamePolicy[]
+  contracts: { id: string; name: string; module: string }[]
   texts: StudioNameText[]
 }
 
@@ -968,9 +969,9 @@ export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
 }
 
 /** The kind of a module resource that Studio lists and opens read-only. */
-export type ModuleResourceKind = 'entity' | 'process' | 'policy' | 'page'
+export type ModuleResourceKind = 'entity' | 'process' | 'policy' | 'contract' | 'page'
 
-/** An entity, process, policy or page of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
+/** An entity, process, policy, contract or page of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
 export interface ModuleResourceItem {
   id: string
   kind: ModuleResourceKind
@@ -985,7 +986,7 @@ export interface ModuleResourceGroup {
 }
 
 /**
- * The module entities, processes, policies and pages in the names, in that order, with the application's own left out.
+ * The module entities, processes, policies, contracts and pages in the names, in that order, with the application's own left out.
  * An item stays when its name or id contains `search`, ignoring letter case and surrounding spaces. A kind with no
  * item has no group.
  */
@@ -998,6 +999,7 @@ export function moduleResources(names: StudioNames | null, search: string): Modu
     ['entity', names.entities],
     ['process', names.processes],
     ['policy', names.policies],
+    ['contract', names.contracts],
     ['page', names.pages],
   ]
   return sources

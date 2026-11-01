@@ -320,7 +320,7 @@ agrees it. The answer is:
   events: [{ id, name, entity, fields: [{ name, type }] }],
   roles, sequences, forms: [{ id, name }],
   pages: [{ id, name, module, parameters: [{ name, type, required }] }],
-  policies: [{ id, name, module }],
+  policies: [{ id, name, module }], contracts: [{ id, name, module }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
 ```
 
@@ -329,7 +329,7 @@ agrees it. The answer is:
   is `<module id>:<name>`. `module` is the module id, or null for the application's own.
 - **Module names.** Events, sequences and forms of a module are listed under
   `<module id>/<name>` too. Only entities, data sources, rules, processes, pages
-  and policies carry `module`. A module resource's `id` is the id in its module file.
+  and policies carry `module`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
 - **Event `entity`.** It is the entity the event is about, written as a process
   writes its `entity`. A module event that names its own module's entity without
   a slash is listed with the entity qualified, as `<module id>/<name>`. Studio's
@@ -348,7 +348,7 @@ agrees it. The answer is:
   one total row, and null for a plain data source. A group field that names no
   field is still listed as a column, with a null type.
 - **Order.** Each list holds the module resources first, then the
-  application's own in file path order. Module policies come in pin order. A step
+  application's own in file path order. Module policies and module contracts come in pin order. A step
   that is not a task has `outcomes: []`. Text keys are sorted ordinally.
 - **Process `entity`.** The subject entity of the process, or null for a process without a subject.
 - **Process `parameters`.** The parameters of a process without a subject, in file order. It is `[]` for a process with a subject.

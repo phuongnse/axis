@@ -66,9 +66,9 @@ Run and the Test results list, the read-only views of a module entity, a module 
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
   its name, kind, `id` and file, and opens it in the editor below. **Module entities**, **Module processes**,
-  **Module policies** and **Module pages** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
+  **Module policies**, **Module contracts** and **Module pages** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
   the application's names, and the search box filters them too. A module process opens as its graph alone, with no palette, connect handle, step panel or delete,
-  a module policy as a read-only table of its grants, and a module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. Each view shows its read-only notice with the alert role.
+  a module policy as a read-only table of its grants, a module contract as its lifecycle in a state diagram (initial and deletable states marked, each arrow labelled with its transition's name and whether it has a guard) with tables of its states, transitions, core validations, effects and ceiling entries, each row with its [named point](module-contracts.md#named-points), and a module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. Each view shows its read-only notice with the alert role.
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
     bundles the schemas in `src/Axis.Configuration/Schemas`, the files the

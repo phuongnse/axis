@@ -6,6 +6,8 @@
   "locale": "en",
   "texts": {
     "checklists.roles.reviewer": "Reviewer",
-    "checklists.pages.checklists.title": "Checklists"
+    "checklists.pages.checklists.title": "Checklists",
+    "checklists.checklist.signInToCheck": "Sign in to check a checklist.",
+    "checklists.checklist.titleRequired": "A checklist needs a title."
   }
 }

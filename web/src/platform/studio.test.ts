@@ -238,20 +238,22 @@ describe('moduleResources', () => {
       { id: 'own-policy', name: 'Access', module: null },
       { id: 'checklists-policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
     ],
+    contracts: [{ id: 'checklists-contract', name: 'checklists/ChecklistContract', module: 'checklists' }],
     pages: [
       { id: 'own-page', name: 'Home', module: null, parameters: [] },
       { id: 'checklists-page', name: 'checklists/Checklists', module: 'checklists', parameters: [] },
     ],
   } as unknown as StudioNames
 
-  it('returns the entities, processes, policies and pages of modules with their module id', () => {
+  it('returns the entities, processes, policies, contracts and pages of modules with their module id', () => {
     const groups = moduleResources(names, '')
 
-    expect(groups.map((group) => group.kind)).toEqual(['entity', 'process', 'policy', 'page'])
+    expect(groups.map((group) => group.kind)).toEqual(['entity', 'process', 'policy', 'contract', 'page'])
     expect(groups.flatMap((group) => group.items)).toEqual([
       { id: 'checklists-entity', kind: 'entity', name: 'checklists/Checklist', module: 'checklists' },
       { id: 'checklists-process', kind: 'process', name: 'checklists/ChecklistReview', module: 'checklists' },
       { id: 'checklists-policy', kind: 'policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
+      { id: 'checklists-contract', kind: 'contract', name: 'checklists/ChecklistContract', module: 'checklists' },
       { id: 'checklists-page', kind: 'page', name: 'checklists/Checklists', module: 'checklists' },
     ])
   })
@@ -263,6 +265,7 @@ describe('moduleResources', () => {
     expect(ids).not.toContain('own-process')
     expect(ids).not.toContain('own-policy')
     expect(ids).not.toContain('own-page')
+    expect(ids).toContain('checklists-contract')
   })
 
   it('applies the search to the name and the id, ignoring letter case and spaces, and drops empty groups', () => {
@@ -270,6 +273,8 @@ describe('moduleResources', () => {
       ['checklists-process'],
     ])
     expect(moduleResources(names, 'CHECKLISTS-POLICY').map((group) => group.kind)).toEqual(['policy'])
+    expect(moduleResources(names, 'checklistcontract').map((group) => group.kind)).toEqual(['contract'])
+    expect(moduleResources(names, ' CHECKLISTS-CONTRACT ').map((group) => group.kind)).toEqual(['contract'])
     expect(moduleResources(names, 'nothing')).toEqual([])
   })
 
