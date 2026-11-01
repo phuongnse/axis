@@ -15,8 +15,9 @@ issues that build each check, as new rows of the [diagnostic codes](diagnostic-c
 
 A contract is a resource of the kind `contract`, one file for each module entity it covers. Only a
 module holds contracts: a `contract` file in an application folder is a diagnostic. A
-[customization layer](../domain/concepts.md) _(planned for M25)_ never names a `contract` file, so
-the contract stays apart from the parts of the module that an application changes.
+[customization layer](customization-layers.md) _(planned for M25)_ only adds states and transitions
+to a contract, so the contract stays apart from the parts of the module that an application
+changes.
 
 This contract covers the `Request` entity of an approvals module. A request is created as a draft,
 is submitted by its requester and is decided by someone else. An approval writes one entry in the
@@ -122,6 +123,8 @@ The lifecycle is a state machine on one field of the entity.
   - `initial: true` marks a state a record may be created in. At least one state is initial.
   - `deletable: true` marks a state a record may be deleted in. No state is deletable unless it
     says so.
+  - `protected: true` _(planned for M25)_ marks a state that only the contract's own transitions
+    enter, see [extending a lifecycle](customization-layers.md#extending-a-lifecycle).
 - **Transitions.** Each has a `name`, `from`, a non-empty list of states, a `to` state, and an
   optional `guard` and `message`.
   - A pair of a `from` state and the `to` state belongs to one transition at most.
@@ -136,8 +139,9 @@ The lifecycle is a state machine on one field of the entity.
   - An update that keeps the state makes no transition. The core validations still run.
   - A delete is refused unless the stored state is deletable.
 - **Extending the lifecycle.** An application cannot add states or transitions in M24, and a relax
-  entry cannot either, see [relax entries](#relax-entries). Adding them is a change to the module,
-  which [customization layers](../domain/concepts.md) design _(planned for M25)_.
+  entry never can, see [relax entries](#relax-entries). A
+  [customization layer](customization-layers.md#extending-a-lifecycle) adds them _(planned for
+  M25)_, except into a protected state.
 
 ## Core validations
 
