@@ -1,0 +1,13 @@
+{
+  "id": "6466d2e0-85ae-48ce-a6fe-f0bc10b20435",
+  "kind": "application",
+  "name": "ModuleEffectApp",
+  "formatVersion": 1,
+  "modules": [
+    {
+      "id": "ledgers",
+      "version": "^1.0.0",
+      "roles": { "clerk": "clerk" }
+    }
+  ]
+}

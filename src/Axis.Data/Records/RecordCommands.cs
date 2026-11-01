@@ -22,6 +22,10 @@ namespace Axis.Data.Records;
 /// and <see cref="DeleteAsync"/>, so <see cref="SetAsync"/> and <see cref="CreateFromAsync"/> reach it
 /// through them. A refusal is <see cref="RecordWriteOutcome.LifecycleRefused"/> or
 /// <see cref="RecordDeleteOutcome.LifecycleRefused"/> and writes nothing.
+/// An update that makes a transition ends with its effects: after the record is stored, each effect of the
+/// transition creates its record, in declaration order. Only an update runs effects, so effects never chain.
+/// An effect that cannot be written is <see cref="RecordWriteOutcome.EffectRefused"/>, and the caller's
+/// rollback leaves nothing of the write.
 /// </summary>
 public static class RecordCommands
 {
@@ -142,8 +146,14 @@ public static class RecordCommands
     /// as it will be stored. An update that sends the lifecycle's state field and changes the state
     /// reads the stored record, and is <see cref="RecordWriteOutcome.LifecycleRefused"/> unless a
     /// transition from the stored state to the new one has a guard that is <c>true</c>, or has none.
+    /// After the record is stored, each effect of that transition creates its record, in declaration order,
+    /// as <see cref="CreateFromAsync"/> does, with the accountable user as its creator and no grant check.
+    /// The caller must hold a transaction when the entity's contract has effects, and roll it back unless the
+    /// record is <see cref="RecordWriteOutcome.Written"/>. An effect that cannot be written is
+    /// <see cref="RecordWriteOutcome.EffectRefused"/>, which names the effect in its point. A written result lists
+    /// the records the effects created in <see cref="RecordWriteResult.Effects"/>.
     /// </summary>
-    /// <param name="context">Who answers for the write and the task decision that led to it. A contract guard reads it through <c>accountableUser()</c> and <c>decisionTask()</c>.</param>
+    /// <param name="context">Who answers for the write and the task decision that led to it. A contract guard and an effect read it through <c>accountableUser()</c> and <c>decisionTask()</c>.</param>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
@@ -172,7 +182,8 @@ public static class RecordCommands
             return coreFailure;
         }
 
-        if (await RecordLifecycle.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, context, cipher, cancellationToken) is { } lifecycleRefusal)
+        var lifecycle = await RecordLifecycle.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, context, cipher, cancellationToken);
+        if (lifecycle.Refusal is { } lifecycleRefusal)
         {
             return lifecycleRefusal;
         }
@@ -216,6 +227,11 @@ public static class RecordCommands
             if (written.Outcome == RecordWriteOutcome.Written)
             {
                 await MarkReplacedFilesAsync(connection, application, id, values, rows, cancellationToken);
+                if (lifecycle is { Transition: { } transition, Stored: { } before } && written.Record is { } after)
+                {
+                    var (refusal, created) = await RecordEffects.RunAsync(connection, application, entity, releaseId, context, transition, before, after, cipher, cancellationToken);
+                    return refusal ?? written with { Effects = created };
+                }
             }
 
             return written;
@@ -306,7 +322,8 @@ public static class RecordCommands
     /// caller's transaction and with no grant check. Each value must fit its field's column, and a
     /// <c>null</c> for a required field is refused. The fields the values leave out get their
     /// defaults, and a required field with no value, no default, no formula, no sequence and no
-    /// creator is refused. Each creator field is set to <paramref name="creatorId"/>. Then the
+    /// creator is refused. Each creator field is set to <paramref name="creatorId"/>, and stays <c>null</c> when
+    /// it is <see langword="null"/>. Then the
     /// computed fields are computed, the validations run and the record is inserted with its
     /// sequence numbers. A value that does not fit, a missing required field, a computed field that
     /// cannot be computed and a failed validation are <see cref="RecordWriteOutcome.Invalid"/>, keyed
@@ -316,7 +333,7 @@ public static class RecordCommands
     /// <param name="releaseId">The release the caller runs on, which the written record is stamped with.</param>
     /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
-    /// <param name="creatorId">The id the creator fields are set to.</param>
+    /// <param name="creatorId">The id the creator fields are set to, or <see langword="null"/> to leave them <c>null</c>.</param>
     /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a default and a validation.</param>
     public static async Task<RecordWriteResult> CreateFromAsync(
         NpgsqlConnection connection,
@@ -325,7 +342,7 @@ public static class RecordCommands
         Guid releaseId,
         RecordWriteContext context,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
-        string creatorId,
+        string? creatorId,
         DateTimeOffset now,
         RecordCipher? cipher = null,
         CancellationToken cancellationToken = default)
@@ -335,7 +352,6 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
-        ArgumentNullException.ThrowIfNull(creatorId);
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var converted = new List<RecordValue>();

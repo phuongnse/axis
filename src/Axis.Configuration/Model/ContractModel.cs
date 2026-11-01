@@ -5,7 +5,7 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled module contract on an entity of a pinned module. The lifecycle, the core validations, the
 /// effects and the grant ceiling are compiled so far. Every record write runs the core validations and checks
-/// the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>. Nothing runs the effects yet.
+/// the lifecycle, and every record update runs the effects of the transition it makes, see <c>RecordCommands</c> in <c>Axis.Data</c>.
 /// The filters of the grant ceiling narrow a role's grants when a request runs, see <c>PolicyEvaluator.Access</c>.
 /// </summary>
 public sealed record ContractModel
