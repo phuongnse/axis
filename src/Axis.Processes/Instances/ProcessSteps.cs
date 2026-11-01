@@ -22,7 +22,7 @@ internal static class ProcessSteps
         await using var command = new NpgsqlCommand(
             $"""
             SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, {SqlTranslator.NowSql}, parameters::text,
-                   parent_instance_id, parent_step
+                   parent_instance_id, parent_step, accountable_user, decision_task
             FROM axis.process_instances WHERE id = @id
             """,
             Connection(transaction),
@@ -47,7 +47,9 @@ internal static class ProcessSteps
             reader.GetFieldValue<DateTimeOffset>(8),
             reader.IsDBNull(9) ? null : JsonNode.Parse(reader.GetString(9))!.AsObject(),
             reader.IsDBNull(10) ? null : reader.GetGuid(10),
-            reader.IsDBNull(11) ? null : reader.GetString(11));
+            reader.IsDBNull(11) ? null : reader.GetString(11),
+            reader.IsDBNull(12) ? null : reader.GetString(12),
+            reader.IsDBNull(13) ? null : reader.GetGuid(13));
     }
 
     /// <summary>
@@ -127,23 +129,31 @@ internal static class ProcessSteps
     /// Moves an instance that is <c>waiting</c> on the task step <paramref name="taskStep"/> back to
     /// <c>running</c> on <paramref name="next"/>, with the next revision, and returns the revision
     /// it waited at. Returns <see langword="null"/> when the instance is not waiting on that step.
+    /// A task completion passes <paramref name="decided"/>, the completing user and the task, which replace the
+    /// instance's accountable user and deciding task. With <see langword="null"/>, as for a deadline, both stay as they are.
     /// </summary>
     public static async Task<long?> TryResumeAsync(
         NpgsqlTransaction transaction,
         Guid id,
         string taskStep,
         string next,
+        (string UserId, Guid TaskId)? decided,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             UPDATE axis.process_instances
-            SET state = @running, step = @next, revision = revision + 1
+            SET state = @running, step = @next, revision = revision + 1,
+                accountable_user = CASE WHEN @decided THEN @user ELSE accountable_user END,
+                decision_task = CASE WHEN @decided THEN @task ELSE decision_task END
             WHERE id = @id AND state = @waiting AND step = @step
             RETURNING revision - 1
             """,
             Connection(transaction),
             transaction);
+        command.Parameters.AddWithValue("decided", decided is not null);
+        command.Parameters.Add(new NpgsqlParameter("user", NpgsqlDbType.Text) { Value = (object?)decided?.UserId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("task", NpgsqlDbType.Uuid) { Value = decided is { } d ? d.TaskId : DBNull.Value });
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("step", taskStep);
         command.Parameters.AddWithValue("next", next);
@@ -243,7 +253,8 @@ internal static class ProcessSteps
 /// ids are <see langword="null"/> for an instance of a process without a subject, and
 /// <see cref="Parameters"/> holds its parameter values. It is <see langword="null"/> for an instance with a subject.
 /// The parent fields name the instance and the sub-process step that started it, and are <see langword="null"/>
-/// for an instance that has no parent.
+/// for an instance that has no parent. <see cref="AccountableUser"/> and <see cref="DecisionTask"/> are the
+/// instance's accountable user and deciding task, <see langword="null"/> when it has none.
 /// </summary>
 internal sealed record LoadedInstance(
     Guid Id,
@@ -258,7 +269,9 @@ internal sealed record LoadedInstance(
     DateTimeOffset Now,
     JsonObject? Parameters,
     Guid? ParentInstanceId,
-    string? ParentStep);
+    string? ParentStep,
+    string? AccountableUser,
+    Guid? DecisionTask);
 
 /// <summary>One occurrence of a step, as its history row records it.</summary>
 /// <param name="Revision">The instance revision the step ran at.</param>

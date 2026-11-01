@@ -311,6 +311,7 @@ public static class RecordCommand
             DataChangeKinds.Create,
             written,
             changedFields: null,
+            actor.Id,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
         return WriteResult(result);
@@ -764,6 +765,7 @@ public static class RecordCommand
             before is null
                 ? null
                 : DataChangeTriggerStarts.ChangedFields(model, before, written, input.Rows.Select(rows => rows.Collection.Name).Concat(input.Links.Select(links => links.Field.Name))),
+            actor.Id,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
         return WriteResult(result);
@@ -870,6 +872,7 @@ public static class RecordCommand
                     releaseId,
                     recordId,
                     prepared,
+                    actor.Id,
                     loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                     cancellationToken),
                 cancellationToken);
