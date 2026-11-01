@@ -4,5 +4,5 @@
   "name": "NoteReading",
   "formatVersion": 1,
   "roles": ["reader"],
-  "grants": [{ "entity": "Note", "actions": ["read"] }]
+  "grants": [{ "name": "noteRead", "entity": "Note", "actions": ["read"] }]
 }

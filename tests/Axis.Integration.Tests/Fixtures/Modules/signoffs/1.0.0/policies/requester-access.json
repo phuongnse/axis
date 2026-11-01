@@ -4,5 +4,5 @@
   "name": "RequesterAccess",
   "formatVersion": 1,
   "roles": ["requester"],
-  "grants": [{ "entity": "Request", "actions": ["read", "create", "update"] }]
+  "grants": [{ "name": "requestRead", "entity": "Request", "actions": ["read", "create", "update"] }]
 }

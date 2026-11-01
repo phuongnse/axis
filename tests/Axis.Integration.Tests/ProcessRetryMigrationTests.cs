@@ -65,8 +65,8 @@ public sealed class ProcessRetryMigrationTests(TaskApiFixture fixture) : IClassF
     private static string? AllowRetry(string path, string content) =>
         path == _financePath
             ? content.Replace(
-                "{ \"process\": \"Decide\", \"actions\": [\"start\"] },",
-                "{ \"process\": \"Decide\", \"actions\": [\"start\"] },\n    { \"process\": \"Divide\", \"actions\": [\"retry\"] },",
+                "{ \"name\": \"decideStart\", \"process\": \"Decide\", \"actions\": [\"start\"] },",
+                "{ \"name\": \"decideStart\", \"process\": \"Decide\", \"actions\": [\"start\"] },\n    { \"process\": \"Divide\", \"actions\": [\"retry\"] },",
                 StringComparison.Ordinal)
             : content;
 

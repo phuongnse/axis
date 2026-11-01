@@ -118,8 +118,8 @@ public sealed class TaskReleaseTests(TaskApiFixture fixture) : IClassFixture<Tas
         await fixture.ActivateEditedAsync(TenantA, (path, content) =>
             path == Path.Combine("policies", "finance-access.json")
                 ? content.Replace(
-                    """{ "entity": "Request", "actions": ["read", "create", "delete"] }""",
-                    """{ "entity": "Request", "actions": ["read", "create", "delete"], "fields": ["title", "amount", "divisor", "status", "submittedAt", "department"] }""",
+                    """{ "name": "requestRead", "entity": "Request", "actions": ["read", "create", "delete"] }""",
+                    """{ "name": "requestRead", "entity": "Request", "actions": ["read", "create", "delete"], "fields": ["title", "amount", "divisor", "status", "submittedAt", "department"] }""",
                     StringComparison.Ordinal)
                 : content);
         using var maria = fixture.CreateClient().SignedInAs("maria");

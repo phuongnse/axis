@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["approver"],
   "grants": [
-    { "entity": "Review", "actions": ["read"] },
-    { "process": "Close", "actions": ["start"] }
+    { "name": "reviewRead", "entity": "Review", "actions": ["read"] },
+    { "name": "closeStart", "process": "Close", "actions": ["start"] }
   ]
 }

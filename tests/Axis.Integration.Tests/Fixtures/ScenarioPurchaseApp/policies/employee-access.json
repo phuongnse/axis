@@ -8,6 +8,7 @@
   ],
   "grants": [
     {
+      "name": "purchaseRequestRead",
       "entity": "PurchaseRequest",
       "actions": [
         "read",
@@ -16,6 +17,7 @@
       ]
     },
     {
+      "name": "purchaseRequestApprovalStart",
       "process": "PurchaseRequestApproval",
       "actions": [
         "start"

@@ -4,5 +4,5 @@
   "name": "EmployeeAccess",
   "formatVersion": 1,
   "roles": ["employee"],
-  "grants": [{ "process": "AdvanceTwice", "actions": ["start", "inspect", "retry"] }]
+  "grants": [{ "name": "advanceTwiceStart", "process": "AdvanceTwice", "actions": ["start", "inspect", "retry"] }]
 }

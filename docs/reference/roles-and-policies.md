@@ -83,17 +83,18 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "requester == currentUser()" },
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "requester == currentUser()" },
     {
+      "name": "purchaseRequestCreate",
       "entity": "PurchaseRequest",
       "actions": ["create", "update"],
       "filter": "requester == currentUser() and status in ('draft', 'returned')",
       "fields": ["title", "department", "supplier", "currency", "lineItems", "status"]
     },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["start"] }
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "name": "purchaseRequestApprovalStart", "process": "PurchaseRequestApproval", "actions": ["start"] }
   ]
 }
 ```
@@ -106,11 +107,11 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["department-manager"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "dataSource": "RequestsByDepartment", "actions": ["read"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] }
   ]
 }
 ```
@@ -123,12 +124,12 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["finance-reviewer"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "dataSource": "RequestsByDepartment", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["inspect", "cancel", "retry", "resolve"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] },
+    { "name": "purchaseRequestApprovalInspect", "process": "PurchaseRequestApproval", "actions": ["inspect", "cancel", "retry", "resolve"] }
   ]
 }
 ```
@@ -141,10 +142,10 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["operator"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"] },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["inspect"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestApprovalInspect", "process": "PurchaseRequestApproval", "actions": ["inspect"] }
   ]
 }
 ```
@@ -232,7 +233,7 @@ caller. The purchase request sample gives the purchasing system this policy, in
   "name": "PurchasingSystemAccess",
   "formatVersion": 1,
   "roles": ["purchasing-system"],
-  "grants": [{ "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
+  "grants": [{ "name": "submitPurchaseRequestInvoke", "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
 }
 ```
 
