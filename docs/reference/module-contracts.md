@@ -9,7 +9,8 @@ idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked
 shapes below. The `contract` resource and the compile checks of its `lifecycle`, its `validations`, its
 `effects` and its `ceiling` are built. So is the lifecycle check on every record write, with the record API's
 `409` and its log line. So are the core validations on every create and update, with the record
-API's `400`. So is the compile check of a module scenario's `contract.covers`. A guard, a core
+API's `400`. So is the compile check of a module scenario's `contract.covers`. So is the compile check
+of an application's `relax` entries, and the compiled module pin keeps the valid ones. A guard, a core
 validation and an effect value read `accountableUser()` and `decisionTask()`, the values of the write
 they check. The shared record update runs the effects of the transition it makes, in its own transaction.
 The record API, a task completion, a process step, a connector or package output and a call
@@ -406,7 +407,8 @@ module's entry in `application.json`:
 - **Effect of each point:** a relaxed transition runs without its guard, a relaxed `initial` or
   `deletable` rule allows the create or the delete in that state, a relaxed core validation and a
   relaxed effect do not run, and a relaxed ceiling no longer limits the roles it covers.
-- **Checks.** An unknown point, a point named twice, and a missing or blank reason are diagnostics.
+- **Checks.** An unknown point (`AXC0356`), a point named twice (`AXC0357`), and a missing or blank
+  reason (`AXC0358`) are diagnostics, each at `/modules/{i}/relax/{j}` of `application.json`.
   A point that a newer pinned version no longer has is the same diagnostic, so a relax entry never
   silently stops meaning anything.
 - **Platform invariants never relax.** Default-deny authorization, audit records, one decision per
