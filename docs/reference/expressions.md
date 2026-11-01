@@ -511,7 +511,7 @@ them over child collections and `references` fields.
 | `max(list, item)` | type of `item` | `null` |
 | `any(list, condition)` | boolean | false |
 | `all(list, condition)` | boolean | true |
-| `first(list, condition, item)` | type of `item` | `null` |
+| `first(list, condition, item)` | type of `item` | `null` _(planned for M26)_ |
 
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
 - **Item types.** `sum` takes integer or decimal items. `min` and `max` take
