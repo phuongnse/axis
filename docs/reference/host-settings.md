@@ -536,6 +536,7 @@ replica. See [rate limits](headers-and-rate-limits.md#rate-limits) and
 | `RateLimits:Session`    | 1200    | Every other route that takes a session, by tenant and user           |
 | `RateLimits:Bearer`     | 1200    | Requests with a bearer token, by tenant and caller id                |
 | `RateLimits:Publishing` | 60      | Studio validate, publish, preview, rollback and test, by tenant and user |
+| `RateLimits:Mcp`        | 600     | _(planned for M35)_ MCP tool calls, by tenant and client             |
 
 - **Environment variables.** `RateLimits__SignIn`, `RateLimits__Session`,
   `RateLimits__Bearer` and `RateLimits__Publishing`.
@@ -546,6 +547,15 @@ replica. See [rate limits](headers-and-rate-limits.md#rate-limits) and
 - **Defaults.** They are proposals. The weekly load test of
   [D82](../decisions/d82-performance-slos-and-load-tests.md) never reaches
   them, and it can tune them.
+
+## AI settings
+
+_(planned for M35)_ The agent host reads the `Ai` settings: the model bindings, the default and
+review bindings, tenant keys and the budgets of a request. Their table is in
+[model bindings](model-bindings.md#bindings), as
+[D125](../decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) agrees. The
+server reads `Studio:RevisionsPath`, the folder of the application repositories, which defaults to
+`.revisions` under `Studio:ApplicationsPath`, see [revisions and drafts](revisions-and-drafts.md).
 
 ## Telemetry export
 

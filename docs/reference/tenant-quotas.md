@@ -21,12 +21,13 @@ what one tenant uses in total or at once. A rate limit limits how fast one calle
 | `concurrentConnectorCalls` | Connector and package calls in flight at once | 10 | Lease |
 | `concurrentQueries` | Data source queries and record list reads that run at once | 10 | Lease |
 | `workerWeight` | The tenant's share of the worker, see [worker scheduling](worker-scheduling.md) | 1 | Weight |
-| `authoringRequests` | AI authoring requests, see [D119](../decisions/d119-ai-authoring-in-studio.md) _(planned for M35)_ | — | Exact |
+| `authoringRequests` | AI authoring requests a month, counted when the author sends one, see [budgets](authoring-requests.md#budgets) _(planned for M35)_ | — | Exact |
 
 - **Where they live.** `platform.tenant_quotas` holds one row for each quota a tenant overrides:
   `tenant_id`, `quota`, `value` and `updated_at`. A quota with no row takes the cell's default,
   `Quotas:Defaults:<quota>`, see [cell settings](host-settings.md#cell-settings). A `value` of
-  `null` means no limit. M34's plans write rows here, with no schema change.
+  `null` means no limit. _(planned for M34)_ The [control plane](control-plane.md) writes a SaaS
+tenant's rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
 - **Who sets them.** The operator sets a tenant's quotas through the
   [provisioning API](tenant-lifecycle.md#provisioning-api). Each change writes a platform audit
   record. The hosts read the quotas with the directory, at each `Tenancy:RefreshInterval`.
@@ -109,8 +110,12 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 - **Daily rows.** `platform.tenant_usage` holds one row per tenant and day (UTC): the largest
   storage sample of the day, split into database and file bytes, the users and applications at the
   end of the day, the emails sent, the connector and package calls, and the work items run. Rows are
-  kept for 13 months, then deleted.
+  kept for 13 months, then deleted. _(planned for M35)_ They also hold the authoring requests sent
+  and the tokens of each model, with a tenant's own key counted apart, see
+  [authoring requests](authoring-requests.md#audit).
 - **Readers.** The [cell console](cell-console.md#views) shows the usage. M34's plans and prices
-  read it, as D118 agrees. A tenant administrator sees the tenant's own usage in M33.
+  read it, as D118 agrees. _(planned for M33)_ A tenant administrator sees the tenant's own quotas
+  and its usage of the last 30 days on the users page's "Usage" section, and the
+  [billing portal](billing-portal.md#pages) shows them to its owner.
 - **No business data.** Usage holds counts and sizes only, never a record value, a file name or a
   user name.

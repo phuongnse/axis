@@ -53,8 +53,8 @@ A host runs as a cell when `Cell:Id` is set, see [cell settings](host-settings.m
   - A host that a deleted tenant used is held back for 90 days, see
     [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
 - **Routing.** Inside the cell, request resolution is the same as today, see
-  [request resolution](../architecture.md#request-resolution). The directory of regions and cells
-  that sends a sign-up or a host to its cell is M33's, see D118.
+  [request resolution](../architecture.md#request-resolution). The [region directory](region-directory.md)
+  _(planned for M33)_ sends a sign-up and a host to its cell.
 
 ## Connections
 
