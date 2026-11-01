@@ -61,9 +61,13 @@ are under "Several changes are a design review" in Design changes.
 2. Agree a short topic with the owner, such as `field-look`. Create the
    prototype branch from `main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says:
-   `git switch -c design/<yyyy-mm-dd>-<topic> main`. Work
-   only on that branch, never only in a temporary folder. Never open a pull
-   request from it, and never give it a NexKit branch name.
+   `git switch -c design/<yyyy-mm-dd>-<topic> main`, then
+   `git push -u origin design/<yyyy-mm-dd>-<topic>`. Work only on that branch,
+   never only in a temporary folder. Never open a pull request from it, and
+   never give it a NexKit branch name. CI leaves `design/` branches out, so a
+   push starts no run.
+3. Keep the owner's rules, in their words, in `design-review.md` at the root
+   of the branch, so the review can go on from another machine.
 
 ### Each change
 
@@ -88,11 +92,10 @@ seen this one.
    artifact type's limit, that names the review and its branch, such as
    `Design review 2026-11-02-field-look: required mark and help text`.
 7. Commit the change on the branch with a message that says what it shows,
-   so the branch history lists the review's changes in order. The branch
-   stays local: only its tag is pushed, at the end.
+   so the branch history lists the review's changes in order. Push the branch.
 8. Show the owner the card and ask for a verdict. Keep, change or drop the
-   change as they say. Write down each rule they agree, in their words, for
-   the docs change at the end.
+   change as they say. Write down each rule they agree, in their words, in
+   `design-review.md` for the docs change at the end, then commit and push it.
 
 ### Checking a card
 
@@ -119,17 +122,17 @@ A check passes only when the card behaves as it will in the artifact.
    [keeping the docs current](../../../docs/delivery.md#keeping-the-docs-current),
    and mark what is not built yet. Open it as a hand-made pull request for
    the owner to merge.
-2. Before the issue, tag the prototype's last commit and push only the tag,
-   so NexKit's agents can read it and no link to it ever breaks:
+2. Before the issue, tag the prototype's last commit and push the tag, so
+   NexKit's agents can read it and no link to it ever breaks:
    `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"` and
    `git push origin design-review/<yyyy-mm-dd>-<topic>`. CI and CodeQL start only on
-   branch pushes, so the tag starts no run; check with `gh run list`. Never
-   push the branch: the prototype does not update the tests, so CI would only
-   fail on it. The issue links the tag's comparison with the commit the branch
+   branch pushes, so the tag starts no run; check with `gh run list`. The
+   issue links the tag's comparison with the commit the branch
    started from, `compare/<base>...design-review/<yyyy-mm-dd>-<topic>`, where
    `<base>` is `git merge-base design/<yyyy-mm-dd>-<topic> main`, so the diff stays the
-   same as `main` moves on. The tag is never deleted. Delete the local branch
-   once it is tagged.
+   same as `main` moves on. The tag is never deleted. Once it is pushed,
+   delete the branch, locally and with `git push origin --delete
+   design/<yyyy-mm-dd>-<topic>`.
 3. Write one NexKit issue that builds the whole review, as
    [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) says. It
    links the docs sections, the artifact and the prototype tag, and names
