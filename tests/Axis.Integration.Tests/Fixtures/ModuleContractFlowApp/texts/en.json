@@ -1,0 +1,14 @@
+{
+  "id": "e73e7165-53a0-4270-8206-0e34575d5771",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.employee": "Employee",
+    "role.importer": "Importer",
+    "request.decide": "Decide the request",
+    "request.done": "Done",
+    "request.main": "Request"
+  }
+}

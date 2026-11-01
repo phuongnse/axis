@@ -1,0 +1,22 @@
+{
+  "id": "4a40a99b-c7cc-47a0-82c0-c2d092424cd7",
+  "kind": "form",
+  "name": "RequestForm",
+  "formatVersion": 1,
+  "entity": "requests/Request",
+  "sections": [
+    {
+      "title": {
+        "textKey": "request.main"
+      },
+      "fields": [
+        {
+          "field": "status"
+        },
+        {
+          "field": "amount"
+        }
+      ]
+    }
+  ]
+}

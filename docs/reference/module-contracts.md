@@ -8,7 +8,8 @@ named point of it with a `relax` entry and a reason, and its release is then mar
 idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked.md) agrees the
 shapes below. The `contract` resource and the compile checks of its `lifecycle` and its `ceiling`
 are built. So is the lifecycle check on every record write, with the record API's `409` and its log
-line. A refusal on another write path fails as that path already fails, and logs nothing yet. The
+line. So is the compile check of a module scenario's `contract.covers`. A refusal on another write
+path fails as that path already fails, and logs nothing yet. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
 
@@ -267,7 +268,7 @@ does. It is how a guard knows who decided.
   the same user.
 - **Allowed where.** In a contract's guards, core validations and effect values, and in the `set` of
   an `updateRecord` or `createRecord` step, which writes it as the value the write will be judged
-  by, such as who decided a step. Anywhere else it is a diagnostic (`AXC0339`), as `currentUser()`
+  by, such as who decided a step. Anywhere else it is a diagnostic (`AXC0341`), as `currentUser()`
   outside a policy filter is. A contract's expression is the diagnostic until contracts allow it.
 
 ## The deciding task
@@ -283,7 +284,7 @@ promise that each step is decided once.
   value a step stores with the one it held before: `stepDecision == decisionTask() and stepDecision
   != previous(stepDecision)`. A layer that adds a second write after one decision then cannot move
   the counter twice.
-- **Allowed where.** Where `accountableUser()` is allowed, and `AXC0339` elsewhere.
+- **Allowed where.** Where `accountableUser()` is allowed, and `AXC0341` elsewhere.
 - **Why not `currentUser()`.** `currentUser()` is the session's user and binds a SQL parameter.
   A process step has no session, and its write must still be judged by who decided it. So a step
   that sets `approved` before any task was decided runs with the starter as its accountable user,
@@ -320,7 +321,9 @@ promise that each step is decided once.
 - **Task completion.** The completion is refused with the same answers, and the task stays open.
 - **Process step.** The step fails, as a refused `createRecord` does, and the instance ends
   `failed`. The [process inspector](process-inspection.md#step-errors-in-inspection) and the
-  [operator console](operator-console.md#views) show the error with the named point. The operator fixes
+  [operator console](operator-console.md#views) show the error with the named point, such as
+  `The record update was rejected: /values/status: requests.request.amountRequired (named point
+  Request/transitions/submit)`. The operator fixes
   the cause and retries, or resolves.
 - **Import.** The row fails with the message, as a validation failure does, see
   [import](import-export.md#import).
@@ -399,9 +402,14 @@ some of them as contract scenarios.
   the application as compiled. It runs with the application's own scenarios, in Studio and with
   `Axis.Scenarios`, see [test scenarios](test-scenarios.md). A module's scenario files stay out of
   the release, as an application's do.
-- **Contract scenarios.** A module scenario with `"contract": { "covers": [<points>] }` is a
-  contract scenario. `covers` lists at least one named point of the module that the scenario tests.
-  An unknown point is a diagnostic.
+- **Contract scenarios** _(built for the compile check)_. A module scenario with
+  `"contract": { "covers": [<points>] }` is a contract scenario. `covers` lists at least one
+  [named point](#named-points) of the module that the scenario tests, and an empty list fails the
+  schema. The points come from the module's own contracts and are matched exactly, with the letter
+  case the contract writes. A point the module lacks is `AXC0339` at `/contract/covers/{i}` of the
+  module's scenario file. An application's own scenario with `contract` is `AXC0340` at
+  `/contract`. The compiled module scenarios keep their `covers`. Whether the scenario really
+  tests its points is not checked.
 - **On publish.** Every publish and every validate request of an application runs the contract
   scenarios of every module it pins, before activation, through the
   [publisher](authoring.md#publishing). A failing one fails the request, which names the

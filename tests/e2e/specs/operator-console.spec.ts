@@ -14,7 +14,7 @@ const instancesPath = `${appPath}/processes/PurchaseRequestApproval/instances`
  * manager approval. Then it marks the instance as failed with a history error at that step, through the E2E database,
  * because the engine fails no step of the sample. It returns the instance's id.
  */
-async function failedInstance(page: Page) {
+async function failedInstance(page: Page, error = 'System.InvalidOperationException') {
   await useSession(page, 'requester')
   const { id } = await createRequest(page, 'Zz Console', 500)
   const started = await page.request.post(instancesPath, { data: { subjectId: id }, headers: csrfHeaders })
@@ -34,7 +34,7 @@ async function failedInstance(page: Page) {
   const query =
     `UPDATE axis.process_instances SET state = 'failed', ended_at = now() WHERE id = '${instanceId}'; ` +
     'INSERT INTO axis.process_step_history (id, process_instance_id, step, revision, input, error, started_at, finished_at) ' +
-    `SELECT gen_random_uuid(), id, 'managerApproval', revision, '{}'::jsonb, 'System.InvalidOperationException', now(), now() ` +
+    `SELECT gen_random_uuid(), id, 'managerApproval', revision, '{}'::jsonb, '${error}', now(), now() ` +
     `FROM axis.process_instances WHERE id = '${instanceId}'`
   const result = spawnSync(
     'docker',
@@ -86,6 +86,22 @@ test('the platform operator opens a failed instance from Failed work and sees it
   await expect(failed).toContainText('Current')
   await expect(page.getByRole('row', { name: /managerApproval.*System\.InvalidOperationException/ })).toBeVisible()
   await expect(page.getByTestId('inspector-command-retry')).toBeVisible()
+})
+
+test('the platform operator sees the named point of a refused write in Failed work', async ({ page }) => {
+  // No application in this stack has a module contract, so the error is the text the engine writes
+  // when a contract refuses a step's write. The integration tests prove the engine writes it.
+  const error =
+    'The record update was rejected: /values/status: requests.request.amountRequired (named point Request/transitions/submit)'
+  const instanceId = await failedInstance(page, error)
+
+  await useSession(page, 'platform-operator')
+  await page.goto('/console')
+  await expect(page.getByTestId('console-failed-work')).toContainText('named point Request/transitions/submit')
+  await page.getByTestId(`console-failed-work-open-${instanceId}`).click()
+
+  await expect(page).toHaveURL(new RegExp(`/console/instances/${instanceId}$`))
+  await expect(page.getByRole('row', { name: /managerApproval.*named point Request\/transitions\/submit/ })).toBeVisible()
 })
 
 test('the platform operator retries a failed instance from the console with a reason and it leaves Failed work', async ({

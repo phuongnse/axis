@@ -177,9 +177,17 @@ public static class TaskCompletionCommand
                 connection, release, entity, task.ReleaseId, write, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
-                return result.Outcome == RecordWriteOutcome.StaleVersion
-                    ? new TaskCompletionResult(TaskCompletionOutcome.StaleVersion)
-                    : new TaskCompletionResult(TaskCompletionOutcome.WriteFailed, Write: result);
+                if (result.Outcome == RecordWriteOutcome.StaleVersion)
+                {
+                    return new TaskCompletionResult(TaskCompletionOutcome.StaleVersion);
+                }
+
+                if (result.Outcome == RecordWriteOutcome.LifecycleRefused)
+                {
+                    RecordLifecycleLog.Refused(loggerFactory, entity.Id, result.Point, task.SubjectId);
+                }
+
+                return new TaskCompletionResult(TaskCompletionOutcome.WriteFailed, Write: result);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, release, entity, task.ReleaseId, cancellationToken);

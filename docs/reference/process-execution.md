@@ -252,11 +252,11 @@ that gives no user, rolls all of it back. So the record keeps its values and
 version, and no task, connector call, package call, event occurrence or notification is stored. The
 error of a refused write names each field pointer and message, such as
 `The record update was rejected: /values/amount: request.amountNegative`. A
-following transaction then sets the instance to `failed` with its `ended_at`
-time and the next revision, writes a history row with the error, and writes
-the audit record `process.failed` with
-details `{ "step" }` and the actor `system`. It does nothing when the instance
-has changed since the step loaded it. No step is retried.
+[module contract](module-contracts.md#when-a-write-is-refused)'s refusal ends with its named point:
+`(named point Request/transitions/submit)`. A following transaction then sets the instance to
+`failed` with its `ended_at` time and the next revision, writes a history row with the error, and
+writes the audit record `process.failed` with details `{ "step" }` and the actor `system`. It does
+nothing when the instance has changed since the step loaded it. No step is retried.
 
 The error in the history row is never the exception message, because a
 message can hold a value. It is the exception type, such as

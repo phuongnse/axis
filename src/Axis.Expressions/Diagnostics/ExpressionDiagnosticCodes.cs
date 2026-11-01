@@ -23,5 +23,5 @@ public static class ExpressionDiagnosticCodes
     public const string UndeclaredModuleReference = "AXC0207";
     public const string PreviousOutsideContract = "AXC0336";
     public const string InvalidPreviousArgument = "AXC0337";
-    public const string AccountabilityOutsideStepSet = "AXC0339";
+    public const string AccountabilityOutsideStepSet = "AXC0341";
 }

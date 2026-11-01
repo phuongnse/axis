@@ -429,8 +429,8 @@ argument is `null`.
 | `toDate(date-time)` | date | The calendar date of an instant in the application's time zone. `null` gives `null`. Not allowed in a computed field (`AXC0086`). | Yes |
 | `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
 | `previous(field)` | type of the field | The field's value before the write, `null` on a create. Allowed only in a module contract (`AXC0336`), and its argument must be an own field (`AXC0337`). See [previous values](module-contracts.md#previous-values). | No |
-| `accountableUser()` | text | The user who answers for the write, or `null`. Allowed only in the `set` of an `updateRecord` or `createRecord` step (`AXC0339`). A module contract will allow it later. See [the accountable user](module-contracts.md#the-accountable-user). | No |
-| `decisionTask()` | text | The id of the task whose completion the write follows, as a lowercase GUID with hyphens, or `null`. Allowed where `accountableUser()` is (`AXC0339`). See [the deciding task](module-contracts.md#the-deciding-task). | No |
+| `accountableUser()` | text | The user who answers for the write, or `null`. Allowed only in the `set` of an `updateRecord` or `createRecord` step (`AXC0341`). A module contract will allow it later. See [the accountable user](module-contracts.md#the-accountable-user). | No |
+| `decisionTask()` | text | The id of the task whose completion the write follows, as a lowercase GUID with hyphens, or `null`. Allowed where `accountableUser()` is (`AXC0341`). See [the deciding task](module-contracts.md#the-deciding-task). | No |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, so `toDate` does it.
@@ -853,7 +853,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   entity's own fields, at the call. A child collection, a `references` field,
   an unknown name, any other expression, and a call inside an aggregate's item
   expression are all this.
-- **`AXC0339`.** An expression that is not the `set` of an `updateRecord` or
+- **`AXC0341`.** An expression that is not the `set` of an `updateRecord` or
   `createRecord` step calls `accountableUser()` or `decisionTask()`, at the
   call. This includes a decision condition, a computed field, a policy filter
   and a rule body. A module contract's expression is this too, until contracts

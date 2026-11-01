@@ -10,6 +10,7 @@ using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Expressions.Evaluation;
 using Axis.Expressions.Typing;
+using Axis.Processes.Records;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using Microsoft.Extensions.Logging;
@@ -592,6 +593,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, write, stored!, assignments, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
+                LogRefusal(result, entity!.Id, instance.SubjectId);
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
             }
 
@@ -619,6 +621,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 context.Connection, model, created!, instance.ReleaseId, write, creation, AuditActors.System, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
+                LogRefusal(result, created!.Id, null);
                 throw Failure($"The record create was rejected: {Describe(result)}", instance, input);
             }
 
@@ -1308,11 +1311,27 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             ? json
             : throw Failure($"The {name} of the step '{step.Name}' gave a value of type '{value!.GetType().Name}'.", instance, input);
 
-    /// <summary>Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>, or the outcome when it has none.</summary>
-    internal static string Describe(RecordWriteResult result) =>
-        result.Errors is { Count: > 0 } errors
+    /// <summary>
+    /// Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>,
+    /// or the outcome when it has none. A write that a module contract refused ends with its named point, such as
+    /// <c>(named point Request/transitions/submit)</c>.
+    /// </summary>
+    internal static string Describe(RecordWriteResult result)
+    {
+        var text = result.Errors is { Count: > 0 } errors
             ? string.Join(", ", errors.Select(error => $"{error.Key}: {string.Join(" ", error.Value)}"))
             : result.Outcome.ToString();
+        return result.Point is { } point ? $"{text} (named point {point})" : text;
+    }
+
+    /// <summary>Logs the refusal of a module contract with its named point and record, as a record API refusal is.</summary>
+    private void LogRefusal(RecordWriteResult result, Guid entityId, Guid? recordId)
+    {
+        if (result.Outcome == RecordWriteOutcome.LifecycleRefused)
+        {
+            RecordLifecycleLog.Refused(logger, entityId, result.Point, recordId);
+        }
+    }
 
     private static ProcessStepException ExpressionFailure(string part, ProcessStepModel step, ExpressionRuntimeError error, LoadedInstance instance, JsonObject input) =>
         Failure($"The {part} of the step '{step.Name}' failed: {error.Kind}.", instance, input);

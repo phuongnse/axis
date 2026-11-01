@@ -15,9 +15,22 @@ public sealed record ScenarioResource : Resource
     /// <summary>The users of the scenario, each with its role names, in file order. The schema requires at least one.</summary>
     public required IReadOnlyDictionary<string, IReadOnlyList<string>> Users { get; init; }
 
+    /// <summary>
+    /// The contract points the scenario tests, or null for a scenario that is no contract scenario. Only a
+    /// module's scenario may have it.
+    /// </summary>
+    public ScenarioContractDefinition? Contract { get; init; }
+
     /// <summary>The outputs of the connector and package operations the scenario calls, in file order.</summary>
     public IReadOnlyList<ScenarioStubDefinition> Stubs { get; init; } = [];
 
     /// <summary>The steps, in the order they run. The schema requires at least one.</summary>
     public required IReadOnlyList<ScenarioStepDefinition> Steps { get; init; }
+}
+
+/// <summary>The <c>contract</c> of a module scenario as written: the named points it tests.</summary>
+public sealed record ScenarioContractDefinition
+{
+    /// <summary>The named points, each written <c>&lt;entity&gt;/&lt;part&gt;/&lt;name&gt;</c>. The schema requires at least one.</summary>
+    public required IReadOnlyList<string> Covers { get; init; }
 }

@@ -773,7 +773,8 @@ public static partial class ApplicationCompiler
                 new HashSet<string>(moduleManifests[moduleId].Packages.Select(package => package.Id), StringComparer.Ordinal),
                 new ReferenceIndexBuilder(textKeys, loaded.Rules, false),
                 diagnostics,
-                (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()));
+                (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()),
+                ContractPoints.Of(moduleResources.Contracts.Where(entry => entry.ModuleId == moduleId).Select(entry => entry.Contract)));
         }
 
         if (probe is not null)

@@ -8,6 +8,7 @@ using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
+using Axis.Processes.Records;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
@@ -240,7 +241,14 @@ internal static class InboundEndpoints
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);
-            return new(RecordEndpoints.WriteFailure(result));
+            if (result.Outcome != RecordWriteOutcome.LifecycleRefused)
+            {
+                return new(RecordEndpoints.WriteFailure(result));
+            }
+
+            // A module contract's refusal answers as a validation failure does, keyed by the state field.
+            RecordLifecycleLog.Refused(loggerFactory, entity.Id, result.Point, null);
+            return new(Results.ValidationProblem(result.Errors!));
         }
 
         await AuditRecords.AppendAsync(

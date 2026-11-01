@@ -1,0 +1,31 @@
+{
+  "id": "760293a5-93de-4aee-8782-6936589337ab",
+  "kind": "endpoint",
+  "name": "CreateRequest",
+  "formatVersion": 1,
+  "entity": "requests/Request",
+  "process": "SubmitRequest",
+  "input": [
+    {
+      "name": "title",
+      "type": "text",
+      "required": true,
+      "maxLength": 100
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": [
+        "draft",
+        "submitted",
+        "approved",
+        "archived"
+      ],
+      "required": true
+    }
+  ],
+  "values": {
+    "title": "title",
+    "status": "status"
+  }
+}
