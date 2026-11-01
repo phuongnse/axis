@@ -165,6 +165,11 @@ asks its development users for a code, because each one has an authenticator, an
   or the account does not exist.
 - **Reset authenticator:** removes the account's authenticator, so its next sign-in asks the person to add one again,
   and ends the person's sessions. A user of a brokered provider has no authenticator in the realm, so the reset does not apply to it.
+- **Self-service** _(planned for M31)_: a person changes their own password and adds or removes their own authenticators
+  on Axis's [account page](platform-pages.md#account-page), which replaces Keycloak's account console. A user of a
+  brokered provider has neither in the realm, so the page offers neither.
+- **Terms** _(planned for M31)_: when the tenant sets terms, a person accepts them after the first sign-in and again on
+  each new version, see [accepting the terms](legal.md#accepting-the-terms).
 
 ## Disabled users
 

@@ -36,7 +36,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   colour fills, icons and tints. The `*Text` tokens colour text in that state
   colour: state text, links, the selected tab, the active navigation entry and
   form validation messages, the current page of a pagination, destructive menu
-  entries and the text of outlined and danger buttons, see **Buttons** below. `focusRing` colours the solid 2px keyboard focus of
+  entries and the text of outlined and danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid 2px keyboard focus of
   every control. Every text colour reaches 4.5:1 and every border and focus
   ring reaches 3:1 on surface and canvas, in both modes. The shadow group
   holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast
@@ -93,35 +93,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   end-to-end step clicks during an opening animation, and a spec that proves a
   wait asks for motion again
   ([D97](../decisions/d97-reliable-test-runs.md)).
-- **Buttons**. A button's level follows its role, so the same kind
-  of action always has the same style
-  ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
-  - *Finish*: solid primary. The one action that finishes a task, such as Save
-    or Next, one per screen.
-  - *Main*: outlined in `primaryText`. The main action of a region: a table's
-    first toolbar action that is shown, such as New request, Add row of a child
-    collection, and a `startProcess` action on a form or a detail.
-  - *Secondary*: the default grey outline, such as Cancel and Import.
-  - *Icon*: a text button with only an icon, for small actions such as
-    Refresh. Choose and Clear of a `reference` field are bordered and joined.
-  - *Destructive*: in `dangerText` at any level, such as Remove row and
-    Delete.
-  - Ant Design writes the text of text, outlined and danger buttons in the
-    fill colours `primary` and `danger`, which fail contrast on a dark
-    surface, so Axis writes them in `primaryText` and `dangerText`. One shared
-    Axis button, `AxisButton` in `web/src/platform/`, takes the role, and each
-    widget names a role, never an Ant Design button type. The table's toolbar,
-    its icon buttons and the reference, set and file field buttons use it.
-  - **Icon-only buttons.** Only for actions repeated on every row, or where
-    space is tight. Main toolbar actions keep their text. Every icon-only
-    button shows its name as a tooltip on hover and on keyboard focus, and has
-    the same text as its accessible name, from the text resources.
-    Configuration never names an icon, so the platform gives an icon only to
-    an action whose meaning it knows. At narrow width row actions fold into a
-    menu of text entries, so touch users lose nothing.
-- **Selected and current states**. The selected tab, the active
-  menu entry and the current page of a pagination use `primaryText`.
-  Destructive menu entries use `dangerText`.
+- **Buttons, menus and fields**. A button's level follows its role and its place, menus mark the current
+  entry, and every form places field errors the same way, see
+  [actions and controls](actions-and-controls.md).
 - **Shown values**. A value reads the same in every widget: in an
   input, a read-only field, a table cell, a detail and a KPI
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
@@ -509,6 +483,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | Address | Shows |
   | --- | --- |
   | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it starts sign-in at once and draws no screen first. Only two addresses show a card, and neither starts sign-in until the person clicks its button. `/?signIn=failed` is where the server sends the browser after a refused sign-in. It shows "Sign in" and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/?signedOut` is where the identity provider returns the browser after sign-out. It shows "You have signed out", a message and a "Sign in again" button. A signed-in person who opens either address sees the launcher. |
+  | `/licences` | the [open source licences](legal.md#open-source-licences) page, open without signing in _(planned for M31)_ |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
@@ -925,11 +900,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - With nobody signed in, it is a **Sign in** button, except on the home page `/`, which starts sign-in or shows a card.
     It sends the browser to `/api/auth/sign-in` with the current path and query string as `returnUrl`, so the person
     comes back there, but to `/` from the card addresses `/?signIn=failed` and `/?signedOut`.
-  - With someone signed in, it shows their display name. Its menu holds
-    **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
-    ends the session and then sends the browser to the identity provider's sign-out page.
+  - With someone signed in, it shows their display name, and _(planned for M31)_ their avatar before it and a caret
+    after it. Its menu holds **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
+    ends the session and then sends the browser to the identity provider's sign-out page. _(Planned for M31: the server
+    ends the identity provider's session itself and the browser goes to `/?signedOut`, see
+    [sign-in and the session](security.md#sign-in-and-the-session).)_
   - The **sessions screen** at `/account` and the **users page** at `/users` are platform routes beside `/studio`,
-    before the site route, so `account` and `users` are reserved site paths. See [platform pages](platform-pages.md).
+    before the site route, so `account` and `users` are reserved site paths, and so is `licences` _(planned for M31)_. See
+    [platform pages](platform-pages.md).
   - A `401` from any API call shows the **sign-in prompt**, a dialog titled "Your session has ended"
     with a short message and a **Sign in** button. It shows when a signed-out person
     opens an application page, and over the current page when a session ends

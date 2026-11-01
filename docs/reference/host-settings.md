@@ -310,6 +310,10 @@ As environment variables they are `Tenancy__Source`,
   hosts for one site stop the start. Under `directory`, `tenant host add --site` gives it. The E2E server
   uses this for its site host.
 
+- **Legal links** _(planned for M31)_. Under `configuration`, `Tenants:{id}:Legal:PrivacyUrl`, `Tenants:{id}:Legal:TermsUrl`
+  and `Tenants:{id}:Legal:TermsVersion` give the tenant's [legal links](legal.md#legal-settings), and
+  `Tenants:{id}:Legal:Sites:{path}:PrivacyUrl` and `...:TermsUrl` a site's own. Under `directory` the
+  [legal links commands](tenant-setting-commands.md#legal-links) set them.
 - **Tenant keys.** Under `configuration`, `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}`
   give a tenant's data keys and lookup keys, each 32 bytes in base64, as the environment variables
   `Tenants__<id>__DataKeys__<number>` and `Tenants__<id>__LookupKeys__<number>`. A number is an integer of at least 1.

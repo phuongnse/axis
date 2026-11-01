@@ -258,6 +258,31 @@ Both commands also update the tenant's realm, so its "Forgot password?" link is 
   65535, the user name is blank, the password is empty, the password has no user name, `--tls false` is
   given outside Development, or an option is given twice or is unknown. The `version` stays and no audit record is written.
 
+## Legal links
+
+_(planned for M31)_ `tenant legal set <id>` sets the addresses of the tenant's privacy policy and terms of service,
+which the [legal line](legal.md#legal-line) links and the [terms step](legal.md#accepting-the-terms) asks a person to
+accept. Axis writes no policy text: the organization publishes its own.
+
+| Option                   | Meaning                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `--privacy-url <url>`    | The privacy policy, an absolute `https` address                                         |
+| `--terms-url <url>`      | The terms of service, an absolute `https` address                                       |
+| `--terms-version <text>` | The version of the terms, such as `2026-11-01`. Required with `--terms-url`             |
+| `--site <path>`          | Set the addresses of one site instead of the tenant's. `--terms-version` is not allowed |
+
+`tenant legal clear <id> [--site <path>]` removes the tenant's addresses, or one site's. A successful run of either
+command prints `<id> legal ok`.
+
+- **The whole block.** Each `set` replaces the tenant's, or the site's, whole legal block, so an option left out is
+  cleared.
+- **A new version asks again.** When `--terms-version` differs from the stored one, the next realm sync asks every
+  user of the realm to accept the terms again. Changing only the addresses asks nothing.
+- **Kept in the realm.** Both commands update the tenant's realm, as the mail settings do, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A site that does not exist yet keeps its
+  addresses until it does.
+- **Audited.** Each run writes a [platform audit record](#platform-audit-records).
+
 ## Hosts
 
 - `tenant host add <id> <host>` adds a host. A host already used by any tenant exits with code 2.
