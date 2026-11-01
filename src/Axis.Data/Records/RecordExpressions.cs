@@ -9,7 +9,8 @@ namespace Axis.Data.Records;
 /// Evaluates a compiled expression, such as a process condition, against a stored record. A path
 /// such as <c>department.manager.name</c> reads the records it names through
 /// <see cref="RecordQueries"/>. An aggregate over a <c>references</c> field reads the target
-/// records of the stored set.
+/// records of the stored set. An aggregate over a path that ends at a collection, such as
+/// <c>count(type.steps)</c>, reads the rows of the record the path reaches.
 /// </summary>
 public static class RecordExpressions
 {
@@ -18,7 +19,8 @@ public static class RecordExpressions
     /// <paramref name="record"/> as <see cref="RecordQueries.GetAsync"/> returns it. It first reads
     /// every record a path names, shortest path first, then evaluates without I/O. The reads run on
     /// <paramref name="connection"/>, so inside the caller's open transaction, with one command per
-    /// record and each record read at most once. A <c>null</c> reference is not followed, and a
+    /// record and each record read at most once. A record that a path to a collection reaches is read
+    /// again with its collections and <c>references</c> sets, once. A <c>null</c> reference is not followed, and a
     /// reference that names no record gives <c>null</c>. A stored decimal that <see cref="decimal"/>
     /// cannot hold exactly, on the record or on a record a path reads, stops the evaluation with a
     /// <see cref="ExpressionRuntimeErrorKind.DecimalOverflow"/> error, as no value is rounded.
@@ -77,11 +79,7 @@ public static class RecordExpressions
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         if (!RecordCollections.TryAdd(application, entity, record, [], subject, errors, sets))
         {
-            // The first error is at /values/<collection>/<index>/<field>.
-            var pointer = errors.Keys.First().Split('/');
-            entity.TryGetField(pointer[2], out var collection);
-            var child = application.FindEntity(collection!.Target!.Id)!;
-            return Inexact(child.Name, pointer[4]);
+            return InexactRow(application, entity, errors);
         }
 
         // The record's own id comes last, so it wins over a field named id, as in the checker's scope.
@@ -151,6 +149,45 @@ public static class RecordExpressions
             }
         }
 
+        // A path to a collection, such as `type.steps`, needs the rows of the record it reaches, which
+        // the read of the path's reference left out. They are read once for each record.
+        var withRows = new HashSet<(Guid Entity, Guid Id)>();
+        foreach (var path in expression.Check.CollectionPaths)
+        {
+            // A null reference earlier in the path gives no rows, so there is nothing to read.
+            if (!reached.TryGetValue(string.Join('.', Chain(path.Target)), out var owner)
+                || !withRows.Add((owner.Entity.Id, owner.Row.Id)))
+            {
+                continue;
+            }
+
+            var full = await RecordQueries.WithRowsAsync(connection, application, owner.Entity, owner.Row, null, cancellationToken);
+            var targetSets = await RecordSets.ReadAsync(connection, application, owner.Entity, full, [], cancellationToken);
+            if (targetSets.Inexact is { } targetInexact)
+            {
+                return Inexact(targetInexact.Entity, targetInexact.Field);
+            }
+
+            var targetValues = new Dictionary<string, (object? Value, bool Exact)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var field in RecordQueries.Columns(owner.Entity))
+            {
+                if (!RecordClrValues.TryFromStored(field, full.Values.GetValueOrDefault(field.Name), out var value))
+                {
+                    return Inexact(owner.Entity.Name, field.Name);
+                }
+
+                targetValues[field.Name] = (value, true);
+            }
+
+            var targetErrors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+            if (!RecordCollections.TryAdd(application, owner.Entity, full, [], targetValues, targetErrors, targetSets))
+            {
+                return InexactRow(application, owner.Entity, targetErrors);
+            }
+
+            loaded[(owner.Entity.Id, full.Id)] = (full, new ExpressionValues(targetValues.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))));
+        }
+
         // The checker gives each step's target as written, so the entity is found ignoring letter case.
         ExpressionValues? Resolve(string name, Guid id) =>
             application.TryGetEntity(name, out var target) && loaded.TryGetValue((target.Id, id), out var found)
@@ -174,6 +211,19 @@ public static class RecordExpressions
         MemberNode member => [.. Chain(member.Target), member.Name],
         _ => throw new InvalidOperationException("A path starts at a field name."),
     };
+
+    /// <summary>
+    /// The error for the first row value that cannot be held exactly. The first error is at
+    /// <c>/values/&lt;collection&gt;/&lt;index&gt;/&lt;field&gt;</c> or, for a stored set, at <c>/values/&lt;field&gt;</c>.
+    /// </summary>
+    private static ExpressionEvaluationResult InexactRow(
+        ApplicationModel application, EntityModel entity, SortedDictionary<string, string[]> errors)
+    {
+        var pointer = errors.Keys.First().Split('/');
+        entity.TryGetField(pointer[2], out var collection);
+        var child = application.FindEntity(collection!.Target!.Id)!;
+        return Inexact(child.Name, pointer.Length > 4 ? pointer[4] : pointer[2]);
+    }
 
     private static ExpressionEvaluationResult Inexact(string entity, string field) =>
         new(null, new ExpressionRuntimeError(

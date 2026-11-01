@@ -669,6 +669,65 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_decision_aggregates_a_collection_of_a_referenced_record_through_a_path()
+    {
+        using var folder = WithCustomerNotes(Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "count(customer.notes) > 1 and sum(customer.notes, size) > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, startCondition: "any(customer.notes, size > 1)")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var check = Assert.IsType<DecisionStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(ExpressionTypeKind.Boolean, Assert.Single(check.Branches).When.Check.Type?.Kind);
+        Assert.Equal(2, Assert.Single(check.Branches).When.Check.CollectionPaths.Count);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_of_four_hops_is_reported_at_the_condition()
+    {
+        using var folder = WithCustomerNotes(Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "count(customer.referredBy.referredBy.referredBy.notes) > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """)));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TooManyHops, "processes/order-review.json", "/steps/0/branches/0/when"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_in_an_entity_validation_is_an_unknown_name()
+    {
+        using var folder = WithCustomerNotes(Folder(Process("Order", ReviewSteps)))
+            .With("entities/order.json", $$"""
+                { "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
+                  "fields": [
+                    { "name": "amount", "type": "decimal" },
+                    { "name": "customer", "type": "reference", "target": "Customer" }
+                  ],
+                  "validations": [ { "name": "needsNotes", "expression": "count(customer.notes) > 1", "message": { "textKey": "order.cannotStart" }, "field": "amount" } ] }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(ExpressionDiagnosticCodes.UnknownName, diagnostic.Code);
+        Assert.Equal("entities/order.json", diagnostic.File);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_condition_compares_the_id_of_the_subject_with_a_reference_to_it()
     {
         using var folder = Folder(Process("Customer", """
@@ -2166,6 +2225,22 @@ public sealed class ProcessCompilerTests
             ]
             """;
     }
+
+    /// <summary><paramref name="folder"/> with <c>notes</c>, a child collection of <c>CustomerNote</c> rows with a <c>size</c>, on <c>Customer</c>.</summary>
+    private static TemporaryFolder WithCustomerNotes(TemporaryFolder folder) =>
+        folder
+            .With("entities/customer.json", """
+                { "id": "11111111-1111-4111-8111-111111111113", "kind": "entity", "name": "Customer", "formatVersion": 1,
+                  "displayField": "name", "fields": [
+                    { "name": "name", "type": "text", "required": true },
+                    { "name": "referredBy", "type": "reference", "target": "Customer" },
+                    { "name": "notes", "type": "child-collection", "target": "CustomerNote" }
+                  ] }
+                """)
+            .With("entities/customer-note.json", """
+                { "id": "11111111-1111-4111-8111-111111111115", "kind": "entity", "name": "CustomerNote", "formatVersion": 1,
+                  "fields": [ { "name": "size", "type": "integer" } ] }
+                """);
 
     /// <summary>The process <c>OrderReview</c> over <paramref name="entity"/>, with an optional start condition.</summary>
     private static string Process(

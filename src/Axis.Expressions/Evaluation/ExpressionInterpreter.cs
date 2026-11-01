@@ -7,8 +7,8 @@ namespace Axis.Expressions.Evaluation;
 /// <summary>
 /// Evaluates a checked expression against one record's field values, following the null rules and
 /// run-time errors in docs/reference/expressions.md. It covers literals, bare field names, every
-/// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections,
-/// calls to named rules and paths through reference fields. It does no I/O: it reads the records a
+/// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections
+/// and over a path that ends at one, calls to named rules and paths through reference fields. It does no I/O: it reads the records a
 /// path names through an <see cref="ExpressionRecordResolver"/> the caller gives. Arithmetic is exact, and an evaluation stops after
 /// <see cref="ExpressionLimits.MaxSteps"/> steps, counting the steps of the rules it calls and of
 /// an aggregate's item expression on every row. Each node evaluated is one step, and a
@@ -311,7 +311,8 @@ public static class ExpressionInterpreter
 
         /// <summary>
         /// Evaluates the item expression on every row of the collection, in order, on the same
-        /// budget. The collection argument is read, not evaluated, so it costs no step. Every row
+        /// budget. The collection argument is read, not evaluated, so it costs no step, except that the
+        /// reference part of a path to a collection is evaluated, as the path of a scalar field is. Every row
         /// is evaluated, even after <c>any</c> or <c>all</c> knows its result. <c>sum</c>,
         /// <c>avg</c>, <c>min</c> and <c>max</c> skip <c>null</c> items, and a <c>null</c> condition
         /// counts as false.
@@ -367,9 +368,42 @@ public static class ExpressionInterpreter
             }
         }
 
-        /// <summary>The rows of the collection an aggregate names.</summary>
+        /// <summary>
+        /// The rows of the collection an aggregate names: a field of the record, or the collection
+        /// of the record a path ends at. A <c>null</c> reference, or one that names no record, gives no rows.
+        /// </summary>
         private IReadOnlyList<ExpressionValues> Collection(ExpressionNode node)
         {
+            if (node is MemberNode path)
+            {
+                switch (Eval(path.Target))
+                {
+                    case null:
+                        return [];
+                    case Guid id:
+                        if (!checkResult.PathTargets.TryGetValue(path, out var entity))
+                        {
+                            throw new InvalidOperationException($"The type checker recorded no target entity for '.{path.Name}'.");
+                        }
+
+                        if (records is null)
+                        {
+                            throw new InvalidOperationException("A path was evaluated without a record resolver.");
+                        }
+
+                        if (records(entity, id) is not { } record)
+                        {
+                            return [];
+                        }
+
+                        return record.TryGetValue(path.Name, out var rows) && rows is IReadOnlyList<ExpressionValues> list
+                            ? list
+                            : throw new InvalidOperationException($"No rows were given for collection '{path.Name}' of '{entity}'.");
+                    case var other:
+                        throw Unexpected(other);
+                }
+            }
+
             if (node is not NameNode name || !values.TryGetValue(name.Name, out var value))
             {
                 throw new InvalidOperationException("No rows were given for the aggregate's collection.");

@@ -9,7 +9,7 @@ namespace Axis.Expressions.Typing;
 /// Finds the type of a parsed expression, following the typing rules in
 /// docs/reference/expressions.md, and checks it against the type the use needs. It covers
 /// literals, bare field names, every operator, every function in
-/// <see cref="ExpressionFunctions"/>, aggregates over the child collections and references fields in the scope and calls
+/// <see cref="ExpressionFunctions"/>, aggregates over the child collections and references fields in the scope, or over a path that ends at one in a scope that resolves collection paths, and calls
 /// to the named rules in the scope. A collection is accepted only as the first argument of an
 /// aggregate, and the aggregate's item expression sees only the child row's or target record's fields. A path through
 /// reference fields resolves only in a scope that resolves paths, and is an unknown name in any
@@ -39,6 +39,7 @@ public static class ExpressionTypeChecker
                 new HashSet<CallNode>(ReferenceEqualityComparer.Instance),
                 new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance),
                 new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance),
+                new HashSet<MemberNode>(ReferenceEqualityComparer.Instance),
                 storedValue,
                 policyFilter,
                 contract,
@@ -57,6 +58,7 @@ public static class ExpressionTypeChecker
                 DecimalCalls = context.DecimalCalls,
                 RuleCalls = context.RuleCalls,
                 PathTargets = context.PathTargets,
+                CollectionPaths = context.CollectionPaths,
             };
         }
         catch (CheckFailure failure)
@@ -115,6 +117,22 @@ public static class ExpressionTypeChecker
     /// </summary>
     private static ExpressionType InferMember(MemberNode member, Context context)
     {
+        var target = PathTarget(member, context);
+        if (!context.Scope.TryGetReferenceField(target, member.Name, out var type))
+        {
+            throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of '{target.Source}'", member.Offset);
+        }
+
+        context.PathTargets[member] = target.Source ?? "";
+        return type;
+    }
+
+    /// <summary>
+    /// The type of the part of a path before its last name, which must be a reference to a record
+    /// and not a parameter. The path takes at most <see cref="ExpressionLimits.MaxHops"/> hops.
+    /// </summary>
+    private static ExpressionType PathTarget(MemberNode member, Context context)
+    {
         if (!context.Scope.ResolvesPaths)
         {
             throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' after '.'", member.Offset);
@@ -154,13 +172,7 @@ public static class ExpressionTypeChecker
                 member.Offset);
         }
 
-        if (!context.Scope.TryGetReferenceField(target, member.Name, out var type))
-        {
-            throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of '{target.Source}'", member.Offset);
-        }
-
-        context.PathTargets[member] = target.Source ?? "";
-        return type;
+        return target;
     }
 
     private static ExpressionType InferCall(CallNode call, Context context)
@@ -338,13 +350,26 @@ public static class ExpressionTypeChecker
 
     /// <summary>
     /// An aggregate: its first argument names a child collection or a references field in the scope,
+    /// or, in a scope that resolves collection paths, is a path that ends at one, such as <c>type.steps</c>,
     /// and its item expression, when there is one, is checked over the child row's fields alone. A decimal
     /// result is recorded, so that the interpreter returns an integer sum or the 0 of an empty list
     /// as a decimal.
     /// </summary>
     private static ExpressionType InferAggregate(CallNode call, string name, Context context)
     {
-        if (call.Arguments[0] is not NameNode list || !context.Scope.TryGetCollection(list.Name, out var collection))
+        ExpressionCollection? collection;
+        if (call.Arguments[0] is MemberNode path && context.Scope.ResolvesCollectionPaths)
+        {
+            var target = PathTarget(path, context);
+            if (!context.Scope.TryGetReferenceCollection(target, path.Name, out collection))
+            {
+                throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown collection '{path.Name}' of '{target.Source}'", path.Offset);
+            }
+
+            context.PathTargets[path] = target.Source ?? "";
+            context.CollectionPaths.Add(path);
+        }
+        else if (call.Arguments[0] is not NameNode list || !context.Scope.TryGetCollection(list.Name, out collection))
         {
             var found = Infer(call.Arguments[0], context);
             throw Fail(
@@ -701,8 +726,8 @@ public static class ExpressionTypeChecker
     };
 
     /// <summary>
-    /// What one check carries down the tree: the scope, the decimal calls, rule calls and path
-    /// steps found so far, whether the expression computes a stored value, whether it is a
+    /// What one check carries down the tree: the scope, the decimal calls, rule calls, path
+    /// steps and collection paths found so far, whether the expression computes a stored value, whether it is a
     /// policy filter, whether it is a module contract's expression, whether it is the set of a step that writes a record, and whether it is an aggregate's
     /// item expression.
     /// </summary>
@@ -711,6 +736,7 @@ public static class ExpressionTypeChecker
         HashSet<CallNode> DecimalCalls,
         Dictionary<CallNode, ExpressionRule> RuleCalls,
         Dictionary<MemberNode, string> PathTargets,
+        HashSet<MemberNode> CollectionPaths,
         bool StoredValue,
         bool PolicyFilter,
         bool Contract,

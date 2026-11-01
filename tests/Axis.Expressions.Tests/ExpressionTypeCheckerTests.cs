@@ -522,6 +522,72 @@ public sealed class ExpressionTypeCheckerTests
         Assert.Equal($"{message} at character {offset + 1}.", diagnostic.Message);
     }
 
+    [Theory]
+    [InlineData("count(r.manager.parts)")]
+    [InlineData("count(r.manager.parts, amount > 1)")]
+    [InlineData("sum(r.manager.parts, amount) > 1")]
+    [InlineData("any(r.manager.parts, amount > 1)")]
+    [InlineData("count(r.items)")]
+    [InlineData("count(r.manager.department.items) == 0")]
+    public void A_scope_that_resolves_collection_paths_accepts_a_path_to_a_collection(string text)
+    {
+        var result = Check(text, ExpressionType.Null, CollectionPathScope());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_is_recorded_with_the_entity_that_holds_it()
+    {
+        var parsed = ExpressionParser.Parse("count(r.manager.parts)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, CollectionPathScope(), ExpressionType.Null);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        var path = Assert.Single(result.CollectionPaths);
+        Assert.Equal("employee", result.PathTargets[path]);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_of_four_hops_is_too_long()
+    {
+        var diagnostic = CheckFails("count(r.manager.department.manager.parts)", ExpressionType.Null, CollectionPathScope());
+
+        Assert.Equal(("AXC0058", 34), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal("The path takes 4 hops, at most 3 are allowed at character 35.", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("count(r.manager.missing)", "AXC0046", 15, "Unknown collection 'missing' of 'employee'")]
+    [InlineData("count(r.missing.parts)", "AXC0046", 7, "Unknown field 'missing' of 'department'")]
+    [InlineData("count(r.parts)", "AXC0046", 7, "Unknown collection 'parts' of 'department'")]
+    [InlineData("count(t.parts)", "AXC0047", 7, "Operator '.' needs a reference, found text")]
+    [InlineData("count(pr.parts)", "AXC0047", 8, "Operator '.' cannot follow the parameter 'pr'. A path starts at a field")]
+    public void An_invalid_path_to_a_collection_is_reported_at_the_dot(string text, string code, int offset, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, CollectionPathScope());
+
+        Assert.Equal((code, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal($"{message} at character {offset + 1}.", diagnostic.Message);
+    }
+
+    [Fact]
+    public void A_scope_without_collection_paths_refuses_a_path_to_a_collection()
+    {
+        var diagnostic = CheckFails("count(r.manager.parts)", ExpressionType.Null, PathScope());
+
+        Assert.Equal("AXC0046", diagnostic.Code);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_is_not_a_value()
+    {
+        var diagnostic = CheckFails("r.manager.parts is null", ExpressionType.Boolean, CollectionPathScope());
+
+        Assert.Equal("AXC0046", diagnostic.Code);
+    }
+
     [Fact]
     public void Field_names_match_ignoring_letter_case()
     {
@@ -915,6 +981,27 @@ public sealed class ExpressionTypeCheckerTests
             ("employee", "department") => ExpressionType.Reference("department"),
             _ => null,
         });
+
+    /// <summary>The scope of <see cref="PathScope"/>, where an employee holds the collection <c>parts</c> and a department <c>items</c>.</summary>
+    private static ExpressionScope CollectionPathScope() => new(
+        new Dictionary<string, ExpressionType>
+        {
+            ["t"] = ExpressionType.Text,
+            ["r"] = ExpressionType.Reference("department"),
+            ["pr"] = ExpressionType.ReferenceParameter("department"),
+        },
+        referenceFields: (entity, field) => (entity.ToLowerInvariant(), field.ToLowerInvariant()) switch
+        {
+            ("department", "name") => ExpressionType.Text,
+            ("department", "manager") => ExpressionType.Reference("employee"),
+            ("employee", "name") => ExpressionType.Text,
+            ("employee", "department") => ExpressionType.Reference("department"),
+            _ => null,
+        },
+        referenceCollections: (entity, name) =>
+            (entity.ToLowerInvariant(), name.ToLowerInvariant()) is ("employee", "parts") or ("department", "items")
+                ? new ExpressionCollection(name, "Part", new ExpressionScope(new Dictionary<string, ExpressionType> { ["amount"] = ExpressionType.Decimal }))
+                : null);
 
     /// <summary>The fields of <see cref="_scope"/>, with two rules known by their signatures.</summary>
     private static ExpressionScope ModuleScope(bool undeclaredModuleIsUnknown = false) => new(

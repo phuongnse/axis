@@ -91,6 +91,32 @@ public sealed class NotifyStepCompilerTests
     }
 
     [Fact]
+    public void A_value_that_aggregates_a_sensitive_field_of_the_rows_of_a_referenced_record_is_reported_at_the_value()
+    {
+        using var folder = FolderWithShipment("""{ "number": "number", "resolution": "sum(shipment.lines, secret)" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SensitiveNotifyValue, "processes/ticket-notice.json", "/steps/0/message/values/resolution"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'ShipmentLine.secret'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_value_that_aggregates_a_field_that_is_not_sensitive_of_the_rows_of_a_referenced_record_compiles()
+    {
+        using var folder = FolderWithShipment("""{ "number": "number", "resolution": "sum(shipment.lines, quantity)" }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
     public void A_notify_step_without_open_has_no_open_in_the_model()
     {
         using var folder = Folder();
@@ -390,6 +416,32 @@ public sealed class NotifyStepCompilerTests
                 """{ "name": "ticket", "type": "text", "required": true }"""))
             .With("processes/ticket-notice.json", process);
     }
+
+    /// <summary>
+    /// <see cref="Folder"/> with a <c>shipment</c> reference on <c>Ticket</c>. A <c>Shipment</c> owns
+    /// <c>ShipmentLine</c> rows with a <c>quantity</c> and a sensitive <c>secret</c>.
+    /// </summary>
+    private static TemporaryFolder FolderWithShipment(string values) =>
+        Folder(values: values)
+            .With("entities/ticket.json", $$"""
+                { "id": "{{TicketId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1,
+                  "fields": [
+                    { "name": "number", "type": "text" },
+                    { "name": "requester", "type": "text" },
+                    { "name": "shipment", "type": "reference", "target": "Shipment" }
+                  ] }
+                """)
+            .With("entities/shipment.json", """
+                { "id": "11111111-1111-4111-8111-111111111113", "kind": "entity", "name": "Shipment", "formatVersion": 1,
+                  "displayField": "code", "fields": [ { "name": "code", "type": "text", "required": true }, { "name": "lines", "type": "child-collection", "target": "ShipmentLine" } ] }
+                """)
+            .With("entities/shipment-line.json", """
+                { "id": "11111111-1111-4111-8111-111111111114", "kind": "entity", "name": "ShipmentLine", "formatVersion": 1,
+                  "fields": [
+                    { "name": "quantity", "type": "integer" },
+                    { "name": "secret", "type": "decimal", "sensitive": true }
+                  ] }
+                """);
 
     private static string TextFile(string id, string name, string locale, string subject, string body) =>
         $$"""
