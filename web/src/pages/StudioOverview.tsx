@@ -1,4 +1,4 @@
-import { Flex, Tag, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { formatValue } from '../platform/formatValue'
@@ -10,6 +10,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { ProblemList } from './StudioProblems'
 import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
 import { studioKindGroups, type StudioView } from './studioViews'
@@ -24,14 +25,12 @@ import { studioKindGroups, type StudioView } from './studioViews'
  */
 export function StudioOverview({
   locale,
-  description,
   resources,
   diagnostics,
   releases,
   addressOf,
 }: {
   locale: string
-  description: string | undefined
   resources: readonly StudioResourceItem[]
   diagnostics: readonly StudioDiagnostic[]
   /** The release history, `failed` when it did not load, or undefined while it loads. */
@@ -47,7 +46,6 @@ export function StudioOverview({
 
   return (
     <Flex vertical gap={spacing.md} data-testid="studio-overview">
-      {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
       {starting && (
         <Panel title={t('shell.studio.overview.start.title')} testId="studio-overview-start">
           <Typography.Text style={{ color: colour.textMuted }}>
@@ -184,7 +182,7 @@ function Step({ number, to, name }: { number: number; to?: string; name: string 
   )
 }
 
-/** The folder's diagnostics, errors first, with one line that says whether they stop Publish. */
+/** The folder's diagnostics, as the band's problems panel lists them. */
 function Attention({
   diagnostics,
   addressOf,
@@ -193,35 +191,9 @@ function Attention({
   addressOf: (diagnostic: StudioDiagnostic) => string | null
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error')
-  const ordered = [...errors, ...diagnostics.filter((diagnostic) => diagnostic.severity !== 'error')]
-  let summary = 'shell.studio.overview.attention.none'
-  if (errors.length > 0) {
-    summary = 'shell.studio.overview.attention.errors'
-  } else if (diagnostics.length > 0) {
-    summary = 'shell.studio.overview.attention.warnings'
-  }
   return (
     <Panel title={t('shell.studio.overview.attention.title')} testId="studio-diagnostics">
-      <Typography.Text style={{ color: errors.length > 0 ? colour.dangerText : colour.textMuted }}>
-        {t(summary)}
-      </Typography.Text>
-      {ordered.length > 0 && (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {ordered.map((diagnostic, index) => (
-            <li
-              key={index}
-              style={{
-                paddingBlock: spacing.xs,
-                borderTop: index > 0 ? `1px solid ${colour.divider}` : undefined,
-              }}
-            >
-              <DiagnosticRow diagnostic={diagnostic} to={addressOf(diagnostic)} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <ProblemList diagnostics={diagnostics} addressOf={addressOf} />
     </Panel>
   )
 }
@@ -278,32 +250,5 @@ function Release({
     <Panel title={t('shell.studio.overview.release.title')} testId="studio-overview-release">
       {body}
     </Panel>
-  )
-}
-
-/** One diagnostic: its severity and message, then its code and where it is, a link to that place when it is in a resource. */
-function DiagnosticRow({ diagnostic, to }: { diagnostic: StudioDiagnostic; to: string | null }) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const where = `${diagnostic.file}${diagnostic.path !== '' ? ` · ${t('shell.studio.path')}: ${diagnostic.path}` : ''}`
-  return (
-    <Flex gap={spacing.xs} align="baseline">
-      <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'} style={{ marginInlineEnd: 0 }}>
-        {diagnostic.severity}
-      </Tag>
-      <Flex vertical style={{ minWidth: 0 }}>
-        <Typography.Text>{diagnostic.message}</Typography.Text>
-        <span style={{ color: colour.textMuted }}>
-          {diagnostic.code} ·{' '}
-          {to ? (
-            <Link to={to} style={{ color: colour.primaryText }}>
-              {where}
-            </Link>
-          ) : (
-            where
-          )}
-        </span>
-      </Flex>
-    </Flex>
   )
 }

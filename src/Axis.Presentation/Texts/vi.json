@@ -513,6 +513,7 @@
   "shell.studio.status.unpublished": "Chưa xuất bản",
   "shell.studio.status.live": "Đang chạy · Phiên bản {number}",
   "shell.studio.status.releasesFailed": "Không tải được các phiên bản",
+  "shell.studio.problems.title": "Vấn đề",
   "shell.studio.loadFailed": "Không thể tải Studio.",
   "shell.studio.forbidden.title": "Studio không khả dụng",
   "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio.",

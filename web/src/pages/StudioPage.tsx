@@ -33,6 +33,7 @@ import { StudioModuleProcess } from './StudioModuleProcess'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioOverview } from './StudioOverview'
+import { StudioProblemsPanel } from './StudioProblems'
 import { StudioStatus } from './StudioStatus'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
@@ -155,6 +156,9 @@ function StudioWorkspace() {
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
   const [releases, setReleases] = useState<{ application: string; history: StudioReleases | 'failed' }>()
+  // Proposed: whether the problems panel is open beside the page.
+  const [problemsOpen, setProblemsOpen] = useState(false)
+  const { colour } = useDesignTokens()
   const publishing = useRef<StudioPublishingHandle>(null)
   const [requestBusy, setRequestBusy] = useState(false)
 
@@ -413,14 +417,27 @@ function StudioWorkspace() {
         breadcrumb={steps}
         titleShown={false}
         status={
-          loaded && 'resources' in loaded && !(view.name === 'overview' && !selected && !selectedModuleItem) ? (
+          !(loaded && 'resources' in loaded) ? undefined : view.name === 'overview' &&
+            !selected &&
+            !selectedModuleItem ? (
+            // Proposed: the Overview lists the problems and the live release itself, so its band holds the
+            // application's description, on one line that ends in an ellipsis with the whole text in a tooltip.
+            openApp && studioApplicationDescription(openApp, locale) ? (
+              <Typography.Text
+                ellipsis={{ tooltip: studioApplicationDescription(openApp, locale) }}
+                style={{ color: colour.textMuted, flex: '0 1 auto', minWidth: 0 }}
+              >
+                {studioApplicationDescription(openApp, locale)}
+              </Typography.Text>
+            ) : undefined
+          ) : (
             <StudioStatus
               diagnostics={loaded.diagnostics}
               releases={releases?.application === application ? releases.history : undefined}
-              overview={studioAddress(application, { name: 'overview' })}
-              history={studioAddress(application, { name: 'releases' })}
+              problemsOpen={problemsOpen}
+              onProblems={() => setProblemsOpen((current) => !current)}
             />
-          ) : undefined
+          )
         }
         actions={<div ref={setActionsSlot} style={{ display: 'flex' }} />}
       >
@@ -570,7 +587,6 @@ function StudioWorkspace() {
             ) : view.name === 'overview' ? (
               <StudioOverview
                 locale={locale}
-                description={openApp ? studioApplicationDescription(openApp, locale) : undefined}
                 resources={loaded.resources}
                 diagnostics={loaded.diagnostics}
                 releases={releases?.application === application ? releases.history : undefined}
@@ -584,6 +600,18 @@ function StudioWorkspace() {
           </div>
         )}
       </PageLayout>
+      {loaded && 'resources' in loaded && (
+        <StudioProblemsPanel
+          open={problemsOpen}
+          diagnostics={loaded.diagnostics}
+          addressOf={(diagnostic) =>
+            diagnostic.resourceId === null
+              ? null
+              : `/studio?${new URLSearchParams({ app: application, resource: diagnostic.resourceId, ...(diagnostic.path ? { path: diagnostic.path } : {}) })}`
+          }
+          onClose={() => setProblemsOpen(false)}
+        />
+      )}
     </>
   )
 }
