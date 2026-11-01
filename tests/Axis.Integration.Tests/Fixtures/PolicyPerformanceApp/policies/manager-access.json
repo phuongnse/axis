@@ -5,8 +5,8 @@
   "formatVersion": 1,
   "roles": ["manager"],
   "grants": [
-    { "entity": "Request", "actions": ["read"], "filter": "department.manager == currentUser()" },
-    { "entity": "Department", "actions": ["read"] },
-    { "dataSource": "RequestTotals", "actions": ["read"] }
+    { "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "department.manager == currentUser()" },
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "requestTotalsRead", "dataSource": "RequestTotals", "actions": ["read"] }
   ]
 }

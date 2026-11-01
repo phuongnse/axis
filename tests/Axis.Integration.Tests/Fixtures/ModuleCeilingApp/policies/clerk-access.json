@@ -4,5 +4,5 @@
   "name": "ClerkAccess",
   "formatVersion": 1,
   "roles": ["clerk"],
-  "grants": [{ "entity": "claims/Claim", "actions": ["read", "create", "update", "import", "export"] }]
+  "grants": [{ "name": "claimRead", "entity": "claims/Claim", "actions": ["read", "create", "update", "import", "export"] }]
 }

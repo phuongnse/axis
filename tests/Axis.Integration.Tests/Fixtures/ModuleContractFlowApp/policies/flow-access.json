@@ -8,6 +8,7 @@
   ],
   "grants": [
     {
+      "name": "requestCreate",
       "entity": "requests/Request",
       "actions": [
         "create",
@@ -15,6 +16,7 @@
       ]
     },
     {
+      "name": "submitRequestStart",
       "process": "SubmitRequest",
       "actions": [
         "start",
@@ -23,6 +25,7 @@
       ]
     },
     {
+      "name": "autoSubmitStart",
       "process": "AutoSubmit",
       "actions": [
         "start",

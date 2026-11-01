@@ -5,13 +5,13 @@
   "formatVersion": 1,
   "roles": ["filtered"],
   "grants": [
-    { "entity": "Item", "actions": ["read"], "filter": "false" },
-    { "entity": "Item", "actions": ["read"], "filter": "status is not null" },
-    { "entity": "Item", "actions": ["create", "update", "delete"], "filter": "status == 'open'" },
-    { "entity": "Ticket", "actions": ["read", "create", "update", "delete"], "filter": "requester == currentUser()" },
-    { "dataSource": "ActiveItems", "actions": ["read"] },
-    { "dataSource": "ItemTotals", "actions": ["read"] },
-    { "dataSource": "OverdueTickets", "actions": ["read"] },
-    { "dataSource": "ItemsByDepartment", "actions": ["read"] }
+    { "name": "itemRead", "entity": "Item", "actions": ["read"], "filter": "false" },
+    { "name": "itemRead2", "entity": "Item", "actions": ["read"], "filter": "status is not null" },
+    { "name": "itemCreate", "entity": "Item", "actions": ["create", "update", "delete"], "filter": "status == 'open'" },
+    { "name": "ticketRead", "entity": "Ticket", "actions": ["read", "create", "update", "delete"], "filter": "requester == currentUser()" },
+    { "name": "activeItemsRead", "dataSource": "ActiveItems", "actions": ["read"] },
+    { "name": "itemTotalsRead", "dataSource": "ItemTotals", "actions": ["read"] },
+    { "name": "overdueTicketsRead", "dataSource": "OverdueTickets", "actions": ["read"] },
+    { "name": "itemsByDepartmentRead", "dataSource": "ItemsByDepartment", "actions": ["read"] }
   ]
 }

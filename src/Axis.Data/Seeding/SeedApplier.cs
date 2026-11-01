@@ -185,6 +185,11 @@ public static class SeedApplier
     private static SeedResult Failed(SeedModel seed, int index, RecordWriteResult result)
     {
         var path = $"/records/{index}";
+        if (result.Outcome == RecordWriteOutcome.EffectRefused)
+        {
+            return new SeedResult([Invalid(seed, path, $"An effect of the transition could not be recorded. Refused at '{result.Point}'.")], 0, 0);
+        }
+
         var refusal = result.Outcome == RecordWriteOutcome.LifecycleRefused
             ? $" Refused at '{result.Point ?? "no transition"}'."
             : "";

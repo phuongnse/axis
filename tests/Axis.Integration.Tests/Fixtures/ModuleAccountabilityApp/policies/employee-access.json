@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "process": "ApproveAtOnce", "actions": ["start", "inspect", "retry"] },
-    { "process": "ReviewThenApprove", "actions": ["start", "inspect", "retry"] }
+    { "name": "approveAtOnceStart", "process": "ApproveAtOnce", "actions": ["start", "inspect", "retry"] },
+    { "name": "reviewThenApproveStart", "process": "ReviewThenApprove", "actions": ["start", "inspect", "retry"] }
   ]
 }

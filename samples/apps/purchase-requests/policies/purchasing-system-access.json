@@ -4,5 +4,5 @@
   "name": "PurchasingSystemAccess",
   "formatVersion": 1,
   "roles": ["purchasing-system"],
-  "grants": [{ "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
+  "grants": [{ "name": "submitPurchaseRequestInvoke", "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
 }

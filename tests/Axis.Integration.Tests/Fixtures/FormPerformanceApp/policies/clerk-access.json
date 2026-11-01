@@ -8,6 +8,7 @@
   ],
   "grants": [
     {
+      "name": "claimRead",
       "entity": "Claim",
       "actions": [
         "read",

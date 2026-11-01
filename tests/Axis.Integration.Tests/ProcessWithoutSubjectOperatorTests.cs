@@ -147,8 +147,8 @@ public sealed class ProcessWithoutSubjectOperatorTests(TaskApiFixture fixture) :
             TenantA,
             (path, content) => path == _financePath
                 ? content.Replace(
-                    "{ \"process\": \"Approve\", \"actions\": [\"start\"] },",
-                    "{ \"process\": \"Approve\", \"actions\": [\"start\"] },\n    { \"name\": \"nightlyOrderStart\", \"process\": \"NightlyOrder\", \"actions\": [\"start\", \"cancel\", \"retry\", \"resolve\"] },",
+                    "{ \"name\": \"approveStart\", \"process\": \"Approve\", \"actions\": [\"start\"] },",
+                    "{ \"name\": \"approveStart\", \"process\": \"Approve\", \"actions\": [\"start\"] },\n    { \"name\": \"nightlyOrderStart\", \"process\": \"NightlyOrder\", \"actions\": [\"start\", \"cancel\", \"retry\", \"resolve\"] },",
                     StringComparison.Ordinal)
                 : content,
             added: new Dictionary<string, string> { ["processes/nightly-order.json"] = _nightlyOrder });

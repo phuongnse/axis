@@ -5,8 +5,8 @@
   "formatVersion": 1,
   "roles": ["failing"],
   "grants": [
-    { "entity": "Item", "actions": ["read"], "filter": "quantity * 9223372036854775807 > 0" },
-    { "entity": "Item", "actions": ["read"], "filter": "department.name == 'Finance'" },
-    { "dataSource": "ActiveItems", "actions": ["read"] }
+    { "name": "itemRead", "entity": "Item", "actions": ["read"], "filter": "quantity * 9223372036854775807 > 0" },
+    { "name": "itemRead2", "entity": "Item", "actions": ["read"], "filter": "department.name == 'Finance'" },
+    { "name": "activeItemsRead", "dataSource": "ActiveItems", "actions": ["read"] }
   ]
 }

@@ -5,8 +5,8 @@
   "formatVersion": 1,
   "roles": ["department-manager"],
   "grants": [
-    { "entity": "LeaveRequest", "actions": ["read"], "filter": "departments:IsManager(department.manager, currentUser())" },
-    { "entity": "departments/Department", "actions": ["read"] },
-    { "dataSource": "LeaveRequestList", "actions": ["read"] }
+    { "name": "leaveRequestRead", "entity": "LeaveRequest", "actions": ["read"], "filter": "departments:IsManager(department.manager, currentUser())" },
+    { "name": "departmentRead", "entity": "departments/Department", "actions": ["read"] },
+    { "name": "leaveRequestListRead", "dataSource": "LeaveRequestList", "actions": ["read"] }
   ]
 }

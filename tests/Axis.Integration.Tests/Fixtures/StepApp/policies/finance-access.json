@@ -5,17 +5,18 @@
   "formatVersion": 1,
   "roles": ["finance"],
   "grants": [
-    { "entity": "Request", "actions": ["read", "create", "delete"] },
+    { "name": "requestRead", "entity": "Request", "actions": ["read", "create", "delete"] },
     {
+      "name": "requestUpdate",
       "entity": "Request",
       "actions": ["update"],
       "fields": ["title", "amount", "divisor", "status", "department", "comment"]
     },
-    { "entity": "Department", "actions": ["read", "create", "update", "delete"] },
-    { "process": "Decide", "actions": ["start"] },
-    { "process": "Decide", "actions": ["inspect", "retry"] },
-    { "process": "WaitEvent", "actions": ["inspect", "retry"] },
-    { "process": "Approve", "actions": ["start"] },
-    { "process": "Rework", "actions": ["resolve", "inspect"] }
+    { "name": "departmentRead", "entity": "Department", "actions": ["read", "create", "update", "delete"] },
+    { "name": "decideStart", "process": "Decide", "actions": ["start"] },
+    { "name": "decideInspect", "process": "Decide", "actions": ["inspect", "retry"] },
+    { "name": "waitEventInspect", "process": "WaitEvent", "actions": ["inspect", "retry"] },
+    { "name": "approveStart", "process": "Approve", "actions": ["start"] },
+    { "name": "reworkResolve", "process": "Rework", "actions": ["resolve", "inspect"] }
   ]
 }

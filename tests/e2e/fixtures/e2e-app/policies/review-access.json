@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["finance-reviewer"],
   "grants": [
-    { "entity": "Note", "actions": ["read"], "filter": "contains(title, 'Shared')" },
-    { "entity": "Note", "actions": ["create"] },
-    { "entity": "Category", "actions": ["read"], "filter": "contains(name, 'Shared')" },
-    { "dataSource": "NoteRows", "actions": ["read"] }
+    { "name": "noteRead", "entity": "Note", "actions": ["read"], "filter": "contains(title, 'Shared')" },
+    { "name": "noteCreate", "entity": "Note", "actions": ["create"] },
+    { "name": "categoryRead", "entity": "Category", "actions": ["read"], "filter": "contains(name, 'Shared')" },
+    { "name": "noteRowsRead", "dataSource": "NoteRows", "actions": ["read"] }
   ]
 }

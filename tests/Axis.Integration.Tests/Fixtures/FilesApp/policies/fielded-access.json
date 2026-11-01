@@ -5,8 +5,8 @@
   "formatVersion": 1,
   "roles": ["fielded"],
   "grants": [
-    { "entity": "Claim", "actions": ["update"], "fields": ["title"] },
-    { "entity": "Claim", "actions": ["read"], "fields": ["title"] },
-    { "dataSource": "Claims", "actions": ["read"] }
+    { "name": "claimUpdate", "entity": "Claim", "actions": ["update"], "fields": ["title"] },
+    { "name": "claimRead", "entity": "Claim", "actions": ["read"], "fields": ["title"] },
+    { "name": "claimsRead", "dataSource": "Claims", "actions": ["read"] }
   ]
 }

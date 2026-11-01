@@ -5,6 +5,6 @@
   "formatVersion": 1,
   "roles": ["false-only"],
   "grants": [
-    { "entity": "Item", "actions": ["read"], "filter": "false" }
+    { "name": "itemRead", "entity": "Item", "actions": ["read"], "filter": "false" }
   ]
 }

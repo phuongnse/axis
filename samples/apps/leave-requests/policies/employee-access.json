@@ -5,16 +5,17 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "LeaveRequest", "actions": ["read"], "filter": "employee == currentUser()" },
+    { "name": "leaveRequestRead", "entity": "LeaveRequest", "actions": ["read"], "filter": "employee == currentUser()" },
     {
+      "name": "leaveRequestCreate",
       "entity": "LeaveRequest",
       "actions": ["create", "update"],
       "filter": "employee == currentUser() and status in ('draft', 'returned')",
       "fields": ["title", "department", "leaveType", "firstDay", "lastDay", "reason", "status"]
     },
-    { "entity": "departments/Department", "actions": ["read"] },
-    { "dataSource": "departments/Departments", "actions": ["read"] },
-    { "dataSource": "LeaveRequestList", "actions": ["read"] },
-    { "process": "LeaveRequestApproval", "actions": ["start"] }
+    { "name": "departmentRead", "entity": "departments/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] },
+    { "name": "leaveRequestListRead", "dataSource": "LeaveRequestList", "actions": ["read"] },
+    { "name": "leaveRequestApprovalStart", "process": "LeaveRequestApproval", "actions": ["start"] }
   ]
 }
