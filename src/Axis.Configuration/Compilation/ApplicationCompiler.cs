@@ -530,6 +530,8 @@ public static partial class ApplicationCompiler
             loaded.UnloadedEntityNames,
             RulesFor,
             DeclaredModulesOf,
+            moduleResources.RoleSlots,
+            FilterRulesFor,
             diagnostics);
 
         PresentationChecker.Check(
@@ -649,6 +651,7 @@ public static partial class ApplicationCompiler
             moduleReferences,
             DeclaredModulesOf,
             diagnostics);
+        GrantCeilings.Check(loaded.Policies, contracts, modules, FindEntity, FindRole, diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
         ConnectorChecker.CheckBindingKinds(loaded.Connectors, loaded.Application, loaded.IdentityProviders, diagnostics);
         IdentityProviderChecker.Check(
@@ -846,7 +849,15 @@ public static partial class ApplicationCompiler
         }
 
         var entities = allEntities
-            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), DeclaredModulesOf(entity), contracts.GetValueOrDefault(entity.Name)))
+            .Select(entity => BuildEntity(
+                entitiesByName[entity.Name],
+                entitiesByName,
+                sequencesByName,
+                RulesFor(entity),
+                DeclaredModulesOf(entity),
+                contracts.GetValueOrDefault(entity.Name),
+                IsModuleResource(entity) ? FilterRulesFor(entity) : [],
+                IsModuleResource(entity) ? modules.FirstOrDefault(pin => pin.Id == ModuleIdOf(entity.Name))?.Roles : null))
             .ToList();
         var model = new ApplicationModel
         {
@@ -2720,7 +2731,9 @@ public static partial class ApplicationCompiler
         Dictionary<string, SequenceResource> sequencesByName,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string>? modules,
-        ContractResource? contract)
+        ContractResource? contract,
+        IReadOnlyList<ExpressionRule> filterRules,
+        IReadOnlyDictionary<string, string>? slotRoles)
     {
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
@@ -2746,13 +2759,46 @@ public static partial class ApplicationCompiler
                     [.. declared.Fields.Select(name => FindField(entity, name)!.Name)],
                     declared.Unique ?? false))
                 .ToList(),
-            Contract = contract is null ? null : BuildContract(contract, entity, scope),
+            Contract = contract is null ? null : BuildContract(contract, entity, scope, filterRules, modules, slotRoles, entitiesByName),
         };
     }
 
-    /// <summary>Builds the contract the checker accepted. A guard sees the entity's validation <paramref name="scope"/>.</summary>
-    private static ContractModel BuildContract(ContractResource contract, EntityResource entity, ExpressionScope scope) =>
-        new()
+    /// <summary>
+    /// Builds the contract the checker accepted. A guard sees the entity's validation <paramref name="scope"/>.
+    /// A ceiling filter sees <paramref name="filterRules"/> as a module policy filter does.
+    /// <paramref name="slotRoles"/> maps the module's role slots to application roles.
+    /// </summary>
+    private static ContractModel BuildContract(
+        ContractResource contract,
+        EntityResource entity,
+        ExpressionScope scope,
+        IReadOnlyList<ExpressionRule> filterRules,
+        IReadOnlySet<string>? modules,
+        IReadOnlyDictionary<string, string>? slotRoles,
+        Dictionary<string, EntityResource> entitiesByName)
+    {
+        CeilingModel? BuildCeiling(ContractCeilingDefinition ceiling)
+        {
+            EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
+            var filterScope = ExpressionScopes.ForDataSource(entity.Fields, [], FindEntity, filterRules, modules, undeclaredModuleIsUnknown: true);
+            CeilingEntryModel BuildEntry(CeilingEntryDefinition entry) => new(
+                [.. entry.Actions.Select(PolicyChecker.ParseAction)],
+                // A checked entry names only fields of the entity.
+                entry.Fields is null ? null : [.. entry.Fields.Select(name => FindField(entity, name)!.Name)],
+                entry.Filter is null ? null : ExpressionModel.Compile(entry.Filter, filterScope, ExpressionType.Boolean, policyFilter: true));
+
+            var roles = (slotRoles ?? new Dictionary<string, string>()).Values.Distinct(StringComparer.Ordinal).ToList();
+            return new CeilingModel
+            {
+                Roles = roles.ToDictionary(
+                    role => role,
+                    role => (IReadOnlyList<CeilingEntryModel>)[.. GrantCeilings.EntriesFor(ceiling, slotRoles!, role).Select(BuildEntry)],
+                    StringComparer.Ordinal),
+                Others = ceiling.Others is null ? null : [.. ceiling.Others.Select(BuildEntry)],
+            };
+        }
+
+        return new()
         {
             Name = contract.Name,
             File = contract.File,
@@ -2771,7 +2817,9 @@ public static partial class ApplicationCompiler
                         Message = transition.Message,
                     })],
                 },
+            Ceiling = contract.Ceiling is { } ceiling ? BuildCeiling(ceiling) : null,
         };
+    }
 
     private static FieldModel BuildField(
         EntityResource entity,

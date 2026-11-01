@@ -317,5 +317,8 @@ public static class DiagnosticCodes
     public const string UnknownTransitionState = "AXC0329";
     public const string DuplicateTransitionPair = "AXC0330";
     public const string TransitionToSameState = "AXC0331";
-    public const string ModuleScenarioRoleNotSlot = "AXC0332";
+    public const string UnknownCeilingSlot = "AXC0332";
+    public const string UnknownCeilingField = "AXC0333";
+    public const string GrantPastCeiling = "AXC0334";
+    public const string ModuleScenarioRoleNotSlot = "AXC0335";
 }

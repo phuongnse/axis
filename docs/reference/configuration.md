@@ -663,7 +663,7 @@ flowchart LR
        `/steps/{i}/by`. An `advanceTime` step in a scenario without `now` is
        `AXC0194` at `/steps/{i}`.
      - A scenario error is an error like any other, so a folder with one does not compile or activate.
-       A pinned module's scenarios are checked in its file: a role that is not a role slot is `AXC0332`, and an `entity` or `process` with `/` is `AXC0208`, see [modules](modules-and-templates.md#processes-pages-policies-and-dependencies).
+       A pinned module's scenarios are checked in its file: a role that is not a role slot is `AXC0335`, and an `entity` or `process` with `/` is `AXC0208`, see [modules](modules-and-templates.md#processes-pages-policies-and-dependencies).
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the

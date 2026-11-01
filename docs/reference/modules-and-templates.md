@@ -14,7 +14,7 @@ installation, declaring, pinning, dependencies between modules, the diagnostics 
 role slots with their mapping, `AXC0292` to `AXC0294`, the connector slots with their
 mapping, `AXC0297` to `AXC0303`, the maps of a depending module, with `AXC0306`, the module
 policies that name role slots, `AXC0304` and `AXC0305`, the task assignees that name role slots,
-`AXC0307`, and the scenarios that name role slots, `AXC0332`, are built. A pinned module's files are stored in the release and
+`AXC0307`, and the scenarios that name role slots, `AXC0335`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources, forms and policies join the application
 model, each with an id derived from the application `id` and the name
@@ -448,7 +448,7 @@ An application that declares it maps the slot to one of its own roles:
   systems. A module never names a binding.
 - **Scenarios** _(built)_. A module scenario gives its users, and its assignee
   and recipient roles, role slots instead of roles. A role that is not a slot is
-  `AXC0332`, in the module file. Its steps name entities and processes of its own
+  `AXC0335`, in the module file. Its steps name entities and processes of its own
   module by plain name. A name with `/`, even of a module it declares, is
   `AXC0208`, and an unknown entity or process has its usual code. A connector
   stub names a connector slot, and a package stub names a package the module
