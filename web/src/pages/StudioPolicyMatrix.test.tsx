@@ -327,6 +327,34 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled())
   })
 
+  it('names an added grant with a name no other grant of the policy has, ignoring case', async () => {
+    const content = {
+      ...policyContent,
+      grants: [{ name: 'PurchaseApproval1', process: 'PurchaseApproval', actions: ['start'] }, ...policyContent.grants],
+    }
+    const fetchMock = stubFetch(content)
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-process-PurchaseApproval'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Add grant' }))
+    const names = screen.getAllByTestId('studio-matrix-grant-name')
+    expect(names.map((name) => name.textContent)).toEqual(['PurchaseApproval1', 'purchaseApproval2'])
+    expect(within(screen.getAllByTestId('studio-matrix-own-grant')[2]).queryByRole('textbox')).not.toBeInTheDocument()
+    const added = screen.getAllByTestId('studio-matrix-own-grant')[2]
+    await userEvent.click(within(added).getByRole('checkbox', { name: 'start' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(patches(fetchMock)).toHaveLength(1))
+    const sent = JSON.parse(patches(fetchMock)[0][1]!.body as string)
+    expect(sent).toEqual([
+      {
+        op: 'replace',
+        path: '/grants',
+        value: [...content.grants, { name: 'purchaseApproval2', process: 'PurchaseApproval', actions: ['start'] }],
+      },
+    ])
+  })
+
   it('keeps an action the target does not accept and shows a warning for it', async () => {
     const content = { ...policyContent, grants: [{ process: 'PurchaseApproval', actions: ['read', 'start'] }] }
     const fetchMock = stubFetch(content)
@@ -443,7 +471,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
       name: 'TesterAccess',
       formatVersion: 1,
       roles: ['tester'],
-      grants: [{ process: 'PurchaseApproval', actions: ['start'] }],
+      grants: [{ name: 'purchaseApproval1', process: 'PurchaseApproval', actions: ['start'] }],
     })
     expect(onWritten.mock.calls[0][1]).toMatchObject({ id: body.id, version: 'c1' })
   })
