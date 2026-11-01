@@ -15,7 +15,7 @@ namespace Axis.Processes.Instances;
 /// the parameters before the row is deleted, and <see cref="StartAfterDeleteAsync"/> starts the
 /// processes after the audit record. The triggers come from the model of the release the request resolved, in model order,
 /// and each start runs as <c>system</c>, pinned to that release, so the writer needs no
-/// <c>start</c> grant. The instance still keeps the writer as its accountable user. A trigger whose <c>on</c> does not list the write, or whose <c>fields</c>
+/// <c>start</c> grant. The instance takes the accountable user of the write context, and no deciding task. A trigger whose <c>on</c> does not list the write, or whose <c>fields</c>
 /// lists no changed field, is passed over without a log line. A <c>when</c> or start condition that
 /// is not true, a parameter that fails or is null, or a process that already runs for the record or,
 /// for a delete trigger, at all, skips the start and logs it at Information level. Any other error throws, so the caller's transaction does not commit.
@@ -88,7 +88,7 @@ public static partial class DataChangeTriggerStarts
         Record before,
         Record written,
         IEnumerable<string> replacedCollections,
-        string? accountableUser,
+        RecordWriteContext write,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -98,6 +98,7 @@ public static partial class DataChangeTriggerStarts
         ArgumentNullException.ThrowIfNull(before);
         ArgumentNullException.ThrowIfNull(written);
         ArgumentNullException.ThrowIfNull(replacedCollections);
+        ArgumentNullException.ThrowIfNull(write);
 
         if (active.FindEntity(entity.Id) is not { } watched
             || !active.Triggers.Any(trigger =>
@@ -117,7 +118,7 @@ public static partial class DataChangeTriggerStarts
                 ?? throw new InvalidOperationException($"No record of '{watched.Name}' has the id '{written.Id}'.");
         }
 
-        await StartAsync(transaction, tenantId, active, activeReleaseId, watched, DataChangeKinds.Update, record, changed, accountableUser, logger, cancellationToken);
+        await StartAsync(transaction, tenantId, active, activeReleaseId, watched, DataChangeKinds.Update, record, changed, write, logger, cancellationToken);
     }
 
     /// <summary>
@@ -136,7 +137,7 @@ public static partial class DataChangeTriggerStarts
         Guid writeReleaseId,
         EntityModel entity,
         Record written,
-        string? accountableUser,
+        RecordWriteContext write,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -144,6 +145,7 @@ public static partial class DataChangeTriggerStarts
         ArgumentNullException.ThrowIfNull(active);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(written);
+        ArgumentNullException.ThrowIfNull(write);
 
         if (active.FindEntity(entity.Id) is not { } watched
             || !active.Triggers.Any(trigger =>
@@ -162,7 +164,7 @@ public static partial class DataChangeTriggerStarts
                 ?? throw new InvalidOperationException($"No record of '{watched.Name}' has the id '{written.Id}'.");
         }
 
-        await StartAsync(transaction, tenantId, active, activeReleaseId, watched, DataChangeKinds.Create, record, changedFields: null, accountableUser, logger, cancellationToken);
+        await StartAsync(transaction, tenantId, active, activeReleaseId, watched, DataChangeKinds.Create, record, changedFields: null, write, logger, cancellationToken);
     }
 
     /// <summary>
@@ -181,7 +183,7 @@ public static partial class DataChangeTriggerStarts
         DataChangeKinds kind,
         Record written,
         IReadOnlySet<string>? changedFields,
-        string? accountableUser,
+        RecordWriteContext write,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -189,6 +191,7 @@ public static partial class DataChangeTriggerStarts
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(written);
+        ArgumentNullException.ThrowIfNull(write);
         ArgumentNullException.ThrowIfNull(logger);
 
         var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
@@ -245,7 +248,7 @@ public static partial class DataChangeTriggerStarts
                 computed,
                 Guid.CreateVersion7(),
                 AuditActors.System,
-                accountableUser,
+                write.AccountableUser,
                 new JsonObject { ["trigger"] = trigger.Name },
                 cancellationToken);
             if (started.Outcome != ProcessStartOutcome.Started)
@@ -363,13 +366,14 @@ public static partial class DataChangeTriggerStarts
         Guid releaseId,
         Guid recordId,
         IReadOnlyList<PreparedDeleteStart> prepared,
-        string? accountableUser,
+        RecordWriteContext write,
         ILogger logger,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(prepared);
+        ArgumentNullException.ThrowIfNull(write);
         ArgumentNullException.ThrowIfNull(logger);
 
         var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
@@ -391,7 +395,7 @@ public static partial class DataChangeTriggerStarts
                 parameters,
                 Guid.CreateVersion7(),
                 AuditActors.System,
-                accountableUser,
+                write.AccountableUser,
                 new JsonObject { ["trigger"] = trigger.Name },
                 cancellationToken);
             if (started.Outcome != ProcessStartOutcome.Started)

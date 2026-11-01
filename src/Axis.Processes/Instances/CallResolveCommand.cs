@@ -296,6 +296,7 @@ public static class CallResolveCommand
     {
         var (pinned, subject) = (target.Pinned, target.Subject);
         Record? updated = null;
+        var write = new RecordWriteContext(userId, null);
 
         // An instance without a subject has no record to read or write. A step of such a process maps no
         // outputs, so there are no values either.
@@ -327,7 +328,7 @@ public static class CallResolveCommand
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, record, values, now, cipher: cipher, cancellationToken: cancellationToken);
+            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, write, record, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (written is not { Outcome: RecordWriteOutcome.Written, Record: { } stored })
             {
                 return new CallResolveResult(CallResolveOutcome.Invalid, Errors: Remap(written, target.Mappings));
@@ -386,7 +387,7 @@ public static class CallResolveCommand
                 record,
                 updated,
                 [],
-                userId,
+                write,
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
         }

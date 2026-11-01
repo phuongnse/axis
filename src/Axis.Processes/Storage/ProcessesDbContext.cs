@@ -263,6 +263,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             @event.Property(e => e.SubjectId).HasColumnName("subject_id");
             @event.Property(e => e.Payload).HasColumnName("payload").HasColumnType("jsonb");
             @event.Property(e => e.ProcessInstanceId).HasColumnName("process_instance_id");
+            @event.Property(e => e.AccountableUser).HasColumnName("accountable_user");
             @event.Property(e => e.RaisedAt).HasColumnName("raised_at").HasDefaultValueSql("now()");
             @event.HasIndex(e => e.ProcessInstanceId).HasDatabaseName("ix_events_process_instance_id");
 

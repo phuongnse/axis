@@ -394,7 +394,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     raised.Entity.Id,
                     instance.SubjectId!.Value,
                     await PayloadAsync(evaluate, raiseStep, instance, input),
-                    instance.Id);
+                    instance.Id,
+                    instance.AccountableUser);
                 raisedEvent = raised;
                 state = ProcessStarts.Running;
                 nextStep = following.Name;
@@ -581,9 +582,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         // writes nothing. A rejected write throws, which rolls back the instance's move too.
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (assignments is not null)
         {
-            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, stored!, assignments, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
+            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, write, stored!, assignments, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
@@ -610,7 +612,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (creation is not null)
         {
             var result = await RecordCommands.CreateFromAsync(
-                context.Connection, model, created!, instance.ReleaseId, creation, AuditActors.System, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
+                context.Connection, model, created!, instance.ReleaseId, write, creation, AuditActors.System, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record create was rejected: {Describe(result)}", instance, input);
@@ -703,6 +705,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 occurrence.SubjectId,
                 occurrence.Payload,
                 instance.Id,
+                occurrence.AccountableUser,
                 activeRelease,
                 logger,
                 cancellationToken);
@@ -748,7 +751,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 stored!,
                 updated,
                 [],
-                instance.AccountableUser,
+                write,
                 logger,
                 cancellationToken);
         }
@@ -763,7 +766,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 instance.ReleaseId,
                 created!,
                 createdRecord,
-                instance.AccountableUser,
+                write,
                 logger,
                 cancellationToken);
         }

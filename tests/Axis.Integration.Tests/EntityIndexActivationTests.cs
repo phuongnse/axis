@@ -340,7 +340,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
     {
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync(CancellationToken);
-        return await RecordCommands.CreateAsync(connection, compiled.Model!, order, compiled.Release!.Id, values, [], cancellationToken: CancellationToken);
+        return await RecordCommands.CreateAsync(connection, compiled.Model!, order, compiled.Release!.Id, RecordWriteContext.None, values, [], cancellationToken: CancellationToken);
     }
 
     private string OrderFile(string? indexes, string aName = "a", bool withoutC = false, bool searchableNote = false) => OrderFile(

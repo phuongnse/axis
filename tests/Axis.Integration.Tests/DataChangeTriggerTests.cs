@@ -223,6 +223,20 @@ public sealed class DataChangeTriggerTests(TriggerApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task A_step_that_changes_a_field_another_trigger_watches_starts_that_process_with_the_accountable_user_of_the_step()
+    {
+        var id = await CreateAsync("""{ "title": "Relay" }""");
+        await UpdateAsync(id, """{ "version": 1, "values": { "stage": "open" } }""");
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(1L, await CountInstancesAsync(id, "Notify"));
+        const string accountable = "SELECT accountable_user FROM axis.process_instances WHERE subject_id = @record AND process_id = @process";
+        Assert.Equal("cara", await fixture.ScalarAsync(accountable, ("record", id), ("process", fixture.ProcessId("Escalate"))));
+        Assert.Equal("cara", await fixture.ScalarAsync(accountable, ("record", id), ("process", fixture.ProcessId("Notify"))));
+    }
+
+    [Fact]
     public async Task A_task_form_save_that_changes_a_watched_field_starts_the_triggered_process_as_system()
     {
         var id = await CreateAsync("""{ "title": "Dock" }""");

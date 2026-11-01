@@ -348,6 +348,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AccountableUser")
+                        .HasColumnType("text")
+                        .HasColumnName("accountable_user");
+
                     b.Property<Guid>("ApplicationId")
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");

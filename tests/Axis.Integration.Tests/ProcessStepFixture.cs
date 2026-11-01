@@ -307,7 +307,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     public async Task<long> UpdateTitleAsync(NpgsqlTransaction transaction, Guid id, long version, string title)
     {
         Assert.True(RequestEntity.TryGetField("title", out var field));
-        var result = await RecordCommands.UpdateAsync(transaction.Connection!, Model, RequestEntity, FirstReleaseId, id, version, [new RecordValue(field, title)], []);
+        var result = await RecordCommands.UpdateAsync(transaction.Connection!, Model, RequestEntity, FirstReleaseId, RecordWriteContext.None, id, version, [new RecordValue(field, title)], []);
         Assert.Equal(RecordWriteOutcome.Written, result.Outcome);
         var written = result.Record!.Version;
         await AuditRecords.AppendAsync(

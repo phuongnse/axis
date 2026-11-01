@@ -142,6 +142,7 @@ public static class TaskCompletionCommand
         IReadOnlyList<string> fields = [];
         Record? previous = null;
         Record? updated = null;
+        var write = new RecordWriteContext(actor.Id, task.Id);
         if (body.Input is { } input)
         {
             // The values are written as a record update on the task's release. The lock makes the
@@ -173,7 +174,7 @@ public static class TaskCompletionCommand
             }
 
             var result = await RecordCommands.UpdateAsync(
-                connection, release, entity, task.ReleaseId, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
+                connection, release, entity, task.ReleaseId, write, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return result.Outcome == RecordWriteOutcome.StaleVersion
@@ -234,7 +235,7 @@ public static class TaskCompletionCommand
                 previous,
                 updated,
                 saved.Rows.Select(rows => rows.Collection.Name).Concat(saved.Links.Select(links => links.Field.Name)),
-                actor.Id,
+                write,
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
         }

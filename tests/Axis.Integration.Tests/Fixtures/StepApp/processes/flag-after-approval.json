@@ -1,0 +1,27 @@
+{
+  "id": "c3874eee-0051-4408-a7ed-7169827f1863",
+  "kind": "process",
+  "name": "FlagAfterApproval",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "approve",
+  "steps": [
+    {
+      "name": "approve",
+      "type": "task",
+      "label": { "textKey": "request.approve" },
+      "assignee": { "role": "finance" },
+      "form": "RequestReview",
+      "outcomes": [{ "name": "approve", "label": { "textKey": "task.approve" }, "next": "flag" }]
+    },
+    {
+      "name": "flag",
+      "type": "operation",
+      "operation": "raiseEvent",
+      "event": "RequestFlagged",
+      "fields": { "title": "title", "ratio": "amount / divisor" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

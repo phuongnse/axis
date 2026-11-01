@@ -142,7 +142,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
             links = [new RecordLinks(set, software)];
         }
 
-        var result = await RecordCommands.CreateAsync(connection, model, entity, Guid.NewGuid(), [.. fields], [], links, cancellationToken: CancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, model, entity, Guid.NewGuid(), RecordWriteContext.None, [.. fields], [], links, cancellationToken: CancellationToken);
         Assert.Equal(RecordWriteOutcome.Written, result.Outcome);
         return result.Record!.Id;
     }

@@ -65,6 +65,7 @@ public sealed class TriggerSkipLogTests(DataDatabaseFixture database) : IClassFi
             model,
             entity,
             Guid.NewGuid(),
+            RecordWriteContext.None,
             [new RecordValue(title, "Laptops"), new RecordValue(amount, "386052719483.29"), new RecordValue(divisor, 0L)],
             [],
             cancellationToken: CancellationToken);
@@ -79,7 +80,7 @@ public sealed class TriggerSkipLogTests(DataDatabaseFixture database) : IClassFi
             DataChangeKinds.Create,
             created.Record!,
             null,
-            null,
+            RecordWriteContext.None,
             loggerFactory.CreateLogger("test"),
             CancellationToken);
 

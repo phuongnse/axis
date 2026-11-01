@@ -17,8 +17,8 @@ internal static class ProcessEvents
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.events
-                (id, application_id, event, release_id, entity_id, subject_id, payload, process_instance_id, raised_at)
-            VALUES (@id, @application, @event, @release, @entity, @subject, @payload, @instance, now())
+                (id, application_id, event, release_id, entity_id, subject_id, payload, process_instance_id, accountable_user, raised_at)
+            VALUES (@id, @application, @event, @release, @entity, @subject, @payload, @instance, @user, now())
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
@@ -30,11 +30,12 @@ internal static class ProcessEvents
         command.Parameters.AddWithValue("subject", occurrence.SubjectId);
         command.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = occurrence.Payload.ToJsonString() });
         command.Parameters.AddWithValue("instance", (object?)occurrence.ProcessInstanceId ?? DBNull.Value);
+        command.Parameters.Add(new NpgsqlParameter("user", NpgsqlDbType.Text) { Value = (object?)occurrence.AccountableUser ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>The read of one occurrence by its id, with its parameter <c>@id</c>.</summary>
-    internal const string LoadSql = "SELECT application_id, event, entity_id, subject_id, payload::text FROM axis.events WHERE id = @id";
+    internal const string LoadSql = "SELECT application_id, event, entity_id, subject_id, payload::text, accountable_user FROM axis.events WHERE id = @id";
 
     /// <summary>Returns the occurrence <paramref name="id"/>, or <see langword="null"/> when there is none.</summary>
     internal static async Task<StoredEvent?> LoadAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken)
@@ -56,7 +57,8 @@ internal static class ProcessEvents
             reader.GetString(1),
             reader.GetGuid(2),
             reader.GetGuid(3),
-            JsonNode.Parse(reader.GetString(4)) as JsonObject ?? []);
+            JsonNode.Parse(reader.GetString(4)) as JsonObject ?? [],
+            reader.IsDBNull(5) ? null : reader.GetString(5));
     }
 
     /// <summary>
@@ -74,7 +76,7 @@ internal static class ProcessEvents
     {
         await using var command = new NpgsqlCommand(
             """
-            SELECT e.id, e.application_id, e.event, e.entity_id, e.subject_id, e.payload::text
+            SELECT e.id, e.application_id, e.event, e.entity_id, e.subject_id, e.payload::text, e.accountable_user
             FROM axis.events e
             WHERE e.application_id = @application
               AND e.entity_id = @entity
@@ -103,7 +105,8 @@ internal static class ProcessEvents
                 reader.GetString(2),
                 reader.GetGuid(3),
                 reader.GetGuid(4),
-                JsonNode.Parse(reader.GetString(5)) as JsonObject ?? []));
+                JsonNode.Parse(reader.GetString(5)) as JsonObject ?? [],
+                reader.IsDBNull(6) ? null : reader.GetString(6)));
         }
 
         return found;
@@ -151,6 +154,7 @@ internal static class ProcessEvents
 /// <param name="SubjectId">The record the occurrence names.</param>
 /// <param name="Payload">The evaluated payload, keyed by the payload fields' declared names.</param>
 /// <param name="ProcessInstanceId">The instance that raised the occurrence, or null when an endpoint without a process raised it.</param>
+/// <param name="AccountableUser">The user who answers for the occurrence, which an event trigger starts its instance with, or null when no person does.</param>
 internal sealed record NewEvent(
     Guid Id,
     Guid ApplicationId,
@@ -159,11 +163,13 @@ internal sealed record NewEvent(
     Guid EntityId,
     Guid SubjectId,
     JsonObject Payload,
-    Guid? ProcessInstanceId);
+    Guid? ProcessInstanceId,
+    string? AccountableUser);
 
 /// <summary>A stored event occurrence, as its delivery reads it.</summary>
 /// <param name="Event">The event's declared name, as the release that raised it declares it.</param>
 /// <param name="EntityId">The event's entity.</param>
 /// <param name="SubjectId">The record the occurrence names.</param>
 /// <param name="Payload">The stored payload, keyed by the payload fields' declared names.</param>
-internal sealed record StoredEvent(Guid Id, Guid ApplicationId, string Event, Guid EntityId, Guid SubjectId, JsonObject Payload);
+/// <param name="AccountableUser">The user who answers for the occurrence, which an event trigger starts its instance with, or null when no person does.</param>
+internal sealed record StoredEvent(Guid Id, Guid ApplicationId, string Event, Guid EntityId, Guid SubjectId, JsonObject Payload, string? AccountableUser);

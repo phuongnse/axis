@@ -24,7 +24,7 @@ namespace Axis.Processes.Instances;
 /// release it finds under the lock. A trigger that this release no longer has is skipped with no
 /// receipt, and a trigger that only this release has is not delivered for the occurrence. The
 /// transaction then evaluates the trigger's <c>when</c> on the stored payload, locks and reads the occurrence's
-/// record, and starts the process for it as <c>system</c>, pinned to the active release. A start
+/// record, and starts the process for it as <c>system</c>, pinned to the active release, with the occurrence's accountable user. A start
 /// marks the receipt <c>started</c>. A skip leaves it <c>skipped</c> and is logged with its reason.
 /// A trigger whose transaction fails does not stop the others. After the failed transaction has
 /// rolled back, a transaction of its own counts the failure in <c>axis.delivery_failures</c> for the

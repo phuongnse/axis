@@ -32,8 +32,9 @@ database, with history in `axis.__processes_migrations` (see
   user of each task completion, written in the completion's transaction. A `decision_task` `uuid`
   column, null before any task, holds the [deciding task](module-contracts.md#the-deciding-task),
   replaced with it. A deadline, an escalation, a retry and a cancel keep both. A schedule's instance
-  starts with null, a sub-process's with its parent's values, and an instance that an event trigger
-  starts holds null until events carry an accountable user _(planned for M24)_.
+  starts with null, and a sub-process's with its parent's values. An instance that a data change
+  trigger or an event trigger starts holds the accountable user of the write or event that fired it,
+  and no deciding task.
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.

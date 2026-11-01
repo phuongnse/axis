@@ -293,7 +293,8 @@ public static class RecordCommand
         }
 
         var computed = prepared.Computed!;
-        var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
+        var write = new RecordWriteContext(actor.Id, null);
+        var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, write, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
             LogRefusal(loggerFactory, model, result, recordId: null);
@@ -315,7 +316,7 @@ public static class RecordCommand
             DataChangeKinds.Create,
             written,
             changedFields: null,
-            actor.Id,
+            write,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
         return WriteResult(result);
@@ -746,7 +747,8 @@ public static class RecordCommand
             before = await RecordQueries.GetAsync(connection, application, model, recordId, cipher, cancellationToken);
         }
 
-        var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
+        var write = new RecordWriteContext(actor.Id, null);
+        var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, write, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
             LogRefusal(loggerFactory, model, result, recordId);
@@ -770,7 +772,7 @@ public static class RecordCommand
             before is null
                 ? null
                 : DataChangeTriggerStarts.ChangedFields(model, before, written, input.Rows.Select(rows => rows.Collection.Name).Concat(input.Links.Select(links => links.Field.Name))),
-            actor.Id,
+            write,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
         return WriteResult(result);
@@ -864,7 +866,8 @@ public static class RecordCommand
 
             // The triggers see the record whole, so they are worked out before its row and child rows go.
             var prepared = await DataChangeTriggerStarts.PrepareDeleteAsync(transaction, application, model, recordId, cancellationToken);
-            result = await RecordCommands.DeleteAsync(connection, application, model, recordId, cancellationToken);
+            var write = new RecordWriteContext(actor.Id, null);
+            result = await RecordCommands.DeleteAsync(connection, application, model, write, recordId, cancellationToken);
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
@@ -877,7 +880,7 @@ public static class RecordCommand
                     releaseId,
                     recordId,
                     prepared,
-                    actor.Id,
+                    write,
                     loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                     cancellationToken),
                 cancellationToken);

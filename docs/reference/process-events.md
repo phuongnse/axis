@@ -104,7 +104,9 @@ event's declaration order.
    [record API](record-api.md#record-shape). A run-time error, such as a
    division by zero, fails the step, and no occurrence is stored.
 2. It stores the occurrence in `axis.events`, with the subject record, the
-   payload and the release the instance is pinned to. The occurrence is kept
+   payload, the release the instance is pinned to and the instance's
+   [accountable user](module-contracts.md#the-accountable-user), which after a
+   task completion is the user who completed the task. The occurrence is kept
    even when no trigger listens, so a later wait for event step can match
    early events. A step that finds the instance at another revision stores
    none, so a step run again after a lost lease stores one occurrence.
@@ -133,7 +135,7 @@ event's declaration order.
 An [inbound endpoint call](inbound-endpoints.md#order-of-checks) with an `event`
 raises it the same way, in the call's transaction. It writes steps 2 to 5 for
 the new record, with the instance the call started as the one that raised the
-event.
+event and the calling service account as the occurrence's accountable user.
 
 ## Starts from triggers
 
@@ -158,6 +160,11 @@ user whose write fired a trigger needs no `start` grant.
    the trigger's name. A start from an event adds `"eventId"`. A start from a
    schedule adds `"occurrenceAt"`, the occurrence time in UTC, such as
    `"2026-01-01T05:00:00Z"`.
+
+The instance takes the [accountable user](module-contracts.md#the-accountable-user)
+of the write or event that fired the trigger, and no
+[deciding task](module-contracts.md#the-deciding-task). A schedule trigger
+starts it with `null`.
 
 A module's `event` and `dataChange` triggers start from the same steps. A module
 trigger is in each application's release as `<module id>/<name>`, with an id
@@ -378,6 +385,7 @@ events about a record for a `waitEvent` step.
 | `subject_id` | `uuid` | The record the occurrence names |
 | `payload` | `jsonb` | The evaluated payload fields |
 | `process_instance_id` | `uuid`, null | The instance that raised the event. For an event an [inbound endpoint](inbound-endpoints.md) raises, the instance the call started, or null when the endpoint has no `process` |
+| `accountable_user` | `text`, null | The [accountable user](module-contracts.md#the-accountable-user) of what raised the event: the accountable user of the raising instance, or the calling service account for an event an inbound endpoint raises. An event trigger starts its instance with it. Null when no person answers for the event, and for an event stored before the column existed |
 | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
 
 `axis.process_event_matches` holds one row for each use of an event occurrence by
