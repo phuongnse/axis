@@ -13,9 +13,12 @@ namespace Axis.Data.Records;
 /// identifier comes from <see cref="EntityNaming"/> and is quoted, and every value is a typed
 /// parameter. Storage failures the request can cause become a <see cref="RecordWriteResult"/> or
 /// <see cref="RecordDeleteResult"/> that never names a table, column or constraint.
-/// Every write follows the entity's lifecycle, when a module contract gives it one: a create only in
+/// Every create and update first runs the entity's core validations, when a module contract gives it
+/// some: each must be <c>true</c> on the record as it will be stored, or the write is
+/// <see cref="RecordWriteOutcome.Invalid"/>. They run after the entity's own validations, which the callers
+/// run first. Every write then follows the entity's lifecycle, when a module contract gives it one: a create only in
 /// an initial state, a state change only along a transition whose guard is <c>true</c>, and a delete
-/// only in a deletable state. The check sits in <see cref="CreateAsync"/>, <see cref="UpdateAsync"/>
+/// only in a deletable state. The checks sit in <see cref="CreateAsync"/>, <see cref="UpdateAsync"/>
 /// and <see cref="DeleteAsync"/>, so <see cref="SetAsync"/> and <see cref="CreateFromAsync"/> reach it
 /// through them. A refusal is <see cref="RecordWriteOutcome.LifecycleRefused"/> or
 /// <see cref="RecordDeleteOutcome.LifecycleRefused"/> and writes nothing.
@@ -41,8 +44,9 @@ public static class RecordCommands
     /// A file value also needs the caller's transaction: the file is attached to the record after the
     /// reference check. It must be a pending file that <paramref name="uploader"/> uploaded for the same
     /// entity and field path. Without an <paramref name="uploader"/> nothing attaches, so any file id is
-    /// <see cref="RecordWriteOutcome.Invalid"/>. A create outside an initial state of the entity's
-    /// lifecycle is <see cref="RecordWriteOutcome.LifecycleRefused"/>, checked first.
+    /// <see cref="RecordWriteOutcome.Invalid"/>. A core validation of the entity's module contract that is
+    /// not <c>true</c> is <see cref="RecordWriteOutcome.Invalid"/> too, checked first. A create outside an
+    /// initial state of the entity's lifecycle is <see cref="RecordWriteOutcome.LifecycleRefused"/>, checked next.
     /// </summary>
     /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     public static async Task<RecordWriteResult> CreateAsync(
@@ -66,6 +70,11 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
+
+        if (await RecordCoreValidations.CheckCreateAsync(connection, application, entity, values, rows, links, context, cipher, cancellationToken) is { } coreFailure)
+        {
+            return coreFailure;
+        }
 
         if (RecordLifecycle.CheckCreate(entity, values) is { } lifecycleRefusal)
         {
@@ -128,8 +137,10 @@ public static class RecordCommands
     /// Without an <paramref name="uploader"/> nothing new attaches, so any other file id is
     /// <see cref="RecordWriteOutcome.Invalid"/>. After a write, a file that the record no longer holds
     /// at a written file field, or at the file field of a written collection, becomes <c>deleted</c>
-    /// in the caller's transaction. An update that sends the lifecycle's state field and changes the state
-    /// reads the stored record first, and is <see cref="RecordWriteOutcome.LifecycleRefused"/> unless a
+    /// in the caller's transaction. An update of an entity with core validations reads the stored record
+    /// first, and is <see cref="RecordWriteOutcome.Invalid"/> when one of them is not <c>true</c> on the record
+    /// as it will be stored. An update that sends the lifecycle's state field and changes the state
+    /// reads the stored record, and is <see cref="RecordWriteOutcome.LifecycleRefused"/> unless a
     /// transition from the stored state to the new one has a guard that is <c>true</c>, or has none.
     /// </summary>
     /// <param name="context">Who answers for the write and the task decision that led to it. A contract guard reads it through <c>accountableUser()</c> and <c>decisionTask()</c>.</param>
@@ -155,6 +166,11 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
+
+        if (await RecordCoreValidations.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, context, cipher, cancellationToken) is { } coreFailure)
+        {
+            return coreFailure;
+        }
 
         if (await RecordLifecycle.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, context, cipher, cancellationToken) is { } lifecycleRefusal)
         {

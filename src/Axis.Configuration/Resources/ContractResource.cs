@@ -4,9 +4,9 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A <c>contract</c> resource: what a module guarantees about one of its entities. Only a module holds
-/// one. The schema checks its shape. Its entity, its lifecycle and its ceiling are checked by
-/// <see cref="Compilation.ContractChecker"/>. The validations and effects pass the schema and are
-/// kept as written, until the checks that build them exist.
+/// one. The schema checks its shape. Its entity, its lifecycle, its core validations and its ceiling are
+/// checked by <see cref="Compilation.ContractChecker"/>. The effects pass the schema and are kept as
+/// written, until the checks that build them exist.
 /// </summary>
 public sealed record ContractResource : Resource
 {
@@ -17,13 +17,29 @@ public sealed record ContractResource : Resource
     public ContractLifecycleDefinition? Lifecycle { get; init; }
 
     /// <summary>The core validations as written, or null when the contract has none.</summary>
-    public JsonElement? Validations { get; init; }
+    public IReadOnlyList<ContractValidationDefinition>? Validations { get; init; }
 
     /// <summary>The effects of transitions as written, or null when the contract has none.</summary>
     public JsonElement? Effects { get; init; }
 
     /// <summary>The grant ceiling, or null when the contract has none.</summary>
     public ContractCeilingDefinition? Ceiling { get; init; }
+}
+
+/// <summary>A core validation of a contract as written: a boolean rule on the entity that runs on every write.</summary>
+public sealed record ContractValidationDefinition
+{
+    /// <summary>The validation's name, unique in the contract ignoring letter case.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>A boolean expression that must be true for the write.</summary>
+    public required string Expression { get; init; }
+
+    /// <summary>The text shown when the expression is not true. Its key starts with the module id.</summary>
+    public required TextReference Message { get; init; }
+
+    /// <summary>The name of the field the failure is reported at.</summary>
+    public required string Field { get; init; }
 }
 
 /// <summary>The grant ceiling of a contract as written: the widest grants each role slot may get on the entity.</summary>

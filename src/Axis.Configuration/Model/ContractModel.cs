@@ -3,8 +3,9 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled module contract on an entity of a pinned module. The lifecycle and the grant ceiling are
-/// compiled so far. Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
+/// A compiled module contract on an entity of a pinned module. The lifecycle, the core validations and the
+/// grant ceiling are compiled so far. Every record write runs the core validations and checks the lifecycle,
+/// see <c>RecordCommands</c> in <c>Axis.Data</c>.
 /// The filters of the grant ceiling narrow a role's grants when a request runs, see <c>PolicyEvaluator.Access</c>.
 /// </summary>
 public sealed record ContractModel
@@ -18,9 +19,19 @@ public sealed record ContractModel
     /// <summary>The lifecycle of the entity, or null when the contract has none.</summary>
     public LifecycleModel? Lifecycle { get; init; }
 
+    /// <summary>The core validations, in declaration order. The list is empty when the contract has none.</summary>
+    public IReadOnlyList<CoreValidationModel> Validations { get; init; } = [];
+
     /// <summary>The grant ceiling, or null when the contract has none.</summary>
     public CeilingModel? Ceiling { get; init; }
 }
+
+/// <summary>
+/// A compiled core validation. A write fails at <see cref="Field"/>, a declared field name, with
+/// <see cref="Message"/> when the boolean <see cref="Expression"/> is not true. The expression may read
+/// <c>previous</c>, <c>accountableUser()</c> and <c>decisionTask()</c>.
+/// </summary>
+public sealed record CoreValidationModel(string Name, ExpressionModel Expression, TextReference Message, string Field);
 
 /// <summary>
 /// A compiled grant ceiling: the entries of each application role that some role slot of the module maps
