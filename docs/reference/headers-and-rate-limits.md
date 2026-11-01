@@ -102,6 +102,9 @@ The server uses the ASP.NET Core rate limiter.
 - **The callback.** The OIDC handler answers `GET /api/auth/callback` inside authentication, so the
   limiter counts the callback just before authentication. It shares the sign-in count of its client
   address.
+- **The control plane.** _(planned for M33)_ The [control plane](control-plane.md) is another
+  service with limits of its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse),
+  and the [billing portal](billing-portal.md#rules)'s.
 - **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `/health` and the SPA's static files
   and pages have no limit.
 - **Metric.** `axis.rate_limits.refused` counts the refused requests, with the attribute
