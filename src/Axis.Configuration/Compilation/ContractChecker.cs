@@ -10,8 +10,8 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// Checks the contracts of the pinned modules and returns the ones without a problem, by the qualified
 /// name of their entity. A contract names a plain-named, non-child entity of its own module, and a
-/// module has at most one contract for each entity. A contract has at least one of its four parts. Only
-/// the lifecycle is checked so far: its state field is a required, plain, non-computed <c>enum</c>, its
+/// module has at most one contract for each entity. A contract has at least one of its four parts. The
+/// lifecycle is checked: its state field is a required, plain, non-computed <c>enum</c>, its
 /// states are the field's values, one is initial, and each transition names states of the lifecycle. A
 /// guard is a boolean expression in the entity's validation scope with the module's rules, and a
 /// message text key starts with the module's prefix. The ceiling is checked too: each key of its
@@ -19,8 +19,10 @@ namespace Axis.Configuration.Compilation;
 /// filter type-checks as a policy filter in the scope of a module policy filter. A grant that goes past
 /// the ceiling is checked later, by <see cref="GrantCeilings"/>. Each core validation has a name that is
 /// unique ignoring letter case, a field of the entity, a message key with the module's prefix and a boolean
-/// expression in the same scope as a guard. Every problem of a contract is reported in one pass. The
-/// effects are not checked yet.
+/// expression in the same scope as a guard. The effects are checked too: each name is unique, ignoring letter
+/// case, <c>on</c> names a transition of the contract exactly, <c>create.entity</c> is a plain name of a root
+/// entity of the module, and each <c>values</c> key is a writable field of it with an expression that fits the
+/// field in the effect scope. Every problem of a contract is reported in one pass.
 /// </summary>
 internal static class ContractChecker
 {
@@ -62,6 +64,11 @@ internal static class ContractChecker
                     CheckValidations(moduleId, contract, validations, entity, findEntity, rulesFor, modulesFor, Report);
                 }
 
+                if (contract.Effects is { } effects)
+                {
+                    CheckEffects(moduleId, contract, effects, entity, findEntity, ownerOf, unloadedEntityNames, rulesFor, modulesFor, Report);
+                }
+
                 if (contract.Ceiling is { } ceiling)
                 {
                     CheckCeiling(
@@ -82,6 +89,152 @@ internal static class ContractChecker
         }
 
         return checkedContracts;
+    }
+
+    private static void CheckEffects(
+        string moduleId,
+        ContractResource contract,
+        IReadOnlyList<ContractEffectDefinition> effects,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        Func<string, string?> ownerOf,
+        IReadOnlySet<string> unloadedEntityNames,
+        Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
+        Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, string> report)
+    {
+        var transitions = contract.Lifecycle?.Transitions ?? [];
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        ExpressionScope? scope = null;
+        for (var index = 0; index < effects.Count; index++)
+        {
+            var effect = effects[index];
+            var path = $"/effects/{index.ToString(CultureInfo.InvariantCulture)}";
+
+            if (!firstIndexByName.TryAdd(effect.Name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateContractName,
+                    $"The effect '{effect.Name}' repeats the effect at index {firstIndexByName[effect.Name].ToString(CultureInfo.InvariantCulture)}. Effect names are unique, ignoring letter case.",
+                    $"{path}/name");
+            }
+
+            if (!transitions.Any(transition => string.Equals(transition.Name, effect.On, StringComparison.Ordinal)))
+            {
+                report(
+                    DiagnosticCodes.UnknownEffectTransition,
+                    contract.Lifecycle is null
+                        ? $"The effect '{effect.Name}' runs on the transition '{effect.On}', but the contract has no lifecycle."
+                        : $"'{effect.On}' is not a transition of the contract. The transitions are {(transitions.Count == 0 ? "none" : string.Join(", ", transitions.Select(transition => $"'{transition.Name}'")))}.",
+                    $"{path}/on");
+            }
+
+            if (CheckEffectEntity(moduleId, effect, findEntity, ownerOf, unloadedEntityNames, $"{path}/create/entity", report) is not { } target)
+            {
+                continue;
+            }
+
+            scope ??= ExpressionScopes.ForContractEffect(entity.Name, entity.Fields, rulesFor(contract), findEntity, modulesFor(contract));
+            CheckEffectValues(effect, target, scope, $"{path}/create/values", report);
+        }
+    }
+
+    /// <summary>Finds the entity an effect creates and checks it is a plain name of a root entity of the module. Gives null when it is not.</summary>
+    private static EntityResource? CheckEffectEntity(
+        string moduleId,
+        ContractEffectDefinition effect,
+        Func<string, EntityResource?> findEntity,
+        Func<string, string?> ownerOf,
+        IReadOnlySet<string> unloadedEntityNames,
+        string path,
+        Action<string, string, string> report)
+    {
+        var name = effect.Create.Entity;
+        if (name.Contains('/', StringComparison.Ordinal))
+        {
+            report(
+                DiagnosticCodes.InvalidEffectEntity,
+                $"The entity '{name}' is not a plain name. An effect creates a record of an entity of its own module, named without '/'.",
+                path);
+            return null;
+        }
+
+        var qualified = $"{moduleId}/{name}";
+        if (findEntity(qualified) is not { } target)
+        {
+            // An entity file that was not loaded because of its own errors is not reported again.
+            if (!unloadedEntityNames.Contains(qualified))
+            {
+                report(DiagnosticCodes.InvalidEffectEntity, $"The module '{moduleId}' has no entity '{name}'.", path);
+            }
+
+            return null;
+        }
+
+        if (ownerOf(target.Name) is { } owner)
+        {
+            report(
+                DiagnosticCodes.InvalidEffectEntity,
+                $"The entity '{target.Name}' is a child entity owned by '{owner}'. An effect creates a record of a root entity.",
+                path);
+            return null;
+        }
+
+        return target;
+    }
+
+    /// <summary>
+    /// Checks each <c>values</c> key of an effect: it names a field of <paramref name="target"/>, ignoring
+    /// letter case, that no earlier key names and that an effect can set. Its expression then fits the
+    /// field's type over <paramref name="scope"/>.
+    /// </summary>
+    private static void CheckEffectValues(
+        ContractEffectDefinition effect,
+        EntityResource target,
+        ExpressionScope scope,
+        string path,
+        Action<string, string, string> report)
+    {
+        // The key that first set each field, by the field's declared name.
+        var setBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, expression) in effect.Create.Values)
+        {
+            var valuePath = $"{path}/{ModuleChecker.Escape(key)}";
+            var field = ApplicationCompiler.FindField(target, key);
+            if (field is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidEffectValue,
+                    $"The field '{key}' was not found. The entity '{target.Name}' has no field with that name.",
+                    valuePath);
+                continue;
+            }
+
+            if (!setBy.TryAdd(field.Name, key))
+            {
+                report(
+                    DiagnosticCodes.InvalidEffectValue,
+                    $"The field '{field.Name}' is already set by '{setBy[field.Name]}' in this effect.",
+                    valuePath);
+                continue;
+            }
+
+            var reason = ProcessChecker.ReadOnlyReason(field) ?? (field.Creator == true ? "is set to its creator" : null);
+            if (reason is not null)
+            {
+                report(DiagnosticCodes.InvalidEffectValue, $"The field '{field.Name}' {reason}, so an effect cannot set it.", valuePath);
+                continue;
+            }
+
+            var parsed = ExpressionParser.Parse(expression);
+            var problem = parsed.Succeeded
+                ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!, contract: true).Diagnostic
+                : parsed.Diagnostic;
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, valuePath);
+            }
+        }
     }
 
     private static void CheckCeiling(

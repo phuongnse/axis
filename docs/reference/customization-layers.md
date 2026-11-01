@@ -64,8 +64,8 @@ threshold is new:
 - **Target.** `target` names a resource of a module that `application.json` declares, as
   `<module id>/<name>`. The file's folder must be that module's id and its file name the resource's
   name, so a reader finds the layer of a resource without opening every file. A target that names
-  nothing in a declared module is `AXC0344`, and a file anywhere else is `AXC0346`. Two layers with
-  one target are `AXC0347`, reported on the later file. Each of these checks reports at `/target`.
+  nothing in a declared module is `AXC0347`, and a file anywhere else is `AXC0349`. Two layers with
+  one target are `AXC0350`, reported on the later file. Each of these checks reports at `/target`.
 - **Letter case.** The module id in a target is matched exactly. The resource name is matched
   ignoring letter case, as resource names are elsewhere. The file path must equal
   `customizations/<target as written>.json`, exactly.
@@ -73,17 +73,17 @@ threshold is new:
   the module has no resource named `module`, and it is not allowed, see below.
 - **An ambiguous target.** Names are unique only within one kind, so a module may hold a data
   source and a page that share a name, and `<module id>/<name>` cannot tell them apart. The compiler
-  does not guess: such a target is `AXC0349`. A resource whose name another kind in the module
+  does not guess: such a target is `AXC0352`. A resource whose name another kind in the module
   shares cannot be targeted yet. The lasting fix, such as a `targetKind` property, is open.
 - **What a layer may target.** Every kind a module holds, except `scenario` and `module.json`, which
-  are `AXC0345`. A layer in a module folder is refused like any kind a module may not hold,
+  are `AXC0348`. A layer in a module folder is refused like any kind a module may not hold,
   `AXC0202`. A
   `contract` takes only added states and transitions, see
   [extending a lifecycle](#extending-a-lifecycle).
 - **Changes.** `changes` has the shape of the target resource, with only what changes. The rules of
   [applying a layer](#applying-a-layer) say how each part is read.
 - **What never changes.** The target's `id`, `kind`, `name` and `formatVersion`, which a layer that
-  sets them gets `AXC0348` for at `/changes/<property>`, and the `name` of
+  sets them gets `AXC0351` for at `/changes/<property>`, and the `name` of
   any element. A rename is a remove and an add, so every reference to the old name becomes a
   diagnostic.
 - **The application's own resources.** A new resource of the business, such as an entity of its
