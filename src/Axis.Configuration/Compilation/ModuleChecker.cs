@@ -40,7 +40,8 @@ namespace Axis.Configuration.Compilation;
 /// declared module, a <c>form</c> and a <c>process</c> never do. A trigger's <c>process</c> is rewritten like a
 /// sub-process, and its <c>event</c> and <c>entity</c> like a process's. A module may hold a trigger of any
 /// type. A <c>schedule</c> trigger has no <c>timeZone</c>, see <see cref="ResourceSchemas.ModuleTrigger"/>, and its
-/// <c>dataSource</c> is qualified with the module id like a policy grant's. A
+/// <c>dataSource</c> is qualified with the module id like a policy grant's. A module's contracts come back
+/// with a qualified name and the <c>entity</c> as written, for <see cref="ContractChecker"/>. A
 /// policy's grants name only the module's own resources, so each grant's <c>entity</c> and
 /// <c>dataSource</c> is qualified with the module id as written, and <see cref="PolicyChecker"/> reports
 /// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
@@ -70,6 +71,7 @@ internal static class ModuleChecker
         ResourceKinds.Policy,
         ResourceKinds.Trigger,
         ResourceKinds.Scenario,
+        ResourceKinds.Contract,
     };
 
     /// <summary>
@@ -654,7 +656,7 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies, triggers, texts and scenarios of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies, triggers, contracts, texts and scenarios of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
@@ -668,6 +670,7 @@ internal static class ModuleChecker
         private readonly List<ProcessResource> _processes = [];
         private readonly List<PolicyResource> _policies = [];
         private readonly List<TriggerResource> _triggers = [];
+        private readonly List<ModuleContract> _contracts = [];
         private readonly List<ModuleText> _texts = [];
         private readonly List<ModuleScenario> _scenarios = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
@@ -694,6 +697,7 @@ internal static class ModuleChecker
                 _policies,
                 _processes,
                 _triggers,
+                _contracts,
                 _texts,
                 _scenarios,
                 _unloadedEntityNames,
@@ -745,7 +749,7 @@ internal static class ModuleChecker
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy, a trigger, a text or a scenario.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy, a trigger, a contract, a text or a scenario.</summary>
         public void Add(string moduleId, IReadOnlySet<string> declared, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -827,8 +831,15 @@ internal static class ModuleChecker
                         {
                             Entity = grant.Entity is null ? null : $"{moduleId}/{grant.Entity}",
                             DataSource = grant.DataSource is null ? null : $"{moduleId}/{grant.DataSource}",
+                            Process = grant.Process is null ? null : $"{moduleId}/{grant.Process}",
                         })],
                     });
+                    break;
+                case ResourceKinds.Contract:
+                    // The entity stays as written, so the checker can see a name that is not plain. The
+                    // name is qualified with the module id like any module resource's.
+                    var contract = root.Deserialize<ContractResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+                    _contracts.Add(new ModuleContract(moduleId, contract with { Name = $"{moduleId}/{contract.Name}" }));
                     break;
                 case ResourceKinds.Text:
                     var text = root.Deserialize<TextResource>(ApplicationLoader.SerializerOptions)! with { File = file };
@@ -1034,7 +1045,7 @@ internal static class ModuleChecker
 }
 
 /// <summary>
-/// The entities, sequences, seeds, events, data sources, forms, pages, processes, policies, triggers and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// The entities, sequences, seeds, events, data sources, forms, pages, processes, policies, triggers, contracts and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The scenarios keep their plain names. The rules come by module, in pin order, each in path
 /// order and under its plain name. <c>DeclaredModules</c> maps each pinned module to the ids in its
 /// manifest's <c>modules</c>, and <c>RoleSlots</c> to the names of the slots in its manifest's <c>roles</c>,
@@ -1055,6 +1066,7 @@ internal sealed record ModuleResources(
     IReadOnlyList<PolicyResource> Policies,
     IReadOnlyList<ProcessResource> Processes,
     IReadOnlyList<TriggerResource> Triggers,
+    IReadOnlyList<ModuleContract> Contracts,
     IReadOnlyList<ModuleText> Texts,
     IReadOnlyList<ModuleScenario> Scenarios,
     IReadOnlySet<string> UnloadedEntityNames,
@@ -1066,6 +1078,9 @@ internal sealed record ModuleResources(
     IReadOnlySet<string> UnloadedProcessNames,
     IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredModules,
     IReadOnlyDictionary<string, IReadOnlySet<string>> RoleSlots);
+
+/// <summary>A contract of a pinned module, with the id of that module. The contract's name is qualified and its entity is as written.</summary>
+internal sealed record ModuleContract(string ModuleId, ContractResource Contract);
 
 /// <summary>A text resource of a pinned module, with the id of that module.</summary>
 internal sealed record ModuleText(string ModuleId, TextResource Text);

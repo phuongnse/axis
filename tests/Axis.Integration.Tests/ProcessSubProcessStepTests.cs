@@ -59,6 +59,27 @@ public sealed class ProcessSubProcessStepTests(ProcessStepFixture fixture) : ICl
     }
 
     [Fact]
+    public async Task A_child_takes_over_the_accountable_user_and_the_deciding_task_of_its_parent()
+    {
+        var (release, model) = await fixture.ActivateCopyWithFilesAsync(
+            ("processes/accountable-parent.json", Parent("f6c5b8a7-a0c3-4161-b29b-5d70ce416e01", "AccountableParent", "AccountableChild", """ "next": "close" """)),
+            ("processes/accountable-child.json", Child("f6c5b8a7-a0c3-4161-b29b-5d70ce416e02", "AccountableChild", "", "finish")));
+        var request = await fixture.InsertRequestAsync(10, 2);
+        var parentId = await fixture.StartAsync("AccountableParent", request, release, model);
+        var decisionTask = Guid.CreateVersion7();
+        await fixture.ScalarAsync(
+            "UPDATE axis.process_instances SET accountable_user = 'maria', decision_task = @task WHERE id = @parent",
+            ("task", decisionTask),
+            ("parent", parentId));
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        var childId = await ChildIdAsync("AccountableChild", model);
+        Assert.Equal("maria", await fixture.ScalarAsync("SELECT accountable_user FROM axis.process_instances WHERE id = @id", ("id", childId)));
+        Assert.Equal(decisionTask, await fixture.ScalarAsync("SELECT decision_task FROM axis.process_instances WHERE id = @id", ("id", childId)));
+    }
+
+    [Fact]
     public async Task A_child_that_already_runs_for_the_record_fails_the_parents_step_and_starts_no_second_child()
     {
         var (release, model) = await fixture.ActivateCopyWithFilesAsync(

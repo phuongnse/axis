@@ -305,5 +305,17 @@ public static class DiagnosticCodes
     public const string ConnectorInputTooDeep = "AXC0317";
     public const string MismatchedInputMapping = "AXC0318";
     public const string InvalidMappingSource = "AXC0319";
-    public const string ModuleScenarioRoleNotSlot = "AXC0320";
+    public const string ContractOutsideModule = "AXC0320";
+    public const string UnknownContractEntity = "AXC0321";
+    public const string ContractOnChildEntity = "AXC0322";
+    public const string DuplicateContract = "AXC0323";
+    public const string EmptyContract = "AXC0324";
+    public const string InvalidLifecycleField = "AXC0325";
+    public const string LifecycleStatesMismatch = "AXC0326";
+    public const string NoInitialState = "AXC0327";
+    public const string DuplicateContractName = "AXC0328";
+    public const string UnknownTransitionState = "AXC0329";
+    public const string DuplicateTransitionPair = "AXC0330";
+    public const string TransitionToSameState = "AXC0331";
+    public const string ModuleScenarioRoleNotSlot = "AXC0332";
 }

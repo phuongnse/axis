@@ -107,6 +107,19 @@ public sealed class DataChangeTriggerTests(TriggerApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task The_instance_a_trigger_starts_keeps_the_writing_user_as_its_accountable_user()
+    {
+        var id = await CreateAsync("""{ "title": "Dock" }""");
+
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
+            SELECT count(*) FROM axis.process_instances
+            WHERE subject_id = @record AND process_id = @process AND accountable_user = 'cara' AND decision_task IS NULL
+            """,
+            ("record", id), ("process", fixture.ProcessId("Review"))));
+    }
+
+    [Fact]
     public async Task A_create_whose_start_condition_is_false_is_stored_and_the_skip_is_logged()
     {
         var id = await CreateAsync("""{ "title": "Retired", "status": "closed" }""");

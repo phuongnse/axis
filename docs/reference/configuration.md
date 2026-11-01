@@ -29,13 +29,8 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration` or `scenario`), see
-   [identity provider resource](identity-provider.md#identity-provider-resource). The manifest is the
-   single `application` resource, stored as `application.json` at the
-   folder root; an `application` resource in any other file is not used as
-   the manifest. Resource IDs are unique across the application, compared as
-   UUIDs. Names are unique per kind, ignoring letter case. The same checks
-   run on a release's stored resources when the server rebuilds its model.
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration`, `scenario` or `contract`), see
+   [identity provider resource](identity-provider.md#identity-provider-resource). Only a module holds a `contract`, see [module contracts](module-contracts.md#the-contract-resource): one in an application folder is `AXC0320` and is not loaded. The manifest is the single `application` resource, stored as `application.json` at the folder root; an `application` resource in any other file is not used as the manifest. Resource IDs are unique across the application, compared as UUIDs. Names are unique per kind, ignoring letter case. The same checks run on a release's stored resources when the server rebuilds its model.
 2. **Resolve.** Every reference must resolve inside the application or its
    declared modules. The entity model is built here: each field's `type`
    becomes a typed field type, every type-specific property is checked against
@@ -85,7 +80,7 @@ flowchart LR
      [Entity logic](resource-files.md#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
-     reserved by the platform (`api`, `health`, `assets`, `studio`, `account`, `users`), or one that an
+     reserved by the platform (`api`, `health`, `assets`, `studio`, `account`, `users`, and `licences` _(planned for M31)_), or one that an
      earlier site of the application already uses in path order, is
      `AXC0024` at `/path`. A reserved path is not also checked for
      duplicates. The `default` and `fallback` locales must be in
@@ -668,7 +663,7 @@ flowchart LR
        `/steps/{i}/by`. An `advanceTime` step in a scenario without `now` is
        `AXC0194` at `/steps/{i}`.
      - A scenario error is an error like any other, so a folder with one does not compile or activate.
-       A pinned module's scenarios are checked in its file: a role that is not a role slot is `AXC0320`, and an `entity` or `process` with `/` is `AXC0208`, see [modules](modules-and-templates.md#processes-pages-policies-and-dependencies).
+       A pinned module's scenarios are checked in its file: a role that is not a role slot is `AXC0332`, and an `entity` or `process` with `/` is `AXC0208`, see [modules](modules-and-templates.md#processes-pages-policies-and-dependencies).
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the

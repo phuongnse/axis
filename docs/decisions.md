@@ -138,3 +138,4 @@ files agree, title and status included.
 | [D125](decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) | How AI authoring connects, runs and keeps its changes | **Agreed** |
 | [D126](decisions/d126-sign-up-trials-and-the-control-plane.md) | Sign-up, trials and the control plane | **Agreed** |
 | [D127](decisions/d127-plans-payments-and-invoices.md) | Plans, payments and invoices | **Agreed** |
+| [D128](decisions/d128-rules-from-the-studio-review.md) | Rules from the Studio review | **Agreed** |

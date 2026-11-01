@@ -13,7 +13,7 @@ agrees. The route, the link, the application picker, New application, New resour
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, Run tests,
-Run and the Test results list, the read-only views of a module entity, a module process and a module policy, and the reconnect message are built.
+Run and the Test results list, the read-only views of a module entity, a module process and a module policy, and the reconnect message are built. Where each sits is in [Studio workspace](studio-workspace.md).
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   lists Studio in the app switcher only when `GET /api/me` answers `studio: true`. A person
@@ -24,7 +24,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`. The id of a module entity, process or policy opens it too, as `&resource=<id>`,
   when the id is not one of the folder's own resources.
-- **New application.** A **New application** button shows beside the picker
+- **New application.** A **New application** button shows beside the picker (New application… on the list, _planned for M31_)
   when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
   lists no application. The dialog asks for a name and checks it with the API's
   rule before it sends anything. It offers Blank or a template from
@@ -34,7 +34,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **New resource.** A **New resource** button above the search box opens a
+- **New resource.** A **New resource** button above the search box (New resource… in the band, starting with the list's kind, _planned for M31_) opens a
   dialog that asks for the kind and the name, or the locale for a `text`
   resource. The kind picker lists the 20 kinds the create route accepts: every
   kind except the manifest. The author can type to narrow it. A new
@@ -61,8 +61,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at
-  once.
-- **Resource list.** The list groups the resources by kind. The kind shows as
+  once. The list becomes tiles by title, see [applications](studio-workspace.md#applications) _(planned for M31)_.
+- **Resource list.** The list groups the resources by kind (in the sidebar, see [workspace](studio-workspace.md#workspace), _planned for M31_). The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
   its name, kind, `id` and file, and opens it in the editor below. **Module entities**, **Module processes**,
@@ -142,7 +142,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   opens the resource at the diagnostic's `path`, as a Used by entry does. A
   diagnostic with an empty path opens the resource at its top. A diagnostic that
   names no resource cannot be selected. A diagnostic never blocks a save.
-- **Publishing.** Up to three buttons sit under the application picker. They use the
+- **Publishing.** Up to three buttons sit under the application picker (in the band, see [band](studio-workspace.md#band), _planned for M31_). They use the
   [publishing routes](authoring.md#publishing).
   - **Validate** sends a validate request. **Publish** opens a dialog with an
     optional label, up to 100 characters, and an optional note, up to 2000.
@@ -206,7 +206,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     diagnostics panel, as before.
   - The buttons are off while a request runs and while the reconnect message
     shows.
-- **Releases.** A list under the publishing buttons shows the open application's
+- **Releases.** A list under the publishing buttons (the Releases entry of the sidebar, _planned for M31_) shows the open application's
   release history from `GET .../releases`.
   - Each row is one activation: its release number, label, note, who activated it
     and when. Rows are sorted by time, newest first.
@@ -364,7 +364,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     added in the same session asks nothing, except a `fill` question when it is
     required. Those questions come after the loaded fields, in row order. A new
     row with the name of a removed loaded field counts as that loaded field.
-  - A rename asks Keep data, Drop data or Cancel. Keep data adds
+  - A rename asks Keep data, Drop data or Cancel, the last two as text buttons beside the solid one _(planned for M31)_. Keep data adds
     `renameField`, and Drop data adds `dropField` for the old name. Cancel
     stops the whole save and keeps the draft. A removal asks Drop data or Keep
     field. Keep field puts the field back where it was, and the save goes on
@@ -410,7 +410,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     `retry`, `resolve` and `reassign`. An endpoint takes `invoke`. Studio reads each list
     from `policy.schema.json`. Filter and fields are only on entity grants.
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
-  - A Resources / Policy matrix switch sits under the application picker. The
+  - A Resources / Policy matrix switch sits under the application picker (the policy matrix entry of the sidebar, _planned for M31_). The
     matrix view is kept in the address as `&view=policies`, so a reload or a
     shared link reopens it. The diagnostics panel shows in both views.
   - Selecting a cell opens its grants under the table. A cell lists the

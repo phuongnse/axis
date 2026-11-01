@@ -41,3 +41,19 @@ so their paths are reserved site paths.
   - Each row has buttons for its commands: Resend invitation, Disable or Enable,
     and Reset authenticator. Each asks for confirmation and calls its route, see
     [the users page](user-administration.md#the-users-page).
+
+## Account page
+
+_(planned for M31)_ The sessions screen at `/account` becomes the person's account page, which replaces Keycloak's
+account console, as [D128](../decisions/d128-rules-from-the-studio-review.md) agrees.
+
+- **Change password and Authenticators.** Above the sessions, two actions start the identity provider's own steps, as
+  application-initiated actions through a sign-in with `kc_action`: Change password starts `UPDATE_PASSWORD`, and
+  Authenticators lists the person's authenticators with Add, which starts `CONFIGURE_TOTP`, and Remove for each, which
+  starts `delete_credential:<id>`. Their pages are Axis pages, see [theme](identity-provider.md#theme), and Cancel on
+  them returns to the account page with nothing changed.
+- **The last authenticator stays.** Remove is off on a person's only authenticator, because every account needs one,
+  see [accounts](user-administration.md#accounts).
+- **No account console.** `tenant create` turns off Keycloak's account console client and removes `manage-account`
+  from the realm's default roles, so the account page is the only self-service, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).

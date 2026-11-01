@@ -94,7 +94,7 @@ request ends `approved`:
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md)
   and [module scenarios](modules-and-templates.md#processes-pages-policies-and-dependencies).
   An assignee role and a recipient role are slots too. A name that is not a slot
-  is `AXC0320`.
+  is `AXC0332`.
 - `now` is a date-time with an offset. It fixes the time that expressions,
   filters, sequence numbers and task due dates read, for the whole scenario.
   Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.

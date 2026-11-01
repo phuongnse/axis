@@ -508,6 +508,19 @@ Open, waiting for an issue:
 
 Each becomes a **Gap** row, linked to its issue, once that issue exists.
 
+Planned with [D128](../decisions/d128-rules-from-the-studio-review.md) _(planned for M31)_, each to become a row with
+its test when it is built:
+
+- (Denial of service, Medium) sign-out ends the identity provider's session through the admin API by `sid`. The
+  server ends only the `sid` stored with the caller's own session, on the CSRF-checked sign-out route, so no request
+  names a session to end.
+- (Elevation of privilege, Low) Keycloak's account console is a second self-service surface. `tenant create` turns it
+  off and drops `manage-account`, and Axis's account page starts only Keycloak's own application-initiated actions.
+- (Repudiation, Low) a person denies accepting the terms. Keycloak records when each person accepted, and a new terms
+  version asks everyone again.
+- (Information disclosure, Low) the public `/licences` page shows which libraries Axis ships. It shows versions only to
+  a signed-in person, as the footer does.
+
 ### Personal data
 
 Axis holds personal data about the people who use it: user profiles with email addresses, records and
@@ -794,7 +807,7 @@ flowchart LR
         Text[Issue text, comments and repository files]
     end
     subgraph pipeline [NexKit pipeline]
-        Run[NexKit workflow pinned to tag v5.9.0]
+        Run[NexKit workflow pinned to tag v5.9.1]
     end
     subgraph review [Pull request]
         Branch[Branch with a nexkit prefix and its pull request]
@@ -811,7 +824,7 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| B4 | A dependency, or a new version of one, brings in malicious code. | NexKit and repository | Tampering | High | **Mitigated** | [Dependency updates](../development.md#dependency-updates) pin the NuGet versions and the npm lock files, and take packages only from nuget.org and the npm registry. The CI, CodeQL, Performance and Load test workflows pin their GitHub Actions to commit hashes. NexKit's workflow pins its pipeline to the tag `v5.9.0`, not to a hash. `scripts/scan.sh` does not run in CI until the hand-made change of [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
+| B4 | A dependency, or a new version of one, brings in malicious code. | NexKit and repository | Tampering | High | **Mitigated** | [Dependency updates](../development.md#dependency-updates) pin the NuGet versions and the npm lock files, and take packages only from nuget.org and the npm registry. The CI, CodeQL, Performance and Load test workflows pin their GitHub Actions to commit hashes. NexKit's workflow pins its pipeline to the tag `v5.9.1`, not to a hash. `scripts/scan.sh` does not run in CI until the hand-made change of [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
 | B8 | A change merges with no record of its issue, plan or review. | NexKit and repository | Repudiation | Low | **Mitigated** | Each change follows [the life of an issue](../delivery.md#the-life-of-an-issue), from plan through implementation and review to merge. |
 | B9 | Runaway agent runs use up the runners or the usage limit. | NexKit and repository | Denial of service | Low | **Mitigated** | At most three issues run at once, with `max_parallel` at 3, and a second Claude subscription takes over at the usage limit, see [delivery decisions](../delivery.md#decisions). |
 
