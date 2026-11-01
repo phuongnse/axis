@@ -59,9 +59,15 @@ internal static class ConsolePublishingEndpoints
             connection,
             [.. activations.Select(row => row.Actor), .. requests.Select(row => row.RequestedBy)],
             cancellationToken);
+        var manifests = await store.GetManifestsAsync([.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
         var releases = activations
-            .Select(row => new StudioReleaseItem(
-                row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId))
+            .Select(row =>
+            {
+                var relaxed = StudioEndpoints.RelaxedPoints(manifests.GetValueOrDefault(row.ReleaseId));
+                return new StudioReleaseItem(
+                    row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId,
+                    relaxed.Count > 0, relaxed);
+            })
             .ToList();
         var items = requests
             .Select(row => row with { RequestedByName = names.GetValueOrDefault(row.RequestedBy) ?? row.RequestedByName })

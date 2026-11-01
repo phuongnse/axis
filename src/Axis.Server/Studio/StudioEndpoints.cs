@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
@@ -64,8 +65,9 @@ namespace Axis.Server.Studio;
 /// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
 /// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
-/// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. It reads the
-/// tenant database and changes nothing.
+/// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. Each item has
+/// <c>offStandard</c> and <c>relaxed: [{ module, point, reason }]</c>, read from the <c>application.json</c> stored with
+/// that release. It reads the tenant database and changes nothing.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -362,12 +364,26 @@ internal static class StudioEndpoints
                 : null;
         var names = await UserProfiles.FindDisplayNamesAsync(
             await database.GetConnectionAsync(cancellationToken), [.. activations.Select(row => row.Actor)], cancellationToken);
+        var manifests = await store.GetManifestsAsync([.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
         var items = activations
-            .Select(row => new StudioReleaseItem(
-                row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId))
+            .Select(row =>
+            {
+                var relaxed = RelaxedPoints(manifests.GetValueOrDefault(row.ReleaseId));
+                return new StudioReleaseItem(
+                    row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId,
+                    relaxed.Count > 0, relaxed);
+            })
             .ToList();
         return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, items));
     }
+
+    // The relax entries of a stored application.json, in manifest order. A missing manifest has none.
+    internal static List<StudioRelaxedPoint> RelaxedPoints(string? manifest) =>
+        manifest is null
+            ? []
+            : ApplicationLoader.Load([new ResourceContent("application.json", manifest)]).Application?.Modules
+                .SelectMany(module => module.Relax.Select(entry => new StudioRelaxedPoint(module.Id, entry.Point, entry.Reason ?? "")))
+                .ToList() ?? [];
 
     private static async Task<IResult> PatchAsync(
         string application,
@@ -858,4 +874,9 @@ internal sealed record StudioReleaseItem(
     string? ActorName,
     string? Label,
     string? Note,
-    Guid? RequestId);
+    Guid? RequestId,
+    bool OffStandard,
+    IReadOnlyList<StudioRelaxedPoint> Relaxed);
+
+/// <summary>A relax entry of a release's application: the module, the point it turns off and the reason.</summary>
+internal sealed record StudioRelaxedPoint(string Module, string Point, string Reason);

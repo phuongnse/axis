@@ -873,7 +873,7 @@ stateDiagram-v2
 This route is built. The publisher writes the rows of a publish and a rollback.
 
 `GET .../releases` answers
-`{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId }] }`,
+`{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`,
 newest first.
 
 - `active` is the application's active release in this tenant, or null when
@@ -885,7 +885,7 @@ newest first.
   a rollback. `actor` is a user id, `startup` or `operator`. A row that a
   migration added for a release that was live before the history existed has
   the actor `unknown`. `actorName` is the actor's name from their [user profile](notifications.md#user-profiles),
-  else the name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin activate`.
+  else the name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin activate`. `relaxed` lists the relax entries of the release's application in manifest order, read from the `application.json` stored with that release, and `offStandard` is true when it is not empty, see [off-standard releases](module-contracts.md#off-standard-releases).
 - A release gets its `number` the first time it is activated in the tenant:
   1, 2, 3… per application. Activating it again keeps the number, so the same
   content can have different numbers in two tenants.

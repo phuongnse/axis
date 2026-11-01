@@ -419,7 +419,9 @@ module's entry in `application.json`:
 A release whose application has at least one relax entry is off-standard.
 
 - The release keeps the list of relaxed points with their reasons, and the
-  [release history](storage.md#release-history) shows it.
+  [release history](storage.md#release-history) shows it. The Studio release history route answers
+  `offStandard` and `relaxed: [{ module, point, reason }]` for each release, read from the
+  `application.json` stored with it.
 - Studio's release history and the operator console's publishing view show an off-standard mark,
   and the list of points and reasons on the release.
 - The module's upgrade promise no longer covers a relaxed point _(planned for M29)_.
@@ -450,8 +452,9 @@ some of them as contract scenarios.
   module, the scenario and its failing step, with `AXC0342`, once for each failing scenario. Nothing is
   stored or activated. The run is the `contracts` step of the request, see [the
   publisher](administration.md#publisher). Without scenarios to run, nothing changes.
-- **Relaxed points** _(planned for M29)_. A contract scenario that covers a relaxed point is skipped. The publish result
-  lists each skipped scenario with the point that skipped it.
+- **Relaxed points** _(built)_. A contract scenario that covers a relaxed point of its module is skipped. Its result in
+  the request's scenario results is `{ name, file, outcome: "skipped", point }`, with the first relaxed point in its
+  `covers`, and the publisher writes a `<tenant> scenario <name> skipped: …` line. The other scenarios run as before.
 
 ## In Studio
 

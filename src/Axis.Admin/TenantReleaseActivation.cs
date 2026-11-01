@@ -285,6 +285,8 @@ internal sealed class TenantReleaseActivation(
     /// there is no contract scenario, it runs nothing, writes no line and returns <c>true</c>, so the next step reports the
     /// compile problem. Otherwise it fails with <c>AXC0217</c> when <paramref name="scenarioServer"/> is null, and with one
     /// <c>AXC0342</c> for each scenario that failed, after every scenario ran. Each outcome is added to <paramref name="results"/>.
+    /// A scenario that covers a point the application relaxed does not run. It adds a <c>skipped</c> result with the point and one
+    /// output line, and the other scenarios run as before. When every scenario is skipped, no scenario server is needed.
     /// The scenarios may run for at most <paramref name="limit"/>, and then fail with <c>AXC0219</c>. A stop never cuts them short.
     /// Returns whether the step passed.
     /// </summary>
@@ -309,14 +311,47 @@ internal sealed class TenantReleaseActivation(
             return true;
         }
 
-        var scenarios = compiled.ModuleScenarios.Where(scenario => scenario.Contract is not null).ToList();
-        if (scenarios.Count == 0)
+        var contractScenarios = compiled.ModuleScenarios.Where(scenario => scenario.Contract is not null).ToList();
+        if (contractScenarios.Count == 0)
         {
             return true;
         }
 
+        // A name is <module id>/<name>. The point named is the first of the scenario's covers that its module relaxed.
+        var relaxed = compiled.ModulePins.ToDictionary(
+            pin => pin.Id, pin => pin.Relaxed.Select(entry => entry.Point).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
+        var skipped = new List<(ScenarioResource Scenario, string Point)>();
+        var scenarios = new List<ScenarioResource>();
+        foreach (var scenario in contractScenarios)
+        {
+            var slash = scenario.Name.IndexOf('/');
+            var module = slash < 0 ? "" : scenario.Name[..slash];
+            var point = relaxed.TryGetValue(module, out var points)
+                ? scenario.Contract!.Covers.FirstOrDefault(points.Contains)
+                : null;
+            if (point is null)
+            {
+                scenarios.Add(scenario);
+            }
+            else
+            {
+                skipped.Add((scenario, point));
+            }
+        }
+
         return await Step(id, "contracts", async () =>
         {
+            foreach (var (scenario, point) in skipped)
+            {
+                results.Add(new JsonObject { ["name"] = scenario.Name, ["file"] = scenario.File, ["outcome"] = "skipped", ["point"] = point });
+                output.WriteLine($"{id} scenario {scenario.Name} skipped: it covers the relaxed point {point}");
+            }
+
+            if (scenarios.Count == 0)
+            {
+                return;
+            }
+
             if (scenarioServer is null)
             {
                 const string message = "The setting Scenarios:ServerConnectionString is not set, so contract scenarios cannot run.";

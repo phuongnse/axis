@@ -555,10 +555,15 @@ role unless it says otherwise.
    find them. A snapshot that cannot be read or does not compile, and an application
    whose modules have no contract scenario, run nothing and write no `contracts` line, so
    the next step reports the problem as before. Otherwise the step fails with `AXC0217`
-   when the setting is empty. If not, it runs every contract scenario in its own database, as
+   when the setting is empty and at least one contract scenario is left to run. A contract
+   scenario that covers a point its module has relaxed, see
+   [relax entries](module-contracts.md#relax-entries), is skipped. It writes
+   `<tenant> scenario <name> skipped: …` with the point, and its result is
+   `{ name, file, outcome: "skipped", point }`. When every scenario is skipped, the step needs no
+   scenario server. The others run, each in its own database, as
    for a `test`, whatever the outcome of the ones before. Each failing scenario adds
    one `AXC0342`, and the step writes `<tenant> contracts failed: AXC0342 …` for
-   each, then ends the request with nothing stored or activated. Each scenario writes
+   each, then ends the request with nothing stored or activated. Each scenario that runs writes
    a `<tenant> scenario <name> passed` or `failed` line, and its outcome goes
    in the request's `scenario_results`. The scenarios may run for 10 minutes, counted from the
    first one of each claim, and past that the request fails with `AXC0219`. A stop of

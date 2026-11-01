@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Tests;
 using Axis.Data;
@@ -113,6 +115,38 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.Contains(deleted.GetProperty("items").EnumerateArray(), item => item.GetProperty("actor").GetString() == "gone");
     }
 
+    [Fact]
+    public async Task A_release_activated_with_a_relax_entry_is_off_standard_and_lists_the_relaxed_point_and_its_reason()
+    {
+        const string point = "Request/transitions/submit";
+        const string reason = "Tests skip it.";
+        var fixtureModules = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Modules");
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Fixtures", "ModuleContractApp"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_relax", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path, fixtureModules);
+
+        // Creating a client starts the server, which activates the folder without relax entries as release 1.
+        using var author = factory.CreateClient().SignedInAs("author");
+        var manifestPath = Path.Combine(folder.Path, "application.json");
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath, CancellationToken))!;
+        manifest["modules"]![0]!["relax"] = new JsonArray(new JsonObject { ["point"] = point, ["reason"] = reason });
+        await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString(), CancellationToken);
+        await ActivateWithModulesAsync(connectionString, folder.Path, fixtureModules, ActivationActor.User("author", null, null, null));
+
+        var history = await GetAsync(author, "/api/studio/apps/ModuleContractApp/releases");
+
+        var items = history.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal([2, 1], items.Select(item => item.GetProperty("number").GetInt32()));
+        Assert.True(items[0].GetProperty("offStandard").GetBoolean());
+        var relaxed = Assert.Single(items[0].GetProperty("relaxed").EnumerateArray());
+        Assert.Equal(
+            ("requests", point, reason),
+            (relaxed.GetProperty("module").GetString(), relaxed.GetProperty("point").GetString(), relaxed.GetProperty("reason").GetString()));
+        Assert.False(items[1].GetProperty("offStandard").GetBoolean());
+        Assert.Equal(0, items[1].GetProperty("relaxed").GetArrayLength());
+    }
+
     private static string? ActorName(JsonElement history, string actor) =>
         history.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("actor").GetString() == actor).GetProperty("actorName").GetString();
 
@@ -174,7 +208,23 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.Empty(result.Diagnostics);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string connectionString, string folder) =>
+    // Like ActivateAsync, but for an application that pins modules from modulesPath and needs no bindings.
+    private static async Task ActivateWithModulesAsync(string connectionString, string folder, string modulesPath, ActivationActor actor)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
+        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, SamplePackages.Versions, ModuleCatalog.Load(modulesPath).Modules, CancellationToken);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Severity == Axis.Configuration.Diagnostics.DiagnosticSeverity.Error);
+        var bindings = new ActivationBindings(Tenant, new Dictionary<string, ActivationBinding>(), AllowHttp: false);
+        var result = await ReleaseActivator.ActivateAsync(
+            compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance,
+            ReleaseActivator.DefaultInlineRecomputeLimit, actor, CancellationToken);
+        Assert.Empty(result.Diagnostics);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(string connectionString, string folder, string? modulesPath = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -194,7 +244,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
                 builder.UseSetting(key, value);
             }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
-            builder.UseSetting("Modules:Path", SampleModules.Path);
+            builder.UseSetting("Modules:Path", modulesPath ?? SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
