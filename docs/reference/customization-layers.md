@@ -5,8 +5,11 @@ resource of the module and holds only what the application changes in it. Compil
 layers to the pinned module version, then checks the result, the [module contract](module-contracts.md)
 included. [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees
 the idea, and [D122](../decisions/d122-how-a-customization-layer-is-written-and-applied.md) agrees
-the shapes below. Everything here is _(planned for M25)_. Module upgrades, the three-way merge and
-eject are _(planned for M29)_.
+the shapes below. The layer resource and the checks of [the layer resource](#the-layer-resource)
+are built: a layer that compiles is stored in the release and counts toward its content hash, but
+does not yet change anything. Applying layers, Studio's support for them and everything below
+that section are _(planned for M25)_. Module upgrades, the three-way merge and eject are
+_(planned for M29)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -60,14 +63,27 @@ threshold is new:
 - **Shape.** `id`, `kind` and `formatVersion` as for every resource, `target`, and `changes`.
 - **Target.** `target` names a resource of a module that `application.json` declares, as
   `<module id>/<name>`. The file's folder must be that module's id and its file name the resource's
-  name, so a reader finds the layer of a resource without opening every file. Two layers with one
-  target are a diagnostic.
-- **What a layer may target.** Every kind a module holds, except `scenario` and `module.json`. A
+  name, so a reader finds the layer of a resource without opening every file. A target that names
+  nothing in a declared module is `AXC0344`, and a file anywhere else is `AXC0346`. Two layers with
+  one target are `AXC0347`, reported on the later file. Each of these checks reports at `/target`.
+- **Letter case.** The module id in a target is matched exactly. The resource name is matched
+  ignoring letter case, as resource names are elsewhere. The file path must equal
+  `customizations/<target as written>.json`, exactly.
+- **The module manifest.** `module.json` is targeted as `<module id>/module`. That counts only when
+  the module has no resource named `module`, and it is not allowed, see below.
+- **An ambiguous target.** Names are unique only within one kind, so a module may hold a data
+  source and a page that share a name, and `<module id>/<name>` cannot tell them apart. The compiler
+  does not guess: such a target is `AXC0349`. A resource whose name another kind in the module
+  shares cannot be targeted yet. The lasting fix, such as a `targetKind` property, is open.
+- **What a layer may target.** Every kind a module holds, except `scenario` and `module.json`, which
+  are `AXC0345`. A layer in a module folder is refused like any kind a module may not hold,
+  `AXC0202`. A
   `contract` takes only added states and transitions, see
   [extending a lifecycle](#extending-a-lifecycle).
 - **Changes.** `changes` has the shape of the target resource, with only what changes. The rules of
   [applying a layer](#applying-a-layer) say how each part is read.
-- **What never changes.** The target's `id`, `kind`, `name` and `formatVersion`, and the `name` of
+- **What never changes.** The target's `id`, `kind`, `name` and `formatVersion`, which a layer that
+  sets them gets `AXC0348` for at `/changes/<property>`, and the `name` of
   any element. A rename is a remove and an add, so every reference to the old name becomes a
   diagnostic.
 - **The application's own resources.** A new resource of the business, such as an entity of its

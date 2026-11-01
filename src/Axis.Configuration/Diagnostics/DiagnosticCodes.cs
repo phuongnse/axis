@@ -326,4 +326,10 @@ public static class DiagnosticCodes
     public const string ContractOnApplicationScenario = "AXC0340";
     public const string ContractScenarioFailed = "AXC0342";
     public const string DuplicateEntityElementName = "AXC0343";
+    public const string UnknownLayerTarget = "AXC0344";
+    public const string LayerTargetNotAllowed = "AXC0345";
+    public const string MisplacedLayer = "AXC0346";
+    public const string DuplicateLayerTarget = "AXC0347";
+    public const string LayerChangesIdentity = "AXC0348";
+    public const string AmbiguousLayerTarget = "AXC0349";
 }
