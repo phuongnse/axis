@@ -1,26 +1,34 @@
-import { CloseCircleOutlined, CloudUploadOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  CloudUploadOutlined,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons'
 import { Flex } from 'antd'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { folderDiffers, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
+import { folderDiffers, releaseRows, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 
 /**
  * Proposed: the open application's state in Studio's band, on every page but the Overview, beside Validate and
  * Publish…: its errors, which stop Publish, its warnings, and whether the folder has changes the live release lacks,
- * or that it has no live release yet.
- * Each opens the Overview, which lists them. Nothing shows when nothing needs attention.
+ * or that it has no live release yet. Each opens the Overview, which lists them. When nothing needs attention it names
+ * the live release, a link to Releases, so a quiet band never leaves the author guessing whether it is still loading.
  */
 export function StudioStatus({
   diagnostics,
   releases,
   overview,
+  history,
 }: {
   diagnostics: readonly StudioDiagnostic[]
   releases: StudioReleases | 'failed' | undefined
   /** The Overview's address. */
   overview: string
+  /** The address of the release history. */
+  history: string
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
@@ -30,7 +38,7 @@ export function StudioStatus({
   // Proposed: an application with no live release says so, as no site runs it yet.
   const unpublished = releases !== undefined && releases !== 'failed' && releases.active === null
   const count = (key: string, n: number) => t(`${key}.${n === 1 ? 'one' : 'other'}`).replace('{count}', String(n))
-  const entries: { key: string; icon: ReactNode; text: string; colour: string }[] = []
+  const entries: { key: string; icon: ReactNode; text: string; colour: string; to?: string }[] = []
   if (errors > 0) {
     entries.push({
       key: 'errors',
@@ -63,6 +71,26 @@ export function StudioStatus({
       colour: colour.textMuted,
     })
   }
+  if (releases === 'failed') {
+    entries.push({
+      key: 'failed',
+      icon: <ExclamationCircleOutlined aria-hidden />,
+      text: t('shell.studio.status.releasesFailed'),
+      colour: colour.warningText,
+      to: history,
+    })
+  }
+  const live =
+    releases !== undefined && releases !== 'failed' ? releaseRows(releases).find((row) => row.active) : undefined
+  if (entries.length === 0 && live) {
+    entries.push({
+      key: 'live',
+      icon: <CheckCircleOutlined aria-hidden />,
+      text: t('shell.studio.status.live').replace('{number}', String(live.number)),
+      colour: colour.textMuted,
+      to: history,
+    })
+  }
   if (entries.length === 0) {
     return null
   }
@@ -76,7 +104,7 @@ export function StudioStatus({
     >
       {entries.map((entry) => (
         <li key={entry.key}>
-          <Link to={overview} style={{ color: entry.colour, display: 'inline-flex', gap: spacing.xs }}>
+          <Link to={entry.to ?? overview} style={{ color: entry.colour, display: 'inline-flex', gap: spacing.xs }}>
             {entry.icon}
             {entry.text}
           </Link>

@@ -418,6 +418,7 @@ function StudioWorkspace() {
               diagnostics={loaded.diagnostics}
               releases={releases?.application === application ? releases.history : undefined}
               overview={studioAddress(application, { name: 'overview' })}
+              history={studioAddress(application, { name: 'releases' })}
             />
           ) : undefined
         }
