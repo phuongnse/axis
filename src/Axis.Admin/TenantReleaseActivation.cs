@@ -201,7 +201,8 @@ internal sealed class TenantReleaseActivation(
     /// Runs the <c>version</c> step and then the <c>test</c> step for the tenant <paramref name="id"/>. The test step fails
     /// with <c>AXC0217</c> when <paramref name="scenarioServer"/> is null, and when the snapshot cannot be read, which is a null
     /// <paramref name="files"/>, or does not compile. It fails with <c>AXC0218</c> for each name of
-    /// <paramref name="scenarioNames"/>, a JSON array of strings or null for every scenario, that the application does not have.
+    /// <paramref name="scenarioNames"/>, a JSON array of strings or null for every scenario, that the application does not have. A name of a module's
+    /// scenario is <c>&lt;module id&gt;/&lt;name&gt;</c>, and the module's scenarios run after the application's own.
     /// In each of these cases no scenario runs. Otherwise it runs the chosen scenarios in file order, and fails when one
     /// failed. Every compile diagnostic, warnings included, is added to <paramref name="diagnostics"/>.
     /// The scenarios may run for at most <paramref name="limit"/>, counted from the first of them. A run that
@@ -246,7 +247,7 @@ internal sealed class TenantReleaseActivation(
                     throw new DiagnosticsFailure(compiled.Diagnostics);
                 }
 
-                var scenarios = ApplicationLoader.Load(files).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).ToList();
+                var scenarios = ApplicationLoader.Load(files).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).Concat(compiled.ModuleScenarios).ToList();
                 if (scenarioNames is not null)
                 {
                     var names = JsonSerializer.Deserialize<List<string>>(scenarioNames) ?? [];

@@ -13,8 +13,8 @@ installation, declaring, pinning, dependencies between modules, the diagnostics 
 `AXC0295` and `AXC0296`, the
 role slots with their mapping, `AXC0292` to `AXC0294`, the connector slots with their
 mapping, `AXC0297` to `AXC0303`, the maps of a depending module, with `AXC0306`, the module
-policies that name role slots, `AXC0304` and `AXC0305`, and the task assignees that name role slots,
-`AXC0307`, are built. A pinned module's files are stored in the release and
+policies that name role slots, `AXC0304` and `AXC0305`, the task assignees that name role slots,
+`AXC0307`, and the scenarios that name role slots, `AXC0335`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources, forms and policies join the application
 model, each with an id derived from the application `id` and the name
@@ -82,9 +82,9 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
   [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
-  `form`, `page`, `process`, `event`, `text`, `seed`, `policy`, `contract` and `trigger`
-  of type `event`, `dataChange` or `schedule`. Roles are not allowed.
-  _(planned for M24)_ `scenario` is allowed too. See
+  `form`, `page`, `process`, `event`, `text`, `seed`, `policy`, `contract`,
+  `scenario` and `trigger` of type `event`, `dataChange` or `schedule`. Roles
+  are not allowed. See
   [module contracts](module-contracts.md). Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
@@ -257,7 +257,7 @@ permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies. Dependencies (the `modules` list with the slot maps), resolving the graph, one
-copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios and module policy grants on the module's processes are _(planned for M24)_.
+copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios are built. Module policy grants on the module's processes are _(planned for M24)_.
 
 ```json
 {
@@ -288,7 +288,7 @@ An application that declares it maps the slot to one of its own roles:
 ```
 
 - **Kinds.** A module may also hold `process` _(built)_, `trigger` of type `event`,
-  `dataChange` or `schedule` _(built)_ and _(planned for M24)_ `scenario`, as
+  `dataChange` or `schedule`, and `scenario`, as
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
   `connector`, `endpoint` or `webhook`.
 - **Role slots.** `roles` in `module.json` lists the module's role slots, each
@@ -446,11 +446,20 @@ An application that declares it maps the slot to one of its own roles:
   header and lookup, and the worker runs it like an application step. Two
   applications that map one slot to different connectors call different
   systems. A module never names a binding.
-- **Scenarios** _(planned for M24)_. A module scenario gives its users role
-  slots instead of roles. When it runs for an application, each slot becomes
-  the role it maps to, and the scenario runs against the application as
-  customized. A module marks some as contract scenarios, which run on every
-  publish, see [contract scenarios](module-contracts.md#contract-scenarios).
+- **Scenarios** _(built)_. A module scenario gives its users, and its assignee
+  and recipient roles, role slots instead of roles. A role that is not a slot is
+  `AXC0335`, in the module file. Its steps name entities and processes of its own
+  module by plain name. A name with `/`, even of a module it declares, is
+  `AXC0208`, and an unknown entity or process has its usual code. A connector
+  stub names a connector slot, and a package stub names a package the module
+  lists. When it runs for each application that pins the module, each slot
+  becomes the role the application maps it to, and the scenario runs against the
+  application as compiled. A module's scenarios run after the application's own,
+  in pin order and then by file path, in Studio and with `Axis.Scenarios`. A result
+  is named `<module id>/<scenario name>`. The scenario files stay out of the
+  release and its content hash. A module marks some as contract scenarios
+  _(planned for M24)_, which run on every publish, see
+  [contract scenarios](module-contracts.md#contract-scenarios).
 - **Dependencies.** _(built)_ `module.json` has an optional `modules`, with the `id` and
   `version` entries of an application's `modules`. A bad entry is `AXC0203`,
   `AXC0204` or `AXC0206`, reported in the `module.json` of the module that

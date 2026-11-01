@@ -320,4 +320,5 @@ public static class DiagnosticCodes
     public const string UnknownCeilingSlot = "AXC0332";
     public const string UnknownCeilingField = "AXC0333";
     public const string GrantPastCeiling = "AXC0334";
+    public const string ModuleScenarioRoleNotSlot = "AXC0335";
 }

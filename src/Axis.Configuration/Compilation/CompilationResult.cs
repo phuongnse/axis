@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Compilation;
 
@@ -22,6 +23,14 @@ public sealed record CompilationResult(ApplicationModel? Model, IReadOnlyList<Di
 
     /// <summary>The modules the application pins, each with the installed version the compile picked, even when it has errors.</summary>
     public IReadOnlyList<PinnedModuleModel> ModulePins { get; init; } = [];
+
+    /// <summary>
+    /// The scenarios of the pinned modules, present when no diagnostic is an error. Each is named
+    /// <c>&lt;module id&gt;/&lt;name&gt;</c> and its users, assignees and recipients hold the application roles the pins map
+    /// the module's role slots to. They come in pin order and then by file path, to run after the application's own scenarios.
+    /// They are not part of the release or its content hash.
+    /// </summary>
+    public IReadOnlyList<ScenarioResource> ModuleScenarios { get; init; } = [];
 
     /// <summary>The application's content hash; see <see cref="Releases.ContentHash"/>.</summary>
     public string? ContentHash { get; init; }

@@ -41,8 +41,10 @@ test.describe('author runs the test scenarios of the purchase request sample fro
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 240_000,
     })
-    await expect(page.getByTestId('studio-test-result')).toHaveCount(6)
-    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(6)
+    await expect(page.getByTestId('studio-test-result')).toHaveCount(7)
+    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(7)
+    // The module's scenario runs with the application's own, named by its module.
+    await expect(page.getByTestId('studio-test-result').filter({ hasText: 'department-budgets/ApproverCreatesBudget' })).toHaveCount(1)
   })
 
   test('Run runs one broken scenario, and selecting its failure opens the failing step', async ({ page }) => {

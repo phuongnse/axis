@@ -811,8 +811,8 @@ the outcome, see [Studio](studio.md).
 - **Who may.** The author role is enough. It needs no publisher role, because
   a test changes no tenant. It costs database time, so the limits below apply.
 - **The body.** The optional `scenarios` list names the scenarios to run, by
-  their `name`. With no body, no list or an empty list, every scenario runs.
-  An unknown name is accepted with `202`, and the request then ends `failed`
+  their `name`. With no body, no list or an empty list, every scenario runs,
+  a pinned module's after the application's own, as `<module id>/<name>`. An unknown name is accepted with `202`, and the request then ends `failed`
   with `AXC0218`, as for a folder with errors.
 - **Where it runs.** The publisher runs it with `Scenarios:ServerConnectionString`,
   in a new database for each scenario, see
@@ -825,7 +825,7 @@ the outcome, see [Studio](studio.md).
 - **The outcome.** `scenarios` holds one item for each scenario that ran. A
   scenario that fails has the failing `step`, its `path` and its `message`.
   Selecting it in Studio opens the scenario at that step, as a diagnostic opens
-  a resource.
+  a resource. A module's scenario opens nothing.
 - **Limits.** The scenarios of a request run one after another. A request stops
   after 10 minutes: the scenario that runs fails, its database is dropped and
   the request ends `failed` with `AXC0219`. A stop of the publisher does the same

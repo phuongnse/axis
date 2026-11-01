@@ -89,10 +89,12 @@ request ends `approved`:
 - `users` maps a user id to its role names. Each role must be a declared
   [`role`](roles-and-policies.md). No identity provider takes part. The runner
   gives each step the user's id and roles, as a session would.
-  _(planned for M24)_ A scenario in a module names role slots of the module
-  instead, and each becomes the role the application maps it to, see
+  A scenario in a module names role slots of the module instead, and each
+  becomes the role the application maps it to, see
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md)
-  and [contract scenarios](module-contracts.md#contract-scenarios).
+  and [module scenarios](modules-and-templates.md#processes-pages-policies-and-dependencies).
+  An assignee role and a recipient role are slots too. A name that is not a slot
+  is `AXC0335`.
 - `now` is a date-time with an offset. It fixes the time that expressions,
   filters, sequence numbers and task due dates read, for the whole scenario.
   Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.
@@ -393,6 +395,11 @@ What runs now:
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops
 a scenario at its first failing step.
+
+Each module the application pins may hold scenarios, see
+[module scenarios](modules-and-templates.md#processes-pages-policies-and-dependencies).
+They run after the application's own, for each module in pin order and then by file path. A result
+is named `<module id>/<scenario name>`, in the output, the JUnit file and the Studio test results.
 
 It writes `scenarios-<application name>.xml`, a JUnit file with one test case per
 scenario, to `artifacts/test-results/`, or to the folder of `--results`. The exit
