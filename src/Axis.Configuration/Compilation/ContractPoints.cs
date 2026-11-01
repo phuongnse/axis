@@ -43,12 +43,9 @@ internal static class ContractPoints
                 }
             }
 
-            if (contract.Effects is { ValueKind: JsonValueKind.Array } effects)
+            foreach (var effect in contract.Effects ?? [])
             {
-                foreach (var item in effects.EnumerateArray())
-                {
-                    points.Add($"{entity}/effects/{item.GetProperty("name").GetString()}");
-                }
+                points.Add($"{entity}/effects/{effect.Name}");
             }
 
             if (contract.Ceiling is { } ceiling)

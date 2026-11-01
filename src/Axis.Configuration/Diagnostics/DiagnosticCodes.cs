@@ -326,4 +326,7 @@ public static class DiagnosticCodes
     public const string ContractOnApplicationScenario = "AXC0340";
     public const string ContractScenarioFailed = "AXC0342";
     public const string DuplicateEntityElementName = "AXC0343";
+    public const string UnknownEffectTransition = "AXC0344";
+    public const string InvalidEffectEntity = "AXC0345";
+    public const string InvalidEffectValue = "AXC0346";
 }

@@ -26,7 +26,9 @@ namespace Axis.Configuration.Compilation;
 /// <c>modules</c>, the application's or, with <c>undeclaredModuleIsUnknown</c>, those of a module. A
 /// navigate action's parameter sees <c>id</c>, as a reference parameter to the root entity, so a
 /// path cannot start at it, and the names of the row or record. It has no rules and no collections. A field default sees no fields, no collections and no
-/// paths, and has the rules it is given.
+/// paths, and has the rules it is given. A module contract's effect value sees <c>id</c> as a reference
+/// parameter to the contract's entity, then the entity's fields and child collections and the module's
+/// rules, and resolves no paths.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -186,6 +188,32 @@ public static class ExpressionScopes
             CollectionsOf(all, findEntity),
             ReferenceFieldsOf(findEntity),
             modules);
+    }
+
+    /// <summary>
+    /// The scope of a module contract's effect value: <c>id</c> as a reference parameter to the contract's
+    /// entity, then every field of the entity, computed ones included, its child collections, which only
+    /// aggregates accept, and the named <paramref name="rules"/>. It resolves no paths. A rule call
+    /// qualified with a module id is allowed only for the ids in <paramref name="modules"/>.
+    /// </summary>
+    internal static ExpressionScope ForContractEffect(
+        string entityName,
+        IEnumerable<FieldDefinition> fields,
+        IEnumerable<ExpressionRule> rules,
+        Func<string, EntityResource?> findEntity,
+        IEnumerable<string>? modules)
+    {
+        var all = fields.ToList();
+        return Build(
+            [
+                ("id", (ExpressionType?)ExpressionType.ReferenceParameter(entityName)),
+                .. all.Select(field => (field.Name, TypeOf(field))),
+            ],
+            rules,
+            CollectionsOf(all, findEntity),
+            referenceFields: null,
+            modules,
+            undeclaredModuleIsUnknown: true);
     }
 
     /// <summary>

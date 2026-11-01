@@ -2823,7 +2823,7 @@ public static partial class ApplicationCompiler
                     [.. declared.Fields.Select(name => FindField(entity, name)!.Name)],
                     declared.Unique ?? false))
                 .ToList(),
-            Contract = contract is null ? null : BuildContract(contract, entity, scope, filterRules, modules, slotRoles, entitiesByName),
+            Contract = contract is null ? null : BuildContract(contract, entity, scope, rules, filterRules, modules, slotRoles, entitiesByName),
         };
     }
 
@@ -2836,6 +2836,7 @@ public static partial class ApplicationCompiler
         ContractResource contract,
         EntityResource entity,
         ExpressionScope scope,
+        IEnumerable<ExpressionRule> rules,
         IReadOnlyList<ExpressionRule> filterRules,
         IReadOnlySet<string>? modules,
         IReadOnlyDictionary<string, string>? slotRoles,
@@ -2862,6 +2863,26 @@ public static partial class ApplicationCompiler
             };
         }
 
+        // A checked effect names a root entity of the contract's module, and each value key names a writable field once.
+        ContractEffectModel BuildEffect(ContractEffectDefinition effect)
+        {
+            var moduleId = entity.Name[..entity.Name.IndexOf('/', StringComparison.Ordinal)];
+            var target = entitiesByName[$"{moduleId}/{effect.Create.Entity}"];
+            var effectScope = ExpressionScopes.ForContractEffect(entity.Name, entity.Fields, rules, entitiesByName.GetValueOrDefault, modules);
+            var values = new Dictionary<string, string>(effect.Create.Values, StringComparer.OrdinalIgnoreCase);
+            return new ContractEffectModel(
+                effect.Name,
+                effect.On,
+                new EntityReference(target.Id, target.Name),
+                [
+                    .. target.Fields
+                        .Where(field => values.ContainsKey(field.Name))
+                        .Select(field => new RecordAssignmentModel(
+                            field.Name,
+                            ExpressionModel.Compile(values[field.Name], effectScope, ExpressionScopes.TypeOf(field)!, contract: true))),
+                ]);
+        }
+
         return new()
         {
             Name = contract.Name,
@@ -2881,6 +2902,7 @@ public static partial class ApplicationCompiler
                         Message = transition.Message,
                     })],
                 },
+            Effects = [.. (contract.Effects ?? []).Select(BuildEffect)],
             Ceiling = contract.Ceiling is { } ceiling ? BuildCeiling(ceiling) : null,
         };
     }

@@ -3,8 +3,8 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled module contract on an entity of a pinned module. The lifecycle and the grant ceiling are
-/// compiled so far. Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
+/// A compiled module contract on an entity of a pinned module. The lifecycle, the effects and the grant
+/// ceiling are compiled so far. Nothing runs the effects yet. Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
 /// The filters of the grant ceiling narrow a role's grants when a request runs, see <c>PolicyEvaluator.Access</c>.
 /// </summary>
 public sealed record ContractModel
@@ -18,9 +18,19 @@ public sealed record ContractModel
     /// <summary>The lifecycle of the entity, or null when the contract has none.</summary>
     public LifecycleModel? Lifecycle { get; init; }
 
+    /// <summary>The effects of transitions, in declaration order. The list is empty when the contract has none.</summary>
+    public IReadOnlyList<ContractEffectModel> Effects { get; init; } = [];
+
     /// <summary>The grant ceiling, or null when the contract has none.</summary>
     public CeilingModel? Ceiling { get; init; }
 }
+
+/// <summary>
+/// A compiled effect of a transition: the record of <see cref="Entity"/> that a record's
+/// <see cref="On"/> transition creates. <see cref="Values"/> hold the compiled expression of each field the
+/// effect sets, in the entity's field order.
+/// </summary>
+public sealed record ContractEffectModel(string Name, string On, EntityReference Entity, IReadOnlyList<RecordAssignmentModel> Values);
 
 /// <summary>
 /// A compiled grant ceiling: the entries of each application role that some role slot of the module maps
