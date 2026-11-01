@@ -13,7 +13,7 @@ Refusing a value for a hidden or `readOnlyWhen` field in the task API is built. 
 server evaluates every condition.
 NexKit autopilot confirmed these points for the owner on
 issue #934 on 2026-10-21. The reference text is in
-[Form conditions and steps](../reference/resource-files.md#form-conditions-and-steps), the
+[Form conditions and steps](../reference/form-conditions.md#form-conditions-and-steps), the
 [form state endpoint](../reference/record-api.md#form-state) and the
 [task form state endpoint](../reference/task-api.md#form-state-of-a-task).
 

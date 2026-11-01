@@ -258,7 +258,7 @@ flowchart LR
      Each section title joins the `AXC0028` check, at
      `/sections/{i}/title/textKey`. The conditions and steps have their own
      checks, see
-     [Form conditions and steps](resource-files.md#form-conditions-and-steps):
+     [Form conditions and steps](form-conditions.md#form-conditions-and-steps):
      each condition is a boolean expression over the entity, and it reads only
      listed fields (`AXC0225`). `visibleWhen` is not allowed on a required
      field (`AXC0226`). A section name is used once (`AXC0227`). A step names

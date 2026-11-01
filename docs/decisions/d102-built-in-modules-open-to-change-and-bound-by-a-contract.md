@@ -64,6 +64,9 @@ the upgrade merge and eject, _(planned for M29)_, and the `service-desk` and
   - [D122](d122-how-a-customization-layer-is-written-and-applied.md) sets the layer's shapes: one
     file for each changed resource, a key for every list element, `after` and `before`, lifecycles
     that grow except into protected states, and Studio writing the difference.
+  - [D124](d124-the-organization-and-approvals-modules.md) sets what `organization` and
+    `approvals` hold: request types that decide the approval path, employees with a line manager,
+    delegation, and the general expression features they need.
 - **Two levels of invariants:**
   - **Platform invariants never relax:** server-side default-deny
     authorization, audit records, one decision per task, durable execution and

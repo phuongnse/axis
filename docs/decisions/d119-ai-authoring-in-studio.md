@@ -17,6 +17,10 @@ whichever model the installation chooses. Everything here is _(planned for M35 a
   the publish history.
 - **One tool surface, the MCP server:** Axis serves an MCP server over the authoring API. It is the
   only way any agent acts on Axis.
+  - [D125](d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) sets the shapes: the
+    transport and sign-in, client registration and the administrator's switch, the tools, durable
+    requests, accepts through the publisher, budgets, bindings, the eval, and revisions and drafts
+    in an internal git repository.
   - Its tools read a resource, change a draft, write a customization layer, validate, run
     scenarios, read diagnostics and read the reference index. There is no shell, no file system
     and no network behind them, so an agent can do nothing that its user could not do in Studio.

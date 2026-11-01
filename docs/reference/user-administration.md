@@ -124,6 +124,10 @@ seven commands are built. The invite, resend an invitation, disable, enable and 
   [session lifetimes and re-authentication](security.md#session-lifetimes-and-re-authentication).
 - **Not on oneself:** an administrator cannot disable themselves or remove their own administrator role, so a tenant
   never loses its last administrator from the page.
+- **Export data and Usage** _(planned for M33)_. In a tenant of a cell, the users page has two more
+  sections for an administrator: "Export data", see
+  [exports by a tenant administrator](tenant-lifecycle.md#exports-by-a-tenant-administrator), and
+  "Usage", the tenant's quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
 
 ## Accounts
 

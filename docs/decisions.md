@@ -134,3 +134,7 @@ files agree, title and status included.
 | [D121](decisions/d121-how-a-module-contract-is-declared-and-checked.md) | How a module contract is declared and checked | **Agreed** |
 | [D122](decisions/d122-how-a-customization-layer-is-written-and-applied.md) | How a customization layer is written and applied | **Agreed** |
 | [D123](decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) | How an Axis SaaS cell keeps tenants apart, measured and recoverable | **Agreed** |
+| [D124](decisions/d124-the-organization-and-approvals-modules.md) | The organization and approvals modules | **Agreed** |
+| [D125](decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) | How AI authoring connects, runs and keeps its changes | **Agreed** |
+| [D126](decisions/d126-sign-up-trials-and-the-control-plane.md) | Sign-up, trials and the control plane | **Agreed** |
+| [D127](decisions/d127-plans-payments-and-invoices.md) | Plans, payments and invoices | **Agreed** |

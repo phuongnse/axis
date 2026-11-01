@@ -26,12 +26,19 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Configuration pipeline](reference/configuration.md)                   | Load, resolve, check, release and activate an application folder; the reference index |
 | [Diagnostic codes](reference/diagnostic-codes.md)                      | The shape of a diagnostic and the table of every `AXCnnnn` code                       |
 | [Resource files](reference/resource-files.md)                          | The resource file shape, schema keywords, entity fields, entity logic, sequences      |
+| [Form conditions](reference/form-conditions.md)                        | The conditions and wizard steps of a `form` resource                                  |
 | [Roles and policies](reference/roles-and-policies.md)                  | The `role` and `policy` resources, the record creator, sensitive fields               |
 | [Connectors, events and endpoints](reference/integration-resources.md) | Connectors and deployment bindings, the `event`, `trigger` and `endpoint` resources |
 | [Outbound webhooks](reference/outbound-webhooks.md)                    | The `webhook` resource, its compile checks, and the signed delivery of an event       |
 | [Modules and templates](reference/modules-and-templates.md)            | Reusable modules and application templates                                            |
 | [Module contracts](reference/module-contracts.md)                      | The `contract` resource: lifecycles, core validations, effects, grant ceilings, relax entries and contract scenarios |
 | [Customization layers](reference/customization-layers.md)              | The `layer` resource: changes to a module by keys, list keys, extending a lifecycle, and Studio writing the layer |
+| [Built-in modules](reference/built-in-modules.md)                      | The `organization` and `approvals` modules, the `approvals` application, request types, delegation and the approval contract |
+| [MCP server](reference/mcp-server.md)                                  | The MCP server for agents: route, sign-in, client registration, tools, limits and audit |
+| [Authoring requests](reference/authoring-requests.md)                  | The agent host and the request loop: states, plans, checks, review, budgets and accepting |
+| [Revisions and drafts](reference/revisions-and-drafts.md)              | The git repository of each application folder: revisions, drafts, accepts and undo |
+| [Model bindings](reference/model-bindings.md)                          | The `Ai` settings, model bindings, a tenant's own key and the authoring eval |
+| [AI authoring in Studio](reference/ai-authoring-in-studio.md)          | The request panel, plan approval, the diff, accept and drop, auto-accept and the history |
 | [Extension packages](reference/extension-packages.md)                  | Custom C# code: manifest, contracts, installation, loading, capabilities              |
 | [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
 | [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |
@@ -92,6 +99,14 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Worker scheduling](reference/worker-scheduling.md)                    | How the worker shares its time between tenants, and wakes an idle tenant               |
 | [Tenant lifecycle in a cell](reference/tenant-lifecycle.md)            | The cell's provisioning API: create a tenant, hosts, the export ZIP, deletion          |
 | [Cell console](reference/cell-console.md)                              | The page where the platform operator sees and provisions every tenant of a cell, and its operator realm |
+| [Control plane](reference/control-plane.md) | The service apart from the cells that runs sign-up, trials, plans and billing, and how it reaches the cells |
+| [Region directory](reference/region-directory.md) | Which cell holds each tenant and host, picking a cell, DNS routing and reserved names |
+| [Sign-up](reference/sign-up.md) | The public sign-up page, the subdomain, bot checks, email verification, provisioning and terms acceptance |
+| [Subscriptions](reference/subscriptions.md) | A tenant's trial and paid states, the read-only tenant, the dunning timeline and the control plane's emails |
+| [Plans](reference/plans.md) | The plan catalogue, versions, quotas from a plan, user packs and changing a plan |
+| [Payments](reference/payments.md) | Billing invoices, PayOS and VietQR, Paddle, webhooks, the daily reconciliation and the ledger |
+| [E-invoices](reference/e-invoices.md) | Vietnamese e-invoices issued on payment through a provider adapter |
+| [Billing portal](reference/billing-portal.md) | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
 | [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
 
