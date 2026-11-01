@@ -9,6 +9,12 @@ namespace Axis.Configuration.Resources;
 /// </summary>
 public sealed record GrantDefinition
 {
+    /// <summary>
+    /// The optional name of the grant. It is unique in its policy, ignoring letter case, and is the list key a
+    /// customization layer uses to find the grant.
+    /// </summary>
+    public string? Name { get; init; }
+
     public string? Entity { get; init; }
 
     public string? DataSource { get; init; }

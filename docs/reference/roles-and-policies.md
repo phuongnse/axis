@@ -192,8 +192,10 @@ outcomes. Operators inspect the approvals and change nothing:
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](security.md#combining-grants).
-- **Name** _(planned for M25)_. Each grant has a `name`, unique in its policy,
-  so a [customization layer](customization-layers.md#list-keys) can change it.
+- **Name.** A grant may have a `name`, which follows the name pattern and is
+  unique in its policy, ignoring letter case. A repeated name is `AXC0347`. A
+  [customization layer](customization-layers.md#list-keys) finds a grant by its
+  name. The name becomes required in a later step _(planned for M25)_.
 - **Ceiling.** A grant on a module entity that has a contract stays within
   the role's ceiling: an action or field past it is a diagnostic (`AXC0334`).
   At run time the filters of the role's ceiling entries that list the action

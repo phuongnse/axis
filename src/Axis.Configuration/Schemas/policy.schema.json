@@ -40,6 +40,7 @@
       "additionalProperties": false,
       "required": ["actions"],
       "properties": {
+        "name": { "$ref": "#/$defs/name" },
         "entity": { "type": "string", "minLength": 1, "x-axis-reference": "entity" },
         "dataSource": { "type": "string", "minLength": 1, "x-axis-reference": "dataSource" },
         "process": { "type": "string", "minLength": 1, "x-axis-reference": "process" },

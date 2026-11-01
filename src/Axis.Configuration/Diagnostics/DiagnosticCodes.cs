@@ -329,4 +329,5 @@ public static class DiagnosticCodes
     public const string UnknownEffectTransition = "AXC0344";
     public const string InvalidEffectEntity = "AXC0345";
     public const string InvalidEffectValue = "AXC0346";
+    public const string DuplicateGrantName = "AXC0347";
 }

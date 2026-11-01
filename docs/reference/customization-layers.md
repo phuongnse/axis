@@ -126,7 +126,7 @@ same change.
 | `contract` | `lifecycle.states`, `lifecycle.transitions` | `name` |
 
 - A key is unique in its list, ignoring letter case. An entity's `validations` and `indexes` require
-  `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A widget's `name` is unique on its page,
+  `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` report a repeated `name` as `AXC0347`, and a grant's `name` is still optional. A widget's `name` is unique on its page,
   whatever its depth, so a layer finds a widget inside a section or a tab by its name.
 - An element of a list that the table does not name is part of a value list.
 - A text's `texts` is a map, so a layer on a module text changes or adds keys as an object merges.
