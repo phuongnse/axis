@@ -1,0 +1,11 @@
+{
+  "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b08",
+  "kind": "policy",
+  "name": "ApproverAccess",
+  "formatVersion": 1,
+  "roles": ["approver"],
+  "grants": [
+    { "entity": "Review", "actions": ["read"] },
+    { "process": "Close", "actions": ["start"] }
+  ]
+}

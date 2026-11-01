@@ -9,7 +9,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the ModuleProcessApp fixture activated against the <c>reviews</c>
 /// test module under <c>Fixtures/Modules</c>. The application holds the module's copy of its
-/// <c>Review</c> entity, and maps the module's role slot <c>approver</c> to the role <c>manager</c>. The real server
+/// <c>Review</c> entity, and maps the module's role slot <c>approver</c> to the role <c>manager</c>. The module's policy
+/// grants <c>manager</c> read on <c>reviews/Review</c> and start on <c>reviews/Close</c>. The real server
 /// serves it on host <c>a.example.test</c> and signs in <c>clerk</c>, who holds the role <c>clerk</c> in the application,
 /// <c>manager</c>, who holds <c>manager</c>, <c>elsewhere</c>, who holds <c>manager</c> in another application only,
 /// and <c>outsider</c>, who holds no role. The endpoint callers are <c>review-importer</c>, who holds the role
