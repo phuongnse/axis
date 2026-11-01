@@ -252,7 +252,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
@@ -522,6 +522,15 @@ public static partial class ApplicationCompiler
                 maxFileSize,
                 diagnostics);
         }
+
+        var contracts = ContractChecker.Check(
+            moduleResources.Contracts,
+            FindEntity,
+            name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+            loaded.UnloadedEntityNames,
+            RulesFor,
+            DeclaredModulesOf,
+            diagnostics);
 
         PresentationChecker.Check(
             loaded,
@@ -801,7 +810,7 @@ public static partial class ApplicationCompiler
         }
 
         var entities = allEntities
-            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), DeclaredModulesOf(entity)))
+            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), DeclaredModulesOf(entity), contracts.GetValueOrDefault(entity.Name)))
             .ToList();
         var model = new ApplicationModel
         {
@@ -2650,7 +2659,8 @@ public static partial class ApplicationCompiler
         Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, SequenceResource> sequencesByName,
         IEnumerable<ExpressionRule> rules,
-        IReadOnlySet<string>? modules)
+        IReadOnlySet<string>? modules,
+        ContractResource? contract)
     {
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
@@ -2676,8 +2686,32 @@ public static partial class ApplicationCompiler
                     [.. declared.Fields.Select(name => FindField(entity, name)!.Name)],
                     declared.Unique ?? false))
                 .ToList(),
+            Contract = contract is null ? null : BuildContract(contract, entity, scope),
         };
     }
+
+    /// <summary>Builds the contract the checker accepted. A guard sees the entity's validation <paramref name="scope"/>.</summary>
+    private static ContractModel BuildContract(ContractResource contract, EntityResource entity, ExpressionScope scope) =>
+        new()
+        {
+            Name = contract.Name,
+            File = contract.File,
+            Lifecycle = contract.Lifecycle is not { } lifecycle
+                ? null
+                : new LifecycleModel
+                {
+                    Field = FindField(entity, lifecycle.Field)!.Name,
+                    States = [.. lifecycle.States.Select(state => new LifecycleStateModel(state.Name, state.Initial == true, state.Deletable == true))],
+                    Transitions = [.. lifecycle.Transitions.Select(transition => new LifecycleTransitionModel
+                    {
+                        Name = transition.Name,
+                        From = transition.From,
+                        To = transition.To,
+                        Guard = transition.Guard is null ? null : ExpressionModel.Compile(transition.Guard, scope, ExpressionType.Boolean),
+                        Message = transition.Message,
+                    })],
+                },
+        };
 
     private static FieldModel BuildField(
         EntityResource entity,

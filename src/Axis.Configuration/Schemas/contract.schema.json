@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "entity"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "contract" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "entity": { "$ref": "#/$defs/qualifiedName" },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "states"],
+      "properties": {
+        "field": { "$ref": "#/$defs/name" },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "$ref": "#/$defs/name" },
+              "initial": { "type": "boolean" },
+              "deletable": { "type": "boolean" }
+            }
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "from", "to"],
+            "properties": {
+              "name": { "$ref": "#/$defs/name" },
+              "from": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/$defs/name" }
+              },
+              "to": { "$ref": "#/$defs/name" },
+              "guard": { "type": "string", "minLength": 1, "x-axis-expression": true },
+              "message": { "$ref": "#/$defs/textReference" }
+            }
+          }
+        }
+      }
+    },
+    "validations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "expression", "message", "field"],
+        "properties": {
+          "name": { "$ref": "#/$defs/name" },
+          "expression": { "type": "string", "minLength": 1 },
+          "message": { "$ref": "#/$defs/textReference" },
+          "field": { "$ref": "#/$defs/name" }
+        }
+      }
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "on", "create"],
+        "properties": {
+          "name": { "$ref": "#/$defs/name" },
+          "on": { "$ref": "#/$defs/name" },
+          "create": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entity", "values"],
+            "properties": {
+              "entity": { "$ref": "#/$defs/name" },
+              "values": {
+                "type": "object",
+                "additionalProperties": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slots": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/ceilingEntry" }
+          }
+        },
+        "others": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ceilingEntry" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
+      "maxLength": 121
+    },
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
+      }
+    },
+    "ceilingEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actions"],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["read", "create", "update", "delete", "export", "import"] }
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/name" }
+        },
+        "filter": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

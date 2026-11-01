@@ -169,6 +169,18 @@ public static class ApplicationLoader
                 manifestFileReported |= kind is null || !CheckManifestFileKind(file, kind, resourceId, diagnostics);
             }
 
+            // Only a module holds a contract, so one here is reported and set aside without more checks.
+            if (kind == ResourceKinds.Contract)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ContractOutsideModule,
+                    $"Only a module holds a '{ResourceKinds.Contract}' resource. Move the file into a module.",
+                    file,
+                    "/kind",
+                    resourceId));
+                continue;
+            }
+
             var schemaValid = false;
             if (kind is not null)
             {

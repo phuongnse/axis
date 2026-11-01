@@ -29,13 +29,8 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration` or `scenario`), see
-   [identity provider resource](identity-provider.md#identity-provider-resource). The manifest is the
-   single `application` resource, stored as `application.json` at the
-   folder root; an `application` resource in any other file is not used as
-   the manifest. Resource IDs are unique across the application, compared as
-   UUIDs. Names are unique per kind, ignoring letter case. The same checks
-   run on a release's stored resources when the server rebuilds its model.
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration`, `scenario` or `contract`), see
+   [identity provider resource](identity-provider.md#identity-provider-resource). Only a module holds a `contract`, see [module contracts](module-contracts.md#the-contract-resource): one in an application folder is `AXC0320` and is not loaded. The manifest is the single `application` resource, stored as `application.json` at the folder root; an `application` resource in any other file is not used as the manifest. Resource IDs are unique across the application, compared as UUIDs. Names are unique per kind, ignoring letter case. The same checks run on a release's stored resources when the server rebuilds its model.
 2. **Resolve.** Every reference must resolve inside the application or its
    declared modules. The entity model is built here: each field's `type`
    becomes a typed field type, every type-specific property is checked against
