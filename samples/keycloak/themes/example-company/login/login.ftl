@@ -1,22 +1,24 @@
-<#-- The sample company's sign-in form: username or email, password and one button, with Keycloak's error under the
-     fields. -->
+<#-- The sample company's sign-in form: username or email, password and one button.
+     Proposed (design review 2026-10-30-studio): an empty field shows its own message under it before the form is sent,
+     and Keycloak's refusal shows once above the fields with both fields marked, never saying which one was wrong. -->
 <#import "template.ftl" as layout>
-<@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password'); section>
+<#assign refused = messagesPerField.existsError('username','password')>
+<@layout.registrationLayout displayMessage=true; section>
   <#if section = "header">
     ${msg("companyWelcome")}
   <#elseif section = "form">
-    <form class="company-form" action="${url.loginAction}" method="post" onsubmit="login.disabled = true; return true;">
+    <form id="company-sign-in" class="company-form" action="${url.loginAction}" method="post" novalidate>
       <label class="company-label" for="username">${msg("usernameOrEmail")}</label>
       <input class="company-input" id="username" name="username" type="text" value="${(login.username!'')}" autofocus
-             autocomplete="username" aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>">
+             autocomplete="username" required <#if refused>aria-invalid="true" aria-describedby="company-alert"</#if>>
+      <p class="company-error" id="username-error" hidden>${msg("companyUsernameRequired")}</p>
       <label class="company-label" for="password">${msg("password")}</label>
       <input class="company-input" id="password" name="password" type="password" autocomplete="current-password"
-             aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>">
-      <#if messagesPerField.existsError('username','password')>
-        <p class="company-error" aria-live="polite">${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}</p>
-      </#if>
+             required <#if refused>aria-invalid="true" aria-describedby="company-alert"</#if>>
+      <p class="company-error" id="password-error" hidden>${msg("companyPasswordRequired")}</p>
       <input type="hidden" id="id-hidden-input" name="credentialId" <#if auth.selectedCredential?has_content>value="${auth.selectedCredential}"</#if>>
       <button class="company-button" name="login" id="kc-login" type="submit">${msg("companySignIn")}</button>
     </form>
+    <script src="${url.resourcesPath}/js/company-sign-in.js"></script>
   </#if>
 </@layout.registrationLayout>

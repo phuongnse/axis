@@ -22,7 +22,7 @@
       <div class="company-panel">
         <h1 class="company-title"><#nested "header"></h1>
         <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
-          <div class="company-alert company-alert-${message.type}" role="alert">${kcSanitize(message.summary)?no_esc}</div>
+          <div class="company-alert company-alert-${message.type}" id="company-alert" role="alert">${kcSanitize(message.summary)?no_esc}</div>
         </#if>
         <#nested "form">
         <#if displayInfo><div class="company-info"><#nested "info"></div></#if>
