@@ -497,7 +497,7 @@ name `identity`, trusts only `/certs/server-ca.crt` in both places and never ski
 This installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`.
 PostgreSQL and the source of secrets are external. The chart runs
 [Axis's identity provider](identity-provider.md#installation), so it needs no
-OIDC provider of its own.
+OIDC provider of its own. Axis SaaS runs the chart in [cells](cells.md) _(planned for M31)_.
 
 The chart has one Deployment for the server and one for the worker, and a
 Service for the server. It also has a Deployment for the publisher, with one

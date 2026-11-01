@@ -723,11 +723,12 @@ admin host carries the same version in its OCI label, see
 
 ## Not built yet
 
-- Deleting a tenant.
-- An HTTP API for provisioning.
+- Deleting a tenant, and an HTTP API for provisioning, _(planned for M31)_ in a cell, see
+  [tenant lifecycle in a cell](tenant-lifecycle.md).
 - Moving a tenant to another database server.
 - Point-in-time recovery of a tenant, and restoring a tenant into another
-  installation.
+  installation. A cell keeps point-in-time recovery of its whole cluster, see
+  [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell) _(planned for M31)_.
 - Overwriting a tenant in place with a restore.
 - The platform audit records of the sign-in setting commands are planned with them, see
   [platform audit records](tenant-setting-commands.md#platform-audit-records).
