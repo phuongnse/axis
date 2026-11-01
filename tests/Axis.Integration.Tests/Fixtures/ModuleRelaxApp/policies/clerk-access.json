@@ -1,0 +1,12 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3e06",
+  "kind": "policy",
+  "name": "ClerkAccess",
+  "formatVersion": 1,
+  "roles": ["clerk"],
+  "grants": [
+    { "name": "ledgerClaimRead", "entity": "ledgers/Claim", "actions": ["read", "create", "update"] },
+    { "name": "entryRead", "entity": "ledgers/Entry", "actions": ["read"] },
+    { "name": "claimRead", "entity": "claims/Claim", "actions": ["read", "create"] }
+  ]
+}

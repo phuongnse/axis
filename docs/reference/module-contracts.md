@@ -10,9 +10,10 @@ shapes below. The `contract` resource and the compile checks of its `lifecycle`,
 `effects` and its `ceiling` are built. So is the lifecycle check on every record write, with the record API's
 `409` and its log line. So are the core validations on every create and update, with the record
 API's `400`. So is the compile check of a module scenario's `contract.covers`. So is the compile check
-of an application's `relax` entries, and the compiled module pin keeps the valid ones. A guard, a core
-validation and an effect value read `accountableUser()` and `decisionTask()`, the values of the write
-they check. The shared record update runs the effects of the transition it makes, in its own transaction.
+of an application's `relax` entries, and the compiled module pin keeps the valid ones. Each relaxed
+point stops applying, at compile time and at run time, as [relax entries](#relax-entries) describes.
+A guard, a core validation and an effect value read `accountableUser()` and `decisionTask()`, the
+values of the write they check. The shared record update runs the effects of the transition it makes, in its own transaction.
 The record API, a task completion, a process step, a connector or package output and a call
 resolution answer a failing effect, audit the effect records and fire the data change triggers for
 them. The same steps are still _(planned for M24)_ for an inbound endpoint call, which only creates
