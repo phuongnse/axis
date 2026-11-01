@@ -329,4 +329,10 @@ public static class DiagnosticCodes
     public const string UnknownEffectTransition = "AXC0344";
     public const string InvalidEffectEntity = "AXC0345";
     public const string InvalidEffectValue = "AXC0346";
+    public const string UnknownLayerTarget = "AXC0347";
+    public const string LayerTargetNotAllowed = "AXC0348";
+    public const string MisplacedLayer = "AXC0349";
+    public const string DuplicateLayerTarget = "AXC0350";
+    public const string LayerChangesIdentity = "AXC0351";
+    public const string AmbiguousLayerTarget = "AXC0352";
 }

@@ -21,8 +21,8 @@ const schemaByKind = new Map(
     schema,
   ]),
 )
-// The manifest is not created from Studio, and only a module holds a contract.
-const notCreatedKinds = ['application', 'contract']
+// The manifest is not created from Studio, only a module holds a contract, and Studio does not create layers yet.
+const notCreatedKinds = ['application', 'contract', 'layer']
 const createdKinds = [...schemaByKind.keys()].filter((kind) => !notCreatedKinds.includes(kind)).toSorted()
 
 function resolvePointer(root: unknown, pointer: string): unknown {
@@ -34,7 +34,7 @@ function resolvePointer(root: unknown, pointer: string): unknown {
 }
 
 describe('the starters', () => {
-  it('cover every bundled schema except the manifest', () => {
+  it('cover every bundled schema except the manifest, the contract and the layer', () => {
     expect(createdKinds.length).toBeGreaterThan(0)
     expect(starterKinds).toEqual(createdKinds)
   })
