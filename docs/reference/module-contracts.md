@@ -8,7 +8,8 @@ named point of it with a `relax` entry and a reason, and its release is then mar
 idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked.md) agrees the
 shapes below. The `contract` resource and the compile checks of its `lifecycle` and its `ceiling`
 are built. So is the lifecycle check on every record write, with the record API's `409` and its log
-line. So is the compile check of a module scenario's `contract.covers`. A refusal on another write
+line. So is the compile check of a module scenario's `contract.covers`. A guard reads
+`accountableUser()` and `decisionTask()`, the values of the write it checks. A refusal on another write
 path fails as that path already fails, and logs nothing yet. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
@@ -269,7 +270,8 @@ does. It is how a guard knows who decided.
 - **Allowed where.** In a contract's guards, core validations and effect values, and in the `set` of
   an `updateRecord` or `createRecord` step, which writes it as the value the write will be judged
   by, such as who decided a step. Anywhere else it is a diagnostic (`AXC0341`), as `currentUser()`
-  outside a policy filter is. A contract's expression is the diagnostic until contracts allow it.
+  outside a policy filter is. A guard is built and reads the values of the write it checks. A core
+  validation and an effect value are still the diagnostic until they are built.
 
 ## The deciding task
 

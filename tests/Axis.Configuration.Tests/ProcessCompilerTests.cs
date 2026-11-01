@@ -794,7 +794,7 @@ public sealed class ProcessCompilerTests
         Assert.Equal(
             (ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "processes/order-review.json", "/steps/0/branches/0/when"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Equal($"Function '{function}' is allowed only in the set of an updateRecord or createRecord step at character 1.", diagnostic.Message);
+        Assert.Equal($"Function '{function}' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step at character 1.", diagnostic.Message);
         Assert.Null(result.Model);
     }
 

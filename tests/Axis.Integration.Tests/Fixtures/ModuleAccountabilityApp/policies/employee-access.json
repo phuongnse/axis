@@ -1,0 +1,11 @@
+{
+  "id": "76bfbc15-7007-4394-849a-0c8d7348c471",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    { "process": "ApproveAtOnce", "actions": ["start", "inspect", "retry"] },
+    { "process": "ReviewThenApprove", "actions": ["start", "inspect", "retry"] }
+  ]
+}

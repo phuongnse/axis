@@ -1,5 +1,6 @@
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
+using Axis.Expressions.Evaluation;
 using Npgsql;
 
 namespace Axis.Data.Records;
@@ -47,6 +48,7 @@ internal static class RecordLifecycle
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
         IReadOnlyList<RecordLinks> links,
+        RecordWriteContext context,
         RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
@@ -87,7 +89,7 @@ internal static class RecordLifecycle
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var sets = await RecordSets.ReadAsync(connection, application, entity, stored, links, cancellationToken, cipher);
-        return RecordValidator.GuardHolds(application, entity, stored, values, rows, guard, now, sets)
+        return RecordValidator.GuardHolds(application, entity, stored, values, rows, guard, now, sets, new ExpressionAccountability(context.AccountableUser, context.DecisionTask?.ToString("D")))
             ? null
             : Refused(
                 lifecycle,

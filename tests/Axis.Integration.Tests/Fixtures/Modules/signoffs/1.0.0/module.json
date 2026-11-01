@@ -1,0 +1,10 @@
+{
+  "kind": "module",
+  "id": "signoffs",
+  "version": "1.0.0",
+  "label": "Signoffs",
+  "roles": [
+    { "name": "requester", "label": { "textKey": "signoffs.roles.requester" } },
+    { "name": "approver", "label": { "textKey": "signoffs.roles.approver" } }
+  ]
+}

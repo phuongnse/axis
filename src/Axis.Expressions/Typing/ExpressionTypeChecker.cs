@@ -19,8 +19,8 @@ namespace Axis.Expressions.Typing;
 /// including as a rule argument there, because no other expression runs for a signed-in user. A
 /// rule body is checked on its own, so it cannot call it. Only a module contract's expression can call
 /// <c>previous</c>, and its argument must be a bare name of one of the entity's own fields. Only the set
-/// of an <c>updateRecord</c> or <c>createRecord</c> step can call <c>accountableUser()</c> or
-/// <c>decisionTask()</c>, also inside an aggregate's item expression. It stops at
+/// of an <c>updateRecord</c> or <c>createRecord</c> step and a module contract's expression can call
+/// <c>accountableUser()</c> or <c>decisionTask()</c>, also inside an aggregate's item expression. It stops at
 /// the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
@@ -260,11 +260,11 @@ public static class ExpressionTypeChecker
                         call.Offset);
 
             case "accountableUser" or "decisionTask":
-                return context.StepSet
+                return context.StepSet || context.Contract
                     ? ExpressionType.Text
                     : throw Fail(
                         ExpressionDiagnosticCodes.AccountabilityOutsideStepSet,
-                        $"Function '{name}' is allowed only in the set of an updateRecord or createRecord step",
+                        $"Function '{name}' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step",
                         call.Offset);
 
             case "length":

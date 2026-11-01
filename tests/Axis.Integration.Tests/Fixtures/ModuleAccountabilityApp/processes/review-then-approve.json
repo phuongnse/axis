@@ -1,0 +1,26 @@
+{
+  "id": "e185c4c4-a04a-4d39-b72f-e4654a0f7ff6",
+  "kind": "process",
+  "name": "ReviewThenApprove",
+  "formatVersion": 1,
+  "entity": "signoffs/Request",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "request.review" },
+      "assignee": { "role": "approver" },
+      "form": "RequestForm",
+      "outcomes": [{ "name": "approve", "label": { "textKey": "request.approve" }, "next": "approve" }]
+    },
+    {
+      "name": "approve",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'approved'" },
+      "next": "finished"
+    },
+    { "name": "finished", "type": "end" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "aabac935-aefb-4b2f-a94e-9706ad8b2698",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "signoffs.roles.requester": "Requester",
+    "signoffs.roles.approver": "Approver"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "e8e0816e-9d64-4f93-9957-1a254dc6d060",
+  "kind": "application",
+  "name": "ModuleAccountabilityApp",
+  "formatVersion": 1,
+  "modules": [
+    {
+      "id": "signoffs",
+      "version": "^1.0.0",
+      "roles": {
+        "requester": "employee",
+        "approver": "approver"
+      }
+    }
+  ]
+}

@@ -68,7 +68,8 @@ public static class RecordValidator
     /// <summary>
     /// Whether a lifecycle guard is <c>true</c> on the <paramref name="stored"/> record with
     /// <paramref name="values"/> and <paramref name="rows"/> on top. <c>previous(field)</c> reads the
-    /// <paramref name="stored"/> record as it was before the write. A <c>false</c>, a <c>null</c>, a
+    /// <paramref name="stored"/> record as it was before the write. <c>accountableUser()</c> and
+    /// <c>decisionTask()</c> read <paramref name="accountability"/>, the values of the write. A <c>false</c>, a <c>null</c>, a
     /// run-time error and a value that cannot be held exactly, in the new record or the stored one,
     /// are all <see langword="false"/>.
     /// </summary>
@@ -80,7 +81,8 @@ public static class RecordValidator
         IReadOnlyList<RecordRows> rows,
         ExpressionModel guard,
         DateTimeOffset now,
-        RecordSets sets)
+        RecordSets sets,
+        ExpressionAccountability accountability)
     {
         var record = BuildRecord(entity, stored, values);
         var before = BuildRecord(entity, stored, []);
@@ -98,7 +100,8 @@ public static class RecordValidator
             records: null,
             now: now,
             timeZone: application.TimeZone,
-            previous: new ExpressionValues(before.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))));
+            previous: new ExpressionValues(before.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
+            accountability: accountability);
         return result.Succeeded && result.Value is true;
     }
 
