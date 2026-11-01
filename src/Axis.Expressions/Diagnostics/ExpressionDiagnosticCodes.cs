@@ -21,4 +21,6 @@ public static class ExpressionDiagnosticCodes
     public const string CurrentTimeInStoredValue = "AXC0086";
     public const string CurrentUserOutsidePolicyFilter = "AXC0095";
     public const string UndeclaredModuleReference = "AXC0207";
+    public const string PreviousOutsideContract = "AXC0336";
+    public const string InvalidPreviousArgument = "AXC0337";
 }

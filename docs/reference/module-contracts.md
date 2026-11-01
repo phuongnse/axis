@@ -235,8 +235,10 @@ module policies alike.
 
 - On a create it gives `null`.
 - It reads only the entity's own fields, not a child collection or a computed field's expression.
+  A child collection, a `references` field, an unknown name or any argument that is not a bare field
+  name is `AXC0337`. An aggregate's item expression cannot call it.
 - It is allowed only in a contract's guards, core validations and effect values. Anywhere else it is
-  a diagnostic.
+  `AXC0336`.
 - It is evaluated in the server and the worker, never translated to SQL.
 
 ## The accountable user

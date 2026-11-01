@@ -286,6 +286,32 @@ public sealed class ModuleContractTests
     }
 
     [Fact]
+    public void A_guard_can_read_the_previous_value_of_a_field()
+    {
+        var transitions = """[ { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "previous(amount) == amount" } ]""";
+
+        using var modules = Modules(Contract(Lifecycle(transitions: transitions)));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var guard = compiled.Model!.Entities.Single(entity => entity.Name == "approvals/Request").Contract!.Lifecycle!.Transitions[0].Guard;
+        Assert.Equal("previous(amount) == amount", guard!.Expression);
+    }
+
+    [Fact]
+    public void A_guard_that_reads_the_previous_value_of_a_child_collection_is_axc0337_at_the_guard()
+    {
+        var transitions = """[ { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "previous(lines) == null" } ]""";
+
+        var diagnostics = Compile(Contract(Lifecycle(transitions: transitions)));
+
+        var diagnostic = Assert.Single(diagnostics, candidate => candidate.Path == "/lifecycle/transitions/0/guard");
+        Assert.Equal(ExpressionDiagnosticCodes.InvalidPreviousArgument, diagnostic.Code);
+    }
+
+    [Fact]
     public void A_message_text_key_without_the_module_prefix_is_axc0209_at_the_text_key()
     {
         var transitions = """
