@@ -11,6 +11,7 @@ public sealed class ModuleContractTests
     private const string ApplicationId = "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e11";
     private const string ContractId = "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b71";
     private const string SecondContractId = "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b72";
+    private const string SeedId = "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b73";
     private const string ContractFile = "modules/approvals/Contract.json";
 
     private const string DefaultStates = """
@@ -56,6 +57,35 @@ public sealed class ModuleContractTests
 
             Assert.Null(Assert.Single(model.Entities, entity => entity.Name == "approvals/Line").Contract);
         }
+    }
+
+    [Fact]
+    public void A_module_seed_record_in_a_state_that_is_not_initial_is_axc0336()
+    {
+        using var modules = Modules(Contract(Lifecycle()), ("Seed.json", Seed("submitted")));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SeedStateNotInitial, "modules/approvals/Seed.json", "/records/0/values/status", (Guid?)Guid.Parse(SeedId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'submitted'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("draft", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
+    public void A_module_seed_record_in_an_initial_state_compiles()
+    {
+        using var modules = Modules(Contract(Lifecycle()), ("Seed.json", Seed("draft")));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        Assert.Single(compiled.Model!.Seeds);
     }
 
     [Fact]
@@ -435,6 +465,11 @@ public sealed class ModuleContractTests
 
     private static string Lifecycle(string states = DefaultStates, string transitions = DefaultTransitions, string field = "status") => $$"""
         { "field": "{{field}}", "states": {{states}}, "transitions": {{transitions}} }
+        """;
+
+    private static string Seed(string status) => $$"""
+        { "id": "{{SeedId}}", "kind": "seed", "name": "Requests", "formatVersion": 1, "entity": "Request",
+          "records": [ { "id": "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b74", "values": { "title": "A", "status": "{{status}}", "locked": "a" } } ] }
         """;
 
     private static string Contract(

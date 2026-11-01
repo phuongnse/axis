@@ -104,7 +104,11 @@ development or E2E server serves a real application without a separate step.
   values on top. A value that cannot be computed is `AXC0033` at
   `/records/{i}/values/<field>`, and the transaction is rolled back. The first record that storage refuses,
   for a missing reference, a duplicate unique value or a schema conflict, is
-  reported as `AXC0033`, and the transaction is rolled back. Any `AXC0033`
+  reported as `AXC0033`, and the transaction is rolled back. A write that the lifecycle of a
+  [module contract](module-contracts.md#where-the-contract-is-checked) refuses, such as a synced
+  seed that changes a stored state along no transition or along one whose guard is not true, is
+  `AXC0033` at the state field. Its message names the point that refused it, and the transaction
+  is rolled back. Any `AXC0033`
   stops the start like any other diagnostic, and the release stays active.
   The step logs how many seed records it inserted and updated.
 - **Database roles.** Migrations, compiling, storing and

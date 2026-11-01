@@ -23,7 +23,8 @@ namespace Axis.Data.Seeding;
 /// and is inserted by <see cref="RecordCommands.CreateAsync"/>. Every record is parsed before any
 /// write, and every parse problem is reported. The writes run in one transaction in path order of
 /// the seed files and file order of the records, so a reference may name a record inserted earlier
-/// in the same run. The first storage problem rolls back every write.
+/// in the same run. The first storage problem rolls back every write. A write that the lifecycle of the
+/// entity's module contract refuses is reported at the state field, and its message names the point that refused it.
 /// </summary>
 public static class SeedApplier
 {
@@ -184,9 +185,12 @@ public static class SeedApplier
     private static SeedResult Failed(SeedModel seed, int index, RecordWriteResult result)
     {
         var path = $"/records/{index}";
+        var refusal = result.Outcome == RecordWriteOutcome.LifecycleRefused
+            ? $" Refused at '{result.Point ?? "no transition"}'."
+            : "";
         return new SeedResult(
             result.Errors is { } errors
-                ? DiagnosticOrder.Sort(errors.Select(error => Invalid(seed, path + error.Key, error.Value[0])))
+                ? DiagnosticOrder.Sort(errors.Select(error => Invalid(seed, path + error.Key, error.Value[0] + refusal)))
                 : [Invalid(seed, path, SchemaConflictMessage)],
             0,
             0);
