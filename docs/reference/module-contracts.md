@@ -6,10 +6,12 @@ slot, and its contract scenarios. The engine checks it on every write. An applic
 named point of it with a `relax` entry and a reason, and its release is then marked off-standard.
 [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees the
 idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked.md) agrees the
-shapes below. The `contract` resource and the compile checks of its `lifecycle` and its `ceiling`
-are built. So is the lifecycle check on every record write, with the record API's `409` and its log
-line. So is the compile check of a module scenario's `contract.covers`. A guard reads
-`accountableUser()` and `decisionTask()`, the values of the write it checks. A refusal on another write
+shapes below. The `contract` resource and the compile checks of its `lifecycle`, its `validations`
+and its `ceiling` are built. So is the lifecycle check on every record write, with the record API's
+`409` and its log line. So are the core validations on every create and update, with the record
+API's `400`. So is the compile check of a module scenario's `contract.covers`. A guard and a core
+validation read
+`accountableUser()` and `decisionTask()`, the values of the write they check. A refusal on another write
 path fails as that path already fails, and logs nothing yet. The
 filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
 _(planned for M24)_.
@@ -158,12 +160,20 @@ The lifecycle is a state machine on one field of the entity.
 
 `validations` holds the module's core validations. Each has a `name`, an `expression`, a `message`
 and a `field`, with the meaning of an [entity validation](resource-files.md#entity-logic), plus
-the [`previous`](#previous-values) and [`accountableUser`](#the-accountable-user) functions.
+the [`previous`](#previous-values), [`accountableUser`](#the-accountable-user) and
+[`decisionTask`](#the-deciding-task) functions.
+
+- The compile checks each one: its `name` is unique ignoring letter case (`AXC0328`), its `field` is
+  a field of the entity (`AXC0052`), its message key starts with `<module id>.` (`AXC0209`), and its
+  expression is boolean.
 
 - They run on every create and update of the entity, after the entity's own validations, on the
   record as it will be stored.
 - A failure is answered like a failing entity validation, with the core validation's message at its
-  field.
+  field. The failure names the point `<entity>/validations/<name>`.
+- A core validation runs only when the entity's own validations pass, so a write that breaks both
+  gets the entity validation's message.
+- A core validation that gives `null` or stops with a run-time error fails, as a validation does.
 - `previous` lets a core validation freeze a field once a state is reached, as
   `amountFrozenAfterSubmit` does above.
 
@@ -270,8 +280,8 @@ does. It is how a guard knows who decided.
 - **Allowed where.** In a contract's guards, core validations and effect values, and in the `set` of
   an `updateRecord` or `createRecord` step, which writes it as the value the write will be judged
   by, such as who decided a step. Anywhere else it is a diagnostic (`AXC0341`), as `currentUser()`
-  outside a policy filter is. A guard is built and reads the values of the write it checks. A core
-  validation and an effect value are still the diagnostic until they are built.
+  outside a policy filter is. A guard and a core validation are built and read the values of the
+  write they check. An effect value is still the diagnostic until it is built.
 
 ## The deciding task
 
@@ -305,7 +315,8 @@ promise that each step is decided once.
 - **Seed data.** A seed record of an entity with a lifecycle must be in an initial state, or the
   seed is a diagnostic (`AXC0338`). A synced seed that changes a stored state must follow a
   transition, and its guard runs with a `null` accountable user. A refusal is `AXC0033`: it stops
-  startup seeding, rolls back every seed write, and the log names the point that refused it.
+  startup seeding, rolls back every seed write, and the log names the point that refused it. A seed
+  record that fails a core validation is `AXC0033` at the validation's field, without the point.
 - **Order in a write.** Computed fields, the entity's validations, the core validations, then the
   lifecycle check, then storage, then the effects. The record API's grant checks come before, as
   [the record API](record-api.md#errors) orders them. In Axis SaaS, the tenant's quota check of

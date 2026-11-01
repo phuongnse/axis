@@ -17,8 +17,10 @@ namespace Axis.Configuration.Compilation;
 /// message text key starts with the module's prefix. The ceiling is checked too: each key of its
 /// <c>slots</c> is a role slot of the module, each entry field is a field of the entity, and each entry
 /// filter type-checks as a policy filter in the scope of a module policy filter. A grant that goes past
-/// the ceiling is checked later, by <see cref="GrantCeilings"/>. Every problem of a contract is reported
-/// in one pass. The validations and effects are not checked yet.
+/// the ceiling is checked later, by <see cref="GrantCeilings"/>. Each core validation has a name that is
+/// unique ignoring letter case, a field of the entity, a message key with the module's prefix and a boolean
+/// expression in the same scope as a guard. Every problem of a contract is reported in one pass. The
+/// effects are not checked yet.
 /// </summary>
 internal static class ContractChecker
 {
@@ -53,6 +55,11 @@ internal static class ContractChecker
                 if (contract.Lifecycle is { } lifecycle)
                 {
                     CheckLifecycle(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, Report);
+                }
+
+                if (contract.Validations is { } validations)
+                {
+                    CheckValidations(moduleId, contract, validations, entity, findEntity, rulesFor, modulesFor, Report);
                 }
 
                 if (contract.Ceiling is { } ceiling)
@@ -368,6 +375,62 @@ internal static class ContractChecker
                 {
                     report(problem.Code, problem.Message, $"{path}/guard");
                 }
+            }
+        }
+    }
+
+    private static void CheckValidations(
+        string moduleId,
+        ContractResource contract,
+        IReadOnlyList<ContractValidationDefinition> validations,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
+        Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, string> report)
+    {
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        ExpressionScope? scope = null;
+        for (var index = 0; index < validations.Count; index++)
+        {
+            var validation = validations[index];
+            var path = $"/validations/{index.ToString(CultureInfo.InvariantCulture)}";
+
+            if (!firstIndexByName.TryAdd(validation.Name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateContractName,
+                    $"The validation '{validation.Name}' repeats the validation at index {firstIndexByName[validation.Name].ToString(CultureInfo.InvariantCulture)}. Validation names are unique, ignoring letter case.",
+                    $"{path}/name");
+            }
+
+            if (ApplicationCompiler.FindField(entity, validation.Field) is null)
+            {
+                report(
+                    DiagnosticCodes.UnknownValidationField,
+                    $"The field '{validation.Field}' of the validation '{validation.Name}' is not a field of the entity '{entity.Name}'.",
+                    $"{path}/field");
+            }
+
+            if (!validation.Message.TextKey.StartsWith($"{moduleId}.", StringComparison.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.ModuleTextKeyWithoutPrefix,
+                    $"The text key '{validation.Message.TextKey}' lacks the prefix '{moduleId}.'. Start each text key of the module with it.",
+                    $"{path}/message/textKey");
+            }
+
+            scope ??= ExpressionScopes.ForEntity(
+                entity.Fields,
+                rules: rulesFor(contract),
+                findEntity: findEntity,
+                modules: modulesFor(contract),
+                undeclaredModuleIsUnknown: true);
+            var parsed = ExpressionParser.Parse(validation.Expression);
+            var problem = parsed.Succeeded ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, contract: true).Diagnostic : parsed.Diagnostic;
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, $"{path}/expression");
             }
         }
     }
