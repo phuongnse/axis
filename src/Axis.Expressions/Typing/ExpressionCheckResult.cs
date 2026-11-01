@@ -28,4 +28,38 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
     /// </summary>
     public IReadOnlyDictionary<MemberNode, string> PathTargets { get; internal init; } =
         new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// The result of a boolean expression built from expressions that <paramref name="results"/>
+    /// checked. It holds every rule call, path target and decimal call of them, so the tables
+    /// still match the nodes the built expression reuses.
+    /// </summary>
+    public static ExpressionCheckResult Merge(IEnumerable<ExpressionCheckResult> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        var decimalCalls = new HashSet<CallNode>(ReferenceEqualityComparer.Instance);
+        var ruleCalls = new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
+        var pathTargets = new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance);
+        foreach (var result in results)
+        {
+            decimalCalls.UnionWith(result.DecimalCalls);
+            foreach (var (call, rule) in result.RuleCalls)
+            {
+                ruleCalls[call] = rule;
+            }
+
+            foreach (var (step, target) in result.PathTargets)
+            {
+                pathTargets[step] = target;
+            }
+        }
+
+        return new ExpressionCheckResult(ExpressionType.Boolean, null)
+        {
+            DecimalCalls = decimalCalls,
+            RuleCalls = ruleCalls,
+            PathTargets = pathTargets,
+        };
+    }
 }

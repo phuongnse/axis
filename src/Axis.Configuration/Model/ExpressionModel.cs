@@ -41,4 +41,44 @@ public sealed record ExpressionModel
 
         return new ExpressionModel { Expression = expression, Syntax = parsed.Expression, Check = check };
     }
+
+    /// <summary>
+    /// <paramref name="left"/> <c>and</c> <paramref name="right"/>, as one boolean expression that
+    /// reuses both syntax trees and merges their check results.
+    /// </summary>
+    public static ExpressionModel And(ExpressionModel left, ExpressionModel right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+
+        return Join(BinaryOperator.And, "and", [left, right]);
+    }
+
+    /// <summary>
+    /// The <c>or</c> of <paramref name="items"/>, as one boolean expression that reuses their
+    /// syntax trees and merges their check results. One item gives itself.
+    /// </summary>
+    public static ExpressionModel Or(IReadOnlyList<ExpressionModel> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentOutOfRangeException.ThrowIfZero(items.Count);
+
+        return items.Count == 1 ? items[0] : Join(BinaryOperator.Or, "or", items);
+    }
+
+    private static ExpressionModel Join(BinaryOperator @operator, string keyword, IReadOnlyList<ExpressionModel> items)
+    {
+        var syntax = items[0].Syntax;
+        for (var index = 1; index < items.Count; index++)
+        {
+            syntax = new BinaryNode(0, @operator, syntax, items[index].Syntax);
+        }
+
+        return new ExpressionModel
+        {
+            Expression = string.Join($" {keyword} ", items.Select(item => $"({item.Expression})")),
+            Syntax = syntax,
+            Check = ExpressionCheckResult.Merge(items.Select(item => item.Check)),
+        };
+    }
 }

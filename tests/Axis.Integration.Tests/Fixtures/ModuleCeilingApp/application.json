@@ -1,0 +1,7 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3d01",
+  "kind": "application",
+  "name": "ModuleCeilingApp",
+  "formatVersion": 1,
+  "modules": [{ "id": "claims", "version": "^1.0.0", "roles": { "filer": "clerk", "viewer": "auditor" } }]
+}

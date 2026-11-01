@@ -1,0 +1,16 @@
+{
+  "id": "4d2a6c81-3e5b-4f70-8a1c-9b0d2e4f6b02",
+  "kind": "contract",
+  "name": "ClaimContract",
+  "formatVersion": 1,
+  "entity": "Claim",
+  "ceiling": {
+    "slots": {
+      "filer": [
+        { "actions": ["read", "create", "import", "export"] },
+        { "actions": ["update"], "filter": "requester == currentUser()" }
+      ],
+      "viewer": [{ "actions": ["read", "export"], "filter": "requester == currentUser()" }]
+    }
+  }
+}

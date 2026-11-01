@@ -5,7 +5,7 @@ namespace Axis.Configuration.Model;
 /// <summary>
 /// A compiled module contract on an entity of a pinned module. The lifecycle and the grant ceiling are
 /// compiled so far. Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
-/// Nothing enforces the grant ceiling yet.
+/// The filters of the grant ceiling narrow a role's grants when a request runs, see <c>PolicyEvaluator.Access</c>.
 /// </summary>
 public sealed record ContractModel
 {
@@ -24,8 +24,8 @@ public sealed record ContractModel
 
 /// <summary>
 /// A compiled grant ceiling: the entries of each application role that some role slot of the module maps
-/// to, and the entries of every other role. The compile has already refused a grant past it. A later
-/// check adds the entries' filters to a request.
+/// to, and the entries of every other role. The compile has already refused a grant past it. At run
+/// time the entries' filters narrow the grants of the role on the entity.
 /// </summary>
 public sealed record CeilingModel
 {

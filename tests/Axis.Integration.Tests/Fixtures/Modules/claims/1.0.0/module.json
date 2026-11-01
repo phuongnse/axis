@@ -1,0 +1,10 @@
+{
+  "kind": "module",
+  "id": "claims",
+  "version": "1.0.0",
+  "label": "Claims",
+  "roles": [
+    { "name": "filer", "label": { "textKey": "claims.roles.filer" } },
+    { "name": "viewer", "label": { "textKey": "claims.roles.viewer" } }
+  ]
+}
