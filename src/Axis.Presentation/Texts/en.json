@@ -510,6 +510,7 @@
   "shell.studio.status.warnings.one": "1 warning",
   "shell.studio.status.warnings.other": "{count} warnings",
   "shell.studio.status.changes": "Changes not live",
+  "shell.studio.status.unpublished": "Not published yet",
   "shell.studio.loadFailed": "Studio could not be loaded.",
   "shell.studio.forbidden.title": "Studio is not available",
   "shell.studio.forbidden.message": "You need the author role to use Studio.",

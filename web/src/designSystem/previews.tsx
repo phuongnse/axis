@@ -303,6 +303,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Entity', draw: () => <ShellPreview />, entry: studioResource(studioEntity), frameHeight: 600 },
+    // Proposed: an application never published says so in the band.
+    {
+      caption: 'Sites of an application not published yet',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=Inventory&view=kind&kind=site',
+      frameHeight: 600,
+    },
     // Proposed: a list whose application has errors and changes not live: the band shows them, not the list's name.
     {
       caption: 'Entities with errors and changes not live',

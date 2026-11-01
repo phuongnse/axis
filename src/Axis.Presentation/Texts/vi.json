@@ -510,6 +510,7 @@
   "shell.studio.status.warnings.one": "1 cảnh báo",
   "shell.studio.status.warnings.other": "{count} cảnh báo",
   "shell.studio.status.changes": "Có thay đổi chưa xuất bản",
+  "shell.studio.status.unpublished": "Chưa xuất bản",
   "shell.studio.loadFailed": "Không thể tải Studio.",
   "shell.studio.forbidden.title": "Studio không khả dụng",
   "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio.",

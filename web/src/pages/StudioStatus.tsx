@@ -8,7 +8,8 @@ import { useDesignTokens } from '../platform/themeMode'
 
 /**
  * Proposed: the open application's state in Studio's band, on every page but the Overview, beside Validate and
- * Publish…: its errors, which stop Publish, its warnings, and whether the folder has changes the live release lacks.
+ * Publish…: its errors, which stop Publish, its warnings, and whether the folder has changes the live release lacks,
+ * or that it has no live release yet.
  * Each opens the Overview, which lists them. Nothing shows when nothing needs attention.
  */
 export function StudioStatus({
@@ -26,6 +27,8 @@ export function StudioStatus({
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length
   const warnings = diagnostics.length - errors
   const changes = releases !== undefined && releases !== 'failed' && folderDiffers(releases)
+  // Proposed: an application with no live release says so, as no site runs it yet.
+  const unpublished = releases !== undefined && releases !== 'failed' && releases.active === null
   const count = (key: string, n: number) => t(`${key}.${n === 1 ? 'one' : 'other'}`).replace('{count}', String(n))
   const entries: { key: string; icon: ReactNode; text: string; colour: string }[] = []
   if (errors > 0) {
@@ -49,6 +52,14 @@ export function StudioStatus({
       key: 'changes',
       icon: <CloudUploadOutlined aria-hidden />,
       text: t('shell.studio.status.changes'),
+      colour: colour.textMuted,
+    })
+  }
+  if (unpublished) {
+    entries.push({
+      key: 'unpublished',
+      icon: <CloudUploadOutlined aria-hidden />,
+      text: t('shell.studio.status.unpublished'),
       colour: colour.textMuted,
     })
   }
