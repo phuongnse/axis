@@ -19,8 +19,9 @@ resolution answer a failing effect, audit the effect records and fire the data c
 them. The same steps are still _(planned for M24)_ for an inbound endpoint call, which only creates
 records. Each of them fails as it already fails for a lifecycle refusal and logs the named point and
 the record id. The
-filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view is
-built, see [in Studio](#in-studio). The rest of this page is _(planned for M24)_.
+filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view, Relax,
+Undo relax and the off-standard mark beside the application picker are built, see [in Studio](#in-studio). The rest of this
+page is _(planned for M24)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -464,11 +465,16 @@ some of them as contract scenarios.
   modules the application uses, by `<module id>/<name>`, as the other module groups do. A contract
   opens read-only, with its read-only notice: the lifecycle as a state diagram, then the core
   validations, the effects and the ceilings, each with its named point.
-- **Relax.** Each point has a **Relax** action, which asks for the reason and writes the `relax`
+- **Relax** _(built)_. Each point has a **Relax** action, which asks for the reason and writes the `relax`
   entry on the module's entry in `application.json`. A relaxed point shows its reason and an
-  **Undo relax** action, which removes the entry.
+  **Undo relax** action, which removes the entry. Relax shows only for a module that
+  `application.json` declares directly. The reason is 1 to 500 characters once trimmed, and a blank
+  reason writes nothing. Undoing the last entry removes the `relax` array. Both write with the
+  authoring API's `PATCH` and `If-Match`, so a write is refused with a conflict when
+  `application.json` changed since Studio loaded it, and Studio loads it again.
 - **Mark.** The application's header and its release history show the off-standard mark while any
-  entry is present.
+  entry is present. The mark beside the application picker is _(built)_. The mark in the release
+  history is _(planned for M24)_.
 - **Diagnostics.** A grant past a ceiling, a relax entry for an unknown point and a failing contract
   scenario show where Studio shows other diagnostics and publish results. The contract scenarios of a publish or validate,
   skipped ones with their relaxed point included, show in a **Contract scenarios** list under the status line.

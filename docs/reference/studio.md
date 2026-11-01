@@ -61,14 +61,14 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at
-  once. The list becomes tiles by title, see [applications](studio-workspace.md#applications) _(planned for M31)_.
+  once. The list becomes tiles by title, see [applications](studio-workspace.md#applications) _(planned for M31)_. An **Off-standard** tag shows beside it while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio).
 - **Resource list.** The list groups the resources by kind (in the sidebar, see [workspace](studio-workspace.md#workspace), _planned for M31_). The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
   its name, kind, `id` and file, and opens it in the editor below. **Module entities**, **Module processes**,
   **Module policies**, **Module contracts** and **Module pages** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
   the application's names, and the search box filters them too. A module process opens as its graph alone, with no palette, connect handle, step panel or delete,
-  a module policy as a read-only table of its grants, a module contract as its lifecycle in a state diagram (initial and deletable states marked, each arrow labelled with its transition's name and whether it has a guard) with tables of its states, transitions, core validations, effects and ceiling entries, each row with its [named point](module-contracts.md#named-points), and a module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. Each view shows its read-only notice with the alert role.
+  a module policy as a read-only table of its grants, a module contract as its lifecycle in a state diagram (initial and deletable states marked, each arrow labelled with its transition's name and whether it has a guard) with tables of its states, transitions, core validations, effects and ceiling entries, each row with its [named point](module-contracts.md#named-points)., and a module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. Each view shows its read-only notice with the alert role. In a module contract, when `application.json` declares the module directly, each named point also has a **Relax** button, which opens a dialog for a reason of 1 to 500 characters, and a relaxed point shows its reason and an **Undo relax** button. Both write `application.json` with `If-Match`, see [in Studio](module-contracts.md#in-studio).
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
     bundles the schemas in `src/Axis.Configuration/Schemas`, the files the

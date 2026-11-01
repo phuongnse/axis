@@ -483,7 +483,8 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(diagnostics).toContainText('No diagnostics.')
 
       await page.getByTestId('studio-preview').click()
-      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
+      // The status still shows the validate that ended before the click, so wait for the preview link instead.
+      await expect(page.getByTestId('studio-preview-link')).toBeVisible({ timeout: 60_000 })
       const preview = await signInToPreview(browser, baseURL!, 'requester')
       try {
         await preview.page.goto(suppliers)
