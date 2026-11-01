@@ -484,6 +484,9 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       await page.getByTestId('studio-preview').click()
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
+      // The status line still shows the validation until the preview request is sent, so it can read succeeded
+      // before the preview exists. The preview link appears only once the preview itself has succeeded.
+      await expect(page.getByTestId('studio-preview-link')).toBeVisible({ timeout: 60_000 })
       const preview = await signInToPreview(browser, baseURL!, 'requester')
       try {
         await preview.page.goto(suppliers)

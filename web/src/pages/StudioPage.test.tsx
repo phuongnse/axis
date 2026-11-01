@@ -175,6 +175,8 @@ interface Outage {
 interface ExpressionStub {
   content?: Record<string, unknown>
   check?: (call: number) => Response
+  /** The content of `application.json`. */
+  manifest?: Record<string, unknown>
 }
 
 /** Stubs `fetch` with the Studio list routes, the read, patch and delete of the purchase request entity, and its references. `apps` is the status or list of `/api/studio/apps`. */
@@ -207,7 +209,10 @@ function stubServer(
       return json({ ...resources[1], content: expressions.content ?? entityContent() })
     }
     if (input === manifestPath) {
-      return json({ ...resources[3], content: { id: manifestId, kind: 'application', name: 'PurchaseRequests' } })
+      return json({
+        ...resources[3],
+        content: expressions.manifest ?? { id: manifestId, kind: 'application', name: 'PurchaseRequests' },
+      })
     }
     if (input === namesPath) {
       return json(applicationNames)
@@ -286,6 +291,36 @@ describe('StudioPage', () => {
         .map((button) => button.textContent),
     ).toEqual(['PurchaseRequestForm'])
     expect(screen.getByText('Select a resource.')).toBeInTheDocument()
+  })
+
+  it('shows the off-standard mark beside the application picker when application.json has a relax entry', async () => {
+    stubServer(undefined, undefined, undefined, {
+      manifest: {
+        modules: [
+          {
+            id: 'approvals',
+            version: '^1.0.0',
+            relax: [{ point: 'Request/transitions/approve', reason: 'Small team' }],
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    expect(await screen.findByTestId('studio-off-standard')).toHaveTextContent('Off-standard')
+  })
+
+  it('shows no off-standard mark when application.json has no relax entry', async () => {
+    const fetchMock = stubServer(undefined, undefined, undefined, {
+      manifest: { modules: [{ id: 'approvals', version: '^1.0.0', relax: [] }] },
+    })
+    renderPage()
+
+    await screen.findByTestId('studio-group-entity')
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/resources/${manifestId}`)).toBe(true),
+    )
+    expect(screen.queryByTestId('studio-off-standard')).not.toBeInTheDocument()
   })
 
   it('filters the resources by part of a name in any letter case', async () => {
