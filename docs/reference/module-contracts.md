@@ -17,8 +17,8 @@ resolution answer a failing effect, audit the effect records and fire the data c
 them. The same steps are still _(planned for M24)_ for an inbound endpoint call, which only creates
 records. Each of them fails as it already fails for a lifecycle refusal and logs the named point and
 the record id. The
-filters of a role's grant ceiling narrow its grants at run time. The rest of this page is
-_(planned for M24)_.
+filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view is
+built, see [in Studio](#in-studio). The rest of this page is _(planned for M24)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -453,7 +453,7 @@ some of them as contract scenarios.
 
 ## In Studio
 
-- **Contracts.** A **Module contracts** group, below the module policies, lists the contracts of the
+- **Contracts** _(built)_. A **Module contracts** group, below the module policies, lists the contracts of the
   modules the application uses, by `<module id>/<name>`, as the other module groups do. A contract
   opens read-only, with its read-only notice: the lifecycle as a state diagram, then the core
   validations, the effects and the ceilings, each with its named point.

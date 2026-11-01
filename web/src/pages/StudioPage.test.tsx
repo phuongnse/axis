@@ -162,6 +162,7 @@ const applicationNames = {
   forms: [],
   pages: [],
   policies: [],
+  contracts: [],
   texts: [{ key: 'entity.purchaseRequest', texts: { en: 'Purchase request' }, usedBy: 1 }],
 }
 

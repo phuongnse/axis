@@ -1,0 +1,41 @@
+{
+  "id": "9b3e7c52-1d84-4a6f-b0e9-5c2a8d4f1e37",
+  "kind": "contract",
+  "name": "ChecklistContract",
+  "formatVersion": 1,
+  "entity": "Checklist",
+  "lifecycle": {
+    "field": "status",
+    "states": [{ "name": "open", "initial": true, "deletable": true }, { "name": "checked" }, { "name": "closed" }],
+    "transitions": [
+      {
+        "name": "check",
+        "from": ["open"],
+        "to": "checked",
+        "guard": "accountableUser() != null",
+        "message": { "textKey": "checklists.checklist.signInToCheck" }
+      },
+      { "name": "reopen", "from": ["checked"], "to": "open" },
+      { "name": "close", "from": ["checked"], "to": "closed" }
+    ]
+  },
+  "validations": [
+    {
+      "name": "titleSet",
+      "expression": "title != ''",
+      "message": { "textKey": "checklists.checklist.titleRequired" },
+      "field": "title"
+    }
+  ],
+  "effects": [
+    {
+      "name": "followUpCreated",
+      "on": "close",
+      "create": { "entity": "Checklist", "values": { "title": "'Follow-up'", "status": "'open'" } }
+    }
+  ],
+  "ceiling": {
+    "slots": { "reviewer": [{ "actions": ["read"] }] },
+    "others": [{ "actions": ["read"] }]
+  }
+}
