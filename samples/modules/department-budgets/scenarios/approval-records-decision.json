@@ -1,0 +1,31 @@
+{
+  "id": "771fda08-a104-48da-bb08-65d1a00e26f8",
+  "kind": "scenario",
+  "name": "ApprovalRecordsDecision",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "contract": { "covers": ["Budget/effects/decisionRecorded"] },
+  "users": {
+    "approver": ["approver"],
+    "second": ["approver"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Budget",
+      "as": "approver",
+      "save": "budget",
+      "values": {
+        "name": "Engineering 2027",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
+        "year": 2027,
+        "amount": 50000,
+        "status": "draft"
+      }
+    },
+    { "type": "startProcess", "process": "BudgetApproval", "record": "budget", "as": "approver" },
+    { "type": "completeTask", "record": "budget", "step": "review", "outcome": "approve", "as": "second" },
+    { "type": "expectInstance", "process": "BudgetApproval", "record": "budget", "state": "completed" },
+    { "type": "expectRecord", "record": "budget", "values": { "status": "approved", "amount": 50000 } }
+  ]
+}

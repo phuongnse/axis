@@ -10,13 +10,14 @@ using Npgsql;
 
 namespace Axis.Integration.Tests;
 
+[Collection("Test scenario runs")]
 public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
-    private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
+    private static readonly string[] _steps = ["version", "contracts", "compile", "activate", "seed", "indexes"];
 
     private static readonly Dictionary<string, string?> _directory = new() { ["Tenancy:Source"] = "directory" };
 
@@ -43,7 +44,8 @@ public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFi
 
         Assert.Equal(0, result.Exit);
         Assert.Equal($"{main} claim ok", result.Output[0]);
-        Assert.Equal(_steps.Select(step => $"{preview} {step} ok"), result.Output.Skip(1));
+        // The contracts step also writes a line for each scenario, with the id of the preview tenant.
+        Assert.Equal(_steps.Select(step => $"{preview} {step} ok"), result.Output.Skip(1).Where(line => !line.StartsWith($"{preview} scenario ", StringComparison.Ordinal)));
         // The preview tenant has no purchasing system or company bindings, so activation only warns about them.
         Assert.All(result.Error, line => Assert.Contains($"{preview} warning AXC0100 ", line, StringComparison.Ordinal));
         foreach (var name in new[] { CompanyBindings.Issuer, CompanyBindings.ClientId, CompanyBindings.ClientSecret })
@@ -181,10 +183,11 @@ public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFi
     private static async Task<AdminResult> RunPublisherAsync(AdminScenario scenario, string tenant, Guid request)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        var run = scenario.RunAsync(["publisher"], stop: stop, extra: _directory);
+        var settings = new Dictionary<string, string?>(_directory) { ["Scenarios:ServerConnectionString"] = await PostgreSqlServer.ScenarioConnectionStringAsync() };
+        var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);
         try
         {
-            var deadline = DateTime.UtcNow.AddSeconds(60);
+            var deadline = DateTime.UtcNow.AddSeconds(180);
             while (!run.IsCompleted && DateTime.UtcNow < deadline)
             {
                 var status = await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");

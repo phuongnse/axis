@@ -284,6 +284,9 @@ The [module contract](module-contracts.md) has a lifecycle where `draft` is init
 the creator of a budget cannot decide it, and a second manager must. It also has the core validation
 `amountFrozenOnceDecided`, which refuses an amount change once the budget is decided, the effect `decisionRecorded`,
 which creates a `BudgetDecision` when a budget is approved, and an `approver` ceiling of `read`, `create` and `update`.
+It holds the scenario `ApproverCreatesBudget` and the
+[contract scenarios](module-contracts.md#contract-scenarios) `RequesterCannotDecideOwnBudget`, `ApprovalRecordsDecision`
+and `DecidedAmountIsFrozen`. Every publish and validate of an application that declares it runs the contract scenarios.
 An application that declares it maps the slot to one of its own roles:
 
 ```json

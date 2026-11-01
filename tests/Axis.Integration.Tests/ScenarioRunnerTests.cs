@@ -1304,7 +1304,7 @@ public sealed class ScenarioRunnerTests
         Assert.True(exitCode == 0, output.ToString());
         var suites = new Dictionary<string, (string Name, string Tests)>
         {
-            ["purchase-requests"] = ("PurchaseRequests", "7"),
+            ["purchase-requests"] = ("PurchaseRequests", "10"),
             ["leave-requests"] = ("LeaveRequests", "5"),
             ["service-desk"] = ("ServiceDesk", "12"),
             ["asset-management"] = ("AssetManagement", "6"),
@@ -1338,10 +1338,11 @@ public sealed class ScenarioRunnerTests
         Assert.True(exitCode == 0, output.ToString());
         var lines = output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         var passed = lines.Where(line => line.StartsWith("PASS ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(7, passed.Count);
-        Assert.Equal("PASS department-budgets/ApproverCreatesBudget", passed[^1]);
+        Assert.Equal(10, passed.Count);
+        string[] moduleScenarios = ["ApprovalRecordsDecision", "ApproverCreatesBudget", "DecidedAmountIsFrozen", "RequesterCannotDecideOwnBudget"];
+        Assert.Equal(moduleScenarios.Select(name => $"PASS department-budgets/{name}"), passed.TakeLast(4));
         var suite = XDocument.Load(Path.Combine(results.Path, "scenarios-PurchaseRequests.xml")).Root!.Element("testsuite")!;
-        Assert.Equal("7", suite.Attribute("tests")!.Value);
+        Assert.Equal("10", suite.Attribute("tests")!.Value);
         Assert.Equal("0", suite.Attribute("failures")!.Value);
         Assert.Contains(suite.Descendants("testcase"), testCase => testCase.Attribute("name")!.Value == "department-budgets/ApproverCreatesBudget");
     }

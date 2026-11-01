@@ -10,6 +10,7 @@ namespace Axis.Integration.Tests;
 /// The entity designer saves an entity patch and a <c>renameField</c> migration in one call of the changes route. The
 /// next publish keeps the stored records under the new field name. The server and the publisher run together here.
 /// </summary>
+[Collection("Test scenario runs")]
 public sealed class StudioDesignerMigrationTests : IAsyncLifetime
 {
     private const string ApplicationUrl = "/api/studio/apps/PurchaseRequests";

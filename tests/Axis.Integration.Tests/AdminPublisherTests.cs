@@ -17,13 +17,14 @@ using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
+[Collection("Test scenario runs")]
 public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
-    private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
+    private static readonly string[] _steps = ["version", "contracts", "compile", "activate", "seed", "indexes"];
 
     private static readonly Dictionary<string, string?> _directory = new() { ["Tenancy:Source"] = "directory" };
 
@@ -41,7 +42,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(0, result.Exit);
         Assert.Empty(result.Error);
         Assert.Equal($"{ids[0]} claim ok", result.Output[0]);
-        Assert.Equal(_steps.Select(step => $"{ids[0]} {step} ok"), result.Output.Skip(1));
+        Assert.Equal(_steps.Select(step => $"{ids[0]} {step} ok"), WithoutScenarioLines(result.Output, ids[0]).Skip(1));
         Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         var release = await ScalarAsync(scenario, ids[0], $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'");
         Assert.NotNull(release);
@@ -155,8 +156,8 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
         await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
         var release = hold.ReleaseAfterAsync(TimeSpan.FromSeconds(7));
-        var first = StartPublisher(scenario, _testLease);
-        var second = StartPublisher(scenario, _testLease);
+        var first = await StartPublisherAsync(scenario, _testLease);
+        var second = await StartPublisherAsync(scenario, _testLease);
         try
         {
             await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
@@ -182,7 +183,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         var ids = await CreateTenantsAsync(scenario);
         var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
         await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
-        var publisher = StartPublisher(scenario, _testLease);
+        var publisher = await StartPublisherAsync(scenario, _testLease);
         AdminResult result;
         try
         {
@@ -213,7 +214,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         var ids = await CreateTenantsAsync(scenario);
         var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
         await SetRunningAsync(scenario, ids[0], request, 1, "now() + interval '10 seconds'");
-        var publisher = StartPublisher(scenario, _testLease);
+        var publisher = await StartPublisherAsync(scenario, _testLease);
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(2), CancellationToken);
@@ -244,7 +245,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         var ids = await CreateTenantsAsync(scenario);
         var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null));
         await SetRunningAsync(scenario, ids[0], request, 3, "now() - interval '1 minute'");
-        var publisher = StartPublisher(scenario, _testLease);
+        var publisher = await StartPublisherAsync(scenario, _testLease);
         try
         {
             await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
@@ -277,7 +278,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
         var text = new StringWriter();
         var output = TextWriter.Synchronized(text);
-        var publisher = StartPublisher(scenario, _testLease, output);
+        var publisher = await StartPublisherAsync(scenario, _testLease, output);
         try
         {
             await WaitForStatusAsync(scenario, ids[0], request, "running");
@@ -288,7 +289,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
                 ids[0],
                 $"UPDATE axis.publish_requests SET claims = 2, lease_until = now() + interval '1 hour' WHERE id = '{request}'");
             await hold.ReleaseAfterAsync(TimeSpan.Zero);
-            await WaitUntilAsync(() => PublisherOutput(output, text).Contains("claim failed", StringComparison.Ordinal), "The publisher did not log the claim failure.", TimeSpan.FromSeconds(60));
+            await WaitUntilAsync(() => PublisherOutput(output, text).Contains("claim failed", StringComparison.Ordinal), "The publisher did not log the claim failure.", TimeSpan.FromSeconds(180));
         }
         finally
         {
@@ -312,8 +313,8 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         var older = await QueueAsync(scenario, ids[0], snapshot);
         var newer = await QueueAsync(scenario, ids[0], snapshot);
         await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
-        var first = StartPublisher(scenario, _testLease);
-        var second = StartPublisher(scenario, _testLease);
+        var first = await StartPublisherAsync(scenario, _testLease);
+        var second = await StartPublisherAsync(scenario, _testLease);
         try
         {
             await WaitForStatusAsync(scenario, ids[0], older, "running");
@@ -361,9 +362,11 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal("failed", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, ids[0], $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
         Assert.Contains(diagnostics, item => item!["code"]!.GetValue<string>() == "AXC0100" && item["severity"]!.GetValue<string>() == "error");
-        Assert.Equal($"{ids[0]} claim ok", result.Output[0]);
-        Assert.Equal($"{ids[0]} version ok", result.Output[1]);
-        Assert.StartsWith($"{ids[0]} validate failed: AXC0100", result.Output[2], StringComparison.Ordinal);
+        var lines = WithoutScenarioLines(result.Output, ids[0]);
+        Assert.Equal($"{ids[0]} claim ok", lines[0]);
+        Assert.Equal($"{ids[0]} version ok", lines[1]);
+        Assert.Equal($"{ids[0]} contracts ok", lines[2]);
+        Assert.StartsWith($"{ids[0]} validate failed: AXC0100", lines[3], StringComparison.Ordinal);
         Assert.DoesNotContain(result.Output, line => line.Contains(" compile ", StringComparison.Ordinal) || line.Contains(" activate ", StringComparison.Ordinal) || line.Contains(" seed ", StringComparison.Ordinal));
         Assert.Equal(releases, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.releases"));
         Assert.Equal(active, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.active_releases"));
@@ -382,7 +385,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
 
         Assert.Equal(0, result.Exit);
         Assert.Empty(result.Error);
-        Assert.Equal([$"{ids[0]} claim ok", $"{ids[0]} version ok", $"{ids[0]} validate ok"], result.Output);
+        Assert.Equal([$"{ids[0]} claim ok", $"{ids[0]} version ok", $"{ids[0]} contracts ok", $"{ids[0]} validate ok"], WithoutScenarioLines(result.Output, ids[0]));
         Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Null(await ScalarAsync(scenario, ids[0], $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Equal(1, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
@@ -461,7 +464,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Empty(result.Error);
         Assert.Equal("default ready", result.Output[0]);
         Assert.Equal("default claim ok", result.Output[1]);
-        Assert.Equal(_steps.Select(step => $"default {step} ok"), result.Output.Skip(2));
+        Assert.Equal(_steps.Select(step => $"default {step} ok"), WithoutScenarioLines(result.Output, "default").Skip(2));
         Assert.Equal("succeeded", await ConfiguredScalarAsync(schema, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         var release = await ConfiguredScalarAsync(schema, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'");
         Assert.NotNull(release);
@@ -481,7 +484,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     {
         var schema = await MigratedTenantDatabaseAsync();
         var request = await QueueConfiguredAsync(schema, await SnapshotAsync(null));
-        var settings = ConfiguredSettings(schema);
+        var settings = await ConfiguredSettingsAsync(schema);
         settings["Tenants:default:Oidc:Authority"] = "http://127.0.0.1:1/realms/default";
         settings["Tenants:default:Realm:Name"] = "default";
         settings["Tenants:default:Realm:ActivationClientSecret"] = $"activation-{Guid.NewGuid():N}";
@@ -502,7 +505,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         var schema = await database.CreateDatabaseAsync("publisher", CancellationToken);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var output = new SynchronizedWriter();
-        var run = RunConfiguredAsync(ConfiguredSettings(schema), output, stop.Token);
+        var run = RunConfiguredAsync(await ConfiguredSettingsAsync(schema), output, stop.Token);
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(2), CancellationToken);
@@ -530,7 +533,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     public async Task Under_the_configuration_source_a_tenant_without_a_schema_connection_string_exits_2_and_names_the_setting()
     {
         var schema = await MigratedTenantDatabaseAsync();
-        var settings = ConfiguredSettings(schema);
+        var settings = await ConfiguredSettingsAsync(schema);
         settings.Remove("Tenants:default:SchemaConnectionString");
         var output = new SynchronizedWriter();
 
@@ -567,11 +570,19 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         }
     }
 
-    private static RunningPublisher StartPublisher(AdminScenario scenario, TimeSpan lease, TextWriter? output = null)
+    private static async Task<RunningPublisher> StartPublisherAsync(AdminScenario scenario, TimeSpan lease, TextWriter? output = null)
     {
         var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        return new RunningPublisher(stop, scenario.RunAsync(["publisher"], output, stop, extra: _directory, publisherLease: lease));
+        return new RunningPublisher(stop, scenario.RunAsync(["publisher"], output, stop, extra: await DirectoryWithScenariosAsync(), publisherLease: lease));
     }
+
+    // The directory source, and the server where the contract scenarios of a publish create their databases.
+    private static async Task<Dictionary<string, string?>> DirectoryWithScenariosAsync() =>
+        new(_directory) { ["Scenarios:ServerConnectionString"] = await PostgreSqlServer.ScenarioConnectionStringAsync() };
+
+    // The output without the lines of the scenarios that the contracts step ran.
+    private static string[] WithoutScenarioLines(IEnumerable<string> output, string tenant) =>
+        [.. output.Where(line => !line.StartsWith($"{tenant} scenario ", StringComparison.Ordinal))];
 
     // Holds a lock on the table of releases, so that a request stops at its activation for a time the test chooses.
     private sealed class ReleasesHold : IAsyncDisposable
@@ -626,16 +637,16 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
                 return Array.IndexOf(statuses, status) >= 0;
             },
             $"The request did not reach {string.Join(" or ", statuses)}.",
-            TimeSpan.FromSeconds(60));
+            TimeSpan.FromSeconds(180));
 
     // Runs the publisher until the request is final, then stops it and returns its result.
     private static async Task<AdminResult> RunPublisherAsync(AdminScenario scenario, string tenant, Guid request)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        var run = scenario.RunAsync(["publisher"], stop: stop, extra: _directory);
+        var run = scenario.RunAsync(["publisher"], stop: stop, extra: await DirectoryWithScenariosAsync());
         try
         {
-            var deadline = DateTime.UtcNow.AddSeconds(60);
+            var deadline = DateTime.UtcNow.AddSeconds(180);
             while (!run.IsCompleted && DateTime.UtcNow < deadline)
             {
                 var status = await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
@@ -711,7 +722,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     // The settings of one tenant, 'default', under the configuration source.
-    private static Dictionary<string, string?> ConfiguredSettings(string schema)
+    private static async Task<Dictionary<string, string?>> ConfiguredSettingsAsync(string schema)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -723,6 +734,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
             [$"Tenants:default:Bindings:{UrlBinding}:Value"] = "https://purchasing.example.test",
             ["Extensions:Path"] = SamplePackages.Path,
             ["Modules:Path"] = SampleModules.Path,
+            ["Scenarios:ServerConnectionString"] = await PostgreSqlServer.ScenarioConnectionStringAsync(),
         };
         foreach (var (key, value) in PurchasingBindings.Settings("default"))
         {
@@ -754,7 +766,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var output = new SynchronizedWriter();
-        var run = RunConfiguredAsync(settings ?? ConfiguredSettings(schema), output, stop.Token, identityProvider);
+        var run = RunConfiguredAsync(settings ?? await ConfiguredSettingsAsync(schema), output, stop.Token, identityProvider);
         try
         {
             await WaitForStatusAsync(schema, request, run);
@@ -769,7 +781,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
 
     private static async Task WaitForStatusAsync(string schema, Guid request, Task<AdminResult> run)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(60);
+        var deadline = DateTime.UtcNow.AddSeconds(180);
         while (!run.IsCompleted && DateTime.UtcNow < deadline)
         {
             var status = await ConfiguredScalarAsync(schema, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
