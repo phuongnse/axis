@@ -547,7 +547,7 @@ public static partial class ApplicationCompiler
             rules,
             declaredModules,
             diagnostics);
-        CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
+        CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, contracts, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, FilterRulesFor, DeclaredModulesOf, diagnostics);
         // An application process names a module form or process only under a module the application declares.
         // A module process names only its own module and the modules it declares, sees no application
@@ -2007,13 +2007,15 @@ public static partial class ApplicationCompiler
     /// <summary>
     /// Checks the seeds, which come in path order: each names a loaded entity, and every seed record
     /// id is used once across all seeds, compared as a UUID. A record cannot set a file field, in its
-    /// own values or in a child row's. The other values are not checked here; the startup step
-    /// checks them with the record API's rules before it inserts any record.
+    /// own values or in a child row's. A record of an entity whose checked contract has a lifecycle
+    /// gives a state that is an initial state, when it gives its state as text. The other values are
+    /// not checked here; the startup step checks them with the record API's rules before it inserts any record.
     /// </summary>
     private static void CheckSeeds(
         IReadOnlyList<SeedResource> seeds,
         IReadOnlySet<string> unloadedEntityNames,
         Func<string, EntityResource?> findEntity,
+        Dictionary<string, ContractResource> contracts,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -2041,6 +2043,10 @@ public static partial class ApplicationCompiler
                 if (entity is not null)
                 {
                     CheckSeedFiles(seed, entity, seed.Records[index].Values, $"/records/{index}/values", findEntity, diagnostics);
+                    if (contracts.TryGetValue(entity.Name, out var contract) && contract.Lifecycle is { } lifecycle)
+                    {
+                        CheckSeedState(seed, entity, lifecycle, seed.Records[index].Values, $"/records/{index}/values", diagnostics);
+                    }
                 }
 
                 var id = seed.Records[index].Id;
@@ -2053,6 +2059,45 @@ public static partial class ApplicationCompiler
                         $"/records/{index}/id",
                         seed.Id));
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a seed record's state that is text and not an initial state of <paramref name="lifecycle"/>, at the state's
+    /// value. A missing state and a value that is not text are left to the startup step.
+    /// </summary>
+    private static void CheckSeedState(
+        SeedResource seed,
+        EntityResource entity,
+        ContractLifecycleDefinition lifecycle,
+        JsonElement values,
+        string path,
+        List<Diagnostic> diagnostics)
+    {
+        if (values.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in values.EnumerateObject())
+        {
+            if (!string.Equals(property.Name, lifecycle.Field, StringComparison.OrdinalIgnoreCase)
+                || property.Value.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            var state = property.Value.GetString();
+            var initial = lifecycle.States.Where(candidate => candidate.Initial == true).Select(candidate => candidate.Name).ToList();
+            if (state is null || !initial.Contains(state))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.SeedStateNotInitial,
+                    $"The state '{state}' is not an initial state of the lifecycle of '{entity.Name}'. A seed record must be in one of: {string.Join(", ", initial)}.",
+                    seed.File,
+                    $"{path}/{property.Name}",
+                    seed.Id));
             }
         }
     }

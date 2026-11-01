@@ -321,4 +321,5 @@ public static class DiagnosticCodes
     public const string UnknownCeilingField = "AXC0333";
     public const string GrantPastCeiling = "AXC0334";
     public const string ModuleScenarioRoleNotSlot = "AXC0335";
+    public const string SeedStateNotInitial = "AXC0336";
 }

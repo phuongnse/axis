@@ -297,8 +297,9 @@ promise that each step is decided once.
   computed fields, a data key rotation and a restore change stored values in bulk and check no
   contract.
 - **Seed data.** A seed record of an entity with a lifecycle must be in an initial state, or the
-  seed is a diagnostic. A synced seed that changes a stored state must follow a transition, and its
-  guard runs with a `null` accountable user.
+  seed is a diagnostic (`AXC0336`). A synced seed that changes a stored state must follow a
+  transition, and its guard runs with a `null` accountable user. A refusal is `AXC0033`: it stops
+  startup seeding, rolls back every seed write, and the log names the point that refused it.
 - **Order in a write.** Computed fields, the entity's validations, the core validations, then the
   lifecycle check, then storage, then the effects. The record API's grant checks come before, as
   [the record API](record-api.md#errors) orders them. In Axis SaaS, the tenant's quota check of

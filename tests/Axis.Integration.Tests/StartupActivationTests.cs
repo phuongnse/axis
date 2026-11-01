@@ -27,6 +27,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
 
     private const string TitleField = """{ "name": "title", "type": "text", "required": true, "maxLength": 200 }""";
     private const string SecretField = """{ "name": "secret", "type": "text", "sensitive": true }""";
+    private static readonly Guid _ticketEntityId = Guid.Parse("8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a61");
+
     private const string DoneField = """{ "name": "done", "type": "boolean" }""";
 
     // Each test uses its own application, so active releases and tables never meet across tests.
@@ -554,6 +556,66 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
     }
 
     [Fact]
+    public async Task Synced_module_seed_moves_a_record_back_to_its_initial_state_along_a_transition_without_a_guard()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var modules = TicketModules(reopenGuard: null);
+        using var folder = TicketApplication();
+        var settings = new Dictionary<string, string> { ["Modules:Path"] = modules.Path };
+        var table = TicketTable();
+        var status = EntityNaming.Quote(EntityNaming.Column("status"));
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), settings))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        Assert.Equal(("open", 1L), await TicketStateAsync(a));
+        await ScalarAsync(a, $"UPDATE {table} SET {status} = 'closed'");
+
+        var logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, settings))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        Assert.Equal(("open", 2L), await TicketStateAsync(a));
+        Assert.Contains(logs.Entries, entry => entry.Contains("updated 1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Synced_module_seed_whose_transition_guard_is_false_stops_the_start_and_the_log_names_the_point()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        // The guard stands in for accountableUser() != null, which seeds fail as they have no accountable user,
+        // until that function can be called in an expression.
+        using var modules = TicketModules(reopenGuard: "reopenedBy != null");
+        using var folder = TicketApplication();
+        var settings = new Dictionary<string, string> { ["Modules:Path"] = modules.Path };
+        var table = TicketTable();
+        var status = EntityNaming.Quote(EntityNaming.Column("status"));
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), settings))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        await ScalarAsync(a, $"UPDATE {table} SET {status} = 'closed'");
+
+        var logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, settings))
+        {
+            Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        }
+
+        Assert.Contains(logs.Entries, entry =>
+            entry.Contains(DiagnosticCodes.InvalidSeedValue, StringComparison.Ordinal)
+            && entry.Contains("/records/0/values/status", StringComparison.Ordinal)
+            && entry.Contains("Ticket/transitions/reopen", StringComparison.Ordinal));
+        Assert.Equal(("closed", 1L), await TicketStateAsync(a));
+    }
+
+    [Fact]
     public async Task Package_that_is_not_installed_stops_the_start_with_its_diagnostic()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
@@ -981,6 +1043,69 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
     {
         var exception = await Assert.ThrowsAsync<PostgresException>(() => ScalarAsync(connectionString, sql));
         Assert.True(exception.SqlState == sqlState, $"{sql} gave {exception.SqlState}, expected {sqlState}: {exception.Message}");
+    }
+
+    private string TicketTable() =>
+        EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(_applicationId, _ticketEntityId)));
+
+    /// <summary>The stored state and version of the seeded ticket in tenant <paramref name="connectionString"/>.</summary>
+    private async Task<(string? State, long Version)> TicketStateAsync(string connectionString)
+    {
+        var status = EntityNaming.Quote(EntityNaming.Column("status"));
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await using var command = dataSource.CreateCommand($"SELECT {status}, {EntityNaming.VersionColumn} FROM {TicketTable()}");
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        return (reader.GetString(0), reader.GetInt64(1));
+    }
+
+    /// <summary>The application that declares the <c>tickets</c> module and maps its slot to <c>employee</c>.</summary>
+    private TemporaryFolder TicketApplication() =>
+        ApplicationFolder(TitleField)
+            .With("application.json", $$"""
+                { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
+                  "modules": [{ "id": "tickets", "version": "^1.0.0", "roles": { "agent": "employee" } }] }
+                """);
+
+    /// <summary>
+    /// A modules folder with <c>tickets</c>: a <c>Ticket</c> entity with a lifecycle of <c>open</c> (initial) and <c>closed</c>,
+    /// and a synced seed of one open ticket. <c>reopen</c> leads from <c>closed</c> to <c>open</c> with the given guard.
+    /// </summary>
+    private static TemporaryFolder TicketModules(string? reopenGuard)
+    {
+        var guard = reopenGuard is null ? "" : $$""", "guard": "{{reopenGuard}}" """;
+        return new TemporaryFolder()
+            .With("tickets/1.0.0/module.json", """
+                { "kind": "module", "id": "tickets", "version": "1.0.0", "label": "Tickets",
+                  "roles": [{ "name": "agent", "label": { "textKey": "tickets.roles.agent" } }] }
+                """)
+            .With("tickets/1.0.0/Ticket.json", $$"""
+                { "id": "{{_ticketEntityId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1,
+                  "fields": [
+                    { "name": "title", "type": "text" },
+                    { "name": "status", "type": "enum", "values": ["open", "closed"], "required": true },
+                    { "name": "reopenedBy", "type": "text" }
+                  ] }
+                """)
+            .With("tickets/1.0.0/TicketContract.json", $$"""
+                { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a62", "kind": "contract", "name": "TicketContract", "formatVersion": 1, "entity": "Ticket",
+                  "lifecycle": {
+                    "field": "status",
+                    "states": [{ "name": "open", "initial": true, "deletable": true }, { "name": "closed" }],
+                    "transitions": [
+                      { "name": "close", "from": ["open"], "to": "closed" },
+                      { "name": "reopen", "from": ["closed"], "to": "open"{{guard}} }
+                    ]
+                  } }
+                """)
+            .With("tickets/1.0.0/Tickets.json", $$"""
+                { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a63", "kind": "seed", "name": "Tickets", "formatVersion": 1, "entity": "Ticket", "sync": true,
+                  "records": [{ "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a64", "values": { "title": "First", "status": "open" } }] }
+                """)
+            .With("tickets/1.0.0/TextsEn.json", """
+                { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a65", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "tickets.roles.agent": "Agent" } }
+                """);
     }
 
     private Task<string> CreateDatabaseAsync() => database.CreateDatabaseAsync("startup", CancellationToken);
