@@ -284,7 +284,7 @@ HTTP also call. The record API maps its outcome to the responses below.
   `?form=<name>`. The name must be a `form` resource over the entity. A name
   that is not, and an empty or repeated `form`, is a `400` keyed `form` with
   the message "Must name a form of this entity.". With a form, the server
-  enforces its [`requiredWhen`](resource-files.md#form-conditions-and-steps) at
+  enforces its [`requiredWhen`](form-conditions.md#form-conditions-and-steps) at
   the validation step, on the record as it will be stored: a visible field
   whose condition is true and whose value is `null` is a `400` at
   `/values/<field>` with "Required.". A hidden field is not required. A child
@@ -722,7 +722,7 @@ answered with `400`:
 
 The form state endpoint answers what a form shows for a draft record, and which messages the user's input earns so far. It writes
 nothing ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
-The conditions are in [Form conditions and steps](resource-files.md#form-conditions-and-steps).
+The conditions are in [Form conditions and steps](form-conditions.md#form-conditions-and-steps).
 
 `POST /api/apps/{app}/forms/{form}/state` needs `Content-Type: application/json`
 and the [CSRF header](#create-update-and-delete). `{form}` is a form name in

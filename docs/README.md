@@ -26,6 +26,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Configuration pipeline](reference/configuration.md)                   | Load, resolve, check, release and activate an application folder; the reference index |
 | [Diagnostic codes](reference/diagnostic-codes.md)                      | The shape of a diagnostic and the table of every `AXCnnnn` code                       |
 | [Resource files](reference/resource-files.md)                          | The resource file shape, schema keywords, entity fields, entity logic, sequences      |
+| [Form conditions](reference/form-conditions.md)                        | The conditions and wizard steps of a `form` resource                                  |
 | [Roles and policies](reference/roles-and-policies.md)                  | The `role` and `policy` resources, the record creator, sensitive fields               |
 | [Connectors, events and endpoints](reference/integration-resources.md) | Connectors and deployment bindings, the `event`, `trigger` and `endpoint` resources |
 | [Outbound webhooks](reference/outbound-webhooks.md)                    | The `webhook` resource, its compile checks, and the signed delivery of an event       |
