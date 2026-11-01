@@ -61,7 +61,7 @@ the upgrade merge and eject, _(planned for M29)_, and the `service-desk` and
   - [D121](d121-how-a-module-contract-is-declared-and-checked.md) sets the shapes: a `contract`
     resource for each entity, the accountable user that guards read, effects that only create
     records, and how ceilings, relax entries and contract scenarios are checked.
-  - [D123](d123-how-a-customization-layer-is-written-and-applied.md) sets the layer's shapes: one
+  - [D122](d122-how-a-customization-layer-is-written-and-applied.md) sets the layer's shapes: one
     file for each changed resource, a key for every list element, `after` and `before`, lifecycles
     that grow except into protected states, and Studio writing the difference.
 - **Two levels of invariants:**

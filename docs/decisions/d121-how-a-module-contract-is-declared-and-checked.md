@@ -11,7 +11,7 @@ the detail.
 - **A resource of its own:** a contract is a resource of the kind `contract`, one file for each
   module entity it covers, holding the lifecycle, the core validations, the effects and the grant
   ceiling. Only a module holds contracts, and a customization layer never names one.
-  - [D123](d123-how-a-customization-layer-is-written-and-applied.md) lets a layer add states and
+  - [D122](d122-how-a-customization-layer-is-written-and-applied.md) lets a layer add states and
     transitions to a contract, never into a state the contract marks `protected`.
 - **Lifecycle:** an `enum` field that is required, not computed and not `sensitive` holds the
   state. Every value of the field is a state.

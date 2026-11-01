@@ -4,7 +4,7 @@ A customization layer is an application's changes to a module it declares. Each 
 resource of the module and holds only what the application changes in it. Compilation applies the
 layers to the pinned module version, then checks the result, the [module contract](module-contracts.md)
 included. [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees
-the idea, and [D123](../decisions/d123-how-a-customization-layer-is-written-and-applied.md) agrees
+the idea, and [D122](../decisions/d122-how-a-customization-layer-is-written-and-applied.md) agrees
 the shapes below. Everything here is _(planned for M25)_. Module upgrades, the three-way merge and
 eject are _(planned for M29)_.
 
