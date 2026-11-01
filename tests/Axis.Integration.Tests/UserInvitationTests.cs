@@ -445,7 +445,7 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
             """)
         .With("policies/buyer-access.json", """
             { "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c15", "kind": "policy", "name": "BuyerAccess", "formatVersion": 1,
-              "roles": ["buyer"], "grants": [ { "entity": "Note", "actions": ["read"], "fields": ["title"] } ] }
+              "roles": ["buyer"], "grants": [ { "name": "noteRead", "entity": "Note", "actions": ["read"], "fields": ["title"] } ] }
             """);
 
     private async Task<GivenRole[]> GivenRolesAsync(string userId)

@@ -384,18 +384,18 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
                 "policies/clerk-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "ClerkAccess", "formatVersion": 1, "roles": ["clerk"], "grants": [
-                    { "entity": "Person", "actions": ["read", "create", "update"] }] }
+                    { "name": "personRead", "entity": "Person", "actions": ["read", "create", "update"] }] }
                 """)
             .With(
                 "policies/matcher-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "MatcherAccess", "formatVersion": 1, "roles": ["matcher"], "grants": [
-                    { "entity": "Person", "actions": ["read"], "filter": "nationalId == '{{Matching}}'" }] }
+                    { "name": "personRead2", "entity": "Person", "actions": ["read"], "filter": "nationalId == '{{Matching}}'" }] }
                 """)
             .With(
                 "policies/other-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "OtherAccess", "formatVersion": 1, "roles": ["other"], "grants": [
-                    { "entity": "Person", "actions": ["read"], "filter": "nationalId != '{{Matching}}'" }] }
+                    { "name": "personRead3", "entity": "Person", "actions": ["read"], "filter": "nationalId != '{{Matching}}'" }] }
                 """);
 }

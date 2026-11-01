@@ -170,7 +170,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
             .With("roles/worker.json", $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "role", "name": "worker", "formatVersion": 1, "label": { "textKey": "role.worker" } }""")
             .With("policies/worker-access.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "WorkerAccess", "formatVersion": 1, "roles": ["worker"],
-                  "grants": [ { "entity": "Workstation", "actions": ["read"], "fields": ["name", "note", "software"] } ] }
+                  "grants": [ { "name": "workstationRead", "entity": "Workstation", "actions": ["read"], "fields": ["name", "note", "software"] } ] }
                 """)
             .With("texts/en.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",

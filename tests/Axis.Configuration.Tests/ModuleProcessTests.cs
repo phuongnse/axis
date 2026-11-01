@@ -243,7 +243,7 @@ public sealed class ModuleProcessTests
                 """)
             .With("policies/ReviewAccess.json", """
                 { "id": "44444444-4444-4444-8444-444444444402", "kind": "policy", "name": "ReviewAccess", "formatVersion": 1,
-                  "roles": ["manager"], "grants": [ { "process": "approvals/Review", "actions": ["start"] } ] }
+                  "roles": ["manager"], "grants": [ { "name": "reviewStart", "process": "approvals/Review", "actions": ["start"] } ] }
                 """);
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);

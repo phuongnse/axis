@@ -66,7 +66,7 @@ public sealed class ProcessRetryMigrationTests(TaskApiFixture fixture) : IClassF
         path == _financePath
             ? content.Replace(
                 "{ \"name\": \"decideStart\", \"process\": \"Decide\", \"actions\": [\"start\"] },",
-                "{ \"name\": \"decideStart\", \"process\": \"Decide\", \"actions\": [\"start\"] },\n    { \"process\": \"Divide\", \"actions\": [\"retry\"] },",
+                "{ \"name\": \"decideStart\", \"process\": \"Decide\", \"actions\": [\"start\"] },\n    { \"name\": \"divideRetry\", \"process\": \"Divide\", \"actions\": [\"retry\"] },",
                 StringComparison.Ordinal)
             : content;
 

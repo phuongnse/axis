@@ -319,6 +319,6 @@ public sealed class AdminTenantDataKeyTests(PostgreSqlFixture database) : IClass
                 "policies/clerk-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "ClerkAccess", "formatVersion": 1, "roles": ["clerk"], "grants": [
-                    { "entity": "Person", "actions": ["read", "create", "update"] }] }
+                    { "name": "personRead", "entity": "Person", "actions": ["read", "create", "update"] }] }
                 """);
 }
