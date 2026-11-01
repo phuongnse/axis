@@ -150,6 +150,11 @@ and a JSON view, and shows the diagnostics.
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
+- **In a cell.** _(planned for M31)_ When `Cell:Id` is set, each tenant's applications are under
+  `<Studio:ApplicationsPath>/<tenant id>/`, and Studio on a tenant's host reads, writes and creates
+  only there. A non-empty `Studio:Folders` stops the start, because it would name folders that every
+  tenant reaches. The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell),
+  [export and deletion](tenant-lifecycle.md), see [cells](cells.md).
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
   roles claim holds the value may use Studio. It has no default, and with no
@@ -531,6 +536,7 @@ replica. See [rate limits](headers-and-rate-limits.md#rate-limits) and
 | `RateLimits:Session`    | 1200    | Every other route that takes a session, by tenant and user           |
 | `RateLimits:Bearer`     | 1200    | Requests with a bearer token, by tenant and caller id                |
 | `RateLimits:Publishing` | 60      | Studio validate, publish, preview, rollback and test, by tenant and user |
+| `RateLimits:Mcp`        | 600     | _(planned for M35)_ MCP tool calls, by tenant and client             |
 
 - **Environment variables.** `RateLimits__SignIn`, `RateLimits__Session`,
   `RateLimits__Bearer` and `RateLimits__Publishing`.
@@ -541,6 +547,15 @@ replica. See [rate limits](headers-and-rate-limits.md#rate-limits) and
 - **Defaults.** They are proposals. The weekly load test of
   [D82](../decisions/d82-performance-slos-and-load-tests.md) never reaches
   them, and it can tune them.
+
+## AI settings
+
+_(planned for M35)_ The agent host reads the `Ai` settings: the model bindings, the default and
+review bindings, tenant keys and the budgets of a request. Their table is in
+[model bindings](model-bindings.md#bindings), as
+[D125](../decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) agrees. The
+server reads `Studio:RevisionsPath`, the folder of the application repositories, which defaults to
+`.revisions` under `Studio:ApplicationsPath`, see [revisions and drafts](revisions-and-drafts.md).
 
 ## Telemetry export
 
@@ -565,3 +580,30 @@ never from a committed file. Docker Compose and `scripts/dev.sh` set no
 endpoint and start no collector. Outside Development every endpoint variable that
 is set must be an absolute `https` URL, or the server and the worker stop at start
 and the error names the variable, never its value. Development accepts `http`.
+
+## Cell settings
+
+_(planned for M31)_ These settings turn a host into part of a [cell](cells.md), as
+[D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md)
+agrees. With no `Cell:Id`, the `Cell` and `Quotas` settings do not apply and the host is a
+self-hosted installation. The `Worker` settings apply to every installation, because the worker
+shares its time the same way everywhere.
+
+| Setting | Read by | Meaning |
+| --- | --- | --- |
+| `Cell:Id` | All hosts | The cell id, such as `vn-1`. Setting it turns on quotas, per-tenant Studio folders and the cell console. |
+| `Cell:Region` | All hosts | The region code, such as `vn`. |
+| `Cell:TenantDomain` | Server, publisher | The domain of the tenant subdomains, such as `vn.example.com`. |
+| `Cell:InternalDomain` | Publisher | A domain no ingress serves, for scratch tenants of the restore check. |
+| `Cell:TenantCap` | Server | The measured number of tenants the cell holds, see [cell size](cells.md#cell-size). |
+| `Cell:ConsoleHost` | Server | The host of the [cell console](cell-console.md). |
+| `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
+| `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
+| `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
+| `Cell:OperatorRole` | Server | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
+| `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. |
+| `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |
+| `Worker:Concurrency` | Worker | The loops that claim work at once, 4 by default, see [fair share](worker-scheduling.md#fair-share). |
+| `Worker:Quantum` | Worker | The work items a tenant of weight 1 runs in a round, 10 by default. |
+| `Worker:IdlePollCeiling` | Worker | The longest wait between two polls of an idle tenant, 30 seconds by default. |
+

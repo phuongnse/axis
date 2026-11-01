@@ -65,6 +65,9 @@ the [roadmap](../roadmap.md#milestones).
     administrators get emails 7 days and 1 day before the end. At the end it is suspended, and 30
     days later it is deleted. Its data can be exported until then.
   - There is no free plan that never ends, so abandoned tenants do not fill the cells.
+  - [D126](d126-sign-up-trials-and-the-control-plane.md) sets the mechanics: a control plane of its
+    own, a region directory, email verification before any tenant exists, and a read-only tenant
+    instead of a suspended one at the trial's end.
   - Sign-up has rate limits and a proof-of-work bot check that the cell serves itself, so no sign-up
     data leaves the region. The operator can still create a tenant by hand.
   - A directory of regions and cells, apart from the cells, routes each sign-up, and each tenant
@@ -81,6 +84,9 @@ the [roadmap](../roadmap.md#milestones).
   - A trial becomes paid without losing anything. A failed or late payment sends reminders, then
     a grace period of 14 days, then a suspension. A tenant suspended for 90 days is deleted, with
     emails before and its data exportable until then.
+  - [D127](d127-plans-payments-and-invoices.md) sets the mechanics: versioned plans, user packs, a
+    billing portal, an inbox and a ledger for payments, e-invoices on payment, and read-only instead
+    of suspended after the grace.
 - **Prices follow cost:**
   - A plan's lowest price covers its share of a cell's fixed cost, counted with the cell 60% full
     of paying tenants, the cost of its quotas, the payment and invoice fees, time for support, and

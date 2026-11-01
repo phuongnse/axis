@@ -158,7 +158,7 @@ state:
   (`[]` when the form has none). Sections the user cannot read, and the steps
   left empty by that, are left out. The condition expressions stay on the
   server. See
-  [Form conditions and steps](resource-files.md#form-conditions-and-steps).
+  [Form conditions and steps](form-conditions.md#form-conditions-and-steps).
 - `completedAt`, `completedBy` and `outcome` are `null` while the task is
   `open`.
 - `overdue` is `true` only for an open task whose `dueAt` has passed. A

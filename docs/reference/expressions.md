@@ -428,6 +428,9 @@ argument is `null`.
 | `today()` | date | The calendar date of the transaction's time in the application's time zone. Not allowed in a computed field (`AXC0086`). | Yes |
 | `toDate(date-time)` | date | The calendar date of an instant in the application's time zone. `null` gives `null`. Not allowed in a computed field (`AXC0086`). | Yes |
 | `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
+| `previous(field)` | type of the field | _(planned for M24)_ The field's value before the write, `null` on a create. Allowed only in a module contract. See [previous values](module-contracts.md#previous-values). | No |
+| `accountableUser()` | text | _(planned for M24)_ The user who answers for the write, or `null`. Allowed only in a module contract and a step's `set`. See [the accountable user](module-contracts.md#the-accountable-user). | No |
+| `decisionTask()` | text | _(planned for M24)_ The task whose completion the write follows, or `null`. Allowed where `accountableUser()` is. See [the deciding task](module-contracts.md#the-deciding-task). | No |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, so `toDate` does it.
@@ -508,6 +511,7 @@ them over child collections and `references` fields.
 | `max(list, item)` | type of `item` | `null` |
 | `any(list, condition)` | boolean | false |
 | `all(list, condition)` | boolean | true |
+| `first(list, condition, item)` | type of `item` | `null` |
 
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
 - **Item types.** `sum` takes integer or decimal items. `min` and `max` take
@@ -530,6 +534,33 @@ them over child collections and `references` fields.
 - **SQL.** Only `any` and `count` are in the SQL subset, so a data source or
   policy filter can use them. The other aggregates are `AXC0053`, see
   [SQL subset](#sql-subset).
+- **`first`** _(planned for M26)_. The `item` of the first row, in the list's
+  stored order, whose `condition` is true, or `null` when none is. The `item`
+  may be any scalar field, an enum or a reference of the row, so a step can
+  store the record a row names. Only the picked row's `item` is evaluated.
+
+### Collections through a path and the outer record
+
+_(planned for M26)_ Two additions let a process read the rows of another
+record, such as the approval steps of a request's type, as
+[D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees:
+
+- **A path to a collection.** The first argument of an aggregate may be a path
+  that ends at a child collection or a `references` field of a referenced
+  record, such as `count(type.steps)`, with at most 3 hops. It is allowed in
+  process expressions: conditions, `set`, assignees, inputs and `fields`. The
+  step reads the rows in its transaction. A `null` reference on the path gives
+  the aggregate's empty-list result.
+- **`outer`.** Inside an item expression, `outer.<field>` reads a field of the
+  record the whole expression runs on, and `outer.<path>` follows its
+  references, such as
+  `count(type.steps, minAmount == null or outer.amount >= minAmount)`. Outside
+  an item expression it is a diagnostic. `outer` becomes a reserved name, so a
+  field named `outer` is a diagnostic.
+- **Not SQL.** A path to a collection, `outer` and `first` are evaluated in the
+  server and the worker, and a filter that uses them is `AXC0053`.
+- **Cost.** The rows count against the [cost bounds](#cost-bounds) as the rows
+  of a child collection of the record do.
 
 ## Cost bounds
 

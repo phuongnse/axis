@@ -71,7 +71,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     checks them. The form widget and the task page follow their conditions
     through the server, and show `steps` as a wizard, see
     [form widget conditions](form-widget-conditions.md). See
-    [Form conditions and steps](resource-files.md#form-conditions-and-steps).
+    [Form conditions and steps](form-conditions.md#form-conditions-and-steps).
 - **Form widget.** A page whose widget is a `form` creates a record at
   `/{site}/{page}/new` and edits one at `/{site}/{page}/{id}`, through the
   record API. It adds no rules of its own: the server validates.

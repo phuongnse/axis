@@ -252,3 +252,55 @@ users, so its people sign in as before once the hosts move.
 - Sequence counters, inbound endpoint receipts and schedule state go back too.
   A number issued after the backup can be issued again, and an inbound request
   accepted after it is lost.
+
+## Backups in a cell
+
+In a [cell](cells.md), every tenant is backed up each day, as
+[D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
+[D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
+Everything in this section is _(planned for M31)_. The archive format and the steps above stay, with
+the changes below.
+
+- **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
+  in a second data centre of the region. It recovers the cell after a lost server. The daily archives
+  recover one tenant, and keep 30 days.
+- **A backup key for each tenant.** `tenant create` makes a 32-byte backup key for the tenant and
+  stores it in `platform.tenant_backup_keys`, encrypted by the cell's backup key, which
+  `Cell:BackupKeyFile` names. The cell's key is a Kubernetes Secret that comes from the cloud
+  provider's key service, and it is never in the platform database or in an archive. In a cell,
+  `tenant backup` and `tenant restore` take the tenant's key from the platform instead of
+  `--backup-key-file`.
+- **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
+  key. Its archives stay in object storage until their lock ends, and nothing can read them. One
+  leaked tenant key opens only that tenant's archives.
+- **Daily job.** A Kubernetes CronJob runs `cell backup` at 01:00 in the region's time zone. It backs up
+  every `active` and `suspended` tenant, four at a time, and writes each archive to the region's
+  object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`. It writes a platform audit record and the
+  metric `axis.backup.last_success` for each tenant. A failed tenant is tried again once, and the
+  others go on. The job ends within 6 hours or fails.
+- **Object lock.** The bucket has object lock in compliance mode for 30 days and a lifecycle rule
+  that deletes an archive after 30 days. Nobody, the operator included, can delete or change an
+  archive before then.
+- **The realm in the archive.** The archive gets a third entry, `realm.json`: the tenant's realm with
+  its users, role mappings, credentials and required actions, as the identity provider's export
+  writes it. The credentials are hashes and authenticator secrets, so the entry is
+  [secret](keys-and-data-protection.md#secret) data, and the archive's encryption covers it. A
+  restore imports it into the new tenant's realm, so its people sign in as before, and needs no new
+  invitation. An archive without `realm.json` restores as today.
+- **Counts in the manifest.** The manifest gets `counts`: the row count of each table of the tenant
+  database, read in the dump's snapshot.
+
+**Weekly restore check.** Each Sunday at 03:00 in the region's time zone, a job checks that a restore
+works.
+
+1. It picks a tenant at random among those with an archive of the last 2 days, and takes its newest
+   archive.
+2. It restores it with `tenant restore` into a scratch tenant, `restore-check-<yyyymmdd>`, with a
+   host under `Cell:InternalDomain` that no ingress serves, and a scratch realm.
+3. It compares the row count of each table with `counts` in the manifest, checks that the realm has
+   the archive's number of users, and runs the scenarios of each application of the tenant's Studio
+   folder against the restored releases.
+4. It deletes the scratch tenant, its realm and its keys at once, with no grace window.
+5. It records the result in the metric `axis.backup.restore_check`, `1` for a pass and `0` for a
+   failure, with the tenant id, and in a platform audit record. The [cell console](cell-console.md#views)
+   shows it.

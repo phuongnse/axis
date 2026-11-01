@@ -142,3 +142,29 @@ to find its own numbers.
 - **When it runs.** _(Built.)_ The load test workflow, `.github/workflows/load.yml`, runs `scripts/load.sh`
   every Monday at 03:00 UTC and on demand, and a missed objective marks the run red. It never gates a merge, and it is not a
   NexKit check, because a run on a shared CI machine varies too much to block a pull request.
+
+### Cell load test
+
+_(planned for M31)_ The cell load test measures how many tenants a [cell](cells.md) holds, as
+[D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md)
+agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
+
+- **Where it runs.** On demand, against a staging cell built like a production cell of the region:
+  managed Kubernetes, managed PostgreSQL with PgBouncer, the identity provider and object storage. It
+  does not run on a CI runner, because a runner is not a cell. `scripts/load-cell.sh` drives it, with
+  the address of the staging cell.
+- **Tenants.** It creates 1,000 tenants through the [provisioning API](tenant-lifecycle.md#provisioning-api),
+  each with its realm and the application of the [load test](#load-test) at its typical size:
+  - 50 busy tenants, each with 10 users that run the loop of the objectives;
+  - 1 tenant with a backlog of 100,000 due work items, made before the run starts;
+  - 949 idle tenants, each with one user who signs in once an hour and reads one page every
+    10 minutes.
+- **Pass.** The run passes when, over one hour after a warm-up of 10 minutes:
+  - the busy tenants meet the [objectives](#objectives) for reads, writes and errors;
+  - every tenant but the one with the backlog meets the worker objective, a claim delay p95 within
+    5 s;
+  - the sign-ins of idle tenants succeed, and their p95 is under 2 s;
+  - the cell's CPU, memory and database connections stay under 80% of their limits.
+- **Finding the number.** A run that fails is run again with fewer tenants, by steps of 100, until
+  one passes. The highest passing number is the cap, set as `Cell:TenantCap`. The run keeps its k6
+  summary and worker metrics in `artifacts/load-results`, as the load test does.

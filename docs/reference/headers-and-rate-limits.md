@@ -82,6 +82,7 @@ The server uses the ASP.NET Core rate limiter.
 | Session      | Every other route that takes a session                                  | Tenant and user             | `RateLimits:Session`        |
 | Bearer       | Inbound endpoints and [service accounts](security.md#service-accounts)  | Tenant and caller id        | `RateLimits:Bearer`         |
 | Publishing   | Studio validate, publish, preview, rollback and test requests           | Tenant and user             | `RateLimits:Publishing`     |
+| MCP          | `/mcp`, the [MCP server](mcp-server.md) _(planned for M35)_             | Tenant and client           | `RateLimits:Mcp`            |
 
 - **Client address.** It follows the [forwarded headers](host-settings.md#forwarded-headers) rules.
   Requests with no client address, such as those on a Unix socket, share one sign-in count.
@@ -101,10 +102,13 @@ The server uses the ASP.NET Core rate limiter.
 - **The callback.** The OIDC handler answers `GET /api/auth/callback` inside authentication, so the
   limiter counts the callback just before authentication. It shares the sign-in count of its client
   address.
+- **The control plane.** _(planned for M33)_ The [control plane](control-plane.md) is another
+  service with limits of its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse),
+  and the [billing portal](billing-portal.md#rules)'s.
 - **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `/health` and the SPA's static files
   and pages have no limit.
 - **Metric.** `axis.rate_limits.refused` counts the refused requests, with the attribute
-  `axis.partition`: `sign_in`, `session`, `bearer` or `publishing`. It carries no tenant, user or
+  `axis.partition`: `sign_in`, `session`, `bearer`, `publishing` or, _(planned for M35)_, `mcp`. It carries no tenant, user or
   address.
 - **Tests.** An integration test sends requests past each partition's limit and expects the `429` with
   `Retry-After`, and a request in another partition, of another user, from another client address or

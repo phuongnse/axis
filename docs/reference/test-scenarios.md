@@ -91,7 +91,8 @@ request ends `approved`:
   gives each step the user's id and roles, as a session would.
   _(planned for M24)_ A scenario in a module names role slots of the module
   instead, and each becomes the role the application maps it to, see
-  [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md).
+  [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md)
+  and [contract scenarios](module-contracts.md#contract-scenarios).
 - `now` is a date-time with an offset. It fixes the time that expressions,
   filters, sequence numbers and task due dates read, for the whole scenario.
   Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.
