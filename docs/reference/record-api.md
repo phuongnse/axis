@@ -463,6 +463,11 @@ otherwise the answer is the stale-version `409`. See
   one whose guard is not `true`, or a delete in a state that is not deletable.
   The title is fixed: "The record's state does not allow this change." The
   `errors` are keyed `/values/<state field>`. Nothing is written.
+- **`409` for a failing effect.** An update that makes a transition whose effect
+  cannot be written. The title is fixed: "A required change could not be
+  recorded." The `point` member names the effect, such as
+  `Claim/effects/entryRecorded`, and there is no `errors`. Nothing is written.
+  See [when a write is refused](module-contracts.md#when-a-write-is-refused).
 - **`409` for a schema conflict.** The table has a constraint the active model
   does not declare, such as a `NOT NULL` column left by an activation that
   failed after provisioning committed. The title is fixed, and the response

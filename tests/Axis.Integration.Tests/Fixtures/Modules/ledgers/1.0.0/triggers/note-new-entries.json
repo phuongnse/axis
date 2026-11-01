@@ -1,0 +1,10 @@
+{
+  "id": "0db9d36c-81dd-4128-91e6-dccb00f0cd1b",
+  "kind": "trigger",
+  "name": "NoteNewEntries",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Entry",
+  "on": ["create"],
+  "process": "NoteEntry"
+}
