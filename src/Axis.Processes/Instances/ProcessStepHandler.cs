@@ -587,6 +587,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         // writes nothing. A rejected write throws, which rolls back the instance's move too.
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (assignments is not null)
         {
@@ -599,6 +600,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
             await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity!, instance.ReleaseId, cancellationToken);
             updated = written;
+            effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
                 AuditActors.System,
@@ -762,6 +764,20 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 logger,
                 cancellationToken);
         }
+
+        await EffectRecordWrites.AppendAsync(
+            context.Transaction,
+            context.Item.TenantId,
+            active?.Model,
+            active?.ReleaseId ?? instance.ReleaseId,
+            instance.ReleaseId,
+            instance.ApplicationId,
+            instance.Id,
+            AuditActors.System,
+            effects,
+            write,
+            logger,
+            cancellationToken);
 
         if (createdRecord is not null && active is { } activeAfterCreate)
         {
@@ -1327,7 +1343,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// <summary>Logs the refusal of a module contract with its named point and record, as a record API refusal is.</summary>
     private void LogRefusal(RecordWriteResult result, Guid entityId, Guid? recordId)
     {
-        if (result.Outcome == RecordWriteOutcome.LifecycleRefused)
+        if (result.Outcome is RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused)
         {
             RecordLifecycleLog.Refused(logger, entityId, result.Point, recordId);
         }
