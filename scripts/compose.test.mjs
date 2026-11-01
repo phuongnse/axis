@@ -178,7 +178,7 @@ test('the stack runs from source', { timeout }, async () => {
 
   // Both images hold the sample modules departments and department-budgets, and the server loads them.
   for (const service of ['server', 'worker']) {
-    for (const version of ['departments/1.1.0', 'department-budgets/1.0.0']) {
+    for (const version of ['departments/1.1.0', 'department-budgets/1.1.0']) {
       const module = compose(['exec', '-T', service, 'test', '-f', `/modules/${version}/module.json`])
       assert.equal(module.status, 0, `${service} ${version}: ${module.stderr}`)
     }

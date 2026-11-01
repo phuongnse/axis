@@ -1,0 +1,12 @@
+{
+  "id": "594da8be-0ed9-4b95-8afb-271b7a8a4d68",
+  "kind": "entity",
+  "name": "BudgetDecision",
+  "formatVersion": 1,
+  "label": { "textKey": "department-budgets.budgetDecision.label" },
+  "fields": [
+    { "name": "budget", "type": "reference", "target": "Budget", "required": true, "label": { "textKey": "department-budgets.budgetDecision.budget" } },
+    { "name": "amount", "type": "decimal", "precision": 18, "scale": 2, "required": true, "label": { "textKey": "department-budgets.budgetDecision.amount" } },
+    { "name": "decidedBy", "type": "text", "maxLength": 100, "label": { "textKey": "department-budgets.budgetDecision.decidedBy" } }
+  ]
+}

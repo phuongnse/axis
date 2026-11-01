@@ -70,7 +70,7 @@ slot to its `department-manager` role, and so does the purchase request sample.
 `department-budgets` is the second sample module, see
 [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 `scripts/build.sh`, `scripts/dev.sh` and the E2E run install them under
-`artifacts/modules/departments/1.1.0/` and `artifacts/modules/department-budgets/1.0.0/`, and the
+`artifacts/modules/departments/1.1.0/` and `artifacts/modules/department-budgets/1.1.0/`, and the
 Compose images hold them in `/modules`. The server and the worker read them through `Modules:Path`.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
@@ -263,7 +263,7 @@ copy each, what the application names, and what a module names and calls of the 
 {
   "kind": "module",
   "id": "department-budgets",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "label": "Department budgets",
   "roles": [{ "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } }],
   "modules": [{ "id": "departments", "version": "^1.1.0", "roles": { "manager": "approver" } }]
@@ -274,16 +274,22 @@ copy each, what the application names, and what a module names and calls of the 
 purchase request sample declares, as
 [D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
 agrees. It holds a `Budget` entity with a name, a `departments/Department` reference, a year, an
-amount and a status, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetForm` page, a `BudgetApproval`
+amount, a `requester` creator field and a required `status` that defaults to `draft`, a `BudgetDecision` entity with the
+budget, the amount and `decidedBy`, a `BudgetContract` on `Budget`, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetForm` page, a `BudgetApproval`
 process whose `review` task goes to `approver`, an `ApproverAccess` policy and `en` and `vi` texts. The
 `Budgets` page has a `New` toolbar action that opens `BudgetForm` and a `Submit for approval` row action that
 starts `BudgetApproval` for the budget.
+The [module contract](module-contracts.md) has a lifecycle where `draft` is initial and deletable and `approve` and
+`reject` go from `draft`. Both have the guard `accountableUser() != null and accountableUser() != requester`, so
+the creator of a budget cannot decide it, and a second manager must. It also has the core validation
+`amountFrozenOnceDecided`, which refuses an amount change once the budget is decided, the effect `decisionRecorded`,
+which creates a `BudgetDecision` when a budget is approved, and an `approver` ceiling of `read`, `create` and `update`.
 An application that declares it maps the slot to one of its own roles:
 
 ```json
 "modules": [
   { "id": "departments", "version": "^1.1.0", "roles": { "manager": "department-manager" } },
-  { "id": "department-budgets", "version": "^1.0.0", "roles": { "approver": "department-manager" } }
+  { "id": "department-budgets", "version": "^1.1.0", "roles": { "approver": "department-manager" } }
 ]
 ```
 
@@ -371,8 +377,8 @@ An application that declares it maps the slot to one of its own roles:
   starts it or an endpoint creates the module record and starts it, and a waiting instance finishes
   on the release it was started on, even after a newer module version is activated. The start endpoint takes it at
   `POST /api/apps/{app}/processes/{module}/{process}/instances`, and the E2E journey
-  `tests/e2e/specs/department-budgets-journey.spec.ts` starts one from the `Budgets` page row action and
-  decides its task. A module task assigned to a slot is listed in the task
+  `tests/e2e/specs/department-budgets-journey.spec.ts` starts one from the `Budgets` page row action, and a
+  second manager decides its task. A module task assigned to a slot is listed in the task
   inbox of the people who hold the mapped role, and only they can decide it.
 - **Triggers.** A module trigger starts a process of its own module. It
   reacts to an event or an entity of its own module, or of a module it

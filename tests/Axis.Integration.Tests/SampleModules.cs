@@ -4,7 +4,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The sample modules that the test project copies to the test output, laid out as they are installed:
-/// <c>departments/1.1.0</c> and <c>department-budgets/1.0.0</c>. The test project's build does this, so the tests do not need
+/// <c>departments/1.1.0</c> and <c>department-budgets/1.1.0</c>. The test project's build does this, so the tests do not need
 /// <c>scripts/build.sh</c> first.
 /// </summary>
 internal static class SampleModules

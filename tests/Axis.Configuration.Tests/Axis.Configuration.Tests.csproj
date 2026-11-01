@@ -28,7 +28,7 @@
     <None Include="..\..\samples\apps\service-desk\**\*" Link="Samples\service-desk\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\apps\asset-management\**\*" Link="Samples\asset-management\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\modules\departments\**\*" Link="SampleModules\departments\1.1.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\samples\modules\department-budgets\**\*" Link="SampleModules\department-budgets\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\modules\department-budgets\**\*" Link="SampleModules\department-budgets\1.1.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\modules\checklists\**\*" Link="FixtureModules\checklists\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\templates\request-approval\**\*" Link="SampleTemplates\request-approval\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\e2e-app\**\*" Link="Fixtures\e2e-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

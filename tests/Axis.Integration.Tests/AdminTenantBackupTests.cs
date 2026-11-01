@@ -65,7 +65,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         var module = modules.Single(m => m.GetProperty("id").GetString() == "departments");
         Assert.Equal("1.1.0", module.GetProperty("version").GetString());
         var budgets = modules.Single(m => m.GetProperty("id").GetString() == "department-budgets");
-        Assert.Equal("1.0.0", budgets.GetProperty("version").GetString());
+        Assert.Equal("1.1.0", budgets.GetProperty("version").GetString());
 
         var directory = root.GetProperty("directory");
         Assert.Equal("active", directory.GetProperty("status").GetString());

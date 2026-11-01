@@ -1384,7 +1384,7 @@ public sealed class ScenarioRunnerTests
         }
 
         // The module's policy no longer lets its approver create a budget. The manager scenario of the application fails for the same reason.
-        const string policy = "department-budgets/1.0.0/policies/approver-access.json";
+        const string policy = "department-budgets/1.1.0/policies/approver-access.json";
         var narrowed = File.ReadAllText(Path.Combine(modules.Path, policy)).Replace("[\"read\", \"create\", \"update\"]", "[\"read\", \"update\"]");
         Assert.DoesNotContain("create", narrowed, StringComparison.Ordinal);
         modules.With(policy, narrowed);

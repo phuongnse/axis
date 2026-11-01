@@ -48,7 +48,7 @@ WORKDIR /app
 COPY --from=build /worker .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.1.0/
-COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
+COPY samples/modules/department-budgets/ /modules/department-budgets/1.1.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
 
@@ -59,7 +59,7 @@ WORKDIR /app
 COPY --from=build /admin .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.1.0/
-COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
+COPY samples/modules/department-budgets/ /modules/department-budgets/1.1.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
@@ -141,7 +141,7 @@ WORKDIR /app
 COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.1.0/
-COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
+COPY samples/modules/department-budgets/ /modules/department-budgets/1.1.0/
 COPY samples/ /samples/
 COPY samples/templates/request-approval/ /templates/request-approval/1.0.0/
 USER $APP_UID
