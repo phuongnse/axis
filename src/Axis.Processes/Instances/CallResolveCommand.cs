@@ -386,6 +386,7 @@ public static class CallResolveCommand
                 record,
                 updated,
                 [],
+                userId,
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
         }

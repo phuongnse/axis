@@ -4,8 +4,8 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A <c>contract</c> resource: what a module guarantees about one of its entities. Only a module holds
-/// one. The schema checks its shape. Its entity and its lifecycle are checked by
-/// <see cref="Compilation.ContractChecker"/>. The validations, effects and ceiling pass the schema and are
+/// one. The schema checks its shape. Its entity, its lifecycle and its ceiling are checked by
+/// <see cref="Compilation.ContractChecker"/>. The validations and effects pass the schema and are
 /// kept as written, until the checks that build them exist.
 /// </summary>
 public sealed record ContractResource : Resource
@@ -22,8 +22,32 @@ public sealed record ContractResource : Resource
     /// <summary>The effects of transitions as written, or null when the contract has none.</summary>
     public JsonElement? Effects { get; init; }
 
-    /// <summary>The grant ceiling as written, or null when the contract has none.</summary>
-    public JsonElement? Ceiling { get; init; }
+    /// <summary>The grant ceiling, or null when the contract has none.</summary>
+    public ContractCeilingDefinition? Ceiling { get; init; }
+}
+
+/// <summary>The grant ceiling of a contract as written: the widest grants each role slot may get on the entity.</summary>
+public sealed record ContractCeilingDefinition
+{
+    /// <summary>The entries of each role slot of the module, by slot name.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<CeilingEntryDefinition>> Slots { get; init; } =
+        new Dictionary<string, IReadOnlyList<CeilingEntryDefinition>>();
+
+    /// <summary>The entries of every role mapped to no slot of the module, or null when there are none.</summary>
+    public IReadOnlyList<CeilingEntryDefinition>? Others { get; init; }
+}
+
+/// <summary>An entry of a ceiling as written: the shape of a grant on the entity without a target.</summary>
+public sealed record CeilingEntryDefinition
+{
+    /// <summary>The entity actions grants may allow.</summary>
+    public required IReadOnlyList<string> Actions { get; init; }
+
+    /// <summary>The fields grants may cover, or null when every field may be covered.</summary>
+    public IReadOnlyList<string>? Fields { get; init; }
+
+    /// <summary>A policy filter that limits the records, or null for none.</summary>
+    public string? Filter { get; init; }
 }
 
 /// <summary>The lifecycle of a contract as written: a state machine on one enum field.</summary>

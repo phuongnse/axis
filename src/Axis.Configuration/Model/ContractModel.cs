@@ -3,8 +3,9 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Model;
 
 /// <summary>
-/// A compiled module contract on an entity of a pinned module. Only the lifecycle is compiled so far.
-/// Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
+/// A compiled module contract on an entity of a pinned module. The lifecycle and the grant ceiling are
+/// compiled so far. Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
+/// Nothing enforces the grant ceiling yet.
 /// </summary>
 public sealed record ContractModel
 {
@@ -16,7 +17,30 @@ public sealed record ContractModel
 
     /// <summary>The lifecycle of the entity, or null when the contract has none.</summary>
     public LifecycleModel? Lifecycle { get; init; }
+
+    /// <summary>The grant ceiling, or null when the contract has none.</summary>
+    public CeilingModel? Ceiling { get; init; }
 }
+
+/// <summary>
+/// A compiled grant ceiling: the entries of each application role that some role slot of the module maps
+/// to, and the entries of every other role. The compile has already refused a grant past it. A later
+/// check adds the entries' filters to a request.
+/// </summary>
+public sealed record CeilingModel
+{
+    /// <summary>The entries of each application role mapped to one or more slots of the module, by role name.</summary>
+    public required IReadOnlyDictionary<string, IReadOnlyList<CeilingEntryModel>> Roles { get; init; }
+
+    /// <summary>The entries of every role mapped to no slot of the module, or null when the contract has none.</summary>
+    public IReadOnlyList<CeilingEntryModel>? Others { get; init; }
+}
+
+/// <summary>
+/// An entry of a ceiling. <see cref="Fields"/> are declared names, and null means every field.
+/// <see cref="Filter"/> is a policy filter, or null for none.
+/// </summary>
+public sealed record CeilingEntryModel(IReadOnlyList<PolicyAction> Actions, IReadOnlyList<string>? Fields, ExpressionModel? Filter);
 
 /// <summary>A compiled lifecycle: a state machine on one enum field of the entity.</summary>
 public sealed record LifecycleModel

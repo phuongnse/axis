@@ -819,6 +819,7 @@ internal static class ModuleChecker
                         {
                             Entity = grant.Entity is null ? null : $"{moduleId}/{grant.Entity}",
                             DataSource = grant.DataSource is null ? null : $"{moduleId}/{grant.DataSource}",
+                            Process = grant.Process is null ? null : $"{moduleId}/{grant.Process}",
                         })],
                     });
                     break;

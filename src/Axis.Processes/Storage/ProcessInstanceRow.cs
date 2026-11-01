@@ -44,6 +44,15 @@ public sealed class ProcessInstanceRow
     /// <summary>The declared name of the sub-process step in the parent that started this instance, or <see langword="null"/> when it has no parent.</summary>
     public string? ParentStep { get; init; }
 
+    /// <summary>
+    /// The user who answers for the instance's writes: its starter at the start, then the user of each task
+    /// completion. It is <see langword="null"/> when no user stands behind the start, as for a schedule.
+    /// </summary>
+    public string? AccountableUser { get; init; }
+
+    /// <summary>The task whose completion last moved the instance on, or <see langword="null"/> until one completes.</summary>
+    public Guid? DecisionTask { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 
     /// <summary>When the instance became <c>completed</c> or <c>failed</c>, or <see langword="null"/> while it has not ended.</summary>

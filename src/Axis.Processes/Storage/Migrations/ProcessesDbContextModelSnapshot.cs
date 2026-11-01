@@ -673,6 +673,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AccountableUser")
+                        .HasColumnType("text")
+                        .HasColumnName("accountable_user");
+
                     b.Property<Guid>("ApplicationId")
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
@@ -682,6 +686,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
+
+                    b.Property<Guid?>("DecisionTask")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decision_task");
 
                     b.Property<DateTimeOffset?>("EndedAt")
                         .HasColumnType("timestamp with time zone")

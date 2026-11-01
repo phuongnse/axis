@@ -972,6 +972,7 @@ internal sealed partial class ConnectorCallHandler(
                 record!,
                 updated,
                 [],
+                instance.AccountableUser,
                 logger,
                 cancellationToken);
         }
