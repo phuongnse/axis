@@ -171,6 +171,9 @@ the SPA.
   application's start lock shared, or none, and the import becomes `committed`
   or `failed`. A row that fails at write time, for example on a unique value
   that is taken or a reference to a record that does not exist, writes nothing.
+  A row that the [module contract](module-contracts.md#when-a-write-is-refused)
+  refuses fails the same way, at `/rows/{n}/values/<state field>` with the
+  contract's message. The dry run does not check the lifecycle.
   The import is `failed` with that row's errors, keyed `/rows/{n}/...` as the
   dry run's errors are. The file is deleted when the commit ends. A commit
   queued before the file was deleted ends `failed` with one error at the empty

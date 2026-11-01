@@ -320,7 +320,9 @@ promise that each step is decided once.
 - **Task completion.** The completion is refused with the same answers, and the task stays open.
 - **Process step.** The step fails, as a refused `createRecord` does, and the instance ends
   `failed`. The [process inspector](process-inspection.md#step-errors-in-inspection) and the
-  [operator console](operator-console.md#views) show the error with the named point. The operator fixes
+  [operator console](operator-console.md#views) show the error with the named point, such as
+  `The record update was rejected: /values/status: requests.request.amountRequired (named point
+  Request/transitions/submit)`. The operator fixes
   the cause and retries, or resolves.
 - **Import.** The row fails with the message, as a validation failure does, see
   [import](import-export.md#import).
