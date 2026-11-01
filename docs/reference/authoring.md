@@ -40,7 +40,7 @@ folders it may edit. A third, `Studio:PublisherRole`, decides who may go live. S
   `GET /api/me` says the same.
 - `Studio:ApplicationsPath` names the folder where Studio creates new
   applications. With no value, Studio cannot create an
-  application. See [Creating an application](#creating-an-application).
+  application. See [Creating an application](#creating-an-application) and, in a cell, [Studio settings](host-settings.md#studio-settings).
 - `Studio:AuthorRole` names the roles claim value that may use the API. With
   no value, nobody may. Application policies play no part.
 - `Studio:PublisherRole` names the roles claim value that

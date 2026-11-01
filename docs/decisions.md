@@ -133,3 +133,4 @@ files agree, title and status included.
 | [D120](decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md) | Axis is AGPL licensed, with a commercial licence | **Agreed** |
 | [D121](decisions/d121-how-a-module-contract-is-declared-and-checked.md) | How a module contract is declared and checked | **Agreed** |
 | [D122](decisions/d122-how-a-customization-layer-is-written-and-applied.md) | How a customization layer is written and applied | **Agreed** |
+| [D123](decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) | How an Axis SaaS cell keeps tenants apart, measured and recoverable | **Agreed** |

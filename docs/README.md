@@ -84,9 +84,14 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Draft page metadata](reference/draft-page-metadata.md)               | The routes that answer the page metadata of a draft page or form and of a module page  |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |
 | [Administration](reference/administration.md)                          | The `Axis.Admin` commands: create a tenant, migrate, activate, publisher |
-| [Tenant backup and restore](reference/tenant-backup-and-restore.md)    | `tenant backup` and `tenant restore`: the encrypted archive, the backup key, the manifest, the checks and the steps |
+| [Tenant backup and restore](reference/tenant-backup-and-restore.md)    | `tenant backup` and `tenant restore`: the encrypted archive, the backup key, the manifest, the checks and the steps, and daily backups in a cell |
 | [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings, mail settings and hosts, rotate keys and passwords, end sessions, and the platform audit records |
 | [Tenant status commands](reference/tenant-status-commands.md)           | The `Axis.Admin` commands that suspend and resume a tenant and list the tenants       |
+| [Cells](reference/cells.md)                                            | Axis SaaS cells and regions, tenant hosts and certificates, PgBouncer connections, cell size |
+| [Tenant quotas and usage](reference/tenant-quotas.md)                  | The quotas of a tenant in a cell, their refusals, work at once and the measured usage  |
+| [Worker scheduling](reference/worker-scheduling.md)                    | How the worker shares its time between tenants, and wakes an idle tenant               |
+| [Tenant lifecycle in a cell](reference/tenant-lifecycle.md)            | The cell's provisioning API: create a tenant, hosts, the export ZIP, deletion          |
+| [Cell console](reference/cell-console.md)                              | The page where the platform operator sees and provisions every tenant of a cell, and its operator realm |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
 | [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
 

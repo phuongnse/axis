@@ -359,7 +359,7 @@ bindings work. Status rules and publishing are built too.
   database only. Without a tenant context it throws
   `InvalidOperationException`.
 - There is one `NpgsqlDataSource` per tenant. It is created on first use and
-  disposed with the host.
+  disposed with the host. A [cell](reference/cells.md#connections) reaches them through PgBouncer _(planned for M31)_.
 - The current tenant is held per asynchronous flow (`AsyncLocal`), so
   concurrent requests never see each other's tenant.
 - In the server, a request scope holds one tenant connection, opened on first
