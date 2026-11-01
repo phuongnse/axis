@@ -340,10 +340,10 @@ user:
   refuses a `sort` on it.
 - **Default.** `sensitive` defaults to `false`. A sensitive field's column is
   `bytea`, whatever the field's type, so it can hold ciphertext. A new field or a
-  new table gets that column. Adding or removing the flag on an existing field is
-  `AXC0016` at `/fields/{i}/type`, even with a `convert`, until activation can
-  encrypt the stored values _(planned for M27)_, see
-  [changing the flag](data-encryption.md#changing-the-flag).
+  new table gets that column. Adding or removing the flag on an existing field makes
+  activation encrypt or decrypt the stored values, see
+  [changing the flag](data-encryption.md#changing-the-flag). A flag change together
+  with a type change is `AXC0016` at `/fields/{i}/type`, except that text may widen.
 - **Uses it cannot serve.** A filter (except the equality of an exact lookup in
   a grant's `filter`, a data source's `filter` or a measure's `filter`), sort, aggregate, group field, index,
   `unique`, `searchable`, stored computed field, migration `fill` or `convert`
@@ -351,7 +351,7 @@ user:
   [`AXC0308`](diagnostic-codes.md), and a caller's `sort` on it in the record
   API or a data source is a `400`. See
   [what a sensitive field cannot do](data-encryption.md#what-a-sensitive-field-cannot-do).
-- **Encrypted at rest** _(planned for M27)_. The value is stored encrypted under
+- **Encrypted at rest.** The value is stored encrypted under
   its tenant's data key, and adding or removing the flag encrypts or decrypts the
   stored values in a migration. A field that declares an exact lookup may be
   tested with `==` or `!=` against a literal other than `null` in a grant's
