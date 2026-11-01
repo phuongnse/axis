@@ -262,19 +262,25 @@ public sealed class PolicyCompilerTests
     }
 
     [Fact]
-    public void Grants_without_names_and_grants_with_different_names_compile_without_diagnostics()
+    public void A_grant_without_a_name_is_a_schema_violation_at_its_grant()
     {
-        using var unnamed = Folder(Policy("""["employee", "manager"]""", """
+        using var folder = Folder(Policy("""["employee"]""", """
             [
-              { "entity": "request", "actions": ["read", "update"], "filter": "owner == currentUser() and department.name != 'x'", "fields": ["OWNER", "amount"] },
-              { "dataSource": "requestList", "actions": ["read"] },
+              { "name": "requestRead", "entity": "Request", "actions": ["read"] },
               { "process": "requestReview", "actions": ["start"] }
             ]
             """));
-        var unnamedResult = ApplicationCompiler.Compile(unnamed.Path);
-        Assert.Empty(unnamedResult.Diagnostics);
-        Assert.NotNull(unnamedResult.Model);
 
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.File) == (DiagnosticCodes.SchemaViolation, "/grants/1", PolicyFile));
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Grants_with_different_names_compile_without_diagnostics()
+    {
         using var named = Folder(Policy("""["employee"]""", """
             [
               { "name": "requestRead", "entity": "Request", "actions": ["read"] },
