@@ -95,6 +95,10 @@ request ends `approved`:
   and [module scenarios](modules-and-templates.md#processes-pages-policies-and-dependencies).
   An assignee role and a recipient role are slots too. A name that is not a slot
   is `AXC0335`.
+- `contract` is for a module's scenario only. Its `covers` lists the named points of the module's
+  contracts that the scenario tests, which makes it a contract scenario, see
+  [contract scenarios](module-contracts.md#contract-scenarios). A point the module lacks is
+  `AXC0339`. An application's own scenario with `contract` is `AXC0340`.
 - `now` is a date-time with an offset. It fixes the time that expressions,
   filters, sequence numbers and task due dates read, for the whole scenario.
   Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.

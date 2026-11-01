@@ -322,4 +322,6 @@ public static class DiagnosticCodes
     public const string GrantPastCeiling = "AXC0334";
     public const string ModuleScenarioRoleNotSlot = "AXC0335";
     public const string SeedStateNotInitial = "AXC0338";
+    public const string UnknownCoveredPoint = "AXC0339";
+    public const string ContractOnApplicationScenario = "AXC0340";
 }
