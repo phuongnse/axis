@@ -20,11 +20,16 @@ namespace Axis.Expressions.Typing;
 /// rule body is checked on its own, so it cannot call it. Only a module contract's expression can call
 /// <c>previous</c>, and its argument must be a bare name of one of the entity's own fields. Only the set
 /// of an <c>updateRecord</c> or <c>createRecord</c> step and a module contract's expression can call
-/// <c>accountableUser()</c> or <c>decisionTask()</c>, also inside an aggregate's item expression. It stops at
-/// the first problem and reports only that one.
+/// <c>accountableUser()</c> or <c>decisionTask()</c>, also inside an aggregate's item expression. Inside an item
+/// expression, <c>outer.field</c> reads a field of the record the whole expression runs on, also in a nested
+/// aggregate, and <c>outer.reference.field</c> follows its references in a scope that resolves paths. Anywhere else
+/// <c>outer</c> is an error. It stops at the first problem and reports only that one.
 /// </summary>
 public static class ExpressionTypeChecker
 {
+    /// <summary>The reserved name an aggregate's item expression uses to read the record the whole expression runs on.</summary>
+    public const string OuterName = "outer";
+
     public static ExpressionCheckResult Check(
         ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool policyFilter = false, bool contract = false, bool stepSet = false)
     {
@@ -39,6 +44,7 @@ public static class ExpressionTypeChecker
                 new HashSet<CallNode>(ReferenceEqualityComparer.Instance),
                 new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance),
                 new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance),
+                new HashSet<MemberNode>(ReferenceEqualityComparer.Instance),
                 new HashSet<MemberNode>(ReferenceEqualityComparer.Instance),
                 storedValue,
                 policyFilter,
@@ -59,6 +65,7 @@ public static class ExpressionTypeChecker
                 RuleCalls = context.RuleCalls,
                 PathTargets = context.PathTargets,
                 CollectionPaths = context.CollectionPaths,
+                OuterReads = context.OuterReads,
             };
         }
         catch (CheckFailure failure)
@@ -105,8 +112,16 @@ public static class ExpressionTypeChecker
                 ExpressionDiagnosticCodes.TypeMismatch,
                 $"Collection '{name.Name}' is list<{collection.Entity}>, which only an aggregate accepts",
                 name.Offset)
-            : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{name.Name}'", name.Offset);
+            : IsOuter(name)
+                ? throw (context.Outer is null
+                    ? Fail(ExpressionDiagnosticCodes.OuterOutsideAggregateItem, OuterOutside, name.Offset)
+                    : Fail(ExpressionDiagnosticCodes.TypeMismatch, "'outer' needs a field, such as outer.amount", name.Offset))
+                : throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{name.Name}'", name.Offset);
     }
+
+    private const string OuterOutside = "'outer' is allowed only inside an aggregate's item expression";
+
+    private static bool IsOuter(NameNode name) => string.Equals(name.Name, OuterName, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// A path such as <c>department.manager.name</c>: it starts at a field of the scope, each name
@@ -117,8 +132,13 @@ public static class ExpressionTypeChecker
     /// </summary>
     private static ExpressionType InferMember(MemberNode member, Context context)
     {
+        if (member.Target is NameNode root && IsOuter(root))
+        {
+            return InferOuter(member, context);
+        }
+
         var target = PathTarget(member, context);
-        if (!context.Scope.TryGetReferenceField(target, member.Name, out var type))
+        if (!PathScope(member, context).TryGetReferenceField(target, member.Name, out var type))
         {
             throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of '{target.Source}'", member.Offset);
         }
@@ -128,12 +148,59 @@ public static class ExpressionTypeChecker
     }
 
     /// <summary>
+    /// <c>outer.field</c>: a field of the record the whole expression runs on, with the field's type. The read is
+    /// recorded, so that the interpreter and the walkers over the expression know it reads the outer record.
+    /// </summary>
+    private static ExpressionType InferOuter(MemberNode member, Context context)
+    {
+        if (context.Outer is not { } outer)
+        {
+            throw Fail(ExpressionDiagnosticCodes.OuterOutsideAggregateItem, OuterOutside, member.Offset);
+        }
+
+        if (outer.TryGetField(member.Name, out var type))
+        {
+            context.OuterReads.Add(member);
+            return type;
+        }
+
+        throw outer.TryGetCollection(member.Name, out var collection)
+            ? Fail(
+                ExpressionDiagnosticCodes.TypeMismatch,
+                $"Collection '{member.Name}' of the outer record is list<{collection.Entity}>, which an item expression cannot read",
+                member.Offset)
+            : Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of the outer record", member.Offset);
+    }
+
+    /// <summary>
+    /// The scope a path resolves its fields in: the outer record's scope for a path that starts at
+    /// <c>outer</c>, and the scope of the expression for any other.
+    /// </summary>
+    private static ExpressionScope PathScope(MemberNode member, Context context)
+    {
+        return Root(member) is NameNode root && IsOuter(root)
+            ? context.Outer ?? throw Fail(ExpressionDiagnosticCodes.OuterOutsideAggregateItem, OuterOutside, root.Offset)
+            : context.Scope;
+    }
+
+    /// <summary>The node a path starts at.</summary>
+    private static ExpressionNode Root(ExpressionNode path)
+    {
+        while (path is MemberNode inner)
+        {
+            path = inner.Target;
+        }
+
+        return path;
+    }
+
+    /// <summary>
     /// The type of the part of a path before its last name, which must be a reference to a record
     /// and not a parameter. The path takes at most <see cref="ExpressionLimits.MaxHops"/> hops.
     /// </summary>
     private static ExpressionType PathTarget(MemberNode member, Context context)
     {
-        if (!context.Scope.ResolvesPaths)
+        if (!PathScope(member, context).ResolvesPaths)
         {
             throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' after '.'", member.Offset);
         }
@@ -148,6 +215,12 @@ public static class ExpressionTypeChecker
         for (var node = member.Target; node is MemberNode inner; node = inner.Target)
         {
             hops++;
+        }
+
+        if (Root(member) is NameNode root && IsOuter(root))
+        {
+            // The word 'outer' selects a scope and follows no reference.
+            hops--;
         }
 
         if (hops > ExpressionLimits.MaxHops)
@@ -360,6 +433,14 @@ public static class ExpressionTypeChecker
         ExpressionCollection? collection;
         if (call.Arguments[0] is MemberNode path && context.Scope.ResolvesCollectionPaths)
         {
+            if (Root(path) is NameNode root && IsOuter(root))
+            {
+                throw Fail(
+                    ExpressionDiagnosticCodes.TypeMismatch,
+                    "An aggregate cannot name a collection through 'outer'",
+                    path.Offset);
+            }
+
             var target = PathTarget(path, context);
             if (!context.Scope.TryGetReferenceCollection(target, path.Name, out collection))
             {
@@ -383,7 +464,7 @@ public static class ExpressionTypeChecker
             return ExpressionType.Integer;
         }
 
-        ExpressionType[] types = [ExpressionType.Null, Infer(call.Arguments[1], context with { Scope = collection.Items, InAggregateItem = true })];
+        ExpressionType[] types = [ExpressionType.Null, Infer(call.Arguments[1], context with { Scope = collection.Items, InAggregateItem = true, Outer = context.Outer ?? context.Scope })];
         ExpressionType result;
         switch (name)
         {
@@ -728,8 +809,8 @@ public static class ExpressionTypeChecker
     /// <summary>
     /// What one check carries down the tree: the scope, the decimal calls, rule calls, path
     /// steps and collection paths found so far, whether the expression computes a stored value, whether it is a
-    /// policy filter, whether it is a module contract's expression, whether it is the set of a step that writes a record, and whether it is an aggregate's
-    /// item expression.
+    /// policy filter, whether it is a module contract's expression, whether it is the set of a step that writes a record, whether it is an aggregate's
+    /// item expression, and the scope of the record the whole expression runs on while it is.
     /// </summary>
     private sealed record Context(
         ExpressionScope Scope,
@@ -737,11 +818,13 @@ public static class ExpressionTypeChecker
         Dictionary<CallNode, ExpressionRule> RuleCalls,
         Dictionary<MemberNode, string> PathTargets,
         HashSet<MemberNode> CollectionPaths,
+        HashSet<MemberNode> OuterReads,
         bool StoredValue,
         bool PolicyFilter,
         bool Contract,
         bool StepSet,
-        bool InAggregateItem = false);
+        bool InAggregateItem = false,
+        ExpressionScope? Outer = null);
 
     /// <summary>Stops checking at the first problem. Only <see cref="Check"/> catches it.</summary>
     private sealed class CheckFailure(ExpressionDiagnostic diagnostic) : Exception(diagnostic.Message)

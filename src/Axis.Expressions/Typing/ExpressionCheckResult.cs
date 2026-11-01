@@ -37,8 +37,14 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
     public IReadOnlySet<MemberNode> CollectionPaths { get; internal init; } = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
 
     /// <summary>
+    /// The <c>outer.field</c> reads inside aggregates' item expressions, such as <c>outer.amount</c>, compared by
+    /// reference. Each one reads the field <c>Name</c> of the record the whole expression runs on.
+    /// </summary>
+    public IReadOnlySet<MemberNode> OuterReads { get; internal init; } = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
     /// The result of a boolean expression built from expressions that <paramref name="results"/>
-    /// checked. It holds every rule call, path target, collection path and decimal call of them, so the tables
+    /// checked. It holds every rule call, path target, collection path, outer read and decimal call of them, so the tables
     /// still match the nodes the built expression reuses.
     /// </summary>
     public static ExpressionCheckResult Merge(IEnumerable<ExpressionCheckResult> results)
@@ -49,10 +55,12 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
         var ruleCalls = new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
         var pathTargets = new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance);
         var collectionPaths = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
+        var outerReads = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
         foreach (var result in results)
         {
             decimalCalls.UnionWith(result.DecimalCalls);
             collectionPaths.UnionWith(result.CollectionPaths);
+            outerReads.UnionWith(result.OuterReads);
             foreach (var (call, rule) in result.RuleCalls)
             {
                 ruleCalls[call] = rule;
@@ -70,6 +78,7 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
             RuleCalls = ruleCalls,
             PathTargets = pathTargets,
             CollectionPaths = collectionPaths,
+            OuterReads = outerReads,
         };
     }
 }

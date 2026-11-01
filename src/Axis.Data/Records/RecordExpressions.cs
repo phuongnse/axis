@@ -1,6 +1,7 @@
 using Axis.Configuration.Model;
 using Axis.Expressions.Evaluation;
 using Axis.Expressions.Syntax;
+using Axis.Expressions.Typing;
 using Npgsql;
 
 namespace Axis.Data.Records;
@@ -93,7 +94,7 @@ public static class RecordExpressions
 
         // A prefix is read before the paths that go through it.
         var chains = expression.Check.PathTargets.Keys
-            .Select(member => Chain(member.Target))
+            .Select(member => Chain(member.Target, expression.Check))
             .DistinctBy(chain => string.Join('.', chain), StringComparer.OrdinalIgnoreCase)
             .OrderBy(chain => chain.Count);
         foreach (var chain in chains)
@@ -155,7 +156,7 @@ public static class RecordExpressions
         foreach (var path in expression.Check.CollectionPaths)
         {
             // A null reference earlier in the path gives no rows, so there is nothing to read.
-            if (!reached.TryGetValue(string.Join('.', Chain(path.Target)), out var owner)
+            if (!reached.TryGetValue(string.Join('.', Chain(path.Target, expression.Check)), out var owner)
                 || !withRows.Add((owner.Entity.Id, owner.Row.Id)))
             {
                 continue;
@@ -204,11 +205,15 @@ public static class RecordExpressions
             accountability: accountability);
     }
 
-    /// <summary>The field names of a path's target, from the subject's field to the last reference, such as <c>department, manager</c>.</summary>
-    private static List<string> Chain(ExpressionNode node) => node switch
+    /// <summary>
+    /// The field names of a path's target, from the subject's field to the last reference, such as <c>department, manager</c>.
+    /// <c>outer.department</c> starts at the subject's field <c>department</c>, because the subject is the outer record.
+    /// </summary>
+    private static List<string> Chain(ExpressionNode node, ExpressionCheckResult check) => node switch
     {
         NameNode name => [name.Name],
-        MemberNode member => [.. Chain(member.Target), member.Name],
+        MemberNode member when check.OuterReads.Contains(member) => [member.Name],
+        MemberNode member => [.. Chain(member.Target, check), member.Name],
         _ => throw new InvalidOperationException("A path starts at a field name."),
     };
 

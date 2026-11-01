@@ -503,7 +503,8 @@ argument names the field, or, in a process expression, is a path to the field
 of a referenced record, as in
 [collections through a path](#collections-through-a-path-and-the-outer-record). The second argument is an item expression,
 evaluated once per row. Inside it, names refer only to the child row's or the
-target record's fields, computed ones included. Computed fields can use
+target record's fields, computed ones included, and `outer.<field>` reads a field of the
+[outer record](#collections-through-a-path-and-the-outer-record). Computed fields can use
 aggregates over child collections. Validations and process conditions can use
 them over child collections and `references` fields. Only process expressions
 can use them over a path to a collection.
@@ -551,7 +552,7 @@ can use them over a path to a collection.
 Two additions let a process read the rows of another record, such as the
 approval steps of a request's type, as
 [D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees. The
-path to a collection is built. `outer` and `first` are _(planned for M26)_.
+path to a collection and `outer` are built. `first` is _(planned for M26)_.
 
 - **A path to a collection.** The first argument of an aggregate may be a path
   that ends at a child collection or a `references` field of a referenced
@@ -567,16 +568,22 @@ path to a collection is built. `outer` and `first` are _(planned for M26)_.
   field in a notification value. Rows are read without the record cipher, as the
   rows of a `references` field are, so a sensitive value in a row read through a
   path makes the read fail.
-- **`outer`** _(planned for M26)_. Inside an item expression, `outer.<field>`
-  reads a field of the record the whole expression runs on, and
-  `outer.<path>` follows its references, such as
-  `count(type.steps, minAmount == null or outer.amount >= minAmount)`. Outside
-  an item expression it is a diagnostic. `outer` becomes a reserved name, so a
-  field named `outer` is a diagnostic.
+- **`outer`.** Inside an item expression, `outer.<field>` reads a field of the
+  record the whole expression runs on, and `outer.<path>` follows its
+  references, such as
+  `count(type.steps, minAmount == null or outer.amount >= minAmount)`. It works
+  wherever aggregates run in memory. `outer` names the top-level record, also in
+  a nested aggregate, and the word `outer` is not a hop. A path after it
+  resolves only where a path does without `outer`. `outer.<collection>` and a
+  bare `outer` are type errors (`AXC0047`). Outside an item expression `outer`
+  is `AXC0353`. An entity field named `outer`, in any letter case, is
+  `AXC0354`, but a parameter named `outer` still works as a bare name. A
+  sensitive field or an unlisted form field is refused through `outer` too.
 - **Not SQL.** A path to a collection is evaluated in the server and the
   worker, and a data source filter or a policy filter that uses it is
-  `AXC0053`. `outer` and `first` _(planned for M26)_ are evaluated there too,
-  and a filter that uses them will be `AXC0053`.
+  `AXC0053`. So is `outer` inside `any` or `count` in a filter. `first`
+  _(planned for M26)_ is evaluated in memory too, and a filter that uses it
+  will be `AXC0053`.
 - **Cost.** The rows count against the [cost bounds](#cost-bounds) as the rows
   of a child collection of the record do. Following the reference part of the
   path costs its usual steps, but the collection itself costs none. So
@@ -879,6 +886,8 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   `set` of an `updateRecord` or `createRecord` step, calls `accountableUser()` or `decisionTask()`, at the
   call. This includes a decision condition, a computed field, a policy filter
   and a rule body.
+- **`AXC0353`.** `outer` is used outside an aggregate's item expression, such
+  as in a rule body, at the name or the `.` after it.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).

@@ -335,4 +335,5 @@ public static class DiagnosticCodes
     public const string DuplicateLayerTarget = "AXC0350";
     public const string LayerChangesIdentity = "AXC0351";
     public const string AmbiguousLayerTarget = "AXC0352";
+    public const string ReservedFieldName = "AXC0354";
 }

@@ -13,7 +13,8 @@ namespace Axis.Expressions.Evaluation;
 /// <see cref="ExpressionLimits.MaxSteps"/> steps, counting the steps of the rules it calls and of
 /// an aggregate's item expression on every row. Each node evaluated is one step, and a
 /// <c>concat</c> also costs one step for each full <see cref="ExpressionLimits.CharactersPerStep"/>
-/// characters of its result. Values use the CLR types listed on
+/// characters of its result. Inside an aggregate's item expression, <c>outer.field</c> reads a field of the
+/// record the whole expression runs on, and it costs one step like a bare name. Values use the CLR types listed on
 /// <see cref="ExpressionValues"/>.
 /// </summary>
 public static class ExpressionInterpreter
@@ -97,7 +98,8 @@ public static class ExpressionInterpreter
         DateTimeOffset? now,
         TimeZoneInfo? timeZone,
         ExpressionValues? previous = null,
-        ExpressionAccountability? accountability = null)
+        ExpressionAccountability? accountability = null,
+        ExpressionValues? outer = null)
     {
         public object? Eval(ExpressionNode node)
         {
@@ -137,13 +139,13 @@ public static class ExpressionInterpreter
             budget.Steps += (int)steps;
         }
 
-        private object? Name(NameNode name) => Read(values, name);
+        private object? Name(NameNode name) => Read(values, name.Name);
 
-        private static object? Read(ExpressionValues source, NameNode name)
+        private static object? Read(ExpressionValues source, string name)
         {
-            if (!source.TryGetValue(name.Name, out var value))
+            if (!source.TryGetValue(name, out var value))
             {
-                throw new InvalidOperationException($"No value was given for field '{name.Name}'.");
+                throw new InvalidOperationException($"No value was given for field '{name}'.");
             }
 
             return value is null or string or long or decimal or bool or DateOnly or DateTimeOffset or Guid
@@ -157,6 +159,13 @@ public static class ExpressionInterpreter
         /// </summary>
         private object? Member(MemberNode member)
         {
+            if (checkResult.OuterReads.Contains(member))
+            {
+                return Read(
+                    outer ?? throw new InvalidOperationException($"'outer.{member.Name}' was evaluated outside an aggregate's item expression."),
+                    member.Name);
+            }
+
             switch (Eval(member.Target))
             {
                 case null:
@@ -217,7 +226,7 @@ public static class ExpressionInterpreter
             {
                 case "previous":
                     // The argument is never evaluated, because that would give the new value.
-                    return previous is null ? null : Read(previous, (NameNode)arguments[0]);
+                    return previous is null ? null : Read(previous, ((NameNode)arguments[0]).Name);
 
                 case "if":
                     // Only the picked branch is evaluated. A null condition picks the else branch.
@@ -329,7 +338,7 @@ public static class ExpressionInterpreter
             var items = new object?[rows.Count];
             for (var i = 0; i < items.Length; i++)
             {
-                items[i] = new Evaluator(rows[i], checkResult, budget, records, now, timeZone, accountability: accountability).Eval(item);
+                items[i] = new Evaluator(rows[i], checkResult, budget, records, now, timeZone, accountability: accountability, outer: outer ?? values).Eval(item);
             }
 
             switch (name)

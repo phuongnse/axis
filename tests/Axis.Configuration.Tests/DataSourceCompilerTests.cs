@@ -534,6 +534,9 @@ public sealed class DataSourceCompilerTests
     [InlineData("lines is null", ExpressionDiagnosticCodes.TypeMismatch)]
     // A path goes only through reference fields, so it cannot go through a child collection.
     [InlineData("lines.amount > 0", ExpressionDiagnosticCodes.TypeMismatch)]
+    // The outer record is read in memory only, so SQL does not translate it.
+    [InlineData("any(lines, description == outer.number)", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("outer.number == 'x'", ExpressionDiagnosticCodes.OuterOutsideAggregateItem)]
     public void Filter_over_a_child_collection_is_reported_at_the_filter(string filter, string code)
     {
         using var folder = new TemporaryFolder()
