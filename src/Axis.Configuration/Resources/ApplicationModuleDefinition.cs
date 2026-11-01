@@ -23,4 +23,19 @@ public sealed record ApplicationModuleDefinition
     /// the pinned version.
     /// </summary>
     public IReadOnlyDictionary<string, string> Connectors { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// The named points of the module's contract that the application turns off, as written. The
+    /// compiler checks each entry against the pinned version and keeps the valid ones.
+    /// </summary>
+    public IReadOnlyList<RelaxEntryDefinition> Relax { get; init; } = [];
+}
+
+/// <summary>A relax entry as written: the named point to turn off and why.</summary>
+public sealed record RelaxEntryDefinition
+{
+    public required string Point { get; init; }
+
+    /// <summary>The reason as written. It may be missing or blank, which the compiler reports.</summary>
+    public string? Reason { get; init; }
 }

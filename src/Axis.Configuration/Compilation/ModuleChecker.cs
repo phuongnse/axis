@@ -47,7 +47,9 @@ namespace Axis.Configuration.Compilation;
 /// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
 /// a role of the application, and the pin keeps that map. The <c>connectors</c> of an entry must map
 /// each connector slot of the pinned version to a connector of the application that fits it, see
-/// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too. A module may hold scenarios.
+/// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too. The <c>relax</c> entries of an entry
+/// must each name a point of the pinned version's contracts, once, with a reason, and the pin keeps the valid ones.
+/// A module may hold scenarios.
 /// A scenario's steps name the module's own entities and processes without <c>/</c>, rewritten to the
 /// qualified name, and anything else is reported as for a process. The scenario files are checked but are not
 /// returned with the files of the release, so they stay out of its content hash.
@@ -224,12 +226,15 @@ internal static class ModuleChecker
             var pinnedModule = installed.First(candidate =>
                 string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
                 && string.Equals(candidate.Manifest.Version, picked, StringComparison.Ordinal));
+            var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
+            CheckFiles(pinnedModule, declared, files, resources, diagnostics);
             if (first.Asker is null)
             {
                 references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
                 var slotRoles = CheckRoleSlots(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, roles, unloadedRoleNames, diagnostics);
                 var slotConnectors = CheckConnectorSlots(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, connectors, unloadedConnectorNames, diagnostics);
-                pins.Add(new PinnedModuleModel(id, first.RangeText, picked) { Roles = slotRoles, Connectors = slotConnectors });
+                var relaxed = CheckRelax(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, ContractPoints.Of(resources.ContractsOf(id)), diagnostics);
+                pins.Add(new PinnedModuleModel(id, first.RangeText, picked) { Roles = slotRoles, Connectors = slotConnectors, Relaxed = relaxed });
             }
             else
             {
@@ -237,10 +242,8 @@ internal static class ModuleChecker
             }
 
             manifests[id] = pinnedModule.Manifest;
-            var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
             declaredByModule[id] = declared;
             slotsByModule[id] = pinnedModule.Manifest.Roles.Select(slot => slot.Name).ToHashSet(StringComparer.Ordinal);
-            CheckFiles(pinnedModule, declared, files, resources, diagnostics);
         }
 
         // The entries of a pinned module for a pinned module send the slots of the dependency to its own.
@@ -563,6 +566,67 @@ internal static class ModuleChecker
         return mapped.Count == 0 ? ReadOnlyDictionary<string, string>.Empty : mapped;
     }
 
+    /// <summary>
+    /// Checks the <c>relax</c> entries of a module entry against the named points of its pinned
+    /// version's contracts. Points are matched exactly. Returns the entries that name a known point
+    /// for the first time and give a reason, in the order written, with the reason as written.
+    /// </summary>
+    private static IReadOnlyList<RelaxedPointModel> CheckRelax(
+        ApplicationManifest application,
+        int index,
+        ApplicationModuleDefinition entry,
+        ModuleManifest manifest,
+        IReadOnlySet<string> points,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, int entryIndex) =>
+            diagnostics.Add(new Diagnostic(code, message, application.File, $"/modules/{index}/relax/{entryIndex}", application.Id));
+
+        var kept = new List<RelaxedPointModel>();
+        var firstIndexByPoint = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var relaxIndex = 0; relaxIndex < entry.Relax.Count; relaxIndex++)
+        {
+            var point = entry.Relax[relaxIndex].Point;
+            var reason = entry.Relax[relaxIndex].Reason;
+            var blank = string.IsNullOrWhiteSpace(reason);
+            if (blank)
+            {
+                Report(
+                    DiagnosticCodes.MissingRelaxReason,
+                    $"The relax entry for '{point}' has no reason. Write why the application turns this point off, in 1 to 500 characters.",
+                    relaxIndex);
+            }
+
+            if (!points.Contains(point))
+            {
+                Report(
+                    DiagnosticCodes.UnknownRelaxPoint,
+                    points.Count == 0
+                        ? $"The module '{manifest.Id}' {manifest.Version} has no contracts, so '{point}' relaxes nothing."
+                        : $"The module '{manifest.Id}' {manifest.Version} has no point '{point}'. Points are matched exactly. Its points are {string.Join(", ", points.Order(StringComparer.Ordinal).Select(known => $"'{known}'"))}.",
+                    relaxIndex);
+                continue;
+            }
+
+            if (firstIndexByPoint.TryGetValue(point, out var firstIndex))
+            {
+                Report(
+                    DiagnosticCodes.DuplicateRelaxPoint,
+                    $"The point '{point}' is already relaxed by entry {firstIndex}. Name each point once.",
+                    relaxIndex);
+                continue;
+            }
+
+            firstIndexByPoint[point] = relaxIndex;
+            if (!blank)
+            {
+                kept.Add(new RelaxedPointModel(point, reason!));
+            }
+        }
+
+        return kept.Count == 0 ? ReadOnlyCollection<RelaxedPointModel>.Empty : kept;
+    }
+
     /// <summary>Escapes a key as an RFC 6901 JSON Pointer segment.</summary>
     internal static string Escape(string segment) =>
         segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
@@ -681,6 +745,10 @@ internal static class ModuleChecker
         private readonly HashSet<string> _unloadedPageNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedProcessNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _noModules = [];
+
+        /// <summary>The contracts collected so far for a module, with the entity and names as written.</summary>
+        public IEnumerable<ContractResource> ContractsOf(string moduleId) =>
+            _contracts.Where(contract => contract.ModuleId == moduleId).Select(contract => contract.Contract);
 
         public ModuleResources ToResources(
             IReadOnlyDictionary<string, IReadOnlySet<string>> declaredModules,

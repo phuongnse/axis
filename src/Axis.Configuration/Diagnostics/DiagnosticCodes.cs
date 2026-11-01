@@ -337,4 +337,7 @@ public static class DiagnosticCodes
     public const string AmbiguousLayerTarget = "AXC0352";
     public const string DuplicateGrantName = "AXC0353";
     public const string ReservedFieldName = "AXC0355";
+    public const string UnknownRelaxPoint = "AXC0356";
+    public const string DuplicateRelaxPoint = "AXC0357";
+    public const string MissingRelaxReason = "AXC0358";
 }
