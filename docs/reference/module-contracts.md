@@ -7,7 +7,9 @@ named point of it with a `relax` entry and a reason, and its release is then mar
 [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees the
 idea, and [D121](../decisions/d121-how-a-module-contract-is-declared-and-checked.md) agrees the
 shapes below. The `contract` resource and the compile checks of its `lifecycle` and its `ceiling`
-are built. Nothing enforces a contract on a write yet. The rest of this page is _(planned for M24)_.
+are built. So is the lifecycle check on every record write, with the record API's `409` and its log
+line. A refusal on another write path fails as that path already fails, and logs nothing yet. Nothing
+enforces the grant ceiling on a write yet. The rest of this page is _(planned for M24)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.

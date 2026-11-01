@@ -209,7 +209,7 @@ one transaction:
    - An `updateRecord` operation first writes `record.updated` for the
      subject record, with the instance id. Its details are
      `{ "version", "fields" }`, as the
-     [record API](record-api.md#audit-records-and-history) writes them.
+     [record API](record-audit.md#audit-records-and-history) writes them.
    - A `createRecord` operation first writes `record.created` for the new
      record, with the instance id. Its details are `{ "version" }`.
    - A decision, an `updateRecord` operation, a `createRecord` operation, a

@@ -1,0 +1,8 @@
+{
+  "id": "4d2a6c81-3e5b-4f70-8a1c-9b0d2e4f6a03",
+  "kind": "policy",
+  "name": "RequesterAccess",
+  "formatVersion": 1,
+  "roles": ["requester"],
+  "grants": [{ "entity": "Request", "actions": ["read", "create", "update", "delete"] }]
+}

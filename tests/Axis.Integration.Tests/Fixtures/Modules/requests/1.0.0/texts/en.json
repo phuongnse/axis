@@ -1,0 +1,11 @@
+{
+  "id": "4d2a6c81-3e5b-4f70-8a1c-9b0d2e4f6a04",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "requests.roles.requester": "Requester",
+    "requests.request.amountRequired": "A request needs an amount above zero to be submitted."
+  }
+}

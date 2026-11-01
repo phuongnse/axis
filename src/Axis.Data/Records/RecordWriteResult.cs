@@ -26,13 +26,25 @@ public enum RecordWriteOutcome
     /// failed; the errors say which. Only <see cref="RecordCommands.SetAsync"/> returns it.
     /// </summary>
     Invalid,
+
+    /// <summary>
+    /// The entity's lifecycle refuses the write: a create outside an initial state, a state change along
+    /// no transition or along one whose guard is not true. The errors say which.
+    /// </summary>
+    LifecycleRefused,
 }
 
 /// <summary>
 /// The outcome of a record create or update. <see cref="Errors"/> is set for
 /// <see cref="RecordWriteOutcome.MissingReference"/>, <see cref="RecordWriteOutcome.UniqueViolation"/>
-/// and <see cref="RecordWriteOutcome.Invalid"/>,
+/// <see cref="RecordWriteOutcome.Invalid"/> and <see cref="RecordWriteOutcome.LifecycleRefused"/>,
 /// keyed by RFC 6901 JSON Pointer such as <c>/values/category</c>, with fixed messages that
 /// never name a table, column or constraint.
+/// <see cref="Point"/> is the named point of the module contract that refused the write, such as
+/// <c>Request/transitions/submit</c>, or <see langword="null"/> when none is named.
 /// </summary>
-public sealed record RecordWriteResult(RecordWriteOutcome Outcome, Record? Record = null, SortedDictionary<string, string[]>? Errors = null);
+public sealed record RecordWriteResult(
+    RecordWriteOutcome Outcome,
+    Record? Record = null,
+    SortedDictionary<string, string[]>? Errors = null,
+    string? Point = null);

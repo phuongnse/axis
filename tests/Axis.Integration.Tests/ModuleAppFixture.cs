@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// One tenant database, <c>a</c>, served by the real server on host <c>a.example.test</c>. The
-/// server migrates it and activates the fixture applications ModuleAppA and ModuleAppB through
+/// server migrates it and activates the fixture applications ModuleAppA, ModuleAppB and ModuleContractApp through
 /// <c>ActivateOnStartup</c>. Both use the <c>departments</c> test module installed under
 /// <c>Fixtures/Modules</c>, so the module's department table and seed rows exist once for each.
 /// ModuleAppA also declares the <c>budgets</c> module, which depends on <c>departments</c>, and has an
@@ -16,6 +16,8 @@ namespace Axis.Integration.Tests;
 /// authentication scheme signs in <c>requester</c>, an employee, <c>manager</c>, who holds no role, and
 /// <c>approver-a</c>, who holds <c>manager</c> in ModuleAppA only.
 /// ModuleAppA also holds the site <c>modulesa</c>, which lists the <c>departments</c> module's Departments page.
+/// ModuleContractApp declares only the <c>requests</c> module, whose <c>Request</c> entity has a contract with a
+/// lifecycle, and maps its <c>requester</c> slot to <c>employee</c>.
 /// </summary>
 public sealed class ModuleAppFixture : IAsyncLifetime
 {
@@ -70,6 +72,7 @@ public sealed class ModuleAppFixture : IAsyncLifetime
             builder.UseSetting("Modules:Path", Path.Combine(_fixtures, "Modules"));
             builder.UseSetting("ActivateOnStartup:0", Path.Combine(_fixtures, "ModuleAppA"));
             builder.UseSetting("ActivateOnStartup:1", Path.Combine(_fixtures, "ModuleAppB"));
+            builder.UseSetting("ActivateOnStartup:2", Path.Combine(_fixtures, "ModuleContractApp"));
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
                 new TestIdentity("manager", "Manager No Role"),
@@ -79,7 +82,7 @@ public sealed class ModuleAppFixture : IAsyncLifetime
                 });
         });
 
-        // Creating a client starts the server, which migrates the database, activates both applications and seeds them.
+        // Creating a client starts the server, which migrates the database, activates the applications and seeds them.
         _factory.CreateClient().Dispose();
     }
 

@@ -74,6 +74,9 @@ public enum RecordConflict
 
     /// <summary>A running or waiting process instance has the record as its subject.</summary>
     RunningProcess,
+
+    /// <summary>The entity's lifecycle refuses the write, and <see cref="RecordCommandResult.Errors"/> says why.</summary>
+    Lifecycle,
 }
 
 /// <summary>
@@ -293,6 +296,7 @@ public static class RecordCommand
         var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
+            LogRefusal(loggerFactory, model, result, recordId: null);
             return WriteResult(result);
         }
 
@@ -745,6 +749,7 @@ public static class RecordCommand
         var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
+            LogRefusal(loggerFactory, model, result, recordId);
             return WriteResult(result);
         }
 
@@ -878,11 +883,18 @@ public static class RecordCommand
                 cancellationToken);
         }
 
+        if (result.Outcome == RecordDeleteOutcome.LifecycleRefused)
+        {
+            RecordLifecycleLog.Refused(loggerFactory, model.Id, result.Point, recordId);
+        }
+
         return result.Outcome switch
         {
             RecordDeleteOutcome.Deleted => new RecordCommandResult(RecordCommandOutcome.Deleted),
             RecordDeleteOutcome.NotFound => new RecordCommandResult(RecordCommandOutcome.NotFound),
             RecordDeleteOutcome.Referenced => new RecordCommandResult(RecordCommandOutcome.Conflict, Conflict: RecordConflict.Referenced),
+            RecordDeleteOutcome.LifecycleRefused => new RecordCommandResult(
+                RecordCommandOutcome.Conflict, Errors: result.Errors, Conflict: RecordConflict.Lifecycle),
             var outcome => throw new InvalidOperationException($"Unexpected delete outcome {outcome}."),
         };
     }
@@ -985,6 +997,15 @@ public static class RecordCommand
     private static Dictionary<string, string[]> UnknownForm() =>
         new() { ["form"] = ["Must name a form of this entity."] };
 
+    // Logs a refusal by the lifecycle: the entity, the named point and the record, never a value.
+    private static void LogRefusal(ILoggerFactory loggerFactory, EntityModel model, RecordWriteResult result, Guid? recordId)
+    {
+        if (result.Outcome == RecordWriteOutcome.LifecycleRefused)
+        {
+            RecordLifecycleLog.Refused(loggerFactory, model.Id, result.Point, recordId);
+        }
+    }
+
     // Maps a storage result that is not a success. The conflicts name no column or constraint:
     // the storage names are not part of the outcome.
     private static RecordCommandResult WriteResult(RecordWriteResult result) =>
@@ -997,6 +1018,8 @@ public static class RecordCommand
             RecordWriteOutcome.UniqueViolation => new RecordCommandResult(
                 RecordCommandOutcome.Conflict, Errors: result.Errors, Conflict: RecordConflict.UniqueValue),
             RecordWriteOutcome.SchemaConflict => new RecordCommandResult(RecordCommandOutcome.Conflict, Conflict: RecordConflict.Schema),
+            RecordWriteOutcome.LifecycleRefused => new RecordCommandResult(
+                RecordCommandOutcome.Conflict, Errors: result.Errors, Conflict: RecordConflict.Lifecycle),
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unexpected write outcome."),
         };
 

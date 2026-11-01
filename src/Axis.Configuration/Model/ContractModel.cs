@@ -4,7 +4,8 @@ namespace Axis.Configuration.Model;
 
 /// <summary>
 /// A compiled module contract on an entity of a pinned module. The lifecycle and the grant ceiling are
-/// compiled so far. Nothing enforces them yet.
+/// compiled so far. Every record write checks the lifecycle, see <c>RecordCommands</c> in <c>Axis.Data</c>.
+/// Nothing enforces the grant ceiling yet.
 /// </summary>
 public sealed record ContractModel
 {

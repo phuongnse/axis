@@ -772,6 +772,7 @@ internal static class RecordEndpoints
                 RecordConflict.Schema => Conflict("The stored schema does not match the active model."),
                 // Names no process, instance or step: the process is not part of the response.
                 RecordConflict.RunningProcess => Conflict("A running process works on this record."),
+                RecordConflict.Lifecycle => LifecycleRefused(result.Errors!),
                 var conflict => throw new InvalidOperationException($"Unexpected conflict {conflict}."),
             },
             var outcome => throw new InvalidOperationException($"Unexpected record command outcome {outcome}."),
@@ -789,8 +790,16 @@ internal static class RecordEndpoints
                 title: "A value must be unique."),
             // Names no column or constraint: the storage names are not part of the API.
             RecordWriteOutcome.SchemaConflict => Conflict("The stored schema does not match the active model."),
+            RecordWriteOutcome.LifecycleRefused => LifecycleRefused(result.Errors!),
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unexpected write outcome."),
         };
+
+    // Names the state field and the transition's message, never a table or a value.
+    private static IResult LifecycleRefused(IDictionary<string, string[]> errors) =>
+        Results.ValidationProblem(
+            errors,
+            statusCode: StatusCodes.Status409Conflict,
+            title: "The record's state does not allow this change.");
 
     private static IResult Conflict(string title) =>
         Results.Problem(statusCode: StatusCodes.Status409Conflict, title: title);

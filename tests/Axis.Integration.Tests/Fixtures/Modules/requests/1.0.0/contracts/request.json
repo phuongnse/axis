@@ -1,0 +1,27 @@
+{
+  "id": "4d2a6c81-3e5b-4f70-8a1c-9b0d2e4f6a02",
+  "kind": "contract",
+  "name": "RequestContract",
+  "formatVersion": 1,
+  "entity": "Request",
+  "lifecycle": {
+    "field": "status",
+    "states": [
+      { "name": "draft", "initial": true, "deletable": true },
+      { "name": "submitted" },
+      { "name": "approved" },
+      { "name": "archived", "deletable": true }
+    ],
+    "transitions": [
+      {
+        "name": "submit",
+        "from": ["draft"],
+        "to": "submitted",
+        "guard": "amount > 0",
+        "message": { "textKey": "requests.request.amountRequired" }
+      },
+      { "name": "approve", "from": ["submitted"], "to": "approved", "guard": "100 / amount > 0" },
+      { "name": "archive", "from": ["approved"], "to": "archived" }
+    ]
+  }
+}

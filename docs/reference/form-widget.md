@@ -240,7 +240,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     value and never sends the form. Enter in a text input sends the form, as
     in any form.
   - **History**. The form page of a saved record shows the record's history
-    from the [history endpoint](record-api.md#audit-records-and-history) in a
+    from the [history endpoint](record-audit.md#audit-records-and-history) in a
     panel below the form, newest first. A new record has no history panel.
     - Each entry shows its action, who did it, its time and a short summary.
       The action is a platform text, such as "Updated" or "Task decided". An

@@ -65,6 +65,38 @@ public static class RecordValidator
         return Validate(application, entity, stored, values, rows, now, sets);
     }
 
+    /// <summary>
+    /// Whether a lifecycle guard is <c>true</c> on the <paramref name="stored"/> record with
+    /// <paramref name="values"/> and <paramref name="rows"/> on top. A <c>false</c>, a <c>null</c>, a
+    /// run-time error and a value that cannot be held exactly are all <see langword="false"/>.
+    /// </summary>
+    internal static bool GuardHolds(
+        ApplicationModel application,
+        EntityModel entity,
+        Record stored,
+        IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
+        ExpressionModel guard,
+        DateTimeOffset now,
+        RecordSets sets)
+    {
+        var record = BuildRecord(entity, stored, values);
+        if (!RecordCollections.TryAdd(application, entity, stored, rows, record, new SortedDictionary<string, string[]>(StringComparer.Ordinal), sets)
+            || record.Values.Any(pair => !pair.Exact))
+        {
+            return false;
+        }
+
+        var result = ExpressionInterpreter.Evaluate(
+            guard.Syntax,
+            guard.Check,
+            new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
+            records: null,
+            now: now,
+            timeZone: application.TimeZone);
+        return result.Succeeded && result.Value is true;
+    }
+
     private static SortedDictionary<string, string[]>? Validate(
         ApplicationModel application,
         EntityModel entity,
