@@ -419,6 +419,8 @@ message can hold a value:
   `The when of branch 0 of the step 'check' failed: DivisionByZero.`
 - A fixed text that holds the field pointer and the message key, such as the
   refused-write text of [Running a step](process-execution.md#running-a-step).
+  A write that a module contract refused ends with the named point, such as
+  `(named point Request/transitions/submit)`.
 - For a connector call that cannot be sent or whose success cannot be
   recorded, a fixed text that ends with the exception type. The same text is
   the call's `last_error`.

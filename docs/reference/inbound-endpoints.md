@@ -193,6 +193,10 @@ values, or the start condition fails. Nothing is written.
   keyed `/values/<field>`, or by a row path such as
   `/values/lineItems/0/quantity`. The mapping from input to fields need not
   be one-to-one, so these errors point at the record's own fields.
+- A create that the [module contract](module-contracts.md#when-a-write-is-refused)
+  refuses, such as a create outside an initial state, is keyed
+  `/values/<state field>` with the contract's message, as a failed
+  validation is.
 - A start condition that fails is keyed `/input`.
 
 ```json
