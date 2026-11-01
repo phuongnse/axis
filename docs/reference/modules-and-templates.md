@@ -246,7 +246,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
 | `AXC0302` | An input of the connector's operation is required, and the slot operation has no input with that name. The message names the slot, the operation and the field. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` it is checked against the connector that the chain of slots reaches, and the report is in that `module.json`. |
 | `AXC0303` | An output of a slot operation is not an output of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` the slot of the depending module takes the place of the connector, and the report is in that `module.json`. |
 | `AXC0304` | A role in a module policy's `roles` is not a role slot of its module. The message lists the slots, or says there are none. Reported at `/roles/{i}` of the module file. |
-| `AXC0305` | A grant in a module policy is on something other than an entity or data source of its own module: a `process` or `endpoint` grant, a name with `/` such as `departments/Department`, or the plain name of an application entity or data source. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
+| `AXC0305` | A grant in a module policy is on something other than an entity, data source or process of its own module: an `endpoint` grant, a name with `/` such as `departments/Department`, or the plain name of an application entity, data source or process. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
 | `AXC0306` | Two mappings of the same slot of a module give it different roles or different connectors: the application's own entry and the chain through a depending module, or the chains through two depending modules. The message names the slot, the module and both mappings. The application's entry stays, and otherwise the first depending module in pin order. Reported at `/modules/{i}/roles/{slot}` or `/modules/{i}/connectors/{slot}` of the later entry, in `modules/<id>/module.json`. See [mapping slots](#processes-pages-policies-and-dependencies). |
 | `AXC0307` | A module task's `assignee.role`, or an escalation's `reassign.role`, is not a role slot of its module. A role of an application gives this too. The message lists the slots, or says there are none. Reported at `/steps/{i}/assignee/role` or `/steps/{i}/escalations/{j}/reassign/role` of the module file. |
 
@@ -317,15 +317,16 @@ An application that declares it maps the slot to one of its own roles:
   is `AXC0304`. Each slot becomes the role the application maps it to, so the
   compiled policy names that role and a person who holds the role in the
   application gets the grants there, and in no other application. A slot the
-  application does not map names nobody. A grant names an entity or data source of
+  application does not map names nobody. A grant names an entity, data source or process of
   its own module by its plain name. A name with `/`, including a module it
-  declares, a `process` or `endpoint` grant, and the plain name of an application
-  entity or data source are `AXC0305`. An unknown plain name keeps `AXC0092`. A grant's `filter` calls
+  declares, an `endpoint` grant, and the plain name of an application
+  entity, data source or process are `AXC0305`. An unknown plain name keeps `AXC0092`. A grant's `filter` calls
   only rules of the modules its module declares, by qualified call, as a module
   data source filter does. Default deny still holds: without the mapped role a
   person gets `403` on the module entity and data source. A module that the
   application reaches only as a dependency gets its slot map through the chain, so its policies
-  grant the role the chain reaches. _(planned for M24)_ A module policy grants on the processes of its own module.
+  grant the role the chain reaches. A `process` grant takes the process actions, and a person who holds the mapped role starts or
+  operates the module process, and without it gets `403`.
 - **Pages.** _(built)_ A module page is a `page` file in the module. In an application it is
   named `<module id>/<name>`, and its id is derived from the application `id` as for other module
   resources. Its widgets name resources of its own module by their plain names: the `entity`,

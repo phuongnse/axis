@@ -12,6 +12,7 @@ public sealed class ModulePolicyTests
     private const string ApprovalId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21";
     private const string ApprovalsDataSourceId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c22";
     private const string PolicyId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c23";
+    private const string ApproveProcessId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c24";
     private const string PolicyFile = "modules/approvals/policies/ApproverAccess.json";
 
     private const string DefaultGrants = """
@@ -45,6 +46,28 @@ public sealed class ModulePolicyTests
             Assert.Equal(new EntityReference(entity.Id, "approvals/Approval"), entityGrant.Entity);
             Assert.NotNull(entityGrant.Filter);
             Assert.Equal(new DataSourceReference(dataSource.Id, "approvals/Approvals"), policy.Grants[1].DataSource);
+        }
+    }
+
+    [Fact]
+    public void A_module_policy_grants_on_a_process_of_its_own_module()
+    {
+        using var modules = Modules(["approver"], """[{ "process": "Approve", "actions": ["start", "inspect"] }]""");
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+        var rebuilt = ApplicationCompiler.Compile(compiled.Resources);
+
+        Assert.Empty(compiled.Diagnostics);
+        Assert.Empty(rebuilt.Diagnostics);
+        foreach (var model in new[] { compiled.Model!, rebuilt.Model! })
+        {
+            var policy = Assert.Single(model.Policies);
+            Assert.Equal(["manager"], policy.Roles);
+
+            var process = Assert.Single(model.Processes, candidate => candidate.Name == "approvals/Approve");
+            var grant = Assert.Single(policy.Grants);
+            Assert.Equal(new ProcessReference(process.Id, "approvals/Approve"), grant.Process);
         }
     }
 
@@ -97,7 +120,8 @@ public sealed class ModulePolicyTests
     [InlineData("""[{ "entity": "departments/Department", "actions": ["read"] }]""", "/grants/0/entity", "departments/Department")]
     [InlineData("""[{ "dataSource": "Invoices", "actions": ["read"] }]""", "/grants/0/dataSource", "Invoices")]
     [InlineData("""[{ "dataSource": "departments/Departments", "actions": ["read"] }]""", "/grants/0/dataSource", "departments/Departments")]
-    [InlineData("""[{ "entity": "Approval", "actions": ["read"] }, { "process": "Approve", "actions": ["start"] }]""", "/grants/1/process", "")]
+    [InlineData("""[{ "entity": "Approval", "actions": ["read"] }, { "process": "departments/Approve", "actions": ["start"] }]""", "/grants/1/process", "departments/Approve")]
+    [InlineData("""[{ "process": "Archive", "actions": ["start"] }]""", "/grants/0/process", "Archive")]
     [InlineData("""[{ "endpoint": "Intake", "actions": ["invoke"] }]""", "/grants/0/endpoint", "")]
     public void A_grant_outside_the_module_is_reported_in_the_module_file(string grants, string path, string named)
     {
@@ -117,6 +141,7 @@ public sealed class ModulePolicyTests
     [Theory]
     [InlineData("""[{ "entity": "Missing", "actions": ["read"] }]""", "/grants/0/entity")]
     [InlineData("""[{ "dataSource": "Missing", "actions": ["read"] }]""", "/grants/0/dataSource")]
+    [InlineData("""[{ "process": "Missing", "actions": ["start"] }]""", "/grants/0/process")]
     public void A_plain_name_that_is_nothing_anywhere_keeps_the_unknown_target_code(string grants, string path)
     {
         using var modules = Modules(["approver"], grants);
@@ -216,6 +241,10 @@ public sealed class ModulePolicyTests
                 { "id": "{{ApprovalsDataSourceId}}", "kind": "dataSource", "name": "Approvals", "formatVersion": 1,
                   "entity": "Approval", "fields": [ { "name": "title", "path": "title" } ] }
                 """)
+            .With("approvals/1.0.0/Approve.json", $$"""
+                { "id": "{{ApproveProcessId}}", "kind": "process", "name": "Approve", "formatVersion": 1,
+                  "entity": "Approval", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
+                """)
             .With("approvals/1.0.0/policies/ApproverAccess.json", $$"""
                 { "id": "{{PolicyId}}", "kind": "policy", "name": "ApproverAccess", "formatVersion": 1,
                   "roles": [{{string.Join(", ", roles.Select(role => $"\"{role}\""))}}], "grants": {{grants}} }
@@ -251,6 +280,10 @@ public sealed class ModulePolicyTests
             .With("dataSources/Invoices.json", """
                 { "id": "44444444-4444-4444-8444-444444444412", "kind": "dataSource", "name": "Invoices", "formatVersion": 1,
                   "entity": "Invoice", "fields": [ { "name": "number", "path": "number" } ] }
+                """)
+            .With("processes/Archive.json", """
+                { "id": "44444444-4444-4444-8444-444444444414", "kind": "process", "name": "Archive", "formatVersion": 1,
+                  "entity": "Invoice", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """)
             .With("rules/IsSecret.json", """
                 { "id": "44444444-4444-4444-8444-444444444413", "kind": "rule", "name": "IsSecret", "formatVersion": 1,
