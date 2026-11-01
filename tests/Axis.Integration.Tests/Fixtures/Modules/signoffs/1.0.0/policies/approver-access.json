@@ -1,0 +1,8 @@
+{
+  "id": "b50b2676-d361-4a94-a638-e0f2339e5c4d",
+  "kind": "policy",
+  "name": "ApproverAccess",
+  "formatVersion": 1,
+  "roles": ["approver"],
+  "grants": [{ "entity": "Request", "actions": ["read", "update"] }]
+}

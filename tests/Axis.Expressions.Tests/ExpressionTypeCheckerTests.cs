@@ -325,6 +325,20 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Theory]
+    [InlineData("accountableUser()")]
+    [InlineData("decisionTask()")]
+    public void Accountability_in_a_contract_is_text(string text)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected("text"), contract: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(Expected("text"), result.Type);
+    }
+
+    [Theory]
     [InlineData("accountableUser()", "text", "accountableUser", 0)]
     [InlineData("decisionTask()", "text", "decisionTask", 0)]
     [InlineData("t == accountableUser()", "boolean", "accountableUser", 5)]
@@ -334,13 +348,12 @@ public sealed class ExpressionTypeCheckerTests
         var parsed = ExpressionParser.Parse(text);
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
 
-        // The default, a stored value, a policy filter and a contract are all outside a step's set.
+        // The default, a stored value and a policy filter are all outside a step's set and a contract.
         var results = new[]
         {
             ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type)),
             ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), storedValue: true),
             ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), policyFilter: true),
-            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), contract: true),
         };
 
         foreach (var diagnostic in results.Select(result => result.Diagnostic))
@@ -348,7 +361,7 @@ public sealed class ExpressionTypeCheckerTests
             Assert.NotNull(diagnostic);
             Assert.Equal((ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, offset), (diagnostic.Code, diagnostic.Offset));
             Assert.Equal(
-                $"Function '{function}' is allowed only in the set of an updateRecord or createRecord step at character {offset + 1}.",
+                $"Function '{function}' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step at character {offset + 1}.",
                 diagnostic.Message);
         }
     }

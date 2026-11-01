@@ -1,0 +1,14 @@
+{
+  "id": "362659af-bdf5-4ad6-b801-3803dfc7c928",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.employee": "Employee",
+    "role.approver": "Approver",
+    "request.main": "Request",
+    "request.review": "Review the request",
+    "request.approve": "Approve"
+  }
+}

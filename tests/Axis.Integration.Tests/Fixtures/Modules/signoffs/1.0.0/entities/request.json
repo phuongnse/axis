@@ -1,0 +1,12 @@
+{
+  "id": "8dfb3687-a65b-40e7-ab69-bb9f7f38a5af",
+  "kind": "entity",
+  "name": "Request",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "requester", "type": "text", "maxLength": 100 },
+    { "name": "status", "type": "enum", "required": true, "values": ["draft", "submitted", "approved"] }
+  ]
+}

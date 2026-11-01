@@ -132,7 +132,7 @@ public static class RecordCommands
     /// reads the stored record first, and is <see cref="RecordWriteOutcome.LifecycleRefused"/> unless a
     /// transition from the stored state to the new one has a guard that is <c>true</c>, or has none.
     /// </summary>
-    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
+    /// <param name="context">Who answers for the write and the task decision that led to it. A contract guard reads it through <c>accountableUser()</c> and <c>decisionTask()</c>.</param>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
@@ -156,7 +156,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
 
-        if (await RecordLifecycle.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, cipher, cancellationToken) is { } lifecycleRefusal)
+        if (await RecordLifecycle.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, context, cipher, cancellationToken) is { } lifecycleRefusal)
         {
             return lifecycleRefusal;
         }

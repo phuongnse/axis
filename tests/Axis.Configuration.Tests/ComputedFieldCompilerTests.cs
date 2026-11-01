@@ -23,8 +23,8 @@ public sealed class ComputedFieldCompilerTests
         { """{ "name": "today", "type": "date", "expression": "today()" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'today' is not allowed in a computed field, because a stored value cannot depend on the current time at character 1." },
         { """{ "name": "day", "type": "date", "expression": "toDate(dateTime('2026-10-08T09:30:00Z'))" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'toDate' is not allowed in a computed field, because a stored value cannot depend on the application's time zone at character 1." },
         // A stored value is not the set of a step either.
-        { """{ "name": "decider", "type": "text", "expression": "accountableUser()" }""", ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "/fields/4/expression", "Function 'accountableUser' is allowed only in the set of an updateRecord or createRecord step at character 1." },
-        { """{ "name": "task", "type": "text", "expression": "decisionTask()" }""", ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "/fields/4/expression", "Function 'decisionTask' is allowed only in the set of an updateRecord or createRecord step at character 1." },
+        { """{ "name": "decider", "type": "text", "expression": "accountableUser()" }""", ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "/fields/4/expression", "Function 'accountableUser' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step at character 1." },
+        { """{ "name": "task", "type": "text", "expression": "decisionTask()" }""", ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "/fields/4/expression", "Function 'decisionTask' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step at character 1." },
     };
 
     [Theory]

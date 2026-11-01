@@ -1,0 +1,13 @@
+{
+  "id": "ba6b78a3-fc93-42f8-afad-a6705c29508e",
+  "kind": "form",
+  "name": "RequestForm",
+  "formatVersion": 1,
+  "entity": "signoffs/Request",
+  "sections": [
+    {
+      "title": { "textKey": "request.main" },
+      "fields": [{ "field": "title" }]
+    }
+  ]
+}
