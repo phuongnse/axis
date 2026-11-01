@@ -95,8 +95,8 @@ seen this one.
    so the branch history lists the review's changes in order. Push the branch.
 8. Show the owner the card and ask for a verdict. Keep, change or drop the
    change as they say. Write down each rule they agree, in English as all
-   committed text is, in
-   `design-review.md` for the docs change at the end, then commit and push it.
+   committed text is, in `design-review.md` for the docs change at the end,
+   then commit and push it.
 
 ### Checking a card
 
