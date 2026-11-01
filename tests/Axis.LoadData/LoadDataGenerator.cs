@@ -126,6 +126,7 @@ public static class LoadDataGenerator
                 {
                     validations.Add(new
                     {
+                        name = $"check{j}",
                         expression = $"Rule{(ValidationsPerEntity * i) + j:D3}(quantity)",
                         message = Label($"entity{i:D2}.check{j}"),
                         field = "quantity",

@@ -60,7 +60,7 @@ public sealed class ComputedFieldCompilerTests
     public void Validation_reads_a_computed_field()
     {
         using var folder = Folder(["""{ "name": "total", "type": "decimal", "expression": "quantity * price" }"""],
-            validations: """[{ "expression": "total is null or total > 0", "message": { "textKey": "order.totalPositive" }, "field": "total" }]""")
+            validations: """[{ "name": "check1", "expression": "total is null or total > 0", "message": { "textKey": "order.totalPositive" }, "field": "total" }]""")
             .With("texts/en.json", """
                 { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
                   "texts": { "order.totalPositive": "The total must be greater than zero." } }

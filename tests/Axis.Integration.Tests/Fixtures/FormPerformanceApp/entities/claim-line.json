@@ -29,6 +29,7 @@
   ],
   "validations": [
     {
+      "name": "quantityPositive",
       "expression": "quantity is null or quantity > 0",
       "message": {
         "textKey": "claimLine.quantityPositive"

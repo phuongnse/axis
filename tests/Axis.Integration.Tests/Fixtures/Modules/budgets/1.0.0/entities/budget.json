@@ -9,6 +9,6 @@
     { "name": "department", "type": "reference", "target": "departments/Department" }
   ],
   "validations": [
-    { "expression": "departments:IsCode(code)", "message": { "textKey": "budgets.budget.shortCode" }, "field": "code" }
+    { "name": "shortCode", "expression": "departments:IsCode(code)", "message": { "textKey": "budgets.budget.shortCode" }, "field": "code" }
   ]
 }

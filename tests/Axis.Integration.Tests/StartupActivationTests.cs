@@ -477,7 +477,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         await ScalarAsync(a, $"INSERT INTO {EntityNaming.QualifiedTable(table)} (id, f_title) SELECT gen_random_uuid(), 'n' || n FROM generate_series(1, 25) n");
         folder.With("entities/note.json", $$"""
             { "id": "{{_noteId}}", "kind": "entity", "name": "Note", "formatVersion": 1,
-              "indexes": [{ "fields": ["title"] }], "fields": [{{TitleField}}] }
+              "indexes": [{ "name": "title", "fields": ["title"] }], "fields": [{{TitleField}}] }
             """);
         var logs = new LogCollector();
 

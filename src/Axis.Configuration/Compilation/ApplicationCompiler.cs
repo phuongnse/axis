@@ -1209,10 +1209,19 @@ public static partial class ApplicationCompiler
     private static void CheckIndexes(EntityResource entity, Action<string, string, string> report)
     {
         var firstIndexByFields = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Indexes.Count; index++)
         {
             var declared = entity.Indexes[index];
             var path = $"/indexes/{index}";
+
+            if (!firstIndexByName.TryAdd(declared.Name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateEntityElementName,
+                    $"The index name '{declared.Name}' is already used by the index at '/indexes/{firstIndexByName[declared.Name]}'.",
+                    $"{path}/name");
+            }
 
             for (var position = 0; position < declared.Fields.Count; position++)
             {
@@ -1338,10 +1347,19 @@ public static partial class ApplicationCompiler
 
         var scope = ExpressionScopes.ForEntity(
             entity.Fields, rules: rules, findEntity: findEntity, modules: modules, undeclaredModuleIsUnknown: IsModuleResource(entity));
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Validations.Count; index++)
         {
             var validation = entity.Validations[index];
             var path = $"/validations/{index}";
+
+            if (!firstIndexByName.TryAdd(validation.Name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateEntityElementName,
+                    $"The validation name '{validation.Name}' is already used by the validation at '/validations/{firstIndexByName[validation.Name]}'.",
+                    $"{path}/name");
+            }
 
             CheckTextKey(validation.Message, entity, $"{path}/message", references, diagnostics);
 

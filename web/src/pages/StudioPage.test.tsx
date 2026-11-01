@@ -701,7 +701,14 @@ describe('StudioPage', () => {
     const fetchMock = stubServer(undefined, undefined, undefined, {
       content: {
         ...entityContent(),
-        validations: [{ expression: 'totalAmount > 0', message: { textKey: 'validation.total' }, field: 'title' }],
+        validations: [
+          {
+            name: 'totalPositive',
+            expression: 'totalAmount > 0',
+            message: { textKey: 'validation.total' },
+            field: 'title',
+          },
+        ],
       },
       check: (call) => {
         if (call === 1) {

@@ -11,6 +11,6 @@
     { "name": "lineCount", "type": "integer", "expression": "count(lines)" }
   ],
   "validations": [
-    { "expression": "count(lines) >= 1", "message": { "textKey": "order.needsLine" }, "field": "lines" }
+    { "name": "needsLine", "expression": "count(lines) >= 1", "message": { "textKey": "order.needsLine" }, "field": "lines" }
   ]
 }

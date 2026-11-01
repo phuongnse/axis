@@ -16,20 +16,21 @@ public sealed class ValidationCompilerTests
 
     public static TheoryData<string, string, string, string> InvalidValidations => new()
     {
-        { """{ "expression": "quantity > 'a'", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "character" },
-        { """{ "expression": "quantity > 0 and date('2026-13-45') is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "'2026-13-45' is not a valid date at character 18." },
-        { """{ "expression": "quantity + 1", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/validations/0/expression", "boolean" },
-        { """{ "expression": "quantity >", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.SyntaxError, "/validations/0/expression", "character" },
-        { """{ "expression": "lines is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "list<OrderLine>" },
-        { """{ "expression": "lines == null", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "list<OrderLine>" },
-        { """{ "expression": "count(quantity) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "child collection" },
-        { """{ "expression": "sum(lines) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.WrongArgumentCount, "/validations/0/expression", "'sum'" },
-        { """{ "expression": "all(lines, quantity > 0)", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "'quantity'" },
+        { """{ "name": "check1", "expression": "quantity > 'a'", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "character" },
+        { """{ "name": "check2", "expression": "quantity > 0 and date('2026-13-45') is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "'2026-13-45' is not a valid date at character 18." },
+        { """{ "name": "check3", "expression": "quantity + 1", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.ResultTypeMismatch, "/validations/0/expression", "boolean" },
+        { """{ "name": "check4", "expression": "quantity >", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.SyntaxError, "/validations/0/expression", "character" },
+        { """{ "name": "check5", "expression": "lines is null", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "list<OrderLine>" },
+        { """{ "name": "check6", "expression": "lines == null", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "list<OrderLine>" },
+        { """{ "name": "check7", "expression": "count(quantity) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "child collection" },
+        { """{ "name": "check8", "expression": "sum(lines) > 0", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.WrongArgumentCount, "/validations/0/expression", "'sum'" },
+        { """{ "name": "check9", "expression": "all(lines, quantity > 0)", "message": { "textKey": "order.quantityPositive" }, "field": "lines" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "'quantity'" },
         // Only data source filters and process conditions follow paths.
-        { """{ "expression": "customer.name == 'x'", "message": { "textKey": "order.quantityPositive" }, "field": "customer" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "Unknown field 'name' after '.'" },
-        { """{ "expression": "receipt == null", "message": { "textKey": "order.quantityPositive" }, "field": "receipt" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "A file allows only 'is null' and 'is not null'" },
-        { """{ "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "nope" }""", DiagnosticCodes.UnknownValidationField, "/validations/0/field", "'nope'" },
-        { """{ "expression": "quantity > 0", "message": { "textKey": "order.missing" }, "field": "quantity" }""", DiagnosticCodes.MissingTextKey, "/validations/0/message/textKey", "'order.missing'" },
+        { """{ "name": "check10", "expression": "customer.name == 'x'", "message": { "textKey": "order.quantityPositive" }, "field": "customer" }""", ExpressionDiagnosticCodes.UnknownName, "/validations/0/expression", "Unknown field 'name' after '.'" },
+        { """{ "name": "check11", "expression": "receipt == null", "message": { "textKey": "order.quantityPositive" }, "field": "receipt" }""", ExpressionDiagnosticCodes.TypeMismatch, "/validations/0/expression", "A file allows only 'is null' and 'is not null'" },
+        { """{ "name": "check12", "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "nope" }""", DiagnosticCodes.UnknownValidationField, "/validations/0/field", "'nope'" },
+        { """{ "name": "check13", "expression": "quantity > 0", "message": { "textKey": "order.missing" }, "field": "quantity" }""", DiagnosticCodes.MissingTextKey, "/validations/0/message/textKey", "'order.missing'" },
+        { """{ "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }""", DiagnosticCodes.SchemaViolation, "/validations/0", "" },
     };
 
     [Theory]
@@ -48,13 +49,33 @@ public sealed class ValidationCompilerTests
     }
 
     [Fact]
+    public void Validation_names_that_differ_only_in_letter_case_are_reported_at_the_later_name()
+    {
+        using var folder = Folder("""
+            [
+              { "name": "positive", "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" },
+              { "name": "Positive", "expression": "quantity < 100", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }
+            ]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateEntityElementName, "entities/order.json", "/validations/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'/validations/0'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void Every_invalid_validation_is_reported_at_its_own_index()
     {
         using var folder = Folder("""
             [
-              { "expression": "quantity", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" },
-              { "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" },
-              { "expression": "status == 'lost'", "message": { "textKey": "order.quantityPositive" }, "field": "status" }
+              { "name": "check14", "expression": "quantity", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" },
+              { "name": "check15", "expression": "quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" },
+              { "name": "check16", "expression": "status == 'lost'", "message": { "textKey": "order.quantityPositive" }, "field": "status" }
             ]
             """);
 
@@ -75,7 +96,7 @@ public sealed class ValidationCompilerTests
         using var withoutValidations = Folder(null);
         // The field resolves ignoring letter case, and the model holds its declared name.
         using var withValidations = Folder("""
-            [{ "expression": "quantity is null or quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "Quantity" }]
+            [{ "name": "check17", "expression": "quantity is null or quantity > 0", "message": { "textKey": "order.quantityPositive" }, "field": "Quantity" }]
             """);
 
         var before = ApplicationCompiler.Compile(withoutValidations.Path);
@@ -100,8 +121,8 @@ public sealed class ValidationCompilerTests
     {
         using var folder = Folder("""
             [
-              { "expression": "count(lines) >= 1", "message": { "textKey": "order.quantityPositive" }, "field": "lines" },
-              { "expression": "all(lines, amount > 0) and sum(lines, total) < 1000", "message": { "textKey": "order.quantityPositive" }, "field": "Lines" }
+              { "name": "check18", "expression": "count(lines) >= 1", "message": { "textKey": "order.quantityPositive" }, "field": "lines" },
+              { "name": "check19", "expression": "all(lines, amount > 0) and sum(lines, total) < 1000", "message": { "textKey": "order.quantityPositive" }, "field": "Lines" }
             ]
             """);
 
@@ -120,7 +141,7 @@ public sealed class ValidationCompilerTests
     public void Validation_can_test_a_file_field_for_null(string expression)
     {
         using var folder = Folder($$"""
-            [{ "expression": "{{expression}}", "message": { "textKey": "order.quantityPositive" }, "field": "receipt" }]
+            [{ "name": "check20", "expression": "{{expression}}", "message": { "textKey": "order.quantityPositive" }, "field": "receipt" }]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -134,7 +155,7 @@ public sealed class ValidationCompilerTests
     public void Validation_can_compare_a_field_with_the_current_time()
     {
         using var folder = Folder("""
-            [{ "expression": "dueAt is null or dueAt > now()", "message": { "textKey": "order.quantityPositive" }, "field": "dueAt" }]
+            [{ "name": "check21", "expression": "dueAt is null or dueAt > now()", "message": { "textKey": "order.quantityPositive" }, "field": "dueAt" }]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);

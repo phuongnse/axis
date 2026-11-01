@@ -51,8 +51,10 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     combination (`AXC0013`). A key that is already in the file stays, and its
     diagnostic opens at the field's row.
   - An Indexes list under the fields adds, moves and removes the entity's
-    `indexes`. Each index picks the entity's fields in order and has a Unique
-    checkbox. The picker offers only fields that have a column, so it leaves
+    `indexes`. Each index shows its name as read-only text, picks the entity's
+    fields in order and has a Unique checkbox. Add index writes the name
+    `index1`, `index2` and so on, the first one that no index of the entity has,
+    ignoring letter case. The picker offers only fields that have a column, so it leaves
     out `child-collection`, `references` and `file` fields (`AXC0276`). Each
     change writes the whole `indexes` array, and removing the last index
     removes the key.
@@ -68,8 +70,10 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     the key, they do not write `false`.
   - A computed field's `expression` and each validation's expression use the
     [expression editor](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md).
-    A validation also has a message key picker and a field picker, and can be
-    added and removed.
+    A validation also shows its name as read-only text, has a message key picker
+    and a field picker, and can be added and removed. Add validation writes the
+    name `validation1`, `validation2` and so on, the first one that no validation
+    of the entity has, ignoring letter case.
   - Fields can be added, removed and moved up or down. Each of these replaces
     the `fields` array.
   - Every input keeps its `studio-field-<pointer>` id, and each row has the id

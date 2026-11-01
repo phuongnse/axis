@@ -47,8 +47,9 @@
     "validation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["expression", "message", "field"],
+      "required": ["name", "expression", "message", "field"],
       "properties": {
+        "name": { "$ref": "#/$defs/name" },
         "expression": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "message": { "$ref": "#/$defs/textReference" },
         "field": { "type": "string" }
@@ -57,8 +58,9 @@
     "index": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fields"],
+      "required": ["name", "fields"],
       "properties": {
+        "name": { "$ref": "#/$defs/name" },
         "fields": {
           "type": "array",
           "minItems": 1,
