@@ -1,0 +1,7 @@
+{
+  "kind": "module",
+  "id": "stages",
+  "version": "1.0.0",
+  "label": "Stages",
+  "roles": [{ "name": "requester", "label": { "textKey": "stages.roles.requester" } }]
+}

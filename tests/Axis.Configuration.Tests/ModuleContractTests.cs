@@ -440,6 +440,71 @@ public sealed class ModuleContractTests
         Assert.Equal(ContractFile, diagnostic.File);
     }
 
+    [Fact]
+    public void A_core_validation_name_that_repeats_ignoring_letter_case_is_axc0328_at_the_name()
+    {
+        var diagnostic = Single(Contract(null, extra: Validations(
+            Validation("amountSmall", "amount < 100"),
+            Validation("AmountSmall", "amount < 1000"))));
+
+        AssertDiagnostic(DiagnosticCodes.DuplicateContractName, "/validations/1/name", diagnostic);
+        Assert.Contains("'AmountSmall'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_core_validation_field_the_entity_lacks_is_axc0052_at_the_field()
+    {
+        var diagnostic = Single(Contract(null, extra: Validations(Validation("amountSmall", "amount < 100", field: "Missing"))));
+
+        AssertDiagnostic(DiagnosticCodes.UnknownValidationField, "/validations/0/field", diagnostic);
+        Assert.Contains("'Missing'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_core_validation_message_key_without_the_module_prefix_is_axc0209_at_the_key()
+    {
+        var diagnostic = Single(Contract(null, extra: Validations(Validation("amountSmall", "amount < 100", textKey: "request.small"))));
+
+        AssertDiagnostic(DiagnosticCodes.ModuleTextKeyWithoutPrefix, "/validations/0/message/textKey", diagnostic);
+        Assert.Contains("approvals.", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
+    [InlineData("missing > 1", ExpressionDiagnosticCodes.UnknownName)]
+    public void A_core_validation_expression_that_is_not_boolean_gives_its_expression_code_at_the_expression(string expression, string code)
+    {
+        var diagnostic = Single(Contract(null, extra: Validations(Validation("amountSmall", expression))));
+
+        AssertDiagnostic(code, "/validations/0/expression", diagnostic);
+    }
+
+    [Fact]
+    public void A_core_validation_may_call_previous_accountableUser_and_decisionTask_and_the_model_holds_it()
+    {
+        using var modules = Modules(Contract(null, extra: Validations(
+            Validation("amountFrozen", "previous(status) == null or previous(status) == 'draft' or amount == previous(amount)"),
+            Validation("owner", "accountableUser() != null or decisionTask() != null or amount == previous(amount)", field: "title"))));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+        var rebuilt = ApplicationCompiler.Compile(compiled.Resources);
+
+        Assert.Empty(compiled.Diagnostics);
+        Assert.Empty(rebuilt.Diagnostics);
+        foreach (var model in new[] { compiled.Model!, rebuilt.Model! })
+        {
+            var contract = model.Entities.Single(entity => entity.Name == "approvals/Request").Contract!;
+            Assert.Equal(["amountFrozen", "owner"], contract.Validations.Select(validation => validation.Name));
+            var frozen = contract.Validations[0];
+            Assert.Equal("amount", frozen.Field);
+            Assert.Equal("approvals.request.small", frozen.Message.TextKey);
+            Assert.Equal("previous(status) == null or previous(status) == 'draft' or amount == previous(amount)", frozen.Expression.Expression);
+            Assert.Equal("title", contract.Validations[1].Field);
+            Assert.Null(contract.Lifecycle);
+        }
+    }
+
     private const string ScenarioFile = "modules/approvals/scenarios/Covers.json";
 
     private const string CoveredPointsExtra = """
@@ -646,6 +711,13 @@ public sealed class ModuleContractTests
 
     private static string Lifecycle(string states = DefaultStates, string transitions = DefaultTransitions, string field = "status") => $$"""
         { "field": "{{field}}", "states": {{states}}, "transitions": {{transitions}} }
+        """;
+
+    private static string Validations(params string[] validations) =>
+        $$""", "validations": [ {{string.Join(", ", validations)}} ]""";
+
+    private static string Validation(string name, string expression, string field = "amount", string textKey = "approvals.request.small") => $$"""
+        { "name": "{{name}}", "expression": "{{expression}}", "message": { "textKey": "{{textKey}}" }, "field": "{{field}}" }
         """;
 
     private static string Seed(string status) => $$"""

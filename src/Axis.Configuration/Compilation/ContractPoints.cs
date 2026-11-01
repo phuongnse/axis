@@ -35,12 +35,9 @@ internal static class ContractPoints
                 }
             }
 
-            if (contract.Validations is { ValueKind: JsonValueKind.Array } validations)
+            foreach (var validation in contract.Validations ?? [])
             {
-                foreach (var item in validations.EnumerateArray())
-                {
-                    points.Add($"{entity}/validations/{item.GetProperty("name").GetString()}");
-                }
+                points.Add($"{entity}/validations/{validation.Name}");
             }
 
             foreach (var effect in contract.Effects ?? [])

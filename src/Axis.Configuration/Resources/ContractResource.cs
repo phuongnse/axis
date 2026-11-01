@@ -1,12 +1,9 @@
-using System.Text.Json;
-
 namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// A <c>contract</c> resource: what a module guarantees about one of its entities. Only a module holds
-/// one. The schema checks its shape. Its entity, its lifecycle, its effects and its ceiling are checked by
-/// <see cref="Compilation.ContractChecker"/>. The validations pass the schema and are kept as written,
-/// until the checks that build them exist.
+/// one. The schema checks its shape. Its entity, its lifecycle, its core validations, its effects and its
+/// ceiling are checked by <see cref="Compilation.ContractChecker"/>.
 /// </summary>
 public sealed record ContractResource : Resource
 {
@@ -17,7 +14,7 @@ public sealed record ContractResource : Resource
     public ContractLifecycleDefinition? Lifecycle { get; init; }
 
     /// <summary>The core validations as written, or null when the contract has none.</summary>
-    public JsonElement? Validations { get; init; }
+    public IReadOnlyList<ContractValidationDefinition>? Validations { get; init; }
 
     /// <summary>The effects of transitions in declaration order, or null when the contract has none.</summary>
     public IReadOnlyList<ContractEffectDefinition>? Effects { get; init; }
@@ -46,6 +43,22 @@ public sealed record ContractEffectCreateDefinition
 
     /// <summary>The expression that gives the value of each field, by field name.</summary>
     public IReadOnlyDictionary<string, string> Values { get; init; } = new Dictionary<string, string>();
+}
+
+/// <summary>A core validation of a contract as written: a boolean rule on the entity that runs on every write.</summary>
+public sealed record ContractValidationDefinition
+{
+    /// <summary>The validation's name, unique in the contract ignoring letter case.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>A boolean expression that must be true for the write.</summary>
+    public required string Expression { get; init; }
+
+    /// <summary>The text shown when the expression is not true. Its key starts with the module id.</summary>
+    public required TextReference Message { get; init; }
+
+    /// <summary>The name of the field the failure is reported at.</summary>
+    public required string Field { get; init; }
 }
 
 /// <summary>The grant ceiling of a contract as written: the widest grants each role slot may get on the entity.</summary>

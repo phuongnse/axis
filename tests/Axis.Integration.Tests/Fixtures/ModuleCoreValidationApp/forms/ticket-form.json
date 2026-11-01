@@ -1,0 +1,13 @@
+{
+  "id": "1b7d3f95-6e28-4a40-b9c1-5f8a2d4e6b14",
+  "kind": "form",
+  "name": "TicketForm",
+  "formatVersion": 1,
+  "entity": "stages/Ticket",
+  "sections": [
+    {
+      "title": { "textKey": "ticket.main" },
+      "fields": [{ "field": "title" }]
+    }
+  ]
+}

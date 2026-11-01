@@ -2902,6 +2902,11 @@ public static partial class ApplicationCompiler
                         Message = transition.Message,
                     })],
                 },
+            Validations = [.. (contract.Validations ?? []).Select(validation => new CoreValidationModel(
+                validation.Name,
+                ExpressionModel.Compile(validation.Expression, scope, ExpressionType.Boolean, contract: true),
+                validation.Message,
+                FindField(entity, validation.Field)!.Name))],
             Effects = [.. (contract.Effects ?? []).Select(BuildEffect)],
             Ceiling = contract.Ceiling is { } ceiling ? BuildCeiling(ceiling) : null,
         };

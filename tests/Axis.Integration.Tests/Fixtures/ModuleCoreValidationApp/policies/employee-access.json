@@ -1,0 +1,8 @@
+{
+  "id": "9e4a6c18-0b53-4d72-8f1e-3a5c7b9d1e15",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [{ "process": "AdvanceTwice", "actions": ["start", "inspect", "retry"] }]
+}
