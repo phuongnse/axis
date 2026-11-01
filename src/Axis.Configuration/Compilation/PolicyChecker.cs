@@ -479,7 +479,7 @@ internal static class PolicyChecker
     private static string? ModuleIdOf(PolicyResource policy) =>
         ApplicationCompiler.IsModuleResource(policy) ? policy.Name[..policy.Name.IndexOf('/', StringComparison.Ordinal)] : null;
 
-    private static PolicyAction ParseAction(string action) =>
+    internal static PolicyAction ParseAction(string action) =>
         action switch
         {
             "read" => PolicyAction.Read,

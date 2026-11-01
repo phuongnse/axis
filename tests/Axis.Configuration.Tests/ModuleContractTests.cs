@@ -307,6 +307,82 @@ public sealed class ModuleContractTests
         Assert.Equal(ContractFile, diagnostic.File);
     }
 
+    [Fact]
+    public void A_ceiling_slot_that_is_no_role_slot_of_the_module_is_axc0332_at_its_key_and_lists_the_slots()
+    {
+        var diagnostic = Single(Contract(null, extra: """, "ceiling": { "slots": { "x/y": [{ "actions": ["read"] }], "requester": [{ "actions": ["read"] }] } }"""));
+
+        AssertDiagnostic(DiagnosticCodes.UnknownCeilingSlot, "/ceiling/slots/x~1y", diagnostic);
+        Assert.Contains("'approver', 'requester'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_ceiling_field_that_the_entity_lacks_is_axc0333_at_the_field_in_a_slot_and_in_others()
+    {
+        var diagnostics = Compile(Contract(null, extra: """
+            , "ceiling": { "slots": { "requester": [{ "actions": ["read"] }, { "actions": ["read"], "fields": ["title", "Missing"] }] },
+                           "others": [{ "actions": ["read"], "fields": ["gone"] }] }
+            """));
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.UnknownCeilingField, "/ceiling/others/0/fields/0"),
+                (DiagnosticCodes.UnknownCeilingField, "/ceiling/slots/requester/1/fields/1"),
+            ],
+            diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+    }
+
+    [Fact]
+    public void A_ceiling_field_matches_a_field_of_the_entity_ignoring_letter_case()
+    {
+        using var modules = Modules(Contract(null, extra: """, "ceiling": { "others": [{ "actions": ["read"], "fields": ["TITLE"] }] }"""));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var others = compiled.Model!.Entities.Single(entity => entity.Name == "approvals/Request").Contract!.Ceiling!.Others!;
+        Assert.Equal(["title"], Assert.Single(others).Fields);
+    }
+
+    [Theory]
+    [InlineData("amount", ExpressionDiagnosticCodes.ResultTypeMismatch)]
+    [InlineData("missing > 1", ExpressionDiagnosticCodes.UnknownName)]
+    public void A_ceiling_filter_that_is_not_a_valid_policy_filter_gives_its_expression_code_at_the_filter(string filter, string code)
+    {
+        var diagnostic = Single(Contract(null, extra: $$"""
+            , "ceiling": { "slots": { "approver": [{ "actions": ["read"], "filter": "{{filter}}" }] } }
+            """));
+
+        AssertDiagnostic(code, "/ceiling/slots/approver/0/filter", diagnostic);
+    }
+
+    [Fact]
+    public void A_ceiling_filter_that_is_a_valid_policy_filter_is_compiled_into_the_entry()
+    {
+        using var modules = Modules(Contract(null, extra: """
+            , "ceiling": { "slots": { "requester": [{ "actions": ["read"], "filter": "amount > 100" }] } }
+            """));
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var ceiling = compiled.Model!.Entities.Single(entity => entity.Name == "approvals/Request").Contract!.Ceiling!;
+        var entry = Assert.Single(ceiling.Roles["clerk"]);
+        Assert.Equal("amount > 100", entry.Filter!.Expression);
+        Assert.Equal([PolicyAction.Read], entry.Actions);
+    }
+
+    [Fact]
+    public void A_ceiling_action_that_is_not_an_entity_action_is_a_schema_violation()
+    {
+        var diagnostic = Single(Contract(null, extra: """, "ceiling": { "others": [{ "actions": ["start"] }] }"""));
+
+        Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code);
+        Assert.Equal(ContractFile, diagnostic.File);
+    }
+
     private static void AssertDiagnostic(string code, string path, Diagnostic diagnostic)
     {
         Assert.Equal(
@@ -363,7 +439,8 @@ public sealed class ModuleContractTests
     private static TemporaryFolder Modules() =>
         new TemporaryFolder()
             .With("approvals/1.0.0/module.json", """
-                { "kind": "module", "id": "approvals", "version": "1.0.0", "label": "Approvals" }
+                { "kind": "module", "id": "approvals", "version": "1.0.0", "label": "Approvals",
+                  "roles": [ { "name": "requester", "label": { "textKey": "approvals.slot" } }, { "name": "approver", "label": { "textKey": "approvals.slot" } } ] }
                 """)
             .With("approvals/1.0.0/Request.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21", "kind": "entity", "name": "Request", "formatVersion": 1,
@@ -386,17 +463,23 @@ public sealed class ModuleContractTests
                 """)
             .With("approvals/1.0.0/TextsEn.json", """
                 { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "approvals.request.small": "Only small requests can be submitted." } }
+                  "texts": { "approvals.request.small": "Only small requests can be submitted.", "approvals.slot": "Slot" } }
                 """);
 
     private static TemporaryFolder Application() =>
         new TemporaryFolder()
             .With("application.json", $$"""
                 { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1,
-                  "modules": [{ "id": "approvals", "version": "1.0.0" }] }
+                  "modules": [{ "id": "approvals", "version": "1.0.0", "roles": { "requester": "clerk", "approver": "lead" } }] }
                 """)
             .With("texts/en.json", """
                 { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "sample.title": "Sample" } }
+                  "texts": { "sample.title": "Sample", "role.clerk": "Clerk", "role.lead": "Lead" } }
+                """)
+            .With("roles/clerk.json", """
+                { "id": "44444444-4444-4444-8444-444444444411", "kind": "role", "name": "clerk", "formatVersion": 1, "label": { "textKey": "role.clerk" } }
+                """)
+            .With("roles/lead.json", """
+                { "id": "44444444-4444-4444-8444-444444444412", "kind": "role", "name": "lead", "formatVersion": 1, "label": { "textKey": "role.lead" } }
                 """);
 }
