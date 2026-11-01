@@ -6,7 +6,7 @@ The owner agreed these points on 2026-10-29. Today Axis encrypts only secrets. A
 `sensitive` is stored in clear, a tenant backup can be read by whoever holds the file, and
 append-only history keeps display names and full client addresses forever. Disk encryption only
 helps against a stolen disk: anyone with a database login, a dump or a replica reads everything.
-Everything here is _(planned for M27)_, see the [roadmap](../roadmap.md#milestones).
+It is built in M27, see the [roadmap](../roadmap.md#milestones), except for what is carried over to M24: the trigger and starter reads of sensitive records, the inline recompute and the backfill of computed fields over them, the search that reads the keys again after a rotation, a caller's filter on an exact lookup field and a restore under a new tenant id.
 
 - **`sensitive` means encrypted at rest.** This changes what
   [sensitive fields](../reference/roles-and-policies.md#sensitive-fields) do.

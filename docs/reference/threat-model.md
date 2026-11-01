@@ -570,6 +570,7 @@ flowchart LR
 | P72 | Notifications are kept longer than needed. | Personal data | Non-compliance | Medium | **Mitigated** | `NotificationRetentionTests` (notifications over the retention days are deleted with their reads, and newer ones stay). |
 | P73 | Logs, telemetry and backup archives are kept longer than needed. | Personal data | Non-compliance | Medium | **Delegated** | The operator keeps and removes them, see [log inventory](log-inventory.md#logs) and [Restricted](keys-and-data-protection.md#restricted). |
 | P101 | Session audit records keep the full client address forever. | Personal data | Identifying | Medium | **Mitigated** | `ClientAddressTests` (IPv4 loses its last octet and IPv6 its last 80 bits) and `SignInTests` (sign-in, sign-out and refused sign-in records hold the shortened address). |
+| P108 | A database login, a dump or a replica reads a sensitive field's value. | Personal data | Data disclosure | High | **Mitigated** | `RecordSensitiveValueTests` (the record API stores a sensitive value as ciphertext) and `LeaveRequestReasonStorageTests` (no runtime-readable column holds a submitted reason, and a backup keeps it as ciphertext). |
 
 Non-repudiation does not apply as a privacy threat. The audit records exist so that a person cannot deny
 a business action, see P3, P12 and P20. What they keep about a person is in the list below.
@@ -578,9 +579,6 @@ Open, waiting for an issue:
 
 - (Identifying, Medium) audit records written before M27 keep the actor's display name, `actor_name`, forever.
   New rows store no name, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
-- (Data disclosure, High) a database login, a dump or a replica reads personal data and `sensitive` fields
-  in clear, _(planned for M27)_, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
-  Until then the operator's control is I15.
 - (Non-compliance, Medium) `axis.email_outbox` rows keep the address and the body forever.
 - (Non-compliance, Medium) `axis.user_profiles` rows and old audit records cannot be removed for a person's
   removal request.
