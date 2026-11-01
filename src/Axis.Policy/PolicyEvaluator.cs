@@ -10,7 +10,8 @@ namespace Axis.Policy;
 /// <see cref="GrantModel.Filter"/> grants the records that match it, and one with
 /// <see cref="GrantModel.Fields"/> grants those fields, through <see cref="Access"/> and
 /// <see cref="Fields"/>. The caller applies them: the record API and the data source endpoint
-/// both add the filters to their SQL and check the fields.
+/// both add the filters to their SQL and check the fields. On an entity with a grant ceiling, the
+/// filters of a role's ceiling entries narrow each grant of that role, see <see cref="Access"/>.
 /// </summary>
 public static class PolicyEvaluator
 {
@@ -19,6 +20,12 @@ public static class PolicyEvaluator
     /// <paramref name="entity"/>. The access is granted when any grant for the action exists,
     /// whatever its <see cref="GrantModel.Fields"/>. It reaches every record when one of them has
     /// no filter, and otherwise the records that match any of their filters.
+    /// <para>
+    /// On an entity with a grant ceiling, each role of a policy that the user holds gives the grant
+    /// its own filter: the grant's filter joined with <c>and</c> to the <c>or</c> of the filters of
+    /// the role's ceiling entries that list the action. An entry without a filter adds no
+    /// condition, and a role whose entries do not list the action gives nothing.
+    /// </para>
     /// </summary>
     public static RecordAccess Access(ApplicationModel application, IEnumerable<string> roles, EntityModel entity, PolicyAction action)
     {
@@ -26,8 +33,10 @@ public static class PolicyEvaluator
         ArgumentNullException.ThrowIfNull(roles);
         ArgumentNullException.ThrowIfNull(entity);
 
+        var held = HeldRoles(application, roles);
+        var ceiling = entity.Contract?.Ceiling;
         var filters = new List<RecordFilter>();
-        foreach (var policy in Policies(application, roles))
+        foreach (var policy in Policies(application, held))
         {
             for (var index = 0; index < policy.Grants.Count; index++)
             {
@@ -37,16 +46,63 @@ public static class PolicyEvaluator
                     continue;
                 }
 
-                if (grant.Filter is null)
+                if (ceiling is null)
                 {
-                    return new RecordAccess(true, null);
+                    if (grant.Filter is null)
+                    {
+                        return new RecordAccess(true, null);
+                    }
+
+                    filters.Add(new RecordFilter(policy.Name, index, grant.Filter));
+                    continue;
                 }
 
-                filters.Add(new RecordFilter(policy.Name, index, grant.Filter));
+                // The grant counts once for each role the user holds, each with its own ceiling.
+                foreach (var role in policy.Roles.Where(held.Contains))
+                {
+                    if (!CeilingFilter(ceiling, role, action, out var ceilingFilter))
+                    {
+                        continue;
+                    }
+
+                    var effective = grant.Filter is { } grantFilter && ceilingFilter is { } limit
+                        ? ExpressionModel.And(grantFilter, limit)
+                        : grant.Filter ?? ceilingFilter;
+                    if (effective is null)
+                    {
+                        return new RecordAccess(true, null);
+                    }
+
+                    filters.Add(new RecordFilter(policy.Name, index, effective));
+                }
             }
         }
 
         return new RecordAccess(filters.Count > 0, filters);
+    }
+
+    /// <summary>
+    /// Whether the ceiling lets <paramref name="role"/> do <paramref name="action"/>, and the filter
+    /// it adds. A role without a key in the ceiling uses its <c>others</c> entries. The filter is
+    /// null when an entry that lists the action has none, and otherwise the <c>or</c> of the filters
+    /// of the entries that list it.
+    /// </summary>
+    private static bool CeilingFilter(CeilingModel ceiling, string role, PolicyAction action, out ExpressionModel? filter)
+    {
+        filter = null;
+        var entries = ceiling.Roles.TryGetValue(role, out var own) ? own : ceiling.Others ?? [];
+        var listing = entries.Where(entry => entry.Actions.Contains(action)).ToList();
+        if (listing.Count == 0)
+        {
+            return false;
+        }
+
+        if (listing.All(entry => entry.Filter is not null))
+        {
+            filter = ExpressionModel.Or([.. listing.Select(entry => entry.Filter!)]);
+        }
+
+        return true;
     }
 
     /// <summary>

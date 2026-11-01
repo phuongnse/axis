@@ -2,6 +2,8 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
+using Axis.Expressions.Syntax;
+using Axis.Policy;
 
 namespace Axis.Configuration.Tests;
 
@@ -55,6 +57,44 @@ public sealed class GrantCeilingTests
             Assert.Equal([PolicyAction.Read], others.Actions);
             Assert.Equal(["title"], others.Fields);
         }
+    }
+
+    [Fact]
+    public void An_unfiltered_grant_gets_no_filter_from_an_unfiltered_entry_and_the_filter_of_the_entry_that_has_one()
+    {
+        using var modules = Shop(Ceiling);
+        using var folder = Application(Policy(
+            "lead",
+            """{ "entity": "shop/Order", "actions": ["read"] }""",
+            """{ "entity": "shop/Order", "actions": ["update"], "fields": ["note"] }"""));
+        var model = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules).Model!;
+        var order = Assert.Single(model.Entities, entity => entity.Name == "shop/Order");
+
+        var read = PolicyEvaluator.Access(model, ["lead"], order, PolicyAction.Read);
+        var update = PolicyEvaluator.Access(model, ["lead"], order, PolicyAction.Update);
+
+        Assert.True(read.Granted);
+        Assert.Null(read.Filters);
+        Assert.True(update.Granted);
+        var filter = Assert.Single(update.Filters!);
+        Assert.Equal("amount > 10", filter.Expression.Expression);
+    }
+
+    [Fact]
+    public void A_grant_filter_is_joined_with_and_to_the_ceiling_filter()
+    {
+        using var modules = Shop(Ceiling);
+        using var folder = Application(Policy(
+            "lead",
+            """{ "entity": "shop/Order", "actions": ["update"], "fields": ["note"], "filter": "amount < 100" }"""));
+        var model = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules).Model!;
+        var order = Assert.Single(model.Entities, entity => entity.Name == "shop/Order");
+
+        var update = PolicyEvaluator.Access(model, ["lead"], order, PolicyAction.Update);
+
+        var filter = Assert.Single(update.Filters!);
+        Assert.Equal("(amount < 100) and (amount > 10)", filter.Expression.Expression);
+        Assert.Equal(BinaryOperator.And, Assert.IsType<BinaryNode>(filter.Expression.Syntax).Operator);
     }
 
     [Fact]

@@ -196,7 +196,9 @@ outcomes. Operators inspect the approvals and change nothing:
   so a [customization layer](customization-layers.md#list-keys) can change it.
 - **Ceiling.** A grant on a module entity that has a contract stays within
   the role's ceiling: an action or field past it is a diagnostic (`AXC0334`).
-  The ceiling's filter joining the grant's with `and` is _(planned for M24)_.
+  At run time the filters of the role's ceiling entries that list the action
+  join the grant's filter with `and`, so a grant never reaches a record past
+  the ceiling.
   See [grant ceiling](module-contracts.md#grant-ceiling).
 
 The `cancel` action of a `process` grant lets a user cancel that process's

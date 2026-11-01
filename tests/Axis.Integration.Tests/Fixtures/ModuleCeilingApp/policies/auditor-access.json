@@ -1,0 +1,11 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3d06",
+  "kind": "policy",
+  "name": "AuditorAccess",
+  "formatVersion": 1,
+  "roles": ["auditor"],
+  "grants": [
+    { "entity": "claims/Claim", "actions": ["read", "export"] },
+    { "dataSource": "claims/Claims", "actions": ["read", "export"] }
+  ]
+}
