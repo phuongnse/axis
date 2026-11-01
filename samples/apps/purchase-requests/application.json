@@ -8,6 +8,6 @@
   "packages": [{ "id": "payment-references", "version": "^1.0.0" }],
   "modules": [
     { "id": "departments", "version": "^1.1.0", "roles": { "manager": "department-manager" } },
-    { "id": "department-budgets", "version": "^1.0.0", "roles": { "approver": "department-manager" } }
+    { "id": "department-budgets", "version": "^1.1.0", "roles": { "approver": "department-manager" } }
   ]
 }

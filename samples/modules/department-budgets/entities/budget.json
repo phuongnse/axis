@@ -10,6 +10,7 @@
     { "name": "department", "type": "reference", "target": "departments/Department", "required": true, "label": { "textKey": "department-budgets.budget.department" } },
     { "name": "year", "type": "integer", "required": true, "label": { "textKey": "department-budgets.budget.year" } },
     { "name": "amount", "type": "decimal", "precision": 18, "scale": 2, "required": true, "label": { "textKey": "department-budgets.budget.amount" } },
-    { "name": "status", "type": "enum", "values": ["draft", "approved", "rejected"], "label": { "textKey": "department-budgets.budget.status" } }
+    { "name": "status", "type": "enum", "values": ["draft", "approved", "rejected"], "required": true, "default": "'draft'", "label": { "textKey": "department-budgets.budget.status" } },
+    { "name": "requester", "type": "text", "maxLength": 100, "creator": true, "label": { "textKey": "department-budgets.budget.requester" } }
   ]
 }

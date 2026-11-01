@@ -216,6 +216,8 @@ system stub at http://localhost:5207. Mailpit is a local mail server that keeps 
 emails that the worker sends. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
 Docker. The images hold the `departments` and `department-budgets` sample modules in `/modules`.
+An existing local Compose volume that already ran `department-budgets` 1.0.0 needs `docker compose down -v` once to
+activate 1.1.0, for example when old budgets have no status. That deletes its data.
 Compose also starts one publisher, `axis-admin publisher`, which runs the
 publish requests of Studio. See [D47](decisions/d47-publishing-from-studio.md).
 It serves the tenants `default` and `default-preview`, so it runs preview requests too. It has no port and no health check, and writes `default ready` and `default-preview ready` once the server has migrated each tenant database.
@@ -305,8 +307,8 @@ inspector page. The leave request sample, `samples/apps/leave-requests`, reuses 
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
 at `/service-desk`. The asset management sample, `samples/apps/asset-management`, adds the `asset-manager` and `auditor` users
 and uses the `employee` user as the holder of assets, in a site at `/asset-management`.
-The department budgets journey, `tests/e2e/specs/department-budgets-journey.spec.ts`, signs in as `manager` to approve a budget
-and as `employee` to be refused.
+The department budgets journey, `tests/e2e/specs/department-budgets-journey.spec.ts`, signs in as `manager` to create and submit a budget,
+as `manager-2` to approve it and as `employee` to be refused.
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
 adds the `approver` user. The `administrator` user holds the `tenant-administrator` role, so it sees "Users" in the shell, and the E2E shell journey uses it. The `platform-operator` user holds the `platform-operator` role, so it sees the [operator console](reference/operator-console.md) in the shell, and the E2E operator console journey uses it. The [users page](reference/user-administration.md) it links to lists the development users, and the E2E users page journey uses it. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.

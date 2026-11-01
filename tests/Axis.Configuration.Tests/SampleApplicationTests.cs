@@ -13,7 +13,7 @@ public sealed class SampleApplicationTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["departments/Department", "department-budgets/Budget", "Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
+        Assert.Equal(["departments/Department", "department-budgets/BudgetDecision", "department-budgets/Budget", "Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
         Assert.Equal(3, result.Model.Seeds.Count);
         Assert.Equal("purchasing", Assert.Single(result.Model.Sites).Path);
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
@@ -150,11 +150,20 @@ public sealed class SampleApplicationTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["department-budgets 1.0.0", "departments 1.1.0"], result.Model.Modules.Select(module => $"{module.Id} {module.Version}").Order());
+        Assert.Equal(["department-budgets 1.1.0", "departments 1.1.0"], result.Model.Modules.Select(module => $"{module.Id} {module.Version}").Order());
         var policy = Assert.Single(result.Model.Policies, policy => policy.Name == "department-budgets/ApproverAccess");
         Assert.Equal(["department-manager"], policy.Roles);
         var process = Assert.Single(result.Model.Processes, process => process.Name == "department-budgets/BudgetApproval");
         var review = Assert.IsType<TaskStepModel>(Assert.Single(process.Steps, step => step.Name == "review"));
         Assert.Equal("department-manager", review.Assignee.Role);
+
+        var budget = Assert.Single(result.Model.Entities, entity => entity.Name == "department-budgets/Budget");
+        var contract = Assert.IsType<ContractModel>(budget.Contract);
+        Assert.Contains("department-manager", contract.Ceiling!.Roles.Keys);
+        Assert.Equal(["approve", "reject"], contract.Lifecycle!.Transitions.Select(transition => transition.Name));
+        Assert.All(contract.Lifecycle.Transitions, transition => Assert.NotNull(transition.Guard));
+        Assert.Equal("amountFrozenOnceDecided", Assert.Single(contract.Validations).Name);
+        var effect = Assert.Single(contract.Effects);
+        Assert.Equal(("decisionRecorded", "approve", "department-budgets/BudgetDecision"), (effect.Name, effect.On, effect.Entity.Name));
     }
 }

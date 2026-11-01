@@ -6,8 +6,9 @@ import { appPath } from '../purchase-requests'
 import { useSession } from '../sessions'
 
 // The purchase request sample declares the department-budgets module and maps its approver slot to
-// department-manager. A manager creates a budget on the module's Budgets page, submits it and decides its task. An
-// employee, who does not hold the role, is refused.
+// department-manager. A manager creates a budget on the module's Budgets page and submits it. The budget contract
+// refuses a decision by its creator, so a second manager decides the task. An employee, who does not hold the
+// role, is refused.
 const budgetsPath = '/purchasing/department-budgets/budgets'
 const tasksPath = `${appPath}/tasks?pageSize=100`
 
@@ -16,7 +17,7 @@ interface TaskItem {
   subject: { id: string }
 }
 
-test('a manager creates, submits and approves a budget of the module and an employee is refused', async ({ page }) => {
+test('a manager creates and submits a budget of the module, a second manager approves it and an employee is refused', async ({ page }) => {
   const name = `Budget ${Date.now()}-${test.info().retry}`
 
   await useSession(page, 'manager')
@@ -43,6 +44,8 @@ test('a manager creates, submits and approves a budget of the module and an empl
   )
   await row.getByRole('button', { name: 'Submit for approval', exact: true }).click()
   expect((await started).status()).toBe(201)
+
+  await useSession(page, 'manager-2')
 
   // The worker creates the task some time after the start.
   const taskRow = page.getByRole('row', { name: new RegExp(name) })
