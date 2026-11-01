@@ -268,7 +268,9 @@ does. It is how a guard knows who decided.
   guard runs with a `null` accountable user.
 - **Order in a write.** Computed fields, the entity's validations, the core validations, then the
   lifecycle check, then storage, then the effects. The record API's grant checks come before, as
-  [the record API](record-api.md#errors) orders them.
+  [the record API](record-api.md#errors) orders them. In Axis SaaS, the tenant's quota check of
+  [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) comes before all
+  of them _(planned for M31)_, so a write refused for a quota checks no contract.
 
 ## When a write is refused
 
