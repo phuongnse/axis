@@ -203,7 +203,9 @@ nothing, until they do _(planned for M27)_.
 
 The leave request sample marks its `reason` `sensitive` and shows each request by a required `title`, its display
 field, because a sensitive field cannot be one. The department manager reads the reason on the review task, and another
-employee gets no record, task or task form state. Test: `tests/e2e/specs/leave-request.spec.ts`.
+employee gets no record, task or task form state. Test: `tests/e2e/specs/leave-request.spec.ts`. No text, `bytea` or JSON column that
+the tenant's runtime role reads holds a submitted reason, and the tenant's backup restores with its backup key, keeps the
+reason as ciphertext and is refused without the key. Test: `LeaveRequestReasonStorageTests`.
 
 ### Rotating the keys
 
