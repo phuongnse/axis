@@ -16,8 +16,8 @@ public sealed class ModulePolicyTests
     private const string PolicyFile = "modules/approvals/policies/ApproverAccess.json";
 
     private const string DefaultGrants = """
-        [ { "entity": "Approval", "actions": ["read", "create"], "filter": "title != 'secret'" },
-          { "dataSource": "Approvals", "actions": ["read"] } ]
+        [ { "name": "approvalRead", "entity": "Approval", "actions": ["read", "create"], "filter": "title != 'secret'" },
+          { "name": "approvalsRead", "dataSource": "Approvals", "actions": ["read"] } ]
         """;
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class ModulePolicyTests
     [Fact]
     public void A_module_policy_grants_on_a_process_of_its_own_module()
     {
-        using var modules = Modules(["approver"], """[{ "process": "Approve", "actions": ["start", "inspect"] }]""");
+        using var modules = Modules(["approver"], """[{ "name": "approveStart", "process": "Approve", "actions": ["start", "inspect"] }]""");
         using var folder = Application();
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
@@ -116,13 +116,13 @@ public sealed class ModulePolicyTests
     }
 
     [Theory]
-    [InlineData("""[{ "entity": "Invoice", "actions": ["read"] }]""", "/grants/0/entity", "Invoice")]
-    [InlineData("""[{ "entity": "departments/Department", "actions": ["read"] }]""", "/grants/0/entity", "departments/Department")]
-    [InlineData("""[{ "dataSource": "Invoices", "actions": ["read"] }]""", "/grants/0/dataSource", "Invoices")]
-    [InlineData("""[{ "dataSource": "departments/Departments", "actions": ["read"] }]""", "/grants/0/dataSource", "departments/Departments")]
-    [InlineData("""[{ "entity": "Approval", "actions": ["read"] }, { "process": "departments/Approve", "actions": ["start"] }]""", "/grants/1/process", "departments/Approve")]
-    [InlineData("""[{ "process": "Archive", "actions": ["start"] }]""", "/grants/0/process", "Archive")]
-    [InlineData("""[{ "endpoint": "Intake", "actions": ["invoke"] }]""", "/grants/0/endpoint", "")]
+    [InlineData("""[{ "name": "invoiceRead", "entity": "Invoice", "actions": ["read"] }]""", "/grants/0/entity", "Invoice")]
+    [InlineData("""[{ "name": "departmentRead", "entity": "departments/Department", "actions": ["read"] }]""", "/grants/0/entity", "departments/Department")]
+    [InlineData("""[{ "name": "invoicesRead", "dataSource": "Invoices", "actions": ["read"] }]""", "/grants/0/dataSource", "Invoices")]
+    [InlineData("""[{ "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] }]""", "/grants/0/dataSource", "departments/Departments")]
+    [InlineData("""[{ "name": "approvalRead2", "entity": "Approval", "actions": ["read"] }, { "name": "approveStart2", "process": "departments/Approve", "actions": ["start"] }]""", "/grants/1/process", "departments/Approve")]
+    [InlineData("""[{ "name": "archiveStart", "process": "Archive", "actions": ["start"] }]""", "/grants/0/process", "Archive")]
+    [InlineData("""[{ "name": "intakeInvoke", "endpoint": "Intake", "actions": ["invoke"] }]""", "/grants/0/endpoint", "")]
     public void A_grant_outside_the_module_is_reported_in_the_module_file(string grants, string path, string named)
     {
         using var modules = Modules(["approver"], grants);
@@ -139,9 +139,9 @@ public sealed class ModulePolicyTests
     }
 
     [Theory]
-    [InlineData("""[{ "entity": "Missing", "actions": ["read"] }]""", "/grants/0/entity")]
-    [InlineData("""[{ "dataSource": "Missing", "actions": ["read"] }]""", "/grants/0/dataSource")]
-    [InlineData("""[{ "process": "Missing", "actions": ["start"] }]""", "/grants/0/process")]
+    [InlineData("""[{ "name": "missingRead", "entity": "Missing", "actions": ["read"] }]""", "/grants/0/entity")]
+    [InlineData("""[{ "name": "missingRead2", "dataSource": "Missing", "actions": ["read"] }]""", "/grants/0/dataSource")]
+    [InlineData("""[{ "name": "missingStart", "process": "Missing", "actions": ["start"] }]""", "/grants/0/process")]
     public void A_plain_name_that_is_nothing_anywhere_keeps_the_unknown_target_code(string grants, string path)
     {
         using var modules = Modules(["approver"], grants);
@@ -159,7 +159,7 @@ public sealed class ModulePolicyTests
     [Fact]
     public void A_module_filter_cannot_call_an_application_rule()
     {
-        using var modules = Modules(["approver"], """[{ "entity": "Approval", "actions": ["read"], "filter": "IsSecret(title)" }]""");
+        using var modules = Modules(["approver"], """[{ "name": "approvalRead3", "entity": "Approval", "actions": ["read"], "filter": "IsSecret(title)" }]""");
         using var folder = Application();
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
@@ -201,7 +201,7 @@ public sealed class ModulePolicyTests
         using var modules = Modules(["approver"], DefaultGrants);
         using var folder = Application().With("policies/InvoiceAccess.json", """
             { "id": "44444444-4444-4444-8444-444444444499", "kind": "policy", "name": "InvoiceAccess", "formatVersion": 1,
-              "roles": ["reviewer"], "grants": [ { "entity": "Invoice", "actions": ["read"] } ] }
+              "roles": ["reviewer"], "grants": [ { "name": "invoiceRead2", "entity": "Invoice", "actions": ["read"] } ] }
             """);
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);

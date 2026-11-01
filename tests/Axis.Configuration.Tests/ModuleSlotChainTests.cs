@@ -45,7 +45,7 @@ public sealed class ModuleSlotChainTests
                 """)
             .With("a/1.0.0/policies/Access.json", $$"""
                 { "id": "{{PolicyId}}", "kind": "policy", "name": "Access", "formatVersion": 1,
-                  "roles": ["manager"], "grants": [ { "entity": "Item", "actions": ["read"] } ] }
+                  "roles": ["manager"], "grants": [ { "name": "itemRead", "entity": "Item", "actions": ["read"] } ] }
                 """);
         using var folder = Application(Entry("b", roles: """{ "approver": "other" }"""));
 

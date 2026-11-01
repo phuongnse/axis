@@ -73,7 +73,7 @@ public sealed class ModuleCompilerTests
 
     private const string DepartmentsPolicy = """
         { "id": "12121212-1212-4212-8212-121212121202", "kind": "policy", "name": "DepartmentsAccess", "formatVersion": 1,
-          "roles": ["employee"], "grants": [ { "dataSource": "departments/Departments", "actions": ["read"] } ] }
+          "roles": ["employee"], "grants": [ { "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] } ] }
         """;
 
     private const string LabelledDepartment = $$"""
@@ -1441,7 +1441,7 @@ public sealed class ModuleCompilerTests
             ("policies/requests.json", """
                 { "id": "12121212-1212-4212-8212-121212121202", "kind": "policy", "name": "RequestAccess", "formatVersion": 1,
                   "roles": ["employee"],
-                  "grants": [{ "entity": "Request", "actions": ["read"], "filter": "departments:A(quantity)" }] }
+                  "grants": [{ "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "departments:A(quantity)" }] }
                 """));
         using var _ = modules;
         using var __ = folder;
@@ -1587,7 +1587,7 @@ public sealed class ModuleCompilerTests
 
     private static string PolicyOver(string entity) => $$"""
         { "id": "12121212-1212-4212-8212-121212121201", "kind": "policy", "name": "DepartmentAccess", "formatVersion": 1,
-          "roles": ["employee"], "grants": [ { "entity": "{{entity}}", "actions": ["read"] } ] }
+          "roles": ["employee"], "grants": [ { "name": "grantRead", "entity": "{{entity}}", "actions": ["read"] } ] }
         """;
 
     /// <summary>An installation root with each version of the <c>departments</c> module, holding its manifest and one entity.</summary>

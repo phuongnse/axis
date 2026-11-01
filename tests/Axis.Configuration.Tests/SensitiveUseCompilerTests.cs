@@ -230,7 +230,7 @@ public sealed class SensitiveUseCompilerTests
                     .With("roles/employee.json", Role)
                     .With("policies/requests.json", $$"""
                         { "id": "{{PolicyId}}", "kind": "policy", "name": "RequestAccess", "formatVersion": 1, "roles": ["employee"],
-                          "grants": [{ "entity": "Order", "actions": ["read"], "filter": "secret == 'x'" }] }
+                          "grants": [{ "name": "orderRead", "entity": "Order", "actions": ["read"], "filter": "secret == 'x'" }] }
                         """);
                 break;
             case "a data source sort":

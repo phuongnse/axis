@@ -165,7 +165,7 @@ public sealed class PendingComputedRefusalTests(TaskApiFixture fixture) : IClass
         path == Path.Combine("policies", "reviewer-access.json")
             ? ReviewerReadsDoubled(path, content).Replace(
                 """{ "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }""",
-                """{ "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }, { "process": "Decide", "actions": ["start", "inspect"] }""",
+                """{ "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }, { "name": "decideStart", "process": "Decide", "actions": ["start", "inspect"] }""",
                 StringComparison.Ordinal)
             : content;
 
@@ -181,7 +181,7 @@ public sealed class PendingComputedRefusalTests(TaskApiFixture fixture) : IClass
         path == Path.Combine("policies", "finance-access.json")
             ? content.Replace(
                 """{ "entity": "Request", "actions": ["read", "create", "delete"] },""",
-                """{ "entity": "Request", "actions": ["read", "create"] }, { "entity": "Request", "actions": ["delete"], "filter": "doubled > 0" },""",
+                """{ "entity": "Request", "actions": ["read", "create"] }, { "name": "requestDelete", "entity": "Request", "actions": ["delete"], "filter": "doubled > 0" },""",
                 StringComparison.Ordinal)
             : content;
 

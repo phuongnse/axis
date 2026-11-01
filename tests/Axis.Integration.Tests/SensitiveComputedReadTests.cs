@@ -178,8 +178,8 @@ public sealed class SensitiveComputedReadTests(DataDatabaseFixture database) : I
                 "policies/clerk-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "ClerkAccess", "formatVersion": 1, "roles": ["clerk"], "grants": [
-                    { "entity": "Order", "actions": ["read", "create", "update"] },
-                    { "entity": "Tag", "actions": ["read", "create"] }] }
+                    { "name": "orderRead", "entity": "Order", "actions": ["read", "create", "update"] },
+                    { "name": "tagRead", "entity": "Tag", "actions": ["read", "create"] }] }
                 """);
 
     private async Task<ReleaseCompilationResult> CompileAsync(TemporaryFolder folder)

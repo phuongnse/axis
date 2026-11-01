@@ -28,9 +28,9 @@ public sealed class GrantCeilingTests
     {
         using var modules = Shop(Ceiling);
         using var folder = Application(
-            Policy("clerk", """{ "entity": "shop/Order", "actions": ["read", "create"], "fields": ["TITLE", "amount"] }"""),
-            Policy("lead", """{ "entity": "shop/Order", "actions": ["read"] }""", """{ "entity": "shop/Order", "actions": ["update"], "fields": ["note"] }"""),
-            Policy("guest", """{ "entity": "shop/Order", "actions": ["read"], "fields": ["title"] }"""));
+            Policy("clerk", """{ "name": "orderRead", "entity": "shop/Order", "actions": ["read", "create"], "fields": ["TITLE", "amount"] }"""),
+            Policy("lead", """{ "name": "orderRead2", "entity": "shop/Order", "actions": ["read"] }""", """{ "name": "orderUpdate", "entity": "shop/Order", "actions": ["update"], "fields": ["note"] }"""),
+            Policy("guest", """{ "name": "orderRead3", "entity": "shop/Order", "actions": ["read"], "fields": ["title"] }"""));
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
         var rebuilt = ApplicationCompiler.Compile(compiled.Resources);
@@ -65,8 +65,8 @@ public sealed class GrantCeilingTests
         using var modules = Shop(Ceiling);
         using var folder = Application(Policy(
             "lead",
-            """{ "entity": "shop/Order", "actions": ["read"] }""",
-            """{ "entity": "shop/Order", "actions": ["update"], "fields": ["note"] }"""));
+            """{ "name": "orderRead4", "entity": "shop/Order", "actions": ["read"] }""",
+            """{ "name": "orderUpdate2", "entity": "shop/Order", "actions": ["update"], "fields": ["note"] }"""));
         var model = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules).Model!;
         var order = Assert.Single(model.Entities, entity => entity.Name == "shop/Order");
 
@@ -86,7 +86,7 @@ public sealed class GrantCeilingTests
         using var modules = Shop(Ceiling);
         using var folder = Application(Policy(
             "lead",
-            """{ "entity": "shop/Order", "actions": ["update"], "fields": ["note"], "filter": "amount < 100" }"""));
+            """{ "name": "orderUpdate3", "entity": "shop/Order", "actions": ["update"], "fields": ["note"], "filter": "amount < 100" }"""));
         var model = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules).Model!;
         var order = Assert.Single(model.Entities, entity => entity.Name == "shop/Order");
 
@@ -100,7 +100,7 @@ public sealed class GrantCeilingTests
     [Fact]
     public void A_grant_past_the_ceiling_by_action_is_axc0334_at_the_grant_of_the_policy_file()
     {
-        var diagnostic = Single(Policy("clerk", """{ "entity": "shop/Order", "actions": ["update"] }"""));
+        var diagnostic = Single(Policy("clerk", """{ "name": "orderUpdate4", "entity": "shop/Order", "actions": ["update"] }"""));
 
         AssertPast(diagnostic, 0);
         Assert.Contains("'clerk'", diagnostic.Message, StringComparison.Ordinal);
@@ -113,8 +113,8 @@ public sealed class GrantCeilingTests
     {
         var diagnostic = Single(Policy(
             "clerk",
-            """{ "entity": "shop/Order", "actions": ["read"], "fields": ["title"] }""",
-            """{ "entity": "shop/Order", "actions": ["read"], "fields": ["title", "Note"] }"""));
+            """{ "name": "orderRead5", "entity": "shop/Order", "actions": ["read"], "fields": ["title"] }""",
+            """{ "name": "orderRead6", "entity": "shop/Order", "actions": ["read"], "fields": ["title", "Note"] }"""));
 
         AssertPast(diagnostic, 1);
         Assert.Contains("'note'", diagnostic.Message, StringComparison.Ordinal);
@@ -124,19 +124,19 @@ public sealed class GrantCeilingTests
     [Fact]
     public void A_grant_without_fields_is_past_entries_that_all_have_fields_and_within_when_one_has_none()
     {
-        var past = Single(Policy("clerk", """{ "entity": "shop/Order", "actions": ["read"] }"""));
+        var past = Single(Policy("clerk", """{ "name": "orderRead7", "entity": "shop/Order", "actions": ["read"] }"""));
         AssertPast(past, 0);
 
         // The seller slot has a 'read' entry without fields, so a grant without fields is within it.
         using var modules = Shop(Ceiling);
-        using var folder = Application(Policy("lead", """{ "entity": "shop/Order", "actions": ["read"] }"""));
+        using var folder = Application(Policy("lead", """{ "name": "orderRead8", "entity": "shop/Order", "actions": ["read"] }"""));
         Assert.Empty(ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules).Diagnostics);
     }
 
     [Fact]
     public void A_role_mapped_to_no_slot_is_checked_against_others()
     {
-        var diagnostic = Single(Policy("guest", """{ "entity": "shop/Order", "actions": ["read"], "fields": ["title", "amount"] }"""));
+        var diagnostic = Single(Policy("guest", """{ "name": "orderRead9", "entity": "shop/Order", "actions": ["read"], "fields": ["title", "amount"] }"""));
 
         AssertPast(diagnostic, 0);
         Assert.Contains("'guest'", diagnostic.Message, StringComparison.Ordinal);
@@ -148,7 +148,7 @@ public sealed class GrantCeilingTests
     public void A_role_mapped_to_no_slot_may_get_no_grant_when_the_ceiling_has_no_others()
     {
         const string withoutOthers = """{ "slots": { "buyer": [ { "actions": ["read"] } ] } }""";
-        var diagnostic = SingleWith(withoutOthers, Policy("guest", """{ "entity": "shop/Order", "actions": ["read"] }"""));
+        var diagnostic = SingleWith(withoutOthers, Policy("guest", """{ "name": "orderRead10", "entity": "shop/Order", "actions": ["read"] }"""));
 
         AssertPast(diagnostic, 0);
         Assert.Contains("no 'others'", diagnostic.Message, StringComparison.Ordinal);
@@ -158,7 +158,7 @@ public sealed class GrantCeilingTests
     public void A_role_mapped_to_a_slot_that_has_no_key_gets_no_entries_and_does_not_fall_back_to_others()
     {
         const string noSellerKey = """{ "slots": { "buyer": [ { "actions": ["read"] } ] }, "others": [ { "actions": ["read"] } ] }""";
-        var diagnostic = SingleWith(noSellerKey, Policy("lead", """{ "entity": "shop/Order", "actions": ["read"] }"""));
+        var diagnostic = SingleWith(noSellerKey, Policy("lead", """{ "name": "orderRead11", "entity": "shop/Order", "actions": ["read"] }"""));
 
         AssertPast(diagnostic, 0);
     }
@@ -169,7 +169,7 @@ public sealed class GrantCeilingTests
         using var modules = Shop(Ceiling);
         using var folder = Application(Policy(
             ["clerk", "lead", "guest"],
-            """{ "entity": "shop/Order", "actions": ["delete"] }"""));
+            """{ "name": "orderDelete", "entity": "shop/Order", "actions": ["delete"] }"""));
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
 
@@ -185,8 +185,8 @@ public sealed class GrantCeilingTests
         using var folder = Application(
             [Policy(
                 "clerk",
-                """{ "entity": "shop/Order", "actions": ["read", "create"], "fields": ["title"] }""",
-                """{ "entity": "shop/Order", "actions": ["update"], "fields": ["note"] }""")],
+                """{ "name": "orderRead12", "entity": "shop/Order", "actions": ["read", "create"], "fields": ["title"] }""",
+                """{ "name": "orderUpdate5", "entity": "shop/Order", "actions": ["update"], "fields": ["note"] }""")],
             """{ "buyer": "clerk", "seller": "clerk" }""");
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
@@ -201,7 +201,7 @@ public sealed class GrantCeilingTests
         using var modules = Shop(Ceiling)
             .With("shop/1.0.0/policies/Access.json", $$"""
                 { "id": "{{ModulePolicyId}}", "kind": "policy", "name": "Access", "formatVersion": 1, "roles": ["buyer"],
-                  "grants": [ { "entity": "Order", "actions": ["read"], "fields": ["title"] }, { "entity": "Order", "actions": ["delete"] } ] }
+                  "grants": [ { "name": "orderRead13", "entity": "Order", "actions": ["read"], "fields": ["title"] }, { "name": "orderDelete2", "entity": "Order", "actions": ["delete"] } ] }
                 """);
         using var folder = Application();
 
@@ -220,7 +220,7 @@ public sealed class GrantCeilingTests
         using var modules = Shop(Ceiling)
             .With("shop/1.0.0/policies/Access.json", $$"""
                 { "id": "{{ModulePolicyId}}", "kind": "policy", "name": "Access", "formatVersion": 1, "roles": ["buyer"],
-                  "grants": [ { "entity": "Order", "actions": ["read", "create"], "fields": ["title"] } ] }
+                  "grants": [ { "name": "orderRead14", "entity": "Order", "actions": ["read", "create"], "fields": ["title"] } ] }
                 """);
         using var folder = Application();
 
@@ -241,8 +241,8 @@ public sealed class GrantCeilingTests
         Install(modules, "b", RoleSlots("b", "approver", "watcher") + Depends("a", """{ "manager": "approver", "auditor": "watcher" }"""), null);
         using var folder = Application(
             [
-                Policy("lead", """{ "entity": "a/Item", "actions": ["read", "update"] }"""),
-                Policy("other", """{ "entity": "a/Item", "actions": ["read", "update"] }"""),
+                Policy("lead", """{ "name": "itemRead", "entity": "a/Item", "actions": ["read", "update"] }"""),
+                Policy("other", """{ "name": "itemRead2", "entity": "a/Item", "actions": ["read", "update"] }"""),
             ],
             "",
             modulesJson: """[ { "id": "b", "version": "^1.0.0", "roles": { "approver": "lead", "watcher": "other" } } ]""");
@@ -260,7 +260,7 @@ public sealed class GrantCeilingTests
     public void A_grant_on_an_entity_without_a_ceiling_or_on_another_target_is_not_checked()
     {
         using var modules = Shop(Ceiling);
-        using var folder = Application(Policy("guest", """{ "entity": "shop/Line", "actions": ["delete"] }"""));
+        using var folder = Application(Policy("guest", """{ "name": "lineDelete", "entity": "shop/Line", "actions": ["delete"] }"""));
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
 

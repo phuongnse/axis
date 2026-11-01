@@ -91,7 +91,7 @@ public sealed class PendingComputedUpdateResponseTests(DataDatabaseFixture datab
                 $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "role.clerk": "Clerk" } }""")
             .With(
                 "policies/clerk-access.json",
-                $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "ClerkAccess", "formatVersion": 1, "roles": ["clerk"], "grants": [{ "entity": "Order", "actions": ["read", "update"] }] }""");
+                $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "ClerkAccess", "formatVersion": 1, "roles": ["clerk"], "grants": [{ "name": "orderRead", "entity": "Order", "actions": ["read", "update"] }] }""");
 
     private async Task<ReleaseCompilationResult> CompileAsync(TemporaryFolder folder)
     {

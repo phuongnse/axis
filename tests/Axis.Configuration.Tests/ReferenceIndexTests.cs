@@ -327,7 +327,7 @@ public sealed class ReferenceIndexTests
     public void A_policy_with_an_unknown_role_keeps_its_grant_edge_and_adds_no_role_edge()
     {
         using var folder = SalesFolder("IsLarge(quantity)")
-            .With("policies/order-access.json", Policy("""["nobody"]""", """[{ "entity": "Order", "actions": ["read"] }]"""));
+            .With("policies/order-access.json", Policy("""["nobody"]""", """[{ "name": "orderRead", "entity": "Order", "actions": ["read"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -786,10 +786,10 @@ public sealed class ReferenceIndexTests
                 """["approver"]""",
                 """
                 [
-                  { "entity": "Order", "actions": ["read"], "filter": "IsLarge(quantity)" },
-                  { "dataSource": "LargeOrders", "actions": ["read"] },
-                  { "process": "OrderReview", "actions": ["start"] },
-                  { "endpoint": "ImportOrder", "actions": ["invoke"] }
+                  { "name": "orderRead2", "entity": "Order", "actions": ["read"], "filter": "IsLarge(quantity)" },
+                  { "name": "largeOrdersRead", "dataSource": "LargeOrders", "actions": ["read"] },
+                  { "name": "orderReviewStart", "process": "OrderReview", "actions": ["start"] },
+                  { "name": "importOrderInvoke", "endpoint": "ImportOrder", "actions": ["invoke"] }
                 ]
                 """));
 

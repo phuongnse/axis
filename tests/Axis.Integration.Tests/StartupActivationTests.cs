@@ -535,8 +535,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
                 """
                 { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a17", "kind": "policy", "name": "ManagerAccess", "formatVersion": 1, "roles": ["employee"],
                   "grants": [
-                    { "entity": "departments/Department", "actions": ["read"], "filter": "departments:IsManager(manager, currentUser())" },
-                    { "dataSource": "departments/Departments", "actions": ["read"] }
+                    { "name": "departmentRead", "entity": "departments/Department", "actions": ["read"], "filter": "departments:IsManager(manager, currentUser())" },
+                    { "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] }
                   ] }
                 """);
         var logs = new LogCollector();
@@ -1118,7 +1118,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
             .With("texts/en.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a14", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "role.employee": "Employee" } }""")
             .With(
                 "policies/employee-access.json",
-                """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a15", "kind": "policy", "name": "EmployeeAccess", "formatVersion": 1, "roles": ["employee"], "grants": [{ "entity": "Note", "actions": ["read", "create", "update", "delete"] }] }""");
+                """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a15", "kind": "policy", "name": "EmployeeAccess", "formatVersion": 1, "roles": ["employee"], "grants": [{ "name": "noteRead", "entity": "Note", "actions": ["read", "create", "update", "delete"] }] }""");
 
     /// <summary>
     /// A seed over <c>Note</c> with the fixed seed ids and the given values, synced when

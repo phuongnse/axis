@@ -28,9 +28,9 @@ public sealed class PolicyCompilerTests
 
     private const string FullPolicyGrants = """
         [
-          { "entity": "request", "actions": ["read", "update"], "filter": "owner == currentUser() and department.name != 'x'", "fields": ["OWNER", "amount"] },
-          { "dataSource": "requestList", "actions": ["read"] },
-          { "process": "requestReview", "actions": ["start"] }
+          { "name": "requestRead", "entity": "request", "actions": ["read", "update"], "filter": "owner == currentUser() and department.name != 'x'", "fields": ["OWNER", "amount"] },
+          { "name": "requestListRead", "dataSource": "requestList", "actions": ["read"] },
+          { "name": "requestReviewStart", "process": "requestReview", "actions": ["start"] }
         ]
         """;
 
@@ -81,7 +81,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_process_grant_with_reassign_compiles()
     {
-        using var folder = Folder(Policy("""["manager"]""", """[{ "process": "RequestReview", "actions": ["start", "reassign"] }]"""));
+        using var folder = Folder(Policy("""["manager"]""", """[{ "name": "requestReviewStart2", "process": "RequestReview", "actions": ["start", "reassign"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -94,7 +94,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_policy_filter_can_pass_current_user_to_a_rule()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "entity": "Request", "actions": ["read"], "filter": "IsOwner(owner, currentUser())" }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestRead2", "entity": "Request", "actions": ["read"], "filter": "IsOwner(owner, currentUser())" }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -110,11 +110,11 @@ public sealed class PolicyCompilerTests
     {
         using var folder = Folder(Policy("""["employee", "Manager", "nobody"]""", """
             [
-              { "entity": "Nope", "actions": ["read"] },
-              { "dataSource": "Nope", "actions": ["read"] },
-              { "process": "Nope", "actions": ["start"] },
-              { "entity": "Request", "actions": ["read"], "fields": ["owner", "nope"] },
-              { "endpoint": "Nope", "actions": ["invoke"] }
+              { "name": "nopeRead", "entity": "Nope", "actions": ["read"] },
+              { "name": "nopeRead2", "dataSource": "Nope", "actions": ["read"] },
+              { "name": "nopeStart", "process": "Nope", "actions": ["start"] },
+              { "name": "requestRead3", "entity": "Request", "actions": ["read"], "fields": ["owner", "nope"] },
+              { "name": "nopeInvoke", "endpoint": "Nope", "actions": ["invoke"] }
             ]
             """));
 
@@ -139,7 +139,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_target_or_role_whose_file_was_not_loaded_is_not_reported_again()
     {
-        using var folder = Folder(Policy("""["auditor"]""", """[{ "entity": "Audit", "actions": ["read"] }]"""))
+        using var folder = Folder(Policy("""["auditor"]""", """[{ "name": "auditRead", "entity": "Audit", "actions": ["read"] }]"""))
             .With("roles/auditor.json", """{ "id": "44444444-4444-4444-8444-444444444409", "kind": "role", "name": "auditor", "formatVersion": 1 }""")
             .With("entities/audit.json", """{ "id": "11111111-1111-4111-8111-111111111109", "kind": "entity", "name": "Audit", "formatVersion": 1 }""");
 
@@ -150,25 +150,25 @@ public sealed class PolicyCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
-    [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read' and 'export'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
-    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "read"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'read'. It takes only 'invoke'.")]
-    [InlineData("""{ "entity": "Request", "actions": ["inspect"] }""", "/grants/0/actions/0", "An entity grant cannot allow 'inspect'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
-    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["inspect"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'inspect'. It takes only 'invoke'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
-    [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "import"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'import'. It takes only 'read' and 'export'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["start", "export"] }""", "/grants/0/actions/1", "A process grant cannot allow 'export'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["import"] }""", "/grants/0/actions/0", "A process grant cannot allow 'import'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
-    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["export"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'export'. It takes only 'invoke'.")]
-    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "import"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'import'. It takes only 'invoke'.")]
-    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "filter": "true" }""", "/grants/0/filter", "An endpoint grant has no 'filter'. Only an entity grant limits rows.")]
-    [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "fields": ["owner"] }""", "/grants/0/fields", "An endpoint grant has no 'fields'. Only an entity grant limits fields.")]
-    [InlineData("""{ "process": "RequestReview", "endpoint": "SubmitRequest", "actions": ["start"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
-    [InlineData("""{ "actions": ["read"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 0.")]
-    [InlineData("""{ "entity": "Request", "dataSource": "RequestList", "actions": ["read"], "filter": "nope" }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
-    [InlineData("""{ "dataSource": "RequestList", "actions": ["read"], "filter": "true" }""", "/grants/0/filter", "A data source grant has no 'filter'. Only an entity grant limits rows.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["start"], "fields": ["owner"] }""", "/grants/0/fields", "A process grant has no 'fields'. Only an entity grant limits fields.")]
+    [InlineData("""{ "name": "requestRead4", "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
+    [InlineData("""{ "name": "requestListRead2", "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read' and 'export'.")]
+    [InlineData("""{ "name": "requestReviewRead", "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
+    [InlineData("""{ "name": "submitRequestInvoke", "endpoint": "SubmitRequest", "actions": ["invoke", "read"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'read'. It takes only 'invoke'.")]
+    [InlineData("""{ "name": "requestInspect", "entity": "Request", "actions": ["inspect"] }""", "/grants/0/actions/0", "An entity grant cannot allow 'inspect'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
+    [InlineData("""{ "name": "submitRequestInspect", "endpoint": "SubmitRequest", "actions": ["inspect"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'inspect'. It takes only 'invoke'.")]
+    [InlineData("""{ "name": "requestReviewInvoke", "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
+    [InlineData("""{ "name": "requestListRead3", "dataSource": "RequestList", "actions": ["read", "import"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'import'. It takes only 'read' and 'export'.")]
+    [InlineData("""{ "name": "requestReviewStart3", "process": "RequestReview", "actions": ["start", "export"] }""", "/grants/0/actions/1", "A process grant cannot allow 'export'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
+    [InlineData("""{ "name": "requestReviewImport", "process": "RequestReview", "actions": ["import"] }""", "/grants/0/actions/0", "A process grant cannot allow 'import'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
+    [InlineData("""{ "name": "submitRequestExport", "endpoint": "SubmitRequest", "actions": ["export"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'export'. It takes only 'invoke'.")]
+    [InlineData("""{ "name": "submitRequestInvoke2", "endpoint": "SubmitRequest", "actions": ["invoke", "import"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'import'. It takes only 'invoke'.")]
+    [InlineData("""{ "name": "submitRequestInvoke3", "endpoint": "SubmitRequest", "actions": ["invoke"], "filter": "true" }""", "/grants/0/filter", "An endpoint grant has no 'filter'. Only an entity grant limits rows.")]
+    [InlineData("""{ "name": "submitRequestInvoke4", "endpoint": "SubmitRequest", "actions": ["invoke"], "fields": ["owner"] }""", "/grants/0/fields", "An endpoint grant has no 'fields'. Only an entity grant limits fields.")]
+    [InlineData("""{ "name": "requestReviewStart4", "process": "RequestReview", "endpoint": "SubmitRequest", "actions": ["start"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
+    [InlineData("""{ "name": "grantRead", "actions": ["read"] }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 0.")]
+    [InlineData("""{ "name": "requestRead5", "entity": "Request", "dataSource": "RequestList", "actions": ["read"], "filter": "nope" }""", "/grants/0", "A grant names exactly one target: an 'entity', a 'dataSource', a 'process' or an 'endpoint'. This one names 2.")]
+    [InlineData("""{ "name": "requestListRead4", "dataSource": "RequestList", "actions": ["read"], "filter": "true" }""", "/grants/0/filter", "A data source grant has no 'filter'. Only an entity grant limits rows.")]
+    [InlineData("""{ "name": "requestReviewStart5", "process": "RequestReview", "actions": ["start"], "fields": ["owner"] }""", "/grants/0/fields", "A process grant has no 'fields'. Only an entity grant limits fields.")]
     public void A_badly_shaped_grant_is_an_invalid_grant_at_its_path(string grant, string path, string message)
     {
         using var folder = Folder(Policy("""["employee"]""", $"[{grant}]"));
@@ -181,12 +181,12 @@ public sealed class PolicyCompilerTests
     }
 
     [Theory]
-    [InlineData("""[{ "entity": "Request", "actions": ["export"] }]""", "/grants/0/actions/0", "An 'export' on the entity 'Request' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
-    [InlineData("""[{ "entity": "Request", "actions": ["create", "export", "import"] }]""", "/grants/0/actions/1", "An 'export' on the entity 'Request' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
-    [InlineData("""[{ "dataSource": "RequestList", "actions": ["export"] }]""", "/grants/0/actions/0", "An 'export' on the data source 'RequestList' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
-    [InlineData("""[{ "entity": "Request", "actions": ["read", "import"] }]""", "/grants/0/actions/1", "An 'import' on the entity 'Request' needs a 'create' grant on it in the same policy. An import writes through 'create'.")]
-    [InlineData("""[{ "entity": "Request", "actions": ["read"] }, { "entity": "Request", "actions": ["import"] }, { "dataSource": "RequestList", "actions": ["read"] }]""", "/grants/1/actions/0", "An 'import' on the entity 'Request' needs a 'create' grant on it in the same policy. An import writes through 'create'.")]
-    [InlineData("""[{ "entity": "Request", "actions": ["read"] }, { "dataSource": "RequestList", "actions": ["export"] }]""", "/grants/1/actions/0", "An 'export' on the data source 'RequestList' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    [InlineData("""[{ "name": "requestExport", "entity": "Request", "actions": ["export"] }]""", "/grants/0/actions/0", "An 'export' on the entity 'Request' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    [InlineData("""[{ "name": "requestCreate", "entity": "Request", "actions": ["create", "export", "import"] }]""", "/grants/0/actions/1", "An 'export' on the entity 'Request' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    [InlineData("""[{ "name": "requestListExport", "dataSource": "RequestList", "actions": ["export"] }]""", "/grants/0/actions/0", "An 'export' on the data source 'RequestList' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
+    [InlineData("""[{ "name": "requestRead6", "entity": "Request", "actions": ["read", "import"] }]""", "/grants/0/actions/1", "An 'import' on the entity 'Request' needs a 'create' grant on it in the same policy. An import writes through 'create'.")]
+    [InlineData("""[{ "name": "requestRead7", "entity": "Request", "actions": ["read"] }, { "name": "requestImport", "entity": "Request", "actions": ["import"] }, { "name": "requestListRead5", "dataSource": "RequestList", "actions": ["read"] }]""", "/grants/1/actions/0", "An 'import' on the entity 'Request' needs a 'create' grant on it in the same policy. An import writes through 'create'.")]
+    [InlineData("""[{ "name": "requestRead8", "entity": "Request", "actions": ["read"] }, { "name": "requestListExport2", "dataSource": "RequestList", "actions": ["export"] }]""", "/grants/1/actions/0", "An 'export' on the data source 'RequestList' needs a 'read' grant on it in the same policy. An export reaches only what 'read' reaches.")]
     public void An_export_without_read_or_an_import_without_create_is_reported_at_the_action(string grants, string path, string message)
     {
         using var folder = Folder(Policy("""["employee"]""", grants));
@@ -204,9 +204,9 @@ public sealed class PolicyCompilerTests
     {
         using var folder = Folder(Policy("""["employee"]""", """
             [
-              { "entity": "Request", "actions": ["read", "create", "export", "import"] },
-              { "dataSource": "RequestList", "actions": ["read"] },
-              { "dataSource": "requestlist", "actions": ["export"] }
+              { "name": "requestRead9", "entity": "Request", "actions": ["read", "create", "export", "import"] },
+              { "name": "requestListRead6", "dataSource": "RequestList", "actions": ["read"] },
+              { "name": "requestlistExport3", "dataSource": "requestlist", "actions": ["export"] }
             ]
             """));
 
@@ -223,8 +223,8 @@ public sealed class PolicyCompilerTests
     {
         using var folder = Folder(Policy("""["employee"]""", """
             [
-              { "entity": "request", "actions": ["read"] },
-              { "entity": "REQUEST", "actions": ["export"] }
+              { "name": "requestRead10", "entity": "request", "actions": ["read"] },
+              { "name": "rEQUESTExport2", "entity": "REQUEST", "actions": ["export"] }
             ]
             """));
 
@@ -264,7 +264,13 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void Grants_without_names_and_grants_with_different_names_compile_without_diagnostics()
     {
-        using var unnamed = Folder(Policy("""["employee", "manager"]""", FullPolicyGrants));
+        using var unnamed = Folder(Policy("""["employee", "manager"]""", """
+            [
+              { "entity": "request", "actions": ["read", "update"], "filter": "owner == currentUser() and department.name != 'x'", "fields": ["OWNER", "amount"] },
+              { "dataSource": "requestList", "actions": ["read"] },
+              { "process": "requestReview", "actions": ["start"] }
+            ]
+            """));
         var unnamedResult = ApplicationCompiler.Compile(unnamed.Path);
         Assert.Empty(unnamedResult.Diagnostics);
         Assert.NotNull(unnamedResult.Model);
@@ -283,7 +289,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void An_action_outside_the_schema_enum_is_a_schema_violation()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["frobnicate"] }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewFrobnicate", "process": "RequestReview", "actions": ["frobnicate"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -295,7 +301,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_start_and_inspect_grant_on_a_process_compiles_with_both_actions()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start", "inspect"] }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart6", "process": "RequestReview", "actions": ["start", "inspect"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -308,7 +314,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_cancel_grant_on_a_process_compiles()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["cancel"] }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewCancel", "process": "RequestReview", "actions": ["cancel"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -320,7 +326,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_retry_grant_on_a_process_compiles()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["retry"] }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewRetry", "process": "RequestReview", "actions": ["retry"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -332,7 +338,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_resolve_grant_on_a_process_compiles()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["resolve"] }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewResolve", "process": "RequestReview", "actions": ["resolve"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -344,7 +350,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void An_invoke_grant_on_an_endpoint_compiles_with_the_endpoint_resolved()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "endpoint": "submitrequest", "actions": ["invoke"] }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "submitrequestInvoke5", "endpoint": "submitrequest", "actions": ["invoke"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -365,7 +371,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void An_endpoint_whose_file_was_not_loaded_is_not_reported_again()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "endpoint": "Broken", "actions": ["invoke"] }]"""))
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "brokenInvoke", "endpoint": "Broken", "actions": ["invoke"] }]"""))
             .With("endpoints/broken.json", """{ "id": "bc241668-fe85-45a4-b7cf-d36da8d56b79", "kind": "endpoint", "name": "Broken", "formatVersion": 1 }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -377,7 +383,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void A_grant_on_a_child_entity_is_reported_at_its_entity_naming_the_owner()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "entity": "requestLine", "actions": ["read"], "fields": ["nope"], "filter": "nope" }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestLineRead", "entity": "requestLine", "actions": ["read"], "fields": ["nope"], "filter": "nope" }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -397,7 +403,7 @@ public sealed class PolicyCompilerTests
     [InlineData("nope == currentUser()", ExpressionDiagnosticCodes.UnknownName, "'nope'")]
     public void A_filter_that_is_not_boolean_or_not_in_the_sql_subset_is_reported_at_the_filter(string filter, string code, string messagePart)
     {
-        using var folder = Folder(Policy("""["employee"]""", $$"""[{ "entity": "Request", "actions": ["read"], "filter": "{{filter}}" }]"""));
+        using var folder = Folder(Policy("""["employee"]""", $$"""[{ "name": "requestRead11", "entity": "Request", "actions": ["read"], "filter": "{{filter}}" }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -437,7 +443,7 @@ public sealed class PolicyCompilerTests
 
     /// <summary>A read grant on <c>Request</c> with <paramref name="filter"/>, where a request line also has a note and a department.</summary>
     private static TemporaryFolder FolderWithLineFields(string filter) =>
-        Folder(Policy("""["employee"]""", $$"""[{ "entity": "Request", "actions": ["read"], "filter": "{{filter}}" }]"""))
+        Folder(Policy("""["employee"]""", $$"""[{ "name": "requestRead12", "entity": "Request", "actions": ["read"], "filter": "{{filter}}" }]"""))
             .With("entities/request-line.json", """
                 { "id": "11111111-1111-4111-8111-111111111103", "kind": "entity", "name": "RequestLine", "formatVersion": 1,
                   "fields": [
@@ -459,7 +465,7 @@ public sealed class PolicyCompilerTests
     [MemberData(nameof(CurrentUserOutsidePolicyFilters))]
     public void Current_user_outside_a_policy_filter_is_reported_at_the_call(string file, string content, string path, string position)
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start"] }]""")).With(file, content);
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart7", "process": "RequestReview", "actions": ["start"] }]""")).With(file, content);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -471,10 +477,10 @@ public sealed class PolicyCompilerTests
 
     private const string FilteredGrants = """
         [
-          { "entity": "Request", "actions": ["read"], "filter": "owner == currentUser()" },
-          { "dataSource": "RequestList", "actions": ["read"] },
-          { "entity": "Request", "actions": ["read", "update"], "filter": "amount > 10" },
-          { "entity": "Request", "actions": ["update", "delete"], "fields": ["owner"] }
+          { "name": "requestRead13", "entity": "Request", "actions": ["read"], "filter": "owner == currentUser()" },
+          { "name": "requestListRead7", "dataSource": "RequestList", "actions": ["read"] },
+          { "name": "requestRead14", "entity": "Request", "actions": ["read", "update"], "filter": "amount > 10" },
+          { "name": "requestUpdate", "entity": "Request", "actions": ["update", "delete"], "fields": ["owner"] }
         ]
         """;
 
@@ -524,8 +530,8 @@ public sealed class PolicyCompilerTests
     {
         using var folder = Folder(Policy("""["employee"]""", """
             [
-              { "entity": "Request", "actions": ["read"], "filter": "owner == currentUser()" },
-              { "entity": "Request", "actions": ["read"] }
+              { "name": "requestRead15", "entity": "Request", "actions": ["read"], "filter": "owner == currentUser()" },
+              { "name": "requestRead16", "entity": "Request", "actions": ["read"] }
             ]
             """));
         var model = Compile(folder);
@@ -540,12 +546,12 @@ public sealed class PolicyCompilerTests
     public void Fields_are_the_union_over_the_matching_grants_and_every_field_when_one_has_no_fields()
     {
         const string Limited = """
-            { "entity": "Request", "actions": ["read"], "fields": ["owner"] },
-            { "entity": "Request", "actions": ["read", "update"], "filter": "amount > 10", "fields": ["AMOUNT"] },
-            { "entity": "Request", "actions": ["create"] }
+            { "name": "requestRead17", "entity": "Request", "actions": ["read"], "fields": ["owner"] },
+            { "name": "requestRead18", "entity": "Request", "actions": ["read", "update"], "filter": "amount > 10", "fields": ["AMOUNT"] },
+            { "name": "requestCreate2", "entity": "Request", "actions": ["create"] }
             """;
         using var limited = Folder(Policy("""["employee"]""", $"[{Limited}]"));
-        using var unlimited = Folder(Policy("""["employee"]""", $$"""[{{Limited}}, { "entity": "Request", "actions": ["read"] }]"""));
+        using var unlimited = Folder(Policy("""["employee"]""", $$"""[{{Limited}}, { "name": "requestRead19", "entity": "Request", "actions": ["read"] }]"""));
         var model = Compile(limited);
         Assert.True(model.TryGetEntity("Request", out var request));
         var everyField = Compile(unlimited);
@@ -563,7 +569,7 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void Export_and_import_need_their_grant_and_read_or_create_and_may_come_from_different_roles()
     {
-        using var folder = Folder(Policy("""["employee"]""", """[{ "entity": "Request", "actions": ["read"] }]"""));
+        using var folder = Folder(Policy("""["employee"]""", """[{ "name": "requestRead20", "entity": "Request", "actions": ["read"] }]"""));
         var compiled = Compile(folder);
         Assert.True(compiled.TryGetEntity("Request", out var request));
         Assert.True(compiled.TryGetDataSource("RequestList", out var requestList));
@@ -610,8 +616,8 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void Start_is_allowed_only_by_a_start_grant_on_the_process_for_a_declared_role_held()
     {
-        using var granted = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start"] }]"""));
-        using var entityOnly = Folder(Policy("""["employee"]""", """[{ "entity": "Request", "actions": ["read", "create", "update", "delete"] }]"""));
+        using var granted = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart8", "process": "RequestReview", "actions": ["start"] }]"""));
+        using var entityOnly = Folder(Policy("""["employee"]""", """[{ "name": "requestRead21", "entity": "Request", "actions": ["read", "create", "update", "delete"] }]"""));
         var model = Compile(granted);
         Assert.True(model.TryGetProcess("RequestReview", out var process));
         var withoutStart = Compile(entityOnly);
@@ -626,8 +632,8 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void Inspect_is_allowed_only_by_an_inspect_grant_on_the_process_for_a_declared_role_held()
     {
-        using var granted = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start", "inspect"] }]"""));
-        using var startOnly = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start"] }]"""));
+        using var granted = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart9", "process": "RequestReview", "actions": ["start", "inspect"] }]"""));
+        using var startOnly = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart10", "process": "RequestReview", "actions": ["start"] }]"""));
         var model = Compile(granted);
         Assert.True(model.TryGetProcess("RequestReview", out var process));
         var withoutInspect = Compile(startOnly);
@@ -643,8 +649,8 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void Cancel_is_allowed_only_by_a_cancel_grant_on_the_process_for_a_declared_role_held()
     {
-        using var granted = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start", "cancel"] }]"""));
-        using var startOnly = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start"] }]"""));
+        using var granted = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart11", "process": "RequestReview", "actions": ["start", "cancel"] }]"""));
+        using var startOnly = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart12", "process": "RequestReview", "actions": ["start"] }]"""));
         var model = Compile(granted);
         Assert.True(model.TryGetProcess("RequestReview", out var process));
         var withoutCancel = Compile(startOnly);
@@ -660,8 +666,8 @@ public sealed class PolicyCompilerTests
     [Fact]
     public void Retry_is_allowed_only_by_a_retry_grant_on_the_process_for_a_declared_role_held()
     {
-        using var granted = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["start", "retry"] }]"""));
-        using var cancelOnly = Folder(Policy("""["employee"]""", """[{ "process": "RequestReview", "actions": ["cancel"] }]"""));
+        using var granted = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewStart13", "process": "RequestReview", "actions": ["start", "retry"] }]"""));
+        using var cancelOnly = Folder(Policy("""["employee"]""", """[{ "name": "requestReviewCancel2", "process": "RequestReview", "actions": ["cancel"] }]"""));
         var model = Compile(granted);
         Assert.True(model.TryGetProcess("RequestReview", out var process));
         var withoutRetry = Compile(cancelOnly);
