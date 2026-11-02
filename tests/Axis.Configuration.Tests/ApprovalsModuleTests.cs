@@ -1,7 +1,10 @@
+using System.Text.Json;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Tests;
 
@@ -93,6 +96,27 @@ public sealed class ApprovalsModuleTests
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(_modulesPath).Modules);
 
         Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.GrantPastCeiling);
+    }
+
+    [Fact]
+    public void Every_named_point_of_the_contracts_has_a_contract_scenario_that_covers_it()
+    {
+        var contracts = Directory.EnumerateFiles(Path.Combine(_modulesPath, "approvals", "1.0.0", "contracts"), "*.json")
+            .Select(file => JsonSerializer.Deserialize<ContractResource>(File.ReadAllText(file), ApplicationLoader.SerializerOptions)!)
+            .ToList();
+        var points = ContractPoints.Of(contracts);
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(_modulesPath).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var covered = compiled.ModuleScenarios
+            .Where(scenario => scenario.File.StartsWith("modules/approvals/", StringComparison.Ordinal))
+            .SelectMany(scenario => scenario.Contract?.Covers ?? [])
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Empty(points.Except(covered).Order(StringComparer.Ordinal));
+        // A guard against an empty read: the three contracts name 22 points.
+        Assert.Equal(22, points.Count);
     }
 
     private static EntityModel Entity(ApplicationModel model, string name) =>

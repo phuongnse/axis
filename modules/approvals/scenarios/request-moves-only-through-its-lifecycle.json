@@ -1,0 +1,362 @@
+{
+  "id": "faab2f48-4dac-4692-8b9a-93a8e78637db",
+  "kind": "scenario",
+  "name": "RequestMovesOnlyThroughItsLifecycle",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": {
+    "covers": [
+      "Request/transitions/submit",
+      "Request/transitions/cancel",
+      "Request/states/submitted/initial",
+      "Request/states/submitted/deletable",
+      "Request/states/approved/initial",
+      "Request/states/approved/deletable",
+      "Request/states/returned/initial",
+      "Request/states/returned/deletable",
+      "Request/states/rejected/initial",
+      "Request/states/rejected/deletable",
+      "Request/states/cancelled/initial",
+      "Request/states/cancelled/deletable"
+    ]
+  },
+  "users": {
+    "admin": [
+      "admin"
+    ],
+    "ann": [
+      "member"
+    ],
+    "mia": [
+      "member"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "mia",
+      "values": {
+        "fullName": "Mia Tran",
+        "workEmail": "mia@example.com",
+        "user": "mia"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "annEmployee",
+      "values": {
+        "fullName": "Ann Nguyen",
+        "workEmail": "ann@example.com",
+        "user": "ann",
+        "manager": "mia"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "purchase",
+      "values": {
+        "name": "Purchase",
+        "code": "PURCHASE",
+        "steps": [
+          {
+            "sequence": 1,
+            "approver": "lineManager"
+          }
+        ]
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "values": {
+        "type": "purchase",
+        "title": "Monitor",
+        "amount": 400,
+        "status": "submitted"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "values": {
+        "type": "purchase",
+        "title": "Monitor",
+        "amount": 400,
+        "status": "approved"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "values": {
+        "type": "purchase",
+        "title": "Monitor",
+        "amount": 400,
+        "status": "returned"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "values": {
+        "type": "purchase",
+        "title": "Monitor",
+        "amount": 400,
+        "status": "rejected"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "values": {
+        "type": "purchase",
+        "title": "Monitor",
+        "amount": 400,
+        "status": "cancelled"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "first",
+      "values": {
+        "type": "purchase",
+        "title": "Request first",
+        "amount": 400
+      }
+    },
+    {
+      "type": "updateRecord",
+      "record": "first",
+      "as": "ann",
+      "values": {
+        "status": "submitted"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "expectRecord",
+      "record": "first",
+      "values": {
+        "status": "draft"
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "RequestApproval",
+      "record": "first",
+      "as": "ann"
+    },
+    {
+      "type": "expectRecord",
+      "record": "first",
+      "values": {
+        "status": "submitted"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "first",
+      "as": "ann",
+      "expect": "conflict"
+    },
+    {
+      "type": "completeTask",
+      "record": "first",
+      "step": "decide",
+      "outcome": "return",
+      "as": "mia"
+    },
+    {
+      "type": "expectRecord",
+      "record": "first",
+      "values": {
+        "status": "returned"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "first",
+      "as": "ann",
+      "expect": "conflict"
+    },
+    {
+      "type": "startProcess",
+      "process": "RequestApproval",
+      "record": "first",
+      "as": "ann"
+    },
+    {
+      "type": "completeTask",
+      "record": "first",
+      "step": "decide",
+      "outcome": "reject",
+      "as": "mia"
+    },
+    {
+      "type": "expectRecord",
+      "record": "first",
+      "values": {
+        "status": "rejected"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "first",
+      "as": "ann",
+      "expect": "conflict"
+    },
+    {
+      "type": "updateRecord",
+      "record": "first",
+      "as": "ann",
+      "values": {
+        "status": "submitted"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "updateRecord",
+      "record": "first",
+      "as": "ann",
+      "values": {
+        "status": "cancelled"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "expectRecord",
+      "record": "first",
+      "values": {
+        "status": "rejected"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "second",
+      "values": {
+        "type": "purchase",
+        "title": "Request second",
+        "amount": 400
+      }
+    },
+    {
+      "type": "startProcess",
+      "process": "RequestApproval",
+      "record": "second",
+      "as": "ann"
+    },
+    {
+      "type": "completeTask",
+      "record": "second",
+      "step": "decide",
+      "outcome": "approve",
+      "as": "mia"
+    },
+    {
+      "type": "expectRecord",
+      "record": "second",
+      "values": {
+        "status": "approved"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "second",
+      "as": "ann",
+      "expect": "conflict"
+    },
+    {
+      "type": "updateRecord",
+      "record": "second",
+      "as": "ann",
+      "values": {
+        "status": "cancelled"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "expectRecord",
+      "record": "second",
+      "values": {
+        "status": "approved"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "third",
+      "values": {
+        "type": "purchase",
+        "title": "Request third",
+        "amount": 400
+      }
+    },
+    {
+      "type": "updateRecord",
+      "record": "third",
+      "as": "ann",
+      "values": {
+        "status": "cancelled"
+      }
+    },
+    {
+      "type": "expectRecord",
+      "record": "third",
+      "values": {
+        "status": "cancelled"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "third",
+      "as": "ann",
+      "expect": "conflict"
+    },
+    {
+      "type": "updateRecord",
+      "record": "third",
+      "as": "ann",
+      "values": {
+        "status": "submitted"
+      },
+      "expect": "conflict"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "fourth",
+      "values": {
+        "type": "purchase",
+        "title": "Request fourth",
+        "amount": 400
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "fourth",
+      "as": "ann"
+    }
+  ]
+}
