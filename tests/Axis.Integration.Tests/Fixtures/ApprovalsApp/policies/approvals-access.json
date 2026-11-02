@@ -1,0 +1,10 @@
+{
+  "id": "1cf19cf3-8026-4656-93b9-1b32b4de7829",
+  "kind": "policy",
+  "name": "ApprovalsAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [
+    { "name": "requestAccess", "entity": "approvals/Request", "actions": ["read", "create", "update"] }
+  ]
+}

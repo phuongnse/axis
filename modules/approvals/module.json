@@ -1,0 +1,11 @@
+{
+  "kind": "module",
+  "id": "approvals",
+  "version": "1.0.0",
+  "label": "Approvals",
+  "roles": [
+    { "name": "admin", "label": { "textKey": "approvals.roles.admin" } },
+    { "name": "member", "label": { "textKey": "approvals.roles.member" } }
+  ],
+  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "admin", "member": "member" } }]
+}

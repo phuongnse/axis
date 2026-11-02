@@ -8,8 +8,10 @@ changes anything else in Studio through [customization layers](customization-lay
 [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees the
 idea, and [D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees what the modules
 hold. `organization` 1.0.0 exists under `modules/organization`, with its entities, data sources, rule,
-role slots, contracts, policies, contract scenarios and texts. Its pages, the `approvals` module and the
-built-in application are _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
+role slots, contracts, policies, contract scenarios and texts. `approvals` 1.0.0 exists under
+`modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots and texts. Its
+contract, process, policies and pages, the pages of `organization` and the built-in application are
+_(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check.
@@ -100,6 +102,11 @@ texts below. The pages are _(planned for M26)_.
 `approvals` holds requests that people submit and that are decided step by step, by the request's
 type. It depends on `organization` `^1.0.0` and maps its slots `admin` and `member` to its own
 slots of the same names.
+
+Version 1.0.0 holds the entities below, the data sources `RequestTypes`, `Requests` and `Decisions`,
+the sequence `RequestNumber` with the format `RQ-{yyyy}-{n:5}`, `amount` and `minAmount` as `decimal`
+with precision 18 and scale 2, and the texts. Its contract, process, policies and pages are
+_(planned for M26)_.
 
 ### Request types
 
