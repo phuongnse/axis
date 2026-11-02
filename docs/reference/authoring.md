@@ -569,7 +569,7 @@ Writes are built for patches, creates, deletes, changes, text writes and module 
 ## Creating an application
 
 `POST /api/studio/apps` creates a new application folder in
-`Studio:ApplicationsPath`, blank or from an installed
+`Studio:ApplicationsPath` (in a cell, [the tenant's folder](host-settings.md#studio-settings)), blank or from an installed
 [application template](modules-and-templates.md#application-templates). It follows
 [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
 The body is `{ "name": "...", "template": "<template id>" }`, and `template` is

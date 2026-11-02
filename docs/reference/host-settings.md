@@ -154,10 +154,12 @@ and a JSON view, and shows the diagnostics.
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **In a cell.** _(planned for M31)_ When `Cell:Id` is set, each tenant's applications are under
+- **In a cell.** When `Cell:Id` is set, each tenant's applications are under
   `<Studio:ApplicationsPath>/<tenant id>/`, and Studio on a tenant's host reads, writes and creates
-  only there. A non-empty `Studio:Folders` stops the start, because it would name folders that every
-  tenant reaches. The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell),
+  only there. Studio creates the folder the first time it uses it. Another tenant's application, by
+  name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
+  message names `Studio:Folders` and `Cell:Id`, because the folders would be reached by every tenant.
+  _(planned for M31)_ The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell),
   [export and deletion](tenant-lifecycle.md), see [cells](cells.md).
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
