@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers and their data keys and lookup keys, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys and their quota overrides, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -23,6 +23,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantPlatformProviderRow> TenantPlatformProviders => Set<TenantPlatformProviderRow>();
 
     public DbSet<TenantDataKeyRow> TenantDataKeys => Set<TenantDataKeyRow>();
+
+    public DbSet<TenantQuotaRow> TenantQuotas => Set<TenantQuotaRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
@@ -112,6 +114,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .HasForeignKey(key => key.TenantId)
                 .HasConstraintName("fk_tenant_data_keys_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantQuotaRow>()
+                .WithOne()
+                .HasForeignKey(quota => quota.TenantId)
+                .HasConstraintName("fk_tenant_quotas_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TenantHostRow>(host =>
@@ -170,6 +177,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             key.Property(k => k.Kind).HasColumnName("kind");
             key.Property(k => k.Number).HasColumnName("number");
             key.Property(k => k.Key).HasColumnName("key").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<TenantQuotaRow>(quota =>
+        {
+            quota.ToTable("tenant_quotas", table => table.HasCheckConstraint("ck_tenant_quotas_value", "value IS NULL OR value >= 0"));
+            quota.HasKey(q => new { q.TenantId, q.Quota }).HasName("pk_tenant_quotas");
+            quota.Property(q => q.TenantId).HasColumnName("tenant_id");
+            quota.Property(q => q.Quota).HasColumnName("quota");
+            quota.Property(q => q.Value).HasColumnName("value").HasColumnType("bigint");
+            quota.Property(q => q.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
         });
 
         modelBuilder.Entity<DataProtectionKeyRow>(key =>

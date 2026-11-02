@@ -3,8 +3,12 @@
 Detailed reference for the quotas of a tenant in a [cell](cells.md) and the usage that Axis measures.
 It follows [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_. A self-hosted installation has no quotas: they are on
-only when `Cell:Id` is set. The conventions of [architecture.md](../architecture.md) apply.
+Everything in this file is _(planned for M31)_, except what the next paragraph says is in place. A
+self-hosted installation has no quotas: they are on only when `Cell:Id` is set.
+
+In place: the `platform.tenant_quotas` table, the cell's defaults and the reading of both with the
+directory. The server and the worker answer a tenant's effective quota from them, and answer no limit
+outside a cell. Refusals, leases and usage are still planned. The conventions of [architecture.md](../architecture.md) apply.
 
 The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
 what one tenant uses in total or at once. A rate limit limits how fast one caller asks.

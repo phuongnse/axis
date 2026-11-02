@@ -188,6 +188,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         List<TenantHostRow> hosts;
         List<TenantBindingRow> bindings;
         List<TenantPlatformProviderRow> platformProviders;
+        List<TenantQuotaRow> quotas;
         try
         {
             var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnectionString).Options;
@@ -201,6 +202,9 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 .Where(binding => ids.Contains(binding.TenantId))
                 .ToListAsync(cancellationToken);
             platformProviders = await context.TenantPlatformProviders.AsNoTracking().ToListAsync(cancellationToken);
+            quotas = await context.TenantQuotas.AsNoTracking()
+                .Where(quota => ids.Contains(quota.TenantId))
+                .ToListAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
         {
@@ -237,7 +241,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 cipher,
                 tls,
                 row.PreviewOf is null ? null : byId[row.PreviewOf],
-                row.PreviewOf is null ? PlatformSignInProviders.From(platformProviders.Where(provider => provider.TenantId == row.Id)) : null)),
+                row.PreviewOf is null ? PlatformSignInProviders.From(platformProviders.Where(provider => provider.TenantId == row.Id)) : null,
+                quotas.Where(quota => quota.TenantId == row.Id))),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
             active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal),
@@ -338,7 +343,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         TenantSecretCipher cipher,
         TenantDatabaseTls tls,
         TenantRow? main,
-        IReadOnlyList<IdentityProviderModel>? realmProviders)
+        IReadOnlyList<IdentityProviderModel>? realmProviders,
+        IEnumerable<TenantQuotaRow> quotaRows)
     {
         var id = row.Id;
         var bindings = Bindings(id, bindingRows, cipher);
@@ -393,7 +399,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             RealmUsers(row, cipher),
             PlatformSignInOf(signIn, platformProviders),
             realmProviders,
-            hostSites);
+            hostSites,
+            Quotas(quotaRows));
     }
 
     /// <summary>
@@ -491,6 +498,12 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             stored is { Length: > 0 } ? SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.SmtpPassword, stored).Reveal()) : null,
             Blank(row.EmailFrom));
     }
+
+    // A tenant's own quota rows. A key the code does not know is ignored, so the control plane can write a new quota before
+    // a host knows it. Quotas stay out of DatabaseKey and OidcKey, so a changed quota neither retires a pool nor rebuilds the sign-in.
+    private static Dictionary<string, long?> Quotas(IEnumerable<TenantQuotaRow> rows) =>
+        rows.Where(row => QuotaKeys.All.Contains(row.Quota, StringComparer.Ordinal))
+            .ToDictionary(row => row.Quota, row => row.Value, StringComparer.Ordinal);
 
     // The current key comes first, then the previous one. Each is decrypted only at the moment of use.
     private static List<TenantClientKey> ClientKeys(TenantRow signIn, TenantSecretCipher cipher)

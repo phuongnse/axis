@@ -78,13 +78,13 @@ moduleId       = letter , { letter | digit | "-" } ;
 - **Names.** A name is ASCII letters and digits that start with a letter, like
   a field name.
 - **Qualified call.** A call to a rule of a [module](modules-and-templates.md#modules)
-  is written `departments:IsManager(x)`, with the module id, a `:` and the rule
+  is written `organization:IsDelegating(from, until)`, with the module id, a `:` and the rule
   name. No space is allowed around the `:`. The reader takes the letters,
   digits and `-` that run into the `:` as the module id, so `a-b:c(x)` calls
   the rule `c` of the module `a-b`. To subtract the result of a call, write
   spaces: `a - b:c(x)`. A `:` was never valid before, so no expression that
   parsed before changes meaning, and `total/ratio(x)` is still a division. A
-  qualified name must be called: `departments:IsManager` alone is `AXC0035`.
+  qualified name must be called: `organization:IsDelegating` alone is `AXC0035`.
 - **Keywords.** `and`, `or`, `not`, `is`, `in`, `null`, `true` and `false` are
   reserved in any letter case. Names ignore letter case, so a field named
   `Null` would otherwise be ambiguous.
@@ -324,7 +324,7 @@ Paths in validations and computed fields are not built. There a path is
   an aggregate's item expression. A filter's SQL inlines the rule's body, see
   [SQL subset](#sql-subset). Calls from computed fields come later.
 - **Qualified rule call.** A rule of a [module](modules-and-templates.md#modules) the
-  application declares is called as `departments:IsManager(x)`. It is allowed
+  application declares is called as `organization:IsDelegating(from, until)`. It is allowed
   wherever a rule call is: a rule body, a validation, a field default, a data
   source filter, a process condition and a policy filter. The module id must match exactly. The
   rule name ignores letter case. A bare name in an application expression never

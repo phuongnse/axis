@@ -28,6 +28,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
     private const string TitleField = """{ "name": "title", "type": "text", "required": true, "maxLength": 200 }""";
     private const string SecretField = """{ "name": "secret", "type": "text", "sensitive": true }""";
     private static readonly Guid _ticketEntityId = Guid.Parse("8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a61");
+    // The id of the Department entity in the built-in organization module, before it is derived for an application.
+    private static readonly Guid _organizationDepartmentEntityId = Guid.Parse("25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95");
 
     private const string DoneField = """{ "name": "done", "type": "boolean" }""";
 
@@ -521,23 +523,20 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
     }
 
     [Fact]
-    public async Task Start_activates_an_application_that_declares_the_sample_departments_module()
+    public async Task Start_activates_an_application_that_declares_the_organization_module()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
         using var folder = ApplicationFolder(TitleField)
             .With("application.json", $$"""
                 { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
-                  "modules": [{ "id": "departments", "version": "^1.0.0", "roles": { "manager": "employee" } }] }
+                  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "employee", "member": "employee" } }] }
                 """)
             .With("texts/vi.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a16", "kind": "text", "name": "TextsVi", "formatVersion": 1, "locale": "vi", "texts": { "role.employee": "Nhân viên" } }""")
             .With(
-                "policies/manager-access.json",
-                """
-                { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a17", "kind": "policy", "name": "ManagerAccess", "formatVersion": 1, "roles": ["employee"],
-                  "grants": [
-                    { "name": "departmentRead", "entity": "departments/Department", "actions": ["read"], "filter": "departments:IsManager(manager, currentUser())" },
-                    { "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] }
-                  ] }
+                "seeds/departments.json",
+                $$"""
+                { "id": "{{_seedResourceId}}", "kind": "seed", "name": "Departments", "formatVersion": 1, "entity": "organization/Department",
+                  "records": [{ "id": "{{_firstSeedId}}", "values": { "code": "FIN", "name": "Finance" } }] }
                 """);
         var logs = new LogCollector();
 
@@ -551,8 +550,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
 
         Assert.NotNull(await ActiveAsync(a));
         Assert.DoesNotContain(logs.Entries, entry => entry.Contains("AXC", StringComparison.Ordinal));
-        var department = EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(_applicationId, SampleModules.DepartmentEntityId)));
-        Assert.Equal(3L, await ScalarAsync(a, $"SELECT count(*) FROM {department}"));
+        var department = EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(_applicationId, _organizationDepartmentEntityId)));
+        Assert.Equal(1L, await ScalarAsync(a, $"SELECT count(*) FROM {department}"));
     }
 
     [Fact]

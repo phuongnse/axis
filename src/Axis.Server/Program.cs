@@ -57,6 +57,8 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, R
 // Read before any database work too, so a bad value stops the start.
 var cell = CellOptions.Load(builder.Configuration);
 builder.Services.AddSingleton(cell);
+builder.Services.AddSingleton(QuotaDefaults.Load(builder.Configuration, cell));
+builder.Services.AddSingleton<TenantQuotas>();
 
 // Both sources need the schema connection, a reader role and the key, so a missing setting stops the start
 // before any database work.

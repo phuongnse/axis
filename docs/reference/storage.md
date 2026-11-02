@@ -258,6 +258,7 @@ The tables:
 | `platform.tenant_platform_providers` | The tenant id and the provider `name`, the primary key, the `type` (`oidc` or `saml`), the names of the issuer, client id, client secret, client key and metadata bindings, the claim names for the display name, email and locale, the roles claim and `role_values`, a `jsonb` object that maps a roles claim value to a platform role. It holds no secret. Rows go with their tenant                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `platform.data_protection_keys`      | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. The server only inserts rows and never updates or deletes one. `platform rekey` updates the encrypted XML. Every server replica reads them.                                                                                                                                                     |
 | `platform.tenant_data_keys`          | The tenant id, the `kind` (`data` or `lookup`), the `number` and the encrypted key, the primary key together. The kind is checked, the number is at least 1, and a row goes with its tenant. `platform rekey` updates the encrypted key. See [data encryption](data-encryption.md#tenant-keys).                                                                         |
+| `platform.tenant_quotas` | The tenant id and the `quota` key, the primary key together, the `value` (`bigint`, null means no limit) and `updated_at`. One row is one quota the tenant overrides, and a quota with no row takes the cell's default. The value is null or at least 0, and a row goes with its tenant. Hosts read the rows with the directory, see [tenant quotas](tenant-quotas.md#quotas). |
 | `platform.audit_records`             | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 The tenant `version` grows on every change to the tenant, its hosts, its bindings or its platform providers.
@@ -266,9 +267,8 @@ The `schema_version` is text. It is the id of the newest EF Core migration acros
 processes contexts that `Axis.Admin` applied to the tenant database, and it is empty until the first migration. A host
 serves a tenant only when this value is the one the host was built for, see [administration](administration.md#migrate).
 
-- **Where secrets are stored.** Each of these is stored encrypted, and nowhere
-  else. The [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory)
-  lists every key:
+- **Where secrets are stored.** Each of these is stored encrypted, and nowhere else.
+  The [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory) lists every key:
   - the runtime and schema database passwords, in `platform.tenants`;
   - the OIDC client secret, in `platform.tenants`. For a tenant that `tenant create` made, it is the secret of the
     realm's platform client;

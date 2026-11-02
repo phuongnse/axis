@@ -604,6 +604,12 @@ uses lowercase letters and digits. A wrong value stops the start and the message
 setting. `Axis.Admin` refuses every command with exit code 2. The features the settings turn on
 are still planned.
 
+In a cell the server and the worker also read and check `Quotas:Defaults`. Each child must be a
+[quota](tenant-quotas.md#quotas) key and its value a whole number of zero or more. An unknown key or a
+wrong value stops the start, and the message names the setting, never its value. A quota with no setting
+takes the default of the quotas table, and `authoringRequests` has none, which is no limit. `Axis.Admin`
+does not read `Quotas:Defaults` yet.
+
 | Setting | Read by | Meaning |
 | --- | --- | --- |
 | `Cell:Id` | All hosts | The cell id, such as `vn-1`. Setting it turns on quotas, per-tenant Studio folders and the cell console. |
