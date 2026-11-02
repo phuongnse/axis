@@ -5,5 +5,5 @@
   "formatVersion": 1,
   "title": { "textKey": "pages.categoryNotes.title" },
   "parameters": [{ "name": "category", "type": "reference", "target": "Category", "required": true }],
-  "widgets": [{ "type": "table", "dataSource": "CategoryNotes", "parameters": { "inCategory": "category" } }]
+  "widgets": [{ "type": "table", "name": "table", "dataSource": "CategoryNotes", "parameters": { "inCategory": "category" } }]
 }

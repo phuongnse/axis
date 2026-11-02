@@ -7,8 +7,9 @@
   "widgets": [
     {
       "type": "form",
+      "name": "form",
       "entity": "Note",
-      "actions": [{ "type": "startProcess", "process": "NoteClose", "label": { "textKey": "noteClose.action" } }]
+      "actions": [{ "type": "startProcess", "name": "startProcess", "process": "NoteClose", "label": { "textKey": "noteClose.action" } }]
     }
   ]
 }

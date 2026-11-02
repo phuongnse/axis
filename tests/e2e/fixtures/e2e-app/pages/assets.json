@@ -7,9 +7,10 @@
   "widgets": [
     {
       "type": "table",
+      "name": "table",
       "entity": "Asset",
       "rowActions": [
-        { "type": "navigate", "page": "AssetDetail", "label": { "textKey": "assets.open" }, "parameters": { "asset": "id" } }
+        { "type": "navigate", "name": "navigate", "page": "AssetDetail", "label": { "textKey": "assets.open" }, "parameters": { "asset": "id" } }
       ]
     }
   ]

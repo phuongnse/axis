@@ -4,5 +4,5 @@
   "name": "Checklists",
   "formatVersion": 1,
   "title": { "textKey": "checklists.pages.checklists.title" },
-  "widgets": [{ "type": "table", "dataSource": "Checklists" }]
+  "widgets": [{ "type": "table", "name": "table", "dataSource": "Checklists" }]
 }

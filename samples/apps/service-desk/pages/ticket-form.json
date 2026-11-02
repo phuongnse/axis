@@ -9,10 +9,12 @@
   "widgets": [
     {
       "type": "form",
+      "name": "ticketForm",
       "form": "TicketEdit",
       "actions": [
         {
           "type": "startProcess",
+          "name": "submit",
           "process": "TicketHandling",
           "label": {
             "textKey": "ticket.submit"

@@ -9,10 +9,12 @@
   "widgets": [
     {
       "type": "table",
+      "name": "myRequests",
       "dataSource": "RequestList",
       "rowActions": [
         {
           "type": "navigate",
+          "name": "open",
           "page": "RequestForm",
           "label": {
             "textKey": "actions.open"
@@ -23,6 +25,7 @@
       "toolbarActions": [
         {
           "type": "navigate",
+          "name": "new",
           "page": "RequestForm",
           "label": {
             "textKey": "actions.new"

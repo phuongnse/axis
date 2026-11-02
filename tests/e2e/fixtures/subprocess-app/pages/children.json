@@ -4,5 +4,5 @@
   "name": "Children",
   "formatVersion": 1,
   "title": { "textKey": "pages.children.title" },
-  "widgets": [{ "type": "processInspector", "process": "ChildJob" }]
+  "widgets": [{ "type": "processInspector", "name": "processInspector", "process": "ChildJob" }]
 }

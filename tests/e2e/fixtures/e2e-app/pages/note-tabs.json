@@ -7,16 +7,20 @@
   "widgets": [
     {
       "type": "tabs",
+      "name": "tabs",
       "tabs": [
         {
+          "name": "tab1",
           "label": { "textKey": "pages.noteTabs.notes" },
-          "widgets": [{ "type": "table", "entity": "Note" }]
+          "widgets": [{ "type": "table", "name": "table", "entity": "Note" }]
         },
         {
+          "name": "tab2",
           "label": { "textKey": "pages.noteTabs.totals" },
           "widgets": [
             {
               "type": "kpi",
+              "name": "kpi",
               "dataSource": "NoteTotals",
               "measure": "notes",
               "label": { "textKey": "kpi.notes" },

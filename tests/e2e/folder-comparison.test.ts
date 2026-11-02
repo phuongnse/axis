@@ -143,6 +143,31 @@ test("a subset fails when a named file is missing", () => {
   );
 });
 
+test("page element names are skipped only when asked, and other page keys still compare", () => {
+  const unnamed = copySample();
+  rewriteJson(unnamed, "pages/all-tickets.json", (page) => {
+    delete page.widgets[0].rowActions[0].name;
+  });
+  assert.throws(
+    () => compareApplicationFolders(sample, unnamed, { files: ["pages/all-tickets.json"] }),
+    { message: 'pages/all-tickets.json at /widgets/0/rowActions/0/name: expected "open", got missing' },
+  );
+  assert.doesNotThrow(() =>
+    compareApplicationFolders(sample, unnamed, { files: ["pages/all-tickets.json"], ignorePageElementNames: true }),
+  );
+
+  const changed = copySample();
+  rewriteJson(changed, "pages/all-tickets.json", (page) => {
+    delete page.widgets[0].name;
+    page.widgets[0].dataSource = "Other";
+  });
+  assert.throws(
+    () =>
+      compareApplicationFolders(sample, changed, { files: ["pages/all-tickets.json"], ignorePageElementNames: true }),
+    { message: 'pages/all-tickets.json at /widgets/0/dataSource: expected "AllTicketList", got "Other"' },
+  );
+});
+
 test("a subset pairs seed ids from a seed file outside it", () => {
   const seedOnly = copySample();
   rewriteJson(seedOnly, seedFile, (seed) => {
@@ -161,18 +186,22 @@ test("a subset pairs seed ids from a seed file outside it", () => {
 });
 
 test("a generated name on a page is accepted only when asked, and a different name never is", () => {
+  const unnamed = copySample();
+  rewriteJson(unnamed, "pages/all-tickets.json", (page) => {
+    delete page.widgets[0].name;
+  });
   const copy = copySample();
   rewriteJson(copy, "pages/all-tickets.json", (page) => {
     page.widgets[0].name = "table1";
   });
-  assert.throws(() => compareApplicationFolders(sample, copy), /pages\/all-tickets\.json at \/widgets\/0\/name/);
-  assert.doesNotThrow(() => compareApplicationFolders(sample, copy, { generatedNames: true }));
+  assert.throws(() => compareApplicationFolders(unnamed, copy), /pages\/all-tickets\.json at \/widgets\/0\/name/);
+  assert.doesNotThrow(() => compareApplicationFolders(unnamed, copy, { generatedNames: true }));
 
   rewriteJson(copy, "pages/all-tickets.json", (page) => {
     page.widgets[0].name = "Tickets";
   });
   assert.throws(
-    () => compareApplicationFolders(sample, copy, { generatedNames: true }),
+    () => compareApplicationFolders(unnamed, copy, { generatedNames: true }),
     /pages\/all-tickets\.json at \/widgets\/0\/name/,
   );
 });

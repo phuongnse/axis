@@ -7,13 +7,16 @@
   "widgets": [
     {
       "type": "columns",
+      "name": "columns",
       "columns": [
-        { "width": 8, "widgets": [{ "type": "table", "entity": "Item" }] },
+        { "width": 8, "name": "column1", "widgets": [{ "type": "table", "name": "table", "entity": "Item" }] },
         {
           "width": 4,
+          "name": "column2",
           "widgets": [
             {
               "type": "kpi",
+              "name": "kpi",
               "dataSource": "ItemTotals",
               "measure": "items",
               "label": { "textKey": "itemKpi.items" }

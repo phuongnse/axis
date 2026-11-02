@@ -7,8 +7,9 @@
   "widgets": [
     {
       "type": "table",
+      "name": "table",
       "entity": "Note",
-      "rowActions": [{ "type": "delete", "label": { "textKey": "notes.delete" } }]
+      "rowActions": [{ "type": "delete", "name": "delete", "label": { "textKey": "notes.delete" } }]
     }
   ]
 }

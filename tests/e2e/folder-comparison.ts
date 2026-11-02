@@ -3,9 +3,11 @@ import path from "node:path";
 
 export interface CompareOptions {
   files?: string[];
+  /** Ignores the `name` of page widgets, actions, columns and tabs. Studio's generated names differ from the samples' names. */
+  ignorePageElementNames?: boolean;
   /**
    * Accepts a generated name, such as `table1` or `navigate2`, that the actual page has and the expected page lacks.
-   * Studio names every widget, column, tab and action it adds. The samples get their names with the rest of #2427.
+   * Studio names every widget, column, tab and action it adds.
    */
   generatedNames?: boolean;
 }
@@ -44,6 +46,10 @@ export function compareApplicationFolders(expected: string, actual: string, opti
       const actualJson = readJson(path.join(actual, file));
       if (isObject(expectedJson)) delete expectedJson.id;
       if (isObject(actualJson)) delete actualJson.id;
+      if (options.ignorePageElementNames) {
+        dropPageElementNames(expectedJson);
+        dropPageElementNames(actualJson);
+      }
       compareValue(file, "", expectedJson, actualJson, seeds, options.generatedNames === true && file.startsWith("pages/"));
     } else {
       const expectedText = fs.readFileSync(path.join(expected, file), "utf8");
@@ -158,4 +164,26 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function escapePointer(key: string): string {
   return key.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+function dropPageElementNames(page: unknown): void {
+  if (isObject(page) && page.kind === "page") dropWidgetNames(page.widgets);
+}
+
+function dropWidgetNames(widgets: unknown): void {
+  for (const widget of objectsIn(widgets)) {
+    delete widget.name;
+    for (const key of ["actions", "rowActions", "toolbarActions"]) {
+      for (const action of objectsIn(widget[key])) delete action.name;
+    }
+    dropWidgetNames(widget.widgets);
+    for (const column of [...objectsIn(widget.columns), ...objectsIn(widget.tabs)]) {
+      delete column.name;
+      dropWidgetNames(column.widgets);
+    }
+  }
+}
+
+function objectsIn(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isObject) : [];
 }

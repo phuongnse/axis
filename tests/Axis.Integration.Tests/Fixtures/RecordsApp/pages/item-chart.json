@@ -7,6 +7,7 @@
   "widgets": [
     {
       "type": "chart",
+      "name": "chart",
       "kind": "bar",
       "dataSource": "ItemCountsByDepartment",
       "category": "departmentName",
