@@ -498,6 +498,59 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             builder.UseTestAuthentication(new TestIdentity("requester", "Requester User", "employee"));
         });
 
+    [Fact]
+    public async Task In_a_cell_a_tenant_takes_the_default_of_each_quota_unless_it_has_a_row()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
+        await SetQuotaAsync(platform, "b", QuotaKeys.Users, 5);
+        await SetQuotaAsync(platform, "b", QuotaKeys.Applications, null);
+        await using var factory = CreateFactory(platform, new LogCollector(), _cellSettings);
+        var quotas = factory.Services.GetRequiredService<TenantQuotas>();
+
+        Assert.Equal(QuotaDefaults.BuiltIn, quotas.For("a"));
+        Assert.Equal(5, quotas.Limit("b", QuotaKeys.Users));
+        Assert.Null(quotas.Limit("b", QuotaKeys.Applications));
+        Assert.Equal(QuotaDefaults.BuiltIn[QuotaKeys.Storage], quotas.Limit("b", QuotaKeys.Storage));
+    }
+
+    [Fact]
+    public async Task In_a_cell_a_changed_quota_row_is_seen_after_the_next_directory_refresh()
+    {
+        var role = NewRole();
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(b with { Host = "b.example.test" });
+        await SetQuotaAsync(platform, "b", QuotaKeys.Users, 5);
+        await using var factory = CreateFactory(platform, new LogCollector(), _cellSettings);
+        var quotas = factory.Services.GetRequiredService<TenantQuotas>();
+        Assert.Equal(5, quotas.Limit("b", QuotaKeys.Users));
+
+        await SetQuotaAsync(platform, "b", QuotaKeys.Users, 7);
+
+        Assert.Equal(5, quotas.Limit("b", QuotaKeys.Users));
+        await RefreshAsync(factory);
+        Assert.Equal(7, quotas.Limit("b", QuotaKeys.Users));
+    }
+
+    [Fact]
+    public async Task Without_a_cell_every_quota_is_no_limit_even_for_a_tenant_with_rows()
+    {
+        var role = NewRole();
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(b with { Host = "b.example.test" });
+        await SetQuotaAsync(platform, "b", QuotaKeys.Users, 5);
+        await SetQuotaAsync(platform, "b", QuotaKeys.Applications, null);
+        await using var factory = CreateFactory(platform, new LogCollector());
+        var quotas = factory.Services.GetRequiredService<TenantQuotas>();
+
+        var all = quotas.For("b");
+
+        Assert.Equal(QuotaKeys.All, all.Keys);
+        Assert.All(all.Values, value => Assert.Null(value));
+    }
+
     private static Role NewRole() =>
         new($"dir_{Guid.NewGuid():N}"[..16], Convert.ToHexString(RandomNumberGenerator.GetBytes(12)));
 
@@ -606,6 +659,30 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             row.RuntimeUser = role.Name;
             row.RuntimePassword = _cipher.Encrypt(tenantId, TenantSecretFields.RuntimePassword, role.Password);
         });
+
+    private static readonly (string Key, string Value)[] _cellSettings =
+    [
+        ("Cell:Id", "vn-1"),
+        ("Cell:Region", "vn"),
+        ("Cell:TenantDomain", "vn.example.test"),
+    ];
+
+    // Adds the tenant's row for the quota, or changes its value.
+    private static async Task SetQuotaAsync(string platform, string tenantId, string quota, long? value)
+    {
+        await using var context = PlatformContext(platform);
+        var row = await context.TenantQuotas.SingleOrDefaultAsync(q => q.TenantId == tenantId && q.Quota == quota, CancellationToken);
+        if (row is null)
+        {
+            context.TenantQuotas.Add(new TenantQuotaRow { TenantId = tenantId, Quota = quota, Value = value });
+        }
+        else
+        {
+            row.Value = value;
+        }
+
+        await context.SaveChangesAsync(CancellationToken);
+    }
 
     private static PlatformDbContext PlatformContext(string platform) =>
         new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
