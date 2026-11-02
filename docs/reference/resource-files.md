@@ -361,7 +361,7 @@ The entity file in the same release renames `decisionComments` to
 - `id` is permanent. `kind` is `migration`, `name` names the migration and
   `formatVersion` is `1`. `entity` names the entity it changes. It may name an
   entity of a module that `application.json` declares as `<module id>/<entity>`,
-  such as `departments/Department`, but no migration may drop it. An entity of a
+  such as `organization/Department`, but no migration may drop it. An entity of a
   module that is not declared is `AXC0214`, and so is a `dropEntity` of a module entity.
 - `changes` is ordered. Each change has a `type` and the properties below.
 

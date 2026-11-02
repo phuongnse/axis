@@ -494,7 +494,7 @@ Studio's expression editor can show errors as the author types. The body is
   is exclusive.
 - **The range.** The compile reports one character position, so the range is
   the token at that position: a name, a literal or an operator. A qualified
-  call such as `departments:IsManager` is one range. A character that starts no
+  call such as `organization:IsDelegating` is one range. A character that starts no
   token covers that one character, and text that is never closed runs to the
   end. `AXC0036` and `AXC0048` cover the whole expression. A limit that the
   compile reports at the place but outside the expression check, such as a rule
