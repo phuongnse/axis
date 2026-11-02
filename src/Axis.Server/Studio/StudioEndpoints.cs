@@ -3,10 +3,12 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 using Axis.Data.Profiles;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
@@ -39,6 +41,13 @@ namespace Axis.Server.Studio;
 /// <c>modules/&lt;module&gt;/&lt;path&gt;</c> and no <c>ETag</c>. It answers 404 for an unknown application, a module the
 /// application does not pin and an unknown resource, and never answers <c>module.json</c>. The page metadata route of
 /// <see cref="StudioPageMetadataEndpoints"/> finds a module page with the same lookup.
+/// <c>PUT /api/studio/apps/{application}/modules/{module}/resources/{id}</c> takes the edited module resource whole and
+/// writes the application's customization layer for it with only what differs from the pinned module version, or deletes
+/// the layer when nothing differs. It answers <c>{ file, version, diagnostics }</c>, with <c>file</c> and <c>version</c> null
+/// when no layer is left. After the lookup above it answers 428 without <c>If-Match</c> or <c>If-None-Match</c>, 400 for both,
+/// 415 for another content type, 400 for a body that is not an object, a module scenario, an ambiguous name, an edit that
+/// cannot be a layer and a contract edit beyond added states and transitions, 409 for a stale version and 503 when the
+/// write lock cannot be taken.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -77,6 +86,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceAsync);
+        endpoints.MapPut("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceSaveAsync);
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
         endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
@@ -230,7 +240,8 @@ internal static class StudioEndpoints
     }
 
     /// <summary>One file of an installed module version: its file id, kind, name, path, text and parsed root.</summary>
-    internal sealed record ModuleFile(Guid Id, string Kind, string? Name, string Path, string Text, JsonElement Root);
+    internal sealed record ModuleFile(
+        Guid Id, string Kind, string? Name, string Path, string Text, JsonElement Root, InstalledModule Module);
 
     // The file with this id, written in the file, in the module version the compile pins, or the 404 problem. The id is not
     // the one derived for the application. The module's manifest is never a resource.
@@ -269,7 +280,7 @@ internal static class StudioEndpoints
                 var name = root.TryGetProperty("name", out var nameProperty) && nameProperty.ValueKind == JsonValueKind.String
                     ? nameProperty.GetString()
                     : null;
-                return (new ModuleFile(guid, kind.GetString()!, name, file.Path, file.Content, root.Clone()), null);
+                return (new ModuleFile(guid, kind.GetString()!, name, file.Path, file.Content, root.Clone(), installed), null);
             }
             catch (JsonException)
             {
@@ -278,6 +289,138 @@ internal static class StudioEndpoints
 
         return (null, NotFound(NoModuleResource));
     }
+
+    private static async Task<IResult> ModuleResourceSaveAsync(
+        string application,
+        string module,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var (found, notFound) = FindModuleFile(
+            ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules), modules, module, id);
+        if (found is null)
+        {
+            return notFound!;
+        }
+
+        var request = httpContext.Request;
+        var hasIfMatch = request.Headers.IfMatch.Count > 0;
+        var hasIfNoneMatch = request.Headers.IfNoneMatch.Count > 0;
+        if (!hasIfMatch && !hasIfNoneMatch)
+        {
+            return Problem(
+                StatusCodes.Status428PreconditionRequired,
+                "The save needs the layer's version in If-Match, or If-None-Match: * when there is no layer.");
+        }
+
+        if (hasIfMatch && hasIfNoneMatch)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "Send If-Match or If-None-Match, not both.");
+        }
+
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        JsonDocument body;
+        try
+        {
+            body = await JsonDocument.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted);
+        }
+        catch (JsonException)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The body is not a resource.");
+        }
+
+        using (body)
+        {
+            if (body.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return Problem(StatusCodes.Status400BadRequest, "The body is not a resource.");
+            }
+
+            if (found.Kind == ResourceKinds.Scenario || found.Name is null)
+            {
+                return Problem(StatusCodes.Status400BadRequest, "A layer cannot change this resource.");
+            }
+
+            if (LayerChecker.KindsByName(found.Module)[found.Name].Distinct(StringComparer.Ordinal).Count() > 1)
+            {
+                return Problem(StatusCodes.Status400BadRequest, "The module has more than one resource with this name.");
+            }
+
+            var difference = LayerDifference.Compare(found.Kind, found.Root, body.RootElement);
+            if (difference.Refusal is not null)
+            {
+                return Problem(StatusCodes.Status400BadRequest, "The edit cannot be saved as a layer.");
+            }
+
+            if (found.Kind == ResourceKinds.Contract && difference.Changes is not null)
+            {
+                var layer = new LayerResource
+                {
+                    Id = Guid.Empty,
+                    Kind = "layer",
+                    FormatVersion = 1,
+                    Target = $"{module}/{found.Name}",
+                    Changes = JsonSerializer.SerializeToElement(difference.Changes),
+                };
+                var problems = new List<Diagnostic>();
+                ContractLayerChecker.CheckAdditions(found.Root, layer, problems);
+                if (problems.Any(problem => problem.Code == DiagnosticCodes.ContractLayerNotAddition))
+                {
+                    return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
+                }
+            }
+
+            // A tag other than * in If-None-Match matches no state of the layer, so the save is stale.
+            if (hasIfNoneMatch && request.Headers.IfNoneMatch.ToString() != "*")
+            {
+                return Problem(StatusCodes.Status409Conflict, StaleLayer);
+            }
+
+            var outcome = await StudioWrites.WriteLayerAsync(
+                writeLock,
+                folder,
+                module,
+                found.Name,
+                difference.Changes,
+                hasIfMatch ? request.Headers.IfMatch.ToString() : null,
+                hasIfNoneMatch,
+                httpContext.RequestAborted);
+            switch (outcome.Refusal)
+            {
+                case StudioWriteRefusal.Unavailable:
+                    return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
+                case StudioWriteRefusal.UnsafePath:
+                    return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
+                case not null:
+                    return Problem(StatusCodes.Status409Conflict, StaleLayer);
+            }
+
+            if (outcome.Version is not null)
+            {
+                httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+            }
+
+            return Results.Ok(new StudioModuleSaveResponse(
+                outcome.File, outcome.Version, StudioDiagnostics.Compile(folder, packages, modules)));
+        }
+    }
+
+    private const string StaleLayer = "The layer has changed since this version, or it exists already. Read it again.";
 
     private static async Task<IResult> DiagnosticsAsync(
         string application,
@@ -834,6 +977,9 @@ internal sealed record StudioDiagnosticsResponse(IReadOnlyList<StudioDiagnostic>
 
 /// <summary>The answer to a patch: the file's new version and the folder's compile diagnostics.</summary>
 internal sealed record StudioPatchResponse(string Version, IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>The answer to a module resource save: the layer's file and version, both null when no layer is left, and the folder's compile diagnostics.</summary>
+internal sealed record StudioModuleSaveResponse(string? File, string? Version, IReadOnlyList<StudioDiagnostic> Diagnostics);
 
 /// <summary>The answer to a create: the new resource's identity and version, and the folder's compile diagnostics.</summary>
 internal sealed record StudioCreateResponse(

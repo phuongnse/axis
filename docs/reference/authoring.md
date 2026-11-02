@@ -9,11 +9,9 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
-references, names, policy matrix, module resource, expression check and draft page metadata routes are built. It is
-agreed in
-[D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md).
-Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
-restarts the server, which activates the folder, as a hand edit does today.
+references, names, policy matrix, module resource, module resource save, expression check and draft page metadata routes are built. It is agreed in
+[D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md). Its edit routes never activate a release.
+Under `scripts/dev.sh`, a saved file restarts the server, which activates the folder, as a hand edit does today.
 A write takes a lock in the platform database, see [Versions](#versions). Reads
 and diagnostics touch no database. Going live from Studio is
 [Publishing](#publishing). `validate`, `publish`, `preview`, `rollback` and the release history are built. It asks for an activation: the
@@ -67,7 +65,8 @@ in the application. File names and names can change.
 | `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, builtIn, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template. Built-in templates come first, then the others, each group sorted by `id`. See [application templates](modules-and-templates.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
-| `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched |
+| `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because this route answers the module's own content, without the application's layer. A change to it is saved by the route below |
+| `PUT /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when the save writes a layer. The body is the edited module resource whole, as `application/json`. It needs `If-Match` with the layer's version, or `If-None-Match: *` when the resource has no layer. `file` and `version` are null, and there is no `ETag`, when no layer is left. See [Module resource saves](module-resource-saves.md) |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `POST /api/studio/apps/{application}/changes` | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
@@ -131,7 +130,7 @@ checked in this order, and the first failure is the response. Checks 1 to 6
 and 8 to 10 are built for every route that is built, and so is check 5a. Check 7 is built for a patch and a delete.
 Check 6 is built for a request and for a release:
 
-1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
+1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PUT`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs `Studio:AuthorRole` to be set and held in
    the session's roles, and `Studio:Folders` to be non-empty. This holds for
@@ -158,13 +157,13 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The names route, the module resource route, the text write and the expression check are built.
-The four routes use these checks. None of them has
-check 6 or a later numbered check, except where a line says so:
+The names route, the module resource route, the module resource save, the text write and the expression check are built.
+The five routes use these checks. None of them has check 6 or a later numbered check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Module resource.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body. Then `404` for a
   module that the application does not pin, and then `404` for a resource that the pinned module version has no file for.
+- **Module resource save.** Checks 1, 2, 3 and 5, then those of [Module resource saves](module-resource-saves.md#order-of-checks).
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
   `application/json`, then `400` for a bad body, then `503` when the
   [write lock](#versions) cannot be taken. Under the lock, it answers `400` when a
@@ -225,7 +224,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Module resource, Create, Patch, Delete, Changes, Diagnostics, Names,
+from the request. The rows for List applications, List resources, Read, Module resource, Module resource save, Create, Patch, Delete, Changes, Diagnostics, Names,
 Text write, Expression check, Draft page metadata, Module page metadata, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -234,6 +233,7 @@ Text write, Expression check, Draft page metadata, Module page metadata, Resourc
 | List resources | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Read | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Module resource | No session | No author role, or no `Studio:Folders` | Unknown application, module or resource | Not used |
+| Module resource save | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, module or resource | A stale `If-Match` version, or `If-None-Match` over an existing layer |
 | Create | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The `id` or the target file already exists |
 | Patch | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
@@ -511,7 +511,7 @@ Studio's expression editor can show errors as the author types. The body is
 
 ## Writes
 
-Writes are built for patches, creates, deletes, changes and text writes.
+Writes are built for patches, creates, deletes, changes, text writes and module resource saves.
 
 - **Atomic.** A write goes to a hidden temporary file in the same folder and
   is then renamed over the target. A reader never sees half a file. A delete removes
