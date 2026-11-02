@@ -34,6 +34,7 @@ internal static class StudioApplicationEndpoints
             return refusal;
         }
 
+        options = StudioEndpoints.ForRequest(httpContext, options);
         if (options.ApplicationsPath is null)
         {
             return StudioEndpoints.Problem(StatusCodes.Status403Forbidden, "Studio cannot create applications here.");

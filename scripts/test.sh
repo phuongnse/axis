@@ -44,6 +44,7 @@ node --test scripts/load.test.mjs || status=1
 node --test scripts/load-workflow.test.mjs || status=1
 node --test scripts/smoke.test.mjs || status=1
 node --test scripts/install-modules.test.mjs || status=1
+node --test scripts/sample-modules.test.mjs || status=1
 node --test scripts/compose-status.test.mjs || status=1
 node --test scripts/dev-stop.test.mjs || status=1
 node --test scripts/development-realm.test.mjs || status=1

@@ -215,7 +215,7 @@ at http://localhost:8025, and the purchasing
 system stub at http://localhost:5207. Mailpit is a local mail server that keeps every email. Its web page shows the
 emails that the worker sends. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
-Docker. The images hold the built-in `organization` module and the `departments` and `department-budgets` sample modules in `/modules`.
+Docker. The images hold the built-in `organization` and `approvals` modules and the `department-budgets` sample module in `/modules`.
 An existing local Compose volume that already ran `department-budgets` 1.0.0 needs `docker compose down -v` once to
 activate 1.1.0, for example when old budgets have no status. That deletes its data.
 The same holds for a volume that ran the leave request sample or the purchase request sample before it moved from `departments`

@@ -1,5 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
@@ -495,8 +497,106 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
                 builder.UseSetting(key, value);
             }
 
-            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User", "employee"));
+            builder.UseTestAuthentication(
+                new TestIdentity("requester", "Requester User", "employee"), new TestIdentity("author", "Author User", "author"));
         });
+
+    [Fact]
+    public async Task In_a_cell_an_author_reaches_only_the_studio_applications_of_their_tenant()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
+        var root = Directory.CreateTempSubdirectory("axis-studio-cell-").FullName;
+        try
+        {
+            await using var factory = CreateFactory(
+                platform, new LogCollector(), [.. _cellSettings, ("Studio:ApplicationsPath", root), ("Studio:AuthorRole", "author")]);
+            using var client = factory.CreateClient().SignedInAs("author");
+
+            foreach (var (name, host) in new[] { ("AppA", "a.example.test"), ("AppB", "b.example.test"), ("Shared", "a.example.test"), ("Shared", "b.example.test") })
+            {
+                using var created = await client.SendAsync(
+                    Request(HttpMethod.Post, "/api/studio/apps", host, $$"""{ "name": "{{name}}" }"""), CancellationToken);
+                Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+            }
+
+            Assert.Equal(["a", "b"], Directory.GetDirectories(root).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            Assert.Equal(["app-a", "shared"], SubfolderNames(Path.Combine(root, "a")));
+            Assert.Equal(["app-b", "shared"], SubfolderNames(Path.Combine(root, "b")));
+
+            Assert.Equal(["AppA", "Shared"], await ApplicationNamesAsync(client, "a.example.test"));
+            Assert.Equal(["AppB", "Shared"], await ApplicationNamesAsync(client, "b.example.test"));
+
+            using var resources = await client.SendAsync(Request("/api/studio/apps/AppA/resources", "a.example.test"), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, resources.StatusCode);
+            using var list = JsonDocument.Parse(await resources.Content.ReadAsStringAsync(CancellationToken));
+            var texts = list.RootElement.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("file").GetString() == "texts/en.json");
+            var id = texts.GetProperty("id").GetString()!;
+            var version = texts.GetProperty("version").GetString()!;
+            using var read = await client.SendAsync(Request($"/api/studio/apps/AppA/resources/{id}", "a.example.test"), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+
+            var textsFile = Path.Combine(root, "a", "app-a", "texts", "en.json");
+            var before = await File.ReadAllTextAsync(textsFile, CancellationToken);
+            using var patch = Request(
+                HttpMethod.Patch,
+                $"/api/studio/apps/AppA/resources/{id}",
+                "a.example.test",
+                """[{"op":"replace","path":"/texts/site.title","value":"Changed in a"}]""",
+                "application/json-patch+json");
+            patch.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
+            using var patched = await client.SendAsync(patch, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+            var after = await File.ReadAllTextAsync(textsFile, CancellationToken);
+            Assert.NotEqual(before, after);
+            Assert.Contains("Changed in a", after, StringComparison.Ordinal);
+
+            // The other tenant's application name, resource id and a path to its folder are unknown on this host.
+            using var otherManifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "b", "app-b", "application.json"), CancellationToken));
+            var otherId = otherManifest.RootElement.GetProperty("id").GetString()!;
+            using var otherTexts = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "b", "app-b", "texts", "en.json"), CancellationToken));
+            var otherTextsId = otherTexts.RootElement.GetProperty("id").GetString()!;
+            var refused = new (HttpMethod Method, string Path, string? Body, string? ContentType)[]
+            {
+                (HttpMethod.Get, "/api/studio/apps/AppB/resources", null, null),
+                (HttpMethod.Get, $"/api/studio/apps/AppA/resources/{otherId}", null, null),
+                (HttpMethod.Get, $"/api/studio/apps/AppA/resources/{otherTextsId}", null, null),
+                (HttpMethod.Patch, $"/api/studio/apps/AppA/resources/{otherTextsId}", """[{"op":"replace","path":"/texts/site.title","value":"x"}]""", "application/json-patch+json"),
+                (HttpMethod.Patch, "/api/studio/apps/AppB/resources/" + otherTextsId, """[{"op":"replace","path":"/texts/site.title","value":"x"}]""", "application/json-patch+json"),
+                (HttpMethod.Get, "/api/studio/apps/..%2Fb%2Fapp-b/resources", null, null),
+                (HttpMethod.Get, "/api/studio/apps/../b/app-b/resources", null, null),
+            };
+            foreach (var (method, path, body, contentType) in refused)
+            {
+                using var request = Request(method, path, "a.example.test", body, contentType);
+                request.Headers.TryAddWithoutValidation("If-Match", "\"x\"");
+                using var response = await client.SendAsync(request, CancellationToken);
+                Assert.True(response.StatusCode == HttpStatusCode.NotFound, $"{method} {path} answered {(int)response.StatusCode}.");
+            }
+
+            // The other tenant's file is untouched, and its own host still reads it.
+            Assert.DoesNotContain("\"x\"", await File.ReadAllTextAsync(Path.Combine(root, "b", "app-b", "texts", "en.json"), CancellationToken), StringComparison.Ordinal);
+            using var own = await client.SendAsync(Request($"/api/studio/apps/AppB/resources/{otherTextsId}", "b.example.test"), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, own.StatusCode);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static string[] SubfolderNames(string folder) =>
+        [.. Directory.GetDirectories(folder).Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal)];
+
+    private static async Task<string[]> ApplicationNamesAsync(HttpClient client, string host)
+    {
+        using var response = await client.SendAsync(Request("/api/studio/apps", host), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return [.. body.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("name").GetString()!)];
+    }
 
     [Fact]
     public async Task In_a_cell_a_tenant_takes_the_default_of_each_quota_unless_it_has_a_row()
