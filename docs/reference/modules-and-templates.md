@@ -195,9 +195,12 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   `type` are refused. Other field properties are not compared there. Removing a
   declared module from an application whose active release uses it counts as
   dropping each of its entities. Nothing is applied when activation is
-  refused. Modules ship no migrations, and a `migration` cannot name a
-  module entity: `AXC0214`. So an application cannot stop using a module once
-  its tables exist.
+  refused. Modules ship no migrations. An application `migration` may name an
+  entity of a module that `application.json` declares as `<module id>/<entity>`,
+  and then drops or converts a column of the application's copy. A migration
+  cannot drop a module entity, or name an entity of a module that is not
+  declared: `AXC0214`. So an application cannot stop using a module once its
+  tables exist.
 - **Texts.** A module's text keys start with `<module id>.`, or `AXC0209` is
   reported. A module ships one `text` resource per locale. Its texts join the
   application's texts of the same locale, ignoring letter case, so labels in
@@ -234,7 +237,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a module the application uses, declared or only depended on. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
-| `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
+| `AXC0214` | A `migration` names a module entity wrongly. Its `entity` contains `/` and names a module that `application.json` does not declare, reported at `/entity`. Or a `dropEntity` change names a module entity, reported at `/changes/{i}/type`. Reported at compile. |
 | `AXC0292` | A role slot of the pinned module version has no key in the entry's `roles`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/roles`, or at `/modules/{i}` when the entry has no `roles`. An entry of a `module.json` is checked the same way for the role slots of the module it names, and reported in `modules/<id>/module.json` of the module that holds it. |
 | `AXC0293` | A role slot is mapped to a name that is not a role the application declares. Reported at `/modules/{i}/roles/{slot}`, with `~` written `~0` and `/` written `~1`. A role whose file failed its own schema is not reported again. In an entry of a `module.json` the name must be a role slot of the module that holds the entry, matched exactly, and the report is in that `module.json`. |
 | `AXC0294` | A key in the entry's `roles` is not a role slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/roles/{key}`, escaped the same way. It is reported the same way in `modules/<id>/module.json` for an entry of a module. |

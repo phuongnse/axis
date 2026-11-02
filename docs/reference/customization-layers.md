@@ -204,7 +204,11 @@ still reads is built. Changing a field and dropping the column of a removed fiel
   forms, pages and processes do not show it until a layer on them adds it.
 - **Changing a field** _(planned for M25)_. A layer may change a label, a default, `required`, a length, a range or an
   enum's `values`. A change of type, and a field removed, follow the
-  [migration](migrations.md#migrations) rules of the application's own entities.
+  [migration](migrations.md#migrations) rules of the application's own entities. The
+  application's `migration` names the entity as `<module id>/<entity>`. Without it, activation is
+  refused, and the schema diagnostic (`AXC0015` for a column with no field, `AXC0016` for an
+  incompatible change) is reported in the layer file at the remove or at the changed property.
+  The active release stays.
 - **Removing a field** that the module still reads is refused with `AXC0375` at the remove, `/changes/fields/{i}`
   of the layer file. The readers are the entity's contract, and the module's data sources and forms on the entity
   that the application does not also layer, because a layer of its own can stop the reading. The names match

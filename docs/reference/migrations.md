@@ -316,7 +316,10 @@ in computed fields remain unbuilt (`AXC0050`). This section records
 [D30](../decisions/d30-schema-migrations.md).
 A [migration resource](resource-files.md#resource-file-shape) changes one
 entity's storage and runs once per tenant, before additive provisioning.
-Migrations run forward only.
+Migrations run forward only. A migration may name an entity of a declared module as
+`<module id>/<entity>`, to drop or convert a column that a
+[customization layer](customization-layers.md#module-entities) removed or retyped
+in the application's copy. It cannot drop the module entity.
 
 - **Pending.** A migration is pending when `axis.applied_migrations` has
   no matching row for its resource `id` in the tenant database.
