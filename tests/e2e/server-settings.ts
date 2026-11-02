@@ -3,9 +3,9 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 
-// The server compiles and activates all eight applications in the tenant when it starts: the generic test
+// The server compiles and activates all nine applications in the tenant when it starts: the generic test
 // application, the purchase request sample, the leave request sample, the service desk sample, the asset management sample,
-// the sub-process fixture, the host site fixture and the organization fixture.
+// the sub-process fixture, the host site fixture, the organization fixture and the approvals fixture.
 export const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 export const purchaseRequests = path.resolve(repoRoot, 'samples', 'apps', 'purchase-requests')
 export const leaveRequests = path.resolve(repoRoot, 'samples', 'apps', 'leave-requests')
@@ -25,6 +25,8 @@ export const hostSiteApp = path.resolve(import.meta.dirname, 'fixtures', 'host-s
 export const hostSiteHost = 'hostsite.localhost'
 /** An application that declares the built-in module `organization` and maps its slots `admin` to `department-manager` and `member` to `employee`. */
 export const organizationApp = path.resolve(import.meta.dirname, 'fixtures', 'organization-app')
+/** An application that declares the built-in modules `organization` and `approvals` and maps their slots `admin` to `department-manager` and `member` to `employee`. */
+export const approvalsApp = path.resolve(import.meta.dirname, 'fixtures', 'approvals-app')
 export const extensionsPath = path.resolve(repoRoot, 'artifacts', 'extensions')
 export const modulesPath = path.resolve(repoRoot, 'artifacts', 'modules')
 export const templatesPath = path.resolve(repoRoot, 'artifacts', 'templates')

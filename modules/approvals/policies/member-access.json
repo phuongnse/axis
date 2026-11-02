@@ -25,6 +25,8 @@
       "actions": ["read"],
       "filter": "request.requester == currentUser() or decidedBy == currentUser()"
     },
+    { "name": "myRequestsRead", "dataSource": "MyRequests", "actions": ["read"] },
+    { "name": "requestDecisionsRead", "dataSource": "RequestDecisions", "actions": ["read"] },
     { "name": "requestApprovalStart", "process": "RequestApproval", "actions": ["start"] }
   ]
 }

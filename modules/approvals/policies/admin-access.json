@@ -8,6 +8,10 @@
     { "name": "requestTypeAll", "entity": "RequestType", "actions": ["read", "create", "update", "delete"] },
     { "name": "requestRead", "entity": "Request", "actions": ["read", "export"] },
     { "name": "decisionRead", "entity": "Decision", "actions": ["read", "export"] },
+    { "name": "requestsAll", "dataSource": "Requests", "actions": ["read", "export"] },
+    { "name": "requestTypesAll", "dataSource": "RequestTypes", "actions": ["read", "export"] },
+    { "name": "decisionsAll", "dataSource": "Decisions", "actions": ["read", "export"] },
+    { "name": "requestDecisionsRead", "dataSource": "RequestDecisions", "actions": ["read"] },
     { "name": "requestApprovalInspect", "process": "RequestApproval", "actions": ["inspect"] }
   ]
 }
