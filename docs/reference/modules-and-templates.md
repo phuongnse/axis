@@ -555,9 +555,9 @@ The manifest is `template.json` at the root of the folder:
 - **Manifest.** `template.json` has `kind: applicationTemplate`, an `id`
   (lower-case letters, digits and `-`, starting with a letter), a SemVer
   `version`, a `title` and a `description`. The title and the description each
-  have an `en` and a `vi` text. _(planned for M26)_ `"builtIn": true` marks a
-  [built-in application](built-in-modules.md#where-they-live), which Studio lists
-  first.
+  have an `en` and a `vi` text. `builtIn` is an optional boolean. `"builtIn": true`
+  marks a [built-in application](built-in-modules.md#where-they-live), which Studio
+  lists first. Any other value leaves the template out.
 - **One site.** A template holds exactly one site. The site path of a copy
   follows the new name, and that rule is only clear for a single site.
 - **Installation.** Templates are installed per installation under
@@ -571,7 +571,8 @@ The manifest is `template.json` at the root of the folder:
   version's folder, as `request-approval/1.0.0`, and has no `AXC` code.
 - **Listing.** `GET /api/studio/templates` lists the newest version of each
   template, with the diagnostics of compiling it in memory. A template that does
-  not compile is still listed.
+  not compile is still listed. Built-in templates come first, then the others,
+  each group sorted by id.
 - **Copy**. A copy takes every `*.json` file of the template except
   `template.json`, in the same folders.
   - The top-level `id` of each resource becomes a new UUID. Seed record ids stay,

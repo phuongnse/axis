@@ -1002,6 +1002,7 @@
   "shell.studio.newApplication.name": "Name",
   "shell.studio.newApplication.template": "Start from",
   "shell.studio.newApplication.blank": "Blank",
+  "shell.studio.newApplication.builtIn": "Built in",
   "shell.studio.newApplication.create": "Create",
   "shell.studio.newApplication.exists": "An application with this name already exists.",
   "shell.studio.newApplication.invalid": "A name uses letters and digits, starts with a letter, has at most 60 characters and is not api, health, assets or studio.",

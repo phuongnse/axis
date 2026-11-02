@@ -1002,6 +1002,7 @@
   "shell.studio.newApplication.name": "Tên",
   "shell.studio.newApplication.template": "Bắt đầu từ",
   "shell.studio.newApplication.blank": "Trống",
+  "shell.studio.newApplication.builtIn": "Tích hợp sẵn",
   "shell.studio.newApplication.create": "Tạo",
   "shell.studio.newApplication.exists": "Đã có ứng dụng với tên này.",
   "shell.studio.newApplication.invalid": "Tên dùng chữ cái và chữ số, bắt đầu bằng chữ cái, dài tối đa 60 ký tự và không được là api, health, assets hay studio.",

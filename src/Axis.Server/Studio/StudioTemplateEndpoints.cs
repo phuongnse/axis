@@ -5,11 +5,12 @@ using Axis.Configuration.Templates;
 namespace Axis.Server.Studio;
 
 /// <summary>
-/// <c>GET /api/studio/templates</c> lists the newest installed version of each application template, sorted by id, as
-/// <c>{ items }</c>. An item is <c>{ id, version, title, description, diagnostics }</c>. The title and the description each
-/// have an <c>en</c> and a <c>vi</c> text. <c>diagnostics</c> are those of compiling the template in memory without its
-/// <c>template.json</c>, so a template that does not compile is still listed. The template catalog is read once at start,
-/// and the route takes no path from the request. It answers 401 without a session and 403 without the author role.
+/// <c>GET /api/studio/templates</c> lists the newest installed version of each application template as <c>{ items }</c>.
+/// Built-in templates come first, then the others, each group sorted by id. An item is
+/// <c>{ id, version, builtIn, title, description, diagnostics }</c>. The title and the description each have an <c>en</c>
+/// and a <c>vi</c> text. <c>diagnostics</c> are those of compiling the template in memory without its <c>template.json</c>,
+/// so a template that does not compile is still listed. The template catalog is read once at start, and the route takes
+/// no path from the request. It answers 401 without a session and 403 without the author role.
 /// </summary>
 internal static class StudioTemplateEndpoints
 {
@@ -29,9 +30,11 @@ internal static class StudioTemplateEndpoints
         }
 
         var items = templates.Newest
+            .OrderBy(template => !template.Manifest.BuiltIn)
             .Select(template => new StudioTemplateItem(
                 template.Manifest.Id,
                 template.Manifest.Version,
+                template.Manifest.BuiltIn,
                 new StudioTemplateText(template.Manifest.Title.En, template.Manifest.Title.Vi),
                 new StudioTemplateText(template.Manifest.Description.En, template.Manifest.Description.Vi),
                 StudioDiagnostics.CompileFiles(template.Files, packages, modules)))
@@ -45,6 +48,7 @@ internal sealed record StudioTemplateListResponse(IReadOnlyList<StudioTemplateIt
 internal sealed record StudioTemplateItem(
     string Id,
     string Version,
+    bool BuiltIn,
     StudioTemplateText Title,
     StudioTemplateText Description,
     IReadOnlyList<StudioDiagnostic> Diagnostics);
