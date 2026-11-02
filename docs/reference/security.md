@@ -890,8 +890,8 @@ The `false` filters add nothing. Someone else's draft matches neither
 filter, so it does not exist for them.
 
 Equality is [null-safe](expressions.md#null-semantics), so a
-department manager's filter `department.manager == currentUser()` is
-`false`, not `null`, for a request whose department has no manager. That
+department manager's filter `department.head.user == currentUser()` is
+`false`, not `null`, for a request whose department has no head. That
 grant adds nothing for the request.
 
 A `null` filter adds nothing either. Suppose a policy granted `read` with the

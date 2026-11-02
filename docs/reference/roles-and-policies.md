@@ -72,7 +72,7 @@ fields rules below: the data source endpoint adds the root entity's read
 filters to its query and refuses a data source that shows a field the user
 may not read. The purchase request sample uses the four policies below.
 Employees reach their own requests, department managers the requests of
-their department, and finance reviewers the submitted requests and their
+the departments they head, and finance reviewers the submitted requests and their
 outcomes. Operators inspect the approvals and change nothing:
 
 ```json
@@ -91,7 +91,8 @@ outcomes. Operators inspect the approvals and change nothing:
       "filter": "requester == currentUser() and status in ('draft', 'returned')",
       "fields": ["title", "department", "supplier", "currency", "lineItems", "status"]
     },
-    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
     { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
     { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "name": "purchaseRequestApprovalStart", "process": "PurchaseRequestApproval", "actions": ["start"] }
@@ -107,8 +108,9 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["department-manager"],
   "grants": [
-    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
-    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.head.user == currentUser()" },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
     { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
     { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] }
@@ -125,7 +127,8 @@ outcomes. Operators inspect the approvals and change nothing:
   "roles": ["finance-reviewer"],
   "grants": [
     { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
-    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
     { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
     { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] },
@@ -143,7 +146,7 @@ outcomes. Operators inspect the approvals and change nothing:
   "roles": ["operator"],
   "grants": [
     { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"] },
-    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
     { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
     { "name": "purchaseRequestApprovalInspect", "process": "PurchaseRequestApproval", "actions": ["inspect"] }
   ]

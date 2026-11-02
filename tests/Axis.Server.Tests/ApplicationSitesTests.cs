@@ -419,7 +419,7 @@ public sealed class ApplicationSitesTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
 
-        var entityTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "Departments")!.Widgets));
+        var entityTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "Suppliers")!.Widgets));
         var dataSourceTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "PurchaseRequests")!.Widgets));
 
         Assert.NotNull(entityTable.Entity);

@@ -61,7 +61,7 @@ public sealed class ScenarioCompilerTests
                 } },
               { "type": "createRecord", "entity": "Nope", "as": "requester", "save": "other", "values": {} },
               { "type": "createRecord", "entity": "LineItem", "as": "requester", "values": {} },
-              { "type": "createRecord", "entity": "Department", "as": "requester", "save": "department", "values": {} },
+              { "type": "createRecord", "entity": "organization/Department", "as": "requester", "save": "department", "values": {} },
               { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": {} },
               { "type": "startProcess", "process": "Unknown", "record": "request", "as": "requester" },
               { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "missing", "as": "nobody" },
@@ -185,7 +185,7 @@ public sealed class ScenarioCompilerTests
 
     [Theory]
     [InlineData("""{ "type": "teleport", "record": "request" }""")]
-    [InlineData("""{ "type": "createRecord", "entity": "Department", "as": "requester", "save": "dept", "values": {}, "expect": "denied" }""")]
+    [InlineData("""{ "type": "createRecord", "entity": "organization/Department", "as": "requester", "save": "dept", "values": {}, "expect": "denied" }""")]
     [InlineData("""{ "type": "expectRecord", "record": "request", "values": {}, "expect": "denied" }""")]
     [InlineData("""{ "type": "deleteRecord", "record": "request" }""")]
     [InlineData("""{ "type": "expectTask", "record": "request", "step": "managerApproval" }""")]
@@ -405,7 +405,7 @@ public sealed class ScenarioCompilerTests
               { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request",
                 "values": {
                   "TITLE": "Laptops",
-                  "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+                  "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
                   "supplier": null,
                   "currency": "EUR",
                   "submittedAt": "2026-10-01T09:00:00Z",
@@ -462,7 +462,7 @@ public sealed class ScenarioCompilerTests
             .With(ScenarioFile, Scenario("""
                 "users": { "requester": ["employee"] },
                 "steps": [
-                  { "type": "createRecord", "entity": "Department", "as": "requester", "save": "dept", "values": {} },
+                  { "type": "createRecord", "entity": "organization/Department", "as": "requester", "save": "dept", "values": {} },
                   { "type": "createRecord", "entity": "ScenarioTag", "as": "requester", "save": "t", "values": {} },
                   { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": { "supplier": "dept", "department": "later" } },
                   { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "self", "values": { "department": "self" } },
@@ -471,7 +471,7 @@ public sealed class ScenarioCompilerTests
                     "values": { "tag": "t", "tags": ["t", "ghost", "6f9619ff-8b86-d011-b42d-00c04fc964ff", 5], "lines": [{ "tag": "t" }, { "tag": "dept" }] } },
                   { "type": "updateRecord", "record": "card", "as": "requester", "values": { "tags": "t", "tag": null } },
                   { "type": "expectRecord", "record": "card", "values": { "tag": "t", "tags": [] } },
-                  { "type": "createRecord", "entity": "Department", "as": "requester", "save": "later", "values": {} }
+                  { "type": "createRecord", "entity": "organization/Department", "as": "requester", "save": "later", "values": {} }
                 ]
                 """));
 

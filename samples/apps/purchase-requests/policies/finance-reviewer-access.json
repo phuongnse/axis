@@ -6,7 +6,8 @@
   "roles": ["finance-reviewer"],
   "grants": [
     { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
-    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
     { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
     { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] },

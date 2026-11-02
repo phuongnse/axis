@@ -7,7 +7,7 @@
   "process": "PurchaseRequestApproval",
   "input": [
     { "name": "title", "type": "text", "required": true, "maxLength": 200 },
-    { "name": "department", "type": "reference", "target": "Department", "required": true },
+    { "name": "department", "type": "reference", "target": "organization/Department", "required": true },
     { "name": "supplier", "type": "reference", "target": "Supplier" },
     { "name": "currency", "type": "enum", "values": ["VND", "USD", "EUR"] },
     { "name": "lineItems", "type": "child-collection", "target": "LineItem" }

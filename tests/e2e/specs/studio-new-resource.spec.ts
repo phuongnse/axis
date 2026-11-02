@@ -118,7 +118,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await values.press('Escape')
 
     await addField(page, 2, 'department', 'reference')
-    await pick(page, 'studio-field-/fields/2/target', 'Department')
+    await pick(page, 'studio-field-/fields/2/target', 'Supplier')
     await addField(page, 3, 'tasks', 'child-collection')
     await pick(page, 'studio-field-/fields/3/target', 'ProjectTask')
 
@@ -130,7 +130,7 @@ test.describe('Studio creates a resource from a starter', () => {
     expect(project.fields).toEqual([
       { name: 'name', type: 'text' },
       { name: 'stage', type: 'enum', values: ['open', 'closed'] },
-      { name: 'department', type: 'reference', target: 'Department' },
+      { name: 'department', type: 'reference', target: 'Supplier' },
       { name: 'tasks', type: 'child-collection', target: 'ProjectTask' },
     ])
   })
@@ -204,7 +204,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await tag('studio-field-/fields/3/accept', 'image/*')
 
     await addField(page, 4, 'departments', 'references')
-    await pick(page, 'studio-field-/fields/4/target', 'Department')
+    await pick(page, 'studio-field-/fields/4/target', 'Supplier')
     await addField(page, 5, 'lines', 'child-collection')
     await pick(page, 'studio-field-/fields/5/target', 'ShipmentLine')
 
@@ -224,7 +224,7 @@ test.describe('Studio creates a resource from a starter', () => {
       },
       { name: 'amount', type: 'money', currencyField: 'currencyCode' },
       { name: 'receipt', type: 'file', maxSize: 1048576, accept: ['application/pdf', 'image/*'] },
-      { name: 'departments', type: 'references', target: 'Department' },
+      { name: 'departments', type: 'references', target: 'Supplier' },
       { name: 'lines', type: 'child-collection', target: 'ShipmentLine' },
     ])
   })

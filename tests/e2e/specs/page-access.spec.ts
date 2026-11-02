@@ -14,7 +14,7 @@ const recordsPath = `${appPath}/entities/PurchaseRequest/records`
 
 /** The id of the seeded department named `name`, read from the record API. */
 async function departmentId(page: Page, name: string) {
-  const response = await page.request.get(`${appPath}/entities/Department/records?pageSize=100`)
+  const response = await page.request.get(`${appPath}/entities/organization/Department/records?pageSize=100`)
   expect(response.status()).toBe(200)
   const body = (await response.json()) as { items: { id: string; values: { name: string } }[] }
   const department = body.items.find((item) => item.values.name === name)

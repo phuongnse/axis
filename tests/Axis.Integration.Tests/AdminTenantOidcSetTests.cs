@@ -26,7 +26,7 @@ namespace Axis.Integration.Tests;
 public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string Departments = "/api/apps/PurchaseRequests/entities/Department/records";
+    private const string Departments = "/api/apps/PurchaseRequests/entities/organization/Department/records";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
