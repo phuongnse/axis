@@ -45,6 +45,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.ActionProcess, "page", "$defs/rowAction/properties/process", "process"),
         (ReferenceRelations.NavigatePage, "page", "$defs/rowAction/properties/page", "page"),
         (ReferenceRelations.NavigatePage, "page", "$defs/navigateAction/properties/page", "page"),
+        (ReferenceRelations.NavigatePage, "page", "$defs/toolbarAction/properties/page", "page"),
         (ReferenceRelations.FormEntity, "form", "properties/entity", "entity"),
         (ReferenceRelations.SeedEntity, "seed", "properties/entity", "entity"),
         (ReferenceRelations.DataSourceEntity, "dataSource", "properties/entity", "entity"),

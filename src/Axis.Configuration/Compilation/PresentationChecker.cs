@@ -433,6 +433,7 @@ internal static class PresentationChecker
 
         var leaves = new List<(WidgetDefinition Widget, string Path)>();
         CheckWidgets(page.Widgets, "/widgets", 1, leaves, page, references, diagnostics);
+        CheckNames(page, Report);
 
         // A form page opens a record, which a navigate action names with 'record'.
         if (page.Parameters.Count > 0 && leaves.Any(leaf => leaf.Widget.Type == "form"))
@@ -537,6 +538,76 @@ internal static class PresentationChecker
             {
                 ApplicationCompiler.CheckTextKey(widget.Title!, page, $"{path}/title", references, diagnostics);
                 CheckWidgets(children, $"{path}/widgets", level + 1, leaves, page, references, diagnostics);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks that a widget name is unique on the page, ignoring letter case, at any depth, and that the names of the actions,
+    /// columns and tabs of each list are unique in that list. A repeat is reported at its name.
+    /// </summary>
+    private static void CheckNames(PageResource page, Action<string, string, string> report)
+    {
+        var firstPathByWidgetName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        CheckWidgetNames(page.Widgets, "/widgets", firstPathByWidgetName, report);
+    }
+
+    private static void CheckWidgetNames(
+        IReadOnlyList<WidgetDefinition> widgets,
+        string listPath,
+        Dictionary<string, string> firstPathByWidgetName,
+        Action<string, string, string> report)
+    {
+        for (var index = 0; index < widgets.Count; index++)
+        {
+            var widget = widgets[index];
+            var path = $"{listPath}/{index}";
+            if (widget.Name is { } name && !firstPathByWidgetName.TryAdd(name, $"{path}/name"))
+            {
+                report(
+                    DiagnosticCodes.DuplicatePageElementName,
+                    $"The widget name '{name}' is already used at '{firstPathByWidgetName[name]}'. A page names each widget once, ignoring letter case.",
+                    $"{path}/name");
+            }
+
+            CheckElementNames(widget.Actions?.Select(action => action.Name) ?? [], $"{path}/actions", report);
+            CheckElementNames(widget.RowActions?.Select(action => action.Name) ?? [], $"{path}/rowActions", report);
+            CheckElementNames(widget.ToolbarActions?.Select(action => action.Name) ?? [], $"{path}/toolbarActions", report);
+            CheckElementNames(widget.Columns?.Select(column => column.Name) ?? [], $"{path}/columns", report);
+            CheckElementNames(widget.Tabs?.Select(tab => tab.Name) ?? [], $"{path}/tabs", report);
+
+            var columns = widget.Columns ?? [];
+            for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
+            {
+                CheckWidgetNames(columns[columnIndex].Widgets, $"{path}/columns/{columnIndex}/widgets", firstPathByWidgetName, report);
+            }
+
+            var tabs = widget.Tabs ?? [];
+            for (var tabIndex = 0; tabIndex < tabs.Count; tabIndex++)
+            {
+                CheckWidgetNames(tabs[tabIndex].Widgets, $"{path}/tabs/{tabIndex}/widgets", firstPathByWidgetName, report);
+            }
+
+            if (widget.Widgets is { } children)
+            {
+                CheckWidgetNames(children, $"{path}/widgets", firstPathByWidgetName, report);
+            }
+        }
+    }
+
+    /// <summary>Checks that the names of one list's elements are unique, ignoring letter case, and reports a repeat at its name.</summary>
+    private static void CheckElementNames(IEnumerable<string?> names, string listPath, Action<string, string, string> report)
+    {
+        var firstPathByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, index) in names.Select((name, index) => (name, index)))
+        {
+            var path = $"{listPath}/{index}/name";
+            if (name is not null && !firstPathByName.TryAdd(name, path))
+            {
+                report(
+                    DiagnosticCodes.DuplicatePageElementName,
+                    $"The name '{name}' is already used at '{firstPathByName[name]}'. Each element of a list has its own name, ignoring letter case.",
+                    path);
             }
         }
     }
