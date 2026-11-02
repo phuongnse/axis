@@ -63,6 +63,9 @@ public sealed record FieldDefinition
     /// <summary>Whether the server sets the field to the id of the user who creates the record, or null when not declared.</summary>
     public bool? Creator { get; init; }
 
+    /// <summary>Whether the field holds a user id and gets a route that searches user profiles, or null when not declared.</summary>
+    public bool? UserId { get; init; }
+
     /// <summary>Whether a search matches the field and the field gets a trigram index, or null when not declared.</summary>
     public bool? Searchable { get; init; }
 

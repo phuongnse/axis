@@ -32,7 +32,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenant_quotas", "tenants"], tables);
     }
 
     [Theory]
@@ -236,7 +236,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenant_quotas", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)

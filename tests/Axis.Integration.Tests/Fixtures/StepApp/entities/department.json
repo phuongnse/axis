@@ -6,6 +6,6 @@
   "displayField": "name",
   "fields": [
     { "name": "name", "type": "text", "required": true },
-    { "name": "manager", "type": "text" }
+    { "name": "manager", "type": "text", "userId": true }
   ]
 }

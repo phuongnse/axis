@@ -1271,6 +1271,7 @@ public static partial class ApplicationCompiler
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
+            CheckUserId(field, path, childOwner, Report);
             CheckSearchable(field, path, Report);
             CheckSensitiveFlags(entity, field, path, Report);
             CheckMatch(entity, field, path, childOwner, findEntity, moduleReferences, Report);
@@ -1591,6 +1592,32 @@ public static partial class ApplicationCompiler
         if (problem is not null)
         {
             report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/creator");
+        }
+    }
+
+    /// <summary>
+    /// Checks a field's <c>userId</c> property: it applies only to text fields, and a user id field
+    /// is neither computed, numbered nor a creator field, and not on a child entity. Only the first
+    /// problem is reported.
+    /// </summary>
+    private static void CheckUserId(
+        FieldDefinition field, string path, ChildOwner? childOwner, Action<string, string, string> report)
+    {
+        if (field.UserId is not { } userId)
+        {
+            return;
+        }
+
+        var problem = FieldTypes.Parse(field.Type) != FieldType.Text ? $"'userId' applies only to text fields, not to {field.Type} fields."
+            : !userId ? null
+            : field.Creator == true ? "A 'userId' field cannot be a 'creator' field: the server sets a creator field to the user who created the record."
+            : field.Expression is not null ? "A 'userId' field cannot have an 'expression': clients write the user id."
+            : field.Sequence is not null ? "A 'userId' field cannot have a 'sequence': clients write the user id."
+            : childOwner is not null ? $"A 'userId' field cannot belong to a child entity, but this entity is owned by '{childOwner}'."
+            : null;
+        if (problem is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/userId");
         }
     }
 
@@ -3193,6 +3220,7 @@ public static partial class ApplicationCompiler
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
             Creator = field.Creator == true,
+            UserId = field.UserId == true,
             Searchable = field.Searchable == true,
             Default = field.Default is null
                 ? null
