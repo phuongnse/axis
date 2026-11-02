@@ -7,11 +7,21 @@ using Json.Schema;
 
 namespace Axis.Configuration.Compilation;
 
+/// <summary>An element that a layer removes, by its key, with the path of the remove in the layer file.</summary>
+internal sealed record LayerRemove(string Key, string LayerPath);
+
 /// <summary>
-/// The module's resource with a layer's changes applied, and the path in the layer file of each property
-/// that came from the layer, by the JSON Pointer the property has in <see cref="Merged"/>.
+/// The module's resource with a layer's changes applied, and where each change came from. By the JSON
+/// Pointer a value has in <see cref="Merged"/>: <see cref="LayerPathByMergedPath"/> holds the path in the layer
+/// file of each value that the layer added or replaced, whole subtree included, and
+/// <see cref="ChangedPathByMergedPath"/> the path of each object, list or element that the layer changed in place.
+/// <see cref="Removes"/> are the elements the layer removed.
 /// </summary>
-internal sealed record LayerMergeResult(JsonNode Merged, IReadOnlyDictionary<string, string> LayerPathByMergedPath);
+internal sealed record LayerMergeResult(
+    JsonNode Merged,
+    IReadOnlyDictionary<string, string> LayerPathByMergedPath,
+    IReadOnlyDictionary<string, string> ChangedPathByMergedPath,
+    IReadOnlyList<LayerRemove> Removes);
 
 /// <summary>
 /// The module version that a layer applied to before, when the application's pin moves to another version: the
@@ -52,12 +62,14 @@ internal static class LayerMerger
     {
         var merged = JsonNode.Parse(module.GetRawText())!;
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        var changed = new Dictionary<string, string>(StringComparer.Ordinal);
+        var removes = new List<LayerRemove>();
         if (merged is JsonObject root && layer.Changes.ValueKind == JsonValueKind.Object)
         {
-            new Merging(kind, layer, map, diagnostics, upgrade).MergeObject(root, layer.Changes, "", "/changes", _identityProperties, upgrade?.Previous);
+            new Merging(kind, layer, map, changed, removes, diagnostics, upgrade).MergeObject(root, layer.Changes, "", "/changes", _identityProperties, upgrade?.Previous);
         }
 
-        return new LayerMergeResult(merged, map);
+        return new LayerMergeResult(merged, map, changed, removes);
     }
 
     /// <summary>
@@ -84,7 +96,14 @@ internal static class LayerMerger
         }
     }
 
-    private sealed class Merging(string kind, LayerResource layer, Dictionary<string, string> map, List<Diagnostic> diagnostics, LayerUpgrade? upgrade)
+    private sealed class Merging(
+        string kind,
+        LayerResource layer,
+        Dictionary<string, string> map,
+        Dictionary<string, string> changed,
+        List<LayerRemove> removes,
+        List<Diagnostic> diagnostics,
+        LayerUpgrade? upgrade)
     {
         public void MergeObject(JsonObject target, JsonElement change, string mergedPath, string layerPath, string[] skipped, JsonElement? previous)
         {
@@ -105,6 +124,7 @@ internal static class LayerMerger
                     : null;
                 if (current is JsonObject currentObject && property.Value.ValueKind == JsonValueKind.Object)
                 {
+                    changed[propertyMergedPath] = propertyLayerPath;
                     MergeObject(currentObject, property.Value, propertyMergedPath, propertyLayerPath, [], previousChild);
                 }
                 else if (current is JsonArray currentList
@@ -112,6 +132,7 @@ internal static class LayerMerger
                     && ListKeys.TryGet(kind, property.Name, out var listKey)
                     && listKey.Mode == ListKeyMode.Keyed)
                 {
+                    changed[propertyMergedPath] = propertyLayerPath;
                     target[property.Name] = MergeList(currentList, property.Value, listKey, propertyMergedPath, propertyLayerPath, previousChild);
                 }
                 else
@@ -145,6 +166,7 @@ internal static class LayerMerger
                     CheckRemove(element, key, keyProperty, position, elementLayerPath);
                     if (position >= 0)
                     {
+                        removes.Add(new LayerRemove(key!, elementLayerPath));
                         entries.RemoveAt(position);
                     }
                 }
@@ -208,6 +230,7 @@ internal static class LayerMerger
                     }
                     else if (node is JsonObject nodeObject && piece.ValueKind == JsonValueKind.Object)
                     {
+                        changed[elementMergedPath] = pieceLayerPath;
                         MergeObject(nodeObject, piece, elementMergedPath, pieceLayerPath, listKey.Ordered ? [keyProperty, AfterProperty, BeforeProperty] : [keyProperty], entry.Previous);
                     }
                     else if (!(node is JsonValue && piece.ValueKind == JsonValueKind.String && entry.Key is not null))
@@ -317,6 +340,7 @@ internal static class LayerMerger
         private JsonNode Replace(JsonElement value, string mergedPath, string layerPath)
         {
             var node = JsonNode.Parse(value.GetRawText())!;
+            map[mergedPath] = layerPath;
             Record(node, mergedPath, layerPath);
             return node;
         }

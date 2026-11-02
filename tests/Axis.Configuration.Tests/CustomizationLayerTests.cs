@@ -261,6 +261,67 @@ public sealed class CustomizationLayerTests
     }
 
     [Fact]
+    public void A_diagnostic_about_a_step_the_layer_added_is_reported_in_the_layer_file_at_the_step()
+    {
+        using var modules = Modules();
+        using var folder = Application().With(ReviewFile, Layer("approvals/Review", changes: """
+            { "steps": [ { "name": "extra", "type": "operation", "operation": "updateRecord", "set": { "title": "'x'" }, "next": "nowhere" } ] }
+            """));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownStep);
+        Assert.Equal((ReviewFile, "/changes/steps/0/next", Guid.Parse(LayerId)), (diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.DoesNotContain(compiled.Diagnostics, other => other.File == "modules/approvals/processes/Review.json");
+    }
+
+    [Fact]
+    public void A_diagnostic_caused_by_a_removed_step_is_reported_in_the_layer_file_at_the_remove()
+    {
+        using var modules = Modules();
+        using var folder = Application().With(ReviewFile, Layer("approvals/Review", changes: """{ "steps": [ { "name": "done", "remove": true } ] }"""));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var unknown = compiled.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCodes.UnknownStep).ToList();
+        Assert.Equal(2, unknown.Count);
+        Assert.All(unknown, diagnostic => Assert.Equal((ReviewFile, "/changes/steps/0", Guid.Parse(LayerId)), (diagnostic.File, diagnostic.Path, diagnostic.ResourceId)));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.File == "modules/approvals/processes/Review.json");
+    }
+
+    [Fact]
+    public void A_diagnostic_at_an_element_the_layer_changed_is_reported_at_that_element_in_the_layer_file()
+    {
+        using var modules = Modules();
+        using var folder = Application().With(ReviewFile, Layer("approvals/Review", changes: """{ "steps": [ { "name": "review", "dueIn": "P3D" } ], "start": "nowhere" }"""));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownStep);
+        Assert.Equal((ReviewFile, "/changes/start", Guid.Parse(LayerId)), (diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+    }
+
+    [Fact]
+    public void A_diagnostic_in_a_part_the_layer_left_untouched_stays_in_the_module_file()
+    {
+        using var modules = Modules();
+        modules.With("approvals/1.0.0/processes/Review.json", """
+            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "formatVersion": 1,
+              "entity": "Approval", "start": "review", "steps": [
+                { "name": "review", "type": "task", "label": { "textKey": "approvals.review" }, "assignee": { "user": "'u1'" }, "form": "ApprovalForm",
+                  "outcomes": [ { "name": "approve", "label": { "textKey": "approvals.approve" }, "next": "nowhere" } ] },
+                { "name": "done", "type": "end" }
+              ] }
+            """);
+        using var folder = Application().With(ReviewFile, Layer("approvals/Review"));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownStep);
+        Assert.Equal(("modules/approvals/processes/Review.json", "/steps/0/outcomes/0/next"), (diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
     public void A_newer_module_version_that_dropped_a_key_the_layer_changes_is_reported_in_the_layer_and_on_the_module_entry()
     {
         using var modules = ModulesWithRenamedStep();

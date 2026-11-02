@@ -40,6 +40,10 @@ public sealed class LayerMergerTests
             list.Select(element => (element![key]!.GetValue<string>(), element["x"]!.GetValue<int>())));
         Assert.Equal("/changes/" + property + "/0/x", result.LayerPathByMergedPath[$"/{property}/0/x"]);
         Assert.Equal("/changes/" + property + "/1/x", result.LayerPathByMergedPath[$"/{property}/1/x"]);
+        Assert.Equal("/changes/" + property + "/1", result.LayerPathByMergedPath[$"/{property}/1"]);
+        Assert.Equal("/changes/" + property + "/0", result.ChangedPathByMergedPath[$"/{property}/0"]);
+        Assert.Equal("/changes/" + property, result.ChangedPathByMergedPath[$"/{property}"]);
+        Assert.Equal([new LayerRemove("b", "/changes/" + property + "/2")], result.Removes);
     }
 
     [Theory]
