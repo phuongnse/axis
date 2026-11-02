@@ -80,7 +80,8 @@ panel are _(built)_.
   - Dropping on the step the drag started from does nothing. The panel's
     pickers can still set a transition to the same step.
   - Escape, or a click outside the menu, closes it and changes nothing.
-  - "New branch" adds a branch with an empty `when` that names the target.
+  - "New branch" adds a branch with the first free name `branch1`, `branch2`
+    and so on, an empty `when` and the target.
     "New outcome" adds an outcome with the first free name `outcome1`,
     `outcome2` and so on, an empty label key and the target. The diagnostics
     mark both until the author fills them in.
@@ -123,7 +124,8 @@ panel are _(built)_.
   has a Deadline section and an Escalations list, after Due in. Add deadline
   writes `deadline` with an empty `after` and `next`, and the author types the
   duration and picks the next step from the step names. Remove deadline removes
-  the key. Add escalation appends an escalation with an empty `after`, and
+  the key. Add escalation appends an escalation with the first free name `escalation1`,
+  `escalation2` and so on, and an empty `after`, and
   Remove escalation removes it. Each escalation has a Reassign switch, which
   adds `reassign` with the assignee editor of the task, and a Notify switch,
   which adds `notify` with the notify editor. Turning a switch off removes its

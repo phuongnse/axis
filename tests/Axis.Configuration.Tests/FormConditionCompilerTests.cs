@@ -44,8 +44,8 @@ public sealed class FormConditionCompilerTests
               { "name": "Details", "title": { "textKey": "orderLayout.details" }, "visibleWhen": "quantity > 0",
                 "fields": [ { "field": "note", "visibleWhen": "quantity > 1", "requiredWhen": "quantity is not null", "readOnlyWhen": "number == 'x'" },
                             { "field": "lines", "visibleWhen": "sum(lines, amount) > 0" } ] } ],
-            "steps": [ { "title": { "textKey": "orderLayout.first" }, "sections": [ "MAIN" ] },
-                       { "title": { "textKey": "orderLayout.second" }, "sections": [ "details" ] } ]
+            "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": [ "MAIN" ] },
+                       { "name": "step2", "title": { "textKey": "orderLayout.second" }, "sections": [ "details" ] } ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -258,8 +258,8 @@ public sealed class FormConditionCompilerTests
     {
         using var folder = Folder($$"""
             "sections": [ {{MainSection}}, {{DetailsSection}} ],
-            "steps": [ { "title": { "textKey": "orderLayout.first" }, "sections": [ "main", "missing" ] },
-                       { "title": { "textKey": "orderLayout.second" }, "sections": [ "details" ] } ]
+            "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": [ "main", "missing" ] },
+                       { "name": "step2", "title": { "textKey": "orderLayout.second" }, "sections": [ "details" ] } ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -273,13 +273,13 @@ public sealed class FormConditionCompilerTests
     }
 
     [Theory]
-    [InlineData("""[ "main", "details" ]""", """, { "title": { "textKey": "orderLayout.second" }, "sections": [ "Main" ] }""", "/steps/1/sections/0", "'/steps/0/sections/0'")]
+    [InlineData("""[ "main", "details" ]""", """, { "name": "step2", "title": { "textKey": "orderLayout.second" }, "sections": [ "Main" ] }""", "/steps/1/sections/0", "'/steps/0/sections/0'")]
     [InlineData("""[ "main", "details", "details" ]""", "", "/steps/0/sections/2", "'/steps/0/sections/1'")]
     public void Section_in_two_steps_is_reported_at_the_second_place(string first, string secondStep, string path, string firstPath)
     {
         using var folder = Folder($$"""
             "sections": [ {{MainSection}}, {{DetailsSection}} ],
-            "steps": [ { "title": { "textKey": "orderLayout.first" }, "sections": {{first}} }{{secondStep}} ]
+            "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": {{first}} }{{secondStep}} ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -291,6 +291,41 @@ public sealed class FormConditionCompilerTests
     }
 
     [Fact]
+    public void A_step_without_a_name_is_a_schema_violation_at_its_step()
+    {
+        using var folder = Folder($$"""
+            "sections": [ {{MainSection}}, {{DetailsSection}} ],
+            "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": [ "main" ] },
+                       { "title": { "textKey": "orderLayout.second" }, "sections": [ "details" ] } ]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path) == (DiagnosticCodes.SchemaViolation, FormFile, "/steps/1"));
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Two_steps_with_the_same_name_ignoring_letter_case_are_a_duplicate_on_the_later_step()
+    {
+        using var folder = Folder($$"""
+            "sections": [ {{MainSection}}, {{DetailsSection}} ],
+            "steps": [ { "name": "intro", "title": { "textKey": "orderLayout.first" }, "sections": [ "main" ] },
+                       { "name": "INTRO", "title": { "textKey": "orderLayout.second" }, "sections": [ "details" ] } ]
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateFormStepName, FormFile, "/steps/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'/steps/0'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void Section_in_no_step_and_an_unnamed_section_are_reported_at_the_section_when_steps_exist()
     {
         using var folder = Folder($$"""
@@ -298,7 +333,7 @@ public sealed class FormConditionCompilerTests
               {{MainSection}},
               {{DetailsSection}},
               { "title": { "textKey": "orderLayout.second" }, "fields": [ { "field": "lines" } ] } ],
-            "steps": [ { "title": { "textKey": "orderLayout.first" }, "sections": [ "main" ] } ]
+            "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": [ "main" ] } ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -327,7 +362,7 @@ public sealed class FormConditionCompilerTests
     {
         using var folder = Folder($$"""
             "sections": [ {{MainSection}} ],
-            "steps": [ { "title": { "textKey": "orderLayout.missing" }, "sections": [ "main" ] } ]
+            "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.missing" }, "sections": [ "main" ] } ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -340,9 +375,9 @@ public sealed class FormConditionCompilerTests
 
     [Theory]
     [InlineData(""" "steps": [] """, "/steps")]
-    [InlineData(""" "steps": [ { "title": { "textKey": "orderLayout.first" }, "sections": [] } ] """, "/steps/0/sections")]
-    [InlineData(""" "steps": [ { "sections": [ "main" ] } ] """, "/steps/0")]
-    [InlineData(""" "steps": [ { "title": { "textKey": "orderLayout.first" }, "sections": [ "main" ], "extra": 1 } ] """, "/steps/0/extra")]
+    [InlineData(""" "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": [] } ] """, "/steps/0/sections")]
+    [InlineData(""" "steps": [ { "name": "step1", "sections": [ "main" ] } ] """, "/steps/0")]
+    [InlineData(""" "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": [ "main" ], "extra": 1 } ] """, "/steps/0/extra")]
     public void Steps_that_break_the_schema_are_reported(string steps, string path)
     {
         using var folder = Folder($$"""

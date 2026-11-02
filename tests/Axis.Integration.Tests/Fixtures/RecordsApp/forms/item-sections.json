@@ -18,7 +18,7 @@
     }
   ],
   "steps": [
-    { "title": { "textKey": "itemSections.stepMain" }, "sections": ["main"] },
-    { "title": { "textKey": "itemSections.stepPricing" }, "sections": ["pricing"] }
+    { "name": "step1", "title": { "textKey": "itemSections.stepMain" }, "sections": ["main"] },
+    { "name": "step2", "title": { "textKey": "itemSections.stepPricing" }, "sections": ["pricing"] }
   ]
 }

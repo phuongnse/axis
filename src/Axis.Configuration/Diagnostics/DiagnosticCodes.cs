@@ -340,4 +340,6 @@ public static class DiagnosticCodes
     public const string UnknownRelaxPoint = "AXC0356";
     public const string DuplicateRelaxPoint = "AXC0357";
     public const string MissingRelaxReason = "AXC0358";
+    public const string DuplicateProcessElementName = "AXC0359";
+    public const string DuplicateFormStepName = "AXC0360";
 }

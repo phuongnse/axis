@@ -42,7 +42,8 @@ hidden or `readOnlyWhen` field.
   `readOnlyWhen` or hidden field too. See
   [the record API](record-api.md#create-update-and-delete) and
   [the task API](task-api.md#task-api-errors).
-- **Steps.** `steps` is an optional list on the form. Each step has a `title`
+- **Steps.** `steps` is an optional list on the form. Each step has a `name`,
+  unique in the form ignoring letter case, a `title`
   label and `sections`, a list of section names. When `steps` is present,
   every section has a `name` and is in exactly one step. The steps show in
   the order listed. A step whose sections are all hidden is skipped. Keep to
@@ -65,6 +66,8 @@ hidden or `readOnlyWhen` field.
     field's `visibleWhen`.
   - `AXC0227`: a section `name` already used, ignoring letter case, at
     `/sections/{i}/name`.
+  - `AXC0360`: a step `name` already used, ignoring letter case, at
+    `/steps/{s}/name`. A step without a `name` is `AXC0004`.
   - `AXC0228`: a step names a section the form does not have, at
     `/steps/{s}/sections/{k}`.
   - `AXC0229`: a step names a section that is already in a step, at the same
@@ -140,8 +143,8 @@ A wizard names its sections and lists them in `steps`. This form has two steps:
     }
   ],
   "steps": [
-    { "title": { "textKey": "ticket.steps.problem" }, "sections": ["problem"] },
-    { "title": { "textKey": "ticket.steps.triage" }, "sections": ["triage"] }
+    { "name": "step1", "title": { "textKey": "ticket.steps.problem" }, "sections": ["problem"] },
+    { "name": "step2", "title": { "textKey": "ticket.steps.triage" }, "sections": ["triage"] }
   ]
 }
 ```

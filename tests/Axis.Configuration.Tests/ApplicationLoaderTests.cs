@@ -121,7 +121,7 @@ public sealed class ApplicationLoaderTests
             .With("application.json", Manifest)
             .With("processes/review.json", Process("""
                 [
-                  { "name": "check", "type": "decision", "branches": [{ "when": "number is null", "next": "done" }], "otherwise": "done" },
+                  { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "number is null", "next": "done" }], "otherwise": "done" },
                   { "name": "done", "type": "end" }
                 ]
                 """));
@@ -137,7 +137,7 @@ public sealed class ApplicationLoaderTests
         Assert.Equal(["check", "done"], process.Steps.Select(step => step.Name));
         var check = process.Steps[0];
         Assert.Equal((ProcessStepDefinition.Decision, "done"), (check.Type, check.Otherwise));
-        Assert.Equal(new DecisionBranchDefinition { When = "number is null", Next = "done" }, Assert.Single(check.Branches!));
+        Assert.Equal(new DecisionBranchDefinition { Name = "branch1", When = "number is null", Next = "done" }, Assert.Single(check.Branches!));
         Assert.Equal((ProcessStepDefinition.End, null, null), (process.Steps[1].Type, process.Steps[1].Branches, process.Steps[1].Otherwise));
     }
 
@@ -145,7 +145,7 @@ public sealed class ApplicationLoaderTests
     [InlineData("""{ "name": "done", "type": "end", "next": "done" }""", "/steps/0/next", "Property 'next' is not allowed here.")]
     [InlineData("""{ "name": "done", "type": "end", "otherwise": "done" }""", "/steps/0/otherwise", "Property 'otherwise' is not allowed here.")]
     [InlineData("""{ "name": "done", "type": "decision", "branches": [], "otherwise": "done" }""", "/steps/0/branches", "Value should have at least 1 items (minItems)")]
-    [InlineData("""{ "name": "done", "type": "decision", "branches": [{ "when": "true", "next": "done" }] }""", "/steps/0", "Required properties [\"otherwise\"] are not present (required)")]
+    [InlineData("""{ "name": "done", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }] }""", "/steps/0", "Required properties [\"otherwise\"] are not present (required)")]
     public void Process_step_that_does_not_fit_its_type_is_one_schema_violation(string step, string path, string message)
     {
         using var folder = new TemporaryFolder()

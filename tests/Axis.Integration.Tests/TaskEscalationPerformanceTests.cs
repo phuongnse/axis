@@ -47,6 +47,7 @@ public sealed class TaskEscalationPerformanceTests(ProcessStepFixture fixture) :
               "deadline": { "after": "P1D", "next": "expired" },
               "escalations": [
                 {
+                  "name": "escalation1",
                   "after": "PT1H",
                   "reassign": { "role": "reviewer" },
                   "notify": {

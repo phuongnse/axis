@@ -17,7 +17,7 @@ public sealed class ListKeyTests
     // No layer targets an application or a scenario.
     private static readonly string[] _untargeted = [ResourceKinds.Application, ResourceKinds.Scenario];
 
-    private static readonly string[] _pendingKinds = [ResourceKinds.Process, ResourceKinds.Form, ResourceKinds.Page];
+    private static readonly string[] _pendingKinds = [ResourceKinds.Form, ResourceKinds.Page];
 
     [Fact]
     public void Every_object_list_in_the_schemas_agrees_with_the_table()
@@ -72,7 +72,7 @@ public sealed class ListKeyTests
     }
 
     [Fact]
-    public void A_pending_entry_in_a_kind_other_than_process_form_or_page_is_reported()
+    public void A_pending_entry_in_a_kind_other_than_form_or_page_is_reported()
     {
         var schema = Parse("""
             {
@@ -83,7 +83,7 @@ public sealed class ListKeyTests
 
         var problems = Problems(ResourceKinds.Entity, schema, Pending);
 
-        Assert.Equal(["entity: things is pending, which only a process, form or page list may be"], problems);
+        Assert.Equal(["entity: things is pending, which only a form or page list may be"], problems);
     }
 
     [Fact]
@@ -96,9 +96,9 @@ public sealed class ListKeyTests
             }
             """);
 
-        var problems = Problems(ResourceKinds.Process, schema, Pending);
+        var problems = Problems(ResourceKinds.Form, schema, Pending);
 
-        Assert.Equal(["process: things is pending, but its items already require name, so key it"], problems);
+        Assert.Equal(["form: things is pending, but its items already require name, so key it"], problems);
     }
 
     [Fact]
@@ -284,7 +284,7 @@ public sealed class ListKeyTests
                 case ListKeyMode.Pending:
                     if (!_pendingKinds.Contains(kind))
                     {
-                        problems.Add($"{kind}: {property} is pending, which only a process, form or page list may be");
+                        problems.Add($"{kind}: {property} is pending, which only a form or page list may be");
                     }
                     else if (objectItems.All(item => Requires(item, "name")))
                     {

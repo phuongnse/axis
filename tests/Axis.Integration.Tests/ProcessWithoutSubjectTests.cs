@@ -26,7 +26,7 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
           },
           "start": "check",
           "steps": [
-            { "name": "check", "type": "decision", "branches": [{ "when": "days > 5", "next": "late" }], "otherwise": "early" },
+            { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "days > 5", "next": "late" }], "otherwise": "early" },
             { "name": "late", "type": "end" },
             { "name": "early", "type": "end" }
           ]
@@ -46,7 +46,7 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
           },
           "start": "check",
           "steps": [
-            { "name": "check", "type": "decision", "branches": [{ "when": "toDate(now()) > date('2000-01-01')", "next": "late" }], "otherwise": "early" },
+            { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "toDate(now()) > date('2000-01-01')", "next": "late" }], "otherwise": "early" },
             { "name": "late", "type": "end" },
             { "name": "early", "type": "end" }
           ]

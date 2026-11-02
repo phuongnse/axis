@@ -33,7 +33,7 @@
     {
       "name": "financeCheck",
       "type": "decision",
-      "branches": [{ "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
+      "branches": [{ "name": "branch1", "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
       "otherwise": "markApproved"
     },
     {

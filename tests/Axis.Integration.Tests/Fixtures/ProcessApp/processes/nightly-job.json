@@ -6,7 +6,7 @@
   "parameters": [{ "name": "days", "type": "integer" }],
   "start": "check",
   "steps": [
-    { "name": "check", "type": "decision", "branches": [{ "when": "days > 30", "next": "done" }], "otherwise": "done" },
+    { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "days > 30", "next": "done" }], "otherwise": "done" },
     { "name": "done", "type": "end" }
   ]
 }

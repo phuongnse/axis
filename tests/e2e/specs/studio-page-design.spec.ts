@@ -616,6 +616,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
           sections: [problem],
           steps: [
             {
+              name: "step1",
               title: { textKey: "ticket.steps.problem" },
               sections: ["problem"],
             },

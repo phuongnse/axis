@@ -24,8 +24,8 @@ public sealed class ProcessCollectionPathTests(ProcessStepFixture fixture) : ICl
               "name": "check",
               "type": "decision",
               "branches": [
-                { "when": "count(shipment.lines) > 1", "next": "many" },
-                { "when": "count(shipment.lines) == 0 and sum(shipment.lines, quantity) == 0", "next": "none" }
+                { "name": "branch1", "when": "count(shipment.lines) > 1", "next": "many" },
+                { "name": "branch2", "when": "count(shipment.lines) == 0 and sum(shipment.lines, quantity) == 0", "next": "none" }
               ],
               "otherwise": "one"
             },
@@ -49,7 +49,7 @@ public sealed class ProcessCollectionPathTests(ProcessStepFixture fixture) : ICl
               "name": "check",
               "type": "decision",
               "branches": [
-                { "when": "count(shipment.lines, quantity >= outer.divisor) > 1", "next": "many" }
+                { "name": "branch1", "when": "count(shipment.lines, quantity >= outer.divisor) > 1", "next": "many" }
               ],
               "otherwise": "few"
             },

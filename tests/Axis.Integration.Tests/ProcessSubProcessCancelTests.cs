@@ -35,7 +35,7 @@ public sealed class ProcessSubProcessCancelTests(ProcessStepFixture fixture) : I
                     {
                       "name": "check",
                       "type": "decision",
-                      "branches": [{ "when": "round(amount / divisor, divisor) > 1", "next": "done" }],
+                      "branches": [{ "name": "branch1", "when": "round(amount / divisor, divisor) > 1", "next": "done" }],
                       "otherwise": "done"
                     },
                     { "name": "done", "type": "end" }

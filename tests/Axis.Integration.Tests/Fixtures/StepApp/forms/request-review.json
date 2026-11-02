@@ -12,5 +12,5 @@
       "fields": [{ "field": "title" }]
     }
   ],
-  "steps": [{ "title": { "textKey": "requestReview.step" }, "sections": ["main"] }]
+  "steps": [{ "name": "step1", "title": { "textKey": "requestReview.step" }, "sections": ["main"] }]
 }

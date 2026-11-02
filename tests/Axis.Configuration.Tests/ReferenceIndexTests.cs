@@ -763,7 +763,7 @@ public sealed class ReferenceIndexTests
                   "entity": "Order", "start": "check",
                   "startCondition": { "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" } },
                   "steps": [
-                    { "name": "check", "type": "decision", "branches": [ { "when": "IsLarge(quantity)", "next": "update" } ], "otherwise": "update" },
+                    { "name": "check", "type": "decision", "branches": [ { "name": "branch1", "when": "IsLarge(quantity)", "next": "update" } ], "otherwise": "update" },
                     { "name": "update", "type": "operation", "operation": "updateRecord", "set": { "quantity": "Doubled(quantity)" }, "next": "connect" },
                     { "name": "connect", "type": "operation", "operation": "callConnector",
                       "connector": { "name": "PurchasingSystem", "operation": "count" }, "input": { "count": "Doubled(quantity)" }, "next": "add" },

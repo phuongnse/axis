@@ -51,11 +51,26 @@ describe('connectEdit', () => {
     })
   })
 
-  it('appends a branch with an empty when for a new branch', () => {
+  it('appends a branch with the next free name and an empty when for a new branch', () => {
     const branches = (steps[2] as { branches: unknown[] }).branches
     expect(connectEdit(steps, 2, done, { kind: 'newBranch' })).toEqual({
       pointer: '/steps/2/branches',
-      value: [...branches, { when: '', next: 'done' }],
+      value: [...branches, { name: 'branch2', when: '', next: 'done' }],
+    })
+  })
+
+  it('skips a branch name that the decision already uses, ignoring letter case', () => {
+    const named = [
+      ...steps.slice(0, 2),
+      { ...(steps[2] as object), branches: [{ name: 'Branch1', when: 'a', next: 'done' }] },
+      ...steps.slice(3),
+    ]
+    expect(connectEdit(named, 2, done, { kind: 'newBranch' })).toEqual({
+      pointer: '/steps/2/branches',
+      value: [
+        { name: 'Branch1', when: 'a', next: 'done' },
+        { name: 'branch2', when: '', next: 'done' },
+      ],
     })
   })
 

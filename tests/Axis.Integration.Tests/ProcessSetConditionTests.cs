@@ -194,7 +194,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
                   "start": "route",
                   "steps": [
                     { "name": "route", "type": "decision", "branches": [
-                        { "when": "{{HasOffice}}", "next": "office" }
+                        { "name": "branch1", "when": "{{HasOffice}}", "next": "office" }
                       ], "otherwise": "other" },
                     { "name": "office", "type": "end" },
                     { "name": "other", "type": "end" }

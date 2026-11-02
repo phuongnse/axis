@@ -316,7 +316,11 @@ describe('addStep', () => {
       'section3',
     ])
     expect(add.steps).toEqual([
-      { title: { textKey: 'forms.ticket.steps.0.title' }, sections: ['section2', 'Section1', 'details', 'section3'] },
+      {
+        name: 'step1',
+        title: { textKey: 'forms.ticket.steps.0.title' },
+        sections: ['section2', 'Section1', 'details', 'section3'],
+      },
     ])
     expect(add.select).toBe('/steps/0')
   })
@@ -325,13 +329,27 @@ describe('addStep', () => {
     const add = addStep(
       {
         sections: [{ name: 'a', fields: [] }],
-        steps: [{ title: { textKey: 'forms.ticket.steps.0.title' }, sections: ['a'] }],
+        steps: [{ name: 'step1', title: { textKey: 'forms.ticket.steps.0.title' }, sections: ['a'] }],
       },
       keys,
     )
     expect(add.sections).toEqual([{ name: 'a', fields: [] }])
-    expect(add.steps?.[1]).toEqual({ title: { textKey: 'forms.ticket.steps.1.title' }, sections: [] })
+    expect(add.steps?.[1]).toEqual({ name: 'step2', title: { textKey: 'forms.ticket.steps.1.title' }, sections: [] })
     expect(add.select).toBe('/steps/1')
+  })
+
+  it('gives a new step the first name that no step uses, ignoring letter case', () => {
+    const add = addStep(
+      {
+        sections: [{ name: 'a', fields: [] }],
+        steps: [
+          { name: 'STEP2', title: { textKey: 'forms.ticket.steps.0.title' }, sections: ['a'] },
+          { title: { textKey: 'forms.ticket.steps.1.title' }, sections: [] },
+        ],
+      },
+      keys,
+    )
+    expect(((add.steps ?? [])[2] as { name: string }).name).toBe('step1')
   })
 })
 

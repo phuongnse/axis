@@ -15,7 +15,7 @@
     {
       "name": "count",
       "type": "decision",
-      "branches": [{ "when": "comment is null", "next": "mark" }],
+      "branches": [{ "name": "branch1", "when": "comment is null", "next": "mark" }],
       "otherwise": "done"
     },
     {

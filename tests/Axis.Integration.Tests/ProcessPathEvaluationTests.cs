@@ -147,8 +147,8 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
                   "start": "route",
                   "steps": [
                     { "name": "route", "type": "decision", "branches": [
-                        { "when": "{{SalesWithManager}}", "next": "managed" },
-                        { "when": "{{Sales}}", "next": "unmanaged" }
+                        { "name": "branch1", "when": "{{SalesWithManager}}", "next": "managed" },
+                        { "name": "branch2", "when": "{{Sales}}", "next": "unmanaged" }
                       ], "otherwise": "other" },
                     { "name": "managed", "type": "end" },
                     { "name": "unmanaged", "type": "end" },

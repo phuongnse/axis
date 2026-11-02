@@ -616,7 +616,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
       including unknown keys, stay.
     - **Decision and end panels** _(built)_. A decision shows its branches,
       each with a `when` expression and a target, and its `otherwise`. A branch
-      can be added and removed. An end step shows only its name and type.
+      can be added and removed, and a new one is named `branch1`, `branch2`... An end step shows only its name and type.
     - **Transitions** _(built)_. The start step, `next`, a branch's `next`,
       `otherwise` and an outcome's `next` pick their target from the step names
       of the unsaved draft. A target that is not a step stays visible and is
