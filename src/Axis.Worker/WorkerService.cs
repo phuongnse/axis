@@ -18,7 +18,7 @@ namespace Axis.Worker;
 /// <c>Worker:Concurrency</c> loops and one poll. The poll runs every <c>Worker:PollInterval</c>, and the loops share the
 /// active list of <see cref="TenantRounds"/>: the tenants that have work due, which get <c>Worker:Quantum</c> work items times
 /// their <c>workerWeight</c> in each turn. A loop takes the tenant whose turn it is, claims and runs one of its work items, and
-/// takes the next. A tenant leaves the list when a claim finds nothing due or a run fails, and the next poll puts it back.
+/// takes the next. A tenant leaves the list when a claim finds nothing due and none of its other items runs, or when a run fails, and the next poll puts it back.
 /// So a tenant with a large backlog does not hold back the others, and a tenant alone runs at full speed.
 /// The poll checks the tenants in ordinal order of their ids, then adds every tenant that is ready to the list in one step.
 /// A tenant whose database the server has not migrated yet is skipped until it has. Under the directory source the poll
@@ -170,7 +170,7 @@ internal sealed partial class WorkerService(
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (!_rounds.TryTake(out var tenantId))
+                if (!_rounds.TryTake(out var tenantId, out var ticket))
                 {
                     await _rounds.WaitForWorkAsync(stoppingToken);
                     continue;
@@ -181,7 +181,7 @@ internal sealed partial class WorkerService(
                 {
                     using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
                     {
-                        await RunNextAsync(loop, tenantId, stoppingToken);
+                        await RunNextAsync(loop, tenantId, ticket, stoppingToken);
                     }
                 }
                 finally
@@ -196,24 +196,23 @@ internal sealed partial class WorkerService(
         }
     }
 
-    private async Task RunNextAsync(int loop, string tenantId, CancellationToken stoppingToken)
+    private async Task RunNextAsync(int loop, string tenantId, long ticket, CancellationToken stoppingToken)
     {
+        var found = false;
+        var failed = false;
         try
         {
             // A tenant that left the directory at a refresh gets no more work.
             if (tenants.Find(tenantId) is null)
             {
-                _rounds.Leave(tenantId);
+                failed = true;
                 return;
             }
 
             health.ItemStarted(loop);
             try
             {
-                if (!await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken))
-                {
-                    _rounds.Leave(tenantId);
-                }
+                found = await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken);
             }
             finally
             {
@@ -225,7 +224,19 @@ internal sealed partial class WorkerService(
         {
             // A claimed item reappears when its lease expires.
             LogRunFailed(exception, tenantId);
-            _rounds.Leave(tenantId);
+            failed = true;
+        }
+        finally
+        {
+            // An empty claim only takes the tenant out of the list when none of its other items runs, because a running item may queue the next one.
+            if (failed)
+            {
+                _rounds.Fail(tenantId);
+            }
+            else
+            {
+                _rounds.Done(tenantId, ticket, found);
+            }
         }
     }
 

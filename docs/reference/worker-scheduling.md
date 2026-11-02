@@ -10,8 +10,8 @@ one way to run. How the worker runs one work item is in
 [architecture.md](../architecture.md) apply.
 
 **Today.** Every poll, after `Worker:PollInterval`, adds each tenant that is ready to the active list,
-and the loops run the tenants in the list. A tenant leaves the list when a claim finds nothing due or a
-run fails, and the next poll adds it again. So a tenant with a large backlog no longer holds back the
+and the loops run the tenants in the list. A tenant leaves the list when a claim finds nothing due and
+none of its other items runs, or when a run fails, and the next poll adds it again. So a tenant with a large backlog no longer holds back the
 others, but an idle cell still polls every database each round. Back-off and wake signals are planned,
 see [waking a tenant](#waking-a-tenant).
 
@@ -21,7 +21,9 @@ The worker runs weighted deficit round-robin over the tenants that have work due
 
 - **Active list.** The worker keeps the tenants that have work due in a list, in round order. A
   tenant joins at the end when a poll finds work due, or _(planned for M31)_ when it is woken. It
-  leaves when a claim finds nothing due. A poll adds every ready tenant in one step, in id order, so
+  leaves when a claim finds nothing due and none of its other items runs, because a running item may
+  queue the next one. While other items of the tenant run, an empty claim only pauses the tenant until
+  one of them ends. A poll adds every ready tenant in one step, in id order, so
   the first tenant does not run alone while the checks of the next one run.
 - **Quantum and weight.** Each round, every tenant in the list gets `Worker:Quantum` work items
   times its `workerWeight`, see [quotas](tenant-quotas.md#quotas), added to its deficit. The quantum

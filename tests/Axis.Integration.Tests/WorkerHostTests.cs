@@ -18,6 +18,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
 {
     private const string RecordKind = "test.record";
     private const string ThrowKind = "test.throw";
+    private const string ChainKind = "test.chain";
     private const string BindingKind = "test.binding";
     private const string PlainSecretKind = "test.plain-secret";
     private const string SecretCallKind = "test.secret-call";
@@ -122,6 +123,25 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         await host.StopAsync(CancellationToken);
 
         Assert.Equal(items.Order(), (await RunsAsync(tenantA)).Select(run => run.ItemId).Order());
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_chain_of_items_that_each_queue_the_next_runs_to_its_end_within_one_poll_interval()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_chain");
+        await EnqueueAsync(tenantA, "a", ChainKind);
+
+        var logs = new LogCollector();
+        using var host = BuildHost("worker", logs, new Dictionary<string, string?> { ["Worker:PollInterval"] = "00:01:00" }, ("a", tenantA));
+        await host.StartAsync(CancellationToken);
+
+        // Each step takes 50 ms and the poll runs once a minute, so a step that waits for a poll would not end the chain in time.
+        await WaitUntilAsync(
+            async () => await CountAsync(tenantA, "test_runs") == ChainHandler.Length && await CountAsync(tenantA, "axis.process_work_items") == 0,
+            "The chain did not run to its end.");
+        await host.StopAsync(CancellationToken);
+
         Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
     }
 
@@ -401,6 +421,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         builder.Services.AddSingleton<IWorkItemHandler>(services =>
             new RecordingHandler(worker, services.GetRequiredService<ITenantContextAccessor>()));
+        builder.Services.AddSingleton<IWorkItemHandler, ChainHandler>();
         builder.Services.AddSingleton<IWorkItemHandler, BindingHandler>();
         builder.Services.AddSingleton<IWorkItemHandler, PlainSecretHandler>();
         builder.Services.AddSingleton<IWorkItemHandler, SecretCallHandler>();
@@ -534,6 +555,42 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             command.Parameters.AddWithValue("tenant", accessor.Current!.TenantId);
             command.Parameters.AddWithValue("worker", worker);
             await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    /// <summary>Records a run, takes 50 ms, and queues the next item of the chain in the same transaction until the chain has its length.</summary>
+    private sealed class ChainHandler : IWorkItemHandler
+    {
+        public const int Length = 20;
+
+        public string Kind => ChainKind;
+
+        public async Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
+        {
+            await using (var command = new NpgsqlCommand(
+                "INSERT INTO test_runs (item_id, tenant_id, worker) VALUES (@item, @tenant, 'chain')",
+                context.Connection,
+                context.Transaction))
+            {
+                command.Parameters.AddWithValue("item", context.Item.Id);
+                command.Parameters.AddWithValue("tenant", context.Item.TenantId);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
+            long runs;
+            await using (var command = new NpgsqlCommand("SELECT count(*) FROM test_runs", context.Connection, context.Transaction))
+            {
+                runs = (long)(await command.ExecuteScalarAsync(cancellationToken))!;
+            }
+
+            if (runs < Length)
+            {
+                await WorkItemQueue.EnqueueAsync(context.Connection, context.Transaction, context.Item.TenantId, ChainKind, DateTimeOffset.UtcNow.AddMinutes(-1), cancellationToken);
+            }
         }
 
         public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>
