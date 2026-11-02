@@ -789,17 +789,15 @@ uses `ConnectionStrings:PlatformSchema`. It reads the directory at start. If tha
 read fails, it logs the failure once, retries every `Worker:PollInterval` and is
 not ready until a read works.
 
-Then it reads the directory again every `Tenancy:RefreshInterval`, without a
-restart. The refresh runs in the polling loop, between work items, so no
-connection pool is dropped while an item runs. A tenant that is `suspended`,
-`provisioning` or removed gets no new work item claimed after the next refresh.
-Work already claimed finishes. A tenant added as `active` is polled after the
-next refresh, once its runtime database role check passes. Until then the worker
-skips it, logs an error and runs the check again at each refresh. A tenant whose
-database settings change goes through the check again and gets a new connection
-pool. If a refresh fails, the worker keeps the last good read and logs an error,
-and `/health/ready` answers `200` with status `Degraded` until a refresh works.
-A long run of work items for one tenant delays the refresh until the run ends.
+Then it reads the directory again every `Tenancy:RefreshInterval`, without a restart. The refresh
+runs in the poll. It pauses the loops and waits for the items already running, not for a tenant's
+backlog, so no connection pool is dropped while an item runs. A tenant that is `suspended`,
+`provisioning` or removed gets no new work item claimed after the next refresh. Work already claimed
+finishes. A tenant added as `active` is polled after the next refresh, once its runtime database
+role check passes. Until then the worker skips it, logs an error and runs the check again at each
+refresh. A tenant whose database settings change goes through the check again and gets a new
+connection pool. If a refresh fails, the worker keeps the last good read and logs an error, and
+`/health/ready` answers `200` with status `Degraded` until a refresh works.
 
 The worker also reads the schema version of every tenant again at each poll
 round, and claims no new work for a tenant whose version is not its own. It runs
@@ -836,15 +834,17 @@ work items.
 | Setting                       | Default                 | Meaning                                                                                                                                                                                                                                                                                     |
 | ----------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Worker:LeaseDuration`        | `00:00:30`              | How long a claim lasts before another worker can claim the item.                                                                                                                                                                                                                            |
-| `Worker:PollInterval`         | `00:00:01`              | How long the worker waits before it polls again when it found no work.                                                                                                                                                                                                                      |
+| `Worker:PollInterval`         | `00:00:01`              | How long the worker waits between two polls of the tenants.                                                                                                                                                                                                                                 |
 | `Worker:MetricsInterval`      | `00:00:30`              | How often the worker reads each tenant database for the [due work item and pending computed field gauges](#worker-metrics). It must be positive.                                                                                                                                            |
+| `Worker:Concurrency`          | `4`                     | The loops that run work items at once, see [fair share](worker-scheduling.md#fair-share). It must be at least 1.                                                                                                                                                                            |
+| `Worker:Quantum`              | `10`                    | The work items a tenant of weight 1 runs in one turn, see [fair share](worker-scheduling.md#fair-share). It must be at least 1.                                                                                                                                                             |
 | `Worker:DeliveryAttempts`     | `5`                     | Failures of a delivery before it becomes a [dead letter](process-events.md#dead-letters). It must be at least 1.                                                                                                                                                                            |
 | `Worker:StatementTimeout`     | `00:01:00`              | The `statement_timeout` of every statement a work item runs. A statement past it fails the attempt, so the item is retried like any other failure of its kind, and a delivery counts it toward its dead letter. A value that is not a duration of at least one millisecond stops the start. |
 | `Notifications:RetentionDays` | `90`                    | How many days the worker keeps [in-app notifications](notifications.md#in-app-notifications). It must be an integer of at least 1.                                                                                                                                                          |
 | `Health:Urls`                 | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else.                                                                                                                                                                                   |
 
 As environment variables they are `Worker__LeaseDuration`,
-`Worker__PollInterval`, `Worker__MetricsInterval`, `Worker__DeliveryAttempts`, `Worker__StatementTimeout`, `Notifications__RetentionDays` and `Health__Urls`. What the health endpoints answer is in [health checks](../architecture.md#health-checks).
+`Worker__PollInterval`, `Worker__Concurrency`, `Worker__Quantum`, `Worker__MetricsInterval`, `Worker__DeliveryAttempts`, `Worker__StatementTimeout`, `Notifications__RetentionDays` and `Health__Urls`. What the health endpoints answer is in [health checks](../architecture.md#health-checks).
 
 The server migrates the tenant databases, and the worker does not. Before it
 claims work for a tenant, the worker checks that the processes migrations are
@@ -880,7 +880,7 @@ release cannot be loaded is counted without `axis.application` and
 | `axis.work_items.duration`       | histogram  | s               | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced`                                                                                                            |
 | `axis.process.instances.ended`   | counter    | `{instance}`    | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed`                                                                                          |
 | `axis.calls.attempts`            | counter    | `{attempt}`     | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
-| `axis.queries.timeouts`          | counter    | `{query}`       | `axis.tenant`, `axis.application` when the route has one. An interactive read that ran past `Data:QueryTimeout`, or a write past `Data:WriteTimeout`, see [Errors](record-api.md#errors)                                                |
+| `axis.queries.timeouts`          | counter    | `{query}`       | `axis.tenant`, `axis.application` when the route has one. An interactive read that ran past `Data:QueryTimeout`, or a write past `Data:WriteTimeout`, see [Errors](record-api.md#errors)           |
 | `axis.dead_letters.created`      | counter    | `{dead_letter}` | `axis.tenant`, `axis.work_item.kind`. See [Dead letters](process-events.md#dead-letters)                                                                                                           |
 | `axis.computed.pending_fields`   | gauge      | fields          | `axis.tenant`, `axis.application`. See [Recomputing computed fields](migrations.md#recomputing-computed-fields)                                                                                    |
 

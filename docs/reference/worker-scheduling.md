@@ -3,22 +3,26 @@
 Detailed reference for how the worker shares its time between the tenants of a [cell](cells.md). It
 follows [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_. It applies to every installation, not only to a cell,
-so the worker has one way to run. How the worker runs one work item is in
+[Fair share](#fair-share) is built. Waking a tenant, the metrics and the concurrency quotas are
+_(planned for M31)_. All of it applies to every installation, not only to a cell, so the worker has
+one way to run. How the worker runs one work item is in
 [process execution](process-execution.md), and it does not change. The conventions of
 [architecture.md](../architecture.md) apply.
 
-**Today.** The worker has one loop. It visits the tenants one after another, and runs a tenant until
-it has no work item left, then polls every tenant again after `Worker:PollInterval`. So a tenant with a
-large backlog holds back every other tenant, and an idle cell still polls every database each round.
+**Today.** Every poll, after `Worker:PollInterval`, adds each tenant that is ready to the active list,
+and the loops run the tenants in the list. A tenant leaves the list when a claim finds nothing due or a
+run fails, and the next poll adds it again. So a tenant with a large backlog no longer holds back the
+others, but an idle cell still polls every database each round. Back-off and wake signals are planned,
+see [waking a tenant](#waking-a-tenant).
 
 ## Fair share
 
 The worker runs weighted deficit round-robin over the tenants that have work due.
 
 - **Active list.** The worker keeps the tenants that have work due in a list, in round order. A
-  tenant joins at the end when a poll finds work due, or when it is woken. It leaves when a claim
-  finds nothing due.
+  tenant joins at the end when a poll finds work due, or _(planned for M31)_ when it is woken. It
+  leaves when a claim finds nothing due. A poll adds every ready tenant in one step, in id order, so
+  the first tenant does not run alone while the checks of the next one run.
 - **Quantum and weight.** Each round, every tenant in the list gets `Worker:Quantum` work items
   times its `workerWeight`, see [quotas](tenant-quotas.md#quotas), added to its deficit. The quantum
   is 10 by default and the weight 1. A tenant runs items while its deficit is at least 1, and each
@@ -29,18 +33,20 @@ The worker runs weighted deficit round-robin over the tenants that have work due
   two workers may today: the claim takes items with `FOR UPDATE SKIP LOCKED`, so no item runs twice.
 - **Several workers.** Each worker keeps its own list and deficits. Over several workers the shares
   stay fair on average, with no coordination between them.
-- **Concurrency quotas.** In a cell, a connector or package call needs a lease of the tenant's
+- **Concurrency quotas.** _(planned for M31)_ In a cell, a connector or package call needs a lease of the tenant's
   `concurrentConnectorCalls` quota before it is claimed, see
   [work at once](tenant-quotas.md#work-at-once). With no lease free, the tenant's turn passes to the
   next tenant, and the tenant keeps its place in the list.
 - **Housekeeping.** Deleting expired sessions, sweeping files and clearing old notifications and
   import files run on a timer of their own for each tenant, at most every 5 minutes, outside the
-  round. Today they run at each poll.
+  round.
 - **What a weight buys.** A tenant of weight 2 runs twice as many items in a round as a tenant of
   weight 1 when both have a backlog. A tenant alone in the list runs at full speed, whatever its
   weight.
 
 ## Waking a tenant
+
+_(planned for M31)_
 
 An idle tenant is polled less and less often, and a wake signal brings it back at once.
 
@@ -62,6 +68,8 @@ An idle tenant is polled less and less often, and a wake signal brings it back a
 - **What wakes whom.** A signal names only a tenant id. It holds no record, process or user.
 
 ## Metrics
+
+_(planned for M31)_
 
 - `axis.work_items.claim_delay` keeps its `axis.tenant` attribute, as in the
   [worker metrics](process-execution.md#worker-metrics). The [cell load test](performance.md#cell-load-test) checks it for every

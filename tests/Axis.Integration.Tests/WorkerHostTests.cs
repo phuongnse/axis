@@ -59,6 +59,73 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
     }
 
     [Fact]
+    public async Task Two_worker_hosts_with_four_loops_each_run_every_due_item_of_two_tenants_exactly_once()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_loops_a");
+        var tenantB = await CreateTenantDatabaseAsync("worker_loops_b");
+        var itemsA = await EnqueueManyAsync(tenantA, "a", 120);
+        var itemsB = await EnqueueManyAsync(tenantB, "b", 80);
+        var settings = new Dictionary<string, string?> { ["Worker:Concurrency"] = "4" };
+
+        var logs = new LogCollector();
+        using var hostOne = BuildHost("one", logs, settings, ("a", tenantA), ("b", tenantB));
+        using var hostTwo = BuildHost("two", logs, settings, ("a", tenantA), ("b", tenantB));
+        await hostOne.StartAsync(CancellationToken);
+        await hostTwo.StartAsync(CancellationToken);
+        await WaitUntilAsync(
+            async () => await CountAsync(tenantA, "axis.process_work_items") == 0 && await CountAsync(tenantB, "axis.process_work_items") == 0,
+            "The work items were not all completed.");
+        await hostOne.StopAsync(CancellationToken);
+        await hostTwo.StopAsync(CancellationToken);
+
+        Assert.Equal(itemsA.Order(), (await RunsAsync(tenantA)).Select(run => run.ItemId).Order());
+        Assert.Equal(itemsB.Order(), (await RunsAsync(tenantB)).Select(run => run.ItemId).Order());
+        Assert.Equal(200, HandlerOf(hostOne).Calls + HandlerOf(hostTwo).Calls);
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_tenant_with_a_small_backlog_runs_all_its_items_before_a_tenant_with_a_large_one_has_run_a_hundred()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_fair_a");
+        var tenantB = await CreateTenantDatabaseAsync("worker_fair_b");
+        await EnqueueManyAsync(tenantA, "a", 1000);
+        await EnqueueManyAsync(tenantB, "b", 10);
+
+        var logs = new LogCollector();
+        using var host = BuildHost("worker", logs, ("a", tenantA), ("b", tenantB));
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await CountAsync(tenantB, "test_runs") == 10 && await CountAsync(tenantA, "test_runs") >= 100, "The tenants did not run enough items.");
+
+        // The large backlog is not drained: the host stops with most of it left.
+        await host.StopAsync(CancellationToken);
+
+        var lastOfB = (DateTime)(await ScalarAsync(tenantB, "SELECT max(ran_at) FROM test_runs"))!;
+        await using var dataSource = NpgsqlDataSource.Create(tenantA);
+        await using var command = dataSource.CreateCommand("SELECT count(*) FROM test_runs WHERE ran_at <= @at");
+        command.Parameters.AddWithValue("at", lastOfB);
+        var ranBeforeEnd = (long)(await command.ExecuteScalarAsync(CancellationToken))!;
+        Assert.True(ranBeforeEnd < 100, $"Tenant a ran {ranBeforeEnd} items before the last item of tenant b.");
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_tenant_alone_runs_all_its_due_items_without_waiting_for_the_poll_interval()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_alone");
+        var items = await EnqueueManyAsync(tenantA, "a", 200);
+
+        var logs = new LogCollector();
+        using var host = BuildHost("worker", logs, new Dictionary<string, string?> { ["Worker:PollInterval"] = "00:01:00" }, ("a", tenantA));
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await CountAsync(tenantA, "axis.process_work_items") == 0, "The work items were not all completed.");
+        await host.StopAsync(CancellationToken);
+
+        Assert.Equal(items.Order(), (await RunsAsync(tenantA)).Select(run => run.ItemId).Order());
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Item_of_a_worker_that_never_commits_is_claimed_again_only_after_its_lease_expires()
     {
         var tenantA = await CreateTenantDatabaseAsync("worker_expired_lease");
@@ -320,7 +387,8 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         params (string TenantId, string ConnectionString)[] tenants)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
-        var settings = new Dictionary<string, string?>(extraSettings) { ["Worker:PollInterval"] = "00:00:00.05" };
+        var settings = new Dictionary<string, string?>(extraSettings);
+        settings.TryAdd("Worker:PollInterval", "00:00:00.05");
         foreach (var (tenantId, connectionString) in tenants)
         {
             settings[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";
@@ -370,7 +438,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         // its own grant on them.
         await using (var dataSource = NpgsqlDataSource.Create(connectionString))
         await using (var command = dataSource.CreateCommand(
-            "CREATE TABLE test_runs (item_id uuid, tenant_id text, worker text); CREATE TABLE test_failures (item_id uuid, message text); "
+            "CREATE TABLE test_runs (item_id uuid, tenant_id text, worker text, ran_at timestamptz DEFAULT clock_timestamp()); CREATE TABLE test_failures (item_id uuid, message text); "
             + $"GRANT SELECT, INSERT, UPDATE, DELETE ON test_runs, test_failures TO {PostgreSqlServer.RuntimeRole}"))
         {
             await command.ExecuteNonQueryAsync(CancellationToken);
@@ -393,6 +461,20 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
 
         // Due a minute ago, so a small clock difference with the database does not delay the claim.
         return await WorkItemQueue.EnqueueAsync(connection, null, tenantId, kind, dueAt ?? DateTimeOffset.UtcNow.AddMinutes(-1), CancellationToken);
+    }
+
+    /// <summary>Enqueues many due items over one open connection.</summary>
+    private static async Task<List<Guid>> EnqueueManyAsync(string connectionString, string tenantId, int count)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(CancellationToken);
+        var items = new List<Guid>();
+        for (var i = 0; i < count; i++)
+        {
+            items.Add(await WorkItemQueue.EnqueueAsync(connection, null, tenantId, RecordKind, DateTimeOffset.UtcNow.AddMinutes(-1), CancellationToken));
+        }
+
+        return items;
     }
 
     private static async Task<List<Run>> RunsAsync(string connectionString)

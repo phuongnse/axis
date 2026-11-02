@@ -69,17 +69,17 @@ A tenant that waits for its schema version, see
 the worker stays Healthy while it waits. One tenant whose migration failed
 cannot keep the worker from being ready.
 
-The loop counts as stalled when it has not polled within twice
-`Worker:LeaseDuration`, one minute by default. A poll interval would be too
-short, because one work item can run for up to a lease.
+The worker counts as stalled when the poll has not run, or one work item has
+run, for longer than twice `Worker:LeaseDuration`, one minute by default. A poll
+interval would be too short, because one work item can run for up to a lease.
 
-| Endpoint        | Status    | HTTP  | When                                                                                                                                                  |
-| --------------- | --------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/health/live`  | Healthy   | `200` | The loop has polled within twice `Worker:LeaseDuration`.                                                                                              |
-| `/health/live`  | Unhealthy | `503` | The loop has not polled within that time, so an orchestrator restarts the worker.                                                                     |
-| `/health/ready` | Healthy   | `200` | Every tenant database has its processes migrations, and the loop has polled within twice `Worker:LeaseDuration`.                                      |
-| `/health/ready` | Degraded  | `200` | A refresh of the tenant directory failed, and the last good read stays in use.                                                                        |
-| `/health/ready` | Unhealthy | `503` | A tenant database lacks its processes migrations, the first read of the tenant directory has not worked, or the loop has not polled within that time. |
+| Endpoint        | Status    | HTTP  | When                                                                                                                               |
+| --------------- | --------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `/health/live`  | Healthy   | `200` | The poll has run, and no work item has run, within twice `Worker:LeaseDuration`.                                                   |
+| `/health/live`  | Unhealthy | `503` | The poll has not run, or one work item has run, for longer than that, so an orchestrator restarts the worker.                      |
+| `/health/ready` | Healthy   | `200` | Every tenant database has its processes migrations, and the worker is not stalled.                                                 |
+| `/health/ready` | Degraded  | `200` | A refresh of the tenant directory failed, and the last good read stays in use.                                                     |
+| `/health/ready` | Unhealthy | `503` | A tenant database lacks its processes migrations, the first read of the tenant directory has not worked, or the worker is stalled. |
 
 **Docker Compose.** The worker gets a health check on `/health/ready`. It runs
 inside the container, and Compose does not publish the worker's health port.
