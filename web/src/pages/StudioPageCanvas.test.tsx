@@ -808,7 +808,7 @@ describe('the Design tab of a page', () => {
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(5), slow)
       const saved = posts.at(-1)!.widgets
       expect(saved[0].rowActions).toHaveLength(2)
-      expect(saved[1]).toEqual(newWidget('kpi'))
+      expect(saved[1]).toEqual({ ...newWidget('kpi'), name: 'kpi1' })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
     })
 
@@ -819,7 +819,7 @@ describe('the Design tab of a page', () => {
       await userEvent.click(within(within(design).getByTestId('studio-palette')).getByTestId('studio-palette-kpi'))
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(5), slow)
-      expect(posts.at(-1)!.widgets[4]).toEqual(newWidget('kpi'))
+      expect(posts.at(-1)!.widgets[4]).toEqual({ ...newWidget('kpi'), name: 'kpi1' })
       expect(within(design).getByTestId('studio-widget-/widgets/4')).toHaveAttribute('aria-current', 'true')
     })
   })
@@ -845,7 +845,7 @@ describe('the Design tab of a page', () => {
       await userEvent.keyboard('{Enter}')
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
-      expect(posts.at(-1)!.widgets[1]).toEqual(newWidget('kpi'))
+      expect(posts.at(-1)!.widgets[1]).toEqual({ ...newWidget('kpi'), name: 'kpi1' })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
       const announcement = palette.getByTestId('studio-palette-announcement')
       expect(announcement).toHaveTextContent('Page')
@@ -880,6 +880,21 @@ describe('the Design tab of a page', () => {
       )
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
       expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2 · position 2')
+    })
+
+    it('names each inserted widget with a name that is unique on the whole page', async () => {
+      const { design, palette, posts } = await openDesign([{ type: 'kpi' }, section([{ type: 'chart' }])])
+      await userEvent.click(within(design).getByTestId('studio-widget-/widgets/0'))
+      await userEvent.click(palette.getByTestId('studio-palette-kpi'))
+      await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
+
+      await userEvent.click(within(design).getByTestId('studio-widget-/widgets/2'))
+      await userEvent.click(palette.getByTestId('studio-palette-kpi'))
+
+      await waitFor(() => expect(posts.at(-1)!.widgets[2]).toMatchObject({ widgets: [{}, {}] }), slow)
+      const saved = posts.at(-1)!.widgets
+      expect(saved[1]).toMatchObject({ type: 'kpi', name: 'kpi1' })
+      expect(saved[2]).toMatchObject({ widgets: [{ type: 'chart' }, { type: 'kpi', name: 'kpi2' }] })
     })
 
     it('disables table with its reason when the page holds a table inside a container', async () => {
@@ -953,7 +968,7 @@ describe('the Design tab of a page', () => {
       dropOn('detail', { kind: 'widget', pointer: '/widgets/0' }, 90)
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
-      expect(posts.at(-1)!.widgets[1]).toEqual(newWidget('detail'))
+      expect(posts.at(-1)!.widgets[1]).toEqual({ ...newWidget('detail'), name: 'detail1' })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
       const announcement = palette.getByTestId('studio-palette-announcement')
       expect(announcement).toHaveTextContent('Inserted detail')
@@ -1082,6 +1097,7 @@ describe('the Design tab of a page', () => {
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
       expect(posts.at(-1)!.widgets[1]).toEqual({
         type: 'chart',
+        name: 'chart1',
         dataSource: 'ByStatus',
         kind: 'bar',
         category: 'status',
@@ -1113,7 +1129,7 @@ describe('the Design tab of a page', () => {
       await userEvent.click(await screen.findByTestId('studio-binding-table'))
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
-      expect(posts.at(-1)!.widgets[1]).toEqual({ type: 'table', entity: 'Ticket' })
+      expect(posts.at(-1)!.widgets[1]).toEqual({ type: 'table', name: 'table1', entity: 'Ticket' })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
       const announcement = screen.getByTestId('studio-palette-announcement')
       expect(announcement).toHaveTextContent('Inserted table')

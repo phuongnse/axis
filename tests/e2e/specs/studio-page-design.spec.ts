@@ -149,8 +149,9 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
           { type: "detail", entity: "Ticket", record: "ticket" },
           {
             type: "section",
+            name: "section1",
             title: { textKey: "" },
-            widgets: [{ type: "table" }],
+            widgets: [{ type: "table", name: "table1" }],
           },
         ]);
     } finally {
@@ -231,6 +232,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
         .poll(async () => JSON.parse(await readFile(file, "utf8")).widgets[1])
         .toEqual({
           type: "chart",
+          name: "chart1",
           dataSource: "OpenTicketsByCategory",
           kind: "bar",
           category: "category",

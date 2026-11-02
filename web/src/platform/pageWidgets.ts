@@ -86,12 +86,35 @@ export function newColumn(columns: unknown[]): Record<string, unknown> {
     0,
   )
   const left = 12 - used
-  return { width: left >= 1 && left <= 12 ? left : 1, widgets: [] }
+  return { name: firstFree(columns, 'column'), width: left >= 1 && left <= 12 ? left : 1, widgets: [] }
 }
 
-/** A new tab with an empty label key and no widgets. */
-export function newTab(): Record<string, unknown> {
-  return { label: { textKey: '' }, widgets: [] }
+/** A new tab with the first free name among its siblings, an empty label key and no widgets. */
+export function newTab(tabs: unknown[]): Record<string, unknown> {
+  return { name: firstFree(tabs, 'tab'), label: { textKey: '' }, widgets: [] }
+}
+
+/** The first `base1`, `base2` and so on that no item in the list uses as its `name`, ignoring letter case. */
+function firstFree(items: readonly unknown[], base: string): string {
+  const used = new Set(
+    items.flatMap((item) => (isContent(item) && typeof item.name === 'string' ? item.name.toUpperCase() : [])),
+  )
+  let n = 1
+  while (used.has(`${base}${n}`.toUpperCase())) {
+    n++
+  }
+  return `${base}${n}`
+}
+
+/** The name for a new widget of a type: the type and the first free number, unique among all widgets on the page. */
+export function widgetName(widgets: unknown[], type: string): string {
+  const all = widgetLists(widgets).flatMap((list) => getAt({ widgets }, list.pointer) as unknown[])
+  return firstFree(all, type)
+}
+
+/** A new widget with a name that is unique on the page. The name follows the type. */
+export function namedWidget(widgets: unknown[], widget: Record<string, unknown>): Record<string, unknown> {
+  return { type: widget.type, name: widgetName(widgets, widget.type as string), ...widget }
 }
 
 /**
@@ -106,12 +129,12 @@ export function newWidget(type: string): Record<string, unknown> {
       return {
         type,
         columns: [
-          { width: 6, widgets: [] },
-          { width: 6, widgets: [] },
+          { name: 'column1', width: 6, widgets: [] },
+          { name: 'column2', width: 6, widgets: [] },
         ],
       }
     case 'tabs':
-      return { type, tabs: [newTab()] }
+      return { type, tabs: [newTab([])] }
     case 'section':
       return { type, title: { textKey: '' }, widgets: [] }
     case 'processInspector':
