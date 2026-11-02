@@ -1368,6 +1368,12 @@ public sealed class ScenarioRunnerTests
         Assert.Contains("PASS approvals/DepartmentHeadReturnsAndRejects", output.ToString(), StringComparison.Ordinal);
         Assert.Contains("PASS approvals/DelegateDecidesWhileApproverIsAway", output.ToString(), StringComparison.Ordinal);
         Assert.Contains("PASS approvals/DepartmentHeadRequestGoesToAdmin", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/RequesterCannotDecideOwnRequest", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/OneDecisionMovesOneStep", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/RequestMovesOnlyThroughItsLifecycle", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/AmountIsFrozenAfterSubmit", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/AccessStaysWithinTheCeilings", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/RequestTypeNeedsAStepForEveryAmount", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

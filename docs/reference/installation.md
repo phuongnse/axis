@@ -425,11 +425,13 @@ of the same authority for the name `postgres`, and every connection string sets
 `SSL Mode=VerifyFull` and that authority as `Root Certificate`. A static check of the rendered configuration shows that
 `compose.yaml` alone gives no service the scenario secret or `Studio__Tests`, and that adding
 `compose.scenarios.yaml` gives the secret to the publisher only and `Studio__Tests` to both servers only. The
-smoke test runs no `test` request against the installed images. An override file in a temporary folder holds
-everything the test adds, so `deploy/compose/compose.yaml` stays as an
+smoke test runs no `test` request against the installed images. It does add `compose.scenarios.yaml` and the
+scenario role, because the leave request sample needs the `organization` module and that module has contract
+scenarios, which the publisher runs when it publishes. An override file in a temporary folder holds
+everything else the test adds, so `deploy/compose/compose.yaml` stays as an
 operator uses it. The test then:
 
-1. Creates the database roles with the SQL above and writes the secret files,
+1. Creates the database roles with the SQL above, the scenario role included, and writes the secret files,
    each connection string with `SSL Mode=VerifyFull`.
 2. Starts the identity provider and the proxy, and waits until the development realm answers through the proxy on the
    identity host. Checks that its sign-in page contains the Axis theme's `axis-sign-in-context`. Runs `migrate`, starts
@@ -452,6 +454,8 @@ operator uses it. The test then:
    checks that it serves again.
 7. Queues one publish request of the leave request sample in each tenant, over
    `psql`, and checks that the installed publisher runs both to `succeeded`.
+   The publisher runs the contract scenarios of the `organization` module
+   on the scenario role's server, so the request needs that role.
    The publisher's log shows `one claim ok` and `two claim ok`, and the
    `publisher` service is still running.
 8. Starts the second replica, with a proxy certificate and a

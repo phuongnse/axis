@@ -11,7 +11,8 @@ namespace Axis.Integration.Tests;
 /// The <c>contracts</c> step of a publish and a validate request: the contract scenarios of the pinned module run in their own
 /// databases before the compile. The <c>requests</c> test module is copied to a temporary folder with one contract scenario that
 /// covers its <c>submit</c> transition, because the shared fixture is used by other tests. The built-in <c>organization</c> module,
-/// which the test project copies to <c>BuiltInModules</c>, runs its own five contract scenarios.
+/// which the test project copies to <c>BuiltInModules</c>, runs its own five contract scenarios, and the built-in <c>approvals</c>
+/// module runs its seven. A copy of the built-in modules whose approval process approves right after the submit makes the publish fail.
 /// </summary>
 [Collection("Test scenario runs")]
 public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
@@ -20,6 +21,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
 
     private static readonly string _app = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ModuleContractApp");
     private static readonly string _organizationApp = Path.Combine(AppContext.BaseDirectory, "Fixtures", "OrganizationApp");
+    private static readonly string _approvalsApp = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ApprovalsModuleApp");
     private static readonly string _modules = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Modules");
 
     private static readonly TimeSpan _limit = TimeSpan.FromSeconds(180);
@@ -220,6 +222,66 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
             items.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray());
         Assert.All(items, item => Assert.Equal("passed", item!["outcome"]!.GetValue<string>()));
         Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3).ToArray());
+        Assert.Equal(0L, await ScenarioDatabasesAsync());
+    }
+
+    [Fact]
+    public async Task A_publish_of_an_application_that_declares_approvals_runs_its_contract_scenarios_and_they_pass()
+    {
+        var modules = System.IO.Path.Combine(AppContext.BaseDirectory, "BuiltInModules");
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, "publish", _approvalsApp);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, modules, withScenarioServer: true);
+
+        var status = await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+        Assert.True(status is "succeeded", string.Join('\n', result.Output));
+        var items = (await ResultsAsync(scenario, tenant, request)).Where(item => item!["name"]!.GetValue<string>().StartsWith("approvals/", StringComparison.Ordinal)).ToList();
+        Assert.Equal(
+            [
+                "approvals/AccessStaysWithinTheCeilings",
+                "approvals/AmountIsFrozenAfterSubmit",
+                "approvals/OneDecisionMovesOneStep",
+                "approvals/RequestGoesToManagerThenNamedEmployee",
+                "approvals/RequestMovesOnlyThroughItsLifecycle",
+                "approvals/RequestTypeNeedsAStepForEveryAmount",
+                "approvals/RequesterCannotDecideOwnRequest",
+            ],
+            items.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray());
+        Assert.All(items, item => Assert.Equal("passed", item!["outcome"]!.GetValue<string>()));
+        Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3).ToArray());
+        Assert.Equal(0L, await ScenarioDatabasesAsync());
+    }
+
+    [Fact]
+    public async Task A_publish_against_an_approvals_copy_that_approves_right_after_the_submit_fails_naming_the_scenario_and_its_step()
+    {
+        using var modules = new TempModules();
+        CopyFolder(System.IO.Path.Combine(AppContext.BaseDirectory, "BuiltInModules"), modules.Path);
+        // The branch after the submit never takes the way to the steps, so the process goes straight to markApproved.
+        var processFile = System.IO.Path.Combine(modules.Path, "approvals", "1.0.0", "processes", "request-approval.json");
+        var process = JsonNode.Parse(await File.ReadAllTextAsync(processFile, CancellationToken))!;
+        Assert.Equal("nextStep", process["steps"]![1]!["name"]!.GetValue<string>());
+        process["steps"]![1]!["branches"]![0]!["when"] = "step < 0";
+        await File.WriteAllTextAsync(processFile, process.ToJsonString(), CancellationToken);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, "publish", _approvalsApp);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, modules.Path, withScenarioServer: true);
+
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        const string file = "modules/approvals/scenarios/request-goes-to-manager-then-named-employee.json";
+        var diagnostics = await DiagnosticsAsync(scenario, tenant, request);
+        var error = Assert.Single(diagnostics, diagnostic => diagnostic["code"]!.GetValue<string>() == "AXC0342" && diagnostic["file"]!.GetValue<string>() == file);
+        Assert.Equal("/steps/6", error["path"]!.GetValue<string>());
+        var message = error["message"]!.GetValue<string>();
+        Assert.Contains("'approvals'", message, StringComparison.Ordinal);
+        Assert.Contains("'RequestGoesToManagerThenNamedEmployee'", message, StringComparison.Ordinal);
+        Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
         Assert.Equal(0L, await ScenarioDatabasesAsync());
     }
 
