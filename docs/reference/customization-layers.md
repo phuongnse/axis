@@ -11,9 +11,9 @@ into its module resource before any check, and the release stores the layer and 
 files side by side, a layer places an element with `after` and `before`, and a diagnostic about a part
 that a layer changed is reported in the layer file. A layer on a `contract` adds states and transitions
 to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). A layer on a module entity adds
-fields and validations, see [module entities](#module-entities). Removing a whole resource is still
-_(planned for M25)_, as are Studio's support for layers and the sections below that are not about
-applying. Module upgrades, the three-way merge and eject are _(planned for M29)_.
+fields and validations, see [module entities](#module-entities). A layer removes a whole resource,
+see [applying a layer](#applying-a-layer). Studio's support for layers and the sections below that are
+not about applying are _(planned for M25)_. Module upgrades, the three-way merge and eject are _(planned for M29)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -119,8 +119,16 @@ Compilation applies each layer to the resource of the pinned module version, bef
   Form sections join when they are keyed. Any other list takes no `after` or `before`: an escalation's
   `after` is its duration, and elsewhere the property is an unknown property. The merged resource
   never holds `after` or `before`.
-- **Removing a whole resource** _(planned for M25)_. A layer whose `changes` is `{ "remove": true }` removes the
-  resource from the application. A reference to it is then a diagnostic.
+- **Removing a whole resource.** A layer whose `changes` is exactly `{ "remove": true }` removes the
+  resource from the application. The compiled model leaves it out, so Studio, the runtime and the
+  site metadata do not see it. The release still stores the module's file as the module wrote it, and
+  compiling the release applies the layer again. A reference to the removed resource, from the
+  application or from the module, is reported in the layer file at `/changes/remove`, with the code
+  that the broken reference has anyway and a message that names the referring file. A reference
+  counts when its value is `<module id>/<name>`, or the plain name in a file of the module, ignoring
+  letter case. Removing an entity that a [module contract](module-contracts.md) covers is `AXC0374`,
+  reported at `/changes/remove`, and the layer is not applied. A `remove` beside any other property in
+  `changes` is `AXC0365` at `/changes`. A layer that removes a `contract` is `AXC0369`.
 - **Then the checks.** The merged resource is checked as any resource of its kind: its schema, its
   references, its expressions, the contract and the grant ceiling. Each diagnostic is then moved to
   where the author made the change:
@@ -136,14 +144,15 @@ Compilation applies each layer to the resource of the pinned module version, bef
     `formatVersion`, which a layer never changes.
 
   Only the diagnostics of the layered resource itself move. A diagnostic in another resource that
-  names a removed element stays in that resource's file.
+  names a removed element stays in that resource's file. The exception is a reference to a whole
+  resource that a layer removes, see _Removing a whole resource_ above.
 - **Keys and names.** Keys are matched ignoring letter case, and a changed element keeps the
   module's spelling of its key. The root `id`, `kind`, `name` and `formatVersion` are never merged.
   A layer on a `scenario` is stored and not applied _(planned for M25)_.
 - **Checks of the layer itself.** A key in `changes` that the module's resource does not have, as a
   change, a remove or an anchor of `after` or `before`, is a diagnostic. So is a property that the
   kind does not have. A layer never matches by position. The checks are `AXC0364` for an unknown key
-  in a remove, `AXC0365` for a remove that holds more than its key, `AXC0366` for an unknown
+  in a remove, `AXC0365` for a remove that holds more than its key, in a list or in `changes`, `AXC0366` for an unknown
   property, `AXC0367` for an element with both `after` and `before` and `AXC0368` for an anchor that
   names no other element of the merged list, each reported at its path under `/changes` in the layer
   file. A layer with one of them is not applied. An element whose key the module's list lacks is an
@@ -196,7 +205,7 @@ still reads is built. Changing a field and dropping the column of a removed fiel
 - **Changing a field** _(planned for M25)_. A layer may change a label, a default, `required`, a length, a range or an
   enum's `values`. A change of type, and a field removed, follow the
   [migration](migrations.md#migrations) rules of the application's own entities.
-- **Removing a field** that the module still reads is refused with `AXC0374` at the remove, `/changes/fields/{i}`
+- **Removing a field** that the module still reads is refused with `AXC0375` at the remove, `/changes/fields/{i}`
   of the layer file. The readers are the entity's contract, and the module's data sources and forms on the entity
   that the application does not also layer, because a layer of its own can stop the reading. The names match
   ignoring letter case. The message names the first reader's file. Dropping the column of a removed field is

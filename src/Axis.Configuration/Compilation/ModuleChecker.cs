@@ -83,11 +83,12 @@ internal static class ModuleChecker
     /// are valid and the resources read from those files. The resources read are those of the module with the
     /// <paramref name="layers"/> of the application applied, and the files are the module's own. The traces
     /// are the layer and the merge of each module file a layer changed, by the file's path, for
-    /// <see cref="LayerDiagnostics.MapToLayers"/>. With the <paramref name="previous"/> copies of the modules in
+    /// <see cref="LayerDiagnostics.MapToLayers"/>. The removed are the module resources that a layer took out of
+    /// the model, for <see cref="LayerDiagnostics.MapRemovedReferences"/>. With the <paramref name="previous"/> copies of the modules in
     /// the application's active release, a layer on a module whose pinned version differs from its copy is also
     /// checked against that copy, for a key that the new version dropped.
     /// </summary>
-    public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources, IReadOnlyDictionary<string, LayerTrace> Traces) Check(
+    public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources, IReadOnlyDictionary<string, LayerTrace> Traces, IReadOnlyList<RemovedResource> Removed) Check(
         ApplicationManifest application,
         IReadOnlyCollection<InstalledModule> installed,
         List<Diagnostic> diagnostics,
@@ -220,6 +221,7 @@ internal static class ModuleChecker
         var files = new List<ResourceContent>();
         var resources = new ModuleResourceCollector();
         var traces = new Dictionary<string, LayerTrace>(StringComparer.Ordinal);
+        var removed = new List<RemovedResource>();
         var declaredByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         var slotsByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         var manifests = new Dictionary<string, ModuleManifest>(StringComparer.Ordinal);
@@ -243,7 +245,7 @@ internal static class ModuleChecker
                     string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
                     && !string.Equals(candidate.Manifest.Version, picked, StringComparison.Ordinal))
                 : null;
-            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, traces, diagnostics, previousModule);
+            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, traces, removed, diagnostics, previousModule);
             if (first.Asker is null)
             {
                 references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
@@ -271,7 +273,7 @@ internal static class ModuleChecker
             .ToList();
         var chained = new ModuleSlotChains(manifests, dependencies, connectors, diagnostics).Apply(pins);
 
-        return (chained, files, resources.ToResources(declaredByModule, slotsByModule), traces);
+        return (chained, files, resources.ToResources(declaredByModule, slotsByModule), traces, removed);
     }
 
     /// <summary>
@@ -655,10 +657,12 @@ internal static class ModuleChecker
         List<ResourceContent> files,
         ModuleResourceCollector resources,
         Dictionary<string, LayerTrace> traces,
+        List<RemovedResource> removed,
         List<Diagnostic> diagnostics,
         InstalledModule? previousModule = null)
     {
         var kindsByName = layers.Count == 0 ? null : LayerChecker.KindsByName(module);
+        var contractEntities = layers.Count == 0 ? null : ContractEntitiesOf(module);
         var pendingContracts = new List<PendingContract>();
         var addedValuesByEntity = new Dictionary<string, (LayerResource Layer, Dictionary<string, HashSet<string>>? Values)>(StringComparer.OrdinalIgnoreCase);
         var removedByEntity = new Dictionary<string, RemovedFields>(StringComparer.OrdinalIgnoreCase);
@@ -693,7 +697,19 @@ internal static class ModuleChecker
                 {
                     // The model reads the resource with the layer applied. The release keeps the file as the
                     // module wrote it, so that compiling the stored release applies the layer once.
-                    using var merged = ApplyLayer(root, layers, kindsByName, path, traces, diagnostics, module.Manifest, previousModule, out var layer, out var additions);
+                    using var merged = ApplyLayer(root, layers, kindsByName, contractEntities, path, traces, diagnostics, module.Manifest, previousModule, out var layer, out var additions, out var isRemoved);
+                    if (isRemoved)
+                    {
+                        // The model leaves the resource out. The release keeps the file, so compiling it applies the layer again.
+                        removed.Add(new RemovedResource(
+                            module.Manifest.Id,
+                            root.GetProperty("name").GetString()!,
+                            root.GetProperty("kind").GetString()!,
+                            layer!));
+                        files.Add(new ResourceContent(path, JsonCanonicalizer.Canonicalize(root)));
+                        continue;
+                    }
+
                     var effective = merged?.RootElement ?? root;
                     if (!CheckKind(path, effective, resourceId, diagnostics))
                     {
@@ -932,6 +948,8 @@ internal static class ModuleChecker
     /// Merges the layer of a module file into it. The layer is the first one that names the file's resource,
     /// ignoring letter case, and applies only when that name is one resource of a kind that a layer may change,
     /// which is not a scenario. A layer on a contract is checked by <see cref="ContractLayerChecker"/> first.
+    /// A layer whose <c>changes</c> is exactly <c>{ "remove": true }</c> sets <paramref name="removed"/>, unless it
+    /// removes an entity that a contract covers, which is reported.
     /// Returns null when there is no layer to apply, or when the layer has a problem of its own, so the
     /// module's file is read as it is. <paramref name="found"/> is the layer that targets the file, applied or
     /// not, and <paramref name="additions"/> is what an applied layer on a contract added.
@@ -940,16 +958,19 @@ internal static class ModuleChecker
         JsonElement root,
         List<LayerResource> layers,
         ILookup<string, string>? kindsByName,
+        HashSet<string>? contractEntities,
         string path,
         Dictionary<string, LayerTrace> traces,
         List<Diagnostic> diagnostics,
         ModuleManifest manifest,
         InstalledModule? previousModule,
         out LayerResource? found,
-        out ContractAdditions? additions)
+        out ContractAdditions? additions,
+        out bool removed)
     {
         found = null;
         additions = null;
+        removed = false;
         if (kindsByName is null
             || root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("kind", out var kindElement) || kindElement.ValueKind != JsonValueKind.String
@@ -982,6 +1003,37 @@ internal static class ModuleChecker
             }
         }
 
+        if (kind != ResourceKinds.Contract
+            && layer.Changes.ValueKind == JsonValueKind.Object
+            && layer.Changes.TryGetProperty("remove", out var remove)
+            && remove.ValueKind == JsonValueKind.True)
+        {
+            if (layer.Changes.EnumerateObject().Any(property => property.Name != "remove"))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.InvalidLayerRemove,
+                    "A layer that removes a whole resource holds only \"remove\": true in 'changes'.",
+                    layer.File,
+                    "/changes",
+                    layer.Id));
+            }
+            else if (kind == ResourceKinds.Entity && contractEntities!.Contains(name))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.RemovedResourceCoveredByContract,
+                    $"The entity '{name}' is covered by a contract of the module, so a layer cannot remove it.",
+                    layer.File,
+                    "/changes/remove",
+                    layer.Id));
+            }
+            else
+            {
+                removed = true;
+            }
+
+            return null;
+        }
+
         using var previousDocument = ReadPreviousFile(previousModule, kind, name);
         var upgrade = previousDocument is null || previousModule is null
             ? null
@@ -996,6 +1048,32 @@ internal static class ModuleChecker
 
         traces[path] = new LayerTrace(layer, result);
         return JsonSerializer.SerializeToDocument(result.Merged);
+    }
+
+    /// <summary>The entities that the contracts of a module cover, by name and ignoring letter case.</summary>
+    private static HashSet<string> ContractEntitiesOf(InstalledModule module)
+    {
+        var entities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in module.Files)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(file.Content, _documentOptions);
+                var root = document.RootElement;
+                if (root.ValueKind == JsonValueKind.Object
+                    && root.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == ResourceKinds.Contract
+                    && root.TryGetProperty("entity", out var entity) && entity.ValueKind == JsonValueKind.String)
+                {
+                    entities.Add(entity.GetString()!);
+                }
+            }
+            catch (JsonException)
+            {
+                // The file is reported when it is checked.
+            }
+        }
+
+        return entities;
     }
 
     /// <summary>The file of an old module version with the same <paramref name="kind"/> and <paramref name="name"/>, ignoring letter case, or null.</summary>
@@ -1517,6 +1595,9 @@ internal sealed record ModuleResources(
 
 /// <summary>A layer that changed a module file, and the merge of its changes into that file.</summary>
 internal sealed record LayerTrace(LayerResource Layer, LayerMergeResult Merge);
+
+/// <summary>A module resource that a layer took out of the model: its module, plain name and kind, and the layer.</summary>
+internal sealed record RemovedResource(string ModuleId, string Name, string Kind, LayerResource Layer);
 
 /// <summary>A contract of a pinned module, with the id of that module. The contract's name is qualified and its entity is as written.</summary>
 internal sealed record ModuleContract(string ModuleId, ContractResource Contract);

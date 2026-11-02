@@ -12,6 +12,8 @@ public sealed class CustomizationLayerTests
     private const string LayerId = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c01";
     private const string SecondLayerId = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c02";
     private const string ReviewFile = "customizations/approvals/Review.json";
+    private const string ReviewsFile = "customizations/approvals/Reviews.json";
+    private const string RemoveChanges = """{ "remove": true }""";
     private const string ReviewChanges = """{ "steps": [ { "name": "review", "dueIn": "P3D" } ] }""";
 
     [Fact]
@@ -322,6 +324,81 @@ public sealed class CustomizationLayerTests
     }
 
     [Fact]
+    public void A_layer_that_removes_a_page_nothing_names_takes_it_out_of_the_model_and_keeps_it_in_the_release()
+    {
+        using var modules = Modules();
+        var installed = ModuleCatalog.Load(modules.Path).Modules;
+        using var folder = Application().With(ReviewsFile, Layer("approvals/Reviews", changes: RemoveChanges));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, installed);
+        var rebuilt = ApplicationCompiler.Compile(compiled.Resources);
+
+        Assert.Empty(compiled.Diagnostics);
+        Assert.NotNull(compiled.Model);
+        Assert.DoesNotContain(compiled.Model.Pages, page => page.Name == "approvals/Reviews");
+        Assert.Contains(compiled.Model.Pages, page => page.Name == "approvals/Shared");
+        Assert.Contains(compiled.Resources, resource => resource.Path == "modules/approvals/pages/Reviews.json");
+        Assert.Contains(compiled.Resources, resource => resource.Path == ReviewsFile);
+        Assert.Empty(rebuilt.Diagnostics);
+        Assert.Equal(compiled.ContentHash, rebuilt.ContentHash);
+    }
+
+    [Fact]
+    public void A_site_that_names_a_removed_page_is_reported_in_the_layer_file_at_the_remove()
+    {
+        using var modules = Modules();
+        using var folder = Application()
+            .With(ReviewsFile, Layer("approvals/Reviews", changes: RemoveChanges))
+            .With("identity-providers/accounts.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c92", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }
+                """)
+            .With("sites/Main.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c91", "kind": "site", "name": "Main", "formatVersion": 1, "path": "main",
+                  "title": { "textKey": "invoice.title" },
+                  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+                  "navigation": [ { "page": "approvals/Reviews", "label": { "textKey": "invoice.title" } } ] }
+                """);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownNavigationPage);
+        Assert.Equal((ReviewsFile, "/changes/remove", Guid.Parse(LayerId)), (diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("sites/Main.json", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(compiled.Diagnostics, other => other.File == "sites/Main.json");
+        Assert.Single(compiled.Diagnostics);
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
+    public void A_module_process_that_names_a_removed_form_is_reported_in_the_layer_file_at_the_remove()
+    {
+        using var modules = Modules();
+        using var folder = Application().With("customizations/approvals/ApprovalForm.json", Layer("approvals/ApprovalForm", changes: RemoveChanges));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(("customizations/approvals/ApprovalForm.json", "/changes/remove", Guid.Parse(LayerId)), (diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("modules/approvals/processes/Review.json", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
+    public void A_remove_with_any_other_change_is_reported_at_the_changes_and_not_applied()
+    {
+        using var modules = Modules();
+        using var folder = Application().With(ReviewsFile, Layer("approvals/Reviews", changes: """{ "remove": true, "title": { "textKey": "approvals.review" } }"""));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InvalidLayerRemove, ReviewsFile, "/changes", Guid.Parse(LayerId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
     public void A_newer_module_version_that_dropped_a_key_the_layer_changes_is_reported_in_the_layer_and_on_the_module_entry()
     {
         using var modules = ModulesWithRenamedStep();
@@ -601,6 +678,11 @@ public sealed class CustomizationLayerTests
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c51", "kind": "page", "name": "Shared", "formatVersion": 1,
                   "title": { "textKey": "approvals.reviews" },
                   "widgets": [ { "name": "table", "type": "table", "dataSource": "Shared" } ] }
+                """)
+            .With("approvals/1.0.0/pages/Reviews.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c52", "kind": "page", "name": "Reviews", "formatVersion": 1,
+                  "title": { "textKey": "approvals.reviews" },
+                  "widgets": [ { "name": "table", "type": "table", "entity": "Approval" } ] }
                 """)
             .With("approvals/1.0.0/scenarios/ReviewScenario.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c71", "kind": "scenario", "name": "ReviewScenario", "formatVersion": 1,
