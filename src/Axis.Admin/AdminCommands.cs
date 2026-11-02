@@ -60,8 +60,8 @@ internal static partial class AdminCommands
         """
         Usage: tenant create <id> --host <host>... [--administrator <email>]
                tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...
-               tenant backup <id> --out <file> --backup-key-file <file>
-               tenant restore <file> --tenant <id> --host <host>... --backup-key-file <file>
+               tenant backup <id> --out <file> [--backup-key-file <file>]
+               tenant restore <file> --tenant <id> --host <host>... [--backup-key-file <file> | --from <id>]
                migrate [--tenant <id>] [--parallel <n>]
                activate <folder> [--tenant <id>]
                tenant suspend <id>
@@ -168,9 +168,9 @@ internal static partial class AdminCommands
     /// </summary>
     internal static IReadOnlyList<AdminCommand> Commands { get; } =
     [
-        new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
-        new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
-        new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
+        new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
+        new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.CancellationToken)),
+        new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
@@ -217,6 +217,7 @@ internal static partial class AdminCommands
         string command,
         string[] args,
         IConfiguration configuration,
+        CellOptions cell,
         TextWriter output,
         TextWriter error,
         HttpMessageHandler? identityProviderHandler,
@@ -234,6 +235,19 @@ internal static partial class AdminCommands
         {
             error.WriteLine(problem);
             return 2;
+        }
+
+        // In a cell the tenant gets a backup key, wrapped by the cell's key, so the command needs that key before any tenant work.
+        if (cell.IsCell)
+        {
+            var cellCipher = TenantBackupKeys.ReadCellCipher(cell, out problem);
+            if (cellCipher is null)
+            {
+                error.WriteLine(problem);
+                return 2;
+            }
+
+            settings = settings with { CellBackupCipher = cellCipher };
         }
 
         // A preview tenant gets no realm, so it needs none of the identity provider settings.
@@ -672,12 +686,13 @@ internal static partial class AdminCommands
         string command,
         string[] args,
         IConfiguration configuration,
+        CellOptions cell,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken)
     {
         var request = ParseTenantBackup(args);
-        if (request is null)
+        if (request is null || (!cell.IsCell && request.BackupKeyFile is null))
         {
             error.WriteLine(Usage);
             return 2;
@@ -690,10 +705,43 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var backupKey = BackupKeyFile.Read(request.BackupKeyFile, out problem);
+        byte[]? backupKey;
+        if (cell.IsCell)
+        {
+            if (request.BackupKeyFile is not null)
+            {
+                error.WriteLine("In a cell, tenant backup takes the tenant's backup key from the platform, so --backup-key-file is refused.");
+                return 2;
+            }
+
+            var cellCipher = TenantBackupKeys.ReadCellCipher(cell, out problem);
+            if (cellCipher is null)
+            {
+                error.WriteLine(problem);
+                return 2;
+            }
+
+            // An unknown tenant keeps the message that it has always had.
+            backupKey = await ReadCellBackupKeyAsync(
+                settings.PlatformConnectionString,
+                request.Id,
+                cellCipher,
+                "The tenant does not exist.",
+                "The tenant has no backup key.",
+                error,
+                cancellationToken);
+        }
+        else
+        {
+            backupKey = BackupKeyFile.Read(request.BackupKeyFile!, out problem);
+            if (backupKey is null)
+            {
+                error.WriteLine(problem);
+            }
+        }
+
         if (backupKey is null)
         {
-            error.WriteLine(problem);
             return 2;
         }
 
@@ -713,17 +761,68 @@ internal static partial class AdminCommands
             : await new TenantBackup(settings, plan, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
     }
 
+    /// <summary>
+    /// Reads the backup key of a tenant of a cell. Writes the reason to <paramref name="error"/> and returns null when the platform
+    /// database cannot be read, the key does not unwrap, or the tenant has no key. With <paramref name="unknownTenant"/>, a tenant
+    /// that is not in the directory gets that message instead of <paramref name="noKey"/>.
+    /// </summary>
+    private static async Task<byte[]?> ReadCellBackupKeyAsync(
+        string platformConnection,
+        string tenantId,
+        TenantSecretCipher cellCipher,
+        string? unknownTenant,
+        string noKey,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var key = await TenantBackupKeys.ReadAsync(platformConnection, tenantId, cellCipher, cancellationToken);
+            if (key is not null)
+            {
+                return key;
+            }
+
+            var exists = true;
+            if (unknownTenant is not null)
+            {
+                await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnection).Options);
+                exists = await platform.Tenants.AnyAsync(tenant => tenant.Id == tenantId, cancellationToken);
+            }
+
+            error.WriteLine(exists ? noKey : unknownTenant);
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any tenant work.");
+            return null;
+        }
+        catch (NpgsqlException)
+        {
+            error.WriteLine($"The setting {PlatformSetting} could not be used to read the tenant directory.");
+            return null;
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine(exception.Message);
+            return null;
+        }
+    }
+
     private static async Task<int> RestoreAsync(
         string command,
         string[] args,
         IConfiguration configuration,
+        CellOptions cell,
         TextWriter output,
         TextWriter error,
         HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         var request = ParseTenantRestore(args);
-        if (request is null)
+        if (request is null
+            || (cell.IsCell ? request.BackupKeyFile is null && request.From is null : request.From is not null || request.BackupKeyFile is null))
         {
             error.WriteLine(Usage);
             return 2;
@@ -736,10 +835,44 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var backupKey = BackupKeyFile.Read(request.BackupKeyFile, out problem);
+        byte[]? backupKey;
+        if (cell.IsCell)
+        {
+            if (request.BackupKeyFile is not null)
+            {
+                error.WriteLine("In a cell, tenant restore takes the backup key of the tenant named by --from from the platform, so --backup-key-file is refused.");
+                return 2;
+            }
+
+            var cellCipher = TenantBackupKeys.ReadCellCipher(cell, out problem);
+            if (cellCipher is null)
+            {
+                error.WriteLine(problem);
+                return 2;
+            }
+
+            // The restored tenant gets a backup key of its own, wrapped by the same cell key.
+            settings = settings with { Create = settings.Create with { CellBackupCipher = cellCipher } };
+            backupKey = await ReadCellBackupKeyAsync(
+                settings.Create.PlatformConnectionString,
+                request.From!,
+                cellCipher,
+                null,
+                "The tenant named by --from has no backup key.",
+                error,
+                cancellationToken);
+        }
+        else
+        {
+            backupKey = BackupKeyFile.Read(request.BackupKeyFile!, out problem);
+            if (backupKey is null)
+            {
+                error.WriteLine(problem);
+            }
+        }
+
         if (backupKey is null)
         {
-            error.WriteLine(problem);
             return 2;
         }
 
@@ -785,6 +918,7 @@ internal static partial class AdminCommands
         var hosts = new List<string>();
         string? id = null;
         string? keyFile = null;
+        string? from = null;
         for (var i = 3; i < args.Length; i += 2)
         {
             if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
@@ -804,12 +938,16 @@ internal static partial class AdminCommands
                 case BackupKeyFile.Option when keyFile is null:
                     keyFile = value;
                     break;
+                case "--from" when from is null:
+                    from = value;
+                    break;
                 default:
                     return null;
             }
         }
 
-        return hosts.Count == 0 || id is null || keyFile is null ? null : new TenantRestoreRequest(args[2], id, hosts, keyFile);
+        // The command, not the parser, decides whether the key file or --from is needed, because that depends on the cell.
+        return hosts.Count == 0 || id is null ? null : new TenantRestoreRequest(args[2], id, hosts, keyFile, from);
     }
 
     private static TenantBackupRequest? ParseTenantBackup(string[] args)
@@ -841,7 +979,8 @@ internal static partial class AdminCommands
             }
         }
 
-        return file is null || keyFile is null ? null : new TenantBackupRequest(args[2], file, keyFile);
+        // The command, not the parser, decides whether the key file is needed, because that depends on the cell.
+        return file is null ? null : new TenantBackupRequest(args[2], file, keyFile);
     }
 
     private static TenantCreateRequest? ParseTenantCreate(string[] args)
@@ -1906,9 +2045,13 @@ internal sealed record MigrateRequest(string? Tenant, int Parallel);
 
 internal sealed record ActivateRequest(string Folder, string? Tenant);
 
-internal sealed record TenantBackupRequest(string Id, string Out, string BackupKeyFile);
+internal sealed record TenantBackupRequest(string Id, string Out, string? BackupKeyFile);
 
-internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts, string BackupKeyFile);
+/// <summary>
+/// <c>tenant restore</c>. <paramref name="BackupKeyFile"/> is the key file of an installation outside a cell. <paramref name="From"/> is the tenant
+/// of a cell whose backup key opens the archive.
+/// </summary>
+internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts, string? BackupKeyFile, string? From = null);
 
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
@@ -1931,11 +2074,13 @@ internal sealed class AdminEnvironment(string environmentName) : IHostEnvironmen
     public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
+/// <summary>The settings of <c>tenant backup</c>.</summary>
 internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
 
 /// <summary>
 /// The settings of <c>tenant create</c>, which also needs the admin role. <paramref name="OidcClientSecret"/> is for <c>tenant restore</c>.
 /// <paramref name="IdentityProvider"/> and <paramref name="Mail"/> are set only by <c>tenant create</c> of a main tenant, and by <c>tenant restore</c> when it has the identity provider settings.
+/// <paramref name="CellBackupCipher"/> is the cell's backup key and is set only in a cell: the new tenant gets a backup key wrapped by it.
 /// </summary>
 internal sealed record CreateSettings(
     NpgsqlConnectionStringBuilder Admin,
@@ -1943,7 +2088,8 @@ internal sealed record CreateSettings(
     TenantSecretCipher Cipher,
     string? OidcClientSecret,
     IdentityProviderAdmin? IdentityProvider = null,
-    RealmMail? Mail = null);
+    RealmMail? Mail = null,
+    TenantSecretCipher? CellBackupCipher = null);
 
 /// <summary>The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.</summary>
 internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath);

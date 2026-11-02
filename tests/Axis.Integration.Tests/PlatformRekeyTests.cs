@@ -327,11 +327,15 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         await context.SaveChangesAsync(CancellationToken);
     }
 
-    /// <summary>Every <c>bytea</c> column of the platform model, found from the model and not from a list.</summary>
+    /// <summary>
+    /// Every <c>bytea</c> column of the platform model that the installation key encrypts, found from the model and not from a list.
+    /// <c>tenant_backup_keys</c> is left out: the cell's backup key wraps it, so the rekey does not move it.
+    /// </summary>
     private static List<(string Table, string Column)> EncryptedColumns()
     {
         using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql("Host=localhost").Options);
         var columns = context.Model.GetEntityTypes()
+            .Where(entity => entity.GetTableName() != "tenant_backup_keys")
             .SelectMany(entity => entity.GetProperties().Where(property => property.GetColumnType() == "bytea")
                 .Select(property => (entity.GetTableName()!, property.GetColumnName())))
             .Order()

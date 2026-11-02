@@ -26,6 +26,25 @@ public sealed class TenantSecretCipherTests
     }
 
     [Fact]
+    public void A_cipher_from_a_key_decrypts_what_the_loaded_cipher_of_that_key_encrypted_and_has_no_previous_key()
+    {
+        var fromKey = TenantSecretCipher.FromKey(_key);
+        var stored = _cipher.Encrypt("a", TenantSecretFields.BackupKey, PlainText);
+
+        Assert.False(fromKey.HasPreviousKey);
+        Assert.Equal(PlainText, fromKey.Decrypt("a", TenantSecretFields.BackupKey, stored).Reveal());
+        Assert.Throws<InvalidOperationException>(() => fromKey.Decrypt("b", TenantSecretFields.BackupKey, stored));
+        Assert.Throws<InvalidOperationException>(() => TenantSecretCipher.FromKey(new byte[32]).Decrypt("a", TenantSecretFields.BackupKey, stored));
+    }
+
+    [Fact]
+    public void A_cipher_from_a_key_that_is_not_32_bytes_is_refused()
+    {
+        Assert.Throws<ArgumentException>(() => TenantSecretCipher.FromKey(new byte[31]));
+        Assert.Throws<ArgumentNullException>(() => TenantSecretCipher.FromKey(null!));
+    }
+
+    [Fact]
     public void An_empty_text_round_trips()
     {
         var stored = _cipher.Encrypt("a", TenantSecretFields.SchemaPassword, "");

@@ -3,6 +3,7 @@ namespace Axis.Admin;
 /// <summary>
 /// The backup key of <c>tenant backup</c> and <c>tenant restore</c>: 32 bytes in base64 in a file, never on the command line or in a setting.
 /// The operator keeps it outside the installation. A message never holds the content of the file.
+/// The cell's backup key, <c>Cell:BackupKeyFile</c>, has the same form, and a message then names that setting.
 /// </summary>
 internal static class BackupKeyFile
 {
@@ -12,7 +13,7 @@ internal static class BackupKeyFile
     private const long MaxFileBytes = 4096;
 
     /// <summary>Returns the key, or null with the reason in <paramref name="problem"/> when the file cannot be read or does not hold a key.</summary>
-    public static byte[]? Read(string path, out string problem)
+    public static byte[]? Read(string path, out string problem, string source = Option)
     {
         string text;
         try
@@ -20,7 +21,7 @@ internal static class BackupKeyFile
             var info = new FileInfo(path);
             if (!info.Exists || info.Length > MaxFileBytes)
             {
-                problem = info.Exists ? Malformed : Unreadable;
+                problem = info.Exists ? Malformed(source) : Unreadable(source);
                 return null;
             }
 
@@ -29,14 +30,14 @@ internal static class BackupKeyFile
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            problem = Unreadable;
+            problem = Unreadable(source);
             return null;
         }
 
         var buffer = new byte[BackupArchive.KeySize + 4];
         if (!Convert.TryFromBase64String(text, buffer, out var length) || length != BackupArchive.KeySize)
         {
-            problem = Malformed;
+            problem = Malformed(source);
             return null;
         }
 
@@ -44,7 +45,7 @@ internal static class BackupKeyFile
         return buffer[..BackupArchive.KeySize];
     }
 
-    private static string Unreadable => $"The {Option} file cannot be read.";
+    private static string Unreadable(string source) => $"The {source} file cannot be read.";
 
-    private static string Malformed => $"The {Option} file does not hold a key of 32 bytes in base64.";
+    private static string Malformed(string source) => $"The {source} file does not hold a key of 32 bytes in base64.";
 }

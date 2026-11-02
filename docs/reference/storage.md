@@ -194,8 +194,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
 
 ## Platform database
 
-See
-[D42](../decisions/d42-tenant-directory-in-the-platform-database.md).
+See [D42](../decisions/d42-tenant-directory-in-the-platform-database.md).
 The `platform` schema, its migrations, the read-only grant, the secret cipher
 and the directory source of the server and the worker are built. `Axis.Admin
 tenant create` writes the tables and encrypts the stored passwords, the OIDC
@@ -203,8 +202,7 @@ client secret and the secrets of the tenant realm's other two clients. `tenant s
 and `tenant restore` adds a suspended tenant. The platform tables exist
 under both tenant sources: the server creates them at start and sets the
 read-only grant. Under both sources the server keeps its data protection keys
-there, see
-[D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
+there, see [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 Under `Tenancy:Source=directory` the server also reads the `active` tenants, their hosts and their bindings over
 `ConnectionStrings:Platform`. Both hosts read them again every
 `Tenancy:RefreshInterval`. The server and the worker keep each password, the client
@@ -258,6 +256,7 @@ The tables:
 | `platform.tenant_platform_providers` | The tenant id and the provider `name`, the primary key, the `type` (`oidc` or `saml`), the names of the issuer, client id, client secret, client key and metadata bindings, the claim names for the display name, email and locale, the roles claim and `role_values`, a `jsonb` object that maps a roles claim value to a platform role. It holds no secret. Rows go with their tenant                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `platform.data_protection_keys`      | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. The server only inserts rows and never updates or deletes one. `platform rekey` updates the encrypted XML. Every server replica reads them.                                                                                                                                                     |
 | `platform.tenant_data_keys`          | The tenant id, the `kind` (`data` or `lookup`), the `number` and the encrypted key, the primary key together. The kind is checked, the number is at least 1, and a row goes with its tenant. `platform rekey` updates the encrypted key. See [data encryption](data-encryption.md#tenant-keys).                                                                         |
+| `platform.tenant_backup_keys`        | The tenant id, the primary key, and the tenant's backup key, wrapped by the cell's backup key. A cell's `tenant create` and `tenant restore` write a row and `tenant backup` and `tenant restore` read it. A row goes with its tenant. `platform rekey` does not touch it. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
 | `platform.tenant_quotas` | The tenant id and the `quota` key, the primary key together, the `value` (`bigint`, null means no limit) and `updated_at`. One row is one quota the tenant overrides, and a quota with no row takes the cell's default. The value is null or at least 0, and a row goes with its tenant. Hosts read the rows with the directory, see [tenant quotas](tenant-quotas.md#quotas). |
 | `platform.audit_records`             | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
@@ -278,7 +277,8 @@ serves a tenant only when this value is the one the host was built for, see [adm
     `platform.tenants`, written by `tenant create`, see
     [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step);
   - the value of a `secret` binding, in `platform.tenant_bindings`;
-  - the data keys and lookup keys of a tenant, in `platform.tenant_data_keys`;
+  - the data keys and lookup keys of a tenant, in `platform.tenant_data_keys`, and the backup key of a tenant of a cell, in
+    `platform.tenant_backup_keys`, wrapped by the cell's key (`Cell:BackupKeyFile`) and not by the installation key;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
     `platform.tenants`, with the field name `oidc_client_key` and the key id,
     see [FAPI 2.0 profile](security.md#fapi-20-profile).

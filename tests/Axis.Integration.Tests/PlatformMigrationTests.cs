@@ -32,7 +32,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenant_quotas", "tenant_usage", "tenant_usage_latest", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_backup_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenant_quotas", "tenant_usage", "tenant_usage_latest", "tenants"], tables);
     }
 
     [Theory]
@@ -200,6 +200,21 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(0L, await ScalarAsync(platform, "SELECT count(*) FROM platform.tenant_data_keys"));
     }
 
+    [Fact]
+    public async Task A_tenant_backup_key_has_one_row_for_each_tenant_and_goes_with_the_tenant()
+    {
+        var platform = await StartServerAsync(directory: true);
+        await ExecuteAsync(platform, InsertTenant("one"));
+        await ExecuteAsync(platform, "INSERT INTO platform.tenant_backup_keys (tenant_id, key) VALUES ('one', '\\x00')");
+
+        await AssertSqlStateAsync(platform, "INSERT INTO platform.tenant_backup_keys (tenant_id, key) VALUES ('one', '\\x00')", UniqueViolation);
+        await AssertSqlStateAsync(platform, "INSERT INTO platform.tenant_backup_keys (tenant_id, key) VALUES ('two', '\\x00')", PostgresErrorCodes.ForeignKeyViolation);
+
+        await ExecuteAsync(platform, "DELETE FROM platform.tenants WHERE id = 'one'");
+
+        Assert.Equal(0L, await ScalarAsync(platform, "SELECT count(*) FROM platform.tenant_backup_keys"));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -241,7 +256,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenant_quotas", "tenant_usage", "tenant_usage_latest", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_backup_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenant_quotas", "tenant_usage", "tenant_usage_latest", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)

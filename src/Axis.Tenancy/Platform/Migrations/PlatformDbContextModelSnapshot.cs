@@ -89,6 +89,23 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("audit_records", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantBackupKeyRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<byte[]>("Key")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("key");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_tenant_backup_keys");
+
+                    b.ToTable("tenant_backup_keys", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -554,6 +571,16 @@ namespace Axis.Tenancy.Platform.Migrations
 
                             t.HasCheckConstraint("ck_tenant_usage_work_items_run", "work_items_run >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantBackupKeyRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_backup_keys_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>

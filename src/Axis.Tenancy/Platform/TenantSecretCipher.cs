@@ -54,6 +54,21 @@ public sealed class TenantSecretCipher
         return new TenantSecretCipher(key, previousKey);
     }
 
+    /// <summary>
+    /// A cipher that holds one key and no previous key, such as the cell's backup key, which wraps the backup keys of the tenants of a cell.
+    /// </summary>
+    /// <exception cref="ArgumentException">The key is not 32 bytes.</exception>
+    public static TenantSecretCipher FromKey(byte[] key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        if (key.Length != KeySize)
+        {
+            throw new ArgumentException($"The key must be {KeySize} bytes.", nameof(key));
+        }
+
+        return new TenantSecretCipher([.. key], null);
+    }
+
     /// <summary>Returns the key of the setting, or <see langword="null"/> for a blank optional setting.</summary>
     private static byte[]? ReadKey(IConfiguration configuration, string setting)
     {
