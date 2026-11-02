@@ -1,0 +1,85 @@
+{
+  "id": "b81c4f27-5d96-4a03-9e7b-2c0d8a6f1e54",
+  "kind": "scenario",
+  "name": "RequestGoesToManagerThenNamedEmployee",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "users": {
+    "admin": ["admin"],
+    "ann": ["member"],
+    "mia": ["member"],
+    "fin": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "mia",
+      "values": { "fullName": "Mia Tran", "workEmail": "mia@example.com", "user": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "fin",
+      "values": { "fullName": "Fin Le", "workEmail": "fin@example.com", "user": "fin" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "annEmployee",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com", "user": "ann", "manager": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "purchase",
+      "values": {
+        "name": "Purchase",
+        "code": "PURCHASE",
+        "steps": [
+          { "sequence": 2, "approver": "employee", "employee": "fin", "minAmount": 1000 },
+          { "sequence": 1, "approver": "lineManager" }
+        ]
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "small",
+      "values": { "type": "purchase", "title": "Keyboard", "amount": 50 }
+    },
+    { "type": "startProcess", "process": "RequestApproval", "record": "small", "as": "ann" },
+    { "type": "expectTask", "record": "small", "step": "decide", "assignee": { "user": "mia" } },
+    { "type": "completeTask", "record": "small", "step": "decide", "outcome": "approve", "as": "mia" },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "small", "state": "completed" },
+    {
+      "type": "expectRecord",
+      "record": "small",
+      "values": { "status": "approved", "stepsRequired": 1, "step": 1 }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "large",
+      "values": { "type": "purchase", "title": "Monitor", "amount": 2500 }
+    },
+    { "type": "startProcess", "process": "RequestApproval", "record": "large", "as": "ann" },
+    { "type": "expectTask", "record": "large", "step": "decide", "assignee": { "user": "mia" } },
+    { "type": "completeTask", "record": "large", "step": "decide", "outcome": "approve", "as": "mia" },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "large", "state": "waiting", "step": "decide" },
+    { "type": "expectTask", "record": "large", "step": "decide", "assignee": { "user": "fin" } },
+    { "type": "completeTask", "record": "large", "step": "decide", "outcome": "approve", "as": "fin" },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "large", "state": "completed" },
+    {
+      "type": "expectRecord",
+      "record": "large",
+      "values": { "status": "approved", "stepsRequired": 2, "step": 2, "stepSequence": 2 }
+    }
+  ]
+}

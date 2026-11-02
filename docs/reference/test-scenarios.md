@@ -93,6 +93,8 @@ request ends `approved`:
   becomes the role the application maps it to, see
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md)
   and [module scenarios](modules-and-templates.md#processes-pages-policies-and-dependencies).
+  A step of a module scenario names an entity of its own module by plain name, or an entity of
+  a module that the module declares, as `<module id>/<name>`. A process is always the module's own.
   An assignee role and a recipient role are slots too. A name that is not a slot
   is `AXC0335`.
 - `contract` is for a module's scenario only. Its `covers` lists the named points of the module's
@@ -147,7 +149,9 @@ Every step has a `type`. These are the step kinds:
   command, as the record API does. `startProcess` and `completeTask` apply the
   checks of the process start and task endpoints without the HTTP layer.
 - `entity` and `process` name a resource of the application, or of a module it
-  declares, written `<module id>/<name>` such as `department-budgets/Budget`.
+  declares, written `<module id>/<name>` such as `department-budgets/Budget`. In a
+  module's scenario, `entity` names an entity of the module or of a module it declares, and
+  `process` names a process of the module only.
 - Only actions may declare `expect`. With no `expect`, an action must succeed.
   An unmet expectation fails the scenario:
   - `"denied"` means 403. A grant, a field grant or a record filter refused

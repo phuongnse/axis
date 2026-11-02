@@ -51,7 +51,8 @@ namespace Axis.Configuration.Compilation;
 /// must each name a point of the pinned version's contracts, once, with a reason, and the pin keeps the valid ones.
 /// A module may hold scenarios.
 /// A scenario's steps name the module's own entities and processes without <c>/</c>, rewritten to the
-/// qualified name, and anything else is reported as for a process. The scenario files are checked but are not
+/// qualified name. A step's <c>entity</c> may instead name an entity of a declared module, and anything
+/// else is reported as for a process. The scenario files are checked but are not
 /// returned with the files of the release, so they stay out of its content hash.
 /// </summary>
 internal static class ModuleChecker
@@ -1362,13 +1363,14 @@ internal static class ModuleChecker
                 case ResourceKinds.Scenario:
                     var scenario = root.Deserialize<ScenarioResource>(ApplicationLoader.SerializerOptions)! with { File = file };
 
-                    // A step names the module's own entities and processes by plain name, and a user's roles stay
-                    // slot names. ScenarioChecker reports a role that is not a slot.
+                    // A step names the module's own processes by plain name. Its entity is the module's own or a
+                    // declared module's. A user's roles stay slot names. ScenarioChecker reports a role that is
+                    // not a slot.
                     _scenarios.Add(new ModuleScenario(moduleId, scenario with
                     {
                         Steps = [.. scenario.Steps.Select((step, index) => step with
                         {
-                            Entity = Rewrite(moduleId, _noModules, step.Entity, scenario.File, scenario.Id, $"/steps/{index}/entity", _unloadedEntityNames, diagnostics),
+                            Entity = Rewrite(moduleId, declared, step.Entity, scenario.File, scenario.Id, $"/steps/{index}/entity", _unloadedEntityNames, diagnostics),
                             Process = Rewrite(moduleId, _noModules, step.Process, scenario.File, scenario.Id, $"/steps/{index}/process", _unloadedProcessNames, diagnostics),
                         })],
                     }));

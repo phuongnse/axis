@@ -442,7 +442,8 @@ A module holds test scenarios, as
 some of them as contract scenarios.
 
 - **Module scenarios** _(built)_. A `scenario` file in a module names entities and processes of its module by
-  their plain names, and its `users` give role slots of the module instead of roles. When it runs
+  their plain names. A step's `entity` may instead name an entity of a module the module
+  declares, as `<module id>/<name>`. Its `users` give role slots of the module instead of roles. When it runs
   for an application, each slot becomes the role the application maps it to, and it runs against
   the application as compiled. It runs with the application's own scenarios, in Studio and with
   `Axis.Scenarios`, see [test scenarios](test-scenarios.md). A module's scenario files stay out of

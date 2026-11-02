@@ -105,8 +105,10 @@ slots of the same names.
 
 Version 1.0.0 holds the entities below, the data sources `RequestTypes`, `Requests` and `Decisions`,
 the sequence `RequestNumber` with the format `RQ-{yyyy}-{n:5}`, `amount` and `minAmount` as `decimal`
-with precision 18 and scale 2, the contracts of `Request`, `RequestType` and `Decision`, and the texts. Its
-process, policies, pages and contract scenarios are _(planned for M26)_.
+with precision 18 and scale 2, the contracts of `Request`, `RequestType` and `Decision`, the process
+`RequestApproval`, the form `RequestReview`, the policies `MemberAccess` and `AdminAccess`, two module
+scenarios, `RequestGoesToManagerThenNamedEmployee` and `DepartmentHeadReturnsAndRejects`, and the texts.
+Its pages and contract scenarios are _(planned for M26)_.
 
 ### Request types
 
@@ -192,10 +194,10 @@ once**, whatever process change a business makes.
 4. **`findApprover`** sets `approver` from the step's `approver`, with
    `first(type.steps, sequence == outer.stepSequence, approver)`: the requester's manager, the
    department's head, or the step's `employee`.
-5. **`findDelegate`** sets `onBehalfOf` to the approver's account and `approverUser` to the
+5. **`findDelegate`** _(planned for M26)_ sets `onBehalfOf` to the approver's account and `approverUser` to the
    delegate's account while `organization:IsDelegating(…)` holds for the approver, else to the
    approver's account.
-6. **`route`**, a decision: when `approverUser` is empty or is the requester, the step goes to
+6. **`route`** _(planned for M26)_, a decision: when `approverUser` is empty or is the requester, the step goes to
    `adminDecide`, a task for the `admin` slot. Otherwise it goes to `decide`, a task for
    `approverUser`. Both tasks show the `RequestReview` form, with outcomes `approve`, `return`
    and `reject`.
@@ -207,9 +209,27 @@ once**, whatever process change a business makes.
 9. **`markApproved`** sets `status` to `approved`. The contract checks the last decider and that
    every step that applies was decided.
 
+Until M26, `findDelegate` only sets `approverUser` to the approver's account, and the process has no
+`route`, so the `decide` task always goes to `approverUser`. When that is empty or is the requester,
+the contract refuses the decision and the instance fails.
+
 A requester who is a department head, and whose step would go to themselves, gets an administrator
-instead. When the only administrator is the requester too, the guard refuses, and a business of
+instead _(planned for M26)_. When the only administrator is the requester too, the guard refuses, and a business of
 that size relaxes `Request/transitions/approve` with its reason.
+
+### Policies
+
+`MemberAccess` and `AdminAccess` give the slots what the contracts allow, so an application that only
+maps the slots works.
+
+- **`MemberAccess`** gives the `member` slot the ceiling of `Request`: read the requests they submitted, the
+  ones they are to decide and the ones they decide for someone else, and create, update and delete their
+  own, with the fields `type`, `title`, `description`, `amount` and `status`. It also reads request types
+  and the decisions on their own requests or made by them, and starts `RequestApproval`. A request that
+  is not theirs is outside their read filter, so starting the process on it is refused with a `400`
+  at `subjectId`.
+- **`AdminAccess`** gives the `admin` slot every action on request types, read and export on requests and
+  decisions, and inspect on `RequestApproval`.
 
 ### Pages
 

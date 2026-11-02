@@ -1,0 +1,13 @@
+{
+  "id": "7c3d8e15-4a92-4f06-b8d1-e5a0c9f27b83",
+  "kind": "policy",
+  "name": "AdminAccess",
+  "formatVersion": 1,
+  "roles": ["admin"],
+  "grants": [
+    { "name": "requestTypeAll", "entity": "RequestType", "actions": ["read", "create", "update", "delete"] },
+    { "name": "requestRead", "entity": "Request", "actions": ["read", "export"] },
+    { "name": "decisionRead", "entity": "Decision", "actions": ["read", "export"] },
+    { "name": "requestApprovalInspect", "process": "RequestApproval", "actions": ["inspect"] }
+  ]
+}

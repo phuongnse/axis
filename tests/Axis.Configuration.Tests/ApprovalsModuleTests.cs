@@ -41,6 +41,25 @@ public sealed class ApprovalsModuleTests
     }
 
     [Fact]
+    public void The_module_has_the_approval_process_and_a_policy_that_lets_the_member_role_start_it()
+    {
+        using var folder = Application();
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(_modulesPath).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        Assert.Single(compiled.Model!.Processes, process => process.Name == "approvals/RequestApproval");
+        var start = Assert.Single(
+            compiled.Model.Policies,
+            policy => policy.Roles.Contains("employee") && policy.Grants.Any(grant =>
+                grant.Process?.Name == "approvals/RequestApproval" && grant.Actions.Contains(PolicyAction.Start)));
+        Assert.Equal("approvals/MemberAccess", start.Name);
+        Assert.Contains(
+            compiled.Model.Policies,
+            policy => policy.Roles.Contains("admin") && policy.Grants.Any(grant => grant.Entity?.Name == "approvals/RequestType"));
+    }
+
+    [Fact]
     public void The_requester_employee_is_matched_by_user_from_the_requester_and_the_steps_are_a_child_collection()
     {
         using var folder = Application();

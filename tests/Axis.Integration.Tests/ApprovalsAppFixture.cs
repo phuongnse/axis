@@ -14,9 +14,9 @@ namespace Axis.Integration.Tests;
 /// sensitive. The application declares the built-in modules <c>organization</c> and <c>approvals</c>, which the test
 /// project copies to <c>BuiltInModules</c>, maps the slot <c>admin</c> of each to <c>admin</c> and the slot
 /// <c>member</c> of each to <c>employee</c>, and has policies of its own that grant access to the entities of
-/// <c>approvals</c> within the module's ceilings. It adds the process <c>DecideRequest</c>, whose task <c>decide</c> a
-/// test completes as another user and whose steps write the request as a task completion or a process step does. The
-/// worker is the one of <see cref="Steps"/>, which runs only when a test calls it. The test authentication scheme signs
+/// <c>approvals</c> within the module's ceilings, and the module's own policies apply too. It adds the process
+/// <c>DecideRequest</c>, whose task <c>decide</c> a test completes as another user and whose steps write the request as
+/// a task completion or a process step does. The worker is the one of <see cref="Steps"/>, which runs only when a test calls it. The test authentication scheme signs
 /// in <c>appr-admin</c>, who holds <c>admin</c> there, and the members <c>appr-ann</c>, <c>appr-bob</c> and
 /// <c>appr-carl</c>, who hold <c>employee</c> there. A member's employee record carries the member's id in
 /// <c>user</c>, which is unique, so each test uses its own member.

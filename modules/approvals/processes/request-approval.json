@@ -1,0 +1,145 @@
+{
+  "id": "e4b7d2a9-6c15-4f83-a0e2-7b9d1c3f5a48",
+  "kind": "process",
+  "name": "RequestApproval",
+  "formatVersion": 1,
+  "entity": "Request",
+  "startCondition": {
+    "expression": "status in ('draft', 'returned') and count(type.steps, outer.amount == null or minAmount == null or outer.amount >= minAmount) > 0",
+    "message": { "textKey": "approvals.requestApproval.cannotSubmit" }
+  },
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'submitted'",
+        "step": "0",
+        "stepSequence": "0",
+        "stepsRequired": "count(type.steps, outer.amount == null or minAmount == null or outer.amount >= minAmount)"
+      },
+      "next": "nextStep"
+    },
+    {
+      "name": "nextStep",
+      "type": "decision",
+      "branches": [{ "name": "more", "when": "step < stepsRequired", "next": "advance" }],
+      "otherwise": "markApproved"
+    },
+    {
+      "name": "advance",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "stepSequence": "min(type.steps, if(sequence > outer.stepSequence and (outer.amount == null or minAmount == null or outer.amount >= minAmount), sequence, null))",
+        "decisionComment": "null"
+      },
+      "next": "findApprover"
+    },
+    {
+      "name": "findApprover",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "approver": "if(first(type.steps, sequence == outer.stepSequence, approver) == 'lineManager', requesterEmployee.manager, if(first(type.steps, sequence == outer.stepSequence, approver) == 'departmentHead', requesterEmployee.department.head, first(type.steps, sequence == outer.stepSequence, employee)))"
+      },
+      "next": "findDelegate"
+    },
+    {
+      "name": "findDelegate",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "approverUser": "approver.user" },
+      "next": "decide"
+    },
+    {
+      "name": "decide",
+      "type": "task",
+      "label": { "textKey": "approvals.requestApproval.decide" },
+      "assignee": { "user": "approverUser" },
+      "form": "RequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "approvals.requestApproval.approve" }, "next": "recordApproval" },
+        { "name": "return", "label": { "textKey": "approvals.requestApproval.return" }, "next": "logReturn" },
+        { "name": "reject", "label": { "textKey": "approvals.requestApproval.reject" }, "next": "logRejection" }
+      ]
+    },
+    {
+      "name": "recordApproval",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "step": "step + 1", "stepDecision": "decisionTask()" },
+      "next": "logApproval"
+    },
+    {
+      "name": "logApproval",
+      "type": "operation",
+      "operation": "createRecord",
+      "entity": "Decision",
+      "set": {
+        "request": "id",
+        "stepSequence": "stepSequence",
+        "outcome": "'approved'",
+        "decidedBy": "accountableUser()",
+        "comment": "decisionComment",
+        "decidedAt": "now()"
+      },
+      "next": "nextStep"
+    },
+    {
+      "name": "logReturn",
+      "type": "operation",
+      "operation": "createRecord",
+      "entity": "Decision",
+      "set": {
+        "request": "id",
+        "stepSequence": "stepSequence",
+        "outcome": "'returned'",
+        "decidedBy": "accountableUser()",
+        "comment": "decisionComment",
+        "decidedAt": "now()"
+      },
+      "next": "markReturned"
+    },
+    {
+      "name": "logRejection",
+      "type": "operation",
+      "operation": "createRecord",
+      "entity": "Decision",
+      "set": {
+        "request": "id",
+        "stepSequence": "stepSequence",
+        "outcome": "'rejected'",
+        "decidedBy": "accountableUser()",
+        "comment": "decisionComment",
+        "decidedAt": "now()"
+      },
+      "next": "markRejected"
+    },
+    {
+      "name": "markApproved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'approved'" },
+      "next": "done"
+    },
+    {
+      "name": "markReturned",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'returned'" },
+      "next": "done"
+    },
+    {
+      "name": "markRejected",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'rejected'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

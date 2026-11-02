@@ -1,0 +1,25 @@
+{
+  "id": "9a1e6c52-3b7d-4e08-8f14-5d2c7b9e0a31",
+  "kind": "form",
+  "name": "RequestReview",
+  "formatVersion": 1,
+  "entity": "Request",
+  "sections": [
+    {
+      "title": { "textKey": "approvals.requestReview.request" },
+      "fields": [
+        { "field": "number", "readOnly": true },
+        { "field": "requester", "readOnly": true },
+        { "field": "type", "readOnly": true },
+        { "field": "title", "readOnly": true },
+        { "field": "description", "readOnly": true },
+        { "field": "amount", "readOnly": true },
+        { "field": "status", "readOnly": true }
+      ]
+    },
+    {
+      "title": { "textKey": "approvals.requestReview.decision" },
+      "fields": [{ "field": "decisionComment" }]
+    }
+  ]
+}

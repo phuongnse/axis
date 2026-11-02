@@ -1348,6 +1348,27 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task The_scenarios_of_the_built_in_approvals_module_run_for_an_application_that_declares_it_and_pass()
+    {
+        using var results = new TemporaryFolder();
+        var output = new StringWriter();
+
+        var exitCode = await ScenarioCommand.RunAsync(
+            [
+                Path.Combine(AppContext.BaseDirectory, "Fixtures", "ApprovalsApp"),
+                "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
+                "--modules", Path.Combine(AppContext.BaseDirectory, "BuiltInModules"),
+                "--results", results.Path,
+            ],
+            output,
+            CancellationToken);
+
+        Assert.True(exitCode == 0, output.ToString());
+        Assert.Contains("PASS approvals/RequestGoesToManagerThenNamedEmployee", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/DepartmentHeadReturnsAndRejects", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_module_scenario_user_acts_with_the_role_the_application_maps_the_slot_to()
     {
         using var folder = new TemporaryFolder();

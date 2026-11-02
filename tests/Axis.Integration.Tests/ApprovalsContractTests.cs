@@ -13,8 +13,8 @@ namespace Axis.Integration.Tests;
 /// <c>step</c> after one task completion are refused on the second. A requester's change of <c>amount</c> on a
 /// submitted request is a <c>400</c> at <c>/values/amount</c>, and the same change in <c>draft</c> succeeds. A request
 /// type needs a step without <c>minAmount</c>. A member lists their own requests and the ones whose
-/// <c>approverUser</c> or <c>onBehalfOf</c> is theirs, and no other. The tests put requests into <c>submitted</c> with
-/// SQL, which skips the contract, as the module's own process does not exist yet.
+/// <c>approverUser</c> or <c>onBehalfOf</c> is theirs, and no other. The tests use SQL to put requests into <c>submitted</c>
+/// directly, which skips the contract.
 /// </summary>
 public sealed class ApprovalsContractTests(ApprovalsAppFixture fixture) : IClassFixture<ApprovalsAppFixture>
 {
