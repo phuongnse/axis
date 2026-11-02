@@ -811,7 +811,7 @@ public static partial class ApplicationCompiler
                 diagnostics);
         }
         WebhookChecker.Check(loaded.Webhooks, FindEvent, loaded.UnloadedEventNames, moduleReferences, references, diagnostics);
-        MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, references, diagnostics);
+        MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, declaredModules, references, diagnostics);
         ScenarioChecker.Check(
             loaded.Scenarios,
             FindRole,
@@ -939,6 +939,7 @@ public static partial class ApplicationCompiler
                 contracts.GetValueOrDefault(entity.Name),
                 IsModuleResource(entity) ? FilterRulesFor(entity) : [],
                 IsModuleResource(entity) ? modules.FirstOrDefault(pin => pin.Id == ModuleIdOf(entity.Name))?.Roles : null))
+            .Select(entity => layerTraces.TryGetValue(entity.File, out var trace) ? entity with { Layer = BuildEntityLayer(trace) } : entity)
             .ToList();
         var model = new ApplicationModel
         {
@@ -2973,6 +2974,23 @@ public static partial class ApplicationCompiler
         }
 
         return null;
+    }
+
+    /// <summary>Where a layered module entity came from in its layer, with the remove of each field the layer removed.</summary>
+    private static EntityLayerModel BuildEntityLayer(LayerTrace trace)
+    {
+        var removedFields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var remove in trace.Merge.Removes.Where(remove => remove.LayerPath.StartsWith("/changes/fields/", StringComparison.Ordinal)))
+        {
+            removedFields.TryAdd(remove.Key, remove.LayerPath);
+        }
+
+        return new EntityLayerModel(
+            trace.Layer.File,
+            trace.Layer.Id,
+            trace.Merge.LayerPathByMergedPath,
+            trace.Merge.ChangedPathByMergedPath,
+            removedFields);
     }
 
     private static EntityModel BuildEntity(
