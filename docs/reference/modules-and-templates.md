@@ -42,7 +42,7 @@ the modules it uses in `application.json`, with a version range for each:
   "kind": "application",
   "name": "PurchaseRequests",
   "formatVersion": 1,
-  "modules": [{ "id": "departments", "version": "^1.0.0", "roles": { "manager": "department-manager" } }]
+  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "department-manager", "member": "employee" } }]
 }
 ```
 
@@ -51,26 +51,21 @@ The module's manifest is `module.json` at the root of its folder:
 ```json
 {
   "kind": "module",
-  "id": "departments",
-  "version": "1.1.0",
-  "label": "Departments",
-  "roles": [{ "name": "manager", "label": { "textKey": "departments.roles.manager" } }]
+  "id": "organization",
+  "version": "1.0.0",
+  "label": "Organization",
+  "roles": [
+    { "name": "admin", "label": { "textKey": "organization.roles.admin" } },
+    { "name": "member", "label": { "textKey": "organization.roles.member" } }
+  ]
 }
 ```
 
-`departments` is the sample module, `samples/modules/departments`. It holds a
-`Department` entity with a code, a name and a manager, a `Departments` data source,
-an `IsManager(manager, user)` rule and an `IsDepartmentCode(code)` rule, three seed
-departments and `en` and `vi` texts. The `Department` entity has a validation that
-calls `IsDepartmentCode`, so a department code must be in capital letters.
-It has a `manager` role slot, labelled in `en` and `vi`, and a `ManagerAccess` module
-policy for the slot. The policy lets the role read the departments whose `manager` is the
-current user, and read the `Departments` data source. No sample declares it any more, because the
-purchase request and leave request samples declare the built-in `organization` module instead.
-`department-budgets` is the second sample module, see
+`organization` is a built-in module, see [built-in modules](built-in-modules.md), and
+`department-budgets` is the sample module, see
 [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 `scripts/build.sh`, `scripts/dev.sh` and the E2E run install them under
-`artifacts/modules/departments/1.1.0/` and `artifacts/modules/department-budgets/1.2.0/`, and the
+`artifacts/modules/organization/1.0.0/` and `artifacts/modules/department-budgets/1.2.0/`, and the
 Compose images hold them in `/modules`. The server and the worker read them through `Modules:Path`.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
@@ -108,7 +103,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   [customization layer](customization-layers.md#versions-until-m29) that names a
   key the newer version dropped fails that compile, and the release in use stays.
 - **References.** An application resource names a module resource as
-  `<module id>/<name>`, for example `departments/Department`. A module resource
+  `<module id>/<name>`, for example `organization/Department`. A module resource
   names resources of its own module without a `/`, and resources of a module its
   `module.json` declares in `modules` as `<module id>/<name>`. The compiler
   builds both rules for a field's `target` and `sequence` and for a data
@@ -140,7 +135,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   name a module entity. One that names an undeclared module keeps the policy's
   unknown-entity code, `AXC0092`. A module rule calls rules of its own
   module by plain name, such as `isActive(x)`, and rules of a module it declares
-  as `<module id>:<rule>(…)`, such as `departments:IsCode(x)`. The rule checks, `AXC0055`,
+  as `<module id>:<rule>(…)`, such as `organization:IsDelegating(from, until)`. The rule checks, `AXC0055`,
   `AXC0056`, `AXC0057` and `AXC0065`, and the type check of its expression
   apply to it and are reported in the module file. A call to an application
   rule, or a qualified call to a module it does not declare or to its own id, is
@@ -149,7 +144,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   dependency order, so a module in a dependency cycle, which is `AXC0296`, may
   also get `AXC0050` for a call back into the cycle. The compiler keeps each module rule as `<module id>/<name>`.
   An application expression calls it as `<module id>:<name>(…)`, such as
-  `departments:IsManager(x)`, with no spaces around the `:`. A rule, a
+  `organization:IsDelegating(from, until)`, with no spaces around the `:`. A rule, a
   validation, a data source filter, a process condition and a policy filter can
   call it. The interpreter runs its body, and a filter's SQL inlines it with the
   module rules it calls. The rule name ignores letter case and the module id
@@ -175,10 +170,10 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   order it is first reached. The record API
   writes a module entity's name as two path segments, `{module id}/{entity
   name}`, for example
-  `/api/apps/{app}/entities/departments/Department/records`. See the
+  `/api/apps/{app}/entities/organization/Department/records`. See the
   [record API routes](record-api.md#routes). The data source endpoint writes a
   module data source's name the same way, `{module id}/{data source name}`, for
-  example `/api/apps/{app}/data-sources/departments/Departments/rows`. See
+  example `/api/apps/{app}/data-sources/organization/Departments/rows`. See
   [the data source endpoint](data-sources.md#endpoint).
 - **A copy per application.** Entities, sequences, seeds, events, data sources and forms of a module belong
   to the application that uses it. The id of each module resource inside an
@@ -251,7 +246,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
 | `AXC0302` | An input of the connector's operation is required, and the slot operation has no input with that name. The message names the slot, the operation and the field. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` it is checked against the connector that the chain of slots reaches, and the report is in that `module.json`. |
 | `AXC0303` | An output of a slot operation is not an output of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` the slot of the depending module takes the place of the connector, and the report is in that `module.json`. |
 | `AXC0304` | A role in a module policy's `roles` is not a role slot of its module. The message lists the slots, or says there are none. Reported at `/roles/{i}` of the module file. |
-| `AXC0305` | A grant in a module policy is on something other than an entity, data source or process of its own module: an `endpoint` grant, a name with `/` such as `departments/Department`, or the plain name of an application entity, data source or process. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
+| `AXC0305` | A grant in a module policy is on something other than an entity, data source or process of its own module: an `endpoint` grant, a name with `/` such as `organization/Department`, or the plain name of an application entity, data source or process. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
 | `AXC0306` | Two mappings of the same slot of a module give it different roles or different connectors: the application's own entry and the chain through a depending module, or the chains through two depending modules. The message names the slot, the module and both mappings. The application's entry stays, and otherwise the first depending module in pin order. Reported at `/modules/{i}/roles/{slot}` or `/modules/{i}/connectors/{slot}` of the later entry, in `modules/<id>/module.json`. See [mapping slots](#processes-pages-policies-and-dependencies). |
 | `AXC0307` | A module task's `assignee.role`, or an escalation's `reassign.role`, is not a role slot of its module. A role of an application gives this too. The message lists the slots, or says there are none. Reported at `/steps/{i}/assignee/role` or `/steps/{i}/escalations/{j}/reassign/role` of the module file. |
 
@@ -357,7 +352,7 @@ An application that declares it maps both slots to roles of its own:
   application, gets the usual unknown-name diagnostic in the module file, and not in the
   application's files. Text keys in the page resolve against the merged texts, as in module forms.
   A module holds no site, so the application's site navigation lists a module page by that name,
-  such as `{ "page": "departments/Departments" }`, for a module that `application.json` declares.
+  such as `{ "page": "organization/Departments" }`, for a module that `application.json` declares.
   A module that the application does not declare is `AXC0207` at `/navigation/{i}/page`. An
   application page cannot navigate to a module page yet, because the `page` of its `navigate`
   action is a plain name. The page metadata API writes the name as two path segments, as the record

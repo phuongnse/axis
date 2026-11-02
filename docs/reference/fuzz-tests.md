@@ -44,8 +44,8 @@ kind of bodies over HTTP. Neither fuzzes the query parameters of a list or the f
   odd character, a long number, 40 open parentheses or SQL injection text such as
   `'x''); DROP TABLE t; --'`.
 - **Scope.** The type checker and the translator see the fields, the enums, a reference field, a
-  child collection and the two rules that the samples use, `FinanceThreshold` and
-  `departments:IsManager`.
+  child collection and two rules: `FinanceThreshold`, which the purchase request sample uses, and
+  the rule `IsManager` of a test module.
 - **Translator inputs.** Each parsed tree is translated twice: as parsed, which the translator's
   API allows, and with the type checker's result when the tree passes it. Most mutated inputs fail
   the checker, so the first translation keeps the translator busy.

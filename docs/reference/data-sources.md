@@ -332,7 +332,7 @@ active release, and `{dataSource}` a data source in that release. Both match
 ignoring letter case, as in the record API.
 
 A module data source's `{dataSource}` is written `{module id}/{data source name}`,
-for example `data-sources/departments/Departments/rows`. It matches ignoring
+for example `data-sources/organization/Departments/rows`. It matches ignoring
 letter case, is two path segments, and only that form reaches a module data
 source. A data source of the application has one segment. This is how the
 [record API routes](record-api.md#routes) name module entities. A module data

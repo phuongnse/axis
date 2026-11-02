@@ -39,7 +39,7 @@ modules/
   organization/           built-in module, as configuration, installed with Axis: departments, employees, the IsDelegating rule, contracts, policies and contract scenarios
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
-  modules/                the sample modules departments and department-budgets, as configuration
+  modules/                the sample module department-budgets, as configuration
   keycloak/               the development Keycloak realm with the sample's users
   postgres/               init-roles.sql, which creates the axis_schema, axis_runtime and axis_scenario database roles, and the preview tenant's database and roles
   packages/               the sample extension package payment-references and its unit tests
