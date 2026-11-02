@@ -1,13 +1,16 @@
 import { Button, Flex, Modal, Table, Tag, Typography } from 'antd'
 import { useContext, useState, type HTMLAttributes } from 'react'
+import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import { releaseRows, type StudioReleaseRow, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { visuallyHidden } from '../platform/visuallyHidden'
 import { PlatformContext } from './context'
 
 /**
  * The release history of the open application, newest activation first, with one row marked Active. A release that
  * was activated more than once has a row for each activation, and only its newest row is marked. When `canRollBack`,
- * every row of a release that is not active has a Roll back button, off while `busy`. The button opens a dialog that
+ * a row of an off-standard release shows the Off-standard tag with each relaxed module, point and reason. When
+ * `canRollBack`, every row of a release that is not active has a Roll back button, off while `busy`. The button opens a dialog that
  * names the release number and label, and its confirmation calls `onRollBack`.
  */
 export function StudioReleasesList({
@@ -50,6 +53,7 @@ export function StudioReleasesList({
               'data-testid': 'studio-release-row',
               'data-number': row.number,
               'data-active': row.active ? 'true' : undefined,
+              'data-off-standard': row.offStandard ? 'true' : undefined,
             }) as HTMLAttributes<HTMLElement>
           }
           columns={[
@@ -67,10 +71,16 @@ export function StudioReleasesList({
               title: t('shell.studio.releases.active'),
               render: (_, row) => (row.active ? <Tag color="success">{t('shell.studio.releases.active')}</Tag> : null),
             },
+            {
+              key: 'relaxed',
+              title: t('shell.studio.releases.relaxed'),
+              render: (_, row) => <ReleaseOffStandard relaxed={row.relaxed} />,
+            },
             ...(canRollBack
               ? [
                   {
                     key: 'rollback',
+                    title: <span style={visuallyHidden}>{t('shell.studio.rollback')}</span>,
                     render: (_: unknown, row: StudioReleaseRow) =>
                       row.releaseId === activeId ? null : (
                         <Button size="small" disabled={busy} onClick={() => setPending(row)}>

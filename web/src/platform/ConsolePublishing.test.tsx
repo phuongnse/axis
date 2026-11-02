@@ -36,6 +36,8 @@ function release(releaseId: string, number: number, overrides: Partial<Publishin
     label: null,
     note: null,
     requestId: null,
+    offStandard: false,
+    relaxed: [],
     ...overrides,
   }
 }
@@ -123,7 +125,7 @@ describe('ConsolePublishing', () => {
     const releases = await screen.findByTestId('console-publishing-releases')
     expect(await within(releases).findByText('#1')).toBeVisible()
     expect(calls).toEqual([{ url: '/api/console/applications/a1/publishing?page=1&pageSize=20', method: 'GET' }])
-    for (const title of ['Release', 'Label', 'Note', 'Activated by', 'Activated']) {
+    for (const title of ['Release', 'Label', 'Note', 'Activated by', 'Activated', 'Relaxed points']) {
       expect(within(releases).getByRole('columnheader', { name: title })).toBeVisible()
     }
     const rows = within(releases).getAllByRole('row').slice(1)
@@ -145,6 +147,38 @@ describe('ConsolePublishing', () => {
     expect(within(requestRows[0]!).getByText('Alan Author')).toBeVisible()
     expect(within(requestRows[1]!).getByText('u9')).toBeVisible()
     expect(within(requestRows[1]!).getByText('Succeeded')).toBeVisible()
+  })
+
+  it('marks an off-standard release with the tag, its points and reasons, and leaves a standard release unmarked', async () => {
+    stubServer(() =>
+      answer({
+        ...leave,
+        releases: [
+          release('r2', 2, {
+            offStandard: true,
+            relaxed: [
+              { module: 'department-budgets', point: 'Budget/transitions/approve', reason: 'Approvers decide alone' },
+              { module: 'department-budgets', point: 'Budget/fields/limit', reason: 'Pilot' },
+            ],
+          }),
+          release('r1', 1, { activatedAt: '2026-10-27T10:00:00Z' }),
+        ],
+      }),
+    )
+    renderView()
+
+    const releases = await screen.findByTestId('console-publishing-releases')
+    expect(await within(releases).findByText('#1')).toBeVisible()
+    const rows = within(releases).getAllByRole('row').slice(1)
+    expect(within(rows[0]!).getByTestId('release-off-standard')).toHaveTextContent('Off-standard')
+    const points = within(rows[0]!).getAllByTestId('release-relaxed-point')
+    expect(points).toHaveLength(2)
+    expect(points[0]).toHaveTextContent('department-budgets')
+    expect(points[0]).toHaveTextContent('Budget/transitions/approve')
+    expect(points[0]).toHaveTextContent('Approvers decide alone')
+    expect(points[1]).toHaveTextContent('Pilot')
+    expect(within(rows[1]!).queryByTestId('release-off-standard')).toBeNull()
+    expect(within(rows[1]!).queryByTestId('release-relaxed-point')).toBeNull()
   })
 
   it('loads the publishing of the application that is chosen', async () => {

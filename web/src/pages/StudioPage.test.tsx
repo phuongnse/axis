@@ -1046,6 +1046,8 @@ describe('StudioPage publishing', () => {
           label: null,
           note: null,
           requestId: null,
+          offStandard: false,
+          relaxed: [],
         })
         return json({
           active: { releaseId, number: 3, contentHash: 'hash-3' },

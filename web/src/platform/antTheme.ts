@@ -95,6 +95,13 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         colorPrimary: colour.primaryText,
         colorPrimaryHover: colour.primaryText,
       },
+      // A status tag draws its text in the token's colour, so it takes the text colour that passes contrast.
+      Tag: {
+        colorSuccess: colour.successText,
+        colorWarning: colour.warningText,
+        colorError: colour.dangerText,
+        colorInfo: colour.infoText,
+      },
       Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
     },
   }

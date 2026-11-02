@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '../test'
 import type { Browser, Page, TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
@@ -221,6 +222,64 @@ test.describe('the active release of the purchase request sample changes', () =>
       await useSession(page, 'requester')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('an author relaxes a contract point and publishes, and Studio and the console mark the release off-standard', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(240_000)
+    const { server } = await studioServer(testInfo)
+    const stamp = Date.now().toString(36)
+    const label = `Relaxed ${stamp}`
+    const point = 'Budget/transitions/approve'
+    const reason = `Approvers decide alone ${stamp}`
+    try {
+      await useSession(page, 'author')
+      await openStudio(page, server.url)
+      await page
+        .getByTestId('studio-group-module-contracts')
+        .getByRole('button', {
+          name: 'department-budgets/BudgetContract',
+          exact: true,
+        })
+        .click()
+      await page.getByTestId(`studio-contract-relax-${point}`).click()
+      const dialog = await waitForDialog(page)
+      await dialog.getByRole('textbox', { name: 'Reason', exact: true }).fill(reason)
+      await confirmDialog(page, 'Relax')
+      await expect(page.getByTestId(`studio-contract-relaxed-${point}`)).toBeVisible()
+
+      await publishWithLabel(page, label)
+      await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+        timeout: 60_000,
+      })
+      const row = page.getByTestId('studio-release-row').filter({ hasText: label })
+      await expect(row).toHaveAttribute('data-off-standard', 'true')
+      await expect(row.getByTestId('release-off-standard')).toHaveText('Off-standard')
+      await expect(row.getByTestId('release-relaxed-point')).toContainText('department-budgets')
+      await expect(row.getByTestId('release-relaxed-point')).toContainText(point)
+      await expect(row.getByTestId('release-relaxed-point')).toContainText(reason)
+      const studio = await new AxeBuilder({ page }).include('[data-testid="studio-releases"]').analyze()
+      expect(studio.violations).toEqual([])
+
+      // The console of the main server reads the same database, and the new release is the active one.
+      await useSession(page, 'platform-operator')
+      await page.goto('/console')
+      const publishing = page.getByTestId('console-publishing')
+      // The list of this picker reports itself hidden, which pickOption waits for, so the option is clicked by its title.
+      await publishing.getByRole('combobox', { name: 'Application', exact: true }).click()
+      await page.getByTitle('PurchaseRequests', { exact: true }).click()
+      await expect(publishing.getByTestId('console-publishing-releases')).toContainText('#')
+      const consoleRow = page.getByTestId('console-publishing-releases').getByRole('row').filter({ hasText: label })
+      await expect(consoleRow.getByTestId('release-off-standard')).toHaveText('Off-standard')
+      await expect(consoleRow.getByTestId('release-relaxed-point')).toContainText('department-budgets')
+      await expect(consoleRow.getByTestId('release-relaxed-point')).toContainText(point)
+      await expect(consoleRow.getByTestId('release-relaxed-point')).toContainText(reason)
+      const operator = await new AxeBuilder({ page }).include('[data-testid="console-publishing"]').analyze()
+      expect(operator.violations).toEqual([])
     } finally {
       await server.stop()
     }
@@ -541,4 +600,33 @@ test.describe('the active release of the purchase request sample changes', () =>
       await server.stop()
     }
   })
+})
+
+test('a user without the author role cannot patch a relax entry into application.json', async ({ page }) => {
+  await useSession(page, 'author')
+  const resources = '/api/studio/apps/PurchaseRequests/resources'
+  const list = await page.request.get(resources)
+  expect(list.status()).toBe(200)
+  const { items } = (await list.json()) as {
+    items: { id: string; file: string; version: string }[]
+  }
+  const resource = items.find((item) => item.file === 'application.json')!
+
+  await useSession(page, 'requester')
+  const response = await page.request.patch(`${resources}/${resource.id}`, {
+    headers: {
+      ...csrfHeaders,
+      'Content-Type': 'application/json-patch+json',
+      'If-Match': `"${resource.version}"`,
+    },
+    // Index 1 is department-budgets in the sample's application.json.
+    data: JSON.stringify([
+      {
+        op: 'add',
+        path: '/modules/1/relax',
+        value: [{ point: 'Budget/transitions/approve', reason: 'x' }],
+      },
+    ]),
+  })
+  expect(response.status(), await response.text()).toBe(403)
 })

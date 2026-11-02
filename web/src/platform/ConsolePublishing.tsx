@@ -9,6 +9,7 @@ import {
 } from './console'
 import { EmptyDash } from './EmptyValue'
 import { markCurrentPage } from './pagination'
+import { ReleaseOffStandard } from './ReleaseOffStandard'
 import { useText } from './texts'
 
 interface ConsolePublishingProps {
@@ -28,10 +29,10 @@ interface LoadState {
 }
 
 const statusColors: Record<ConsolePublishRequest['status'], string> = {
-  queued: 'blue',
-  running: 'blue',
-  succeeded: 'green',
-  failed: 'red',
+  queued: 'processing',
+  running: 'processing',
+  succeeded: 'success',
+  failed: 'error',
 }
 
 function formatTime(value: string | null, locale: string) {
@@ -40,7 +41,7 @@ function formatTime(value: string | null, locale: string) {
 
 /**
  * The Publishing view of the operator console: the release history and the publish requests of one application, read
- * only. The picker starts on the first application of the tenant. The releases table marks the active release, and the
+ * only. The picker starts on the first application of the tenant. The releases table marks the active release and every off-standard release with its relaxed points, and the
  * requests table lists the publish requests newest first, one page at a time. The view has no publish, activate or
  * rollback command, because those stay in Studio. A failure shows an error in this card only.
  */
@@ -95,7 +96,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         render: (_value: unknown, row) => (
           <Flex gap="small" align="center">
             <span>{`#${row.number}`}</span>
-            {row === activeRow && <Tag color="green">{t('shell.console.publishing.active')}</Tag>}
+            {row === activeRow && <Tag color="success">{t('shell.console.publishing.active')}</Tag>}
           </Flex>
         ),
       },
@@ -118,6 +119,12 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         key: 'activatedAt',
         title: t('shell.console.publishing.activatedAt'),
         render: (_value: unknown, row) => formatTime(row.activatedAt, locale),
+      },
+      {
+        key: 'relaxed',
+        title: t('shell.console.publishing.relaxed'),
+        render: (_value: unknown, row) =>
+          row.offStandard ? <ReleaseOffStandard relaxed={row.relaxed} /> : <EmptyDash />,
       },
     ],
     [activeRow, locale, t],

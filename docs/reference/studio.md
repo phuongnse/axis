@@ -208,22 +208,22 @@ Run and the Test results list, the read-only views of a module entity, a module 
     shows.
 - **Releases.** A list under the publishing buttons (the Releases entry of the sidebar, _planned for M31_) shows the open application's
   release history from `GET .../releases`.
-  - Each row is one activation: its release number, label, note, who activated it
-    and when. Rows are sorted by time, newest first.
-  - Exactly one row is marked **Active**. A release that was activated more than
-    once has a row for each activation, and only its newest row is marked.
-  - **Roll back** shows only when `GET /api/me` answers `studioPublisher: true`. It
-    sits on every row of a release that is not the active one, and is off while a
-    request runs and while the reconnect message shows.
-  - **Roll back** opens a dialog that names the release number and label. Confirming
-    sends `POST .../releases/{id}/rollback`. The status line then shows **queued**,
-    **running** and the outcome, as for Publish. A failed rollback puts its
-    diagnostics in the diagnostics panel, and the list still marks the previous
-    release **Active**.
-  - A warning shows when the folder's content hash differs from the active release,
-    for example after a save or a rollback. It does not show without an active
-    release, or while the folder has errors, because the server then returns no
-    content hash for the folder.
+  - Each row is one activation: its release number, label, note, who activated it and when. Rows are
+    sorted by time, newest first.
+  - Exactly one row is marked **Active**. A release that was activated more than once has a row for
+    each activation, and only its newest row is marked.
+  - An [off-standard release](module-contracts.md#off-standard-releases) shows the **Off-standard**
+    tag with the module, point and reason of each relaxed entry. A standard one shows no tag.
+  - **Roll back** shows only when `GET /api/me` answers `studioPublisher: true`. It sits on every row
+    of a release that is not the active one, and is off while a request runs and while the reconnect
+    message shows.
+  - **Roll back** opens a dialog that names the release number and label. Confirming sends
+    `POST .../releases/{id}/rollback`. The status line then shows **queued**, **running** and the
+    outcome, as for Publish. A failed rollback puts its diagnostics in the diagnostics panel, and the
+    list still marks the previous release **Active**.
+  - A warning shows when the folder's content hash differs from the active release, for example after
+    a save or a rollback. It does not show without an active release, or while the folder has errors,
+    because the server then returns no content hash for the folder.
   - The list loads when the application is picked, and again after a request ends,
     after a save, a text write or a delete, and after a reconnect.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
