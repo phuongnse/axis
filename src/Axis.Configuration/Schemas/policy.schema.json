@@ -38,7 +38,7 @@
     "grant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["actions"],
+      "required": ["name", "actions"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "entity": { "type": "string", "minLength": 1, "x-axis-reference": "entity" },

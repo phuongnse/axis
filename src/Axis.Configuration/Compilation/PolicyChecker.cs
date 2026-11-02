@@ -101,7 +101,8 @@ internal static class PolicyChecker
             var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             for (var index = 0; index < policy.Grants.Count; index++)
             {
-                if (policy.Grants[index].Name is { } grantName && !firstIndexByName.TryAdd(grantName, index))
+                var grantName = policy.Grants[index].Name;
+                if (!firstIndexByName.TryAdd(grantName, index))
                 {
                     Report(
                         DiagnosticCodes.DuplicateGrantName,
