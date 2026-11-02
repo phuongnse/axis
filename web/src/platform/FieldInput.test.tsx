@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FieldInput } from './FieldInput'
 import type { FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
@@ -202,5 +202,91 @@ describe('FieldInput description', () => {
     )
 
     expect(screen.getByRole(role, { name: 'limited' })).toHaveAttribute('aria-describedby', 'limited-help')
+  })
+})
+
+describe('FieldInput user picker', () => {
+  const people = [
+    { id: 'u1', displayName: 'Ann Lee' },
+    { id: 'u2', displayName: 'Bob Ray' },
+  ]
+
+  // The route answers the `id` lookup with that person, and a search with the people whose name contains the text.
+  const fetchMock = vi.fn((input: string) => {
+    const query = new URL(input, 'http://localhost').searchParams
+    const id = query.get('id')
+    const search = (query.get('search') ?? '').toLowerCase()
+    const items =
+      id !== null
+        ? people.filter((person) => person.id === id)
+        : people.filter((person) => person.displayName.toLowerCase().includes(search))
+    return Promise.resolve(new Response(JSON.stringify({ items }), { status: 200 }))
+  })
+
+  afterEach(() => {
+    fetchMock.mockClear()
+    vi.unstubAllGlobals()
+  })
+
+  function renderPicker(value: string | null, onChange: (value: unknown) => void = () => undefined, required = false) {
+    vi.stubGlobal('fetch', fetchMock)
+    render(
+      <TextProvider catalogs={catalogs} development={false}>
+        <FieldInput
+          field={field('text', { usersPath: '/api/u', required })}
+          value={value}
+          onChange={onChange}
+          ariaLabel="limited"
+          locale="en"
+        />
+      </TextProvider>,
+    )
+    return screen.getByRole('combobox', { name: 'limited' })
+  }
+
+  const requested = () => fetchMock.mock.calls.map(([input]) => input)
+
+  it('shows the name of the stored id', async () => {
+    const picker = renderPicker('u1')
+
+    await waitFor(() => expect(picker.closest('.ant-select')).toHaveTextContent('Ann Lee'))
+    expect(requested()).toContain('/api/u?id=u1')
+  })
+
+  it('shows the stored id itself when no profile has it', async () => {
+    const picker = renderPicker('gone')
+
+    await waitFor(() => expect(requested()).toContain('/api/u?id=gone'))
+    expect(picker.closest('.ant-select')).toHaveTextContent('gone')
+  })
+
+  it('searches with the typed text and sends the picked id', async () => {
+    const onChange = vi.fn()
+    const picker = renderPicker('u1', onChange)
+
+    await userEvent.type(picker, 'bob')
+    await waitFor(() => expect(requested()).toContain('/api/u?search=bob'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Bob Ray' }))
+
+    expect(onChange).toHaveBeenCalledWith('u2')
+  })
+
+  it('clears a picker that is not required to null', async () => {
+    const onChange = vi.fn()
+    const picker = renderPicker('u1', onChange)
+    await waitFor(() => expect(picker.closest('.ant-select')).toHaveTextContent('Ann Lee'))
+
+    await userEvent.hover(picker.closest('.ant-select')!)
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
+
+    expect(onChange).toHaveBeenCalledWith(null)
+  })
+
+  it('cannot clear a required picker', async () => {
+    const picker = renderPicker('u1', () => undefined, true)
+    await waitFor(() => expect(picker.closest('.ant-select')).toHaveTextContent('Ann Lee'))
+
+    expect(picker.closest('.ant-select')!.querySelector('.ant-select-clear')).toBeNull()
+    expect(picker).toHaveAttribute('aria-required', 'true')
   })
 })

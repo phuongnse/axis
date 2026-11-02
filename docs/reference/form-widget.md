@@ -115,6 +115,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     | Field type | Input |
     | --- | --- |
     | `text` | a text input limited to `maxLength`. With `minLength` it also has the `minlength` attribute and shows the character count against the limits, such as `0 / 3–10`, or `0 / ≥3` with no `maxLength` |
+    | a `text` field marked `userId` | a searchable select of people by display name, from `usersPath`. Typing searches again. It sends the picked user id, and a field that is not required can be cleared, which sends null. A stored id shows the person's name, read through the route's `id` parameter, or the id itself when no profile has it. A failed search leaves the list empty |
     | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides. A number input that takes the locale's decimal comma is not decided yet |
     | `money` | the input of a decimal with the currency code beside the box. The code is `currency`, or the current value of `currencyField` in the form, or in the row of a child collection. Without a code of three letters nothing is shown beside the box. It sends the typed text as a plain JSON number |
     | `boolean` | a checkbox |

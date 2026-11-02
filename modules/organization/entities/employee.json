@@ -12,7 +12,7 @@
     { "name": "jobTitle", "type": "text", "maxLength": 100, "label": { "textKey": "organization.employee.jobTitle" } },
     { "name": "department", "type": "reference", "target": "Department", "label": { "textKey": "organization.employee.department" } },
     { "name": "manager", "type": "reference", "target": "Employee", "label": { "textKey": "organization.employee.manager" } },
-    { "name": "user", "type": "text", "unique": true, "maxLength": 100, "label": { "textKey": "organization.employee.user" } },
+    { "name": "user", "type": "text", "unique": true, "maxLength": 100, "userId": true, "label": { "textKey": "organization.employee.user" } },
     { "name": "active", "type": "boolean", "default": "true", "label": { "textKey": "organization.employee.active" } },
     { "name": "delegate", "type": "reference", "target": "Employee", "label": { "textKey": "organization.employee.delegate" } },
     { "name": "delegateFrom", "type": "date", "label": { "textKey": "organization.employee.delegateFrom" } },
