@@ -24,8 +24,8 @@ resource.
   transition, or changes anything but its lifecycle, is `400` too. A transition into a protected state is not refused. It
   shows up as a diagnostic.
 - **Answer.** `200` with `{ file, version, diagnostics }` and an `ETag` header of the version, when a layer is written. The
-  diagnostics are the folder's, as for the other writes. `GET` of the same route still answers the module's own content
-  without the layer, so Studio reads the layer's version from the resource list.
+  diagnostics are the folder's, as for the other writes. `GET` of the same route answers the resource with the layer
+  applied and the layer's `{ id, file, version }`, so Studio reads the version for its next save from there.
 
 ## Order of checks
 

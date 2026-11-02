@@ -1,0 +1,85 @@
+{
+  "id": "1c39649c-b27a-4fcb-81d5-0ae902610198",
+  "kind": "contract",
+  "name": "RequestContract",
+  "formatVersion": 1,
+  "entity": "Request",
+  "lifecycle": {
+    "field": "status",
+    "states": [
+      { "name": "draft", "initial": true, "deletable": true },
+      { "name": "submitted" },
+      { "name": "approved", "protected": true },
+      { "name": "returned" },
+      { "name": "rejected", "protected": true },
+      { "name": "cancelled" }
+    ],
+    "transitions": [
+      {
+        "name": "submit",
+        "from": ["draft", "returned"],
+        "to": "submitted",
+        "guard": "accountableUser() == requester and coalesce(stepsRequired, 0) > 0",
+        "message": { "textKey": "approvals.request.onlyRequesterSubmits" }
+      },
+      {
+        "name": "approve",
+        "from": ["submitted"],
+        "to": "approved",
+        "guard": "accountableUser() != null and accountableUser() != requester and coalesce(stepsRequired, 0) > 0 and step == stepsRequired",
+        "message": { "textKey": "approvals.request.approveNeedsEveryStep" }
+      },
+      {
+        "name": "return",
+        "from": ["submitted"],
+        "to": "returned",
+        "guard": "accountableUser() != null and accountableUser() != requester",
+        "message": { "textKey": "approvals.request.noSelfDecision" }
+      },
+      {
+        "name": "reject",
+        "from": ["submitted"],
+        "to": "rejected",
+        "guard": "accountableUser() != null and accountableUser() != requester",
+        "message": { "textKey": "approvals.request.noSelfDecision" }
+      },
+      {
+        "name": "cancel",
+        "from": ["draft", "submitted", "returned"],
+        "to": "cancelled",
+        "guard": "accountableUser() == requester",
+        "message": { "textKey": "approvals.request.onlyRequesterCancels" }
+      }
+    ]
+  },
+  "validations": [
+    {
+      "name": "oneDecisionPerStep",
+      "expression": "step == previous(step) or (status == 'submitted' and previous(status) in ('draft', 'returned') and step == 0) or (step == coalesce(previous(step), 0) + 1 and decisionTask() != null and stepDecision == decisionTask() and stepDecision != previous(stepDecision) and accountableUser() != null and accountableUser() != requester)",
+      "message": { "textKey": "approvals.request.oneDecisionPerStep" },
+      "field": "step"
+    },
+    {
+      "name": "frozenAfterSubmit",
+      "expression": "previous(status) == null or previous(status) in ('draft', 'returned') or (type == previous(type) and amount == previous(amount) and stepsRequired == previous(stepsRequired))",
+      "message": { "textKey": "approvals.request.frozenAfterSubmit" },
+      "field": "amount"
+    }
+  ],
+  "ceiling": {
+    "slots": {
+      "admin": [{ "actions": ["read", "export"] }],
+      "member": [
+        {
+          "actions": ["read"],
+          "filter": "requester == currentUser() or approverUser == currentUser() or onBehalfOf == currentUser()"
+        },
+        {
+          "actions": ["create", "update", "delete"],
+          "fields": ["type", "title", "description", "amount", "status"],
+          "filter": "requester == currentUser()"
+        }
+      ]
+    }
+  }
+}

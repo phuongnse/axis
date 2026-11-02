@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 
@@ -59,6 +60,20 @@ public sealed class ApprovalsModuleTests
         var steps = Field(requestType, "steps");
         Assert.Equal(FieldType.ChildCollection, steps.Type);
         Assert.EndsWith("ApprovalStep", steps.Target!.Name, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_policy_that_grants_a_member_role_update_on_a_request_without_fields_is_past_the_ceiling()
+    {
+        using var folder = Application().With("policies/employee-requests.json", """
+            { "id": "66666666-6666-4666-8666-666666666661", "kind": "policy", "name": "EmployeeRequests", "formatVersion": 1,
+              "roles": ["employee"],
+              "grants": [{ "name": "requestUpdate", "entity": "approvals/Request", "actions": ["update"] }] }
+            """);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(_modulesPath).Modules);
+
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.GrantPastCeiling);
     }
 
     private static EntityModel Entity(ApplicationModel model, string name) =>

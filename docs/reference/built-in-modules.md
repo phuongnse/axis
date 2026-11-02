@@ -9,9 +9,9 @@ changes anything else in Studio through [customization layers](customization-lay
 idea, and [D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees what the modules
 hold. `organization` 1.0.0 exists under `modules/organization`, with its entities, data sources, rule,
 role slots, contracts, policies, contract scenarios and texts. `approvals` 1.0.0 exists under
-`modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots and texts. Its
-contract, process, policies and pages, the pages of `organization` and the built-in application are
-_(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
+`modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots, contracts and
+texts. Its process, policies, pages and contract scenarios, the pages of `organization` and the built-in
+application are _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check.
@@ -105,8 +105,8 @@ slots of the same names.
 
 Version 1.0.0 holds the entities below, the data sources `RequestTypes`, `Requests` and `Decisions`,
 the sequence `RequestNumber` with the format `RQ-{yyyy}-{n:5}`, `amount` and `minAmount` as `decimal`
-with precision 18 and scale 2, and the texts. Its contract, process, policies and pages are
-_(planned for M26)_.
+with precision 18 and scale 2, the contracts of `Request`, `RequestType` and `Decision`, and the texts. Its
+process, policies, pages and contract scenarios are _(planned for M26)_.
 
 ### Request types
 
@@ -123,7 +123,8 @@ running application, without Studio or a publish.
   - `departmentHead` is the `head` of the requester's department.
   - A step with a `minAmount` applies only to a request whose `amount` is at least that much.
 - **Contract.** A type has at least one step without a `minAmount`, so every request has a step to
-  decide it.
+  decide it. The core validation `hasStepForEveryAmount` refuses a type without one, with a `400` at
+  `steps`.
 
 ### Requests
 
@@ -157,17 +158,22 @@ once**, whatever process change a business makes.
   `draft` is initial and deletable. `approved` and `rejected` are protected, so a layer can add
   states before them but no other way into them.
 - **Core validations:**
-  - `oneDecisionPerStep`: `step` changes only by one, only with a new deciding task, stored in
+  - `oneDecisionPerStep`, the named point `Request/validations/oneDecisionPerStep`: `step` changes only by one, only with a new deciding task, stored in
     `stepDecision`, and only by someone other than the requester. A submit sets it back to 0.
-  - `frozenAfterSubmit`: `type`, `amount` and `stepsRequired` change only while the request is
-    `draft` or `returned`, or by the submit.
-- **Ceilings:**
+  - `frozenAfterSubmit`, the named point `Request/validations/frozenAfterSubmit`: `type`, `amount`
+    and `stepsRequired` change only while the request is `draft` or `returned`, or by the submit. It
+    reports at `amount`, whichever of the three changed.
+  - `RequestType/validations/hasStepForEveryAmount`, described under [request types](#request-types).
+- **Ceilings**, the named points `Request/ceiling/admin`, `Request/ceiling/member`,
+  `Decision/ceiling/admin` and `Decision/ceiling/member`:
   - `member` reads the requests they submitted, the ones they are to decide, and the ones they
     decide for someone else. They create, update and delete only their own, and only the fields of
-    the request form.
+    the request form and `status`. A member may write `status` on their own request so that they
+    can cancel it. The lifecycle still refuses a self-decision, with a `409`.
   - `admin` reads and exports every request.
   - Nobody writes a `Decision` through a grant: only the process writes them. A `member` reads the
-    decisions on their own requests and the ones they made.
+    decisions on their own requests and the ones they made, and `admin` reads and exports every
+    decision.
 - **Contract scenarios** cover each point: a requester who approves their own request through any
   step is refused, one task decision that moves `step` twice is refused, and a request above a
   step's `minAmount` reaches `approved` only after that step.

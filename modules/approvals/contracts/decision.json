@@ -1,0 +1,18 @@
+{
+  "id": "3d7163ef-1be3-49f6-a3c7-d68f88ae3fc9",
+  "kind": "contract",
+  "name": "DecisionContract",
+  "formatVersion": 1,
+  "entity": "Decision",
+  "ceiling": {
+    "slots": {
+      "admin": [{ "actions": ["read", "export"] }],
+      "member": [
+        {
+          "actions": ["read"],
+          "filter": "request.requester == currentUser() or decidedBy == currentUser()"
+        }
+      ]
+    }
+  }
+}

@@ -5,6 +5,12 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "name": "requestAccess", "entity": "approvals/Request", "actions": ["read", "create", "update"] }
+    { "name": "requestRead", "entity": "approvals/Request", "actions": ["read"] },
+    {
+      "name": "requestWrite",
+      "entity": "approvals/Request",
+      "actions": ["create", "update", "delete"],
+      "fields": ["type", "title", "description", "amount", "status"]
+    }
   ]
 }
