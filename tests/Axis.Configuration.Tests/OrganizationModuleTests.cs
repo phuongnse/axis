@@ -22,7 +22,7 @@ public sealed class OrganizationModuleTests
         var catalog = ModuleCatalog.Load(_modulesPath);
 
         Assert.Empty(catalog.Diagnostics);
-        var module = Assert.Single(catalog.Modules);
+        var module = Assert.Single(catalog.Modules, module => module.Manifest.Id == "organization");
         Assert.Equal(("organization", "1.0.0"), (module.Manifest.Id, module.Manifest.Version));
         Assert.Equal(["admin", "member"], module.Manifest.Roles.Select(slot => slot.Name));
     }

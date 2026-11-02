@@ -1,0 +1,15 @@
+{
+  "id": "6dcbc367-8943-49ab-b8ec-252d580a5858",
+  "kind": "entity",
+  "name": "RequestType",
+  "formatVersion": 1,
+  "label": { "textKey": "approvals.requestType.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "approvals.requestType.name" } },
+    { "name": "code", "type": "text", "required": true, "unique": true, "maxLength": 30, "label": { "textKey": "approvals.requestType.code" } },
+    { "name": "description", "type": "text", "maxLength": 2000, "label": { "textKey": "approvals.requestType.description" } },
+    { "name": "active", "type": "boolean", "default": "true", "label": { "textKey": "approvals.requestType.active" } },
+    { "name": "steps", "type": "child-collection", "target": "ApprovalStep", "label": { "textKey": "approvals.requestType.steps" } }
+  ]
+}

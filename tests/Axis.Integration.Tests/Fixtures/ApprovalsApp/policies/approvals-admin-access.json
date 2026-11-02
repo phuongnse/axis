@@ -1,0 +1,11 @@
+{
+  "id": "07d0920a-0525-47ce-a3dc-a0e3330cba21",
+  "kind": "policy",
+  "name": "ApprovalsAdminAccess",
+  "formatVersion": 1,
+  "roles": ["admin"],
+  "grants": [
+    { "name": "requestAccess", "entity": "approvals/Request", "actions": ["read", "create", "update", "delete"] },
+    { "name": "requestTypeAccess", "entity": "approvals/RequestType", "actions": ["read", "create", "update", "delete"] }
+  ]
+}

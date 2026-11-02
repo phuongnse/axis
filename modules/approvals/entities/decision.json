@@ -1,0 +1,16 @@
+{
+  "id": "a33e954a-10dd-4fed-86c0-24d1bc896c4a",
+  "kind": "entity",
+  "name": "Decision",
+  "formatVersion": 1,
+  "label": { "textKey": "approvals.decision.label" },
+  "fields": [
+    { "name": "request", "type": "reference", "target": "Request", "required": true, "label": { "textKey": "approvals.decision.request" } },
+    { "name": "stepSequence", "type": "integer", "label": { "textKey": "approvals.decision.stepSequence" } },
+    { "name": "outcome", "type": "enum", "required": true, "values": ["approved", "returned", "rejected"], "valueLabels": { "approved": { "textKey": "approvals.decision.outcome.approved" }, "returned": { "textKey": "approvals.decision.outcome.returned" }, "rejected": { "textKey": "approvals.decision.outcome.rejected" } }, "label": { "textKey": "approvals.decision.outcome" } },
+    { "name": "decidedBy", "type": "text", "maxLength": 100, "label": { "textKey": "approvals.decision.decidedBy" } },
+    { "name": "onBehalfOf", "type": "text", "maxLength": 100, "label": { "textKey": "approvals.decision.onBehalfOf" } },
+    { "name": "comment", "type": "text", "maxLength": 2000, "label": { "textKey": "approvals.decision.comment" } },
+    { "name": "decidedAt", "type": "date-time", "label": { "textKey": "approvals.decision.decidedAt" } }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "140c35f8-24e6-4c90-80a7-3dadf905e3d9",
+  "kind": "application",
+  "name": "ApprovalsApp",
+  "formatVersion": 1,
+  "modules": [
+    { "id": "organization", "version": "^1.0.0", "roles": { "admin": "admin", "member": "employee" } },
+    { "id": "approvals", "version": "^1.0.0", "roles": { "admin": "admin", "member": "employee" } }
+  ]
+}

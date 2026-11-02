@@ -1,0 +1,26 @@
+{
+  "id": "6bc6b112-2b33-4e18-8cb3-963f6780985b",
+  "kind": "entity",
+  "name": "Request",
+  "formatVersion": 1,
+  "label": { "textKey": "approvals.request.label" },
+  "displayField": "title",
+  "fields": [
+    { "name": "number", "type": "text", "maxLength": 20, "unique": true, "sequence": "RequestNumber", "label": { "textKey": "approvals.request.number" } },
+    { "name": "type", "type": "reference", "target": "RequestType", "required": true, "label": { "textKey": "approvals.request.type" } },
+    { "name": "title", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "approvals.request.title" } },
+    { "name": "description", "type": "text", "maxLength": 2000, "label": { "textKey": "approvals.request.description" } },
+    { "name": "amount", "type": "decimal", "precision": 18, "scale": 2, "label": { "textKey": "approvals.request.amount" } },
+    { "name": "requester", "type": "text", "maxLength": 100, "creator": true, "label": { "textKey": "approvals.request.requester" } },
+    { "name": "requesterEmployee", "type": "reference", "target": "organization/Employee", "match": { "field": "user", "from": "requester" }, "label": { "textKey": "approvals.request.requesterEmployee" } },
+    { "name": "status", "type": "enum", "required": true, "default": "'draft'", "values": ["draft", "submitted", "approved", "returned", "rejected", "cancelled"], "valueLabels": { "draft": { "textKey": "approvals.request.status.draft" }, "submitted": { "textKey": "approvals.request.status.submitted" }, "approved": { "textKey": "approvals.request.status.approved" }, "returned": { "textKey": "approvals.request.status.returned" }, "rejected": { "textKey": "approvals.request.status.rejected" }, "cancelled": { "textKey": "approvals.request.status.cancelled" } }, "label": { "textKey": "approvals.request.status" } },
+    { "name": "stepsRequired", "type": "integer", "label": { "textKey": "approvals.request.stepsRequired" } },
+    { "name": "step", "type": "integer", "label": { "textKey": "approvals.request.step" } },
+    { "name": "stepSequence", "type": "integer", "label": { "textKey": "approvals.request.stepSequence" } },
+    { "name": "approver", "type": "reference", "target": "organization/Employee", "label": { "textKey": "approvals.request.approver" } },
+    { "name": "approverUser", "type": "text", "maxLength": 100, "label": { "textKey": "approvals.request.approverUser" } },
+    { "name": "onBehalfOf", "type": "text", "maxLength": 100, "label": { "textKey": "approvals.request.onBehalfOf" } },
+    { "name": "stepDecision", "type": "text", "maxLength": 36, "label": { "textKey": "approvals.request.stepDecision" } },
+    { "name": "decisionComment", "type": "text", "maxLength": 2000, "label": { "textKey": "approvals.request.decisionComment" } }
+  ]
+}

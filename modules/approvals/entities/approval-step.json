@@ -1,0 +1,14 @@
+{
+  "id": "23462ff7-a27b-45c3-b879-768834ace704",
+  "kind": "entity",
+  "name": "ApprovalStep",
+  "formatVersion": 1,
+  "label": { "textKey": "approvals.approvalStep.label" },
+  "fields": [
+    { "name": "sequence", "type": "integer", "required": true, "min": 1, "label": { "textKey": "approvals.approvalStep.sequence" } },
+    { "name": "approver", "type": "enum", "required": true, "values": ["lineManager", "departmentHead", "employee"], "valueLabels": { "lineManager": { "textKey": "approvals.approvalStep.approver.lineManager" }, "departmentHead": { "textKey": "approvals.approvalStep.approver.departmentHead" }, "employee": { "textKey": "approvals.approvalStep.approver.employee" } }, "label": { "textKey": "approvals.approvalStep.approver" } },
+    { "name": "employee", "type": "reference", "target": "organization/Employee", "label": { "textKey": "approvals.approvalStep.employee" } },
+    { "name": "minAmount", "type": "decimal", "precision": 18, "scale": 2, "label": { "textKey": "approvals.approvalStep.minAmount" } },
+    { "name": "label", "type": "text", "maxLength": 100, "label": { "textKey": "approvals.approvalStep.label" } }
+  ]
+}
