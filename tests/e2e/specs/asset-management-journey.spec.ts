@@ -890,7 +890,7 @@ test.describe('the author builds the asset management application with Studio on
     const files = (await readdir(assetManagement, { recursive: true })).filter(sixParts).sort()
     expect((await readdir(built, { recursive: true })).filter(sixParts).sort()).toEqual(files)
     await expect(page.getByTestId('studio-group-migration').getByRole('button')).toHaveCount(0)
-    compareApplicationFolders(assetManagement, built, { files, ignorePageElementNames: true })
+    compareApplicationFolders(assetManagement, built, { files, ignorePageElementNames: true, generatedNames: true })
 
     const response = await page.request.get(`${journeyURL}/api/studio/apps/AssetManagement/diagnostics`)
     expect(response.status()).toBe(200)
@@ -902,6 +902,7 @@ test.describe('the author builds the asset management application with Studio on
 
   test('the built data sources, form, pages and site match the sample', async () => {
     compareApplicationFolders(assetManagement, built, {
+      generatedNames: true,
       files: [
         'data-sources/asset-value-by-location.json',
         'data-sources/assets-by-status.json',
@@ -1153,7 +1154,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    compareApplicationFolders(assetManagement, built, { ignorePageElementNames: true })
+    compareApplicationFolders(assetManagement, built, { ignorePageElementNames: true, generatedNames: true })
     const response = await page.request.get(`${journeyURL}/api/studio/apps/AssetManagement/diagnostics`)
     expect(response.status()).toBe(200)
     const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }

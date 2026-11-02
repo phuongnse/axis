@@ -271,7 +271,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   }
 
   async function checkBuilt(page: Page) {
-    compareApplicationFolders(serviceDesk, built, { ignorePageElementNames: true })
+    compareApplicationFolders(serviceDesk, built, { ignorePageElementNames: true, generatedNames: true })
     const response = await page.request.get(`${journeyURL}/api/studio/apps/ServiceDesk/diagnostics`)
     expect(response.status()).toBe(200)
     const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }

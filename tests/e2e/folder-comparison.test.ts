@@ -184,3 +184,35 @@ test("a subset pairs seed ids from a seed file outside it", () => {
   replaceIds(both, [seedFile, scenario], new Map([[oldId, newId]]));
   assert.doesNotThrow(() => compareApplicationFolders(sample, both, { files: [scenario] }));
 });
+
+test("a generated name on a page is accepted only when asked, and a different name never is", () => {
+  const unnamed = copySample();
+  rewriteJson(unnamed, "pages/all-tickets.json", (page) => {
+    delete page.widgets[0].name;
+  });
+  const copy = copySample();
+  rewriteJson(copy, "pages/all-tickets.json", (page) => {
+    page.widgets[0].name = "table1";
+  });
+  assert.throws(() => compareApplicationFolders(unnamed, copy), /pages\/all-tickets\.json at \/widgets\/0\/name/);
+  assert.doesNotThrow(() => compareApplicationFolders(unnamed, copy, { generatedNames: true }));
+
+  rewriteJson(copy, "pages/all-tickets.json", (page) => {
+    page.widgets[0].name = "Tickets";
+  });
+  assert.throws(
+    () => compareApplicationFolders(unnamed, copy, { generatedNames: true }),
+    /pages\/all-tickets\.json at \/widgets\/0\/name/,
+  );
+});
+
+test("a generated name outside a page is not accepted", () => {
+  const copy = copySample();
+  rewriteJson(copy, scenario, (value) => {
+    value.steps[0].name = "step1";
+  });
+  assert.throws(
+    () => compareApplicationFolders(sample, copy, { generatedNames: true }),
+    /scenarios\/agent-cannot-act-on-another-agents-ticket\.json at \/steps\/0\/name/,
+  );
+});
