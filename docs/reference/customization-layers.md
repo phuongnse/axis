@@ -146,7 +146,9 @@ Compilation applies each layer to the resource of the pinned module version, bef
   property, `AXC0367` for an element with both `after` and `before` and `AXC0368` for an anchor that
   names no other element of the merged list, each reported at its path under `/changes` in the layer
   file. A layer with one of them is not applied. An element whose key the module's list lacks is an
-  added element, so only a remove or an anchor can name an unknown key.
+  added element, so only a remove or an anchor can name an unknown key. After a version change, a
+  changed element whose key the new version dropped is `AXC0372`, see
+  [versions until M29](#versions-until-m29).
 
 ## List keys
 
@@ -251,8 +253,17 @@ as they change any resource of their own. The [authoring API](authoring.md) writ
 
 - **Pinning.** A layer applies to the module version the application pins. Until module upgrades
   _(planned for M29)_ merge three ways, a newer installed version in range is applied with the same
-  layer, by keys. A key that the newer version lacks is the diagnostic of a missing key, and the
-  activation that would pick the version fails, so the release in use stays.
+  layer, by keys.
+- **A key the new version lacks.** The compile compares the version it picks with the copy of the
+  module in the application's active release. A layer element that changes a key which the old
+  version has and the new one lacks is `AXC0372` at that key in the layer file, and the element is not
+  added. A missing anchor (`AXC0368`) or a removed target after a version change fails the same way.
+  Each affected module also gets one `AXC0373` on its entry in `application.json`. It names the
+  module, the version in the active release, the new version and the layer files that no longer apply.
+  The publish, `axis-admin activate` or startup stores no release, the release in use stays active and
+  the failed request carries these diagnostics. With no active release, or with the same version as the
+  active release, the compare does not run and an element whose key the module lacks is an added
+  element. Only the step from the active version to the new one is compared.
 - **Built-in modules.** No new version of a built-in module ships to a business that has a layer
   over it before M29, as
   [D117](../decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees.

@@ -83,7 +83,9 @@ internal static class ModuleChecker
     /// are valid and the resources read from those files. The resources read are those of the module with the
     /// <paramref name="layers"/> of the application applied, and the files are the module's own. The traces
     /// are the layer and the merge of each module file a layer changed, by the file's path, for
-    /// <see cref="LayerDiagnostics.MapToLayers"/>.
+    /// <see cref="LayerDiagnostics.MapToLayers"/>. With the <paramref name="previous"/> copies of the modules in
+    /// the application's active release, a layer on a module whose pinned version differs from its copy is also
+    /// checked against that copy, for a key that the new version dropped.
     /// </summary>
     public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources, IReadOnlyDictionary<string, LayerTrace> Traces) Check(
         ApplicationManifest application,
@@ -94,7 +96,8 @@ internal static class ModuleChecker
         IReadOnlySet<string> unloadedRoleNames,
         IReadOnlyList<ConnectorResource> connectors,
         IReadOnlySet<string> unloadedConnectorNames,
-        IReadOnlyList<LayerResource> layers)
+        IReadOnlyList<LayerResource> layers,
+        IReadOnlyCollection<InstalledModule>? previous = null)
     {
         var versionsById = installed
             .GroupBy(candidate => candidate.Manifest.Id, StringComparer.Ordinal)
@@ -235,7 +238,12 @@ internal static class ModuleChecker
             var moduleLayers = first.Asker is null
                 ? layers.Where(layer => LayerModuleId(layer) == id).ToList()
                 : [];
-            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, traces, diagnostics);
+            var previousModule = first.Asker is null && moduleLayers.Count > 0
+                ? previous?.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
+                    && !string.Equals(candidate.Manifest.Version, picked, StringComparison.Ordinal))
+                : null;
+            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, traces, diagnostics, previousModule);
             if (first.Asker is null)
             {
                 references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
@@ -647,7 +655,8 @@ internal static class ModuleChecker
         List<ResourceContent> files,
         ModuleResourceCollector resources,
         Dictionary<string, LayerTrace> traces,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        InstalledModule? previousModule = null)
     {
         var kindsByName = layers.Count == 0 ? null : LayerChecker.KindsByName(module);
         var pendingContracts = new List<PendingContract>();
@@ -680,7 +689,7 @@ internal static class ModuleChecker
                 {
                     // The model reads the resource with the layer applied. The release keeps the file as the
                     // module wrote it, so that compiling the stored release applies the layer once.
-                    using var merged = ApplyLayer(root, layers, kindsByName, path, traces, diagnostics, out var layer, out var additions);
+                    using var merged = ApplyLayer(root, layers, kindsByName, path, traces, diagnostics, module.Manifest, previousModule, out var layer, out var additions);
                     var effective = merged?.RootElement ?? root;
                     if (!CheckKind(path, effective, resourceId, diagnostics))
                     {
@@ -880,6 +889,8 @@ internal static class ModuleChecker
         string path,
         Dictionary<string, LayerTrace> traces,
         List<Diagnostic> diagnostics,
+        ModuleManifest manifest,
+        InstalledModule? previousModule,
         out LayerResource? found,
         out ContractAdditions? additions)
     {
@@ -917,7 +928,11 @@ internal static class ModuleChecker
             }
         }
 
-        var result = LayerMerger.Merge(kind, root, layer, diagnostics);
+        using var previousDocument = ReadPreviousFile(previousModule, kind, name);
+        var upgrade = previousDocument is null || previousModule is null
+            ? null
+            : new LayerUpgrade(manifest.Id, previousModule.Manifest.Version, manifest.Version, previousDocument.RootElement);
+        var result = LayerMerger.Merge(kind, root, layer, diagnostics, upgrade);
         LayerMerger.CheckProperties(kind == ResourceKinds.Trigger ? ResourceSchemas.ModuleTrigger : kindSchema, result, layer, diagnostics);
         if (diagnostics.Count != countBefore)
         {
@@ -927,6 +942,42 @@ internal static class ModuleChecker
 
         traces[path] = new LayerTrace(layer, result);
         return JsonSerializer.SerializeToDocument(result.Merged);
+    }
+
+    /// <summary>The file of an old module version with the same <paramref name="kind"/> and <paramref name="name"/>, ignoring letter case, or null.</summary>
+    private static JsonDocument? ReadPreviousFile(InstalledModule? previousModule, string kind, string name)
+    {
+        foreach (var file in previousModule?.Files ?? [])
+        {
+            if (file.Path == ModuleCatalog.ManifestFileName)
+            {
+                continue;
+            }
+
+            JsonDocument document;
+            try
+            {
+                document = JsonDocument.Parse(file.Content, _documentOptions);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("kind", out var kindElement) && kindElement.ValueKind == JsonValueKind.String
+                && root.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+                && string.Equals(kindElement.GetString(), kind, StringComparison.Ordinal)
+                && string.Equals(nameElement.GetString(), name, StringComparison.OrdinalIgnoreCase))
+            {
+                return document;
+            }
+
+            document.Dispose();
+        }
+
+        return null;
     }
 
     /// <summary>Checks that a module file has a kind a module may hold and is valid against the schema of that kind.</summary>

@@ -171,7 +171,7 @@ public static partial class ApplicationCompiler
     /// id, each read from its own <c>module.json</c>. A copy without a valid manifest, or whose
     /// manifest id differs from its folder, is reported and left out.
     /// </summary>
-    private static List<InstalledModule> ReadModuleCopies(IEnumerable<ResourceContent> copies, List<Diagnostic> diagnostics)
+    internal static List<InstalledModule> ReadModuleCopies(IEnumerable<ResourceContent> copies, List<Diagnostic> diagnostics)
     {
         var modules = new List<InstalledModule>();
         foreach (var group in copies.GroupBy(copy => copy.Path.Split('/')[1], StringComparer.Ordinal).OrderBy(group => group.Key, StringComparer.Ordinal))
@@ -218,11 +218,74 @@ public static partial class ApplicationCompiler
         return modules;
     }
 
+    /// <summary>
+    /// For each module that the application declares and whose pinned version differs from its copy in the active release,
+    /// adds one <see cref="DiagnosticCodes.ModuleUpgradeBreaksLayers"/> at the module's entry in <c>application.json</c> that names the
+    /// module, both versions and the layer files with errors.
+    /// </summary>
+    private static void ReportUpgradesBreakingLayers(
+        ApplicationManifest manifest,
+        IReadOnlyList<PinnedModuleModel> pins,
+        IReadOnlyCollection<InstalledModule>? previousModules,
+        List<Diagnostic> diagnostics)
+    {
+        if (previousModules is null || previousModules.Count == 0)
+        {
+            return;
+        }
+
+        var summaries = new List<Diagnostic>();
+        for (var index = 0; index < manifest.Modules.Count; index++)
+        {
+            var id = manifest.Modules[index].Id;
+            var pin = pins.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
+            var previous = previousModules.FirstOrDefault(candidate => string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal));
+            if (pin is null || previous is null || string.Equals(pin.Version, previous.Manifest.Version, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var prefix = $"customizations/{id}/";
+            var files = diagnostics
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.File.StartsWith(prefix, StringComparison.Ordinal))
+                .Select(diagnostic => diagnostic.File)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToList();
+            if (files.Count == 0)
+            {
+                continue;
+            }
+
+            summaries.Add(new Diagnostic(
+                DiagnosticCodes.ModuleUpgradeBreaksLayers,
+                $"The module '{id}' moves from version {previous.Manifest.Version} in the active release to version {pin.Version}, and the layers in {string.Join(", ", files.Select(file => $"'{file}'"))} no longer apply to it.",
+                manifest.File,
+                $"/modules/{index}",
+                manifest.Id));
+        }
+
+        diagnostics.AddRange(summaries);
+    }
+
     internal static bool IsModuleResource(Resource resource) =>
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
     /// <summary>The module id of a qualified resource name, the text before the first <c>/</c>.</summary>
     internal static string ModuleIdOf(string qualifiedName) => qualifiedName[..qualifiedName.IndexOf('/', StringComparison.Ordinal)];
+
+    /// <summary>
+    /// Compiles an application that is already loaded, as the folder overload does. <paramref name="previousModules"/> are the
+    /// copies of the modules in the application's active release: a layer on a module whose pinned version differs from its
+    /// copy is also checked for the keys the new version dropped.
+    /// </summary>
+    internal static CompilationResult Compile(
+        ApplicationLoadResult loaded,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules,
+        IReadOnlyCollection<InstalledModule> previousModules,
+        long maxFileSize) =>
+        Compile(loaded, installedPackages, installedModules, collectReferences: true, maxFileSize, previousModules: previousModules);
 
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
@@ -230,7 +293,8 @@ public static partial class ApplicationCompiler
         IReadOnlyCollection<InstalledModule> installedModules,
         bool collectReferences,
         long maxFileSize,
-        ExpressionProbe? probe = null)
+        ExpressionProbe? probe = null,
+        IReadOnlyCollection<InstalledModule>? previousModules = null)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
@@ -257,8 +321,9 @@ public static partial class ApplicationCompiler
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
-            (modules, moduleFiles, moduleResources, layerTraces) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames, loaded.Layers);
+            (modules, moduleFiles, moduleResources, layerTraces) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames, loaded.Layers, previousModules);
             LayerChecker.Check(loaded.Layers, manifest, modules, installedModules, diagnostics);
+            ReportUpgradesBreakingLayers(manifest, modules, previousModules, diagnostics);
             var pinnedManifests = modules
                 .Select(pin => (pin.Id, installedModules.First(candidate => candidate.Manifest.Id == pin.Id && candidate.Manifest.Version == pin.Version).Manifest))
                 .ToList();
