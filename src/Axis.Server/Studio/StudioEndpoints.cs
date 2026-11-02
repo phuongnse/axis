@@ -36,7 +36,8 @@ namespace Axis.Server.Studio;
 /// source, process and endpoint, from the same compile, and answers even when the folder has errors.
 /// <c>GET /api/studio/apps/{application}/modules/{module}/resources/{id}</c> answers one file of the module version the
 /// application pins, the highest installed version in its range, in the shape of a resource read, with <c>file</c> as
-/// <c>modules/&lt;module&gt;/&lt;path&gt;</c> and no <c>ETag</c>. It answers 404 for an unknown application, a module the
+/// <c>modules/&lt;module&gt;/&lt;path&gt;</c> and no <c>ETag</c>. Its <c>content</c> has the application's layer applied, and it adds
+/// <c>layer</c> (<c>{ id, file, version }</c> or null), <c>marks</c> and <c>removed</c>, see <see cref="StudioModuleLayers"/>. It answers 404 for an unknown application, a module the
 /// application does not pin and an unknown resource, and never answers <c>module.json</c>. The page metadata route of
 /// <see cref="StudioPageMetadataEndpoints"/> finds a module page with the same lookup.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
@@ -220,13 +221,7 @@ internal static class StudioEndpoints
             return notFound!;
         }
 
-        return Results.Ok(new StudioResourceResponse(
-            found.Id.ToString("D"),
-            found.Kind,
-            found.Name,
-            $"modules/{module}/{found.Path}",
-            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(found.Text))),
-            found.Root));
+        return Results.Ok(StudioModuleLayers.Read(folder, module, found));
     }
 
     /// <summary>One file of an installed module version: its file id, kind, name, path, text and parsed root.</summary>
@@ -828,6 +823,27 @@ internal sealed record StudioResourceItem(string Id, string Kind, string? Name, 
 
 /// <summary>One resource with its JSON content.</summary>
 internal sealed record StudioResourceResponse(string Id, string Kind, string? Name, string File, string Version, JsonElement Content);
+
+/// <summary>A module resource with the application's layer applied, the layer, its marks and the module elements it removed.</summary>
+internal sealed record StudioModuleResourceResponse(
+    string Id,
+    string Kind,
+    string? Name,
+    string File,
+    string Version,
+    JsonElement Content,
+    StudioModuleLayer? Layer,
+    IReadOnlyList<StudioMark> Marks,
+    IReadOnlyList<StudioRemovedElement> Removed);
+
+/// <summary>The layer file that applied to a module resource, with the SHA-256 of its bytes.</summary>
+internal sealed record StudioModuleLayer(string Id, string File, string Version);
+
+/// <summary>An element or property that a layer added or changed, as a JSON Pointer into the content, with the mark <c>added</c> or <c>changed</c>.</summary>
+internal sealed record StudioMark(string Path, string Mark);
+
+/// <summary>A module element that a layer removed: the pointer of its list in the content, its key and the module's element.</summary>
+internal sealed record StudioRemovedElement(string List, string Key, JsonElement Content);
 
 /// <summary>The compile diagnostics of a Studio folder, in the compiler's order.</summary>
 internal sealed record StudioDiagnosticsResponse(IReadOnlyList<StudioDiagnostic> Diagnostics);

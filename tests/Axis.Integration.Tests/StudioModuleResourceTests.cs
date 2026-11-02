@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
@@ -24,7 +25,13 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
 
     private readonly PostgreSqlFixture _database = new();
 
+    private const string BudgetApprovalId = "94f1cc25-6a68-435f-9383-36fc43aae860";
+
+    private const string BudgetLayerFile = "customizations/department-budgets/BudgetApproval.json";
+
     private readonly TemporaryFolder _leaveRequests = new();
+
+    private readonly TemporaryFolder _purchaseRequests = new();
 
     private WebApplicationFactory<Program> _factory = null!;
 
@@ -34,6 +41,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     {
         await _database.InitializeAsync();
         CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "leave-requests"), _leaveRequests.Path);
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), _purchaseRequests.Path);
 
         var connectionString = await _database.CreateDatabaseAsync("studio_module_resource", CancellationToken);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -47,6 +55,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("Studio:Folders:0", _leaveRequests.Path);
+            builder.UseSetting("Studio:Folders:1", _purchaseRequests.Path);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestAuthentication(
                 new TestIdentity("author", "Author User", "author"),
@@ -58,6 +67,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     {
         await _factory.DisposeAsync();
         _leaveRequests.Dispose();
+        _purchaseRequests.Dispose();
         await _database.DisposeAsync();
     }
 
@@ -78,6 +88,53 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
         Assert.Equal(
             ["code", "name", "manager"],
             body.GetProperty("content").GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("layer").ValueKind);
+        Assert.Equal(0, body.GetProperty("marks").GetArrayLength());
+        Assert.Equal(0, body.GetProperty("removed").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task An_author_reads_a_module_process_with_the_application_layer_applied()
+    {
+        const string layer = """
+            { "id": "6f1d9c2a-3b4e-4d58-9a7c-1e2f3a4b5c6d", "kind": "layer", "formatVersion": 1, "target": "department-budgets/BudgetApproval",
+              "changes": { "steps": [
+                { "name": "review", "dueIn": "P3D", "outcomes": [{ "name": "reject", "remove": true }] },
+                { "name": "archive", "after": "markRejected", "type": "end" } ] } }
+            """;
+        var path = Path.Combine(_purchaseRequests.Path, BudgetLayerFile);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, layer, CancellationToken);
+        var layerVersion = Convert.ToHexStringLower(SHA256.HashData(await File.ReadAllBytesAsync(path, CancellationToken)));
+
+        using var client = _factory.CreateClient().SignedInAs("author");
+        using var response = await client.SendAsync(Request("PurchaseRequests", "department-budgets", BudgetApprovalId), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken)).RootElement;
+        Assert.Equal("modules/department-budgets/processes/budget-approval.json", body.GetProperty("file").GetString());
+        var content = body.GetProperty("content");
+        var steps = content.GetProperty("steps");
+        Assert.Equal(
+            ["review", "markApproved", "markRejected", "archive", "done"],
+            steps.EnumerateArray().Select(step => step.GetProperty("name").GetString()));
+        Assert.Equal("P3D", steps[0].GetProperty("dueIn").GetString());
+        Assert.Equal(["approve"], steps[0].GetProperty("outcomes").EnumerateArray().Select(outcome => outcome.GetProperty("name").GetString()));
+
+        var layerBody = body.GetProperty("layer");
+        Assert.Equal("6f1d9c2a-3b4e-4d58-9a7c-1e2f3a4b5c6d", layerBody.GetProperty("id").GetString());
+        Assert.Equal(BudgetLayerFile, layerBody.GetProperty("file").GetString());
+        Assert.Equal(layerVersion, layerBody.GetProperty("version").GetString());
+
+        Assert.Equal(
+            [("/steps/0/dueIn", "added"), ("/steps/3", "added"), ("/steps/0", "changed")],
+            body.GetProperty("marks").EnumerateArray().Select(mark => (mark.GetProperty("path").GetString(), mark.GetProperty("mark").GetString())));
+
+        var removed = Assert.Single(body.GetProperty("removed").EnumerateArray());
+        Assert.Equal("/steps/0/outcomes", removed.GetProperty("list").GetString());
+        Assert.Equal("reject", removed.GetProperty("key").GetString());
+        Assert.Equal("reject", removed.GetProperty("content").GetProperty("name").GetString());
+        Assert.Equal("markRejected", removed.GetProperty("content").GetProperty("next").GetString());
     }
 
     [Fact]
