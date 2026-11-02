@@ -1,4 +1,4 @@
-import { Flex, Tooltip, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import {
@@ -264,7 +264,7 @@ function Release({
           {liveSites.length > 0 && (
             // Proposed: each site is shown by its address, so it reads as a place on the web and not as the site's
             // resource in Studio, which the sidebar opens, and can be copied for the application's people. It opens
-            // in a new tab, which its tooltip and accessible name say. Here the address is this host and the site's
+            // in a new tab, which its accessible name says. Here the address is this host and the site's
             // path; a site that a tenant serves at a host of its own shows that host, which the API has to give Studio.
             <Typography.Text data-testid="studio-overview-sites">
               <span style={{ color: colour.textMuted }}>{t('shell.studio.overview.sites')} </span>
@@ -274,17 +274,15 @@ function Release({
                 return (
                   <span key={site.file}>
                     {index > 0 && ' · '}
-                    <Tooltip title={opens}>
-                      <a
-                        href={`/${site.path}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`${address}, ${opens}`}
-                        style={{ color: colour.primaryText }}
-                      >
-                        {address}
-                      </a>
-                    </Tooltip>
+                    <a
+                      href={`/${site.path}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${address}, ${opens}`}
+                      style={{ color: colour.primaryText }}
+                    >
+                      {address}
+                    </a>
                   </span>
                 )
               })}

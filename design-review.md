@@ -97,5 +97,6 @@ the review.
 - **A link that leaves Studio.** The owner could not tell whether a site on the Overview opens its resource in Studio
   or the running site. Recommended and agreed: the line reads "Live at:" and each site is its address, host and path,
   as the link's text, so it reads as a place on the web and can be copied for the application's people; the site's
-  resource stays in the sidebar. It opens in a new tab, which its tooltip ("Purchasing, opens in a new tab") and its
-  accessible name, which starts with the address, say. No icon, so D128's "text or an icon, never both" stands.
+  resource stays in the sidebar. It opens in a new tab, which its accessible name, the address followed by "Purchasing,
+  opens in a new tab", says; the owner found a tooltip not needed. No icon, so D128's "text or an icon, never both"
+  stands.
