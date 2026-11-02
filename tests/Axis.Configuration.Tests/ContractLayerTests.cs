@@ -87,6 +87,19 @@ public sealed class ContractLayerTests
     }
 
     [Fact]
+    public void An_entity_that_a_contract_covers_cannot_be_removed()
+    {
+        var compiled = Compile(null, """{ "remove": true }""");
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.RemovedResourceCoveredByContract, EntityLayerFile, "/changes/remove", Guid.Parse(EntityLayerId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'Request'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
     public void A_value_added_only_to_the_entity_is_reported_at_its_values()
     {
         var compiled = Compile(null, Entity(AllValues));

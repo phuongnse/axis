@@ -8,7 +8,8 @@ namespace Axis.Integration.Tests;
 /// ModuleLayerApp declares the <c>intake</c> module, whose IntakeForm shows the <c>title</c> field of its
 /// <c>Intake</c> entity. The application's layer on that form adds the <c>notes</c> field, so the page
 /// <c>pages/intake/NewIntake</c> of its site <c>modulelayer</c> shows both. Its layer on that page adds a
-/// <c>review</c> tab <c>after</c> the module's second tab. The module stays as it is.
+/// <c>review</c> tab <c>after</c> the module's second tab. Its layer on the module's IntakeArchive page removes the page.
+/// The module stays as it is.
 /// </summary>
 public sealed class ModuleLayerTests(ModuleAppFixture fixture) : IClassFixture<ModuleAppFixture>
 {
@@ -41,6 +42,20 @@ public sealed class ModuleLayerTests(ModuleAppFixture fixture) : IClassFixture<M
         Assert.Equal(
             ["intake.pages.newIntake.details", "intake.pages.newIntake.notes", "intake.pages.newIntake.review", "intake.pages.newIntake.history"],
             tabs.GetProperty("tabs").EnumerateArray().Select(tab => tab.GetProperty("labelKey").GetString()));
+    }
+
+    [Fact]
+    public async Task A_clerk_gets_404_for_the_page_that_the_layer_removes_and_the_site_does_not_list_it()
+    {
+        using var client = fixture.CreateClient().SignedInAs("layer-clerk");
+
+        using var missing = await GetAsync(client, "/api/sites/modulelayer/pages/intake/IntakeArchive", HttpStatusCode.NotFound);
+        using var site = await GetAsync(client, "/api/sites/modulelayer", HttpStatusCode.OK);
+
+        Assert.Equal("The site's application has no page with this name.", missing.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            ["intake/NewIntake"],
+            site.RootElement.GetProperty("navigation").EnumerateArray().Select(entry => entry.GetProperty("page").GetString()));
     }
 
     [Fact]

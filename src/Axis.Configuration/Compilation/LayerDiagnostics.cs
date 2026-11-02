@@ -8,9 +8,13 @@ namespace Axis.Configuration.Compilation;
 /// the layer added or replaced goes to the path of that part in the layer. One at an element the layer changed
 /// goes to the layer's path of that element. One in the module's own part whose value names an element the
 /// layer removed, ignoring letter case, goes to that remove. Every other diagnostic stays in the module file.
+/// A diagnostic in another file whose value names a whole resource that a layer removed goes to the layer's
+/// <c>/changes/remove</c>.
 /// </summary>
 internal static class LayerDiagnostics
 {
+    private const string LayerFolderPrefix = "customizations/";
+
     public static void MapToLayers(List<Diagnostic> diagnostics, IReadOnlyDictionary<string, LayerTrace> traces)
     {
         if (traces.Count == 0)
@@ -29,6 +33,49 @@ internal static class LayerDiagnostics
             if (LayerPathOf(diagnostic.Path, trace.Merge) is { } layerPath)
             {
                 diagnostics[index] = diagnostic with { File = trace.Layer.File, Path = layerPath, ResourceId = trace.Layer.Id };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Moves a diagnostic about a reference to a removed module resource into the layer file, at
+    /// <c>/changes/remove</c>, and names the referring file in its message. The reference is the string at the
+    /// diagnostic's path in <paramref name="contentOf"/> that equals <c>&lt;module id&gt;/&lt;name&gt;</c>, or the plain
+    /// name in a file of the module, ignoring letter case. A diagnostic in a layer file stays there.
+    /// </summary>
+    public static void MapRemovedReferences(List<Diagnostic> diagnostics, IReadOnlyList<RemovedResource> removed, Func<string, JsonNode?> contentOf)
+    {
+        if (removed.Count == 0)
+        {
+            return;
+        }
+
+        for (var index = 0; index < diagnostics.Count; index++)
+        {
+            var diagnostic = diagnostics[index];
+            if (diagnostic.Path.Length == 0 || diagnostic.File.StartsWith(LayerFolderPrefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (contentOf(diagnostic.File) is not { } content || ValueAt(content, diagnostic.Path) is not { } value)
+            {
+                continue;
+            }
+
+            var match = removed.FirstOrDefault(resource =>
+                string.Equals(value, $"{resource.ModuleId}/{resource.Name}", StringComparison.OrdinalIgnoreCase)
+                || (string.Equals(value, resource.Name, StringComparison.OrdinalIgnoreCase)
+                    && diagnostic.File.StartsWith($"modules/{resource.ModuleId}/", StringComparison.Ordinal)));
+            if (match is not null)
+            {
+                diagnostics[index] = diagnostic with
+                {
+                    File = match.Layer.File,
+                    Path = "/changes/remove",
+                    ResourceId = match.Layer.Id,
+                    Message = $"{diagnostic.Message} It is named in '{diagnostic.File}' at '{diagnostic.Path}', and the layer removes '{match.Layer.Target}'.",
+                };
             }
         }
     }
