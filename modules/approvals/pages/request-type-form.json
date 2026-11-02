@@ -1,0 +1,8 @@
+{
+  "id": "c4e60f3a-3d93-4d43-908e-e519f4c739bb",
+  "kind": "page",
+  "name": "RequestTypeForm",
+  "formatVersion": 1,
+  "title": { "textKey": "approvals.pages.requestTypeForm.title" },
+  "widgets": [{ "type": "form", "name": "requestTypeForm", "entity": "RequestType" }]
+}

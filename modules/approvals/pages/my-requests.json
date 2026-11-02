@@ -1,0 +1,19 @@
+{
+  "id": "051705a3-af9d-406c-89ef-301d0bb9d816",
+  "kind": "page",
+  "name": "MyRequests",
+  "formatVersion": 1,
+  "title": { "textKey": "approvals.pages.myRequests.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "name": "myRequests",
+      "dataSource": "MyRequests",
+      "rowActions": [
+        { "type": "navigate", "name": "open", "page": "RequestForm", "label": { "textKey": "approvals.actions.open" }, "record": "id" },
+        { "type": "navigate", "name": "view", "page": "RequestDetail", "label": { "textKey": "approvals.actions.view" }, "parameters": { "request": "id" } }
+      ],
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "RequestForm", "label": { "textKey": "approvals.actions.newRequest" } }]
+    }
+  ]
+}

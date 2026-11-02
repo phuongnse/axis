@@ -1,0 +1,15 @@
+{
+  "id": "524ecc5b-9064-4f59-9fa7-ca4dbccce45d",
+  "kind": "dataSource",
+  "name": "MyRequests",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    { "name": "number", "path": "number" },
+    { "name": "type", "path": "type" },
+    { "name": "title", "path": "title" },
+    { "name": "amount", "path": "amount" },
+    { "name": "status", "path": "status" }
+  ],
+  "filter": "requester == currentUser()"
+}

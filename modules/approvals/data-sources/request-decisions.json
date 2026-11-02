@@ -1,0 +1,17 @@
+{
+  "id": "6db31568-b930-4272-8c24-e3842c914f11",
+  "kind": "dataSource",
+  "name": "RequestDecisions",
+  "formatVersion": 1,
+  "entity": "Decision",
+  "fields": [
+    { "name": "stepSequence", "path": "stepSequence" },
+    { "name": "outcome", "path": "outcome" },
+    { "name": "decidedBy", "path": "decidedBy" },
+    { "name": "onBehalfOf", "path": "onBehalfOf" },
+    { "name": "comment", "path": "comment" },
+    { "name": "decidedAt", "path": "decidedAt" }
+  ],
+  "parameters": [{ "name": "forRequest", "type": "reference", "target": "Request", "required": true }],
+  "filter": "request == forRequest"
+}
