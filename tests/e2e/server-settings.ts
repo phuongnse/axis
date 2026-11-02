@@ -3,9 +3,9 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 
-// The server compiles and activates all seven applications in the tenant when it starts: the generic test
+// The server compiles and activates all eight applications in the tenant when it starts: the generic test
 // application, the purchase request sample, the leave request sample, the service desk sample, the asset management sample,
-// the sub-process fixture and the host site fixture.
+// the sub-process fixture, the host site fixture and the organization fixture.
 export const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 export const purchaseRequests = path.resolve(repoRoot, 'samples', 'apps', 'purchase-requests')
 export const leaveRequests = path.resolve(repoRoot, 'samples', 'apps', 'leave-requests')
@@ -23,6 +23,8 @@ export const checklistsModule = path.resolve(import.meta.dirname, 'fixtures', 'm
 export const hostSiteApp = path.resolve(import.meta.dirname, 'fixtures', 'host-site-app')
 /** The host of the site `host-site`. It is one of the default tenant's hosts, and the browser resolves any `*.localhost` name to the loopback address. */
 export const hostSiteHost = 'hostsite.localhost'
+/** An application that declares the built-in module `organization` and maps its slots `admin` to `department-manager` and `member` to `employee`. */
+export const organizationApp = path.resolve(import.meta.dirname, 'fixtures', 'organization-app')
 export const extensionsPath = path.resolve(repoRoot, 'artifacts', 'extensions')
 export const modulesPath = path.resolve(repoRoot, 'artifacts', 'modules')
 export const templatesPath = path.resolve(repoRoot, 'artifacts', 'templates')
@@ -89,7 +91,7 @@ export function previewURL(baseURL: string): string {
 
 /**
  * The environment of a server that listens at `baseURL`. Only the applications to activate are left to the
- * caller: the E2E server activates seven, and the activation helper one.
+ * caller: the E2E server activates eight, and the activation helper one.
  */
 export function serverEnv(baseURL: string): Record<string, string> {
   return {

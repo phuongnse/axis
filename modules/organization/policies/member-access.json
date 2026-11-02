@@ -6,7 +6,12 @@
   "roles": ["member"],
   "grants": [
     { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
-    { "name": "employeeRead", "entity": "Employee", "actions": ["read"] },
+    {
+      "name": "employeeRead",
+      "entity": "Employee",
+      "actions": ["read"],
+      "fields": ["fullName", "workEmail", "jobTitle", "department", "manager", "user", "active", "delegate", "delegateFrom", "delegateUntil"]
+    },
     {
       "name": "employeeOwnAbsence",
       "entity": "Employee",
@@ -14,7 +19,6 @@
       "fields": ["phone", "delegate", "delegateFrom", "delegateUntil"],
       "filter": "user == currentUser()"
     },
-    { "name": "departmentsRead", "dataSource": "Departments", "actions": ["read"] },
-    { "name": "employeesRead", "dataSource": "Employees", "actions": ["read"] }
+    { "name": "outOfOfficeRead", "dataSource": "OutOfOffice", "actions": ["read"] }
   ]
 }

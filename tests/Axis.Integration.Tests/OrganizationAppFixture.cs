@@ -13,7 +13,7 @@ namespace Axis.Integration.Tests;
 /// built-in <c>organization</c> module, which the test project copies to <c>BuiltInModules</c>, maps the slot
 /// <c>admin</c> to <c>admin</c> and the slot <c>member</c> to <c>employee</c>, and has no policy of its own. The test
 /// authentication scheme signs in <c>org-admin</c>, who holds <c>admin</c> there, and the members <c>org-ann</c>,
-/// <c>org-ann2</c>, <c>org-ann3</c>, <c>org-ann4</c> and <c>org-ann5</c>, who hold <c>employee</c> there. A member's
+/// <c>org-ann2</c>, <c>org-ann3</c>, <c>org-ann4</c>, <c>org-ann5</c>, <c>org-ann6</c>, <c>org-ann7</c> and <c>org-ann8</c>, who hold <c>employee</c> there. A member's
 /// employee record carries the member's id in <c>user</c>, which is unique, so each test uses its own member.
 /// </summary>
 public sealed class OrganizationAppFixture : IAsyncLifetime
@@ -24,7 +24,7 @@ public sealed class OrganizationAppFixture : IAsyncLifetime
     public static readonly Guid AppId = Guid.Parse("7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b4001");
 
     private static readonly string _fixtures = Path.Combine(AppContext.BaseDirectory, "Fixtures");
-    private static readonly string[] _members = ["org-ann", "org-ann2", "org-ann3", "org-ann4", "org-ann5"];
+    private static readonly string[] _members = ["org-ann", "org-ann2", "org-ann3", "org-ann4", "org-ann5", "org-ann6", "org-ann7", "org-ann8"];
 
     private readonly PostgreSqlFixture _database = new();
     private NpgsqlDataSource? _dataSource;

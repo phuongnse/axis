@@ -1,0 +1,16 @@
+{
+  "id": "6698ddc3-724c-4ad9-b964-d0388954ace8",
+  "kind": "page",
+  "name": "Departments",
+  "formatVersion": 1,
+  "title": { "textKey": "organization.pages.departments.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "name": "departments",
+      "dataSource": "Departments",
+      "rowActions": [{ "type": "navigate", "name": "open", "page": "DepartmentForm", "label": { "textKey": "organization.actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "DepartmentForm", "label": { "textKey": "organization.actions.new" } }]
+    }
+  ]
+}

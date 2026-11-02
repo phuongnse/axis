@@ -29,6 +29,15 @@
     "organization.employee.notOwnDelegate": "An employee cannot be their own delegate.",
     "organization.employee.delegateHasDates": "Give both dates when you name a delegate.",
     "organization.employee.delegateDatesInOrder": "The end date cannot be before the start date.",
+    "organization.pages.departments.title": "Departments",
+    "organization.pages.departmentForm.title": "Department",
+    "organization.pages.employees.title": "Employees",
+    "organization.pages.employeeForm.title": "Employee",
+    "organization.pages.outOfOffice.title": "Out of office",
+    "organization.pages.absenceForm.title": "Out of office",
+    "organization.absence.title": "Absence",
+    "organization.actions.new": "New",
+    "organization.actions.open": "Open",
     "organization.roles.admin": "Organization administrator",
     "organization.roles.member": "Organization member"
   }

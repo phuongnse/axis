@@ -1,0 +1,8 @@
+{
+  "id": "e7053450-4311-4e49-a758-093aa0c9063a",
+  "kind": "page",
+  "name": "DepartmentForm",
+  "formatVersion": 1,
+  "title": { "textKey": "organization.pages.departmentForm.title" },
+  "widgets": [{ "type": "form", "name": "departmentForm", "entity": "Department" }]
+}

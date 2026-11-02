@@ -6,6 +6,7 @@ import {
   journeyServerEnv,
   journeyURL,
   leaveRequests,
+  organizationApp,
   purchaseRequests,
   serverEnv,
   serviceDesk,
@@ -31,6 +32,7 @@ const environment = {
   ActivateOnStartup__4: assetManagement,
   ActivateOnStartup__5: subprocessApp,
   ActivateOnStartup__6: hostSiteApp,
+  ActivateOnStartup__7: organizationApp,
 }
 const isShellName = (name: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
 const hyphenated = Object.entries(environment).filter(([name]) => !isShellName(name))
