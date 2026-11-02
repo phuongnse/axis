@@ -4,18 +4,20 @@ import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
 import { fieldLabel } from '../fields'
 import { useSession } from '../sessions'
+import { pickOption } from '../select'
 import { chooseTheme } from '../shell'
 
 // The organization fixture declares the built-in module `organization` and maps its slot admin to department-manager
 // and its slot member to employee. A manager adds a department and an employee with a manager on the Departments and
-// Employees pages. An employee, who holds the member slot, sees only their own row on the Out of office page and sets a
-// delegate and dates there. The Departments and Employees pages are refused to the employee.
+// Employees pages. The manager picks the member's account by name in the Account picker, which stores the user id. An
+// employee, who holds the member slot, sees only their own row on the Out of office page and sets a delegate and dates
+// there. The Departments and Employees pages are refused to the employee.
 const site = '/organization'
 const records = '/api/apps/OrganizationApp/entities/organization/Employee/records'
 
 interface Employee {
   id: string
-  values: { user: string | null }
+  values: { fullName: string; user: string | null }
 }
 
 /** Opens the lookup of the reference field `field`, searches for `name` and picks the row. */
@@ -78,11 +80,23 @@ test('a manager adds a department and an employee with a manager, and an employe
   await addEmployee(page, member, { user: 'employee', manager: boss, department })
   await expect(page.getByRole('row', { name: new RegExp(member) })).toContainText(boss)
 
+  // The picker stored the user id, not the name it showed.
+  const stored = await page.request.get(`${records}?pageSize=100`)
+  expect(stored.status()).toBe(200)
+  const saved = ((await stored.json()) as { items: Employee[] }).items.filter((item) => item.values.fullName === member)
+  expect(saved.map((item) => item.values.user)).toEqual(['employee'])
+
   await chooseTheme(page, 'Dark')
   await page.reload()
   await expect(page.locator('[data-theme-mode="dark"]').first()).toBeVisible()
   await expect(page.getByRole('row', { name: new RegExp(member) })).toContainText(boss)
   await expect(page.getByRole('row', { name: new RegExp(boss) }).first()).toBeVisible()
+  // In dark mode the member's form shows the name of the stored account.
+  await page.getByRole('row', { name: new RegExp(member) }).getByRole('link', { name: member, exact: true }).click()
+  await expect(page).toHaveURL(/\/organization\/organization\/employeeform\/[0-9a-f-]{36}$/)
+  await expect(accountSelect(page)).toContainText('Employee User')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page).toHaveURL(/\/organization\/organization\/employees$/)
   await chooseTheme(page, 'Light')
 
   await useSession(page, 'employee')
@@ -129,6 +143,11 @@ async function expectAbsence(page: Page, member: string, delegate: string, from:
   await expect(row).toContainText(until)
 }
 
+/** The shown selection of the Account picker, which holds the combobox's input beside the name. */
+function accountSelect(page: Page) {
+  return page.getByRole('combobox', { name: 'Account', exact: true }).locator('..')
+}
+
 /** Adds an employee on the Employees page and waits for the table. */
 async function addEmployee(
   page: Page,
@@ -140,7 +159,8 @@ async function addEmployee(
   await page.getByRole('textbox', { name: 'Full name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'Work email', exact: true }).fill(`${name.replaceAll(' ', '.').toLowerCase()}@example.com`)
   if (options.user) {
-    await page.getByRole('textbox', { name: 'Account', exact: true }).fill(options.user)
+    await pickOption(page.getByRole('combobox', { name: 'Account', exact: true }), 'Employee User', 'Employee U')
+    await expect(accountSelect(page)).toContainText('Employee User')
   }
   if (options.department) {
     await choose(page, 'department', 'Department', options.department)

@@ -223,3 +223,15 @@ export async function searchUsers(path: string, search: string, signal?: AbortSi
   }
   return ((await response.json()) as { items: UserOption[] }).items
 }
+
+/**
+ * Reads one person through a user route's `id` parameter, or `null` when the route has no profile for
+ * that id. It throws when the answer is not a success.
+ */
+export async function findUser(path: string, id: string, signal?: AbortSignal): Promise<UserOption | null> {
+  const response = await apiFetch(`${path}?id=${encodeURIComponent(id)}`, { signal })
+  if (!response.ok) {
+    throw new Error(`Reading the user '${id}' of '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: UserOption[] }).items[0] ?? null
+}

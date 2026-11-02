@@ -52,7 +52,7 @@ the form and the texts below.
 - **`Employee`:**
   - `fullName`, `workEmail`, unique, `phone`, which is `sensitive`, `jobTitle`, `department` and
     `manager`, a reference to another employee;
-  - `user`, unique, the id of the person's account, empty for an employee who never signs in;
+  - `user`, unique, marked `userId`, the id of the person's account, empty for an employee who never signs in;
   - `active`;
   - `delegate`, a reference to another employee, with `delegateFrom` and `delegateUntil`, the
     dates of an absence.
@@ -61,8 +61,10 @@ the form and the texts below.
   [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)
   asks.
 - **Linking an account.** An administrator invites the person on the
-  [users page](user-administration.md), then picks the account in the employee's `user` field,
-  which lists the tenant's users _(planned for M26)_. Until then `user` is a text field.
+  [users page](user-administration.md), then picks the account in the employee's `user` field. The
+  field is marked `userId`, so the form shows a [user picker](form-widget.md) in place of a text
+  box. The picker lists only people who have signed in at least once. An invited person appears
+  after their first sign-in.
 - **Data sources.** `Departments` lists the department fields. `Employees` lists the employee
   fields except `phone`, so a list carries no personal data. A form can still show the phone.
   `OutOfOffice` lists `fullName`, `delegate`, `delegateFrom` and `delegateUntil` of the employees
@@ -298,8 +300,9 @@ The samples become the built-in modules, as D102 agrees:
 - **`departments`** becomes `organization`. The leave request sample declares `organization`, maps
   both of its slots (`admin` to `department-manager`, `member` to `employee`) and seeds its employees
   and departments, and a leave request goes to the head of its department. The purchase request
-  sample and `department-budgets` still use `departments` until they move, and then the `departments`
-  sample module is removed.
+  sample declares `organization` too (`admin` to `operator`, `member` to `department-manager`) and
+  seeds the same employees and departments, and `department-budgets` 1.2.0 depends on `organization`.
+  The `departments` sample module stays installed with no sample using it, until it is removed.
 - **The `request-approval` template** becomes the `approvals` application, and is removed. The
   Studio journeys that create an application from it create one from the built-in application.
 

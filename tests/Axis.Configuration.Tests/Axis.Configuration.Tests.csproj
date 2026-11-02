@@ -28,7 +28,7 @@
     <None Include="..\..\samples\apps\service-desk\**\*" Link="Samples\service-desk\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\apps\asset-management\**\*" Link="Samples\asset-management\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\modules\departments\**\*" Link="SampleModules\departments\1.1.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\samples\modules\department-budgets\**\*" Link="SampleModules\department-budgets\1.1.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\modules\department-budgets\**\*" Link="SampleModules\department-budgets\1.2.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\modules\organization\**\*" Link="SampleModules\organization\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\modules\organization\**\*" Link="BuiltInModules\organization\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\modules\approvals\**\*" Link="BuiltInModules\approvals\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

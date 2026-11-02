@@ -52,6 +52,7 @@ public sealed class OrganizationModuleTests
         Assert.True(Field(employee, "phone").Sensitive);
         Assert.True(Field(employee, "workEmail").Unique);
         Assert.True(Field(employee, "user").Unique);
+        Assert.True(Field(employee, "user").UserId);
         Assert.DoesNotContain(employee.Fields, field => field.Name is "birthDate" or "dateOfBirth" or "identityNumber" or "address");
         var department = Assert.Single(compiled.Model.Entities, entity => entity.Name.EndsWith("Department", StringComparison.Ordinal));
         Assert.True(Field(department, "code").Unique);

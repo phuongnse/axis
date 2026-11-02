@@ -65,12 +65,12 @@ departments and `en` and `vi` texts. The `Department` entity has a validation th
 calls `IsDepartmentCode`, so a department code must be in capital letters.
 It has a `manager` role slot, labelled in `en` and `vi`, and a `ManagerAccess` module
 policy for the slot. The policy lets the role read the departments whose `manager` is the
-current user, and read the `Departments` data source. Only the purchase request sample maps the
-slot to its `department-manager` role.
+current user, and read the `Departments` data source. No sample declares it any more, because the
+purchase request and leave request samples declare the built-in `organization` module instead.
 `department-budgets` is the second sample module, see
 [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 `scripts/build.sh`, `scripts/dev.sh` and the E2E run install them under
-`artifacts/modules/departments/1.1.0/` and `artifacts/modules/department-budgets/1.1.0/`, and the
+`artifacts/modules/departments/1.1.0/` and `artifacts/modules/department-budgets/1.2.0/`, and the
 Compose images hold them in `/modules`. The server and the worker read them through `Modules:Path`.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
@@ -268,17 +268,20 @@ copy each, what the application names, and what a module names and calls of the 
 {
   "kind": "module",
   "id": "department-budgets",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "label": "Department budgets",
-  "roles": [{ "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } }],
-  "modules": [{ "id": "departments", "version": "^1.1.0", "roles": { "manager": "approver" } }]
+  "roles": [
+    { "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } },
+    { "name": "administrator", "label": { "textKey": "department-budgets.roles.administrator" } }
+  ],
+  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "administrator", "member": "approver" } }]
 }
 ```
 
 `department-budgets` is the sample module, `samples/modules/department-budgets`, that the
 purchase request sample declares, as
 [D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
-agrees. It holds a `Budget` entity with a name, a `departments/Department` reference, a year, an
+agrees. It holds a `Budget` entity with a name, an `organization/Department` reference, a year, an
 amount, a `requester` creator field and a required `status` that defaults to `draft`, a `BudgetDecision` entity with the
 budget, the amount and `decidedBy`, a `BudgetContract` on `Budget`, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetForm` page, a `BudgetApproval`
 process whose `review` task goes to `approver`, an `ApproverAccess` policy and `en` and `vi` texts. The
@@ -292,12 +295,14 @@ which creates a `BudgetDecision` when a budget is approved, and an `approver` ce
 It holds the scenario `ApproverCreatesBudget` and the
 [contract scenarios](module-contracts.md#contract-scenarios) `RequesterCannotDecideOwnBudget`, `ApprovalRecordsDecision`
 and `DecidedAmountIsFrozen`. Every publish and validate of an application that declares it runs the contract scenarios.
-An application that declares it maps the slot to one of its own roles:
+It has a second role slot, `administrator`, that grants nothing on budgets. It passes the `admin` slot of
+`organization` on to a role of the application, because the two `organization` slots must reach two different roles.
+An application that declares it maps both slots to roles of its own:
 
 ```json
 "modules": [
-  { "id": "departments", "version": "^1.1.0", "roles": { "manager": "department-manager" } },
-  { "id": "department-budgets", "version": "^1.1.0", "roles": { "approver": "department-manager" } }
+  { "id": "organization", "version": "^1.0.0", "roles": { "admin": "operator", "member": "department-manager" } },
+  { "id": "department-budgets", "version": "^1.2.0", "roles": { "approver": "department-manager", "administrator": "operator" } }
 ]
 ```
 

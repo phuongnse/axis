@@ -146,7 +146,7 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
             author, validate.Headers.Location!.OriginalString, StudioPublishTests.HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         var validated = finished.RootElement.GetProperty("scenarios").EnumerateArray().ToList();
-        Assert.Equal(3, validated.Count);
+        Assert.Equal(8, validated.Count);
         Assert.All(validated, item => Assert.Equal("passed", item.GetProperty("outcome").GetString()));
 
         using var ended = await StudioPublishTests.WaitForFinalAsync(
@@ -154,9 +154,9 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         Assert.Equal("succeeded", ended.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Array, ended.RootElement.GetProperty("scenarios").ValueKind);
 
-        // The scenarios of the application and of its module: the purchase request sample has 10.
+        // The scenarios of the application and of its module: the purchase request sample has 15.
         var results = ended.RootElement.GetProperty("scenarios").EnumerateArray().ToList();
-        Assert.Equal(10, results.Count);
+        Assert.Equal(15, results.Count);
         Assert.All(results, item => Assert.Equal("passed", item.GetProperty("outcome").GetString()));
     }
 

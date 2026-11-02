@@ -6,6 +6,7 @@ import { datePattern, enumLabel, timePattern } from './formatValue'
 import { isFileValue, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
+import { UserIdInput } from './UserIdInput'
 
 interface FieldInputProps {
   /** A field of a type with a plain value: not a reference and not a child collection. */
@@ -77,6 +78,20 @@ export function FieldInput({
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
   switch (field.type) {
     case 'text':
+      if (field.usersPath) {
+        return (
+          <UserIdInput
+            field={field}
+            value={value === null ? null : String(value)}
+            onChange={onChange}
+            id={id}
+            ariaLabel={ariaLabel}
+            ariaRequired={ariaRequired}
+            ariaDescribedBy={ariaDescribedBy}
+            style={style}
+          />
+        )
+      }
       return (
         <Input
           id={id}
