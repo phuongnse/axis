@@ -41,13 +41,13 @@ internal sealed record LayerUpgrade(string ModuleId, string FromVersion, string 
 /// </summary>
 internal static class LayerMerger
 {
-    private const string RemoveProperty = "remove";
-    private const string AfterProperty = "after";
-    private const string BeforeProperty = "before";
+    internal const string RemoveProperty = "remove";
+    internal const string AfterProperty = "after";
+    internal const string BeforeProperty = "before";
+
+    internal static readonly string[] IdentityProperties = ["id", "kind", "name", "formatVersion"];
 
     private static readonly string[] _placementProperties = [AfterProperty, BeforeProperty];
-
-    private static readonly string[] _identityProperties = ["id", "kind", "name", "formatVersion"];
 
     /// <summary>
     /// Merges the changes of <paramref name="layer"/> into <paramref name="module"/>, a resource of
@@ -66,7 +66,7 @@ internal static class LayerMerger
         var removes = new List<LayerRemove>();
         if (merged is JsonObject root && layer.Changes.ValueKind == JsonValueKind.Object)
         {
-            new Merging(kind, layer, map, changed, removes, diagnostics, upgrade).MergeObject(root, layer.Changes, "", "/changes", _identityProperties, upgrade?.Previous);
+            new Merging(kind, layer, map, changed, removes, diagnostics, upgrade).MergeObject(root, layer.Changes, "", "/changes", IdentityProperties, upgrade?.Previous);
         }
 
         return new LayerMergeResult(merged, map, changed, removes);
@@ -409,7 +409,7 @@ internal static class LayerMerger
         _ => null,
     };
 
-    private static string? KeyOf(JsonElement element, string keyProperty) => element.ValueKind switch
+    internal static string? KeyOf(JsonElement element, string keyProperty) => element.ValueKind switch
     {
         JsonValueKind.String => element.GetString(),
         JsonValueKind.Object when element.TryGetProperty(keyProperty, out var key) && key.ValueKind == JsonValueKind.String => key.GetString(),

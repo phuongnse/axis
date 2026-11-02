@@ -259,7 +259,9 @@ as they change any resource of their own. The [authoring API](authoring.md) writ
   compares it with the pinned module version, by the list keys, and writes the layer that holds
   only the difference: changed properties, added elements with their place, and removes. A save
   that leaves no difference deletes the layer file. The file is never edited by hand to save from
-  Studio.
+  Studio. A save is refused when it changes `id`, `kind`, `name` or `formatVersion`, drops a
+  property of the module, leaves a keyed element without a key, repeats a key or changes only the
+  letter case of one.
 - **Refused changes.** A save is checked like any save. A change that breaks the contract, such as
   a step that moves a request to `approved` past its guard, publishes as a failed contract scenario
   or a refused write, and a change that adds a transition into a protected state is a diagnostic in
