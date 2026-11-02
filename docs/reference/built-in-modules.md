@@ -52,7 +52,7 @@ the form and the texts below.
 - **`Employee`:**
   - `fullName`, `workEmail`, unique, `phone`, which is `sensitive`, `jobTitle`, `department` and
     `manager`, a reference to another employee;
-  - `user`, unique, the id of the person's account, empty for an employee who never signs in;
+  - `user`, unique, marked `userId`, the id of the person's account, empty for an employee who never signs in;
   - `active`;
   - `delegate`, a reference to another employee, with `delegateFrom` and `delegateUntil`, the
     dates of an absence.
@@ -61,8 +61,10 @@ the form and the texts below.
   [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)
   asks.
 - **Linking an account.** An administrator invites the person on the
-  [users page](user-administration.md), then picks the account in the employee's `user` field,
-  which lists the tenant's users _(planned for M26)_. Until then `user` is a text field.
+  [users page](user-administration.md), then picks the account in the employee's `user` field. The
+  field is marked `userId`, so the form shows a [user picker](form-widget.md) in place of a text
+  box. The picker lists only people who have signed in at least once. An invited person appears
+  after their first sign-in.
 - **Data sources.** `Departments` lists the department fields. `Employees` lists the employee
   fields except `phone`, so a list carries no personal data. A form can still show the phone.
   `OutOfOffice` lists `fullName`, `delegate`, `delegateFrom` and `delegateUntil` of the employees
