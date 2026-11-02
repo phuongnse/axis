@@ -325,7 +325,7 @@ internal static class MigrationChecker
         static string Column(IReadOnlyList<string> path) => string.Join('.', path);
 
         if (before is not null
-            && NamedFields(expression).FirstOrDefault(name => before.GetValueOrDefault(name) is { Sensitive: true }) is { } sensitive)
+            && ExpressionNames.NamedFields(expression).FirstOrDefault(name => before.GetValueOrDefault(name) is { Sensitive: true }) is { } sensitive)
         {
             return new ExpressionDiagnostic(
                 DiagnosticCodes.SensitiveFieldUse,
@@ -337,7 +337,7 @@ internal static class MigrationChecker
             && before is not null
             && after is not null
             && after.GetValueOrDefault(change.Field!) is { } field
-            && !NamedFields(expression).Any(name => before.TryGetValue(name, out var known) && known is null))
+            && !ExpressionNames.NamedFields(expression).Any(name => before.TryGetValue(name, out var known) && known is null))
         {
             var scope = ExpressionScopes.ForMigration(
                 before.Where(pair => pair.Value is not null).Select(pair => (pair.Key, pair.Value!)));
@@ -356,19 +356,6 @@ internal static class MigrationChecker
         var translated = SqlTranslator.Translate(expression, Column);
         return translated.Succeeded ? null : translated.Diagnostic;
     }
-
-    /// <summary>The names a value starts a field path at, in any order.</summary>
-    private static IEnumerable<string> NamedFields(ExpressionNode node) => node switch
-    {
-        NameNode name => [name.Name],
-        MemberNode member => NamedFields(member.Target),
-        CallNode call => call.Arguments.SelectMany(NamedFields),
-        UnaryNode unary => NamedFields(unary.Operand),
-        BinaryNode binary => NamedFields(binary.Left).Concat(NamedFields(binary.Right)),
-        IsNullNode isNull => NamedFields(isNull.Operand),
-        InNode inNode => NamedFields(inNode.Operand).Concat(inNode.Items.SelectMany(NamedFields)),
-        _ => [],
-    };
 
     private static MigrationChangeType ParseType(string type) => type switch
     {

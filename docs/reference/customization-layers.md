@@ -188,16 +188,19 @@ schemas.
 
 A layer on a module entity changes the application's copy of it, which is the application's own
 table. Adding fields and adding validations are built: activation adds the column of an added field
-to the copy, and the record API reads and writes the field. Changing and removing a field are
-_(planned for M25)_.
+to the copy, and the record API reads and writes the field. Refusing a removed field that the module
+still reads is built. Changing a field and dropping the column of a removed field are _(planned for M25)_.
 
 - **Adding fields** adds columns to the copy. A new field is the application's, and the module's
   forms, pages and processes do not show it until a layer on them adds it.
 - **Changing a field** _(planned for M25)_. A layer may change a label, a default, `required`, a length, a range or an
   enum's `values`. A change of type, and a field removed, follow the
   [migration](migrations.md#migrations) rules of the application's own entities.
-- **Removing a field** _(planned for M25)_ that the contract, or a module resource the layer does not also change,
-  still reads is a diagnostic at the removed field.
+- **Removing a field** that the module still reads is refused with `AXC0374` at the remove, `/changes/fields/{i}`
+  of the layer file. The readers are the entity's contract, and the module's data sources and forms on the entity
+  that the application does not also layer, because a layer of its own can stop the reading. The names match
+  ignoring letter case. The message names the first reader's file. Dropping the column of a removed field is
+  _(planned for M25)_.
 - **Validations** that the layer adds run with the entity's own, before the core validations.
 
 ## Extending a lifecycle

@@ -380,6 +380,148 @@ public sealed class CustomizationLayerTests
         Assert.Equal((ReviewFile, "/changes/steps/0"), (anchor.File, anchor.Path));
     }
 
+    [Fact]
+    public void Removing_a_field_that_a_contract_guard_reads_is_reported_at_the_remove()
+    {
+        using var modules = ContractModules();
+        using var folder = Application().With(
+            "customizations/approvals/Request.json",
+            Layer("approvals/Request", changes: """{ "fields": [ { "name": "amount", "remove": true } ] }"""));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.RemovedFieldStillRead);
+        Assert.Equal(
+            ("customizations/approvals/Request.json", "/changes/fields/0", Guid.Parse(LayerId)),
+            (diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'amount'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("modules/approvals/RequestContract.json", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Removing_a_field_that_no_contract_reads_is_not_reported()
+    {
+        using var modules = ContractModules();
+        using var folder = Application().With(
+            "customizations/approvals/Request.json",
+            Layer("approvals/Request", changes: """{ "fields": [ { "name": "note", "remove": true } ] }"""));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.RemovedFieldStillRead);
+    }
+
+    [Fact]
+    public void Removing_a_field_that_a_module_data_source_without_a_layer_reads_is_reported_at_the_remove()
+    {
+        using var modules = ModulesWithNote();
+        using var folder = Application().With(NoteLayerFile, Layer("approvals/Approval", changes: RemoveNote));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.RemovedFieldStillRead);
+        Assert.Equal((NoteLayerFile, "/changes/fields/0", Guid.Parse(LayerId)), (diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("modules/approvals/data-sources/ApprovalList.json", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_data_source_that_the_application_also_layers_is_not_a_reader_of_the_removed_field()
+    {
+        using var modules = ModulesWithNote();
+        using var folder = Application()
+            .With(NoteLayerFile, Layer("approvals/Approval", changes: RemoveNote))
+            .With(
+                "customizations/approvals/ApprovalList.json",
+                Layer("approvals/ApprovalList", SecondLayerId, """{ "fields": [ { "name": "note", "remove": true } ] }"""));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.RemovedFieldStillRead);
+    }
+
+    [Fact]
+    public void A_data_source_filter_name_that_is_a_parameter_is_not_a_read_of_the_removed_field()
+    {
+        using var modules = ModulesWithNote()
+            .With("approvals/1.0.0/data-sources/ApprovalList.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c61", "kind": "dataSource", "name": "ApprovalList", "formatVersion": 1,
+                  "entity": "Approval", "fields": [ { "name": "title", "path": "title" } ],
+                  "parameters": [ { "name": "note", "type": "text" } ], "filter": "title == note" }
+                """);
+        using var folder = Application().With(NoteLayerFile, Layer("approvals/Approval", changes: RemoveNote));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.RemovedFieldStillRead);
+    }
+
+    [Fact]
+    public void Removing_a_field_that_a_module_form_without_a_layer_reads_is_reported_at_the_remove()
+    {
+        using var modules = ModulesWithNote()
+            .Without("approvals/1.0.0/data-sources/ApprovalList.json")
+            .With("approvals/1.0.0/forms/ApprovalForm.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c24", "kind": "form", "name": "ApprovalForm", "formatVersion": 1, "entity": "Approval",
+                  "sections": [ { "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" }, { "field": "Note" } ] } ] }
+                """)
+            .With("approvals/1.0.0/pages/Shared.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c51", "kind": "page", "name": "Shared", "formatVersion": 1,
+                  "title": { "textKey": "approvals.reviews" }, "widgets": [] }
+                """);
+        using var folder = Application().With(NoteLayerFile, Layer("approvals/Approval", changes: RemoveNote));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.RemovedFieldStillRead);
+        Assert.Equal((NoteLayerFile, "/changes/fields/0"), (diagnostic.File, diagnostic.Path));
+        Assert.Contains("modules/approvals/forms/ApprovalForm.json", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    private const string NoteLayerFile = "customizations/approvals/Approval.json";
+    private const string RemoveNote = """{ "fields": [ { "name": "note", "remove": true } ] }""";
+
+    /// <summary>The modules where <c>Approval</c> has a <c>note</c> field that the data source <c>ApprovalList</c> reads.</summary>
+    private static TemporaryFolder ModulesWithNote() =>
+        Modules()
+            .With("approvals/1.0.0/Approval.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21", "kind": "entity", "name": "Approval", "formatVersion": 1,
+                  "fields": [ { "name": "title", "type": "text" }, { "name": "note", "type": "text" } ] }
+                """)
+            .Without("approvals/1.0.0/data-sources/Shared.json")
+            .With("approvals/1.0.0/data-sources/ApprovalList.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c61", "kind": "dataSource", "name": "ApprovalList", "formatVersion": 1,
+                  "entity": "Approval", "fields": [ { "name": "title", "path": "title" }, { "name": "note", "path": "note" } ] }
+                """)
+            .With("approvals/1.0.0/pages/Shared.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c51", "kind": "page", "name": "Shared", "formatVersion": 1,
+                  "title": { "textKey": "approvals.reviews" },
+                  "widgets": [ { "name": "table", "type": "table", "dataSource": "ApprovalList" } ] }
+                """);
+
+    /// <summary>A module whose <c>Request</c> entity has a contract with a guard that reads <c>amount</c>.</summary>
+    private static TemporaryFolder ContractModules() =>
+        new TemporaryFolder()
+            .With("approvals/1.0.0/module.json", """{ "kind": "module", "id": "approvals", "version": "1.0.0", "label": "Approvals" }""")
+            .With("approvals/1.0.0/Request.json", """
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21", "kind": "entity", "name": "Request", "formatVersion": 1, "displayField": "title",
+                  "fields": [
+                    { "name": "title", "type": "text", "required": true },
+                    { "name": "amount", "type": "integer" },
+                    { "name": "note", "type": "text" },
+                    { "name": "status", "type": "enum", "values": ["draft", "submitted"], "required": true }
+                  ] }
+                """)
+            .With("approvals/1.0.0/RequestContract.json", """
+                { "id": "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b71", "kind": "contract", "name": "RequestContract", "formatVersion": 1, "entity": "Request",
+                  "lifecycle": { "field": "status",
+                    "states": [ { "name": "draft", "initial": true }, { "name": "submitted" } ],
+                    "transitions": [ { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "amount > 0" } ] } }
+                """)
+            .With("approvals/1.0.0/TextsEn.json", """
+                { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "approvals.request": "Request" } }
+                """);
+
     private static CompilationResult CompileAgainstActiveRelease(TemporaryFolder folder, TemporaryFolder modules)
     {
         var installed = ModuleCatalog.Load(modules.Path).Modules;
