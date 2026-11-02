@@ -49,6 +49,24 @@ tenancy:
   # Empty keeps the host default.
   refreshInterval: ""
 
+# Setting cell.id makes the server, the worker and the publisher part of an Axis
+# SaaS cell. They then need cell.region and cell.tenantDomain, and the id is the
+# region, a hyphen and a number, such as "vn-1". Empty means a self-hosted
+# installation and renders no Cell setting. Empty operatorRealm and
+# operatorRole keep the host defaults.
+cell:
+  id: ""
+  region: ""
+  tenantDomain: ""
+  internalDomain: ""
+  tenantCap: ""
+  consoleHost: ""
+  consoleAllowedNetworks: []
+  internalUrl: ""
+  operatorRealm: ""
+  operatorRole: ""
+  backupKeyFile: ""
+
 # Extension packages, mounted read-only at /extensions. Empty uses the empty
 # folder of the image. Give any Kubernetes volume source, for example:
 #   volume:

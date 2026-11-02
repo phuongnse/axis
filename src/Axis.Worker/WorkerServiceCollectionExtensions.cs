@@ -28,9 +28,10 @@ public static class WorkerServiceCollectionExtensions
     /// <c>notify</c> steps staged over the SMTP server of the <c>Email</c> section, which a tenant's own <c>Email</c> block
     /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none, and only a worker that runs in Development sends email
     /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>.
+    /// With <c>Cell:Id</c> set the worker is part of a cell and needs <c>Tenancy:Source=directory</c>, <c>Cell:Region</c> and <c>Cell:TenantDomain</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -67,6 +68,9 @@ public static class WorkerServiceCollectionExtensions
         {
             throw new InvalidOperationException($"'{HealthOptions.SectionName}:{nameof(HealthOptions.Urls)}' must not be empty.");
         }
+
+        var cell = CellOptions.Load(configuration);
+        services.AddSingleton(cell);
 
         WorkerTenantCatalog catalog;
         ITenantKeySource keySource;

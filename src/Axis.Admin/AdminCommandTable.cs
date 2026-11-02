@@ -1,3 +1,4 @@
+using Axis.Tenancy;
 using Microsoft.Extensions.Configuration;
 
 namespace Axis.Admin;
@@ -24,6 +25,7 @@ internal sealed record AdminRun(
     AdminCommand Command,
     string[] Args,
     IConfiguration Configuration,
+    CellOptions Cell,
     TextReader Input,
     TextWriter Output,
     TextWriter Error,
