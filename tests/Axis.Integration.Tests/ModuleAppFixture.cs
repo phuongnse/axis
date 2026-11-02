@@ -17,7 +17,9 @@ namespace Axis.Integration.Tests;
 /// <c>approver-a</c>, who holds <c>manager</c> in ModuleAppA only.
 /// ModuleAppA also holds the site <c>modulesa</c>, which lists the <c>departments</c> module's Departments page.
 /// ModuleContractApp declares only the <c>requests</c> module, whose <c>Request</c> entity has a contract with a
-/// lifecycle, and maps its <c>requester</c> slot to <c>employee</c>.
+/// lifecycle, and maps its <c>requester</c> slot to <c>employee</c>. The contract's <c>approved</c> state is protected. The
+/// application's layers add the <c>onHold</c> state, its enum value, and the <c>hold</c> and <c>resume</c> transitions between
+/// it and <c>submitted</c>.
 /// ModuleCeilingApp declares only the <c>claims</c> module, whose <c>Claim</c> entity has a contract with a grant
 /// ceiling. It maps the <c>filer</c> slot to <c>clerk</c> and the <c>viewer</c> slot to <c>auditor</c>. The test
 /// authentication scheme signs in <c>ceiling-clerk</c> and <c>ceiling-auditor</c>, who hold those roles there only.

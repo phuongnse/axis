@@ -9,7 +9,7 @@
     "states": [
       { "name": "draft", "initial": true, "deletable": true },
       { "name": "submitted" },
-      { "name": "approved" },
+      { "name": "approved", "protected": true },
       { "name": "archived", "deletable": true }
     ],
     "transitions": [

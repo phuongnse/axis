@@ -26,7 +26,8 @@
             "properties": {
               "name": { "$ref": "#/$defs/name" },
               "initial": { "type": "boolean" },
-              "deletable": { "type": "boolean" }
+              "deletable": { "type": "boolean" },
+              "protected": { "type": "boolean" }
             }
           }
         },

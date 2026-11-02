@@ -650,6 +650,8 @@ internal static class ModuleChecker
         List<Diagnostic> diagnostics)
     {
         var kindsByName = layers.Count == 0 ? null : LayerChecker.KindsByName(module);
+        var pendingContracts = new List<PendingContract>();
+        var addedValuesByEntity = new Dictionary<string, (LayerResource Layer, Dictionary<string, HashSet<string>>? Values)>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in module.Files)
         {
             var path = $"modules/{module.Manifest.Id}/{file.Path}";
@@ -678,7 +680,7 @@ internal static class ModuleChecker
                 {
                     // The model reads the resource with the layer applied. The release keeps the file as the
                     // module wrote it, so that compiling the stored release applies the layer once.
-                    using var merged = ApplyLayer(root, layers, kindsByName, path, traces, diagnostics);
+                    using var merged = ApplyLayer(root, layers, kindsByName, path, traces, diagnostics, out var layer, out var additions);
                     var effective = merged?.RootElement ?? root;
                     if (!CheckKind(path, effective, resourceId, diagnostics))
                     {
@@ -687,6 +689,23 @@ internal static class ModuleChecker
                     }
 
                     resources.Add(module.Manifest.Id, declared, path, effective, diagnostics);
+                    if (layer is not null && root.GetProperty("kind").GetString() == ResourceKinds.Entity)
+                    {
+                        addedValuesByEntity[root.GetProperty("name").GetString()!] = (layer, merged is null ? null : AddedValues(root, effective));
+                    }
+                    else if (layers.Count > 0
+                        && root.GetProperty("kind").GetString() == ResourceKinds.Contract
+                        && effective.TryGetProperty("lifecycle", out var lifecycle)
+                        && lifecycle.TryGetProperty("field", out var field)
+                        && field.ValueKind == JsonValueKind.String)
+                    {
+                        pendingContracts.Add(new PendingContract(
+                            root.GetProperty("name").GetString()!,
+                            effective.GetProperty("entity").GetString()!,
+                            field.GetString()!,
+                            layer,
+                            additions));
+                    }
 
                     // A module scenario is a test. It is not part of the release or its content hash.
                     if (root.GetProperty("kind").GetString() == ResourceKinds.Scenario)
@@ -698,6 +717,145 @@ internal static class ModuleChecker
                 files.Add(new ResourceContent(path, JsonCanonicalizer.Canonicalize(root)));
             }
         }
+
+        foreach (var pending in pendingContracts)
+        {
+            CheckLifecycleAdditions(module.Manifest.Id, pending, addedValuesByEntity, resources, diagnostics);
+        }
+    }
+
+    /// <summary>
+    /// A contract with a lifecycle, once every file of the module is read. <see cref="Layer"/> is its layer, and
+    /// <see cref="Additions"/> is what that layer added, or null when there is no layer or it was not applied.
+    /// </summary>
+    private sealed record PendingContract(string Name, string Entity, string Field, LayerResource? Layer, ContractAdditions? Additions);
+
+    /// <summary>
+    /// The values that a layer added to each enum field of an entity: the values of the merged field that the
+    /// module's field does not have, by the declared name of the field.
+    /// </summary>
+    private static Dictionary<string, HashSet<string>> AddedValues(JsonElement module, JsonElement merged)
+    {
+        var added = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        if (!merged.TryGetProperty("fields", out var fields) || fields.ValueKind != JsonValueKind.Array)
+        {
+            return added;
+        }
+
+        foreach (var field in fields.EnumerateArray())
+        {
+            if (field.ValueKind != JsonValueKind.Object
+                || !field.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String
+                || !field.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            var before = new HashSet<string>(StringComparer.Ordinal);
+            if (module.TryGetProperty("fields", out var moduleFields) && moduleFields.ValueKind == JsonValueKind.Array)
+            {
+                var moduleField = moduleFields.EnumerateArray().FirstOrDefault(candidate =>
+                    candidate.ValueKind == JsonValueKind.Object
+                    && candidate.TryGetProperty("name", out var moduleName)
+                    && moduleName.ValueKind == JsonValueKind.String
+                    && string.Equals(moduleName.GetString(), name.GetString(), StringComparison.OrdinalIgnoreCase));
+                if (moduleField.ValueKind == JsonValueKind.Object && moduleField.TryGetProperty("values", out var moduleValues) && moduleValues.ValueKind == JsonValueKind.Array)
+                {
+                    before.UnionWith(moduleValues.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String).Select(value => value.GetString()!));
+                }
+            }
+
+            var extra = values.EnumerateArray()
+                .Where(value => value.ValueKind == JsonValueKind.String)
+                .Select(value => value.GetString()!)
+                .Where(value => !before.Contains(value))
+                .ToHashSet(StringComparer.Ordinal);
+            if (extra.Count > 0)
+            {
+                added[name.GetString()!] = extra;
+            }
+        }
+
+        return added;
+    }
+
+    /// <summary>
+    /// Reports a state that the contract's layer added without the same value in the state field, and a value that
+    /// the entity's layer added without the same state. Then keeps the added names on the contract, so the
+    /// contract check, the named points and the compiled lifecycle know them.
+    /// </summary>
+    private static void CheckLifecycleAdditions(
+        string moduleId,
+        PendingContract pending,
+        Dictionary<string, (LayerResource Layer, Dictionary<string, HashSet<string>>? Values)> addedValuesByEntity,
+        ModuleResourceCollector resources,
+        List<Diagnostic> diagnostics)
+    {
+        var addedStates = pending.Additions?.States ?? [];
+        var entity = addedValuesByEntity.TryGetValue(pending.Entity, out var found) ? found : default;
+        var addedValues = entity.Values?.GetValueOrDefault(pending.Field) ?? [];
+
+        // A layer that was not applied has its own diagnostics, so what it would have added is not compared.
+        var contractLayerRejected = pending.Layer is not null && pending.Additions is null;
+        var entityLayerRejected = entity.Layer is not null && entity.Values is null;
+        if (pending.Layer is not null && !contractLayerRejected && !entityLayerRejected)
+        {
+            foreach (var (name, index) in addedStates.Where(state => !addedValues.Contains(state.Name)))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.LifecycleAdditionMismatch,
+                    $"The state '{name}' is added without the value '{name}' in the field '{pending.Field}'. Add the same value to the field in the layer of the entity '{pending.Entity}'.",
+                    pending.Layer.File,
+                    $"/changes/lifecycle/states/{index.ToString(CultureInfo.InvariantCulture)}/name",
+                    pending.Layer.Id));
+            }
+        }
+
+        if (entity.Layer is { } entityLayer && !contractLayerRejected && !entityLayerRejected)
+        {
+            var path = FieldValuesPath(entityLayer, pending.Field);
+            foreach (var value in addedValues.Where(value => !addedStates.Any(state => state.Name == value)).Order(StringComparer.Ordinal))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.LifecycleAdditionMismatch,
+                    $"The value '{value}' is added to the field '{pending.Field}' without the state '{value}'. Add the same state to the lifecycle in the layer of the contract of '{pending.Entity}'.",
+                    entityLayer.File,
+                    path,
+                    entityLayer.Id));
+            }
+        }
+
+        resources.AddAdditions(
+            moduleId,
+            pending.Name,
+            addedStates.Select(state => state.Name).ToHashSet(StringComparer.Ordinal),
+            (pending.Additions?.Transitions ?? []).ToHashSet(StringComparer.Ordinal),
+            addedValues);
+    }
+
+    /// <summary>The path in an entity's layer of the <c>values</c> of a field, or of the <c>fields</c> when the layer does not list the field.</summary>
+    private static string FieldValuesPath(LayerResource layer, string field)
+    {
+        if (layer.Changes.ValueKind == JsonValueKind.Object
+            && layer.Changes.TryGetProperty("fields", out var fields)
+            && fields.ValueKind == JsonValueKind.Array)
+        {
+            var index = 0;
+            foreach (var element in fields.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.Object
+                    && element.TryGetProperty("name", out var name)
+                    && name.ValueKind == JsonValueKind.String
+                    && string.Equals(name.GetString(), field, StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"/changes/fields/{index.ToString(CultureInfo.InvariantCulture)}/values";
+                }
+
+                index++;
+            }
+        }
+
+        return "/changes/fields";
     }
 
     /// <summary>The module id of a layer's target, the text before the first <c>/</c>.</summary>
@@ -709,9 +867,11 @@ internal static class ModuleChecker
 
     /// <summary>
     /// Merges the layer of a module file into it. The layer is the first one that names the file's resource,
-    /// ignoring letter case, and applies only when that name is one resource of a kind that a layer may change
-    /// now, which is neither a scenario nor a contract. Returns null when there is no layer to apply, or when
-    /// the layer has a problem of its own, so the module's file is read as it is.
+    /// ignoring letter case, and applies only when that name is one resource of a kind that a layer may change,
+    /// which is not a scenario. A layer on a contract is checked by <see cref="ContractLayerChecker"/> first.
+    /// Returns null when there is no layer to apply, or when the layer has a problem of its own, so the
+    /// module's file is read as it is. <paramref name="found"/> is the layer that targets the file, applied or
+    /// not, and <paramref name="additions"/> is what an applied layer on a contract added.
     /// </summary>
     private static JsonDocument? ApplyLayer(
         JsonElement root,
@@ -719,8 +879,12 @@ internal static class ModuleChecker
         ILookup<string, string>? kindsByName,
         string path,
         Dictionary<string, LayerTrace> traces,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        out LayerResource? found,
+        out ContractAdditions? additions)
     {
+        found = null;
+        additions = null;
         if (kindsByName is null
             || root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("kind", out var kindElement) || kindElement.ValueKind != JsonValueKind.String
@@ -736,17 +900,28 @@ internal static class ModuleChecker
             && string.Equals(candidate.Target[(LayerModuleId(candidate).Length + 1)..], name, StringComparison.OrdinalIgnoreCase));
         if (layer is null
             || kindsByName[name].Distinct(StringComparer.Ordinal).Count() != 1
-            || kind is ResourceKinds.Scenario or ResourceKinds.Contract
+            || kind == ResourceKinds.Scenario
             || !ResourceSchemas.TryGet(kind, out var kindSchema))
         {
             return null;
         }
 
+        found = layer;
         var countBefore = diagnostics.Count;
+        if (kind == ResourceKinds.Contract)
+        {
+            additions = ContractLayerChecker.CheckAdditions(root, layer, diagnostics);
+            if (additions is null)
+            {
+                return null;
+            }
+        }
+
         var result = LayerMerger.Merge(kind, root, layer, diagnostics);
         LayerMerger.CheckProperties(kind == ResourceKinds.Trigger ? ResourceSchemas.ModuleTrigger : kindSchema, result, layer, diagnostics);
         if (diagnostics.Count != countBefore)
         {
+            additions = null;
             return null;
         }
 
@@ -814,6 +989,25 @@ internal static class ModuleChecker
         private readonly HashSet<string> _unloadedPageNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedProcessNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _noModules = [];
+
+        /// <summary>Keeps on a collected contract the names that its module's layers added to the lifecycle.</summary>
+        public void AddAdditions(
+            string moduleId,
+            string contractName,
+            HashSet<string> states,
+            HashSet<string> transitions,
+            HashSet<string> values)
+        {
+            var qualified = $"{moduleId}/{contractName}";
+            var index = _contracts.FindIndex(entry => entry.ModuleId == moduleId && entry.Contract.Name == qualified);
+            if (index >= 0 && (states.Count > 0 || transitions.Count > 0 || values.Count > 0))
+            {
+                _contracts[index] = _contracts[index] with
+                {
+                    Contract = _contracts[index].Contract with { AddedStates = states, AddedTransitions = transitions, AddedValues = values },
+                };
+            }
+        }
 
         /// <summary>The contracts collected so far for a module, with the entity and names as written.</summary>
         public IEnumerable<ContractResource> ContractsOf(string moduleId) =>

@@ -9,8 +9,9 @@ the shapes below. The layer resource and the checks of [the layer resource](#the
 and [applying a layer](#applying-a-layer) are built: compilation merges the `changes` of a layer
 into its module resource before any check, and the release stores the layer and the module's own
 files side by side, a layer places an element with `after` and `before`, and a diagnostic about a part
-that a layer changed is reported in the layer file. Removing a whole resource and a layer on a `contract`
-are still _(planned for M25)_, as are Studio's support for layers and the sections below that are not about
+that a layer changed is reported in the layer file. A layer on a `contract` adds states and transitions
+to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). Removing a whole resource is still
+_(planned for M25)_, as are Studio's support for layers and the sections below that are not about
 applying. Module upgrades, the three-way merge and eject are _(planned for M29)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
@@ -137,7 +138,7 @@ Compilation applies each layer to the resource of the pinned module version, bef
   names a removed element stays in that resource's file.
 - **Keys and names.** Keys are matched ignoring letter case, and a changed element keeps the
   module's spelling of its key. The root `id`, `kind`, `name` and `formatVersion` are never merged.
-  A layer on a `contract` or a `scenario` is stored and not applied _(planned for M25)_.
+  A layer on a `scenario` is stored and not applied _(planned for M25)_.
 - **Checks of the layer itself.** A key in `changes` that the module's resource does not have, as a
   change, a remove or an anchor of `after` or `before`, is a diagnostic. So is a property that the
   kind does not have. A layer never matches by position. The checks are `AXC0364` for an unknown key
@@ -201,17 +202,26 @@ the module's.
 
 - **Adding a state.** A layer on the entity adds the value to the state field's `values`. A layer
   on the contract adds the state to `lifecycle.states`, with its own `initial` and `deletable`. A
-  value in one without the other is a diagnostic.
+  value in one without the other is `AXC0371`. It is reported in the contract's layer at the state
+  or in the entity's layer at the field's `values`. An added state cannot set `protected`, because
+  protection is the module's promise. That is `AXC0369`.
 - **Adding a transition.** The contract's layer adds it to `lifecycle.transitions`, with `name`,
-  `from`, `to`, and its own `guard` and `message`.
+  `from`, `to`, and its own `guard` and `message`. The message's text key needs no module prefix,
+  because the text belongs to the application. The record API checks an added transition and its guard
+  on every write as it checks the module's, and refuses a change that no transition allows with a `409`.
+  An added guard sees the module's rules and modules, not the application's own rules.
 - **Protected states.** A state the contract marks `"protected": true` is entered only by the
-  contract's own transitions. An added transition whose `to` is a protected state is a diagnostic.
-  A module protects the states that its promise is about, such as `approved` and `rejected`.
+  contract's own transitions. An added transition whose `to` is a protected state is `AXC0370`, reported
+  at its `to`. The record API refuses such a transition as well. A module protects the states that
+  its promise is about, such as `approved` and `rejected`.
 - **Only additions.** A contract layer that changes or removes anything, or that holds anything but
-  added states and transitions, is a diagnostic. Changing a module's guard is a
+  added states and transitions, is `AXC0369`, reported in the layer file at the element or property.
+  An element whose `name` is one of the module's, ignoring letter case, is a change. A layer with
+  `AXC0369` or `AXC0370` is not applied. Changing a module's guard is a
   [relax entry](module-contracts.md#relax-entries), not a layer.
 - **Named points.** An added transition is the application's, so it is no point of the module's
-  contract and a relax entry cannot name it.
+  contract and a relax entry cannot name it. Nor are the `initial` and `deletable` rules of an
+  added state. A relax entry that names one is `AXC0356`.
 
 ## In Studio
 
