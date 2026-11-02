@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
@@ -36,7 +37,58 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
         using var folder = new TemporaryFolder();
         CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
         var connectionString = await _database.CreateDatabaseAsync("studio_diagnostics", TestContext.Current.CancellationToken);
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        await using var factory = Factory(folder, connectionString);
+
+        // Creating a client starts the server, which migrates the database and activates the folder first.
+        using var client = factory.CreateClient().SignedInAs("author");
+        var releasesBefore = await CountReleasesAsync(connectionString);
+        var activeBefore = await ActiveReleaseIdAsync(connectionString);
+        Assert.Equal(1, releasesBefore);
+
+        var textsPath = Path.Combine(folder.Path, "texts", "en.json");
+        var texts = await File.ReadAllTextAsync(textsPath, CancellationToken);
+        await File.WriteAllTextAsync(textsPath, texts.Replace("\"Departments\"", "\"Teams\"", StringComparison.Ordinal), CancellationToken);
+        Assert.Empty(await ErrorsAsync(client));
+
+        var entityPath = Path.Combine(folder.Path, "entities", "purchase-request.json");
+        var entity = await File.ReadAllTextAsync(entityPath, CancellationToken);
+        await File.WriteAllTextAsync(entityPath, entity.Replace("\"target\": \"Department\"", "\"target\": \"NoSuchEntity\"", StringComparison.Ordinal), CancellationToken);
+        Assert.Contains("AXC0012", await ErrorsAsync(client));
+
+        Assert.Equal(releasesBefore, await CountReleasesAsync(connectionString));
+        Assert.Equal(activeBefore, await ActiveReleaseIdAsync(connectionString));
+    }
+
+    [Fact]
+    public async Task A_diagnostic_about_a_layer_change_is_listed_under_the_layer_file()
+    {
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_layer_diagnostics", CancellationToken);
+        await using var factory = Factory(folder, connectionString);
+        using var client = factory.CreateClient().SignedInAs("author");
+        Assert.Empty(await ErrorsAsync(client));
+
+        const string layerFile = "customizations/departments/Department.json";
+        folder.With(layerFile, """
+            { "id": "6f1d9c2a-3b4e-4d58-9a7c-1e2f3a4b5c6d", "kind": "layer", "formatVersion": 1, "target": "departments/Department",
+              "changes": { "fields": [ { "name": "owner", "type": "reference", "target": "NoSuchEntity" } ] } }
+            """);
+
+        using var request = RecordApiFixture.Request(DiagnosticsUrl, Host);
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var diagnostics = body.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Select(item => (Code: item.GetProperty("code").GetString(), File: item.GetProperty("file").GetString(), Path: item.GetProperty("path").GetString()))
+            .ToList();
+
+        Assert.Contains((DiagnosticCodes.UnknownReferenceTarget, layerFile, "/changes/fields/0/target"), diagnostics);
+        Assert.DoesNotContain(diagnostics, item => item.File == "modules/departments/entities/department.json");
+    }
+
+    private static WebApplicationFactory<Program> Factory(TemporaryFolder folder, string connectionString) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(connectionString);
@@ -61,26 +113,6 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
-
-        // Creating a client starts the server, which migrates the database and activates the folder first.
-        using var client = factory.CreateClient().SignedInAs("author");
-        var releasesBefore = await CountReleasesAsync(connectionString);
-        var activeBefore = await ActiveReleaseIdAsync(connectionString);
-        Assert.Equal(1, releasesBefore);
-
-        var textsPath = Path.Combine(folder.Path, "texts", "en.json");
-        var texts = await File.ReadAllTextAsync(textsPath, CancellationToken);
-        await File.WriteAllTextAsync(textsPath, texts.Replace("\"Departments\"", "\"Teams\"", StringComparison.Ordinal), CancellationToken);
-        Assert.Empty(await ErrorsAsync(client));
-
-        var entityPath = Path.Combine(folder.Path, "entities", "purchase-request.json");
-        var entity = await File.ReadAllTextAsync(entityPath, CancellationToken);
-        await File.WriteAllTextAsync(entityPath, entity.Replace("\"target\": \"Department\"", "\"target\": \"NoSuchEntity\"", StringComparison.Ordinal), CancellationToken);
-        Assert.Contains("AXC0012", await ErrorsAsync(client));
-
-        Assert.Equal(releasesBefore, await CountReleasesAsync(connectionString));
-        Assert.Equal(activeBefore, await ActiveReleaseIdAsync(connectionString));
-    }
 
     private static async Task<List<string?>> ErrorsAsync(HttpClient client)
     {

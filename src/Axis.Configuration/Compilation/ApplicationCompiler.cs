@@ -250,13 +250,14 @@ public static partial class ApplicationCompiler
         var moduleManifests = new Dictionary<string, ModuleManifest>(StringComparer.Ordinal);
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
+        IReadOnlyDictionary<string, LayerTrace> layerTraces = new Dictionary<string, LayerTrace>();
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
         var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
-            (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames, loaded.Layers);
+            (modules, moduleFiles, moduleResources, layerTraces) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames, loaded.Layers);
             LayerChecker.Check(loaded.Layers, manifest, modules, installedModules, diagnostics);
             var pinnedManifests = modules
                 .Select(pin => (pin.Id, installedModules.First(candidate => candidate.Manifest.Id == pin.Id && candidate.Manifest.Version == pin.Version).Manifest))
@@ -788,6 +789,8 @@ public static partial class ApplicationCompiler
                 (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()),
                 ContractPoints.Of(moduleResources.Contracts.Where(entry => entry.ModuleId == moduleId).Select(entry => entry.Contract)));
         }
+
+        LayerDiagnostics.MapToLayers(diagnostics, layerTraces);
 
         if (probe is not null)
         {

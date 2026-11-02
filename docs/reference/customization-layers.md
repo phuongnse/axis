@@ -8,10 +8,10 @@ the idea, and [D122](../decisions/d122-how-a-customization-layer-is-written-and-
 the shapes below. The layer resource and the checks of [the layer resource](#the-layer-resource)
 and [applying a layer](#applying-a-layer) are built: compilation merges the `changes` of a layer
 into its module resource before any check, and the release stores the layer and the module's own
-files side by side, and a layer places an element with `after` and `before`. A layer on a `contract` adds
-states and transitions to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). A layer on a module
-entity adds fields and validations, see [module entities](#module-entities). Removing a whole
-resource and reporting a diagnostic of the merged resource in the layer file are still
+files side by side, a layer places an element with `after` and `before`, and a diagnostic about a part
+that a layer changed is reported in the layer file. A layer on a `contract` adds states and transitions
+to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). A layer on a module entity adds
+fields and validations, see [module entities](#module-entities). Removing a whole resource is still
 _(planned for M25)_, as are Studio's support for layers and the sections below that are not about
 applying. Module upgrades, the three-way merge and eject are _(planned for M29)_.
 
@@ -122,12 +122,21 @@ Compilation applies each layer to the resource of the pinned module version, bef
 - **Removing a whole resource** _(planned for M25)_. A layer whose `changes` is `{ "remove": true }` removes the
   resource from the application. A reference to it is then a diagnostic.
 - **Then the checks.** The merged resource is checked as any resource of its kind: its schema, its
-  references, its expressions, the contract and the grant ceiling. A diagnostic about something the
-  layer added or changed is reported in the layer file, at the path of the change. A diagnostic
-  about the module's own part, such as a reference that the layer removed, is reported in the layer
-  file at the removed element. Reporting in the layer file is _(planned for M25)_. Until then the
-  diagnostic of the merged resource is reported in the module's file, at the path in the merged
-  resource.
+  references, its expressions, the contract and the grant ceiling. Each diagnostic is then moved to
+  where the author made the change:
+  - A diagnostic inside a part that the layer added or replaced is reported in the layer file, at
+    the path of that part under `/changes`, such as `/changes/steps/2/next`.
+  - A diagnostic at an element that the layer changed as a whole, such as a required property
+    missing from a changed step, is reported at that element under `/changes`.
+  - A diagnostic in the module's own part whose value names an element that the layer removed,
+    ignoring letter case, is reported in the layer file at that remove. An example is a step's
+    `next` that names a removed step.
+  - Any other diagnostic in the module's own part stays in the module's file, at the path in the
+    merged resource. So does a diagnostic at the root or at `id`, `kind`, `name` or
+    `formatVersion`, which a layer never changes.
+
+  Only the diagnostics of the layered resource itself move. A diagnostic in another resource that
+  names a removed element stays in that resource's file.
 - **Keys and names.** Keys are matched ignoring letter case, and a changed element keeps the
   module's spelling of its key. The root `id`, `kind`, `name` and `formatVersion` are never merged.
   A layer on a `scenario` is stored and not applied _(planned for M25)_.
