@@ -81,10 +81,8 @@ the review.
   where to go next, in a block called Changes since the live release, as a publish would change just that: under its
   title each file
   that differs from it, its resource's label as the link that opens it, its kind and whether it was added, changed or
-  removed, or one line that everything is live; then one line "Live at:" with every live site, as an application can have
-  several, leaving out a site that is not live yet; then a link to every release. A site that a tenant serves at a host
-  of its own opens at that host, so the API has to give Studio each site's address; the prototype shows this host and
-  the site's path. Get started stays
+  removed, or one line that everything is live; then a link to every release. Its live sites are in a block of their own,
+  see "A block for what is live" below. Get started stays
   for an application with no entity. More you can add stays in full, as the owner found it useful: by the sidebar's
   groups, each kind the application has none of as a link to its list, what it is for, and in textMuted when one is
   needed, leaving out migrations, which the entity designer writes with the entity (D54). For the docs change: a
@@ -94,9 +92,13 @@ the review.
   who published it and when, repeated the band. Recommended and agreed: the block holds no line naming the live
   release, nor the warning that changes are not live, as the band says both beside Publish…; who published the live
   release and when is on the Releases list, which See all releases opens.
-- **A link that leaves Studio.** The owner could not tell whether a site on the Overview opens its resource in Studio
-  or the running site. Recommended and agreed: the line reads "Live at:" and each site is its address, host and path,
-  as the link's text, so it reads as a place on the web and can be copied for the application's people; the site's
-  resource stays in the sidebar. It opens in a new tab, which its accessible name, the address followed by "Purchasing,
-  opens in a new tab", says; the owner found a tooltip not needed. No icon, so D128's "text or an icon, never both"
-  stands.
+- **A block for what is live.** The owner could not tell whether a site on the Overview opens its resource in Studio
+  or the running site. A line of addresses was tried first; the owner then asked for a block of its own, Live, showing
+  the sites as the home page does. Built: a Live block above Changes since the live release, once the application has
+  a live release, with each live site as the home page's tile, made one shared `SiteTile`: its mark, its title as the
+  link and its description in textMuted, in the home page's grid and order. The sites are the sites list's, which
+  holds only what is live, so a site added since the live release is not there and the titles are the live release's;
+  "The live release has no site yet." when it has none. Each tile opens its site in a new tab, so Studio stays open,
+  and its accessible name says so ("Purchasing, opens in a new tab"); no tooltip and no icon, so D128's "text or an
+  icon, never both" stands. A site that a tenant serves at a host of its own opens at that host, as the home page's
+  tile does.

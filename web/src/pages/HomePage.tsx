@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Empty, Flex, Spin, Typography } from 'antd'
-import { createElement, useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { createElement, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { isSignInCardAddress, startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
@@ -10,10 +10,9 @@ import { SiteMark } from '../platform/SiteMark'
 import { applicationTitle, fetchSites, localized, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { usePlatform } from './context'
-import { homeGridColumns } from './homeGrid'
-import { siteAddress } from '../platform/siteLinks'
+import { useTileGrid } from './homeGrid'
+import { SiteTile, TileFocusStyle } from './SiteTile'
 
 /** What the page loaded. `null` means that the call answered 401, and `'failed'` that it failed otherwise. */
 interface Loaded {
@@ -31,26 +30,6 @@ function cardOfAddress(pathname: string, search: string): SignInCardState | null
     return null
   }
   return new URLSearchParams(search).get('signIn') === 'failed' ? 'refused' : 'signedOut'
-}
-
-function useHomeGrid(): CSSProperties {
-  const narrow = useNarrowWidth()
-  const { spacing } = useDesignTokens()
-  return {
-    display: 'grid',
-    gridTemplateColumns: narrow ? '1fr' : homeGridColumns(spacing.md),
-    // Proposed: every row is as tall as the tallest, so a tile in one row matches the tiles in the others.
-    gridAutoRows: '1fr',
-    gap: spacing.md,
-  }
-}
-
-/** The keyboard focus ring of a link tile. Inline styles cannot target focus. */
-function HomeTileStyle() {
-  const { colour } = useDesignTokens()
-  return (
-    <style>{`[data-home-tile]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: 2px; }`}</style>
-  )
 }
 
 /** The card on `/` that replaces the page when nobody is signed in: after a refused sign-in or after sign-out. */
@@ -148,7 +127,7 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
 function Tools({ user }: { user: CurrentUser }) {
   const t = useText()
   const { spacing } = useDesignTokens()
-  const grid = useHomeGrid()
+  const grid = useTileGrid()
   if (!user.studio && !user.console && !user.users) {
     return null
   }
@@ -199,7 +178,7 @@ function ApplicationCard({
   locale: string
 }) {
   const { colour, radius, spacing } = useDesignTokens()
-  const grid = useHomeGrid()
+  const grid = useTileGrid()
   const headingId = useId()
   const sorted = [...sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
 
@@ -228,37 +207,9 @@ function ApplicationCard({
       </Flex>
       <div style={{ borderTop: `1px solid ${colour.divider}`, marginBlock: spacing.md }} />
       <div data-testid="home-grid" style={grid}>
-        {sorted.map((site) => {
-          const siteDescription = localized(site.descriptions, locale)
-          return (
-            <Link
-              key={site.path}
-              to={siteAddress(site.path)}
-              data-home-tile
-              style={{
-                display: 'flex',
-                alignItems: siteDescription === null ? 'center' : 'flex-start',
-                gap: spacing.sm,
-                minWidth: 0,
-              }}
-            >
-              <SiteMark title={siteTitle(site, locale)} size={20} />
-              <Flex vertical style={{ minWidth: 0 }}>
-                <Typography.Text strong style={{ color: colour.primaryText }}>
-                  {siteTitle(site, locale)}
-                </Typography.Text>
-                {siteDescription !== null && (
-                  <Typography.Paragraph
-                    ellipsis={{ rows: 2, tooltip: siteDescription }}
-                    style={{ margin: 0, color: colour.textMuted }}
-                  >
-                    {siteDescription}
-                  </Typography.Paragraph>
-                )}
-              </Flex>
-            </Link>
-          )
-        })}
+        {sorted.map((site) => (
+          <SiteTile key={site.path} site={site} locale={locale} />
+        ))}
       </div>
     </section>
   )
@@ -359,7 +310,7 @@ export function HomePage() {
 
   return (
     <Flex vertical gap={spacing.lg}>
-      <HomeTileStyle />
+      <TileFocusStyle />
       <Applications sites={loaded.sites} locale={locale} />
       {loaded.user !== 'failed' && <Tools user={loaded.user} />}
     </Flex>

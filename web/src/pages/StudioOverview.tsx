@@ -1,8 +1,8 @@
 import { Flex, Typography } from 'antd'
-import { useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
+import { fetchSites, siteTitle, type SiteListItem } from '../platform/site'
 import {
-  fetchStudioResource,
   folderDiffers,
   releaseGroups,
   resourceTitle,
@@ -12,14 +12,15 @@ import {
 import { useText } from '../platform/texts'
 import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
-import { PlatformContext } from './context'
+import { useTileGrid } from './homeGrid'
+import { SiteTile, TileFocusStyle } from './SiteTile'
 import { studioKindGroups, type StudioView } from './studioViews'
 
 /**
  * Proposed: the first view of an open application, which says what to do next rather than what the application
  * holds. An application with no entity yet starts with the steps that build one, each a link to where it is done.
- * Then what differs from the live release, file by file, each opening its resource, or that everything is live,
- * with links to open each live site and to see every release. Problems are not listed here: the band's problems panel
+ * Then, once it has a live release, what is live: its sites, each opening where it runs. Then what differs from the
+ * live release, file by file, each opening its resource, or that everything is live, with a link to every release. Problems are not listed here: the band's problems panel
  * lists them on every page. Last, the kinds the application has none of yet, each with what it is for and when one is
  * needed.
  */
@@ -41,7 +42,8 @@ export function StudioOverview({
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const starting = !resources.some((item) => item.kind === 'entity')
-  const published = releases !== undefined && releases !== 'failed' && releases.active !== null
+  const active = releases !== undefined && releases !== 'failed' ? releases.active : null
+  const published = active !== null
   const site = resources.find((item) => item.kind === 'site')
 
   return (
@@ -63,14 +65,9 @@ export function StudioOverview({
           </ol>
         </Panel>
       )}
+      {active !== null && <Live application={application} releaseId={active.releaseId} locale={locale} />}
       {(!starting || published) && releases !== undefined && (
-        <Release
-          application={application}
-          releases={releases}
-          resources={resources}
-          locale={locale}
-          addressOf={addressOf}
-        />
+        <Release releases={releases} resources={resources} locale={locale} addressOf={addressOf} />
       )}
       <More resources={resources} skip={starting ? startKinds : []} addressOf={addressOf} />
     </Flex>
@@ -196,17 +193,14 @@ function Step({ number, to, name }: { number: number; to?: string; name: string 
 /**
  * Proposed: what differs from the live release, which is what a publish would change: one row per file that
  * differs, its resource's label as the link that opens it, its kind and whether it was added, changed or removed, or
- * one line that everything is live. Then the sites, each its address as a link that opens it in a new tab, leaving
- * out a site that is not live yet, and a link to every release.
+ * one line that everything is live. Then a link to every release.
  */
 function Release({
-  application,
   releases,
   resources,
   locale,
   addressOf,
 }: {
-  application: string
   releases: StudioReleases | 'failed'
   resources: readonly StudioResourceItem[]
   locale: string
@@ -214,7 +208,6 @@ function Release({
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
-  const sites = useSitePaths(application, resources)
   let body: ReactNode
   if (releases === 'failed') {
     body = <Typography.Text type="danger">{t('shell.studio.releases.loadFailed')}</Typography.Text>
@@ -228,8 +221,6 @@ function Release({
       )
     } else {
       const changes = releases.changes ?? []
-      const added = new Set(changes.filter((change) => change.change === 'added').map((change) => change.path))
-      const liveSites = sites.filter((site) => !added.has(site.file))
       body = (
         <>
           {folderDiffers(releases) ? (
@@ -261,33 +252,6 @@ function Release({
               {t('shell.studio.overview.release.allLive')}
             </Typography.Text>
           )}
-          {liveSites.length > 0 && (
-            // Proposed: each site is shown by its address, so it reads as a place on the web and not as the site's
-            // resource in Studio, which the sidebar opens, and can be copied for the application's people. It opens
-            // in a new tab, which its accessible name says. Here the address is this host and the site's
-            // path; a site that a tenant serves at a host of its own shows that host, which the API has to give Studio.
-            <Typography.Text data-testid="studio-overview-sites">
-              <span style={{ color: colour.textMuted }}>{t('shell.studio.overview.sites')} </span>
-              {liveSites.map((site, index) => {
-                const address = `${window.location.host}/${site.path}`
-                const opens = t('shell.studio.overview.site.opens').replace('{site}', site.title)
-                return (
-                  <span key={site.file}>
-                    {index > 0 && ' · '}
-                    <a
-                      href={`/${site.path}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`${address}, ${opens}`}
-                      style={{ color: colour.primaryText }}
-                    >
-                      {address}
-                    </a>
-                  </span>
-                )
-              })}
-            </Typography.Text>
-          )}
           <Link to={addressOf({ name: 'releases' })} style={{ color: colour.primaryText, alignSelf: 'flex-start' }}>
             {t('shell.studio.overview.release.history')}
           </Link>
@@ -309,30 +273,56 @@ function kindName(kind: string, t: (key: string) => string): string {
   return name === key ? kind : name
 }
 
-/** Proposed: the path and title of each site of the application, read from its resource, to open it where it runs. */
-function useSitePaths(application: string, resources: readonly StudioResourceItem[]) {
-  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const siteItems = resources.filter((item) => item.kind === 'site')
-  const key = siteItems.map((item) => `${item.id}@${item.version}`).join(',')
-  const [paths, setPaths] = useState<Record<string, string>>({})
+/**
+ * Proposed: what runs now, the application's live sites as the home page shows them, each its mark, its title as the
+ * link and its description, in the home page's grid and order. They come from the sites list, which holds only what is live, so a
+ * site added since the live release is not here, and a site's title and description are the live release's. Each opens
+ * in a new tab, so Studio stays open. The block shows once the application has a live release.
+ */
+function Live({ application, releaseId, locale }: { application: string; releaseId: string; locale: string }) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const grid = useTileGrid()
+  const [sites, setSites] = useState<SiteListItem[] | 'failed'>()
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all(
-      siteItems.map((item) =>
-        fetchStudioResource(application, item.id, controller.signal).then(
-          (resource) => [item.id, typeof resource.content.path === 'string' ? resource.content.path : null] as const,
+    fetchSites(controller.signal).then(
+      (list) =>
+        setSites(
+          (list ?? [])
+            .filter((site) => site.application.name === application)
+            .sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale)),
         ),
-      ),
-    ).then(
-      (pairs) =>
-        setPaths(Object.fromEntries(pairs.filter((pair): pair is readonly [string, string] => pair[1] !== null))),
-      () => setPaths({}),
+      () => !controller.signal.aborted && setSites('failed'),
     )
     return () => controller.abort()
-    // The key holds the sites' ids and versions, so a site saved again is read again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [application, key])
-  return siteItems
-    .filter((item) => paths[item.id])
-    .map((item) => ({ file: item.file, path: paths[item.id], title: resourceTitle(item, locale) }))
+  }, [application, releaseId, locale])
+  if (sites === undefined) {
+    return null
+  }
+  let body: ReactNode
+  if (sites === 'failed') {
+    body = <Typography.Text type="danger">{t('shell.studio.overview.live.failed')}</Typography.Text>
+  } else if (sites.length === 0) {
+    body = <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.live.none')}</Typography.Text>
+  } else {
+    body = (
+      <div data-testid="studio-overview-sites" style={grid}>
+        <TileFocusStyle />
+        {sites.map((site) => (
+          <SiteTile
+            key={site.path}
+            site={site}
+            locale={locale}
+            newTab={t('shell.studio.overview.site.opens').replace('{site}', siteTitle(site, locale))}
+          />
+        ))}
+      </div>
+    )
+  }
+  return (
+    <Panel title={t('shell.studio.overview.live.title')} testId="studio-overview-live">
+      {body}
+    </Panel>
+  )
 }
