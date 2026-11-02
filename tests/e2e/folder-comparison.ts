@@ -3,6 +3,11 @@ import path from "node:path";
 
 export interface CompareOptions {
   files?: string[];
+  /**
+   * Accepts a generated name, such as `table1` or `navigate2`, that the actual page has and the expected page lacks.
+   * Studio names every widget, column, tab and action it adds. The samples get their names with the rest of #2427.
+   */
+  generatedNames?: boolean;
 }
 
 type Seeds = Map<string, string>;
@@ -39,7 +44,7 @@ export function compareApplicationFolders(expected: string, actual: string, opti
       const actualJson = readJson(path.join(actual, file));
       if (isObject(expectedJson)) delete expectedJson.id;
       if (isObject(actualJson)) delete actualJson.id;
-      compareValue(file, "", expectedJson, actualJson, seeds);
+      compareValue(file, "", expectedJson, actualJson, seeds, options.generatedNames === true && file.startsWith("pages/"));
     } else {
       const expectedText = fs.readFileSync(path.join(expected, file), "utf8");
       const actualText = fs.readFileSync(path.join(actual, file), "utf8");
@@ -85,7 +90,14 @@ function recordId(record: unknown): string | undefined {
   return isObject(record) && typeof record.id === "string" ? record.id : undefined;
 }
 
-function compareValue(file: string, pointer: string, expected: unknown, actual: unknown, seeds: Seeds): void {
+function compareValue(
+  file: string,
+  pointer: string,
+  expected: unknown,
+  actual: unknown,
+  seeds: Seeds,
+  generatedNames: boolean,
+): void {
   if (kindOf(expected) !== kindOf(actual)) {
     fail(file, pointer, JSON.stringify(expected), JSON.stringify(actual));
   }
@@ -93,7 +105,7 @@ function compareValue(file: string, pointer: string, expected: unknown, actual: 
   if (Array.isArray(expected) && Array.isArray(actual)) {
     const shared = Math.min(expected.length, actual.length);
     for (let index = 0; index < shared; index++) {
-      compareValue(file, `${pointer}/${index}`, expected[index], actual[index], seeds);
+      compareValue(file, `${pointer}/${index}`, expected[index], actual[index], seeds, generatedNames);
     }
     if (expected.length !== actual.length) {
       fail(file, pointer, `${expected.length} items`, `${actual.length} items`);
@@ -105,10 +117,11 @@ function compareValue(file: string, pointer: string, expected: unknown, actual: 
     for (const key of Object.keys(expected).sort()) {
       const child = `${pointer}/${escapePointer(key)}`;
       if (!Object.hasOwn(actual, key)) fail(file, child, JSON.stringify(expected[key]), "missing");
-      compareValue(file, child, expected[key], actual[key], seeds);
+      compareValue(file, child, expected[key], actual[key], seeds, generatedNames);
     }
     for (const key of Object.keys(actual).sort()) {
       if (!Object.hasOwn(expected, key)) {
+        if (generatedNames && pointer !== "" && key === "name" && /^[A-Za-z]+\d+$/.test(String(actual[key]))) continue;
         fail(file, `${pointer}/${escapePointer(key)}`, "missing", JSON.stringify(actual[key]));
       }
     }
