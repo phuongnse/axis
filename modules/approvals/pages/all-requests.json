@@ -1,0 +1,15 @@
+{
+  "id": "cb323d58-f3aa-4c75-84e1-8bc454564f11",
+  "kind": "page",
+  "name": "AllRequests",
+  "formatVersion": 1,
+  "title": { "textKey": "approvals.pages.allRequests.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "name": "allRequests",
+      "dataSource": "Requests",
+      "rowActions": [{ "type": "navigate", "name": "view", "page": "RequestDetail", "label": { "textKey": "approvals.actions.view" }, "parameters": { "request": "id" } }]
+    }
+  ]
+}

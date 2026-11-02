@@ -10,8 +10,8 @@ idea, and [D124](../decisions/d124-the-organization-and-approvals-modules.md) ag
 hold. `organization` 1.0.0 exists under `modules/organization`, with its entities, data sources, rule,
 role slots, contracts, policies, contract scenarios, pages, one form and texts. `approvals` 1.0.0 exists under
 `modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots, contracts,
-process, policies, contract scenarios and texts. Its pages and the built-in
-application are _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
+process, policies, contract scenarios, pages and texts. Its built-in
+application is _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check.
@@ -120,14 +120,15 @@ the form and the texts below.
 type. It depends on `organization` `^1.0.0` and maps its slots `admin` and `member` to its own
 slots of the same names.
 
-Version 1.0.0 holds the entities below, the data sources `RequestTypes`, `Requests` and `Decisions`,
+Version 1.0.0 holds the entities below, the data sources `RequestTypes`, `Requests`, `Decisions`, `MyRequests` and
+`RequestDecisions`,
 the sequence `RequestNumber` with the format `RQ-{yyyy}-{n:5}`, `amount` and `minAmount` as `decimal`
 with precision 18 and scale 2, the contracts of `Request`, `RequestType` and `Decision`, the process
 `RequestApproval`, the form `RequestReview`, the policies `MemberAccess` and `AdminAccess`, four module
 scenarios, `RequestGoesToManagerThenNamedEmployee`, `DepartmentHeadReturnsAndRejects`,
 `DelegateDecidesWhileApproverIsAway` and `DepartmentHeadRequestGoesToAdmin`, the contract scenarios
-listed under [the request contract](#the-request-contract), and the texts. Its pages are
-_(planned for M26)_.
+listed under [the request contract](#the-request-contract), the pages, the forms `RequestForm` and
+`RequestDetail`, and the texts.
 
 ### Request types
 
@@ -249,16 +250,34 @@ maps the slots works.
   and the decisions on their own requests or made by them, and starts `RequestApproval`. A request that
   is not theirs is outside their read filter, so starting the process on it is refused with a `400`
   at `subjectId`.
+  It also reads the data sources `MyRequests` and `RequestDecisions`. `MyRequests` keeps only the
+  requests whose requester is the reader, so a member's My requests page never lists another
+  member's request.
 - **`AdminAccess`** gives the `admin` slot every action on request types, read and export on requests and
-  decisions, and inspect on `RequestApproval`.
+  decisions, and inspect on `RequestApproval`. It also reads and exports the data sources `Requests`,
+  `RequestTypes` and `Decisions`, and reads `RequestDecisions`. A member has no grant on `Requests`,
+  `RequestTypes` or `Decisions`, so those pages and data sources answer a member with `403`.
 
 ### Pages
 
-- **My requests:** the member's own requests, with a "New request" form and the submit action.
-- **To decide:** the [task inbox](task-inbox-widget.md) for the member's approval tasks.
-- **Request:** one request with its decisions and its approval path.
-- **All requests** and **Request types**, for the `admin` slot. A request type's form edits its steps
-  as child rows.
+Each is a [module page](modules-and-templates.md#modules), and a site lists it as `approvals/<name>`. A page
+is readable only to a person who reads its data source.
+
+- **`MyRequests`** is for the `member` slot. Its table lists the `MyRequests` data source, so a member
+  sees only the requests they submitted. The "New request" button and the Open action lead to
+  `RequestForm`, a form widget on the form `RequestForm` with the Submit action, which starts
+  `RequestApproval`. View leads to `RequestDetail`.
+- **`ToDecide`** is for whoever decides requests. It is the [task inbox](task-inbox-widget.md) of the signed-in
+  person's open tasks. An approver opens a task there and approves, returns or rejects the request.
+- **`RequestDetail`** shows one request read-only, from the page parameter `request`, with the form
+  `RequestDetail`. Its "Approval path" section shows `stepsRequired`, `step`, `stepSequence`, `approver`,
+  `approverUser` and `onBehalfOf`, which say where the request stands, and not the type's steps. A table
+  of the `RequestDecisions` data source lists the request's decisions. A person who may read the request sees it.
+- **`AllRequests`** is for the `admin` slot. Its table lists the `Requests` data source, with a View
+  action that leads to `RequestDetail`.
+- **`RequestTypes`** is for the `admin` slot. Its table lists the `RequestTypes` data source, with a New
+  button and an Open action that lead to `RequestTypeForm`, a form widget on the entity. The form edits
+  the steps as child rows.
 
 ## The approvals application
 
@@ -276,8 +295,10 @@ The built-in application `approvals` is what a business starts from.
 
 The samples become the built-in modules, as D102 agrees:
 
-- **`departments`** becomes `organization`. The purchase request and leave request samples declare
-  `organization` and map its slots, and `department-budgets` depends on it. The `departments`
+- **`departments`** becomes `organization`. The leave request sample declares `organization`, maps
+  both of its slots (`admin` to `department-manager`, `member` to `employee`) and seeds its employees
+  and departments, and a leave request goes to the head of its department. The purchase request
+  sample and `department-budgets` still use `departments` until they move, and then the `departments`
   sample module is removed.
 - **The `request-approval` template** becomes the `approvals` application, and is removed. The
   Studio journeys that create an application from it create one from the built-in application.

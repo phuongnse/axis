@@ -1305,7 +1305,7 @@ public sealed class ScenarioRunnerTests
         var suites = new Dictionary<string, (string Name, string Tests)>
         {
             ["purchase-requests"] = ("PurchaseRequests", "10"),
-            ["leave-requests"] = ("LeaveRequests", "5"),
+            ["leave-requests"] = ("LeaveRequests", "10"),
             ["service-desk"] = ("ServiceDesk", "12"),
             ["asset-management"] = ("AssetManagement", "6"),
         };

@@ -691,7 +691,8 @@ real metadata and records:
 - the sub-process fixture in `tests/e2e/fixtures/subprocess-app`, a parent process that starts a child on a 24-hour
   timer, both without a subject, for the process inspector's sub-process journey;
 - the host site fixture in `tests/e2e/fixtures/host-site-app`, for the journey that opens a site at its own host's root;
-- the organization fixture in `tests/e2e/fixtures/organization-app`, which declares `organization`, for its pages' journey.
+- the organization fixture in `tests/e2e/fixtures/organization-app`, which declares `organization`, for its pages' journey;
+- the approvals fixture in `tests/e2e/fixtures/approvals-app`, which declares `organization` and `approvals`, for the approvals pages' journey.
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on

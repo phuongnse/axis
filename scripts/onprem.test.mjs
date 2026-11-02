@@ -10,7 +10,8 @@
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL over TLS, the development
 // realm that the identity provider imports, a certificate authority made for the run, the modules folder and a short
-// refresh interval.
+// refresh interval. compose.scenarios.yaml and an axis_scenario role come with it, because the publisher runs the contract
+// scenarios of the organization module, which the leave request sample needs, when it publishes.
 // PostgreSQL serves a certificate of the same authority, every connection string sets SSL Mode=VerifyFull with
 // that authority as Root Certificate, and the test checks in pg_stat_ssl that every Axis connection uses TLS.
 // The production hosts refuse a connection string with a weaker mode.
@@ -420,7 +421,7 @@ describe('the on-premises installation', () => {
   const docker = (args, options = {}) => spawnSync('docker', args, { cwd: root, encoding: 'utf8', ...options })
 
   const compose = (args, options = {}) =>
-    spawnSync('docker', ['compose', '-p', project, '-f', composeFile, '-f', overrideFile, ...args], {
+    spawnSync('docker', ['compose', '-p', project, '-f', composeFile, '-f', scenariosFile, '-f', overrideFile, ...args], {
       cwd: root,
       env,
       encoding: 'utf8',
@@ -637,7 +638,7 @@ describe('the on-premises installation', () => {
       const secrets = join(folder, 'secrets')
       mkdirSync(secrets)
       chmodSync(secrets, 0o755)
-      const passwords = { schema: password(), platform: password(), admin: password(), postgres: password(), identity: password() }
+      const passwords = { schema: password(), platform: password(), admin: password(), scenario: password(), postgres: password(), identity: password() }
       const trust = verifyFull('/run/test-ca/ca.crt')
       const connection = (user, pass) =>
         `Host=postgres;Port=5432;Database=axis_platform;Username=${user};Password=${pass}${trust}`
@@ -646,6 +647,11 @@ describe('the on-premises installation', () => {
       writeFile(
         join(secrets, 'Admin__ConnectionString'),
         `Host=postgres;Port=5432;Database=postgres;Username=axis_admin;Password=${passwords.admin}${trust}`,
+      )
+      // The scenario role owns no database, so its connection string names the postgres database.
+      writeFile(
+        join(secrets, 'Scenarios__ServerConnectionString'),
+        `Host=postgres;Port=5432;Database=postgres;Username=axis_scenario;Password=${passwords.scenario}${trust}`,
       )
       writeFile(join(secrets, 'Platform__SecretKey'), randomBytes(32).toString('base64'))
       adminClientSecret = password()
@@ -663,6 +669,7 @@ describe('the on-premises installation', () => {
           `CREATE ROLE axis_platform_schema LOGIN PASSWORD '${passwords.schema}';`,
           `CREATE ROLE axis_platform LOGIN PASSWORD '${passwords.platform}';`,
           `CREATE ROLE axis_admin LOGIN PASSWORD '${passwords.admin}' CREATEDB CREATEROLE;`,
+          `CREATE ROLE axis_scenario LOGIN PASSWORD '${passwords.scenario}' CREATEDB;`,
           'CREATE DATABASE axis_platform OWNER axis_platform_schema;',
           `CREATE ROLE axis_identity LOGIN PASSWORD '${passwords.identity}';`,
           'CREATE DATABASE axis_identity OWNER axis_identity;',

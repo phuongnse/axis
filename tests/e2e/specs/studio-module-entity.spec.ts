@@ -9,7 +9,7 @@ import { useSession } from "../sessions";
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
 
-// The leave request sample uses the departments module. The second server's Studio edits a copy of the sample, so the
+// The leave request sample uses the organization module. The second server's Studio edits a copy of the sample, so the
 // main E2E server's Studio folder stays as the other Studio specs expect it.
 test.describe("Studio opens a module entity read-only", () => {
   let copy: string;
@@ -31,7 +31,7 @@ test.describe("Studio opens a module entity read-only", () => {
     }
   });
 
-  test("an author sees the fields of departments/Department with no way to change them", async ({
+  test("an author sees the fields of organization/Department with no way to change them", async ({
     page,
   }) => {
     await useSession(page, "author");
@@ -39,12 +39,12 @@ test.describe("Studio opens a module entity read-only", () => {
 
     await page
       .getByTestId("studio-group-module-entities")
-      .getByRole("button", { name: "departments/Department", exact: true })
+      .getByRole("button", { name: "organization/Department", exact: true })
       .click();
 
     await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
     await expect(page.getByTestId("studio-module-read-only")).toBeVisible();
-    for (const [index, name] of ["code", "name", "manager"].entries()) {
+    for (const [index, name] of ["code", "name", "parent", "head", "active"].entries()) {
       const field = page
         .getByTestId(`studio-field-/fields/${index}/name`)
         .getByRole("textbox");

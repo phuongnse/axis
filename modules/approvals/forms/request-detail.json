@@ -1,0 +1,32 @@
+{
+  "id": "9dd27ddf-9fa3-4b4d-8759-87daffb1d2ac",
+  "kind": "form",
+  "name": "RequestDetail",
+  "formatVersion": 1,
+  "entity": "Request",
+  "sections": [
+    {
+      "title": { "textKey": "approvals.requestDetail.request" },
+      "fields": [
+        { "field": "number", "readOnly": true },
+        { "field": "requester", "readOnly": true },
+        { "field": "type", "readOnly": true },
+        { "field": "title", "readOnly": true },
+        { "field": "description", "readOnly": true },
+        { "field": "amount", "readOnly": true },
+        { "field": "status", "readOnly": true }
+      ]
+    },
+    {
+      "title": { "textKey": "approvals.requestDetail.approvalPath" },
+      "fields": [
+        { "field": "stepsRequired", "readOnly": true },
+        { "field": "step", "readOnly": true },
+        { "field": "stepSequence", "readOnly": true },
+        { "field": "approver", "readOnly": true },
+        { "field": "approverUser", "readOnly": true },
+        { "field": "onBehalfOf", "readOnly": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "3e9885ad-819e-4fde-a87a-780016524970",
+  "kind": "site",
+  "name": "Approvals",
+  "formatVersion": 1,
+  "path": "approvals",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [
+    { "page": "approvals/MyRequests", "label": { "textKey": "nav.myRequests" } },
+    { "page": "approvals/ToDecide", "label": { "textKey": "nav.toDecide" } },
+    { "page": "approvals/AllRequests", "label": { "textKey": "nav.allRequests" } },
+    { "page": "approvals/RequestTypes", "label": { "textKey": "nav.requestTypes" } }
+  ]
+}

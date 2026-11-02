@@ -273,6 +273,9 @@ A `seed` holds records with fixed ids for one entity:
 }
 ```
 
+- `entity` is the name of an entity of the application, or a module entity written as
+  `module/Entity`, such as `organization/Employee`. Seeds apply in path order, so a seed
+  that names a record of another seed, such as a department's `head`, sorts after it.
 - Each record's `id` is the record id, fixed so that the startup step
   inserts the record once. It is unique across every seed file of the
   application (`AXC0034`).
@@ -530,16 +533,13 @@ is `AXC0013`.
   `required: true`, `expression` or `sequence`, and a child entity's field
   cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
   [Record creator](roles-and-policies.md#record-creator).
-- `userId` marks a `text` field that holds a user id. It is allowed only on a
-  `text` field, even as `false`. It cannot be combined with `creator`,
-  `expression` or `sequence`, and a child entity's field cannot have it. Each is
-  `AXC0013` at `/fields/{i}/userId`. The server does not check a written value.
-  The field gets `GET /api/apps/{app}/entities/{entity}/fields/{field}/users?search=&id=`
-  (`.../entities/{module}/{entity}/...` for a module's entity), its `usersPath`
-  in page metadata. It is checked in order: signed in (401, never a service
-  account), the entity and field (404), a `create` or `update` grant covering
-  the field (403). It lists 20 profiles at most whose display name or email
-  contains `search`, or with `id` only that one, as `{ "items": [{ "id", "displayName" }] }`.
+- `userId` marks a `text` field that holds a user id, and the server does not check a written value. It is
+  allowed only on `text`, even as `false`, not with `creator`, `expression` or `sequence`, and not on a child
+  entity's field. Each is `AXC0013` at `/fields/{i}/userId`. The field gets `usersPath` in page metadata, the path
+  `GET /api/apps/{app}/entities/{entity}/fields/{field}/users?search=&id=` (`{module}/{entity}` for a module's entity).
+  It is checked in order: signed in (401, never a service account), entity and field (404), a `create` or `update`
+  grant covering the field (403). It lists 20 profiles at most whose display name or email contains `search`, or
+  with `id` only that one, as `{ "items": [{ "id", "displayName" }] }`.
 - `sensitive` is allowed on `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `money`, and defaults to
   `false`. `true` on a `reference`, `references` or `file` field is `AXC0308` at `/fields/{i}/sensitive`, on the `displayField`
   at `/displayField`, on `child-collection` `AXC0013`. `exactLookup` needs `sensitive` and a name of at most 54 characters,

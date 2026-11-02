@@ -14,7 +14,7 @@
       "entity": "Department",
       "as": "admin",
       "save": "finance",
-      "values": { "code": "FIN", "name": "Finance" }
+      "values": { "code": "TEST-FIN", "name": "Finance" }
     },
     { "type": "updateRecord", "record": "finance", "as": "admin", "values": { "name": "Finance and Accounting" } },
     { "type": "expectRecord", "record": "finance", "values": { "name": "Finance and Accounting" } },

@@ -164,23 +164,21 @@ public sealed class StudioNamesTests : IAsyncLifetime
     {
         var names = await NamesAsync("LeaveRequests");
 
-        var entity = Named(names, "entities", "departments/Department");
-        Assert.Equal("departments", entity.GetProperty("module").GetString());
+        var entity = Named(names, "entities", "organization/Department");
+        Assert.Equal("organization", entity.GetProperty("module").GetString());
 
-        var rule = Named(names, "rules", "departments:IsManager");
-        Assert.Equal("departments", rule.GetProperty("module").GetString());
+        var rule = Named(names, "rules", "organization:IsDelegating");
+        Assert.Equal("organization", rule.GetProperty("module").GetString());
         Assert.Equal(
-            [("manager", "text"), ("user", "text")],
+            [("from", "date"), ("until", "date")],
             rule.GetProperty("parameters").EnumerateArray().Select(parameter => (parameter.GetProperty("name").GetString()!, parameter.GetProperty("type").GetString()!)));
         Assert.Equal("boolean", rule.GetProperty("resultType").GetString());
 
-        var page = Named(names, "pages", "departments/Departments");
-        Assert.Equal("departments", page.GetProperty("module").GetString());
         Assert.Equal(JsonValueKind.Null, Named(names, "pages", "MyTasks").GetProperty("module").ValueKind);
 
         var policies = names.GetProperty("policies").EnumerateArray().ToList();
         Assert.Equal(
-            [("DepartmentManagerAccess", null), ("EmployeeAccess", null), ("departments/ManagerAccess", "departments")],
+            [("DepartmentManagerAccess", null), ("EmployeeAccess", null), ("organization/AdminAccess", "organization"), ("organization/MemberAccess", "organization")],
             policies
                 .Select(policy => (policy.GetProperty("name").GetString()!, policy.GetProperty("module").GetString()))
                 .OrderBy(policy => policy.Item1, StringComparer.Ordinal));

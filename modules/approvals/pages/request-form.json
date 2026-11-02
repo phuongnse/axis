@@ -1,0 +1,15 @@
+{
+  "id": "283cecb2-2d17-457b-a4fd-d7d57ee779ad",
+  "kind": "page",
+  "name": "RequestForm",
+  "formatVersion": 1,
+  "title": { "textKey": "approvals.pages.requestForm.title" },
+  "widgets": [
+    {
+      "type": "form",
+      "name": "requestForm",
+      "form": "RequestForm",
+      "actions": [{ "type": "startProcess", "name": "submit", "process": "RequestApproval", "label": { "textKey": "approvals.actions.submit" } }]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "71fe0a1e-bbe0-44ed-95b3-bcb0d28f2ebb",
+  "kind": "page",
+  "name": "ToDecide",
+  "formatVersion": 1,
+  "title": { "textKey": "approvals.pages.toDecide.title" },
+  "widgets": [{ "type": "taskInbox", "name": "inbox" }]
+}

@@ -31,7 +31,7 @@ internal static class UserIdFieldEndpoints
             "/api/apps/{app}/entities/{module}/{entity}/fields/{field}/users",
         })
         {
-            endpoints.MapGet(pattern, ListAsync);
+            endpoints.MapGet(pattern, ListAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
         }
     }
 
