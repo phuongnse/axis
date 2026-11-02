@@ -29,7 +29,7 @@
   "specs/purchase-request-extensibility-journey.spec.ts": 45,
   "specs/purchase-request-inspector.spec.ts": 20,
   "specs/purchase-request-phone.spec.ts": 3,
-  "specs/purchase-request-release.spec.ts": 145,
+  "specs/purchase-request-release.spec.ts": 160,
   "specs/purchase-requests.spec.ts": 23,
   "specs/records.spec.ts": 0,
   "specs/reduced-motion.spec.ts": 2,

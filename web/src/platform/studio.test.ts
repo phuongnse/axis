@@ -294,6 +294,8 @@ function release(releaseId: string, number: number, activatedAt: string): Studio
     label: null,
     note: null,
     requestId: null,
+    offStandard: false,
+    relaxed: [],
   }
 }
 

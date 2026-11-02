@@ -18,6 +18,8 @@ function item(releaseId: string, number: number, activatedAt: string, label: str
     label,
     note: null,
     requestId: null,
+    offStandard: false,
+    relaxed: [],
   }
 }
 
@@ -64,6 +66,28 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(within(rows[0]).getByText('Active')).toBeInTheDocument()
     expect(within(rows[3]).getByText('Author User')).toBeInTheDocument()
     expect(within(rows[1]).getByText('user-1')).toBeInTheDocument()
+  })
+
+  it('marks an off-standard release with the tag and each relaxed module, point and reason', () => {
+    const relaxed = {
+      ...item('r3', 3, '2026-05-03T10:00:00Z', null),
+      offStandard: true,
+      relaxed: [
+        { module: 'department-budgets', point: 'Budget/transitions/approve', reason: 'Approvers decide alone' },
+      ],
+    }
+    renderList({ history: { ...history, items: [history.items[0], relaxed, history.items[3]] } })
+
+    const rows = screen.getAllByTestId('studio-release-row')
+    expect(rows.map((row) => row.getAttribute('data-off-standard'))).toEqual(['true', null, null])
+    expect(within(rows[0]).getByTestId('release-off-standard')).toHaveTextContent('Off-standard')
+    const point = within(rows[0]).getByTestId('release-relaxed-point')
+    expect(point).toHaveTextContent('department-budgets')
+    expect(point).toHaveTextContent('Budget/transitions/approve')
+    expect(point).toHaveTextContent('Approvers decide alone')
+    expect(within(rows[1]).queryByTestId('release-off-standard')).not.toBeInTheDocument()
+    expect(within(rows[2]).queryByTestId('release-off-standard')).not.toBeInTheDocument()
+    expect(within(rows[1]).queryByTestId('release-relaxed-point')).not.toBeInTheDocument()
   })
 
   it('shows an empty text without releases', () => {

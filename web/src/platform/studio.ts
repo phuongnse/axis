@@ -781,9 +781,17 @@ export interface StudioRequest {
   scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
 }
 
+/** One contract point that the application relaxed in a release, with the author's reason. */
+export interface StudioRelaxedPoint {
+  module: string
+  point: string
+  reason: string
+}
+
 /**
  * One activation in the release history. `actor` is a user id, `startup`, `operator` or `unknown`. `actorName` is the
- * name in the actor's user profile, else the one stored with the activation, else `null`.
+ * name in the actor's user profile, else the one stored with the activation, else `null`. `offStandard` is set when
+ * the release relaxed a contract point, and `relaxed` lists those points.
  */
 export interface StudioReleaseItem {
   releaseId: string
@@ -795,6 +803,8 @@ export interface StudioReleaseItem {
   label: string | null
   note: string | null
   requestId: string | null
+  offStandard: boolean
+  relaxed: StudioRelaxedPoint[]
 }
 
 /**

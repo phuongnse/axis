@@ -20,8 +20,8 @@ them. The same steps are still _(planned for M24)_ for an inbound endpoint call,
 records. Each of them fails as it already fails for a lifecycle refusal and logs the named point and
 the record id. The
 filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view, Relax,
-Undo relax and the off-standard mark beside the application picker are built, see [in Studio](#in-studio). The rest of this
-page is _(planned for M24)_.
+Undo relax, the off-standard mark beside the application picker and the mark in the release history are built, see
+[in Studio](#in-studio). The rest of this page is _(planned for M24)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -425,7 +425,7 @@ A release whose application has at least one relax entry is off-standard.
   `offStandard` and `relaxed: [{ module, point, reason }]` for each release, read from the
   `application.json` stored with it.
 - Studio's release history and the operator console's publishing view show an off-standard mark,
-  and the list of points and reasons on the release.
+  and the list of points and reasons on the release. Built.
 - The module's upgrade promise no longer covers a relaxed point _(planned for M29)_.
 
 ## Contract scenarios
@@ -474,7 +474,7 @@ some of them as contract scenarios.
   `application.json` changed since Studio loaded it, and Studio loads it again.
 - **Mark.** The application's header and its release history show the off-standard mark while any
   entry is present. The mark beside the application picker is _(built)_. The mark in the release
-  history is _(planned for M24)_.
+  history is _(built)_: the Off-standard tag, then the module, point and reason of each relaxed entry.
 - **Diagnostics.** A grant past a ceiling, a relax entry for an unknown point and a failing contract
   scenario show where Studio shows other diagnostics and publish results. The contract scenarios of a publish or validate,
   skipped ones with their relaxed point included, show in a **Contract scenarios** list under the status line.
