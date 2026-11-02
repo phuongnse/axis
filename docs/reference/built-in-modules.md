@@ -298,8 +298,9 @@ The samples become the built-in modules, as D102 agrees:
 - **`departments`** becomes `organization`. The leave request sample declares `organization`, maps
   both of its slots (`admin` to `department-manager`, `member` to `employee`) and seeds its employees
   and departments, and a leave request goes to the head of its department. The purchase request
-  sample and `department-budgets` still use `departments` until they move, and then the `departments`
-  sample module is removed.
+  sample declares `organization` too (`admin` to `operator`, `member` to `department-manager`) and
+  seeds the same employees and departments, and `department-budgets` 1.2.0 depends on `organization`.
+  The `departments` sample module stays installed with no sample using it, until it is removed.
 - **The `request-approval` template** becomes the `approvals` application, and is removed. The
   Studio journeys that create an application from it create one from the built-in application.
 

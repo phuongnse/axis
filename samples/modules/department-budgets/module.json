@@ -1,8 +1,11 @@
 {
   "kind": "module",
   "id": "department-budgets",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "label": "Department budgets",
-  "roles": [{ "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } }],
-  "modules": [{ "id": "departments", "version": "^1.1.0", "roles": { "manager": "approver" } }]
+  "roles": [
+    { "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } },
+    { "name": "administrator", "label": { "textKey": "department-budgets.roles.administrator" } }
+  ],
+  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "administrator", "member": "approver" } }]
 }

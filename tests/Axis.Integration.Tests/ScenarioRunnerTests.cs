@@ -1304,7 +1304,7 @@ public sealed class ScenarioRunnerTests
         Assert.True(exitCode == 0, output.ToString());
         var suites = new Dictionary<string, (string Name, string Tests)>
         {
-            ["purchase-requests"] = ("PurchaseRequests", "10"),
+            ["purchase-requests"] = ("PurchaseRequests", "15"),
             ["leave-requests"] = ("LeaveRequests", "10"),
             ["service-desk"] = ("ServiceDesk", "12"),
             ["asset-management"] = ("AssetManagement", "6"),
@@ -1338,11 +1338,11 @@ public sealed class ScenarioRunnerTests
         Assert.True(exitCode == 0, output.ToString());
         var lines = output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         var passed = lines.Where(line => line.StartsWith("PASS ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(10, passed.Count);
+        Assert.Equal(15, passed.Count);
         string[] moduleScenarios = ["ApprovalRecordsDecision", "ApproverCreatesBudget", "DecidedAmountIsFrozen", "RequesterCannotDecideOwnBudget"];
         Assert.Equal(moduleScenarios.Select(name => $"PASS department-budgets/{name}"), passed.TakeLast(4));
         var suite = XDocument.Load(Path.Combine(results.Path, "scenarios-PurchaseRequests.xml")).Root!.Element("testsuite")!;
-        Assert.Equal("10", suite.Attribute("tests")!.Value);
+        Assert.Equal("15", suite.Attribute("tests")!.Value);
         Assert.Equal("0", suite.Attribute("failures")!.Value);
         Assert.Contains(suite.Descendants("testcase"), testCase => testCase.Attribute("name")!.Value == "department-budgets/ApproverCreatesBudget");
     }
@@ -1386,10 +1386,10 @@ public sealed class ScenarioRunnerTests
             folder.With(Path.GetRelativePath(source, file), File.ReadAllText(file));
         }
 
-        // Both slots that chain to the same role move together, so the pins do not disagree.
+        // The organization member slot and the approver slot of the budgets module chain to the same role, so they move together and the pins do not disagree.
         const string manifest = "application.json";
-        var remapped = File.ReadAllText(Path.Combine(folder.Path, manifest)).Replace("department-manager\" }", "employee\" }");
-        Assert.Equal(2, remapped.Split("employee\" }").Length - 1);
+        var remapped = File.ReadAllText(Path.Combine(folder.Path, manifest)).Replace("\"department-manager\"", "\"employee\"");
+        Assert.Equal(2, remapped.Split("\"employee\"").Length - 1);
         folder.With(manifest, remapped);
         using var results = new TemporaryFolder();
 
@@ -1414,7 +1414,7 @@ public sealed class ScenarioRunnerTests
         }
 
         // The module's policy no longer lets its approver create a budget. The manager scenario of the application fails for the same reason.
-        const string policy = "department-budgets/1.1.0/policies/approver-access.json";
+        const string policy = "department-budgets/1.2.0/policies/approver-access.json";
         var narrowed = File.ReadAllText(Path.Combine(modules.Path, policy)).Replace("[\"read\", \"create\", \"update\"]", "[\"read\", \"update\"]");
         Assert.DoesNotContain("create", narrowed, StringComparison.Ordinal);
         modules.With(policy, narrowed);

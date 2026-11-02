@@ -26,6 +26,7 @@
     "department-budgets.budgetApproval.review": "Xem xét ngân sách",
     "department-budgets.budgetApproval.approve": "Phê duyệt",
     "department-budgets.budgetApproval.reject": "Từ chối",
-    "department-budgets.roles.approver": "Người phê duyệt ngân sách"
+    "department-budgets.roles.approver": "Người phê duyệt ngân sách",
+    "department-budgets.roles.administrator": "Quản trị tổ chức"
   }
 }

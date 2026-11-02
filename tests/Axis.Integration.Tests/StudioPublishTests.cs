@@ -290,17 +290,18 @@ public sealed class StudioPublishTests : IAsyncLifetime
             using var finished = await WaitForFinalAsync(client, accepted.Headers.Location!.OriginalString, HostA);
             Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
             var results = finished.RootElement.GetProperty("scenarios").EnumerateArray().ToList();
-            Assert.Equal(3, results.Count);
+            Assert.Equal(8, results.Count);
             var skipped = Assert.Single(results, item => item.GetProperty("outcome").GetString() == "skipped");
             Assert.Equal("department-budgets/ApprovalRecordsDecision", skipped.GetProperty("name").GetString());
             Assert.Equal("Budget/effects/decisionRecorded", skipped.GetProperty("point").GetString());
-            Assert.Equal(2, results.Count(item => item.GetProperty("outcome").GetString() == "passed"));
+            Assert.Equal(7, results.Count(item => item.GetProperty("outcome").GetString() == "passed"));
         }
 
-        // A copy of the sample modules without the department budgets scenarios: nothing runs, so nothing is stored.
+        // A copy of the sample modules without the scenarios of department budgets and organization: nothing runs, so nothing is stored.
         using var modules = new TemporaryFolder();
         CopyDirectory(SampleModules.Path, modules.Path);
-        Directory.Delete(Path.Combine(modules.Path, "department-budgets", "1.1.0", "scenarios"), recursive: true);
+        Directory.Delete(Path.Combine(modules.Path, "department-budgets", "1.2.0", "scenarios"), recursive: true);
+        Directory.Delete(Path.Combine(modules.Path, "organization", "1.0.0", "scenarios"), recursive: true);
         using var second = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
         Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
 
@@ -478,11 +479,14 @@ public sealed class StudioPublishTests : IAsyncLifetime
             connectionString, $"SELECT scenario_results::text FROM axis.publish_requests WHERE id = '{request}'", CancellationToken);
         Assert.NotNull(stored);
         var results = JsonNode.Parse(stored)!.AsArray();
-        Assert.Equal(3, results.Count);
+        Assert.Equal(8, results.Count);
         Assert.All(results, item =>
         {
             Assert.Equal("passed", item!["outcome"]!.GetValue<string>());
-            Assert.StartsWith("department-budgets/", item["name"]!.GetValue<string>(), StringComparison.Ordinal);
+            var name = item["name"]!.GetValue<string>();
+            Assert.True(
+                name.StartsWith("department-budgets/", StringComparison.Ordinal) || name.StartsWith("organization/", StringComparison.Ordinal),
+                $"The scenario {name} is not a contract scenario of a module.");
         });
     }
 

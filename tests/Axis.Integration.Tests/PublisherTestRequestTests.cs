@@ -18,20 +18,31 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     private const string Passing = "ApprovalBelowThreshold";
     private const string FailingFile = "scenarios/failing.json";
 
-    // The prefix of the department-budgets scenarios, which run after the application's own, named by their module.
+    // The prefixes of the module scenarios, which run after the application's own, named by their module.
     private const string ModulePrefix = "department-budgets/";
+    private const string OrganizationPrefix = "organization/";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
-    // The scenarios of the department-budgets module, the contract scenarios among them.
+    // The scenarios of the department-budgets and organization modules, the contract scenarios among them.
     private static readonly string[] _moduleScenarios =
     [
-        .. Directory.EnumerateFiles(Path.Combine(SampleModules.Path, "department-budgets", "1.1.0", "scenarios"), "*.json")
-            .Select(path => ModulePrefix + JsonNode.Parse(File.ReadAllText(path))!["name"]!.GetValue<string>()),
+        .. ScenarioNames("department-budgets", "1.2.0", ModulePrefix),
+        .. ScenarioNames("organization", "1.0.0", OrganizationPrefix),
     ];
 
     // A sample has several scenarios, and each one creates, migrates and drops a database.
     private static readonly TimeSpan _limit = TimeSpan.FromSeconds(180);
+
+    private static IEnumerable<string> ScenarioNames(string module, string version, string prefix) =>
+        Directory.EnumerateFiles(Path.Combine(SampleModules.Path, module, version, "scenarios"), "*.json")
+            .Select(path => prefix + JsonNode.Parse(File.ReadAllText(path))!["name"]!.GetValue<string>());
+
+    // The file of a module scenario is under the folder of its module, and the file of an application scenario under scenarios/.
+    private static string ScenarioFolder(string name) =>
+        name.StartsWith(ModulePrefix, StringComparison.Ordinal) ? "modules/department-budgets/scenarios/"
+        : name.StartsWith(OrganizationPrefix, StringComparison.Ordinal) ? "modules/organization/scenarios/"
+        : "scenarios/";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -77,7 +88,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
             .Concat(_moduleScenarios)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(4, _moduleScenarios.Length);
+        Assert.Equal(9, _moduleScenarios.Length);
         Assert.Equal(names.Length, results.Count);
         Assert.All(results, item =>
         {
@@ -86,10 +97,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
             Assert.Null(item["path"]);
             Assert.Null(item["message"]);
             Assert.True(item["durationMs"]!.GetValue<long>() >= 0);
-            Assert.StartsWith(
-                item["name"]!.GetValue<string>().StartsWith(ModulePrefix, StringComparison.Ordinal) ? "modules/department-budgets/scenarios/" : "scenarios/",
-                item["file"]!.GetValue<string>(),
-                StringComparison.Ordinal);
+            Assert.StartsWith(ScenarioFolder(item["name"]!.GetValue<string>()), item["file"]!.GetValue<string>(), StringComparison.Ordinal);
             Assert.True(Guid.TryParseExact(item["resourceId"]!.GetValue<string>(), "D", out _));
         });
         Assert.Equal(names, results.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray());
@@ -104,7 +112,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     }
 
     [Fact]
-    public async Task A_publish_of_the_purchase_request_sample_runs_the_department_budgets_contract_scenarios_and_activates()
+    public async Task A_publish_of_the_purchase_request_sample_runs_the_contract_scenarios_of_both_modules_and_activates()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var tenant = await CreateTenantAsync(scenario);
@@ -119,12 +127,21 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         // Only the contract scenarios run on a publish, not the other scenarios of the module or the application.
         var results = await ResultsAsync(scenario, tenant, request);
         Assert.Equal(
-            ["ApprovalRecordsDecision", "DecidedAmountIsFrozen", "RequesterCannotDecideOwnBudget"],
-            results.Select(item => item!["name"]!.GetValue<string>().Replace(ModulePrefix, string.Empty, StringComparison.Ordinal)).Order(StringComparer.Ordinal));
+            [
+                "department-budgets/ApprovalRecordsDecision",
+                "department-budgets/DecidedAmountIsFrozen",
+                "department-budgets/RequesterCannotDecideOwnBudget",
+                "organization/AdminManagesOrganization",
+                "organization/DelegateNeedsDatesInOrder",
+                "organization/DepartmentIsNotItsOwnParent",
+                "organization/EmployeeIsNotTheirOwnManagerOrDelegate",
+                "organization/MemberUpdatesOnlyTheirOwnAbsence",
+            ],
+            results.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal));
         Assert.All(results, item =>
         {
             Assert.Equal("passed", item!["outcome"]!.GetValue<string>());
-            Assert.StartsWith("modules/department-budgets/scenarios/", item["file"]!.GetValue<string>(), StringComparison.Ordinal);
+            Assert.StartsWith(ScenarioFolder(item["name"]!.GetValue<string>()), item["file"]!.GetValue<string>(), StringComparison.Ordinal);
         });
         Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
         Assert.Equal(0L, await ScenarioDatabasesAsync());

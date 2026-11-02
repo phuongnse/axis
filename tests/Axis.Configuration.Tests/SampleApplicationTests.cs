@@ -13,8 +13,8 @@ public sealed class SampleApplicationTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["departments/Department", "department-budgets/BudgetDecision", "department-budgets/Budget", "Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
-        Assert.Equal(3, result.Model.Seeds.Count);
+        Assert.Equal(["organization/Department", "organization/Employee", "department-budgets/BudgetDecision", "department-budgets/Budget", "Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
+        Assert.Equal(4, result.Model.Seeds.Count);
         Assert.Equal("purchasing", Assert.Single(result.Model.Sites).Path);
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
         Assert.Single(result.Model.Processes, process => process.Name == "PurchaseRequestApproval");
@@ -144,13 +144,18 @@ public sealed class SampleApplicationTests
     }
 
     [Fact]
-    public void Purchase_request_sample_maps_the_slots_of_the_departments_and_department_budgets_modules_to_department_manager()
+    public void Purchase_request_sample_maps_the_slots_of_the_organization_and_department_budgets_modules()
     {
         var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["department-budgets 1.1.0", "departments 1.1.0"], result.Model.Modules.Select(module => $"{module.Id} {module.Version}").Order());
+        Assert.Equal(["department-budgets 1.2.0", "organization 1.0.0"], result.Model.Modules.Select(module => $"{module.Id} {module.Version}").Order());
+        Assert.DoesNotContain(result.Model.Modules, pinned => pinned.Id == "departments");
+        var organization = Assert.Single(result.Model.Modules, pinned => pinned.Id == "organization");
+        Assert.Equal(
+            [("admin", "operator"), ("member", "department-manager")],
+            organization.Roles.OrderBy(slot => slot.Key, StringComparer.Ordinal).Select(slot => (slot.Key, slot.Value)));
         var policy = Assert.Single(result.Model.Policies, policy => policy.Name == "department-budgets/ApproverAccess");
         Assert.Equal(["department-manager"], policy.Roles);
         var process = Assert.Single(result.Model.Processes, process => process.Name == "department-budgets/BudgetApproval");
@@ -160,6 +165,8 @@ public sealed class SampleApplicationTests
         var budget = Assert.Single(result.Model.Entities, entity => entity.Name == "department-budgets/Budget");
         var contract = Assert.IsType<ContractModel>(budget.Contract);
         Assert.Contains("department-manager", contract.Ceiling!.Roles.Keys);
+        var department = Assert.Single(budget.Fields, field => field.Name == "department");
+        Assert.Equal("organization/Department", department.Target!.Name);
         Assert.Equal(["approve", "reject"], contract.Lifecycle!.Transitions.Select(transition => transition.Name));
         Assert.All(contract.Lifecycle.Transitions, transition => Assert.NotNull(transition.Guard));
         Assert.Equal("amountFrozenOnceDecided", Assert.Single(contract.Validations).Name);

@@ -26,6 +26,7 @@
     "department-budgets.budgetApproval.review": "Review the budget",
     "department-budgets.budgetApproval.approve": "Approve",
     "department-budgets.budgetApproval.reject": "Reject",
-    "department-budgets.roles.approver": "Budget approver"
+    "department-budgets.roles.approver": "Budget approver",
+    "department-budgets.roles.administrator": "Organization administrator"
   }
 }
