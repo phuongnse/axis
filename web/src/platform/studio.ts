@@ -739,8 +739,8 @@ export async function putStudioTexts(
 export type StudioRequestStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 
 /**
- * One scenario of a `test` request. `step` is the 0-based index of the failing step and `path` is `/steps/{step}`, both
- * `null` when the scenario passed or failed before any step.
+ * One scenario of a `test` request, or a contract scenario of a `publish` or `validate`. `step` is the 0-based index of
+ * the failing step and `path` is `/steps/{step}`, both `null` when the scenario passed or failed before any step.
  */
 export interface StudioScenarioResult {
   name: string
@@ -754,8 +754,19 @@ export interface StudioScenarioResult {
 }
 
 /**
+ * A contract scenario that a relax entry skipped in a `publish` or `validate`. `point` is the relaxed point it covers.
+ */
+export interface StudioSkippedScenarioResult {
+  name: string
+  file: string
+  outcome: 'skipped'
+  point: string
+}
+
+/**
  * A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends.
- * `scenarios` is `null` unless the kind is `test`, and then it is empty until the request ends.
+ * `scenarios` holds the stored results of a `test`, `publish` or `validate`, and is `null` when none were stored. For a
+ * `test` it is empty until the request ends.
  */
 export interface StudioRequest {
   id: string
@@ -767,7 +778,7 @@ export interface StudioRequest {
   note: string | null
   releaseId: string | null
   diagnostics: StudioDiagnostic[]
-  scenarios: StudioScenarioResult[] | null
+  scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
 }
 
 /**

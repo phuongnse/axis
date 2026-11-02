@@ -120,7 +120,7 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_status_route_answers_scenarios_null_for_a_validate_and_an_empty_list_for_a_test_before_it_runs_and_its_results_after()
+    public async Task The_status_route_answers_the_contract_scenarios_of_a_validate_and_an_empty_list_for_a_test_before_it_runs_and_its_results_after()
     {
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_test_status", CancellationToken);
@@ -140,12 +140,14 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Array, queued.RootElement.GetProperty("scenarios").ValueKind);
         Assert.Equal(0, queued.RootElement.GetProperty("scenarios").GetArrayLength());
 
-        // The publisher has a scenario server. The validate runs the contract scenarios and keeps its results to itself.
+        // The publisher has a scenario server. The validate runs the contract scenarios and answers their results.
         await using var publisher = StudioPublishTests.RunPublisher("a", StudioPublishTests.HostA, connectionString);
         using var finished = await StudioPublishTests.WaitForFinalAsync(
             author, validate.Headers.Location!.OriginalString, StudioPublishTests.HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
-        Assert.Equal(JsonValueKind.Null, finished.RootElement.GetProperty("scenarios").ValueKind);
+        var validated = finished.RootElement.GetProperty("scenarios").EnumerateArray().ToList();
+        Assert.Equal(3, validated.Count);
+        Assert.All(validated, item => Assert.Equal("passed", item.GetProperty("outcome").GetString()));
 
         using var ended = await StudioPublishTests.WaitForFinalAsync(
             author, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
