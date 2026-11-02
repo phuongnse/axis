@@ -10,7 +10,8 @@ namespace Axis.Integration.Tests;
 /// One tenant database, <c>a</c>, with the ModuleCoreValidationApp fixture activated against the <c>stages</c>
 /// test module under <c>Fixtures/Modules</c>. The module's <c>Ticket</c> entity has the validation
 /// <c>amountNotNegative</c>, a contract with a lifecycle on <c>status</c> and the core validations
-/// <c>amountFrozenAfterSubmit</c> and <c>stepMovesWithNewDecision</c>. The application maps the role slot
+/// <c>amountFrozenAfterSubmit</c> and <c>stepMovesWithNewDecision</c>. The application's layer on <c>Ticket</c> adds the
+/// field <c>costCenter</c> and the validation <c>titleNotBlockedByLayer</c>. The application maps the role slot
 /// <c>requester</c> to <c>employee</c> and adds the process <c>AdvanceTwice</c>. The real server serves it on host
 /// <c>a.example.test</c> and signs in <c>requester</c>, who holds <c>employee</c>. The worker is the one of
 /// <see cref="Steps"/>, which runs only when a test calls it, so a started instance stays <c>running</c> until then.

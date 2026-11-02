@@ -10,7 +10,8 @@ and [applying a layer](#applying-a-layer) are built: compilation merges the `cha
 into its module resource before any check, and the release stores the layer and the module's own
 files side by side, a layer places an element with `after` and `before`, and a diagnostic about a part
 that a layer changed is reported in the layer file. A layer on a `contract` adds states and transitions
-to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). A layer removes a whole resource,
+to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). A layer on a module entity adds
+fields and validations, see [module entities](#module-entities). A layer removes a whole resource,
 see [applying a layer](#applying-a-layer). Studio's support for layers and the sections below that are
 not about applying are _(planned for M25)_. Module upgrades, the three-way merge and eject are _(planned for M29)_.
 
@@ -195,14 +196,16 @@ schemas.
 ## Module entities
 
 A layer on a module entity changes the application's copy of it, which is the application's own
-table.
+table. Adding fields and adding validations are built: activation adds the column of an added field
+to the copy, and the record API reads and writes the field. Changing and removing a field are
+_(planned for M25)_.
 
 - **Adding fields** adds columns to the copy. A new field is the application's, and the module's
   forms, pages and processes do not show it until a layer on them adds it.
-- **Changing a field.** A layer may change a label, a default, `required`, a length, a range or an
+- **Changing a field** _(planned for M25)_. A layer may change a label, a default, `required`, a length, a range or an
   enum's `values`. A change of type, and a field removed, follow the
   [migration](migrations.md#migrations) rules of the application's own entities.
-- **Removing a field** that the contract, or a module resource the layer does not also change,
+- **Removing a field** _(planned for M25)_ that the contract, or a module resource the layer does not also change,
   still reads is a diagnostic at the removed field.
 - **Validations** that the layer adds run with the entity's own, before the core validations.
 

@@ -179,7 +179,8 @@ record from referring to itself. A field named `id` is hidden by it.
   expression is boolean.
 
 - They run on every create and update of the entity, after the entity's own validations, on the
-  record as it will be stored.
+  record as it will be stored. Validations that an application's
+  [layer](customization-layers.md#module-entities) adds to the entity count as the entity's own.
 - A failure is answered like a failing entity validation, with the core validation's message at its
   field. The failure names the point `<entity>/validations/<name>`.
 - A core validation runs only when the entity's own validations pass, so a write that breaks both
