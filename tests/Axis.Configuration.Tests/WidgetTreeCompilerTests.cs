@@ -227,6 +227,108 @@ public sealed class WidgetTreeCompilerTests
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal((DiagnosticCodes.SchemaViolation, PageFile), (diagnostic.Code, diagnostic.File)));
     }
 
+    [Fact]
+    public void Widget_name_repeated_in_another_section_ignoring_case_is_reported_at_the_later_widget()
+    {
+        var first = """{ "type": "table", "name": "Summary", "entity": "Order" }""";
+        var second = """{ "type": "taskInbox", "name": "summary" }""";
+        using var folder = Folder(Columns((6, Section("orders.title", false, first)), (6, Section("orders.title", false, second))));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicatePageElementName, PageFile, "/widgets/0/columns/1/widgets/0/widgets/0/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'/widgets/0/columns/0/widgets/0/widgets/0/name'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Row_action_name_repeated_in_its_table_is_reported_at_the_later_action()
+    {
+        using var folder = Folder("""
+            { "type": "table", "entity": "Order", "rowActions": [
+              { "type": "delete", "name": "Remove", "label": { "textKey": "orders.title" } },
+              { "type": "delete", "name": "remove", "label": { "textKey": "orders.title" } }
+            ] }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicatePageElementName, PageFile, "/widgets/0/rowActions/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Column_name_repeated_in_its_columns_widget_is_reported_at_the_later_column()
+    {
+        using var folder = Folder("""
+            { "type": "columns", "columns": [
+              { "width": 6, "name": "Left", "widgets": [ { "type": "table", "entity": "Order" } ] },
+              { "width": 6, "name": "left", "widgets": [ { "type": "taskInbox" } ] }
+            ] }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicatePageElementName, PageFile, "/widgets/0/columns/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Tab_name_repeated_in_its_tabs_widget_is_reported_at_the_later_tab()
+    {
+        using var folder = Folder("""
+            { "type": "tabs", "tabs": [
+              { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] },
+              { "name": "DETAILS", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "taskInbox" } ] }
+            ] }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicatePageElementName, PageFile, "/widgets/0/tabs/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Row_action_and_toolbar_action_may_share_a_name()
+    {
+        using var folder = Folder("""
+            { "type": "table", "entity": "Order",
+              "rowActions": [ { "type": "delete", "name": "Open", "label": { "textKey": "orders.title" } } ],
+              "toolbarActions": [ { "type": "navigate", "name": "Open", "page": "OrderForm", "label": { "textKey": "orders.title" } } ] }
+            """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void Tab_name_may_repeat_across_two_different_tabs_widgets()
+    {
+        using var folder = Folder(Columns(
+            (6, """{ "type": "tabs", "tabs": [ { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] } ] }"""),
+            (6, """{ "type": "tabs", "tabs": [ { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "form", "entity": "Order" } ] } ] }""")));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
     /// <summary>The presentation folder with an overview page, not in the site's navigation, holding <paramref name="widgets"/>.</summary>
     private static TemporaryFolder Folder(string widgets) =>
         PresentationCompilerTests.Folder().With(PageFile, Page("Overview", widgets, "55555555-5555-4555-8555-555555555560"));

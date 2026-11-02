@@ -74,6 +74,7 @@
       "required": ["type"],
       "properties": {
         "type": { "enum": ["table", "form", "taskInbox", "processInspector", "kpi", "chart", "detail", "columns", "tabs", "section"] },
+        "name": { "$ref": "#/$defs/name" },
         "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
         "dataSource": { "$ref": "#/$defs/dataSourceName", "x-axis-reference": "dataSource" },
         "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
@@ -89,7 +90,7 @@
         },
         "toolbarActions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/navigateAction" }
+          "items": { "$ref": "#/$defs/toolbarAction" }
         },
         "parameters": {
           "type": "object",
@@ -191,6 +192,7 @@
       "required": ["width", "widgets"],
       "properties": {
         "width": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "name": { "$ref": "#/$defs/name" },
         "widgets": { "$ref": "#/$defs/widgets" }
       }
     },
@@ -199,6 +201,7 @@
       "additionalProperties": false,
       "required": ["label", "widgets"],
       "properties": {
+        "name": { "$ref": "#/$defs/name" },
         "label": { "$ref": "#/$defs/textReference" },
         "widgets": { "$ref": "#/$defs/widgets" }
       }
@@ -214,6 +217,7 @@
       "required": ["type", "label"],
       "properties": {
         "type": { "enum": ["startProcess", "navigate"] },
+        "name": { "$ref": "#/$defs/name" },
         "process": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "process" },
         "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
         "label": { "$ref": "#/$defs/textReference" },
@@ -234,6 +238,7 @@
       "required": ["type", "label"],
       "properties": {
         "type": { "enum": ["startProcess", "navigate", "delete"] },
+        "name": { "$ref": "#/$defs/name" },
         "process": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "process" },
         "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
         "label": { "$ref": "#/$defs/textReference" },
@@ -262,6 +267,19 @@
       "required": ["type", "page", "label"],
       "properties": {
         "type": { "const": "navigate" },
+        "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
+        "label": { "$ref": "#/$defs/textReference" },
+        "parameters": { "$ref": "#/$defs/navigateParameters" },
+        "record": { "type": "string", "minLength": 1, "x-axis-expression": true }
+      }
+    },
+    "toolbarAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "page", "label"],
+      "properties": {
+        "type": { "const": "navigate" },
+        "name": { "$ref": "#/$defs/name" },
         "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
         "label": { "$ref": "#/$defs/textReference" },
         "parameters": { "$ref": "#/$defs/navigateParameters" },

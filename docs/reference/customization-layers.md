@@ -146,7 +146,7 @@ schemas.
 
 - A key is unique in its list, ignoring letter case. An entity's `validations` and `indexes` require
   `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A decision's `branches` and a task's `escalations` require `name` as well (`AXC0004` when it is missing) and report a repeated name as `AXC0359`, and a form's `steps` do the same and report it as `AXC0360`. Each of these names is unique in its own list: one decision's branches, one task's escalations or one form's steps. A widget's `name` is unique on its page,
-  whatever its depth, so a layer finds a widget inside a section or a tab by its name.
+  whatever its depth, so a layer finds a widget inside a section or a tab by its name. A repeated name on a page, in a widget's own list of actions, columns or tabs, is `AXC0361`, and `name` stays optional there.
 - An element of a list that the table does not name is part of a value list.
 - A text's `texts` is a map, so a layer on a module text changes or adds keys as an object merges.
   A business that wants another label changes the text, never a name.

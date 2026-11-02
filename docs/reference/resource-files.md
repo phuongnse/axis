@@ -240,6 +240,16 @@ widgets `columns`, `tabs` and `section` hold other widgets, see
   Every `widgets`, `columns` and `tabs` list has at least one entry.
 - The compiler checks every widget at any depth. A problem is reported at the
   widget's own JSON pointer, such as `/widgets/0/columns/1/widgets/0/entity`.
+- A widget, an action, a column or a tab may have a `name`. The name is optional,
+  and no layer reads it yet.
+- A widget's `name` is unique on the whole page, at any depth, ignoring letter case.
+  A repeat is `AXC0361`, reported at the later widget's `name`.
+- An action, column or tab `name` is unique in its own list, ignoring letter case.
+  A repeat is `AXC0361`, reported at the later element's `name`. The actions of a
+  `form` or `detail` widget, a table's `rowActions` and `toolbarActions`, a
+  `columns` widget's columns and a `tabs` widget's tabs each have their own list,
+  so a row action and a toolbar action may share a name.
+- A kpi's `navigate` action has no `name`. The schema refuses one there.
 - `formatVersion` stays 1. Today's pages stay valid.
 
 A `seed` holds records with fixed ids for one entity:
