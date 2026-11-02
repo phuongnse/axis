@@ -79,14 +79,23 @@ the review.
   keep. Agreed: the panel stays, as it opens from every page and stays open while each problem is fixed; the Overview
   lists no problems, as the band already says how many. The Overview answers what differs from the live release and
   where to go next, in a block called Changes since the live release, as a publish would change just that: under its
-  title a line in textMuted names the live release, its number, label, and who published it and when; then each file
+  title each file
   that differs from it, its resource's label as the link that opens it, its kind and whether it was added, changed or
-  removed, or one line that everything is live; then one line "Sites:" with every live site as a link that opens it in
-  a new tab, as an application can have several, leaving out a site that is not live yet; then a link to every
-  release. A site that a tenant serves at a host of its own opens at that host, so the API has to give Studio each
-  site's address; the prototype opens its path. Get started stays
+  removed, or one line that everything is live; then one line "Live at:" with every live site, as an application can have
+  several, leaving out a site that is not live yet; then a link to every release. A site that a tenant serves at a host
+  of its own opens at that host, so the API has to give Studio each site's address; the prototype shows this host and
+  the site's path. Get started stays
   for an application with no entity. More you can add stays in full, as the owner found it useful: by the sidebar's
   groups, each kind the application has none of as a link to its list, what it is for, and in textMuted when one is
   needed, leaving out migrations, which the entity designer writes with the entity (D54). For the docs change: a
   Proposed `changes` list on `GET .../releases`, the files that differ from the live release, compared as the
   canonical JSON a release stores.
+- **The Overview says nothing twice.** The owner found that the block's line naming the live release, its number and
+  who published it and when, repeated the band. Recommended and agreed: the block holds no line naming the live
+  release, nor the warning that changes are not live, as the band says both beside Publish…; who published the live
+  release and when is on the Releases list, which See all releases opens.
+- **A link that leaves Studio.** The owner could not tell whether a site on the Overview opens its resource in Studio
+  or the running site. Recommended and agreed: the line reads "Live at:" and each site is its address, host and path,
+  as the link's text, so it reads as a place on the web and can be copied for the application's people; the site's
+  resource stays in the sidebar. It opens in a new tab, which its tooltip ("Purchasing, opens in a new tab") and its
+  accessible name, which starts with the address, say. No icon, so D128's "text or an icon, never both" stands.

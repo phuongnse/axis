@@ -1,11 +1,9 @@
-import { Flex, Typography } from 'antd'
+import { Flex, Tooltip, Typography } from 'antd'
 import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { formatValue } from '../platform/formatValue'
 import {
   fetchStudioResource,
   folderDiffers,
-  releaseActorName,
   releaseGroups,
   resourceTitle,
   type StudioReleases,
@@ -21,7 +19,7 @@ import { studioKindGroups, type StudioView } from './studioViews'
  * Proposed: the first view of an open application, which says what to do next rather than what the application
  * holds. An application with no entity yet starts with the steps that build one, each a link to where it is done.
  * Then what differs from the live release, file by file, each opening its resource, or that everything is live,
- * under a line that names the live release, with links to open each live site and to see every release. Problems are not listed here: the band's problems panel
+ * with links to open each live site and to see every release. Problems are not listed here: the band's problems panel
  * lists them on every page. Last, the kinds the application has none of yet, each with what it is for and when one is
  * needed.
  */
@@ -146,18 +144,8 @@ function More({
   )
 }
 
-/** A block of the overview: a `heading5` title, and a line in textMuted under it when given, over its content, on `surface`. */
-function Panel({
-  title,
-  subtitle,
-  testId,
-  children,
-}: {
-  title: string
-  subtitle?: string
-  testId: string
-  children: ReactNode
-}) {
+/** A block of the overview: a `heading5` title over its content, on `surface`. */
+function Panel({ title, testId, children }: { title: string; testId: string; children: ReactNode }) {
   const { colour, spacing, radius } = useDesignTokens()
   return (
     <section
@@ -173,12 +161,9 @@ function Panel({
         borderRadius: radius.base,
       }}
     >
-      <Flex vertical>
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          {title}
-        </Typography.Title>
-        {subtitle && <Typography.Text style={{ color: colour.textMuted }}>{subtitle}</Typography.Text>}
-      </Flex>
+      <Typography.Title level={5} style={{ margin: 0 }}>
+        {title}
+      </Typography.Title>
       {children}
     </section>
   )
@@ -209,11 +194,10 @@ function Step({ number, to, name }: { number: number; to?: string; name: string 
 }
 
 /**
- * Proposed: what differs from the live release, which is what a publish would change. Under the title one line in
- * textMuted names the live release: its number, its label, who published it and when. Then one row per file that
+ * Proposed: what differs from the live release, which is what a publish would change: one row per file that
  * differs, its resource's label as the link that opens it, its kind and whether it was added, changed or removed, or
- * one line that everything is live. Then the sites, each a link that opens it where it runs, leaving out a site that
- * is not live yet, and a link to every release.
+ * one line that everything is live. Then the sites, each its address as a link that opens it in a new tab, leaving
+ * out a site that is not live yet, and a link to every release.
  */
 function Release({
   application,
@@ -231,80 +215,79 @@ function Release({
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const sites = useSitePaths(application, resources)
-  let subtitle: string | undefined
   let body: ReactNode
   if (releases === 'failed') {
     body = <Typography.Text type="danger">{t('shell.studio.releases.loadFailed')}</Typography.Text>
   } else {
-    // Proposed: the live release as the Releases list shows it: its label, and when and by whom it was published.
+    // Proposed: no line names the live release or says that changes are not live: the band says both, beside
+    // Publish…, and the Releases list says who published it and when.
     const live = releaseGroups(releases).find((release) => release.live)
     if (!live) {
       body = (
         <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.release.none')}</Typography.Text>
       )
     } else {
-      const time = formatValue(
-        { name: 'activatedAt', type: 'date-time' },
-        live.published.activatedAt,
-        {},
-        { locale, text: t },
-      )
-      subtitle = [
-        t('shell.studio.overview.release.live').replace('{number}', String(live.number)),
-        ...(live.label ? [live.label] : []),
-        t('shell.studio.overview.release.published')
-          .replace('{time}', time)
-          .replace('{actor}', releaseActorName(live.published, t)),
-      ].join(' · ')
       const changes = releases.changes ?? []
       const added = new Set(changes.filter((change) => change.change === 'added').map((change) => change.path))
       const liveSites = sites.filter((site) => !added.has(site.file))
       body = (
         <>
           {folderDiffers(releases) ? (
-            <Flex vertical gap={spacing.xs} data-testid="studio-overview-changes">
-              <Typography.Text style={{ color: colour.warningText }}>
-                {t('shell.studio.overview.release.changes')}
-              </Typography.Text>
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.xs }}>
-                {changes.map((change) => {
-                  const item = resources.find((resource) => resource.file === change.path)
-                  return (
-                    <li key={change.path} style={{ display: 'flex', gap: spacing.xs, alignItems: 'baseline' }}>
-                      {item ? (
-                        <Link to={addressOf({ resource: item.id })} style={{ color: colour.primaryText }}>
-                          {resourceTitle(item, locale)}
-                        </Link>
-                      ) : (
-                        <Typography.Text>{change.path}</Typography.Text>
-                      )}
-                      <Typography.Text style={{ color: colour.textMuted }}>
-                        {item ? `${kindName(item.kind, t)} · ` : ''}
-                        {t(`shell.studio.overview.change.${change.change}`)}
-                      </Typography.Text>
-                    </li>
-                  )
-                })}
-              </ul>
-            </Flex>
+            <ul
+              data-testid="studio-overview-changes"
+              style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.xs }}
+            >
+              {changes.map((change) => {
+                const item = resources.find((resource) => resource.file === change.path)
+                return (
+                  <li key={change.path} style={{ display: 'flex', gap: spacing.xs, alignItems: 'baseline' }}>
+                    {item ? (
+                      <Link to={addressOf({ resource: item.id })} style={{ color: colour.primaryText }}>
+                        {resourceTitle(item, locale)}
+                      </Link>
+                    ) : (
+                      <Typography.Text>{change.path}</Typography.Text>
+                    )}
+                    <Typography.Text style={{ color: colour.textMuted }}>
+                      {item ? `${kindName(item.kind, t)} · ` : ''}
+                      {t(`shell.studio.overview.change.${change.change}`)}
+                    </Typography.Text>
+                  </li>
+                )
+              })}
+            </ul>
           ) : (
             <Typography.Text style={{ color: colour.textMuted }}>
               {t('shell.studio.overview.release.allLive')}
             </Typography.Text>
           )}
           {liveSites.length > 0 && (
-            // Proposed: each site opens where it runs. Here that is its path; a site that a tenant serves at a host
-            // of its own opens at that host, which the API has to give Studio.
+            // Proposed: each site is shown by its address, so it reads as a place on the web and not as the site's
+            // resource in Studio, which the sidebar opens, and can be copied for the application's people. It opens
+            // in a new tab, which its tooltip and accessible name say. Here the address is this host and the site's
+            // path; a site that a tenant serves at a host of its own shows that host, which the API has to give Studio.
             <Typography.Text data-testid="studio-overview-sites">
               <span style={{ color: colour.textMuted }}>{t('shell.studio.overview.sites')} </span>
-              {liveSites.map((site, index) => (
-                <span key={site.file}>
-                  {index > 0 && ' · '}
-                  <a href={`/${site.path}`} target="_blank" rel="noreferrer" style={{ color: colour.primaryText }}>
-                    {site.title}
-                  </a>
-                </span>
-              ))}
+              {liveSites.map((site, index) => {
+                const address = `${window.location.host}/${site.path}`
+                const opens = t('shell.studio.overview.site.opens').replace('{site}', site.title)
+                return (
+                  <span key={site.file}>
+                    {index > 0 && ' · '}
+                    <Tooltip title={opens}>
+                      <a
+                        href={`/${site.path}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`${address}, ${opens}`}
+                        style={{ color: colour.primaryText }}
+                      >
+                        {address}
+                      </a>
+                    </Tooltip>
+                  </span>
+                )
+              })}
             </Typography.Text>
           )}
           <Link to={addressOf({ name: 'releases' })} style={{ color: colour.primaryText, alignSelf: 'flex-start' }}>
@@ -315,7 +298,7 @@ function Release({
     }
   }
   return (
-    <Panel title={t('shell.studio.overview.changes.title')} subtitle={subtitle} testId="studio-overview-release">
+    <Panel title={t('shell.studio.overview.changes.title')} testId="studio-overview-release">
       {body}
     </Panel>
   )
