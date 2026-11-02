@@ -362,7 +362,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                   "name": "Home",
                   "formatVersion": 1,
                   "title": { "textKey": "pages.home.title" },
-                  "widgets": [{ "type": "taskInbox" }]
+                  "widgets": [{ "type": "taskInbox", "name": "taskInbox" }]
                 }
                 """);
             Write(folder, "texts/en.json", $$"""

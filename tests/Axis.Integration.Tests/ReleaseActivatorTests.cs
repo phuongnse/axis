@@ -955,7 +955,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
     private static string OrdersPage(Guid id) =>
         $$"""
         { "id": "{{id}}", "kind": "page", "name": "Orders", "formatVersion": 1,
-          "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] }
+          "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Order" } ] }
         """;
 
     private static string AccountsProvider(Guid id) =>

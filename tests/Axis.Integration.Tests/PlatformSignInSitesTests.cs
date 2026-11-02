@@ -140,7 +140,7 @@ public sealed class PlatformSignInSitesTests(PostgreSqlFixture database, Keycloa
                 """)
             .With("pages/home.json", """
                 { "id": "4d7c2a63-9e1f-4b58-8d2c-3a8f6b0e5c22", "kind": "page", "name": "Home", "formatVersion": 1,
-                  "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox" } ] }
+                  "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }
                 """)
             .With("identity-providers/accounts.json", """{ "id": "4d7c2a63-9e1f-4b58-8d2c-3a8f6b0e5c23", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""")
             .With("identity-providers/partner.json", OidcProvider("4d7c2a63-9e1f-4b58-8d2c-3a8f6b0e5c24", "partner", "SiteIssuer"))

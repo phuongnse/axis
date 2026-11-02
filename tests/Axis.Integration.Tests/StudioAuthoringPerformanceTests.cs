@@ -274,7 +274,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
               "name": "Home",
               "formatVersion": 1,
               "title": { "textKey": "common.name" },
-              "widgets": [{ "type": "taskInbox" }]
+              "widgets": [{ "type": "taskInbox", "name": "taskInbox" }]
             }
             """);
         files.Add("pages/home.json");

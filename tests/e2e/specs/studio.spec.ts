@@ -555,7 +555,7 @@ test.describe('Studio on a copy of its own', () => {
     const id = randomUUID()
     await writeFile(
       pageFile,
-      JSON.stringify({ id, kind: 'page', name: 'LabelTextsE2e', formatVersion: 1, widgets: [{ type: 'taskInbox' }] }),
+      JSON.stringify({ id, kind: 'page', name: 'LabelTextsE2e', formatVersion: 1, widgets: [{ type: 'taskInbox', name: 'taskInbox' }] }),
     )
 
     try {

@@ -318,7 +318,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
                 ["target"] = "PurchaseRequest",
                 ["required"] = true,
             }),
-            ["widgets"] = new JsonArray(new JsonObject { ["type"] = "taskInbox" }),
+            ["widgets"] = new JsonArray(new JsonObject { ["type"] = "taskInbox", ["name"] = "taskInbox" }),
         };
         File.WriteAllText(file, page.ToJsonString());
     }
