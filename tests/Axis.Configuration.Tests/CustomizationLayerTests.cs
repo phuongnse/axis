@@ -1,5 +1,6 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 
@@ -396,6 +397,99 @@ public sealed class CustomizationLayerTests
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
         Assert.Null(compiled.Model);
     }
+
+    [Fact]
+    public void A_newer_module_version_that_dropped_a_key_the_layer_changes_is_reported_in_the_layer_and_on_the_module_entry()
+    {
+        using var modules = ModulesWithRenamedStep();
+        using var folder = RangedApplication().With(ReviewFile, Layer("approvals/Review"));
+
+        var compiled = CompileAgainstActiveRelease(folder, modules);
+
+        var dropped = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.LayerKeyDroppedByModuleUpgrade);
+        Assert.Equal((ReviewFile, "/changes/steps/0/name", Guid.Parse(LayerId)), (dropped.File, dropped.Path, dropped.ResourceId));
+        var summary = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.ModuleUpgradeBreaksLayers);
+        Assert.Equal(("application.json", "/modules/0", Guid.Parse(ApplicationId)), (summary.File, summary.Path, summary.ResourceId));
+        Assert.Contains("'approvals'", summary.Message, StringComparison.Ordinal);
+        Assert.Contains("1.0.0", summary.Message, StringComparison.Ordinal);
+        Assert.Contains("1.1.0", summary.Message, StringComparison.Ordinal);
+        Assert.Contains(ReviewFile, summary.Message, StringComparison.Ordinal);
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
+    public void Without_an_active_release_a_layer_element_whose_key_the_module_lacks_is_an_added_element()
+    {
+        using var modules = ModulesWithRenamedStep();
+        using var folder = RangedApplication().With(ReviewFile, Layer("approvals/Review"));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.LayerKeyDroppedByModuleUpgrade);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.ModuleUpgradeBreaksLayers);
+    }
+
+    [Fact]
+    public void A_module_version_that_keeps_every_key_the_layer_names_applies_the_layer()
+    {
+        using var modules = ModulesWithRenamedStep(rename: false);
+        using var folder = RangedApplication().With(ReviewFile, Layer("approvals/Review"));
+
+        var compiled = CompileAgainstActiveRelease(folder, modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var review = Assert.IsType<TaskStepModel>(Assert.Single(compiled.Model!.Processes).Steps[0]);
+        Assert.Equal(TimeSpan.FromDays(3), review.DueIn);
+    }
+
+    [Fact]
+    public void A_missing_anchor_after_a_module_upgrade_is_reported_with_the_summary()
+    {
+        using var modules = ModulesWithRenamedStep();
+        using var folder = RangedApplication().With(ReviewFile, Layer("approvals/Review", changes: """{ "steps": [ { "name": "extra", "type": "end", "after": "review" } ] }"""));
+
+        var compiled = CompileAgainstActiveRelease(folder, modules);
+
+        Assert.Equal(
+            [DiagnosticCodes.UnknownLayerAnchor, DiagnosticCodes.ModuleUpgradeBreaksLayers],
+            compiled.Diagnostics.Select(diagnostic => diagnostic.Code).Order(StringComparer.Ordinal));
+        var anchor = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownLayerAnchor);
+        Assert.Equal((ReviewFile, "/changes/steps/0"), (anchor.File, anchor.Path));
+    }
+
+    private static CompilationResult CompileAgainstActiveRelease(TemporaryFolder folder, TemporaryFolder modules)
+    {
+        var installed = ModuleCatalog.Load(modules.Path).Modules;
+        var active = installed.Where(module => module.Manifest.Version == "1.0.0").ToList();
+        return ApplicationCompiler.Compile(ApplicationLoader.Load(folder.Path), [], installed, active, ApplicationCompiler.DefaultMaxFileSize);
+    }
+
+    /// <summary>The modules with a version 1.1.0 of <c>approvals</c> that copies 1.0.0 and, when asked, renames the step <c>review</c> to <c>approval</c>.</summary>
+    private static TemporaryFolder ModulesWithRenamedStep(bool rename = true)
+    {
+        var modules = Modules();
+        var source = Path.Combine(modules.Path, "approvals", "1.0.0");
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var content = File.ReadAllText(file).Replace("\"1.0.0\"", "\"1.1.0\"", StringComparison.Ordinal);
+            if (rename && Path.GetFileName(file) == "Review.json")
+            {
+                content = content
+                    .Replace("\"name\": \"review\"", "\"name\": \"approval\"", StringComparison.Ordinal)
+                    .Replace("\"start\": \"review\"", "\"start\": \"approval\"", StringComparison.Ordinal);
+            }
+
+            modules.With(Path.Combine("approvals", "1.1.0", Path.GetRelativePath(source, file)), content);
+        }
+
+        return modules;
+    }
+
+    private static TemporaryFolder RangedApplication() =>
+        Application().With("application.json", $$"""
+            { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1,
+              "modules": [{ "id": "approvals", "version": "^1.0.0" }] }
+            """);
 
     private static string Layer(string target, string id = LayerId, string changes = ReviewChanges) => $$"""
         { "id": "{{id}}", "kind": "layer", "formatVersion": 1, "target": "{{target}}", "changes": {{changes}} }

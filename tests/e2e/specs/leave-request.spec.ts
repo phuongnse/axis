@@ -19,7 +19,7 @@ const tasksPath = `${appPath}/tasks`;
 
 /** A unique part for the titles of this run, so runs and parallel specs never share a title. */
 function runId() {
-  return `${Date.now()}-${test.info().retry}`;
+  return `${Date.now()}-${test.info().parallelIndex}-${test.info().retry}`;
 }
 
 /** Runs `body` with an API context that holds `user`'s saved session, and disposes the context after. */

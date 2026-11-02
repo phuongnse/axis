@@ -104,7 +104,9 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   `modules/<id>/module.json`. There is no extra release table. A release keeps
   working when the version is later removed from the installation, because the
   release holds the files. A newer installed version in range gives a new
-  release at the next activation, as for packages.
+  release at the next activation, as for packages. A
+  [customization layer](customization-layers.md#versions-until-m29) that names a
+  key the newer version dropped fails that compile, and the release in use stays.
 - **References.** An application resource names a module resource as
   `<module id>/<name>`, for example `departments/Department`. A module resource
   names resources of its own module without a `/`, and resources of a module its
