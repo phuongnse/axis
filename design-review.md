@@ -119,3 +119,17 @@ the review.
   side column goes under it at full width, and its tiles fill the row, no narrower than the new `tile` size token,
   240 px. An application with no live release has one column. The problems panel lies over the page, so it covers the
   side column while it is open.
+- **More in the side column.** The owner found the side column too short with one or two sites, and asked what else
+  is worth it there. Recommended and agreed: what an author looks up rather than works on, one question a block,
+  never what the band or the main column already says. The Live block holds the sites alone: the band names the live
+  release and the Releases list says who published it and when. Under it:
+  - Tests: how the newest run of every scenario went, "All 6 scenarios passed" in successText or "1 of 6 scenarios
+    failed" in dangerText, "Run <time> by <person>" in textMuted, and each failed scenario as a link that opens it at
+    its failing step; "Not run yet. Run tests runs every scenario." before any; no block for an application with no
+    scenario. For the docs change: a Proposed `GET .../tests/latest`, the newest ended test request on the tenant
+    that ran every scenario, as `GET .../requests/{id}` answers it, or 204.
+  - Built with: each module the folder pins, its label and, on the right in textMuted, the pinned version; no block
+    when it uses none. For the docs change: a Proposed `GET .../dependencies`. Extension packages are left out until
+    a package manifest has a label, so no package id shows.
+  Not taken: the languages and sign-in, which the sidebar and the site already show, and run-time figures such as
+  open tasks or failed calls, which are the console's.

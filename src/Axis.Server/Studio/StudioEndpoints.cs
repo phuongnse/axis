@@ -82,6 +82,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/names", NamesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/policy-matrix", PolicyMatrixAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/dependencies", DependenciesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
@@ -597,6 +598,33 @@ internal static class StudioEndpoints
             name,
             titles.Count > 0 ? titles : null,
             kind == "text" ? root["locale"]?.GetValue<string>() : null);
+    }
+
+    /// <summary>
+    /// Proposed: what the application is built with, the modules its folder pins, each with the label and the version
+    /// the module catalog gives it, in the manifest's order. The Overview's Built with block lists them.
+    /// </summary>
+    private static async Task<IResult> DependenciesAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var compiled = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules);
+        var items = compiled.ModulePins
+            .Select(pin => new StudioDependency(
+                pin.Id,
+                modules.Modules.FirstOrDefault(module => module.Manifest.Id == pin.Id && module.Manifest.Version == pin.Version)?.Manifest.Label,
+                pin.Version))
+            .ToList();
+        return Results.Ok(new StudioDependenciesResponse(items));
     }
 
     private static async Task<IResult> PatchAsync(
@@ -1117,3 +1145,9 @@ internal sealed record StudioReleaseItem(
     string? Label,
     string? Note,
     Guid? RequestId);
+
+/// <summary>Proposed: the modules an application is built with, as <c>GET .../dependencies</c> answers them.</summary>
+internal sealed record StudioDependenciesResponse(IReadOnlyList<StudioDependency> Modules);
+
+/// <summary>Proposed: a module the folder pins: its id, its label, or null when it has none, and the pinned version.</summary>
+internal sealed record StudioDependency(string Id, string? Label, string Version);

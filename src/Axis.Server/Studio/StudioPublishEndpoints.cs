@@ -48,6 +48,43 @@ internal static class StudioPublishEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/test", TestAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/rollback", RollbackAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapGet("/api/studio/apps/{application}/requests/{id}", GetRequestAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/tests/latest", LatestTestAsync);
+    }
+
+    /// <summary>
+    /// Proposed: the newest test request of the application that ran every scenario and has ended, as
+    /// <c>GET .../requests/{id}</c> answers it, so the Overview can say how the last full run went. 204 when there is none.
+    /// </summary>
+    private static async Task<IResult> LatestTestAsync(
+        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
+        {
+            return Results.NoContent();
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT id FROM axis.publish_requests
+            WHERE application_id = @application AND kind = 'test' AND target = 'tenant'
+              AND scenario_names IS NULL AND status IN ('succeeded', 'failed')
+            ORDER BY finished_at DESC
+            LIMIT 1
+            """,
+            connection);
+        command.Parameters.AddWithValue("application", applicationId);
+        var id = await command.ExecuteScalarAsync(cancellationToken);
+        return id is Guid requestId
+            ? await GetRequestAsync(application, requestId.ToString("D"), httpContext, options, database)
+            : Results.NoContent();
     }
 
     private static async Task<IResult> RollbackAsync(
