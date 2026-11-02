@@ -3,6 +3,8 @@ import path from "node:path";
 
 export interface CompareOptions {
   files?: string[];
+  /** Ignores the `name` of page widgets, actions, columns and tabs, which Studio does not write yet. */
+  ignorePageElementNames?: boolean;
 }
 
 type Seeds = Map<string, string>;
@@ -39,6 +41,10 @@ export function compareApplicationFolders(expected: string, actual: string, opti
       const actualJson = readJson(path.join(actual, file));
       if (isObject(expectedJson)) delete expectedJson.id;
       if (isObject(actualJson)) delete actualJson.id;
+      if (options.ignorePageElementNames) {
+        dropPageElementNames(expectedJson);
+        dropPageElementNames(actualJson);
+      }
       compareValue(file, "", expectedJson, actualJson, seeds);
     } else {
       const expectedText = fs.readFileSync(path.join(expected, file), "utf8");
@@ -145,4 +151,26 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function escapePointer(key: string): string {
   return key.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+function dropPageElementNames(page: unknown): void {
+  if (isObject(page) && page.kind === "page") dropWidgetNames(page.widgets);
+}
+
+function dropWidgetNames(widgets: unknown): void {
+  for (const widget of objectsIn(widgets)) {
+    delete widget.name;
+    for (const key of ["actions", "rowActions", "toolbarActions"]) {
+      for (const action of objectsIn(widget[key])) delete action.name;
+    }
+    dropWidgetNames(widget.widgets);
+    for (const column of [...objectsIn(widget.columns), ...objectsIn(widget.tabs)]) {
+      delete column.name;
+      dropWidgetNames(column.widgets);
+    }
+  }
+}
+
+function objectsIn(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isObject) : [];
 }

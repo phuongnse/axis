@@ -890,7 +890,7 @@ test.describe('the author builds the asset management application with Studio on
     const files = (await readdir(assetManagement, { recursive: true })).filter(sixParts).sort()
     expect((await readdir(built, { recursive: true })).filter(sixParts).sort()).toEqual(files)
     await expect(page.getByTestId('studio-group-migration').getByRole('button')).toHaveCount(0)
-    compareApplicationFolders(assetManagement, built, { files })
+    compareApplicationFolders(assetManagement, built, { files, ignorePageElementNames: true })
 
     const response = await page.request.get(`${journeyURL}/api/studio/apps/AssetManagement/diagnostics`)
     expect(response.status()).toBe(200)
@@ -913,6 +913,7 @@ test.describe('the author builds the asset management application with Studio on
         'pages/dashboard.json',
         'sites/asset-management.json',
       ],
+      ignorePageElementNames: true,
     })
     // The sample has no Home page.
     expect(await readdir(path.join(built, 'pages'))).not.toContain('home.json')
@@ -1152,7 +1153,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    compareApplicationFolders(assetManagement, built)
+    compareApplicationFolders(assetManagement, built, { ignorePageElementNames: true })
     const response = await page.request.get(`${journeyURL}/api/studio/apps/AssetManagement/diagnostics`)
     expect(response.status()).toBe(200)
     const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }

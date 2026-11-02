@@ -146,7 +146,12 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       await expect
         .poll(async () => JSON.parse(await readFile(file, "utf8")).widgets)
         .toEqual([
-          { type: "detail", entity: "Ticket", record: "ticket" },
+          {
+            type: "detail",
+            name: "ticketDetail",
+            entity: "Ticket",
+            record: "ticket",
+          },
           {
             type: "section",
             title: { textKey: "" },
@@ -277,7 +282,10 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
           const { widgets } = JSON.parse(await readFile(file, "utf8"));
           return [widgets.length, widgets[0].columns[1].widgets[1]];
         })
-        .toEqual([1, { type: "table", dataSource: "AllTicketList" }]);
+        .toEqual([
+          1,
+          { type: "table", name: "allTickets", dataSource: "AllTicketList" },
+        ]);
     } finally {
       await cp(path.join(serviceDesk, "pages", "dashboard.json"), file);
     }
