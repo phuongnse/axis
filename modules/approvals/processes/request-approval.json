@@ -51,14 +51,36 @@
       "name": "findDelegate",
       "type": "operation",
       "operation": "updateRecord",
-      "set": { "approverUser": "approver.user" },
-      "next": "decide"
+      "set": {
+        "onBehalfOf": "if(organization:IsDelegating(approver.delegateFrom, approver.delegateUntil) and approver.delegate != null, approver.user, null)",
+        "approverUser": "if(organization:IsDelegating(approver.delegateFrom, approver.delegateUntil) and approver.delegate != null, approver.delegate.user, approver.user)"
+      },
+      "next": "route"
+    },
+    {
+      "name": "route",
+      "type": "decision",
+      "branches": [{ "name": "toAdmin", "when": "approverUser == null or approverUser == requester", "next": "adminDecide" }],
+      "otherwise": "decide"
     },
     {
       "name": "decide",
       "type": "task",
       "label": { "textKey": "approvals.requestApproval.decide" },
       "assignee": { "user": "approverUser" },
+      "form": "RequestReview",
+      "dueIn": "P3D",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "approvals.requestApproval.approve" }, "next": "recordApproval" },
+        { "name": "return", "label": { "textKey": "approvals.requestApproval.return" }, "next": "logReturn" },
+        { "name": "reject", "label": { "textKey": "approvals.requestApproval.reject" }, "next": "logRejection" }
+      ]
+    },
+    {
+      "name": "adminDecide",
+      "type": "task",
+      "label": { "textKey": "approvals.requestApproval.decide" },
+      "assignee": { "role": "admin" },
       "form": "RequestReview",
       "dueIn": "P3D",
       "outcomes": [
@@ -84,6 +106,7 @@
         "stepSequence": "stepSequence",
         "outcome": "'approved'",
         "decidedBy": "accountableUser()",
+        "onBehalfOf": "onBehalfOf",
         "comment": "decisionComment",
         "decidedAt": "now()"
       },
@@ -99,6 +122,7 @@
         "stepSequence": "stepSequence",
         "outcome": "'returned'",
         "decidedBy": "accountableUser()",
+        "onBehalfOf": "onBehalfOf",
         "comment": "decisionComment",
         "decidedAt": "now()"
       },
@@ -114,6 +138,7 @@
         "stepSequence": "stepSequence",
         "outcome": "'rejected'",
         "decidedBy": "accountableUser()",
+        "onBehalfOf": "onBehalfOf",
         "comment": "decisionComment",
         "decidedAt": "now()"
       },

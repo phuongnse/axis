@@ -1,0 +1,57 @@
+{
+  "id": "a27d5e83-4b19-4c60-b8f2-0e6c9d1a7f34",
+  "kind": "scenario",
+  "name": "DepartmentHeadRequestGoesToAdmin",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "users": {
+    "admin": ["admin"],
+    "hank": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "hank",
+      "values": { "fullName": "Hank Pham", "workEmail": "hank@example.com", "user": "hank" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Department",
+      "as": "admin",
+      "save": "sales",
+      "values": { "code": "SALES", "name": "Sales", "head": "hank" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "hank",
+      "as": "admin",
+      "values": { "department": "sales" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "travel",
+      "values": {
+        "name": "Travel",
+        "code": "TRAVEL",
+        "steps": [{ "sequence": 1, "approver": "departmentHead" }]
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "hank",
+      "save": "trip",
+      "values": { "type": "travel", "title": "Conference trip", "amount": 800 }
+    },
+    { "type": "startProcess", "process": "RequestApproval", "record": "trip", "as": "hank" },
+    { "type": "expectTask", "record": "trip", "step": "adminDecide", "assignee": { "role": "admin" } },
+    { "type": "completeTask", "record": "trip", "step": "adminDecide", "outcome": "approve", "as": "hank", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "adminDecide", "outcome": "approve", "as": "admin" },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "trip", "state": "completed" },
+    { "type": "expectRecord", "record": "trip", "values": { "status": "approved", "step": 1 } }
+  ]
+}
