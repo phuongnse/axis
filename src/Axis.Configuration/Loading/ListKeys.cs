@@ -77,6 +77,9 @@ internal static class ListKeys
             [(ResourceKinds.Event, "fields")] = _value,
         }.ToFrozenDictionary();
 
+    /// <summary>Every list in the table, by resource kind and property name.</summary>
+    internal static IEnumerable<KeyValuePair<(string Kind, string Property), ListKey>> Entries => _keys;
+
     /// <summary>Finds the key of the object list that the property <paramref name="property"/> of a <paramref name="kind"/> holds.</summary>
     public static bool TryGet(string kind, string property, out ListKey key) =>
         _keys.TryGetValue((kind, property), out key);

@@ -6,10 +6,12 @@ layers to the pinned module version, then checks the result, the [module contrac
 included. [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees
 the idea, and [D122](../decisions/d122-how-a-customization-layer-is-written-and-applied.md) agrees
 the shapes below. The layer resource and the checks of [the layer resource](#the-layer-resource)
-are built: a layer that compiles is stored in the release and counts toward its content hash, but
-does not yet change anything. Applying layers, Studio's support for them and everything below
-that section are _(planned for M25)_. Module upgrades, the three-way merge and eject are
-_(planned for M29)_.
+and [applying a layer](#applying-a-layer) are built: compilation merges the `changes` of a layer
+into its module resource before any check, and the release stores the layer and the module's own
+files side by side. Ordering with `after` and `before`, removing a whole resource, reporting a
+diagnostic of the merged resource in the layer file, and a layer on a `contract` are still
+_(planned for M25)_, as are Studio's support for layers and the sections below that are not about
+applying. Module upgrades, the three-way merge and eject are _(planned for M29)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -104,21 +106,30 @@ Compilation applies each layer to the resource of the pinned module version, bef
 - **Value lists**, such as a grant's `actions`, a notification's `to` or an index's `fields`, are
   one value. A layer that gives one replaces the whole list.
 - **Expressions** are one value. A layer that changes one replaces the whole expression.
-- **Order.** An added element goes to the end of its list, unless it has `"after": "<key>"` or
+- **Order** _(planned for M25)_. An added element goes to the end of its list, unless it has `"after": "<key>"` or
   `"before": "<key>"`, never both. A changed element with `after` or `before` moves there. The key
   names an element of the merged list. Order counts in fields, form sections and fields, widgets,
   columns, tabs, actions and steps of a wizard. In a process the steps are a graph, so their order
   only sets how Studio lists them.
-- **Removing a whole resource.** A layer whose `changes` is `{ "remove": true }` removes the
+- **Removing a whole resource** _(planned for M25)_. A layer whose `changes` is `{ "remove": true }` removes the
   resource from the application. A reference to it is then a diagnostic.
 - **Then the checks.** The merged resource is checked as any resource of its kind: its schema, its
   references, its expressions, the contract and the grant ceiling. A diagnostic about something the
   layer added or changed is reported in the layer file, at the path of the change. A diagnostic
   about the module's own part, such as a reference that the layer removed, is reported in the layer
-  file at the removed element.
+  file at the removed element. Reporting in the layer file is _(planned for M25)_. Until then the
+  diagnostic of the merged resource is reported in the module's file, at the path in the merged
+  resource.
+- **Keys and names.** Keys are matched ignoring letter case, and a changed element keeps the
+  module's spelling of its key. The root `id`, `kind`, `name` and `formatVersion` are never merged.
+  A layer on a `contract` or a `scenario` is stored and not applied _(planned for M25)_.
 - **Checks of the layer itself.** A key in `changes` that the module's resource does not have, as a
   change, a remove or an anchor of `after` or `before`, is a diagnostic. So is a property that the
-  kind does not have. A layer never matches by position.
+  kind does not have. A layer never matches by position. The checks are `AXC0359` for an unknown key
+  in a remove, `AXC0360` for a remove that holds more than its key and `AXC0361` for an unknown
+  property, each reported at its path under `/changes` in the layer file. A layer with one of them is
+  not applied. An element whose key the module's list lacks is an added element until `after` and
+  `before` exist, so only a remove can name an unknown key.
 
 ## List keys
 
@@ -148,6 +159,9 @@ schemas.
   `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A widget's `name` is unique on its page,
   whatever its depth, so a layer finds a widget inside a section or a tab by its name.
 - An element of a list that the table does not name is part of a value list.
+- A list that the table still marks as pending in code, such as a process's `branches` and
+  `escalations`, a form's `sections` and `steps` and the lists of a page, is a value list until its
+  naming issue keys it. A layer that changes one gives the whole list.
 - A text's `texts` is a map, so a layer on a module text changes or adds keys as an object merges.
   A business that wants another label changes the text, never a name.
 

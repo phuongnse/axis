@@ -80,7 +80,8 @@ internal static class ModuleChecker
     /// Checks <paramref name="application"/>'s modules and the modules they depend on, and returns
     /// the pins of the modules without problems, the application's entries as written and then each
     /// dependency in the order it is first reached, the canonical files of the pinned versions that
-    /// are valid and the resources read from those files.
+    /// are valid and the resources read from those files. The resources read are those of the module with the
+    /// <paramref name="layers"/> of the application applied, and the files are the module's own.
     /// </summary>
     public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources) Check(
         ApplicationManifest application,
@@ -90,7 +91,8 @@ internal static class ModuleChecker
         IReadOnlyList<RoleResource> roles,
         IReadOnlySet<string> unloadedRoleNames,
         IReadOnlyList<ConnectorResource> connectors,
-        IReadOnlySet<string> unloadedConnectorNames)
+        IReadOnlySet<string> unloadedConnectorNames,
+        IReadOnlyList<LayerResource> layers)
     {
         var versionsById = installed
             .GroupBy(candidate => candidate.Manifest.Id, StringComparer.Ordinal)
@@ -227,7 +229,10 @@ internal static class ModuleChecker
                 string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
                 && string.Equals(candidate.Manifest.Version, picked, StringComparison.Ordinal));
             var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
-            CheckFiles(pinnedModule, declared, files, resources, diagnostics);
+            var moduleLayers = first.Asker is null
+                ? layers.Where(layer => LayerModuleId(layer) == id).ToList()
+                : [];
+            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, diagnostics);
             if (first.Asker is null)
             {
                 references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
@@ -635,10 +640,12 @@ internal static class ModuleChecker
     private static void CheckFiles(
         InstalledModule module,
         IReadOnlySet<string> declared,
+        List<LayerResource> layers,
         List<ResourceContent> files,
         ModuleResourceCollector resources,
         List<Diagnostic> diagnostics)
     {
+        var kindsByName = layers.Count == 0 ? null : LayerChecker.KindsByName(module);
         foreach (var file in module.Files)
         {
             var path = $"modules/{module.Manifest.Id}/{file.Path}";
@@ -665,13 +672,17 @@ internal static class ModuleChecker
                 var resourceId = ReadResourceId(root);
                 if (file.Path != ModuleCatalog.ManifestFileName)
                 {
-                    if (!CheckKind(path, root, resourceId, diagnostics))
+                    // The model reads the resource with the layer applied. The release keeps the file as the
+                    // module wrote it, so that compiling the stored release applies the layer once.
+                    using var merged = ApplyLayer(root, layers, kindsByName, diagnostics);
+                    var effective = merged?.RootElement ?? root;
+                    if (!CheckKind(path, effective, resourceId, diagnostics))
                     {
-                        resources.AddUnloaded(module.Manifest.Id, root);
+                        resources.AddUnloaded(module.Manifest.Id, effective);
                         continue;
                     }
 
-                    resources.Add(module.Manifest.Id, declared, path, root, diagnostics);
+                    resources.Add(module.Manifest.Id, declared, path, effective, diagnostics);
 
                     // A module scenario is a test. It is not part of the release or its content hash.
                     if (root.GetProperty("kind").GetString() == ResourceKinds.Scenario)
@@ -683,6 +694,52 @@ internal static class ModuleChecker
                 files.Add(new ResourceContent(path, JsonCanonicalizer.Canonicalize(root)));
             }
         }
+    }
+
+    /// <summary>The module id of a layer's target, the text before the first <c>/</c>.</summary>
+    private static string LayerModuleId(LayerResource layer)
+    {
+        var slash = layer.Target.IndexOf('/', StringComparison.Ordinal);
+        return slash < 0 ? layer.Target : layer.Target[..slash];
+    }
+
+    /// <summary>
+    /// Merges the layer of a module file into it. The layer is the first one that names the file's resource,
+    /// ignoring letter case, and applies only when that name is one resource of a kind that a layer may change
+    /// now, which is neither a scenario nor a contract. Returns null when there is no layer to apply, or when
+    /// the layer has a problem of its own, so the module's file is read as it is.
+    /// </summary>
+    private static JsonDocument? ApplyLayer(
+        JsonElement root,
+        List<LayerResource> layers,
+        ILookup<string, string>? kindsByName,
+        List<Diagnostic> diagnostics)
+    {
+        if (kindsByName is null
+            || root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("kind", out var kindElement) || kindElement.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("name", out var nameElement) || nameElement.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var kind = kindElement.GetString()!;
+        var name = nameElement.GetString()!;
+        var layer = layers.FirstOrDefault(candidate =>
+            candidate.Target.Length > LayerModuleId(candidate).Length + 1
+            && string.Equals(candidate.Target[(LayerModuleId(candidate).Length + 1)..], name, StringComparison.OrdinalIgnoreCase));
+        if (layer is null
+            || kindsByName[name].Distinct(StringComparer.Ordinal).Count() != 1
+            || kind is ResourceKinds.Scenario or ResourceKinds.Contract
+            || !ResourceSchemas.TryGet(kind, out var kindSchema))
+        {
+            return null;
+        }
+
+        var countBefore = diagnostics.Count;
+        var result = LayerMerger.Merge(kind, root, layer, diagnostics);
+        LayerMerger.CheckProperties(kind == ResourceKinds.Trigger ? ResourceSchemas.ModuleTrigger : kindSchema, result, layer, diagnostics);
+        return diagnostics.Count == countBefore ? JsonSerializer.SerializeToDocument(result.Merged) : null;
     }
 
     /// <summary>Checks that a module file has a kind a module may hold and is valid against the schema of that kind.</summary>

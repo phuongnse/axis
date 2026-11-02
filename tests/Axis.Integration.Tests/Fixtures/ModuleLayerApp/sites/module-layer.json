@@ -1,0 +1,10 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3f04",
+  "kind": "site",
+  "name": "ModuleLayer",
+  "formatVersion": 1,
+  "path": "modulelayer",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [{ "page": "intake/NewIntake", "label": { "textKey": "nav.newIntake" } }]
+}

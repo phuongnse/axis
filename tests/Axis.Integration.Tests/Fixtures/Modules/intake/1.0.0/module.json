@@ -1,0 +1,7 @@
+{
+  "kind": "module",
+  "id": "intake",
+  "version": "1.0.0",
+  "label": "Intake",
+  "roles": [{ "name": "clerk", "label": { "textKey": "intake.roles.clerk" } }]
+}

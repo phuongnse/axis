@@ -1,0 +1,13 @@
+{
+  "id": "9c4e1a20-5d3b-4f7a-8b16-2a0d6c8e4f02",
+  "kind": "form",
+  "name": "IntakeForm",
+  "formatVersion": 1,
+  "entity": "Intake",
+  "sections": [
+    {
+      "title": { "textKey": "intake.intakeForm.title" },
+      "fields": [{ "field": "title" }]
+    }
+  ]
+}

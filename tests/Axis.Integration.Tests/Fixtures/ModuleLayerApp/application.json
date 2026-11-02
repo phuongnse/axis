@@ -1,0 +1,7 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3f01",
+  "kind": "application",
+  "name": "ModuleLayerApp",
+  "formatVersion": 1,
+  "modules": [{ "id": "intake", "version": "^1.0.0", "roles": { "clerk": "clerk" } }]
+}

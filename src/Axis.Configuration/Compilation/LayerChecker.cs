@@ -159,7 +159,7 @@ internal static class LayerChecker
     /// is not valid JSON, or has no <c>kind</c> or <c>name</c> text, is left out, because
     /// <see cref="ModuleChecker"/> reports it.
     /// </summary>
-    private static ILookup<string, string> KindsByName(InstalledModule module)
+    internal static ILookup<string, string> KindsByName(InstalledModule module)
     {
         var pairs = new List<(string Name, string Kind)>();
         foreach (var file in module.Files)

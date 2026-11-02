@@ -1,0 +1,11 @@
+{
+  "id": "9c4e1a20-5d3b-4f7a-8b16-2a0d6c8e4f05",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "intake.intakeForm.title": "Intake",
+    "intake.pages.newIntake.title": "New intake"
+  }
+}

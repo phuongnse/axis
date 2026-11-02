@@ -1,5 +1,6 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 
 namespace Axis.Configuration.Tests;
@@ -182,6 +183,63 @@ public sealed class CustomizationLayerTests
         Assert.Equal(first.ContentHash, rebuilt.ContentHash);
     }
 
+    [Fact]
+    public void A_layer_changes_the_process_of_the_module_and_leaves_the_rest_as_it_was()
+    {
+        using var modules = Modules();
+        var installed = ModuleCatalog.Load(modules.Path).Modules;
+        using var plain = Application();
+        using var layered = Application().With(ReviewFile, Layer("approvals/Review", changes: """
+            { "steps": [
+                { "name": "review", "dueIn": "P3D",
+                  "outcomes": [
+                    { "name": "reject", "remove": true },
+                    { "name": "escalate", "label": { "textKey": "approvals.escalate" }, "next": "archive" } ] },
+                { "name": "archive", "type": "end" } ] }
+            """));
+
+        var before = Assert.Single(ApplicationCompiler.Compile(plain.Path, null, installed).Model!.Processes);
+        var compiled = ApplicationCompiler.Compile(layered.Path, null, installed);
+
+        Assert.Empty(compiled.Diagnostics);
+        var after = Assert.Single(compiled.Model!.Processes);
+        Assert.Equal(["review", "done", "archive"], after.Steps.Select(step => step.Name));
+        var review = Assert.IsType<TaskStepModel>(after.Steps[0]);
+        var original = Assert.IsType<TaskStepModel>(before.Steps[0]);
+        Assert.Equal(TimeSpan.FromDays(3), review.DueIn);
+        Assert.Equal(["approve", "escalate"], review.Outcomes.Select(outcome => outcome.Name));
+        Assert.Equal("archive", review.Outcomes[1].Next);
+        Assert.Equal(["approve", "reject"], original.Outcomes.Select(outcome => outcome.Name));
+        Assert.Equal((original.Label, original.Form, original.Assignee.User!.Expression, original.Deadline), (review.Label, review.Form, review.Assignee.User!.Expression, review.Deadline));
+        Assert.Equal(original.Outcomes[0], review.Outcomes[0]);
+        Assert.Equal(before.Steps[1], after.Steps[1]);
+        Assert.Equal((before.Name, before.Start, before.Entity), (after.Name, after.Start, after.Entity));
+        Assert.Equal(
+            Assert.Single(compiled.Resources, resource => resource.Path == "modules/approvals/processes/Review.json").Content,
+            Assert.Single(ApplicationCompiler.Compile(plain.Path, null, installed).Resources, resource => resource.Path == "modules/approvals/processes/Review.json").Content);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [ { "name": "missing", "remove": true } ] }""", DiagnosticCodes.UnknownLayerKey, "/changes/steps/0/name")]
+    [InlineData("""{ "steps": [ { "name": "review", "outcomes": [ { "name": "Nope", "remove": true } ] } ] }""", DiagnosticCodes.UnknownLayerKey, "/changes/steps/0/outcomes/0/name")]
+    [InlineData("""{ "steps": [ { "name": "done", "type": "end" }, { "name": "review", "outcomes": [ { "name": "reject", "remove": true, "next": "done" } ] } ] }""", DiagnosticCodes.InvalidLayerRemove, "/changes/steps/1/outcomes/0")]
+    [InlineData("""{ "steps": [ { "name": "review", "colour": "red" } ] }""", DiagnosticCodes.UnknownLayerProperty, "/changes/steps/0/colour")]
+    [InlineData("""{ "steps": [ { "name": "extra", "type": "end", "colour": "red" } ] }""", DiagnosticCodes.UnknownLayerProperty, "/changes/steps/0/colour")]
+    [InlineData("""{ "colour": "red" }""", DiagnosticCodes.UnknownLayerProperty, "/changes/colour")]
+    public void A_change_that_cannot_apply_is_reported_at_its_path_in_the_layer_and_not_applied(string changes, string code, string path)
+    {
+        using var modules = Modules();
+        using var folder = Application().With(ReviewFile, Layer("approvals/Review", changes: changes));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(
+            (code, ReviewFile, path, Guid.Parse(LayerId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(compiled.Model);
+    }
+
     private static string Layer(string target, string id = LayerId, string changes = ReviewChanges) => $$"""
         { "id": "{{id}}", "kind": "layer", "formatVersion": 1, "target": "{{target}}", "changes": {{changes}} }
         """;
@@ -213,7 +271,9 @@ public sealed class CustomizationLayerTests
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "formatVersion": 1,
                   "entity": "Approval", "start": "review", "steps": [
                     { "name": "review", "type": "task", "label": { "textKey": "approvals.review" }, "assignee": { "user": "'u1'" }, "form": "ApprovalForm",
-                      "outcomes": [ { "name": "approve", "label": { "textKey": "approvals.approve" }, "next": "done" } ] },
+                      "outcomes": [
+                        { "name": "approve", "label": { "textKey": "approvals.approve" }, "next": "done" },
+                        { "name": "reject", "label": { "textKey": "approvals.reject" }, "next": "done" } ] },
                     { "name": "done", "type": "end" }
                   ] }
                 """)
@@ -233,7 +293,7 @@ public sealed class CustomizationLayerTests
                 """)
             .With("approvals/1.0.0/TextsEn.json", """
                 { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "approvals.approval": "Approval", "approvals.review": "Review", "approvals.approve": "Approve", "approvals.reviews": "Reviews" } }
+                  "texts": { "approvals.approval": "Approval", "approvals.review": "Review", "approvals.approve": "Approve", "approvals.reject": "Reject", "approvals.escalate": "Escalate", "approvals.reviews": "Reviews" } }
                 """);
 
     private static TemporaryFolder Application() =>

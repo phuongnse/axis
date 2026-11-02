@@ -9,7 +9,7 @@ namespace Axis.Configuration.Resources;
 /// <see cref="Resource"/>. The schema checks its shape. Where the file sits, whether its
 /// <see cref="Target"/> names a resource that may be changed and whether <see cref="Changes"/> leaves
 /// the identity of the target alone are checked by <see cref="Compilation.ApplicationCompiler"/>.
-/// Applying the changes is not built yet.
+/// Compilation merges the changes into the module resource before any check, so the application runs the module as changed.
 /// </summary>
 public sealed record LayerResource
 {

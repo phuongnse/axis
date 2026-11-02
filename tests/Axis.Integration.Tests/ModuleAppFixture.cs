@@ -25,6 +25,9 @@ namespace Axis.Integration.Tests;
 /// one relax entry: the <c>Request</c> submit guard, the <c>Ticket</c> <c>amountFrozenAfterSubmit</c> validation, the
 /// <c>ledgers</c> <c>Claim</c> <c>entryRecorded</c> effect and the <c>claims</c> <c>viewer</c> ceiling slot. The test
 /// authentication scheme signs in <c>relax-clerk</c> and <c>relax-auditor</c>, who hold <c>clerk</c> and <c>auditor</c> there only.
+/// ModuleLayerApp declares only the <c>intake</c> module and maps its <c>clerk</c> slot to <c>clerk</c>. Its layer on the
+/// module's <c>IntakeForm</c> adds the <c>notes</c> field, and its site <c>modulelayer</c> lists the module's NewIntake page. The test
+/// authentication scheme signs in <c>layer-clerk</c>, who holds <c>clerk</c> there only.
 /// </summary>
 public sealed class ModuleAppFixture : IAsyncLifetime
 {
@@ -43,6 +46,9 @@ public sealed class ModuleAppFixture : IAsyncLifetime
 
     /// <summary>The <c>id</c> of ModuleRelaxApp.</summary>
     public static readonly Guid RelaxAppId = Guid.Parse("7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3e01");
+
+    /// <summary>The <c>id</c> of ModuleLayerApp.</summary>
+    public static readonly Guid LayerAppId = Guid.Parse("7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3f01");
 
     /// <summary>The id of the Department entity in the module file, before it is derived for an application.</summary>
     public static readonly Guid DepartmentEntityId = Guid.Parse("3b7e5a10-4c2d-4f6a-9d18-7a1c0e5b2f01");
@@ -88,6 +94,7 @@ public sealed class ModuleAppFixture : IAsyncLifetime
             builder.UseSetting("ActivateOnStartup:2", Path.Combine(_fixtures, "ModuleContractApp"));
             builder.UseSetting("ActivateOnStartup:3", Path.Combine(_fixtures, "ModuleCeilingApp"));
             builder.UseSetting("ActivateOnStartup:4", Path.Combine(_fixtures, "ModuleRelaxApp"));
+            builder.UseSetting("ActivateOnStartup:5", Path.Combine(_fixtures, "ModuleLayerApp"));
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
                 new TestIdentity("manager", "Manager No Role"),
@@ -110,6 +117,10 @@ public sealed class ModuleAppFixture : IAsyncLifetime
                 new TestIdentity("relax-auditor", "Relax Auditor")
                 {
                     ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [RelaxAppId] = ["auditor"] },
+                },
+                new TestIdentity("layer-clerk", "Layer Clerk")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [LayerAppId] = ["clerk"] },
                 });
         });
 
