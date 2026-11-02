@@ -112,6 +112,47 @@ public sealed class ModuleScenarioTests
     }
 
     [Fact]
+    public void A_module_scenario_step_that_names_an_entity_of_a_declared_module_compiles_without_diagnostics()
+    {
+        using var modules = Modules(users: """{ "u1": ["approver"] }""", entity: "ledger/Entry", declared: true);
+        using var folder = Application(declared: true);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var scenario = Assert.Single(compiled.ModuleScenarios);
+        Assert.Equal("ledger/Entry", scenario.Steps[0].Entity);
+    }
+
+    [Fact]
+    public void A_module_scenario_step_that_names_a_module_the_module_does_not_declare_is_axc0208_when_another_module_is_declared()
+    {
+        using var modules = Modules(users: """{ "u1": ["approver"] }""", entity: "departments/Department", declared: true);
+        using var folder = Application(declared: true);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, ScenarioFile, "/steps/0/entity"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_module_scenario_step_that_starts_a_process_of_a_declared_module_is_axc0208()
+    {
+        using var modules = Modules(users: """{ "u1": ["approver"] }""", process: "ledger/Review", declared: true);
+        using var folder = Application(declared: true);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, ScenarioFile, "/steps/1/process"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
     public void A_module_scenario_step_that_names_an_application_entity_is_an_unknown_entity_in_the_module_file()
     {
         using var modules = Modules(users: """{ "u1": ["approver"] }""", entity: "Invoice");
@@ -131,14 +172,18 @@ public sealed class ModuleScenarioTests
         string? recipient = null,
         string entity = "Approval",
         bool slots = true,
-        bool scenario = true)
+        bool scenario = true,
+        bool declared = false,
+        string? process = null)
     {
+        var declares = declared ? """, "modules": [{ "id": "ledger", "version": "^1.0.0" }]""" : "";
+        var processStep = process is null ? "" : $$""", { "type": "startProcess", "process": "{{process}}", "record": "approval", "as": "u1" }""";
         var slotList = slots ? """, "roles": [ { "name": "approver", "label": { "textKey": "approvals.approver" } } ]""" : "";
         var assigneeStep = assignee is null ? "" : $$""", { "type": "expectTask", "record": "approval", "step": "review", "assignee": {{assignee}} }""";
         var recipientStep = recipient is null ? "" : $$""", { "type": "expectNotification", "recipient": {{recipient}} }""";
         var folder = new TemporaryFolder()
             .With("approvals/1.0.0/module.json", $$"""
-                { "kind": "module", "id": "approvals", "version": "1.0.0", "label": "Approvals"{{slotList}} }
+                { "kind": "module", "id": "approvals", "version": "1.0.0", "label": "Approvals"{{slotList}}{{declares}} }
                 """)
             .With("approvals/1.0.0/Approval.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21", "kind": "entity", "name": "Approval", "formatVersion": 1,
@@ -160,22 +205,39 @@ public sealed class ModuleScenarioTests
                 { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
                   "texts": { "approvals.approval": "Approval", "approvals.review": "Review", "approvals.approve": "Approve", "approvals.approver": "Approver" } }
                 """);
+        if (declared)
+        {
+            folder
+                .With("ledger/1.0.0/module.json", """
+                    { "kind": "module", "id": "ledger", "version": "1.0.0", "label": "Ledger" }
+                    """)
+                .With("ledger/1.0.0/Entry.json", """
+                    { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c31", "kind": "entity", "name": "Entry", "formatVersion": 1,
+                      "fields": [ { "name": "title", "type": "text" } ] }
+                    """)
+                .With("ledger/1.0.0/TextsEn.json", """
+                    { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6d", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                      "texts": { "ledger.entry": "Entry" } }
+                    """);
+        }
+
         return scenario
             ? folder.With("approvals/1.0.0/scenarios/Create.json", $$"""
                 { "id": "{{ScenarioId}}", "kind": "scenario", "name": "Create", "formatVersion": 1,
                   "users": {{users}},
-                  "steps": [ { "type": "createRecord", "entity": "{{entity}}", "save": "approval", "values": { "title": "x" }, "as": "u1" }{{assigneeStep}}{{recipientStep}} ] }
+                  "steps": [ { "type": "createRecord", "entity": "{{entity}}", "save": "approval", "values": { "title": "x" }, "as": "u1" }{{processStep}}{{assigneeStep}}{{recipientStep}} ] }
                 """)
             : folder;
     }
 
-    private static TemporaryFolder Application(string? mapping = """{ "approver": "manager" }""")
+    private static TemporaryFolder Application(string? mapping = """{ "approver": "manager" }""", bool declared = false)
     {
         var roles = mapping is null ? "" : $$""", "roles": {{mapping}}""";
+        var ledger = declared ? """, { "id": "ledger", "version": "1.0.0" }""" : "";
         return new TemporaryFolder()
             .With("application.json", $$"""
                 { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1,
-                  "modules": [{ "id": "approvals", "version": "1.0.0"{{roles}} }] }
+                  "modules": [{ "id": "approvals", "version": "1.0.0"{{roles}} }{{ledger}}] }
                 """)
             .With("texts/en.json", """
                 { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",

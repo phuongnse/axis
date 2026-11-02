@@ -1,0 +1,70 @@
+{
+  "id": "0d5e9a36-7b24-4c81-a3f9-6e1b8c4d2f75",
+  "kind": "scenario",
+  "name": "DepartmentHeadReturnsAndRejects",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "users": {
+    "admin": ["admin"],
+    "ann": ["member"],
+    "hank": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "hank",
+      "values": { "fullName": "Hank Pham", "workEmail": "hank@example.com", "user": "hank" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Department",
+      "as": "admin",
+      "save": "sales",
+      "values": { "code": "SALES", "name": "Sales", "head": "hank" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "annEmployee",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com", "user": "ann", "department": "sales" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "travel",
+      "values": {
+        "name": "Travel",
+        "code": "TRAVEL",
+        "steps": [{ "sequence": 1, "approver": "departmentHead" }]
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "trip",
+      "values": { "type": "travel", "title": "Conference trip", "amount": 800 }
+    },
+    { "type": "startProcess", "process": "RequestApproval", "record": "trip", "as": "ann" },
+    { "type": "expectTask", "record": "trip", "step": "decide", "assignee": { "user": "hank" } },
+    {
+      "type": "completeTask",
+      "record": "trip",
+      "step": "decide",
+      "outcome": "return",
+      "as": "hank",
+      "values": { "decisionComment": "Add the dates" }
+    },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "trip", "state": "completed" },
+    { "type": "expectRecord", "record": "trip", "values": { "status": "returned" } },
+    { "type": "startProcess", "process": "RequestApproval", "record": "trip", "as": "ann" },
+    { "type": "expectTask", "record": "trip", "step": "decide", "assignee": { "user": "hank" } },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "reject", "as": "hank" },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "trip", "state": "completed" },
+    { "type": "expectRecord", "record": "trip", "values": { "status": "rejected" } }
+  ]
+}

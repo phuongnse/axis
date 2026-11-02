@@ -60,6 +60,13 @@
     "approvals.request.oneDecisionPerStep": "A step is decided once, by someone other than the requester, with a new task.",
     "approvals.request.frozenAfterSubmit": "The type, the amount and the steps required cannot change after the request is submitted.",
     "approvals.requestType.hasStepForEveryAmount": "A request type needs at least one approval step without a minimum amount.",
+    "approvals.requestApproval.cannotSubmit": "Only a draft or returned request with at least one approval step that applies can be submitted.",
+    "approvals.requestApproval.decide": "Decide the request",
+    "approvals.requestApproval.approve": "Approve",
+    "approvals.requestApproval.return": "Return",
+    "approvals.requestApproval.reject": "Reject",
+    "approvals.requestReview.request": "Request",
+    "approvals.requestReview.decision": "Decision",
     "approvals.roles.admin": "Administrator",
     "approvals.roles.member": "Member"
   }

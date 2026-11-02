@@ -60,6 +60,13 @@
     "approvals.request.oneDecisionPerStep": "Mỗi bước chỉ được quyết định một lần, bởi người khác người yêu cầu, với một tác vụ mới.",
     "approvals.request.frozenAfterSubmit": "Loại, số tiền và số bước cần duyệt không thể thay đổi sau khi yêu cầu được gửi.",
     "approvals.requestType.hasStepForEveryAmount": "Loại yêu cầu cần ít nhất một bước duyệt không có số tiền tối thiểu.",
+    "approvals.requestApproval.cannotSubmit": "Chỉ yêu cầu ở trạng thái nháp hoặc bị trả lại và có ít nhất một bước duyệt áp dụng mới có thể được gửi.",
+    "approvals.requestApproval.decide": "Quyết định yêu cầu",
+    "approvals.requestApproval.approve": "Duyệt",
+    "approvals.requestApproval.return": "Trả lại",
+    "approvals.requestApproval.reject": "Từ chối",
+    "approvals.requestReview.request": "Yêu cầu",
+    "approvals.requestReview.decision": "Quyết định",
     "approvals.roles.admin": "Quản trị viên",
     "approvals.roles.member": "Thành viên"
   }

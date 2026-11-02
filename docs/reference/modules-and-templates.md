@@ -463,8 +463,11 @@ An application that declares it maps the slot to one of its own roles:
 - **Scenarios** _(built)_. A module scenario gives its users, and its assignee
   and recipient roles, role slots instead of roles. A role that is not a slot is
   `AXC0335`, in the module file. Its steps name entities and processes of its own
-  module by plain name. A name with `/`, even of a module it declares, is
-  `AXC0208`, and an unknown entity or process has its usual code. A connector
+  module by plain name. A step's `entity` may also name an entity of a module the
+  module declares, written `<module id>/<name>`, so a scenario can create the
+  records another module holds, such as `organization/Employee`. A process
+  names only the module's own. Any other name with `/` is `AXC0208`, and an
+  unknown entity or process has its usual code. A connector
   stub names a connector slot, and a package stub names a package the module
   lists. When it runs for each application that pins the module, each slot
   becomes the role the application maps it to, and the scenario runs against the

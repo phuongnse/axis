@@ -10,12 +10,14 @@ namespace Axis.Integration.Tests;
 /// The built-in <c>approvals</c> module on the record API of ApprovalsApp. A request gets its number from the
 /// sequence <c>RequestNumber</c>, and <c>requesterEmployee</c> is the employee whose <c>user</c> is the requester, or
 /// empty when no employee matches. A request type keeps its approval steps as child rows in the order written, and a
-/// member cannot create a request type.
+/// member cannot create a request type. A member starts the module's process <c>RequestApproval</c> on their own
+/// request, and is refused on another member's, which the member ceiling hides from them.
 /// </summary>
 public sealed partial class ApprovalsModuleTests(ApprovalsAppFixture fixture) : IClassFixture<ApprovalsAppFixture>
 {
     private const string Admin = "appr-admin";
     private const string Employees = "/api/apps/ApprovalsApp/entities/organization/Employee/records";
+    private const string StartRequestApproval = "/api/apps/ApprovalsApp/processes/approvals/RequestApproval/instances";
     private const string RequestTypes = "/api/apps/ApprovalsApp/entities/approvals/RequestType/records";
     private const string Requests = "/api/apps/ApprovalsApp/entities/approvals/Request/records";
 
@@ -89,6 +91,28 @@ public sealed partial class ApprovalsModuleTests(ApprovalsAppFixture fixture) : 
         Assert.Equal(employee, steps[2].GetProperty("employee").GetGuid());
         Assert.Equal(1000m, steps[2].GetProperty("minAmount").GetDecimal());
         Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_member_starts_the_approval_process_on_their_own_request_and_another_member_is_refused()
+    {
+        using var admin = fixture.CreateClient().SignedInAs(Admin);
+        var type = await CreateAsync(admin, RequestTypes, RequestType());
+        using var bob = fixture.CreateClient().SignedInAs("appr-bob");
+        using var carl = fixture.CreateClient().SignedInAs("appr-carl");
+        var first = await CreateAsync(bob, Requests, $$"""{ "type": "{{type}}", "title": "Desk" }""");
+        var second = await CreateAsync(bob, Requests, $$"""{ "type": "{{type}}", "title": "Lamp" }""");
+
+        using var started = await SendAsync(bob, HttpMethod.Post, StartRequestApproval, $$"""{ "subjectId": "{{first:D}}" }""");
+        using var refused = await SendAsync(carl, HttpMethod.Post, StartRequestApproval, $$"""{ "subjectId": "{{second:D}}" }""");
+
+        Assert.Equal(HttpStatusCode.Created, started.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        using var problem = JsonDocument.Parse(await refused.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(["/subjectId"], problem.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        Assert.Equal(
+            0L,
+            await fixture.Steps.CountAsync("SELECT count(*) FROM axis.process_instances WHERE subject_id = @id", ("id", second)));
     }
 
     private static string RequestType() =>
