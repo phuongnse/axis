@@ -209,5 +209,7 @@ export function journeyServerEnv(): Record<string, string> {
     Studio__AuthorRole: 'author',
     Studio__PublisherRole: 'publisher',
     Studio__Tests: 'true',
+    // Lets the operator console routes answer the platform-operator user, as on the main server.
+    Console__OperatorRole: 'platform-operator',
   }
 }
