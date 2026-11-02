@@ -21,8 +21,9 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     setting a type does not take cannot be edited. The settings
     column also has a field's [`help`](resource-files.md#resource-file-shape)
     on every type, a picker of the existing text keys like the label.
-    A `reference` field's [`match`](resource-files.md#matched-references) is
-    edited in the JSON tab.
+    A `reference` field's [`match`](resource-files.md#matched-references) and a
+    `text` field's [`userId`](resource-files.md#entity-field-types-and-constraints)
+    are edited in the JSON tab.
   - The type picker also offers `money`, `file` and `references`, and a child
     entity's fields may be `reference`. A `references` field has the same
     target picker as a `reference` field. The settings column adds, for a

@@ -339,7 +339,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `maxLength` and `minLength` for text, `min` and `max` for integer, decimal, date and
     date-time, `precision` and `scale` for decimal and money, `currency` (the fixed code) or `currencyField` (the field
     holding the code) for money, `values` for enum, `valueLabelKeys` for an enum with `valueLabels`, `maxSize`,
-    `accept`, `uploadPath` and `downloadPath` for file, `target` for reference and references, and `fields` for
+    `accept`, `uploadPath` and `downloadPath` for file, `usersPath` for a text field marked `userId`, `target` for reference and references, and `fields` for
     child collection. `min` and `max` are strings in the
     entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is

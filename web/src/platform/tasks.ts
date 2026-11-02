@@ -213,7 +213,7 @@ export function usersPath(tasksPath: string): string {
 }
 
 /**
- * Lists up to 20 users whose display name contains `search`, or the first 20 for an empty search.
+ * Lists up to 20 users whose display name or email contains `search`, or the first 20 for an empty search.
  * It throws when the answer is not a success.
  */
 export async function searchUsers(path: string, search: string, signal?: AbortSignal): Promise<UserOption[]> {
