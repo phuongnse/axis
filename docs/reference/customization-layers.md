@@ -141,6 +141,9 @@ same change.
 | `seed` | `records` | `id` |
 | `contract` | `lifecycle.states`, `lifecycle.transitions` | `name` |
 
+`Axis.Configuration` holds this table in code, and a unit test checks it against the resource
+schemas.
+
 - A key is unique in its list, ignoring letter case. An entity's `validations` and `indexes` require
   `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A widget's `name` is unique on its page,
   whatever its depth, so a layer finds a widget inside a section or a tab by its name.
