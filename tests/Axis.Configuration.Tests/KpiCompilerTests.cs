@@ -26,7 +26,7 @@ public sealed class KpiCompilerTests
     private const string OrdersFile = "pages/orders.json";
 
     private const string Valid = """
-        { "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" },
+        { "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" },
           "comparison": { "measure": "quantitysum", "label": { "textKey": "kpi.quantity" } },
           "navigate": { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "kpi.show" } } }
         """;
@@ -59,7 +59,7 @@ public sealed class KpiCompilerTests
     [Fact]
     public void Kpi_without_a_comparison_or_navigate_compiles_to_a_model_with_neither()
     {
-        using var folder = Folder("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "ORDERS", "label": { "textKey": "kpi.orders" } }""");
+        using var folder = Folder("""{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "ORDERS", "label": { "textKey": "kpi.orders" } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -85,10 +85,10 @@ public sealed class KpiCompilerTests
     {
         using var folder = Folder(
             """
-            { "type": "table", "entity": "Order" },
-            { "type": "form", "entity": "Order" },
-            { "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" } },
-            { "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" } }
+            { "type": "table", "name": "table", "entity": "Order" },
+            { "type": "form", "name": "form", "entity": "Order" },
+            { "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" } },
+            { "type": "kpi", "name": "kpi2", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" } }
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -102,7 +102,7 @@ public sealed class KpiCompilerTests
     [InlineData("OrderByNumber")]
     public void Kpi_over_a_data_source_that_is_not_one_total_row_is_reported_at_its_data_source(string dataSource)
     {
-        using var folder = Folder($$"""{ "type": "kpi", "dataSource": "{{dataSource}}", "measure": "orders", "label": { "textKey": "kpi.orders" } }""");
+        using var folder = Folder($$"""{ "type": "kpi", "name": "kpi", "dataSource": "{{dataSource}}", "measure": "orders", "label": { "textKey": "kpi.orders" } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -115,9 +115,9 @@ public sealed class KpiCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "missing", "label": { "textKey": "kpi.orders" } }""", "/widgets/0/measure", "missing")]
+    [InlineData("""{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "missing", "label": { "textKey": "kpi.orders" } }""", "/widgets/0/measure", "missing")]
     [InlineData(
-        """{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "comparison": { "measure": "other", "label": { "textKey": "kpi.quantity" } } }""",
+        """{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "comparison": { "measure": "other", "label": { "textKey": "kpi.quantity" } } }""",
         "/widgets/0/comparison/measure",
         "other")]
     public void Kpi_naming_a_measure_its_data_source_lacks_is_reported_at_that_property(string widget, string path, string measure)
@@ -140,7 +140,7 @@ public sealed class KpiCompilerTests
     [InlineData("toolbarActions", "[]", DiagnosticCodes.InvalidWidgetBinding)]
     public void Kpi_naming_an_entity_a_form_or_actions_is_reported_at_that_property(string property, string value, string code)
     {
-        using var folder = Folder($$"""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "{{property}}": {{value}} }""");
+        using var folder = Folder($$"""{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "{{property}}": {{value}} }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -154,7 +154,7 @@ public sealed class KpiCompilerTests
     public void Kpi_over_a_data_source_with_a_required_parameter_is_reported_naming_the_parameter()
     {
         using var folder = Folder(
-            """{ "type": "kpi", "dataSource": "FilteredTotals", "measure": "orders", "label": { "textKey": "kpi.orders" } }""");
+            """{ "type": "kpi", "name": "kpi", "dataSource": "FilteredTotals", "measure": "orders", "label": { "textKey": "kpi.orders" } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -169,7 +169,7 @@ public sealed class KpiCompilerTests
     private const string NumberParameter = """{ "name": "number", "type": "text", "required": true }""";
 
     private static string BoundKpi(string dataSource, string parameters) =>
-        $$"""{ "type": "kpi", "dataSource": "{{dataSource}}", "measure": "orders", "label": { "textKey": "kpi.orders" }, "parameters": {{parameters}} }""";
+        $$"""{ "type": "kpi", "name": "kpi", "dataSource": "{{dataSource}}", "measure": "orders", "label": { "textKey": "kpi.orders" }, "parameters": {{parameters}} }""";
 
     [Fact]
     public void Kpi_binding_a_required_parameter_to_a_required_page_parameter_compiles_with_the_declared_names()
@@ -251,7 +251,7 @@ public sealed class KpiCompilerTests
     [Fact]
     public void Kpi_naming_no_loaded_data_source_is_reported_at_its_data_source()
     {
-        using var folder = Folder("""{ "type": "kpi", "dataSource": "Missing", "measure": "orders", "label": { "textKey": "kpi.orders" } }""");
+        using var folder = Folder("""{ "type": "kpi", "name": "kpi", "dataSource": "Missing", "measure": "orders", "label": { "textKey": "kpi.orders" } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -263,9 +263,9 @@ public sealed class KpiCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.missing" } }""", "/widgets/0/label/textKey")]
+    [InlineData("""{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.missing" } }""", "/widgets/0/label/textKey")]
     [InlineData(
-        """{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "comparison": { "measure": "orders", "label": { "textKey": "kpi.missing" } } }""",
+        """{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "comparison": { "measure": "orders", "label": { "textKey": "kpi.missing" } } }""",
         "/widgets/0/comparison/label/textKey")]
     public void Kpi_label_without_a_text_is_reported_at_its_text_key(string widget, string path)
     {
@@ -282,7 +282,7 @@ public sealed class KpiCompilerTests
     public void Navigate_to_an_unknown_page_is_reported_at_its_page()
     {
         using var folder = Folder(
-            """{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Missing", "label": { "textKey": "kpi.show" } } }""");
+            """{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Missing", "label": { "textKey": "kpi.show" } } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -297,7 +297,7 @@ public sealed class KpiCompilerTests
     public void Navigate_of_a_kpi_is_checked_even_when_its_data_source_is_unknown()
     {
         using var folder = Folder(
-            """{ "type": "kpi", "dataSource": "Missing", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Gone", "label": { "textKey": "kpi.show" } } }""");
+            """{ "type": "kpi", "name": "kpi", "dataSource": "Missing", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Gone", "label": { "textKey": "kpi.show" } } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -313,7 +313,7 @@ public sealed class KpiCompilerTests
     public void Navigate_parameter_naming_a_page_parameter_compiles_with_the_declared_names()
     {
         using var folder = Folder(
-            """{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Detail", "label": { "textKey": "kpi.show" }, "parameters": { "ORDER": "order" } } }""",
+            """{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Detail", "label": { "textKey": "kpi.show" }, "parameters": { "ORDER": "order" } } }""",
             pageParameters: """{ "name": "order", "type": "reference", "target": "Order", "required": true }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -327,7 +327,7 @@ public sealed class KpiCompilerTests
     public void Navigate_parameter_naming_id_is_reported_because_a_kpi_has_no_record()
     {
         using var folder = Folder(
-            """{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Detail", "label": { "textKey": "kpi.show" }, "parameters": { "order": "id" } } }""",
+            """{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "navigate": { "type": "navigate", "page": "Detail", "label": { "textKey": "kpi.show" }, "parameters": { "order": "id" } } }""",
             pageParameters: """{ "name": "order", "type": "reference", "target": "Order", "required": true }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -340,14 +340,14 @@ public sealed class KpiCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "label": { "textKey": "kpi.orders" } }""")]
-    [InlineData("""{ "type": "kpi", "measure": "orders", "label": { "textKey": "kpi.orders" } }""")]
-    [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders" }""")]
-    [InlineData("""{ "type": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "comparison": { "measure": "orders" } }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "measure": "orders" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "label": { "textKey": "kpi.orders" } }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "comparison": { "measure": "orders", "label": { "textKey": "kpi.orders" } } }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "navigate": { "type": "navigate", "page": "Detail", "label": { "textKey": "kpi.show" } } }""")]
+    [InlineData("""{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "label": { "textKey": "kpi.orders" } }""")]
+    [InlineData("""{ "type": "kpi", "name": "kpi", "measure": "orders", "label": { "textKey": "kpi.orders" } }""")]
+    [InlineData("""{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders" }""")]
+    [InlineData("""{ "type": "kpi", "name": "kpi", "dataSource": "OrderTotals", "measure": "orders", "label": { "textKey": "kpi.orders" }, "comparison": { "measure": "orders" } }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "measure": "orders" }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "label": { "textKey": "kpi.orders" } }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "comparison": { "measure": "orders", "label": { "textKey": "kpi.orders" } } }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "navigate": { "type": "navigate", "page": "Detail", "label": { "textKey": "kpi.show" } } }""")]
     public void Kpi_with_a_missing_property_or_another_widget_with_a_kpi_property_violates_the_page_schema(string widget)
     {
         using var folder = Folder(widget);
@@ -394,5 +394,5 @@ public sealed class KpiCompilerTests
                   "aggregate": { "groupBy": [], "measures": [ { "name": "orders", "function": "count" } ] } }
                 """)
             .With(OrdersFile, Page("Orders", widgets, parameters: pageParameters))
-            .With("pages/detail.json", Page("Detail", """{ "type": "table", "entity": "Order" }""", DetailId, "detail.title", pageParameters));
+            .With("pages/detail.json", Page("Detail", """{ "type": "table", "name": "table", "entity": "Order" }""", DetailId, "detail.title", pageParameters));
 }

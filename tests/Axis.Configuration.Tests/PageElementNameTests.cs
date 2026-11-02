@@ -71,10 +71,43 @@ public sealed class PageElementNameTests
         Assert.Equal(["inline: /widgets/0/tabs/1 has no name"], UnnamedElements(page, "inline"));
     }
 
-    private static List<string> UnnamedElements(JsonNode page, string file)
+    [Fact]
+    public void A_page_written_to_a_temporary_folder_with_an_unnamed_element_is_rejected()
+    {
+        using var folder = new TemporaryFolder();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            folder.With("pages/p.json", """
+                {
+                  "id": "7d1c2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+                  "kind": "page",
+                  "name": "Inline",
+                  "formatVersion": 1,
+                  "title": { "textKey": "pages.inline.title" },
+                  "widgets": [
+                    {
+                      "type": "table",
+                      "name": "table",
+                      "entity": "Note",
+                      "rowActions": [{ "type": "navigate", "label": { "textKey": "actions.open" }, "to": "Note" }]
+                    }
+                  ]
+                }
+                """);
+        });
+
+        Assert.Contains("/widgets/0/rowActions/0 has no name", exception.Message);
+    }
+
+    internal static List<string> UnnamedElements(JsonNode page, string file)
     {
         var problems = new List<string>();
-        CheckWidgets((JsonArray)page["widgets"]!, "/widgets", file, problems);
+        if (page["widgets"] is JsonArray widgets)
+        {
+            CheckWidgets(widgets, "/widgets", file, problems);
+        }
+
         return problems;
     }
 
@@ -82,7 +115,11 @@ public sealed class PageElementNameTests
     {
         for (var i = 0; i < widgets.Count; i++)
         {
-            var widget = (JsonObject)widgets[i]!;
+            if (widgets[i] is not JsonObject widget)
+            {
+                continue;
+            }
+
             var widgetPointer = $"{pointer}/{i}";
             CheckNamed(widget, widgetPointer, file, problems);
             foreach (var list in _itemLists)
@@ -109,7 +146,11 @@ public sealed class PageElementNameTests
 
         for (var i = 0; i < containers.Count; i++)
         {
-            var container = (JsonObject)containers[i]!;
+            if (containers[i] is not JsonObject container)
+            {
+                continue;
+            }
+
             var containerPointer = $"{pointer}/{key}/{i}";
             CheckNamed(container, containerPointer, file, problems);
             if (container["widgets"] is JsonArray children)
@@ -128,7 +169,10 @@ public sealed class PageElementNameTests
 
         for (var i = 0; i < items.Count; i++)
         {
-            CheckNamed((JsonObject)items[i]!, $"{pointer}/{key}/{i}", file, problems);
+            if (items[i] is JsonObject item)
+            {
+                CheckNamed(item, $"{pointer}/{key}/{i}", file, problems);
+            }
         }
     }
 

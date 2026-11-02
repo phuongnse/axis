@@ -224,7 +224,7 @@ public sealed class CustomizationLayerTests
             .With("approvals/1.0.0/pages/Shared.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c51", "kind": "page", "name": "Shared", "formatVersion": 1,
                   "title": { "textKey": "approvals.reviews" },
-                  "widgets": [ { "type": "table", "dataSource": "Shared" } ] }
+                  "widgets": [ { "name": "table", "type": "table", "dataSource": "Shared" } ] }
                 """)
             .With("approvals/1.0.0/scenarios/ReviewScenario.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c71", "kind": "scenario", "name": "ReviewScenario", "formatVersion": 1,

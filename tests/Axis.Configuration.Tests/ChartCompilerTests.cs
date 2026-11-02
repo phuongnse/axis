@@ -25,14 +25,14 @@ public sealed class ChartCompilerTests
     private const string OrdersFile = "pages/orders.json";
 
     private const string Valid = """
-        { "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" },
+        { "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" },
           "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } }, { "name": "quantitysum", "label": { "textKey": "chart.quantity" } } ] }
         """;
 
-    private static string Chart(string kind = "bar", string dataSource = "OrderStats", string category = "status", string measures = "")
+    private static string Chart(string kind = "bar", string dataSource = "OrderStats", string category = "status", string measures = "", string name = "chart")
     {
         var list = measures.Length > 0 ? measures : """{ "name": "orders", "label": { "textKey": "chart.orders" } }""";
-        return $$"""{ "type": "chart", "kind": "{{kind}}", "dataSource": "{{dataSource}}", "category": "{{category}}", "title": { "textKey": "chart.title" }, "measures": [ {{list}} ] }""";
+        return $$"""{ "type": "chart", "name": "{{name}}", "kind": "{{kind}}", "dataSource": "{{dataSource}}", "category": "{{category}}", "title": { "textKey": "chart.title" }, "measures": [ {{list}} ] }""";
     }
 
     private static string Measure(string name) => $$"""{ "name": "{{name}}", "label": { "textKey": "chart.orders" } }""";
@@ -106,10 +106,10 @@ public sealed class ChartCompilerTests
     {
         using var folder = Folder(
             $$"""
-            { "type": "table", "entity": "Order" },
-            { "type": "form", "entity": "Order" },
+            { "type": "table", "name": "table", "entity": "Order" },
+            { "type": "form", "name": "form", "entity": "Order" },
             {{Chart()}},
-            {{Chart()}}
+            {{Chart(name: "chart2")}}
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -375,7 +375,7 @@ public sealed class ChartCompilerTests
     {
         using var folder = Folder(
             """
-            { "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.noTitle" },
+            { "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.noTitle" },
               "measures": [ { "name": "orders", "label": { "textKey": "chart.noLabel" } }, { "name": "quantitySum", "label": { "textKey": "chart.quantity" } },
                             { "name": "orders", "label": { "textKey": "chart.noOther" } } ] }
             """);
@@ -393,19 +393,19 @@ public sealed class ChartCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "chart", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" } }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [] }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders" } ] }""")]
-    [InlineData("""{ "type": "chart", "kind": "area", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
-    [InlineData("""{ "type": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ], "measure": "orders" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "kind": "bar" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "category": "status" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "title": { "textKey": "chart.title" } }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "bar", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" } }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders" } ] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "area", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
+    [InlineData("""{ "type": "chart", "name": "chart", "kind": "bar", "dataSource": "OrderStats", "category": "status", "title": { "textKey": "chart.title" }, "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ], "measure": "orders" }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "kind": "bar" }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "category": "status" }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "title": { "textKey": "chart.title" } }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "measures": [ { "name": "orders", "label": { "textKey": "chart.orders" } } ] }""")]
     public void Chart_with_a_missing_property_or_another_widget_with_a_chart_property_violates_the_page_schema(string widget)
     {
         using var folder = Folder(widget);

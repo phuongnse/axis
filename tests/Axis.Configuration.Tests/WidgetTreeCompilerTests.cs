@@ -8,14 +8,11 @@ namespace Axis.Configuration.Tests;
 public sealed class WidgetTreeCompilerTests
 {
     private const string PageFile = "pages/overview.json";
-    private const string Table = """{ "type": "table", "entity": "Order" }""";
-    private const string Inbox = """{ "type": "taskInbox" }""";
-    private const string OrderFormWidget = """{ "type": "form", "entity": "Order" }""";
 
     [Fact]
     public void Columns_holding_a_table_and_tabs_with_a_section_compile_to_a_tree_in_file_order()
     {
-        var tree = Columns((8, Table), (4, Tabs(("orders.title", Section("orderForm.title", true, Inbox)))));
+        var tree = Columns("columns", ("left", 8, Table("table")), ("right", 4, Tabs("tabs", ("tab1", "orders.title", Section("section", "orderForm.title", true, Inbox("taskInbox"))))));
         using var folder = Folder(tree);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -40,7 +37,7 @@ public sealed class WidgetTreeCompilerTests
     [Fact]
     public void Several_widgets_at_the_top_of_a_page_compile_and_a_section_is_expanded_by_default()
     {
-        using var folder = Folder($"{Section("orders.title", null, Table)}, {Inbox}");
+        using var folder = Folder($"{Section("section", "orders.title", null, Table("table"))}, {Inbox("taskInbox")}");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -53,7 +50,7 @@ public sealed class WidgetTreeCompilerTests
     [Fact]
     public void Widget_checks_apply_at_any_depth_and_are_reported_at_the_nested_pointer()
     {
-        using var folder = Folder(Columns((12, """{ "type": "table", "entity": "Invoice" }""")));
+        using var folder = Folder(Columns("columns", ("left", 12, """{ "type": "table", "name": "table", "entity": "Invoice" }""")));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -68,14 +65,14 @@ public sealed class WidgetTreeCompilerTests
     public void Widget_list_on_level_4_is_allowed_and_a_container_on_level_4_is_reported_at_its_pointer()
     {
         // Levels 1 to 3 are containers, so the innermost widget list is on level 4.
-        var allowed = Columns((12, Tabs(("orders.title", Section("orders.title", false, Inbox)))));
+        var allowed = Columns("columns", ("left", 12, Tabs("tabs", ("tab1", "orders.title", Section("section", "orders.title", false, Inbox("taskInbox"))))));
         using (var folder = Folder(allowed))
         {
             Assert.Empty(ApplicationCompiler.Compile(folder.Path).Diagnostics);
         }
 
         // A fourth container would hold a widget list on level 5.
-        var tooDeep = Columns((12, Tabs(("orders.title", Section("orders.title", false, Columns((12, Inbox)))))));
+        var tooDeep = Columns("columns", ("left", 12, Tabs("tabs", ("tab1", "orders.title", Section("section", "orders.title", false, Columns("columns2", ("left", 12, Inbox("taskInbox"))))))));
         using var deep = Folder(tooDeep);
 
         var result = ApplicationCompiler.Compile(deep.Path);
@@ -92,7 +89,7 @@ public sealed class WidgetTreeCompilerTests
     [InlineData(8, 8, 16)]
     public void Column_widths_that_do_not_add_up_to_12_are_reported_at_the_columns(int first, int second, int sum)
     {
-        using var folder = Folder(Columns((first, Table), (second, Inbox)));
+        using var folder = Folder(Columns("columns", ("left", first, Table("table")), ("right", second, Inbox("taskInbox"))));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -107,7 +104,7 @@ public sealed class WidgetTreeCompilerTests
     [Fact]
     public void Second_table_anywhere_on_the_page_is_reported_at_the_second_table()
     {
-        using var folder = Folder($"{Table}, {Columns((12, """{ "type": "table", "entity": "Customer" }"""))}");
+        using var folder = Folder($"{Table("table")}, {Columns("columns", ("left", 12, """{ "type": "table", "name": "table2", "entity": "Customer" }"""))}");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -122,7 +119,7 @@ public sealed class WidgetTreeCompilerTests
     [Fact]
     public void Form_with_a_task_inbox_is_reported_at_the_second_record_widget()
     {
-        using var folder = Folder($"{OrderFormWidget}, {Section("orders.title", false, Inbox)}");
+        using var folder = Folder($"{OrderFormWidget("form")}, {Section("section", "orders.title", false, Inbox("taskInbox"))}");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -137,7 +134,7 @@ public sealed class WidgetTreeCompilerTests
     [Fact]
     public void Table_with_a_form_and_an_inbox_in_other_containers_is_reported_once_for_the_inbox()
     {
-        using var folder = Folder($"{Table}, {OrderFormWidget}, {Inbox}");
+        using var folder = Folder($"{Table("table")}, {OrderFormWidget("form")}, {Inbox("taskInbox")}");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -149,17 +146,17 @@ public sealed class WidgetTreeCompilerTests
     public void Record_navigate_finds_the_form_in_containers_and_checks_its_entity()
     {
         const string openOrder = """
-            "rowActions": [ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "orders.title" }, "record": "id" } ]
+            "rowActions": [ { "type": "navigate", "name": "navigate", "page": "OrderForm", "label": { "textKey": "orders.title" }, "record": "id" } ]
             """;
-        using var folder = Folder($$"""{ "type": "table", "entity": "Order", {{openOrder}} }""")
+        using var folder = Folder($$"""{ "type": "table", "name": "table", "entity": "Order", {{openOrder}} }""")
             .With("pages/order-form.json", Page(
                 "OrderForm",
-                Columns((12, Section("orders.title", false, OrderFormWidget))),
+                Columns("columns", ("left", 12, Section("section", "orders.title", false, OrderFormWidget("form")))),
                 "55555555-5555-4555-8555-555555555552",
                 "orderForm.title"))
             .With("pages/customer-widget.json", Page(
                 "CustomerWidget",
-                Section("orders.title", false, $$"""{ "type": "table", "entity": "Customer", {{openOrder}} }"""),
+                Section("section", "orders.title", false, $$"""{ "type": "table", "name": "table", "entity": "Customer", {{openOrder}} }"""),
                 "55555555-5555-4555-8555-555555555554",
                 "orders.title"));
 
@@ -176,7 +173,7 @@ public sealed class WidgetTreeCompilerTests
     [Fact]
     public void Missing_text_key_on_a_tab_label_or_a_section_title_is_reported_at_its_nested_pointer()
     {
-        using var folder = Folder(Tabs(("missing.label", Section("missing.title", false, Inbox))));
+        using var folder = Folder(Tabs("tabs", ("tab1", "missing.label", Section("section", "missing.title", false, Inbox("taskInbox")))));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -190,21 +187,21 @@ public sealed class WidgetTreeCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "columns", "entity": "Order", "columns": [ { "width": 12, "widgets": [ { "type": "taskInbox" } ] } ] }""")]
-    [InlineData("""{ "type": "columns" }""")]
-    [InlineData("""{ "type": "columns", "columns": [] }""")]
-    [InlineData("""{ "type": "columns", "columns": [ { "width": 13, "widgets": [ { "type": "taskInbox" } ] } ] }""")]
-    [InlineData("""{ "type": "columns", "columns": [ { "width": 0, "widgets": [ { "type": "taskInbox" } ] } ] }""")]
-    [InlineData("""{ "type": "columns", "columns": [ { "width": 12, "widgets": [] } ] }""")]
-    [InlineData("""{ "type": "tabs" }""")]
-    [InlineData("""{ "type": "tabs", "tabs": [ { "widgets": [ { "type": "taskInbox" } ] } ] }""")]
-    [InlineData("""{ "type": "section", "widgets": [ { "type": "taskInbox" } ] }""")]
-    [InlineData("""{ "type": "section", "title": { "textKey": "orders.title" }, "widgets": [] }""")]
-    [InlineData("""{ "type": "section", "title": { "textKey": "orders.title" } }""")]
-    [InlineData("""{ "type": "section", "title": { "textKey": "orders.title" }, "entity": "Order", "widgets": [ { "type": "taskInbox" } ] }""")]
-    [InlineData("""{ "type": "taskInbox", "widgets": [ { "type": "taskInbox" } ] }""")]
-    [InlineData("""{ "type": "taskInbox", "collapsed": true }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "columns": [ { "width": 12, "widgets": [ { "type": "taskInbox" } ] } ] }""")]
+    [InlineData("""{ "type": "columns", "name": "columns", "entity": "Order", "columns": [ { "name": "left", "width": 12, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] } ] }""")]
+    [InlineData("""{ "type": "columns", "name": "columns" }""")]
+    [InlineData("""{ "type": "columns", "name": "columns", "columns": [] }""")]
+    [InlineData("""{ "type": "columns", "name": "columns", "columns": [ { "name": "left", "width": 13, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] } ] }""")]
+    [InlineData("""{ "type": "columns", "name": "columns", "columns": [ { "name": "left", "width": 0, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] } ] }""")]
+    [InlineData("""{ "type": "columns", "name": "columns", "columns": [ { "name": "left", "width": 12, "widgets": [] } ] }""")]
+    [InlineData("""{ "type": "tabs", "name": "tabs" }""")]
+    [InlineData("""{ "type": "tabs", "name": "tabs", "tabs": [ { "name": "tab1", "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] } ] }""")]
+    [InlineData("""{ "type": "section", "name": "section", "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }""")]
+    [InlineData("""{ "type": "section", "name": "section", "title": { "textKey": "orders.title" }, "widgets": [] }""")]
+    [InlineData("""{ "type": "section", "name": "section", "title": { "textKey": "orders.title" } }""")]
+    [InlineData("""{ "type": "section", "name": "section", "title": { "textKey": "orders.title" }, "entity": "Order", "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }""")]
+    [InlineData("""{ "type": "taskInbox", "name": "taskInbox", "widgets": [ { "type": "taskInbox", "name": "taskInbox2" } ] }""")]
+    [InlineData("""{ "type": "taskInbox", "name": "taskInbox", "collapsed": true }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "columns": [ { "name": "left", "width": 12, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] } ] }""")]
     public void Malformed_containers_violate_the_page_schema(string widget)
     {
         using var folder = Folder(widget);
@@ -232,7 +229,7 @@ public sealed class WidgetTreeCompilerTests
     {
         var first = """{ "type": "table", "name": "Summary", "entity": "Order" }""";
         var second = """{ "type": "taskInbox", "name": "summary" }""";
-        using var folder = Folder(Columns((6, Section("orders.title", false, first)), (6, Section("orders.title", false, second))));
+        using var folder = Folder(Columns("columns", ("left", 6, Section("section", "orders.title", false, first)), ("right", 6, Section("section2", "orders.title", false, second))));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -248,7 +245,7 @@ public sealed class WidgetTreeCompilerTests
     public void Row_action_name_repeated_in_its_table_is_reported_at_the_later_action()
     {
         using var folder = Folder("""
-            { "type": "table", "entity": "Order", "rowActions": [
+            { "type": "table", "name": "table", "entity": "Order", "rowActions": [
               { "type": "delete", "name": "Remove", "label": { "textKey": "orders.title" } },
               { "type": "delete", "name": "remove", "label": { "textKey": "orders.title" } }
             ] }
@@ -267,9 +264,9 @@ public sealed class WidgetTreeCompilerTests
     public void Column_name_repeated_in_its_columns_widget_is_reported_at_the_later_column()
     {
         using var folder = Folder("""
-            { "type": "columns", "columns": [
-              { "width": 6, "name": "Left", "widgets": [ { "type": "table", "entity": "Order" } ] },
-              { "width": 6, "name": "left", "widgets": [ { "type": "taskInbox" } ] }
+            { "type": "columns", "name": "columns", "columns": [
+              { "width": 6, "name": "Left", "widgets": [ { "type": "table", "name": "table", "entity": "Order" } ] },
+              { "width": 6, "name": "left", "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }
             ] }
             """);
 
@@ -286,9 +283,9 @@ public sealed class WidgetTreeCompilerTests
     public void Tab_name_repeated_in_its_tabs_widget_is_reported_at_the_later_tab()
     {
         using var folder = Folder("""
-            { "type": "tabs", "tabs": [
-              { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] },
-              { "name": "DETAILS", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "taskInbox" } ] }
+            { "type": "tabs", "name": "tabs", "tabs": [
+              { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Order" } ] },
+              { "name": "DETAILS", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }
             ] }
             """);
 
@@ -305,7 +302,7 @@ public sealed class WidgetTreeCompilerTests
     public void Row_action_and_toolbar_action_may_share_a_name()
     {
         using var folder = Folder("""
-            { "type": "table", "entity": "Order",
+            { "type": "table", "name": "table", "entity": "Order",
               "rowActions": [ { "type": "delete", "name": "Open", "label": { "textKey": "orders.title" } } ],
               "toolbarActions": [ { "type": "navigate", "name": "Open", "page": "OrderForm", "label": { "textKey": "orders.title" } } ] }
             """);
@@ -320,8 +317,9 @@ public sealed class WidgetTreeCompilerTests
     public void Tab_name_may_repeat_across_two_different_tabs_widgets()
     {
         using var folder = Folder(Columns(
-            (6, """{ "type": "tabs", "tabs": [ { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] } ] }"""),
-            (6, """{ "type": "tabs", "tabs": [ { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "form", "entity": "Order" } ] } ] }""")));
+            "columns",
+            ("left", 6, """{ "type": "tabs", "name": "tabs", "tabs": [ { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Order" } ] } ] }"""),
+            ("right", 6, """{ "type": "tabs", "name": "tabs2", "tabs": [ { "name": "Details", "label": { "textKey": "orders.title" }, "widgets": [ { "type": "form", "name": "form", "entity": "Order" } ] } ] }""")));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -333,12 +331,18 @@ public sealed class WidgetTreeCompilerTests
     private static TemporaryFolder Folder(string widgets) =>
         PresentationCompilerTests.Folder().With(PageFile, Page("Overview", widgets, "55555555-5555-4555-8555-555555555560"));
 
-    private static string Columns(params (int Width, string Widgets)[] columns) =>
-        $$"""{ "type": "columns", "columns": [ {{string.Join(", ", columns.Select(column => $$"""{ "width": {{column.Width}}, "widgets": [ {{column.Widgets}} ] }"""))}} ] }""";
+    private static string Table(string name) => $$"""{ "type": "table", "name": "{{name}}", "entity": "Order" }""";
 
-    private static string Tabs(params (string LabelKey, string Widgets)[] tabs) =>
-        $$"""{ "type": "tabs", "tabs": [ {{string.Join(", ", tabs.Select(tab => $$"""{ "label": { "textKey": "{{tab.LabelKey}}" }, "widgets": [ {{tab.Widgets}} ] }"""))}} ] }""";
+    private static string Inbox(string name) => $$"""{ "type": "taskInbox", "name": "{{name}}" }""";
 
-    private static string Section(string titleKey, bool? collapsed, string widgets) =>
-        $$"""{ "type": "section", "title": { "textKey": "{{titleKey}}" }{{(collapsed is { } value ? $", \"collapsed\": {(value ? "true" : "false")}" : "")}}, "widgets": [ {{widgets}} ] }""";
+    private static string OrderFormWidget(string name) => $$"""{ "type": "form", "name": "{{name}}", "entity": "Order" }""";
+
+    private static string Columns(string name, params (string Name, int Width, string Widgets)[] columns) =>
+        $$"""{ "type": "columns", "name": "{{name}}", "columns": [ {{string.Join(", ", columns.Select(column => $$"""{ "name": "{{column.Name}}", "width": {{column.Width}}, "widgets": [ {{column.Widgets}} ] }"""))}} ] }""";
+
+    private static string Tabs(string name, params (string Name, string LabelKey, string Widgets)[] tabs) =>
+        $$"""{ "type": "tabs", "name": "{{name}}", "tabs": [ {{string.Join(", ", tabs.Select(tab => $$"""{ "name": "{{tab.Name}}", "label": { "textKey": "{{tab.LabelKey}}" }, "widgets": [ {{tab.Widgets}} ] }"""))}} ] }""";
+
+    private static string Section(string name, string titleKey, bool? collapsed, string widgets) =>
+        $$"""{ "type": "section", "name": "{{name}}", "title": { "textKey": "{{titleKey}}" }{{(collapsed is { } value ? $", \"collapsed\": {(value ? "true" : "false")}" : "")}}, "widgets": [ {{widgets}} ] }""";
 }

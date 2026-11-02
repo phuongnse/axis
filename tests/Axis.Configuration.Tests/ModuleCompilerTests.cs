@@ -68,7 +68,7 @@ public sealed class ModuleCompilerTests
     private const string DepartmentsPage = """
         { "id": "66666666-6666-4666-8666-666666666601", "kind": "page", "name": "Departments", "formatVersion": 1,
           "title": { "textKey": "pages.departments.title" },
-          "widgets": [ { "type": "table", "dataSource": "departments/Departments" } ] }
+          "widgets": [ { "name": "table", "type": "table", "dataSource": "departments/Departments" } ] }
         """;
 
     private const string DepartmentsPolicy = """
@@ -1107,7 +1107,7 @@ public sealed class ModuleCompilerTests
     private static string ModulePage(string dataSource) => $$"""
         { "id": "{{ModulePageId}}", "kind": "page", "name": "Departments", "formatVersion": 1,
           "title": { "textKey": "{{ModulePageTitleKey}}" },
-          "widgets": [ { "type": "table", "dataSource": "{{dataSource}}" } ] }
+          "widgets": [ { "name": "table", "type": "table", "dataSource": "{{dataSource}}" } ] }
         """;
 
     private const string MainSite = """
