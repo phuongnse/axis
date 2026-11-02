@@ -113,6 +113,31 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.Contains(deleted.GetProperty("items").EnumerateArray(), item => item.GetProperty("actor").GetString() == "gone");
     }
 
+    [Fact]
+    public async Task A_removed_file_is_named_from_the_live_release()
+    {
+        // Proposed: the folder no longer holds a removed file, so the change carries its kind, name and label from the
+        // live release, and an added or changed file carries none, as Studio names it from the folder.
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_removed", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        await GetAsync(author, ReleasesUrl);
+
+        File.Delete(Path.Combine(folder.Path, "roles", "finance-reviewer.json"));
+        await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
+        var history = await GetAsync(author, ReleasesUrl);
+
+        var changes = history.GetProperty("changes").EnumerateArray().ToList();
+        var removed = Assert.Single(changes, change => change.GetProperty("change").GetString() == "removed");
+        Assert.Equal(
+            ("roles/finance-reviewer.json", "role", "finance-reviewer", "Finance reviewer"),
+            (removed.GetProperty("path").GetString(), removed.GetProperty("kind").GetString(), removed.GetProperty("name").GetString(), removed.GetProperty("titles").GetProperty("en").GetString()));
+        var changed = Assert.Single(changes, change => change.GetProperty("change").GetString() == "changed");
+        Assert.Equal(JsonValueKind.Null, changed.GetProperty("kind").ValueKind);
+    }
+
     private static string? ActorName(JsonElement history, string actor) =>
         history.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("actor").GetString() == actor).GetProperty("actorName").GetString();
 

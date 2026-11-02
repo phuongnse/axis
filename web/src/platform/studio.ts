@@ -813,8 +813,20 @@ export interface StudioReleases {
   active: { releaseId: string; number: number; contentHash: string } | null
   folderContentHash: string | null
   items: StudioReleaseItem[]
-  /** Proposed: the files of the folder that differ from the live release, by path. */
-  changes?: { path: string; change: 'added' | 'changed' | 'removed' }[] | null
+  /**
+   * Proposed: the files of the folder that differ from the live release, by path. A removed file, which the folder no
+   * longer holds, also has its kind, name, label in each locale and a text resource's locale, from the live release.
+   */
+  changes?:
+    | {
+        path: string
+        change: 'added' | 'changed' | 'removed'
+        kind?: string | null
+        name?: string | null
+        titles?: Record<string, string> | null
+        locale?: string | null
+      }[]
+    | null
 }
 
 /** A row of the release list. `active` is set on one row only. */
@@ -1024,7 +1036,10 @@ export function filterResources(items: StudioResourceItem[], search: string, loc
  * has one. A text resource is named by its language, in the author's language. A resource with no label, which only
  * authors see, is named by the name its author gave, or its file.
  */
-export function resourceTitle(item: StudioResourceItem, locale = 'en'): string {
+export function resourceTitle(
+  item: Pick<StudioResourceItem, 'file' | 'name' | 'titles' | 'locale'>,
+  locale = 'en',
+): string {
   if (item.locale) {
     try {
       const name = new Intl.DisplayNames([locale], { type: 'language' }).of(item.locale)

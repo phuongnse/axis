@@ -524,9 +524,79 @@ internal static class StudioEndpoints
                 }
             }
 
-            list.AddRange(live.Keys.Where(path => !folderFiles.ContainsKey(path)).Select(path => new StudioReleaseChange(path, "removed")));
+            // Proposed: a removed file is no longer in the folder, so Studio names it from the live release: its kind, its
+            // name and its label in the release's own texts.
+            var removed = live.Where(file => !folderFiles.ContainsKey(file.Key)).ToList();
+            if (removed.Count > 0)
+            {
+                var releaseTexts = ReleaseTexts(live.Values);
+                list.AddRange(removed.Select(file => RemovedChange(file.Key, file.Value, releaseTexts)));
+            }
             return [.. list.OrderBy(change => change.Path, StringComparer.Ordinal)];
         }
+    }
+
+    /// <summary>Proposed: the texts of each text resource of a release, by its locale, read from its canonical JSON.</summary>
+    private static Dictionary<string, Dictionary<string, string>> ReleaseTexts(IEnumerable<string> contents)
+    {
+        var byLocale = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var content in contents)
+        {
+            if (JsonNode.Parse(content) is JsonObject root
+                && root["kind"]?.GetValue<string>() == "text"
+                && root["locale"]?.GetValue<string>() is { } locale
+                && root["texts"] is JsonObject entries)
+            {
+                var target = byLocale.TryGetValue(locale, out var existing)
+                    ? existing
+                    : byLocale[locale] = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var (key, value) in entries)
+                {
+                    if (value is JsonValue text && text.TryGetValue<string>(out var line))
+                    {
+                        target[key] = line;
+                    }
+                }
+            }
+        }
+
+        return byLocale;
+    }
+
+    /// <summary>
+    /// Proposed: a removed file as the live release holds it: its kind, its name and its label in each locale, as
+    /// <see cref="ResourceTitles"/> names a resource of the folder. A text resource is named by its locale.
+    /// </summary>
+    private static StudioReleaseChange RemovedChange(
+        string path, string content, Dictionary<string, Dictionary<string, string>> texts)
+    {
+        if (JsonNode.Parse(content) is not JsonObject root)
+        {
+            return new StudioReleaseChange(path, "removed");
+        }
+
+        var kind = root["kind"]?.GetValue<string>();
+        var name = root["name"]?.GetValue<string>();
+        var key = (root["label"] ?? root["title"])?["textKey"]?.GetValue<string>();
+        var titles = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (key is not null)
+        {
+            foreach (var (locale, entries) in texts)
+            {
+                if (entries.TryGetValue(key, out var title))
+                {
+                    titles[locale] = title;
+                }
+            }
+        }
+
+        return new StudioReleaseChange(
+            path,
+            "removed",
+            kind,
+            name,
+            titles.Count > 0 ? titles : null,
+            kind == "text" ? root["locale"]?.GetValue<string>() : null);
     }
 
     private static async Task<IResult> PatchAsync(
@@ -1019,8 +1089,16 @@ internal sealed record StudioReleaseHistoryResponse(
 
 /// <summary>
 /// Proposed: a file of the folder that differs from the live release: <c>added</c>, <c>changed</c> or <c>removed</c>.
+/// A removed file, which the folder no longer holds, also has the kind, the name, the label in each locale and, for a
+/// text resource, the locale that the live release gives it, so Studio names it as it names a resource of the folder.
 /// </summary>
-internal sealed record StudioReleaseChange(string Path, string Change);
+internal sealed record StudioReleaseChange(
+    string Path,
+    string Change,
+    string? Kind = null,
+    string? Name = null,
+    IReadOnlyDictionary<string, string>? Titles = null,
+    string? Locale = null);
 
 /// <summary>The active release: its id, its number and its content hash.</summary>
 internal sealed record StudioActiveRelease(Guid ReleaseId, int Number, string ContentHash);

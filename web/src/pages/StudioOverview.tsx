@@ -230,17 +230,31 @@ function Release({
             >
               {changes.map((change) => {
                 const item = resources.find((resource) => resource.file === change.path)
+                // Proposed: a removed file is named from the live release, as the folder no longer holds it, and is
+                // not a link, as there is nothing left to open.
+                const title = item
+                  ? resourceTitle(item, locale)
+                  : resourceTitle(
+                      {
+                        file: change.path,
+                        name: change.name ?? null,
+                        titles: change.titles ?? null,
+                        locale: change.locale ?? null,
+                      },
+                      locale,
+                    )
+                const kind = item?.kind ?? change.kind
                 return (
                   <li key={change.path} style={{ display: 'flex', gap: spacing.xs, alignItems: 'baseline' }}>
                     {item ? (
                       <Link to={addressOf({ resource: item.id })} style={{ color: colour.primaryText }}>
-                        {resourceTitle(item, locale)}
+                        {title}
                       </Link>
                     ) : (
-                      <Typography.Text>{change.path}</Typography.Text>
+                      <Typography.Text>{title}</Typography.Text>
                     )}
                     <Typography.Text style={{ color: colour.textMuted }}>
-                      {item ? `${kindName(item.kind, t)} · ` : ''}
+                      {kind ? `${kindName(kind, t)} · ` : ''}
                       {t(`shell.studio.overview.change.${change.change}`)}
                     </Typography.Text>
                   </li>
@@ -266,9 +280,9 @@ function Release({
   )
 }
 
-/** A kind's name for one resource, as the sidebar names its list. */
+/** Proposed: a kind's name for one resource, in the singular, such as Entity, where the sidebar's list says Entities. */
 function kindName(kind: string, t: (key: string) => string): string {
-  const key = `shell.studio.kind.${kind}`
+  const key = `shell.studio.kindOne.${kind}`
   const name = t(key)
   return name === key ? kind : name
 }

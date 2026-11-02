@@ -102,3 +102,12 @@ the review.
   and its accessible name says so ("Purchasing, opens in a new tab"); no tooltip and no icon, so D128's "text or an
   icon, never both" stands. A site that a tenant serves at a host of its own opens at that host, as the home page's
   tile does.
+- **Changes, named as elsewhere.** The owner agreed to two fixes the review found. A change's kind is said in the
+  singular, Entity or Role, where the sidebar's list says Entities or Roles: `shell.studio.kindOne.*` texts. A removed
+  file, which the folder no longer holds, is named from the live release, its label, else the name its author gave, and
+  its kind, as text and not a link, as nothing is left to open; never its path. For the docs change: the Proposed
+  `changes` list on `GET .../releases` gives a removed file its `kind`, `name`, `titles` and a text resource's
+  `locale` from the live release, and `null` on an added or changed file, which Studio names from the folder.
+- **More you can add, in natural words.** The owner found that every "when" line began "Add one when…". Agreed: each
+  line says in its own words when the kind is needed, such as "Handy for lists that must be ready on the first day"
+  or "For a process that starts on its own, on a schedule or when a record changes", in English and Vietnamese.
