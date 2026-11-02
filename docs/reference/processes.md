@@ -150,7 +150,7 @@ a payment reference from the sample extension package, see
     {
       "name": "financeCheck",
       "type": "decision",
-      "branches": [{ "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
+      "branches": [{ "name": "branch1", "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
       "otherwise": "markApproved"
     },
     {
@@ -250,8 +250,8 @@ step and stores its in-app notification, see
 operation is built, see
 [Create record operation](process-flow.md#create-record-operation).
 
-- **`decision`.** `branches` is an ordered list. Each branch has a `when`
-  expression and a `next` step. The branches are evaluated in order, and the
+- **`decision`.** `branches` is an ordered list. Each branch has a `name`, a `when`
+  expression and a `next` step. A branch name is unique in its decision, ignoring letter case. The branches are evaluated in order, and the
   first one that is true wins. A `when` that gives `null` counts as false.
   `otherwise` is required and names the step taken when no branch is true.
 - **`task`.** A human task. The instance waits until a person completes the
@@ -337,7 +337,10 @@ reported in one pass. See
   passes through a `task`, a `timer` or a `waitEvent` step is allowed, see
   [Loops](process-flow.md#loops). A cycle of steps that never wait, such as
   `decision` and `operation` steps, would run for ever and is reported.
-- A decision has at least one branch (`AXC0004`).
+- A decision has at least one branch (`AXC0004`). Each branch has a `name`
+  (`AXC0004` when it is missing), and a later branch with a name already used
+  in the decision, ignoring letter case, is `AXC0359` at
+  `/steps/{i}/branches/{j}/name`.
 - Each `when` and the `startCondition` expression give a boolean. They see
   the subject entity's fields, computed ones included, `id`, the subject
   record's id, its child collections through aggregates, the named rules, and

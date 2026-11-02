@@ -114,7 +114,7 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
                   "parameters": [{ "name": "days", "type": "integer" }, { "name": "since", "type": "date-time" }],
                   "start": "check",
                   "steps": [
-                    { "name": "check", "type": "decision", "branches": [{ "when": "days > 5", "next": "late" }], "otherwise": "early" },
+                    { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "days > 5", "next": "late" }], "otherwise": "early" },
                     { "name": "late", "type": "end" },
                     { "name": "early", "type": "end" }
                   ]

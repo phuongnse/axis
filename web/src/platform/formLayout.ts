@@ -437,6 +437,18 @@ function unusedSectionName(used: ReadonlySet<string>): string {
   }
 }
 
+/** The lowest `step{n}` from 1 that no step of `steps` uses, ignoring letter case as the compiler does. */
+export function unusedStepName(steps: unknown[]): string {
+  const used = new Set(
+    steps.flatMap((step) => (isContent(step) && typeof step.name === 'string' ? [step.name.toLowerCase()] : [])),
+  )
+  for (let number = 1; ; number++) {
+    if (!used.has(`step${number}`)) {
+      return `step${number}`
+    }
+  }
+}
+
 function sectionNames(sections: unknown[]): Set<string> {
   return new Set(
     sections.flatMap((section) =>
@@ -519,7 +531,7 @@ export function addStep(draft: Content, keys: TitleKeys): LayoutAdd {
   if (steps.length > 0) {
     return {
       sections,
-      steps: [...steps, { title: { textKey }, sections: [] }],
+      steps: [...steps, { name: unusedStepName(steps), title: { textKey }, sections: [] }],
       select: `/steps/${steps.length}`,
       name: textKey,
     }
@@ -535,7 +547,9 @@ export function addStep(draft: Content, keys: TitleKeys): LayoutAdd {
   })
   return {
     sections: named,
-    steps: [{ title: { textKey }, sections: named.map((section) => section.name as string) }],
+    steps: [
+      { name: unusedStepName(steps), title: { textKey }, sections: named.map((section) => section.name as string) },
+    ],
     select: '/steps/0',
     name: textKey,
   }

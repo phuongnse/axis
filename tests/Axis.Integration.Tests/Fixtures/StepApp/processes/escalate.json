@@ -17,7 +17,7 @@
         { "name": "reject", "label": { "textKey": "task.reject" }, "next": "rejected" }
       ],
       "deadline": { "after": "P1D", "next": "expired" },
-      "escalations": [{ "after": "PT1H", "reassign": { "role": "reviewer" } }]
+      "escalations": [{ "name": "escalation1", "after": "PT1H", "reassign": { "role": "reviewer" } }]
     },
     { "name": "approved", "type": "end" },
     { "name": "rejected", "type": "end" },

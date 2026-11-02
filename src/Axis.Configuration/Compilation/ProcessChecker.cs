@@ -43,7 +43,8 @@ namespace Axis.Configuration.Compilation;
 /// over the event's payload fields, its <c>timeout.after</c> is a positive fixed duration and its
 /// <c>timeout.next</c> is a transition.
 /// A <c>notify</c> step is checked by <see cref="CheckNotify"/>. A task's <c>escalations</c> are checked by
-/// <see cref="CheckEscalations"/>.
+/// <see cref="CheckEscalations"/>. A decision's branch names and a task's escalation names are each unique in their
+/// list, ignoring letter case.
 /// Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
@@ -1010,7 +1011,8 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks the step names and the transitions, then walks the steps: breadth-first from
+    /// Checks the step names, the branch names of each decision step and the escalation names of each
+    /// task step, each unique in its list ignoring letter case, and the transitions, then walks the steps: breadth-first from
     /// <c>start</c> for reachability, to a fixed point for the path to an end, and depth-first in
     /// file order for cycles. A transition resolves to the first step with its name.
     /// </summary>
@@ -1033,6 +1035,25 @@ internal static class ProcessChecker
             }
         }
 
+        // Reports a name that an earlier element of the same list already uses, at the later element's name.
+        void CheckElementNames(string element, string listPath, IEnumerable<string> names)
+        {
+            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var position = 0;
+            foreach (var name in names)
+            {
+                if (!firstIndexByName.TryAdd(name, position))
+                {
+                    report(
+                        DiagnosticCodes.DuplicateProcessElementName,
+                        $"The {element} name '{name}' is already used by the {element} at '{listPath}/{firstIndexByName[name]}'.",
+                        $"{listPath}/{position}/name");
+                }
+
+                position++;
+            }
+        }
+
         // The index of the step a transition names, or null when it names none.
         int? Resolve(string name, string path)
         {
@@ -1051,6 +1072,8 @@ internal static class ProcessChecker
         {
             var step = steps[index];
             var path = $"/steps/{index}";
+            CheckElementNames("branch", $"{path}/branches", (step.Branches ?? []).Select(branch => branch.Name));
+            CheckElementNames("escalation", $"{path}/escalations", (step.Escalations ?? []).Select(escalation => escalation.Name));
             transitions[index] = [];
             for (var branch = 0; branch < (step.Branches?.Count ?? 0); branch++)
             {

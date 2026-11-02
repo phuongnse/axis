@@ -72,6 +72,7 @@
       "dueIn": "P3D",
       "escalations": [
         {
+          "name": "escalation1",
           "after": "P3D",
           "notify": {
             "to": [
@@ -96,12 +97,14 @@
           }
         },
         {
+          "name": "escalation2",
           "after": "P4D",
           "reassign": {
             "role": "service-desk-lead"
           }
         },
         {
+          "name": "escalation3",
           "after": "P3D",
           "notify": {
             "to": [

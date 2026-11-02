@@ -10,7 +10,7 @@ import { NotifyFields } from './NotifyFields'
 import { OperationPanel } from './OperationPanel'
 import { operationJsonOnlyKeys } from './operationKeys'
 import { Expression, NamePicker } from './ProcessFields'
-import { moved, requiredStepKeys } from './processPalette'
+import { moved, requiredStepKeys, uniqueStepName } from './processPalette'
 import { stepTypes, withType } from './processStepSchema'
 import { ReferencePicker } from './ReferencePicker'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
@@ -667,7 +667,14 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
           )
         })}
         <div>
-          <Button onClick={() => onChange(escalationsPointer, [...escalations, { after: '' }])}>
+          <Button
+            onClick={() =>
+              onChange(escalationsPointer, [
+                ...escalations,
+                { name: uniqueStepName(escalations, 'escalation'), after: '' },
+              ])
+            }
+          >
             {t('shell.studio.process.addEscalation')}
           </Button>
         </div>
@@ -1014,7 +1021,14 @@ function Decision({
             )
           })}
           <div>
-            <Button onClick={() => onChange(branchesPointer, [...branches, { when: '', next: '' }])}>
+            <Button
+              onClick={() =>
+                onChange(branchesPointer, [
+                  ...branches,
+                  { name: uniqueStepName(branches, 'branch'), when: '', next: '' },
+                ])
+              }
+            >
               {t('shell.studio.process.addBranch')}
             </Button>
           </div>

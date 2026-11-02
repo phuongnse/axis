@@ -131,7 +131,7 @@ test.describe("Studio edits a process in the process editor", () => {
     expect(saved.steps[11]).toEqual({
       name: "checkTotal",
       type: "decision",
-      branches: [{ when: "totalAmount > 0", next: "managerApproval" }],
+      branches: [{ name: "branch1", when: "totalAmount > 0", next: "managerApproval" }],
       otherwise: "markRejected",
     });
   });

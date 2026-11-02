@@ -52,7 +52,7 @@ const process = {
     {
       name: 'financeCheck',
       type: 'decision',
-      branches: [{ when: 'totalAmount >= FinanceThreshold()', next: 'done' }],
+      branches: [{ name: 'branch1', when: 'totalAmount >= FinanceThreshold()', next: 'done' }],
       otherwise: 'missing',
     },
     { name: 'done', type: 'end' },
@@ -294,7 +294,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
 
     await userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
-    expect(stepOf(latest, 1).escalations).toEqual([{ after: '' }])
+    expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation1', after: '' }])
     await userEvent.type(field('/steps/1/escalations/0/after').getByRole('textbox'), 'P1D')
     await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
     expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).toEqual({
@@ -314,6 +314,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
 
     expect(stepOf(latest, 1).escalations).toEqual([
       {
+        name: 'escalation1',
         after: 'P1D',
         notify: {
           to: [{ role: 'finance-reviewer' }],
@@ -325,7 +326,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).not.toHaveProperty('next')
 
     await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
-    expect(stepOf(latest, 1).escalations).toEqual([{ after: 'P1D' }])
+    expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation1', after: 'P1D' }])
   })
 
   it('turns on reassign for an escalation with its own assignee editor and removes the key when off', async () => {
@@ -346,7 +347,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(stepOf(latest, 1).assignee).toEqual({ user: 'department.manager' })
 
     await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Reassign' }))
-    expect(stepOf(latest, 1).escalations).toEqual([{ after: '' }])
+    expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation1', after: '' }])
   })
 
   it('adds a deadline and removes the key when it is removed', async () => {
@@ -377,7 +378,27 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     await add()
     await userEvent.type(field('/steps/1/escalations/1/after').getByRole('textbox'), 'P2D')
     await userEvent.click(field('/steps/1/escalations/0').getByRole('button', { name: 'Remove escalation' }))
-    expect(stepOf(latest, 1).escalations).toEqual([{ after: 'P2D' }])
+    expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation2', after: 'P2D' }])
+  })
+
+  it('names a new escalation with the first free name, ignoring letter case', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: (process.steps as Record<string, unknown>[]).map((step, index) =>
+        index === 1
+          ? { ...step, escalations: [{ name: 'Escalation1', after: 'PT1H', reassign: { user: 'a' } }] }
+          : step,
+      ),
+    })
+
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/steps/1/escalations')).getByRole('button', { name: 'Add escalation' }),
+    )
+
+    expect(stepOf(latest, 1).escalations).toEqual([
+      { name: 'Escalation1', after: 'PT1H', reassign: { user: 'a' } },
+      { name: 'escalation2', after: '' },
+    ])
   })
 
   it('switches the subject between an entity and parameters and keeps only the chosen key', async () => {

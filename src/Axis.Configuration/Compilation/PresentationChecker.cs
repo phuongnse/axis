@@ -163,7 +163,7 @@ internal static class PresentationChecker
     }
 
     /// <summary>
-    /// Checks the steps: each title is a known text key, each step section names a section of the
+    /// Checks the steps: each name is unique, ignoring letter case, each title is a known text key, each step section names a section of the
     /// form, no section is in two steps, and, when there are steps, each section has a name and is in
     /// one. A section name matches ignoring letter case.
     /// </summary>
@@ -181,9 +181,18 @@ internal static class PresentationChecker
         var sectionNames = new HashSet<string>(
             form.Sections.Select(section => section.Name).OfType<string>(), StringComparer.OrdinalIgnoreCase);
         var firstPathByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var firstIndexByStepName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var stepIndex = 0; stepIndex < form.Steps.Count; stepIndex++)
         {
             var step = form.Steps[stepIndex];
+            if (!firstIndexByStepName.TryAdd(step.Name, stepIndex))
+            {
+                report(
+                    DiagnosticCodes.DuplicateFormStepName,
+                    $"The step name '{step.Name}' is already used by the step at '/steps/{firstIndexByStepName[step.Name]}'.",
+                    $"/steps/{stepIndex}/name");
+            }
+
             ApplicationCompiler.CheckTextKey(step.Title, form, $"/steps/{stepIndex}/title", references, diagnostics);
 
             for (var sectionIndex = 0; sectionIndex < step.Sections.Count; sectionIndex++)

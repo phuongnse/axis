@@ -38,7 +38,7 @@ public sealed class ProcessWithoutSubjectOperatorTests(TaskApiFixture fixture) :
           ],
           "start": "check",
           "steps": [
-            { "name": "check", "type": "decision", "branches": [{ "when": "amount / divisor > 0", "next": "send" }], "otherwise": "send" },
+            { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "amount / divisor > 0", "next": "send" }], "otherwise": "send" },
             {
               "name": "send",
               "type": "operation",

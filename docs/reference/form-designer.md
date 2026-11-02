@@ -102,7 +102,9 @@ Dn refers to [decisions.md](../decisions.md).
     `forms.ticketResolution.sections.1.title`. The new section is selected. It
     joins the selected step, the step of the selected section or field, or the
     last step. The first Add step names every unnamed section and puts all
-    sections into one step. A later Add step adds an empty, selected step. A
+    sections into one step. A later Add step adds an empty, selected step. Each new step, the first
+    one included, gets the first free name `step1`, `step2` and so on, ignoring
+    letter case. A
     section with no fields shows a "Drop a field here" area in the outline,
     where a palette field can land. Each add is one undo step, and a live
     region names what was added. Until a field goes into an empty section or

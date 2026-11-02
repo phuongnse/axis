@@ -447,8 +447,8 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         form["sections"]![0]!["name"] = "request";
         form["sections"]![1]!["name"] = "decision";
         form["steps"] = new JsonArray(
-            new JsonObject { ["title"] = new JsonObject { ["textKey"] = "purchaseRequest.sections.request" }, ["sections"] = new JsonArray("request") },
-            new JsonObject { ["title"] = new JsonObject { ["textKey"] = "purchaseRequest.sections.decision" }, ["sections"] = new JsonArray("decision") });
+            new JsonObject { ["name"] = "step1", ["title"] = new JsonObject { ["textKey"] = "purchaseRequest.sections.request" }, ["sections"] = new JsonArray("request") },
+            new JsonObject { ["name"] = "step2", ["title"] = new JsonObject { ["textKey"] = "purchaseRequest.sections.decision" }, ["sections"] = new JsonArray("decision") });
         return form;
     }
 

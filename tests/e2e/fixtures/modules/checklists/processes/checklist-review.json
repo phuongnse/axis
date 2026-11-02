@@ -6,7 +6,7 @@
   "entity": "Checklist",
   "start": "check",
   "steps": [
-    { "name": "check", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done" },
+    { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "otherwise": "done" },
     { "name": "done", "type": "end" }
   ]
 }

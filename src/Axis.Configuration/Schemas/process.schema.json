@@ -539,8 +539,9 @@
     "branch": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["when", "next"],
+      "required": ["name", "when", "next"],
       "properties": {
+        "name": { "$ref": "#/$defs/name" },
         "when": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } }
       }
@@ -556,8 +557,9 @@
     "escalation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["after"],
+      "required": ["name", "after"],
       "properties": {
+        "name": { "$ref": "#/$defs/name" },
         "after": { "type": "string", "minLength": 1 },
         "reassign": { "$ref": "#/$defs/assignee" },
         "notify": { "$ref": "#/$defs/escalationNotify" }

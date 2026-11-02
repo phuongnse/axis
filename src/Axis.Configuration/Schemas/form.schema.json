@@ -48,8 +48,9 @@
     "step": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["title", "sections"],
+      "required": ["name", "title", "sections"],
       "properties": {
+        "name": { "$ref": "#/$defs/name" },
         "title": { "$ref": "#/$defs/textReference" },
         "sections": {
           "type": "array",

@@ -79,7 +79,7 @@ public sealed class ProcessCompilerTests
 
     private const string ReviewSteps = """
         [
-          { "name": "check", "type": "decision", "branches": [{ "when": "NeedsReview(amount)", "next": "big" }], "otherwise": "small" },
+          { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "NeedsReview(amount)", "next": "big" }], "otherwise": "small" },
           { "name": "big", "type": "end" },
           { "name": "small", "type": "end" }
         ]
@@ -119,7 +119,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(SubjectlessProcess("""[{ "name": "limit", "type": "decimal" }]""", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "NeedsReview(limit)", "next": "big" }], "otherwise": "small" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "NeedsReview(limit)", "next": "big" }], "otherwise": "small" },
               { "name": "big", "type": "end" },
               { "name": "small", "type": "end" }
             ]
@@ -163,7 +163,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(SubjectlessProcess("""[{ "name": "limit", "type": "decimal" }]""", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "amount > limit", "next": "big" }], "otherwise": "small" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "amount > limit", "next": "big" }], "otherwise": "small" },
               { "name": "big", "type": "end" },
               { "name": "small", "type": "end" }
             ]
@@ -211,7 +211,7 @@ public sealed class ProcessCompilerTests
             """[{ "name": "DailyJob", "type": "text" }, { "name": "limit", "type": "decimal" }, { "name": "dailyjob", "type": "integer" }]""",
             """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "limit > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "limit > 0", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """));
@@ -283,7 +283,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "DONE" }], "otherwise": "Done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "amount > 0", "next": "DONE" }], "otherwise": "Done" },
               { "name": "done", "type": "end" }
             ]
             """, start: "CHECK"));
@@ -299,13 +299,80 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_branch_without_a_name_is_a_schema_violation_at_its_branch()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "name": "high", "when": "amount > 100", "next": "done" }, { "when": "amount > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.Path) == (DiagnosticCodes.SchemaViolation, "/steps/0/branches/1"));
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Two_branches_with_the_same_name_ignoring_letter_case_are_a_duplicate_on_the_later_branch()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "name": "high", "when": "amount > 100", "next": "done" }, { "name": "HIGH", "when": "amount > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateProcessElementName, "/steps/0/branches/1/name", "The branch name 'HIGH' is already used by the branch at '/steps/0/branches/0'."),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Branches_of_two_decisions_may_share_a_name()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "name": "high", "when": "amount > 100", "next": "again" }], "otherwise": "done" },
+              { "name": "again", "type": "decision", "branches": [{ "name": "high", "when": "amount > 200", "next": "done" }], "otherwise": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void A_repeated_escalation_name_is_reported_in_a_process_without_a_subject()
+    {
+        using var folder = Folder(SubjectlessProcess(
+            """[{ "name": "limit", "type": "decimal" }]""",
+            TaskSteps(escalations: """[{ "name": "remind", "after": "P1D" }, { "name": "Remind", "after": "P2D" }]"""),
+            start: "review"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [(DiagnosticCodes.StepNeedsSubject, "/steps/0/type"), (DiagnosticCodes.DuplicateProcessElementName, "/steps/0/escalations/1/name")],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)).Order());
+    }
+
+    [Fact]
     public void Every_graph_error_of_a_process_is_reported_at_its_path_in_one_pass()
     {
         using var folder = Folder(Process("Nope", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "true", "next": "loopA" }], "otherwise": "missing" },
-              { "name": "loopA", "type": "decision", "branches": [{ "when": "true", "next": "loopB" }], "otherwise": "loopB" },
-              { "name": "loopB", "type": "decision", "branches": [{ "when": "true", "next": "loopA" }], "otherwise": "loopA" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "loopA" }], "otherwise": "missing" },
+              { "name": "loopA", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "loopB" }], "otherwise": "loopB" },
+              { "name": "loopB", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "loopA" }], "otherwise": "loopA" },
               { "name": "orphan", "type": "end" },
               { "name": "CHECK", "type": "end" }
             ]
@@ -368,7 +435,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "pause" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "amount > 0", "next": "pause" }], "otherwise": "done" },
               { "name": "pause", "type": "timer", "wait": "PT1H", "next": "check" },
               { "name": "done", "type": "end" }
             ]
@@ -461,7 +528,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "wait" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "amount > 0", "next": "wait" }], "otherwise": "done" },
               { "name": "wait", "type": "waitEvent", "event": "orderPLACED", "when": "amount > 10", "timeout": { "after": "P2D", "next": "DONE" }, "next": "check" },
               { "name": "done", "type": "end" }
             ]
@@ -559,7 +626,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "prepare" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "amount > 0", "next": "prepare" }], "otherwise": "done" },
               { "name": "prepare", "type": "operation", "operation": "updateRecord", "set": { "status": "'Reopened'" }, "next": "check" },
               { "name": "done", "type": "end" }
             ]
@@ -578,7 +645,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "check" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "amount > 0", "next": "check" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """));
@@ -628,7 +695,7 @@ public sealed class ProcessCompilerTests
     {
         var steps = $$"""
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "{{(inStartCondition ? "amount > 0" : expression)}}", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "{{(inStartCondition ? "amount > 0" : expression)}}", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """;
@@ -653,7 +720,7 @@ public sealed class ProcessCompilerTests
     {
         var steps = $$"""
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "{{(inStartCondition ? "amount > 0" : expression)}}", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "{{(inStartCondition ? "amount > 0" : expression)}}", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """;
@@ -673,7 +740,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = WithCustomerNotes(Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "count(customer.notes) > 1 and sum(customer.notes, size) > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "count(customer.notes) > 1 and sum(customer.notes, size) > 0", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """, startCondition: "any(customer.notes, size > 1)")));
@@ -692,7 +759,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = WithCustomerNotes(Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "count(customer.referredBy.referredBy.referredBy.notes) > 0", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "count(customer.referredBy.referredBy.referredBy.notes) > 0", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """)));
@@ -732,7 +799,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Customer", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "id == referredBy", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "id == referredBy", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """));
@@ -748,7 +815,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Customer", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "id.name == 'x'", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "id.name == 'x'", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """));
@@ -767,7 +834,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "customer.referredBy.name == 'x'", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "customer.referredBy.name == 'x'", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """, startCondition: "customer.REFERREDBY is not null"));
@@ -786,7 +853,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Order", """
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "count(lines) > 0 and large", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "count(lines) > 0 and large", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """));
@@ -842,7 +909,7 @@ public sealed class ProcessCompilerTests
     {
         using var folder = Folder(Process("Order", $$"""
             [
-              { "name": "check", "type": "decision", "branches": [{ "when": "{{expression}}", "next": "done" }], "otherwise": "done" },
+              { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "{{expression}}", "next": "done" }], "otherwise": "done" },
               { "name": "done", "type": "end" }
             ]
             """));
@@ -1472,7 +1539,7 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": {}, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "otherwise": "done" }""")]
-    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "otherwise": "done", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "set": { "status": "'x'" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview" }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [] }""")]
@@ -1481,7 +1548,7 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "queue": "x" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
     [InlineData("""{ "name": "submit", "type": "task", "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "next": "done" }] }""")]
-    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "form": "OrderReview" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "otherwise": "done", "form": "OrderReview" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "next": "done", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }] }""")]
     [InlineData("""{ "name": "submit", "type": "end", "dueIn": "P3D" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "wait": "PT1H" }""")]
@@ -1503,14 +1570,14 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "timeout": { "after": "P1D", "next": "done" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "when": "true", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "deadline": { "after": "P1D", "next": "done" } }""")]
-    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "deadline": { "after": "P1D", "next": "done" } }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "otherwise": "done", "deadline": { "after": "P1D", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "P1D" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "P1D", "next": "done", "escalate": true } }""")]
-    [InlineData("""{ "name": "submit", "type": "end", "escalations": [{ "after": "P1D", "reassign": { "role": "finance" } }] }""")]
-    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "escalations": [{ "after": "P1D", "reassign": { "role": "finance" }, "extra": true }] }""")]
-    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "escalations": [{ "after": "P1D", "notify": { "to": [{ "role": "finance" }], "channels": ["inApp"], "message": { "subject": { "textKey": "a" }, "body": { "textKey": "b" } }, "next": "done" } }] }""")]
+    [InlineData("""{ "name": "submit", "type": "end", "escalations": [{ "name": "escalation1", "after": "P1D", "reassign": { "role": "finance" } }] }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "escalations": [{ "name": "escalation1", "after": "P1D", "reassign": { "role": "finance" }, "extra": true }] }""")]
+    [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "escalations": [{ "name": "escalation1", "after": "P1D", "notify": { "to": [{ "role": "finance" }], "channels": ["inApp"], "message": { "subject": { "textKey": "a" }, "body": { "textKey": "b" } }, "next": "done" } }] }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "escalations": [{ "reassign": { "role": "finance" } }] }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "input": { "amount": "1" }, "next": "done" }""")]
@@ -1527,7 +1594,7 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "attempts": 2.5 }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "backoff": "" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "callConnector", "connector": { "name": "Purchasing", "operation": "createOrder" }, "input": {}, "retry": { "delay": "PT1S" }, "next": "done" }""")]
-    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "retry": { "attempts": 2 } }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "otherwise": "done", "retry": { "attempts": 2 } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "input": {} }""")]
     [InlineData("""{ "name": "submit", "type": "end", "connector": { "name": "Purchasing", "operation": "createOrder" } }""")]
     [InlineData("""{ "name": "submit", "type": "end", "output": {} }""")]
@@ -1537,13 +1604,13 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": { "not a name": "1" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": {}, "retry": { "attempts": 2 }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "raiseEvent", "event": "OrderPlaced", "fields": {}, "output": {}, "next": "done" }""")]
-    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "event": "OrderPlaced" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "otherwise": "done", "event": "OrderPlaced" }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "fields": {} }""")]
     [InlineData("""{ "name": "submit", "type": "end", "event": "OrderPlaced" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "subject": "customer", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "process": "Child", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "parameters": {}, "next": "done" }""")]
-    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "process": "Child" }""")]
+    [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "otherwise": "done", "process": "Child" }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "subject": "customer" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "parameters": {} }""")]
     [InlineData("""{ "name": "submit", "type": "subProcess", "next": "done" }""")]
@@ -1554,7 +1621,7 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "parameters": { "not a name": "1" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "operation": "updateRecord", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "input": {}, "next": "done" }""")]
-    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "branches": [{ "when": "true", "next": "done" }], "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "branches": [{ "name": "branch1", "when": "true", "next": "done" }], "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "subProcess", "process": "Child", "retry": { "attempts": 2 }, "next": "done" }""")]
     public void A_step_shape_the_schema_refuses_is_a_schema_violation(string step)
     {
@@ -2209,10 +2276,12 @@ public sealed class ProcessCompilerTests
         string form = "OrderReview",
         string? dueIn = "P3D",
         string secondOutcome = "reject",
-        string? deadline = null)
+        string? deadline = null,
+        string? escalations = null)
     {
         var due = (dueIn is null ? "" : $$""" "dueIn": "{{dueIn}}", """)
-            + (deadline is null ? "" : $$""" "deadline": {{deadline}}, """);
+            + (deadline is null ? "" : $$""" "deadline": {{deadline}}, """)
+            + (escalations is null ? "" : $$""" "escalations": {{escalations}}, """);
         return $$"""
             [
               { "name": "review", "type": "task", "label": { "textKey": "order.review" }, "assignee": {{assignee}}, "form": "{{form}}", {{due}}

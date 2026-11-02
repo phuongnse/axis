@@ -256,7 +256,7 @@ flowchart LR
      [Form conditions and steps](form-conditions.md#form-conditions-and-steps):
      each condition is a boolean expression over the entity, and it reads only
      listed fields (`AXC0225`). `visibleWhen` is not allowed on a required
-     field (`AXC0226`). A section name is used once (`AXC0227`). A step names
+     field (`AXC0226`). A section name is used once (`AXC0227`) and a step name once (`AXC0360`). A step names
      a known section (`AXC0228`) that is in no other step (`AXC0229`), and
      when there are steps, every section has a name and is in one step
      (`AXC0230`).
@@ -437,7 +437,7 @@ flowchart LR
      `/steps/{i}/deadline/after`. A later outcome with a name already
      used in the step, ignoring letter case, is `AXC0085` at
      `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
-     `label` join the `AXC0028` check. A decision with no branches, an
+     `label` join the `AXC0028` check. A branch or escalation name used twice in its list, ignoring letter case, is `AXC0359` at its `name`. A decision with no branches, an
      operation without `operation` or `next`, an `updateRecord` step without
      `set` or with `connector`, `input`, `output` or `retry`, a
      `callConnector` step without `connector` or `input` or with `set`, a
@@ -450,7 +450,7 @@ flowchart LR
      not letters and digits, an `event` or `fields` on any other step, `to`,
      `channels`, `message` or `open` on any other step, a retry `attempts` outside 1 to 10, a task without
      `label`, `assignee`, `form` or an outcome, and an `end` step with
-     `branches`, `otherwise` or any other property, are `AXC0004`. A
+     `branches`, `otherwise` or any other property, or a branch or escalation without `name`, are `AXC0004`. A
      sub-process step without `process` or `next`, or with a property of
      another step type, is `AXC0004` too, and so is `process`, `subject` or
      `parameters` on any other step. A sub-process step's `process` that names

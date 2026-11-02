@@ -35,8 +35,8 @@ const sections = [
 ]
 
 const steps = [
-  { title: { textKey: 'review.stepOne' }, sections: ['request'] },
-  { title: { textKey: 'review.stepTwo' }, sections: ['decision'] },
+  { name: 'step1', title: { textKey: 'review.stepOne' }, sections: ['request'] },
+  { name: 'step2', title: { textKey: 'review.stepTwo' }, sections: ['decision'] },
 ]
 
 /** The theme root of the shell: an element that carries the mode the provider chose. */
@@ -89,7 +89,7 @@ describe('FormSteps', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
 
-    expect(onChange).toHaveBeenLastCalledWith('/steps', [{ title: { textKey: '' }, sections: [] }])
+    expect(onChange).toHaveBeenLastCalledWith('/steps', [{ name: 'step1', title: { textKey: '' }, sections: [] }])
   })
 
   it('adds a step after the last one', async () => {
@@ -97,7 +97,22 @@ describe('FormSteps', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
 
-    expect(onChange).toHaveBeenLastCalledWith('/steps', [...steps, { title: { textKey: '' }, sections: [] }])
+    expect(onChange).toHaveBeenLastCalledWith('/steps', [
+      ...steps,
+      { name: 'step3', title: { textKey: '' }, sections: [] },
+    ])
+  })
+
+  it('names a new step with the first free name, ignoring letter case', async () => {
+    const existing = [{ name: 'Step1', title: { textKey: 'review.stepOne' }, sections: ['request'] }]
+    const onChange = renderSteps(existing)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
+
+    expect(onChange).toHaveBeenLastCalledWith('/steps', [
+      ...existing,
+      { name: 'step2', title: { textKey: '' }, sections: [] },
+    ])
   })
 
   it('moves a step down and up by swapping it with its neighbour', async () => {
