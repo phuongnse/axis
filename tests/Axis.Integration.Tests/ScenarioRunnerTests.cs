@@ -1366,6 +1366,8 @@ public sealed class ScenarioRunnerTests
         Assert.True(exitCode == 0, output.ToString());
         Assert.Contains("PASS approvals/RequestGoesToManagerThenNamedEmployee", output.ToString(), StringComparison.Ordinal);
         Assert.Contains("PASS approvals/DepartmentHeadReturnsAndRejects", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/DelegateDecidesWhileApproverIsAway", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("PASS approvals/DepartmentHeadRequestGoesToAdmin", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

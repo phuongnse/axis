@@ -124,8 +124,9 @@ Version 1.0.0 holds the entities below, the data sources `RequestTypes`, `Reques
 `RequestDecisions`,
 the sequence `RequestNumber` with the format `RQ-{yyyy}-{n:5}`, `amount` and `minAmount` as `decimal`
 with precision 18 and scale 2, the contracts of `Request`, `RequestType` and `Decision`, the process
-`RequestApproval`, the form `RequestReview`, the policies `MemberAccess` and `AdminAccess`, two module
-scenarios, `RequestGoesToManagerThenNamedEmployee` and `DepartmentHeadReturnsAndRejects`, the pages, the forms
+`RequestApproval`, the form `RequestReview`, the policies `MemberAccess` and `AdminAccess`, four module
+scenarios, `RequestGoesToManagerThenNamedEmployee`, `DepartmentHeadReturnsAndRejects`,
+`DelegateDecidesWhileApproverIsAway` and `DepartmentHeadRequestGoesToAdmin`, the pages, the forms
 `RequestForm` and `RequestDetail`, and the texts. Its contract scenarios are _(planned for M26)_.
 
 ### Request types
@@ -212,10 +213,10 @@ once**, whatever process change a business makes.
 4. **`findApprover`** sets `approver` from the step's `approver`, with
    `first(type.steps, sequence == outer.stepSequence, approver)`: the requester's manager, the
    department's head, or the step's `employee`.
-5. **`findDelegate`** _(planned for M26)_ sets `onBehalfOf` to the approver's account and `approverUser` to the
-   delegate's account while `organization:IsDelegating(…)` holds for the approver, else to the
-   approver's account.
-6. **`route`** _(planned for M26)_, a decision: when `approverUser` is empty or is the requester, the step goes to
+5. **`findDelegate`** sets `onBehalfOf` to the approver's account and `approverUser` to the
+   delegate's account while `organization:IsDelegating(…)` holds for the approver and the approver has
+   a delegate. Otherwise it sets `approverUser` to the approver's account and clears `onBehalfOf`.
+6. **`route`**, a decision: when `approverUser` is empty or is the requester, the step goes to
    `adminDecide`, a task for the `admin` slot. Otherwise it goes to `decide`, a task for
    `approverUser`. Both tasks show the `RequestReview` form, with outcomes `approve`, `return`
    and `reject`.
@@ -227,12 +228,8 @@ once**, whatever process change a business makes.
 9. **`markApproved`** sets `status` to `approved`. The contract checks the last decider and that
    every step that applies was decided.
 
-Until M26, `findDelegate` only sets `approverUser` to the approver's account, and the process has no
-`route`, so the `decide` task always goes to `approverUser`. When that is empty or is the requester,
-the contract refuses the decision and the instance fails.
-
 A requester who is a department head, and whose step would go to themselves, gets an administrator
-instead _(planned for M26)_. When the only administrator is the requester too, the guard refuses, and a business of
+instead. When the only administrator is the requester too, the guard refuses, and a business of
 that size relaxes `Request/transitions/approve` with its reason.
 
 ### Policies
