@@ -81,8 +81,9 @@ public sealed class StudioModuleLayerTests(PostgreSqlFixture database) : IClassF
         using var folder = StudioPublishTests.NewFolder();
         await using var factory = await CreateFactoryAsync(folder.Path);
         using var client = factory.CreateClient().SignedInAs("author");
-        var version = await CreateLayerAsync(client, folder.Path);
+        // Read the module's own content first: once a layer exists, the GET answers the content with the layer applied.
         var module = await ReadModuleAsync(client, ProcessId);
+        var version = await CreateLayerAsync(client, folder.Path);
 
         using var response = await PutAsync(client, ProcessId, module, ("If-Match", $"\"{version}\""));
 
@@ -115,9 +116,9 @@ public sealed class StudioModuleLayerTests(PostgreSqlFixture database) : IClassF
         using var folder = StudioPublishTests.NewFolder();
         await using var factory = await CreateFactoryAsync(folder.Path);
         using var client = factory.CreateClient().SignedInAs("author");
+        var edited = await ReadModuleAsync(client, ProcessId);
         await CreateLayerAsync(client, folder.Path);
         var before = Snapshot(folder.Path);
-        var edited = await ReadModuleAsync(client, ProcessId);
         edited["entity"] = "Budget";
         edited["start"] = "markApproved";
 
