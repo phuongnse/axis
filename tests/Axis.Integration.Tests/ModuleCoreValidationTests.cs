@@ -7,11 +7,14 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The core validations of the <c>stages</c> module's <c>Ticket</c> contract run on every write, after the entity's own
-/// validation <c>amountNotNegative</c> and before the lifecycle check. <c>amountFrozenAfterSubmit</c> refuses a change of
-/// <c>amount</c> once the ticket left <c>draft</c>, with a <c>400</c> at <c>/values/amount</c> and the record unchanged,
-/// and allows the same change in <c>draft</c>. A write that breaks both the entity's validation and the core validation
-/// gets only the entity's message. <c>stepMovesWithNewDecision</c> refuses the second <c>updateRecord</c> step that
-/// reuses <c>decisionTask()</c> to move <c>step</c>, which fails the instance and keeps the first step's value.
+/// validations and before the lifecycle check. The entity's own validations are <c>amountNotNegative</c> and
+/// <c>titleNotBlockedByLayer</c>, which the application's layer adds together with the field <c>costCenter</c>.
+/// <c>amountFrozenAfterSubmit</c> refuses a change of <c>amount</c> once the ticket left <c>draft</c>, with a <c>400</c>
+/// at <c>/values/amount</c> and the record unchanged, and allows the same change in <c>draft</c>. A write that breaks both
+/// the entity's validation and the core validation gets only the entity's message, and so does a write that breaks the
+/// layer's validation and the core validation. The record API writes and reads <c>costCenter</c>.
+/// <c>stepMovesWithNewDecision</c> refuses the second <c>updateRecord</c> step that reuses <c>decisionTask()</c> to move
+/// <c>step</c>, which fails the instance and keeps the first step's value.
 /// </summary>
 public sealed class ModuleCoreValidationTests(ModuleCoreValidationFixture fixture) : IClassFixture<ModuleCoreValidationFixture>
 {
@@ -60,6 +63,45 @@ public sealed class ModuleCoreValidationTests(ModuleCoreValidationFixture fixtur
         var error = Assert.Single(problem.RootElement.GetProperty("errors").EnumerateObject());
         Assert.Equal("/values/amount", error.Name);
         Assert.Equal(["stages.ticket.amountNotNegative"], error.Value.EnumerateArray().Select(message => message.GetString()));
+        Assert.Equal((5L, (long?)null, version), await fixture.TicketAsync(id));
+    }
+
+    [Fact]
+    public async Task A_field_the_layer_adds_is_written_and_read_through_the_record_api()
+    {
+        using var client = fixture.CreateClient().SignedInAs("requester");
+        Guid id;
+        using (var response = await SendAsync(
+            client,
+            HttpMethod.Post,
+            Records,
+            $$"""{ "values": { "title": "Ticket {{Guid.NewGuid():N}}", "amount": 5, "status": "draft", "costCenter": "CC-42" } }"""))
+        {
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            using var created = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+            id = created.RootElement.GetProperty("id").GetGuid();
+        }
+
+        using var read = await SendAsync(client, HttpMethod.Get, $"{Records}/{id}", null);
+
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        using var body = JsonDocument.Parse(await read.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal("CC-42", body.RootElement.GetProperty("values").GetProperty("costCenter").GetString());
+    }
+
+    [Fact]
+    public async Task A_write_that_breaks_the_layer_validation_and_a_core_validation_gets_only_the_layer_message()
+    {
+        using var client = fixture.CreateClient().SignedInAs("requester");
+        var (id, version) = await CreateAsync(client);
+        version = await PatchAsync(client, id, version, """{ "status": "submitted" }""");
+
+        using var response = await PatchResponseAsync(client, id, version, """{ "title": "blocked-by-layer", "amount": 10 }""");
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        var error = Assert.Single(problem.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal("/values/title", error.Name);
+        Assert.Equal(["ticket.blockedByLayer"], error.Value.EnumerateArray().Select(message => message.GetString()));
         Assert.Equal((5L, (long?)null, version), await fixture.TicketAsync(id));
     }
 

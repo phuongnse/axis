@@ -1,0 +1,17 @@
+{
+  "id": "23e2961b-af39-4ed0-89f8-3d42e30cad48",
+  "kind": "layer",
+  "formatVersion": 1,
+  "target": "stages/Ticket",
+  "changes": {
+    "fields": [{ "name": "costCenter", "type": "text", "maxLength": 50 }],
+    "validations": [
+      {
+        "name": "titleNotBlockedByLayer",
+        "expression": "title != 'blocked-by-layer'",
+        "message": { "textKey": "ticket.blockedByLayer" },
+        "field": "title"
+      }
+    ]
+  }
+}
