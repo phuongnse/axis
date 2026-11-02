@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Form, Input, Modal, Radio, Typography } from 'antd'
+import { Alert, Button, Flex, Form, Input, Modal, Radio, Tag, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { createStudioApp, fetchStudioTemplates, ServerUnreachableError, type StudioTemplate } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
@@ -11,7 +11,8 @@ type Problem = 'exists' | 'invalid' | 'failed'
 
 /**
  * The New application button and its dialog. The dialog asks for a name and for Blank or an installed template, and
- * shows each template's title and description in the UI locale, with `en` as the fallback. Create stays off while the
+ * shows each template's title and description in the UI locale, with `en` as the fallback. A built-in template keeps the
+ * server's order and carries a "Built in" tag after its title. Create stays off while the
  * name breaks the API's rule. A `409` shows that the name is taken, and a `400` that it is refused, and the dialog stays
  * open in both cases. When the template list does not load, the dialog offers only Blank. `onCreated` gets the new
  * application's name once the create succeeds.
@@ -132,6 +133,9 @@ export function StudioNewApplication({ onCreated }: { onCreated: (name: string) 
                   templates.map((item) => (
                     <Radio key={item.id} value={item.id}>
                       <span>{localized(item.title, locale)}</span>
+                      {item.builtIn && (
+                        <Tag style={{ marginInlineStart: 8 }}>{t('shell.studio.newApplication.builtIn')}</Tag>
+                      )}
                       <Typography.Text type="secondary" style={{ display: 'block' }}>
                         {localized(item.description, locale)}
                       </Typography.Text>

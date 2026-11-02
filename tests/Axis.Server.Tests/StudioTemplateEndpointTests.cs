@@ -50,6 +50,25 @@ public sealed class StudioTemplateEndpointTests : IDisposable
         Assert.Equal("Description of tpl-a", first.GetProperty("description").GetProperty("en").GetString());
         Assert.Equal("Mô tả của tpl-a", first.GetProperty("description").GetProperty("vi").GetString());
         Assert.All(items, item => Assert.Equal(JsonValueKind.Array, item.GetProperty("diagnostics").ValueKind));
+        Assert.All(items, item => Assert.False(item.GetProperty("builtIn").GetBoolean()));
+    }
+
+    [Fact]
+    public async Task Built_in_templates_are_listed_first_and_the_others_by_id()
+    {
+        AddTemplate("tpl-b", "1.0.0");
+        AddTemplate("tpl-z", "1.0.0", builtIn: true);
+        AddTemplate("tpl-a", "1.0.0");
+        await using var factory = CreateFactory(TemplatesFolder);
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        var response = await client.GetAsync(new Uri("/api/studio/templates", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var items = body.RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(["tpl-z", "tpl-a", "tpl-b"], items.Select(item => item.GetProperty("id").GetString()));
+        Assert.Equal([true, false, false], items.Select(item => item.GetProperty("builtIn").GetBoolean()));
     }
 
     [Fact]
@@ -91,14 +110,16 @@ public sealed class StudioTemplateEndpointTests : IDisposable
         Assert.Contains("Templates:Path", exception.Message, StringComparison.Ordinal);
     }
 
-    private void AddTemplate(string id, string version)
+    private void AddTemplate(string id, string version, bool builtIn = false)
     {
         var folder = Path.Combine(TemplatesFolder, id, version);
+        var builtInLine = builtIn ? "\"builtIn\": true," : "";
         Write(folder, "template.json", $$"""
             {
               "kind": "applicationTemplate",
               "id": "{{id}}",
               "version": "{{version}}",
+              {{builtInLine}}
               "title": { "en": "Title of {{id}}", "vi": "Tiêu đề của {{id}}" },
               "description": { "en": "Description of {{id}}", "vi": "Mô tả của {{id}}" }
             }

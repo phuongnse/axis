@@ -108,10 +108,14 @@ export interface StudioApplication {
   name: string
 }
 
-/** An application template in the list of `GET /api/studio/templates`. `title` and `description` hold `en` and `vi`. */
+/**
+ * An application template in the list of `GET /api/studio/templates`. `title` and `description` hold `en` and `vi`.
+ * `builtIn` is true for a built-in application, and the server lists those first.
+ */
 export interface StudioTemplate {
   id: string
   version: string
+  builtIn: boolean
   title: Record<string, string>
   description: Record<string, string>
 }

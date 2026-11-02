@@ -29,7 +29,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   lists no application. The dialog asks for a name and checks it with the API's
   rule before it sends anything. It offers Blank or a template from
   `GET /api/studio/templates`, with the title and description in the UI locale
-  and `en` as the fallback. A `409` or a `400` shows next to the name. A success
+  and `en` as the fallback. A built-in template is listed first, with a "Built in" mark. A `409` or a `400` shows next to the name. A success
   adds the application to the picker, picks it, and loads its resources and
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
