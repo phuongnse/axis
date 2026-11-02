@@ -240,6 +240,35 @@ namespace Axis.Tenancy.Platform.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantQuotaRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Quota")
+                        .HasColumnType("text")
+                        .HasColumnName("quota");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long?>("Value")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value");
+
+                    b.HasKey("TenantId", "Quota")
+                        .HasName("pk_tenant_quotas");
+
+                    b.ToTable("tenant_quotas", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_quotas_value", "value IS NULL OR value >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantRow", b =>
                 {
                     b.Property<string>("Id")
@@ -467,6 +496,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_platform_providers_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantQuotaRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_quotas_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantRow", b =>

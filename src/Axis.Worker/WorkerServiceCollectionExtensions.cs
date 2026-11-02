@@ -71,6 +71,8 @@ public static class WorkerServiceCollectionExtensions
 
         var cell = CellOptions.Load(configuration);
         services.AddSingleton(cell);
+        services.AddSingleton(QuotaDefaults.Load(configuration, cell));
+        services.AddSingleton<TenantQuotas>();
 
         WorkerTenantCatalog catalog;
         ITenantKeySource keySource;
