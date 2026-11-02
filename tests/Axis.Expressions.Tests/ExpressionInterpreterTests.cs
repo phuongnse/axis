@@ -649,6 +649,7 @@ public sealed class ExpressionInterpreterTests
     [InlineData("avg(lines, qty)", null)]
     [InlineData("any(lines, ok)", false)]
     [InlineData("all(lines, ok)", true)]
+    [InlineData("first(lines, ok, qty)", null)]
     public void An_aggregate_over_an_empty_list_gives_its_empty_value(string text, object? expected)
     {
         var result = EvaluateOver(text, Rows());
@@ -784,6 +785,74 @@ public sealed class ExpressionInterpreterTests
         Assert.False(result.Succeeded);
         Assert.Equal(ExpressionRuntimeErrorKind.IntegerOverflow, result.Error.Kind);
         Assert.Equal(4, result.Error.Offset);
+    }
+
+    [Theory]
+    [InlineData("first(lines, qty > 1, qty)", 2L)]
+    [InlineData("first(lines, qty > 2, qty)", 3L)]
+    [InlineData("first(lines, ok, qty)", 1L)]
+    [InlineData("first(lines, qty > 99, qty)", null)]
+    public void First_gives_the_item_of_the_first_matching_row_in_list_order(string text, object? expected)
+    {
+        var lines = Rows((1L, null, true), (2L, null, true), (3L, null, null), (4L, null, false));
+
+        var result = EvaluateOver(text, lines);
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
+    public void First_evaluates_only_the_item_of_the_picked_row()
+    {
+        var result = EvaluateOver("first(lines, qty == 2, 10 / qty)", Rows((0L, null, null), (2L, null, null)));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(5m, Assert.IsType<decimal>(result.Value));
+    }
+
+    [Fact]
+    public void First_evaluates_the_condition_of_every_row()
+    {
+        var result = EvaluateOver("first(lines, qty / qty > 0, qty)", Rows((1L, null, null), (0L, null, null)));
+
+        Assert.Equal(ExpressionRuntimeErrorKind.DivisionByZero, result.Error?.Kind);
+    }
+
+    [Fact]
+    public void First_of_a_decimal_item_is_a_decimal()
+    {
+        var result = EvaluateOver("first(lines, qty > 1, amount)", Rows((1L, 1m, null), (2L, 2m, null)));
+
+        Assert.Equal(2m, Assert.IsType<decimal>(result.Value));
+    }
+
+    [Fact]
+    public void First_with_a_reference_item_gives_the_id_of_the_picked_row()
+    {
+        var first = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000041");
+        var second = Guid.Parse("0199a9e5-7c1e-7000-8000-000000000042");
+        var steps = new[]
+        {
+            new ExpressionValues(new Dictionary<string, object?> { ["decided"] = false, ["approver"] = first }),
+            new ExpressionValues(new Dictionary<string, object?> { ["decided"] = true, ["approver"] = second }),
+            new ExpressionValues(new Dictionary<string, object?> { ["decided"] = true, ["approver"] = first }),
+        };
+        var items = new ExpressionScope(new Dictionary<string, ExpressionType>
+        {
+            ["decided"] = ExpressionType.Boolean,
+            ["approver"] = ExpressionType.Reference("Employee"),
+        });
+        var scope = new ExpressionScope(_fields, collections: [new ExpressionCollection("steps", "Step", items)]);
+        var parsed = ExpressionParser.Parse("first(steps, decided, approver)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+
+        var result = ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("steps", steps)]));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(second, result.Value);
     }
 
     [Fact]

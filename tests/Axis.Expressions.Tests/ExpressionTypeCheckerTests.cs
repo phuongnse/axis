@@ -938,6 +938,38 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Fact]
+    public void First_has_the_type_of_its_item()
+    {
+        var reference = Check("first(lines, quantity > 1, dept)", ExpressionType.Null, OuterScope());
+        var number = Check("first(lines, quantity > outer.minimum, quantity)", ExpressionType.Null, OuterScope());
+
+        Assert.True(reference.Succeeded, reference.Diagnostic?.Message);
+        Assert.Equal(ExpressionType.Reference("department"), reference.Type);
+        Assert.True(number.Succeeded, number.Diagnostic?.Message);
+        Assert.Equal(ExpressionType.Integer, number.Type);
+    }
+
+    [Theory]
+    [InlineData("first(lines, quantity, quantity)")]
+    [InlineData("first(lines, outer.title, quantity)")]
+    public void First_needs_a_boolean_condition(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, OuterScope());
+
+        Assert.Equal(ExpressionDiagnosticCodes.TypeMismatch, diagnostic.Code);
+    }
+
+    [Theory]
+    [InlineData("first(lines, quantity > 1)")]
+    [InlineData("first(lines, quantity > 1, quantity, quantity)")]
+    public void First_takes_three_arguments(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, OuterScope());
+
+        Assert.Equal(ExpressionDiagnosticCodes.WrongArgumentCount, diagnostic.Code);
+    }
+
+    [Fact]
     public void An_aggregate_is_unknown_outside_a_scope_with_collections()
     {
         Assert.Equal(ExpressionDiagnosticCodes.UnknownName, CheckFails("count(lineItems) > 0", ExpressionType.Boolean).Code);

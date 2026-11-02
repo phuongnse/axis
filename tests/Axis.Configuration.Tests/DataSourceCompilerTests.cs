@@ -527,6 +527,7 @@ public sealed class DataSourceCompilerTests
     // A filter type-checks with the child collections, but only any and count are in the SQL subset.
     [InlineData("sum(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("avg(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("first(lines, amount > 0, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("number != 'x' and all(lines, amount > 0)", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("any(lines, lower(description) == 'a')", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("any(lines, number == 'x')", ExpressionDiagnosticCodes.UnknownName)]

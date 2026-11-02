@@ -519,12 +519,12 @@ can use them over a path to a collection.
 | `max(list, item)` | type of `item` | `null` |
 | `any(list, condition)` | boolean | false |
 | `all(list, condition)` | boolean | true |
-| `first(list, condition, item)` | _(planned for M26)_ type of `item` | `null` |
+| `first(list, condition, item)` | type of `item` | `null` |
 
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
 - **Item types.** `sum` takes integer or decimal items. `min` and `max` take
   integer, decimal, date and date-time items, because they order them. The
-  condition of `count`, `any` and `all` is boolean.
+  condition of `count`, `any`, `all` and `first` is boolean.
 - **Decimal results.** A `sum`, `min` or `max` over decimal items gives a
   decimal, so the 0 of an empty `sum` is a decimal 0.
 - **Null items.** `sum`, `min` and `max` skip `null` items. So a list of
@@ -540,19 +540,20 @@ can use them over a path to a collection.
   `null` when none is left. Its result is a decimal rounded to 6 digits
   after the point.
 - **SQL.** Only `any` and `count` are in the SQL subset, so a data source or
-  policy filter can use them. The other aggregates are `AXC0053`, see
+  policy filter can use them. The other aggregates, `first` too, are `AXC0053`, see
   [SQL subset](#sql-subset).
-- **`first`** _(planned for M26)_. The `item` of the first row, in the list's
-  stored order, whose `condition` is true, or `null` when none is. The `item`
-  may be any scalar field, an enum or a reference of the row, so a step can
-  store the record a row names. Only the picked row's `item` is evaluated.
+- **`first`.** The `item` of the first row, in the list's stored order, whose
+  `condition` is true, or `null` when none is. The `item` may be a scalar
+  field, an enum or a reference of the row, which gives the record's id, so a
+  step can store the record a row names. The `condition` is evaluated on every
+  row, but only the picked row's `item` is, so an error in another is not raised.
 
 ### Collections through a path and the outer record
 
 Two additions let a process read the rows of another record, such as the
 approval steps of a request's type, as
 [D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees. The
-path to a collection and `outer` are built. `first` is _(planned for M26)_.
+path to a collection and `outer` are built, and so is `first`.
 
 - **A path to a collection.** The first argument of an aggregate may be a path
   that ends at a child collection or a `references` field of a referenced
@@ -581,9 +582,8 @@ path to a collection and `outer` are built. `first` is _(planned for M26)_.
   sensitive field or an unlisted form field is refused through `outer` too.
 - **Not SQL.** A path to a collection is evaluated in the server and the
   worker, and a data source filter or a policy filter that uses it is
-  `AXC0053`. So is `outer` inside `any` or `count` in a filter. `first`
-  _(planned for M26)_ is evaluated in memory too, and a filter that uses it
-  will be `AXC0053`.
+  `AXC0053`. So is `outer` inside `any` or `count` in a filter. `first` is
+  evaluated in memory too, and a filter that uses it is `AXC0053`.
 - **Cost.** The rows count against the [cost bounds](#cost-bounds) as the rows
   of a child collection of the record do. Following the reference part of the
   path costs its usual steps, but the collection itself costs none. So
