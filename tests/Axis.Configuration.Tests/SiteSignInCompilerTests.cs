@@ -120,7 +120,7 @@ public sealed class SiteSignInCompilerTests
 
     private const string Home = """
         { "id": "55555555-5555-4555-8555-555555555551", "kind": "page", "name": "Home", "formatVersion": 1,
-          "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox" } ] }
+          "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }
         """;
 
     private static string Site(string id, string name, string path, string signIn) =>

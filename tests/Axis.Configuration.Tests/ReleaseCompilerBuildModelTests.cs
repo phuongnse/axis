@@ -239,7 +239,7 @@ public sealed class ReleaseCompilerBuildModelTests
                 { "id": "55555555-5555-4555-8555-555555555501", "kind": "page", "name": "TicketDetail", "formatVersion": 1,
                   "title": { "textKey": "page.title" },
                   "parameters": [ { "name": "zebra", "type": "text" }, { "name": "apple", "type": "text" } ],
-                  "widgets": [ { "type": "taskInbox" } ] }
+                  "widgets": [ { "name": "taskInbox", "type": "taskInbox" } ] }
                 """),
             new ResourceContent("processes/tell.json", """
                 { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Tell", "formatVersion": 1, "entity": "Ticket",

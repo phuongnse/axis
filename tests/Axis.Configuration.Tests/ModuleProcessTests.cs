@@ -97,7 +97,7 @@ public sealed class ModuleProcessTests
         modules.With("approvals/1.0.0/pages/Reviews.json", """
             { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c51", "kind": "page", "name": "Reviews", "formatVersion": 1,
               "title": { "textKey": "approvals.reviews" },
-              "widgets": [ { "type": "processInspector", "process": "Review" } ] }
+              "widgets": [ { "name": "processInspector", "type": "processInspector", "process": "Review" } ] }
             """);
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
@@ -222,7 +222,7 @@ public sealed class ModuleProcessTests
         using var folder = Application().With("pages/Inspect.json", """
             { "id": "44444444-4444-4444-8444-444444444461", "kind": "page", "name": "Inspect", "formatVersion": 1,
               "title": { "textKey": "invoice.title" },
-              "widgets": [ { "type": "processInspector", "process": "departments/Onboard" } ] }
+              "widgets": [ { "name": "processInspector", "type": "processInspector", "process": "departments/Onboard" } ] }
             """);
 
         var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
@@ -277,8 +277,8 @@ public sealed class ModuleProcessTests
             .With("pages/Reviews.json", $$"""
                 { "id": "44444444-4444-4444-8444-444444444441", "kind": "page", "name": "Reviews", "formatVersion": 1,
                   "title": { "textKey": "reviews.title" },
-                  "widgets": [ { "type": "table", "dataSource": "Approvals",
-                    "rowActions": [ { "type": "startProcess", "process": "{{name}}", "label": { "textKey": "reviews.start" } } ] } ] }
+                  "widgets": [ { "name": "table", "type": "table", "dataSource": "Approvals",
+                    "rowActions": [ { "name": "startProcess", "type": "startProcess", "process": "{{name}}", "label": { "textKey": "reviews.start" } } ] } ] }
                 """)
             .With("processes/Parent.json", $$"""
                 { "id": "44444444-4444-4444-8444-444444444451", "kind": "process", "name": "Parent", "formatVersion": 1,

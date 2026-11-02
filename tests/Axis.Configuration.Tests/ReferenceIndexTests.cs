@@ -217,11 +217,11 @@ public sealed class ReferenceIndexTests
             .With("data-sources/large-orders.json", DataSource("LargeOrders", "IsLarge(quantity)"))
             .With("pages/order-list.json", PresentationCompilerTests.Page(
                 "OrderList",
-                """{ "type": "table", "dataSource": "LargeOrders" }""",
+                """{ "name": "table", "type": "table", "dataSource": "LargeOrders" }""",
                 "55555555-5555-4555-8555-555555555553"))
             .With("pages/order-form.json", PresentationCompilerTests.Page(
                 "OrderForm",
-                """{ "type": "form", "form": "Missing" }""",
+                """{ "name": "form", "type": "form", "form": "Missing" }""",
                 "55555555-5555-4555-8555-555555555552",
                 "orderForm.title"));
 
@@ -487,7 +487,7 @@ public sealed class ReferenceIndexTests
         const string Parameter = """{ "name": "client", "type": "reference", "target": "Client" }""";
         using (var folder = PresentationCompilerTests.Folder()
             .With("entities/client.json", PresentationCompilerTests.Client)
-            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order" }""", parameters: Parameter)))
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "name": "table", "type": "table", "entity": "Order" }""", parameters: Parameter)))
         {
             var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -502,7 +502,7 @@ public sealed class ReferenceIndexTests
         }
 
         using (var folder = PresentationCompilerTests.Folder()
-            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order" }""", parameters: Parameter.Replace("Client", "Missing", StringComparison.Ordinal))))
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "name": "table", "type": "table", "entity": "Order" }""", parameters: Parameter.Replace("Client", "Missing", StringComparison.Ordinal))))
         {
             var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -514,10 +514,10 @@ public sealed class ReferenceIndexTests
     [Fact]
     public void A_navigate_action_gives_a_navigate_page_edge_to_its_target_and_an_unknown_target_none()
     {
-        const string Detail = """{ "type": "table", "entity": "Order" }""";
+        const string Detail = """{ "name": "table", "type": "table", "entity": "Order" }""";
         const string Parameter = """{ "name": "client", "type": "reference", "target": "Client", "required": true }""";
-        const string Action = """{ "type": "navigate", "page": "TARGET", "label": { "textKey": "orders.title" }, "parameters": { "client": "id" } }""";
-        const string Orders = """{ "type": "table", "entity": "Client", "rowActions": [ ACTION ] }""";
+        const string Action = """{ "name": "navigate", "type": "navigate", "page": "TARGET", "label": { "textKey": "orders.title" }, "parameters": { "client": "id" } }""";
+        const string Orders = """{ "name": "table", "type": "table", "entity": "Client", "rowActions": [ ACTION ] }""";
 
         using (var folder = PresentationCompilerTests.Folder()
             .With("entities/client.json", PresentationCompilerTests.Client)
@@ -640,19 +640,19 @@ public sealed class ReferenceIndexTests
             """)
         .With("pages/orders.json", PresentationCompilerTests.Page(
             "Orders",
-            """{ "type": "table", "entity": "Order" }""",
+            """{ "name": "table", "type": "table", "entity": "Order" }""",
             "55555555-5555-4555-8555-555555555551"))
         .With("pages/order-list.json", PresentationCompilerTests.Page(
             "OrderList",
-            """{ "type": "table", "dataSource": "LargeOrders" }""",
+            """{ "name": "table", "type": "table", "dataSource": "LargeOrders" }""",
             "55555555-5555-4555-8555-555555555553"))
         .With("pages/order-review.json", PresentationCompilerTests.Page(
             "OrderReviewPage",
-            """{ "type": "processInspector", "process": "OrderReview" }""",
+            """{ "name": "processInspector", "type": "processInspector", "process": "OrderReview" }""",
             "55555555-5555-4555-8555-555555555554"))
         .With("pages/order-form.json", PresentationCompilerTests.Page(
             "OrderForm",
-            """{ "type": "form", "form": "OrderEntry", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } }, { "type": "navigate", "page": "Orders", "label": { "textKey": "order.submit" } } ] }""",
+            """{ "name": "form", "type": "form", "form": "OrderEntry", "actions": [ { "name": "startProcess", "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } }, { "name": "navigate", "type": "navigate", "page": "Orders", "label": { "textKey": "order.submit" } } ] }""",
             "55555555-5555-4555-8555-555555555552",
             "orderForm.title"))
         .With("identity-providers/accounts.json", PresentationCompilerTests.AccountsProvider)

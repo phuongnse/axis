@@ -410,7 +410,7 @@ public sealed class NotifyStepCompilerTests
                 """)
             .With("pages/ticket-detail.json", PresentationCompilerTests.Page(
                 "TicketDetail",
-                """{ "type": "taskInbox" }""",
+                """{ "name": "taskInbox", "type": "taskInbox" }""",
                 DetailPageId,
                 "ticket.title",
                 """{ "name": "ticket", "type": "text", "required": true }"""))
