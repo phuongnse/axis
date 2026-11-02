@@ -56,7 +56,8 @@
 # startup activation migrates a tenant database. Playwright starts that server after the main one, which
 # shares the platform database. The worker and the publisher serve the journey tenant too, and the run fails if
 # either log never reports it ready. The setup step signs the author, the requester, the service desk lead,
-# the agent, the approver, the asset manager, the employee and the auditor in on its host.
+# the agent, the approver, the asset manager, the employee, the auditor, the department managers and the
+# platform operator in on its host.
 # The tenant create spec signs a person in on the host of the tenant it creates, over https and with no port. This script
 # makes a throwaway certificate with openssl for the run, in a temporary folder that it removes at the end, and gives
 # Playwright its paths as AXIS_E2E_TLS_CERT and AXIS_E2E_TLS_KEY. It also gives AXIS_E2E_TENANT_HTTPS_PORT (default

@@ -766,7 +766,7 @@ It sets `Studio:ApplicationsPath` to a temporary folder and has no preview tenan
 activation migrates a tenant database, so it activates one application at start,
 `tests/e2e/fixtures/journey-base`, which holds only a manifest. It clashes with no sample. A journey therefore builds a whole application in Studio and publishes it, with no clash with
 the committed samples on the main tenant. The setup step signs the author, the requester, the service desk lead,
-the agent, the approver, the asset manager, the employee and the auditor in on the journey host and saves those sessions apart from the sessions of the main host. The
+the agent, the approver, the asset manager, the employee, the auditor, the department managers and the platform operator in on the journey host and saves those sessions apart from the sessions of the main host. The journey server sets `Console:OperatorRole` to `platform-operator`, so the operator console answers there. The
 worker and the publisher serve the journey tenant too, and the run fails when the worker log lacks
 `Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
 `artifacts/logs/e2e-journey-server.log`.
