@@ -93,6 +93,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Process designer](reference/process-designer.md)                      | The Design tab of the process editor: palette, transitions, removes, keyboard         |
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
 | [Draft page metadata](reference/draft-page-metadata.md)               | The routes that answer the page metadata of a draft page or form and of a module page  |
+| [Module resource saves](reference/module-resource-saves.md)           | The route that saves an edited module resource as a customization layer with only the difference |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |
 | [Administration](reference/administration.md)                          | The `Axis.Admin` commands: create a tenant, migrate, activate, publisher |
 | [Tenant backup and restore](reference/tenant-backup-and-restore.md)    | `tenant backup` and `tenant restore`: the encrypted archive, the backup key, the manifest, the checks and the steps, and daily backups in a cell |

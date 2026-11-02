@@ -13,8 +13,9 @@ that a layer changed is reported in the layer file. A layer on a `contract` adds
 to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). A layer on a module entity adds
 fields and validations, see [module entities](#module-entities). A layer removes a whole resource,
 see [applying a layer](#applying-a-layer). The [authoring API](authoring.md#routes) reads a module resource
-with the layer applied, its marks and its removed elements. The rest of Studio's support for layers and the
-sections below that are not about applying are _(planned for M25)_. Module upgrades, the three-way merge and eject are _(planned for M29)_.
+with the layer applied, its marks and its removed elements, and saves a module resource as a layer, see
+[in Studio](#in-studio). The rest of Studio's support for layers and the sections below that are
+not about applying are _(planned for M25)_. Module upgrades, the three-way merge and eject are _(planned for M29)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -249,9 +250,9 @@ the module's.
 ## In Studio
 
 Studio shows each module resource with the application's layer applied, and an author changes it
-as they change any resource of their own. The [authoring API](authoring.md) writes the layer.
-The module resource read that answers the resource with the layer applied, its marks and its removed
-elements is built. The editor, **Reset to module** and saving are _(planned for M25)_.
+as they change any resource of their own. The [authoring API](authoring.md) reads the resource with the layer
+applied, its marks and its removed elements, and its [save route](module-resource-saves.md) writes the layer.
+Both are built. The editor and **Reset to module** are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.
