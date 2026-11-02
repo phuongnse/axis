@@ -4,5 +4,12 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "role.admin": "Administrator", "role.employee": "Employee" }
+  "texts": {
+    "role.admin": "Administrator",
+    "role.employee": "Employee",
+    "decide.main": "Request",
+    "decide.review": "Decide the request",
+    "decide.approve": "Approve",
+    "decide.advance": "Advance"
+  }
 }

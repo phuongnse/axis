@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["admin"],
   "grants": [
-    { "name": "requestAccess", "entity": "approvals/Request", "actions": ["read", "create", "update", "delete"] },
+    { "name": "requestAccess", "entity": "approvals/Request", "actions": ["read", "export"] },
     { "name": "requestTypeAccess", "entity": "approvals/RequestType", "actions": ["read", "create", "update", "delete"] }
   ]
 }

@@ -53,6 +53,13 @@
     "approvals.decision.comment": "Comment",
     "approvals.decision.decidedAt": "Decided at",
     "approvals.decision.label": "Decision",
+    "approvals.request.onlyRequesterSubmits": "Only the requester can submit a request, and it needs at least one approval step.",
+    "approvals.request.approveNeedsEveryStep": "A request is approved by someone other than the requester, and only after every step is decided.",
+    "approvals.request.noSelfDecision": "Only someone other than the requester can return or reject a request.",
+    "approvals.request.onlyRequesterCancels": "Only the requester can cancel a request.",
+    "approvals.request.oneDecisionPerStep": "A step is decided once, by someone other than the requester, with a new task.",
+    "approvals.request.frozenAfterSubmit": "The type, the amount and the steps required cannot change after the request is submitted.",
+    "approvals.requestType.hasStepForEveryAmount": "A request type needs at least one approval step without a minimum amount.",
     "approvals.roles.admin": "Administrator",
     "approvals.roles.member": "Member"
   }
