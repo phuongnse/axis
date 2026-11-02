@@ -6,7 +6,7 @@
   "roles": ["operator"],
   "grants": [
     { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"] },
-    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
     { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
     { "name": "purchaseRequestApprovalInspect", "process": "PurchaseRequestApproval", "actions": ["inspect"] }
   ]

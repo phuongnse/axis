@@ -312,7 +312,7 @@ adds the `agent` user and two `service-desk-lead` users and gives an employee th
 at `/service-desk`. The asset management sample, `samples/apps/asset-management`, adds the `asset-manager` and `auditor` users
 and uses the `employee` user as the holder of assets, in a site at `/asset-management`.
 The purchase request sample declares the `organization` module too, seeds the same employees and departments as the leave request
-sample, and lets `operator` administer the organization and `department-manager` read it.
+sample, and lets `operator` administer the organization and `department-manager` read it. A purchase request goes to the head of its department.
 The department budgets journey, `tests/e2e/specs/department-budgets-journey.spec.ts`, signs in as `manager` to create and submit a budget,
 as `manager-2` to approve it and as `employee` to be refused.
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,

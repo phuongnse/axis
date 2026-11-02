@@ -14,7 +14,7 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
 {
     private const string UrlBinding = "PurchasingSystemUrl";
     private const string Site = "/api/sites/purchasing";
-    private const string Departments = "/api/apps/PurchaseRequests/entities/Department/records";
+    private const string Departments = "/api/apps/PurchaseRequests/entities/organization/Department/records";
 
     private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
 

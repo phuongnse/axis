@@ -84,10 +84,12 @@ the form and the texts below.
     departments or managers is not refused, because an expression runs no query.
   - Ceilings: the `admin` slot gets every action on both. The `member` slot reads both, and updates
     only `phone`, `delegate`, `delegateFrom` and `delegateUntil` of the employee whose `user` is
-    their own. The ceilings have no `others` entry, so a role mapped to neither slot gets no grant on
-    these entities, and that includes the roles of other modules until an application maps them to
-    a slot. The points are `Department/ceiling/admin`, `Department/ceiling/member`,
-    `Employee/ceiling/admin` and `Employee/ceiling/member`.
+    their own. The `Department` ceiling has an `others` entry that reads, so a role mapped to neither
+    slot may read departments, as an application's employees and reviewers do when they pick or see
+    a department. The `Employee` ceiling has no `others` entry, so a role mapped to neither slot gets
+    no grant on employees, and that includes the roles of other modules until an application maps
+    them to a slot. The points are `Department/ceiling/admin`, `Department/ceiling/member`,
+    `Department/ceiling/others`, `Employee/ceiling/admin` and `Employee/ceiling/member`.
 - **Policies.**
   - `AdminAccess` grants the `admin` slot every action on both entities, and read and export on the
     `Departments` and `Employees` data sources.
@@ -301,7 +303,8 @@ The samples become the built-in modules, as D102 agrees:
   both of its slots (`admin` to `department-manager`, `member` to `employee`) and seeds its employees
   and departments, and a leave request goes to the head of its department. The purchase request
   sample declares `organization` too (`admin` to `operator`, `member` to `department-manager`) and
-  seeds the same employees and departments, and `department-budgets` 1.2.0 depends on `organization`.
+  seeds the same employees and departments, and a purchase request goes to the head of its department.
+  `department-budgets` 1.2.0 depends on `organization`.
   The `departments` sample module stays installed with no sample using it, until it is removed.
 - **The `request-approval` template** becomes the `approvals` application, and is removed. The
   Studio journeys that create an application from it create one from the built-in application.

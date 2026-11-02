@@ -44,7 +44,7 @@ async function asUser<T>(
 /** The id of the seeded department named `name`, read from the record API. */
 async function departmentId(request: APIRequestContext, name: string) {
   const response = await request.get(
-    `${appPath}/entities/Department/records?pageSize=100`,
+    `${appPath}/entities/organization/Department/records?pageSize=100`,
   );
   expect(response.status()).toBe(200);
   const body = (await response.json()) as {
@@ -339,7 +339,7 @@ const signedOutPages: {
     name: "Departments",
     address: () => "/purchasing/departments",
     user: "requester",
-    api: () => `${appPath}/entities/Department/records?pageSize=100`,
+    api: () => `${appPath}/entities/organization/Department/records?pageSize=100`,
     expectation: (page) =>
       expect(page.getByRole("row", { name: /Engineering/ })).toBeVisible(),
   },

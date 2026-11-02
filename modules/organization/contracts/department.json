@@ -16,6 +16,7 @@
     "slots": {
       "admin": [{ "actions": ["read", "create", "update", "delete", "export", "import"] }],
       "member": [{ "actions": ["read"] }]
-    }
+    },
+    "others": [{ "actions": ["read"] }]
   }
 }

@@ -22,7 +22,7 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
 
     private const string EntityId = "d9ccbf89-5004-4d52-8885-2ee377b7caa5";
 
-    private const string DepartmentFile = "entities/department.json";
+    private const string SupplierFile = "entities/supplier.json";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -75,7 +75,7 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
     public async Task Two_deletes_with_the_same_version_on_two_instances_give_one_200_and_one_409_and_the_file_is_gone()
     {
         await using var replicas = await Replicas.StartAsync(database);
-        var path = Path.Combine(replicas.FolderA, DepartmentFile);
+        var path = Path.Combine(replicas.FolderA, SupplierFile);
         var id = IdOf(path);
         var version = Sha256(path);
         var held = await HoldAsync(replicas.Platform, replicas.FolderA);

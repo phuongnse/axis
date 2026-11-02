@@ -13,8 +13,8 @@ public sealed class SampleApplicationTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["organization/Department", "organization/Employee", "department-budgets/BudgetDecision", "department-budgets/Budget", "Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
-        Assert.Equal(4, result.Model.Seeds.Count);
+        Assert.Equal(["organization/Department", "organization/Employee", "department-budgets/BudgetDecision", "department-budgets/Budget", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
+        Assert.Equal(3, result.Model.Seeds.Count);
         Assert.Equal("purchasing", Assert.Single(result.Model.Sites).Path);
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
         Assert.Single(result.Model.Processes, process => process.Name == "PurchaseRequestApproval");

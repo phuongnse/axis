@@ -548,28 +548,27 @@ public sealed class ReferenceIndexTests
     }
 
     [Fact]
-    public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_department_entity()
+    public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_supplier_entity()
     {
         var result = ApplicationCompiler.Compile(
             Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         var edges = result.References.Edges
-            .Where(edge => edge.To is ResourceNode { Kind: ResourceKinds.Entity, Name: "Department" })
+            .Where(edge => edge.To is ResourceNode { Kind: ResourceKinds.Entity, Name: "Supplier" })
             .Select(edge => (edge.From.File, edge.Path, edge.Relation));
         Assert.Equivalent(
             new (string, string, string)[]
             {
-                ("entities/purchase-request.json", "/fields/3/target", ReferenceRelations.FieldTarget),
-                ("data-sources/purchase-request-list.json", "/fields/2/path", ReferenceRelations.FieldPath),
-                ("data-sources/requests-by-department.json", "/fields/0/path", ReferenceRelations.FieldPath),
-                ("seeds/departments.json", "/entity", ReferenceRelations.SeedEntity),
-                ("pages/departments.json", "/widgets/0/entity", ReferenceRelations.WidgetEntity),
-                ("endpoints/submit-purchase-request.json", "/input/1/target", ReferenceRelations.FieldTarget),
-                ("policies/department-manager-access.json", "/grants/1/entity", ReferenceRelations.Grant),
-                ("policies/finance-reviewer-access.json", "/grants/1/entity", ReferenceRelations.Grant),
-                ("policies/operator-access.json", "/grants/1/entity", ReferenceRelations.Grant),
-                ("policies/employee-access.json", "/grants/2/entity", ReferenceRelations.Grant),
+                ("entities/purchase-request.json", "/fields/4/target", ReferenceRelations.FieldTarget),
+                ("data-sources/purchase-request-list.json", "/fields/3/path", ReferenceRelations.FieldPath),
+                ("seeds/suppliers.json", "/entity", ReferenceRelations.SeedEntity),
+                ("pages/suppliers.json", "/widgets/0/entity", ReferenceRelations.WidgetEntity),
+                ("endpoints/submit-purchase-request.json", "/input/2/target", ReferenceRelations.FieldTarget),
+                ("policies/department-manager-access.json", "/grants/3/entity", ReferenceRelations.Grant),
+                ("policies/finance-reviewer-access.json", "/grants/3/entity", ReferenceRelations.Grant),
+                ("policies/operator-access.json", "/grants/2/entity", ReferenceRelations.Grant),
+                ("policies/employee-access.json", "/grants/4/entity", ReferenceRelations.Grant),
             },
             edges);
     }

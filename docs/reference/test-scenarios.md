@@ -52,7 +52,7 @@ request ends `approved`:
       "save": "request",
       "values": {
         "title": "Laptops",
-        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
         "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
         "currency": "USD",
         "status": "draft",
@@ -299,7 +299,7 @@ advances three hours, the schedule has fired and the manager has a task:
       "save": "request",
       "values": {
         "title": "Laptops",
-        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
         "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
         "currency": "USD",
         "status": "draft",

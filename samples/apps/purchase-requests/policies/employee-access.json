@@ -13,7 +13,8 @@
       "filter": "requester == currentUser() and status in ('draft', 'returned')",
       "fields": ["title", "department", "supplier", "currency", "lineItems", "status"]
     },
-    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
     { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
     { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
     { "name": "purchaseRequestApprovalStart", "process": "PurchaseRequestApproval", "actions": ["start"] }

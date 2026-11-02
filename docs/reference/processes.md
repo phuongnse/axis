@@ -138,7 +138,7 @@ a payment reference from the sample extension package, see
       "name": "managerApproval",
       "type": "task",
       "label": { "textKey": "purchaseRequest.managerApproval" },
-      "assignee": { "user": "department.manager" },
+      "assignee": { "user": "department.head.user" },
       "form": "PurchaseRequestReview",
       "dueIn": "P3D",
       "outcomes": [

@@ -46,11 +46,11 @@ public sealed class SampleAppFixture : IAsyncLifetime
 
     public const string Host = "a.example.test";
 
-    /// <summary>The id of the seeded Operations department, whose manager is <c>manager-2</c>.</summary>
-    public static readonly Guid Operations = Guid.Parse("2cec287b-4f8a-4ac4-a38c-08214a1846ae");
+    /// <summary>The id of the seeded Operations department, whose head is <c>manager-2</c>.</summary>
+    public static readonly Guid Operations = Guid.Parse("d1b09f14-34f5-4831-9708-158361c860df");
 
-    /// <summary>The id of the seeded Engineering department, whose manager is <c>manager</c>.</summary>
-    public static readonly Guid Engineering = Guid.Parse("15d5bba1-eaf1-431b-9001-e1e3ade50979");
+    /// <summary>The id of the seeded Engineering department, whose head is <c>manager</c>.</summary>
+    public static readonly Guid Engineering = Guid.Parse("949c1d11-aaba-44aa-b0d1-6c9d659d6bd5");
 
     private static readonly string _appFolder = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
