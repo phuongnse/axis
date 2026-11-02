@@ -69,9 +69,9 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
         using var client = factory.CreateClient().SignedInAs("author");
         Assert.Empty(await ErrorsAsync(client));
 
-        const string layerFile = "customizations/departments/Department.json";
+        const string layerFile = "customizations/organization/Department.json";
         folder.With(layerFile, """
-            { "id": "6f1d9c2a-3b4e-4d58-9a7c-1e2f3a4b5c6d", "kind": "layer", "formatVersion": 1, "target": "departments/Department",
+            { "id": "6f1d9c2a-3b4e-4d58-9a7c-1e2f3a4b5c6d", "kind": "layer", "formatVersion": 1, "target": "organization/Department",
               "changes": { "fields": [ { "name": "owner", "type": "reference", "target": "NoSuchEntity" } ] } }
             """);
 
@@ -84,7 +84,7 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
             .ToList();
 
         Assert.Contains((DiagnosticCodes.UnknownReferenceTarget, layerFile, "/changes/fields/0/target"), diagnostics);
-        Assert.DoesNotContain(diagnostics, item => item.File == "modules/departments/entities/department.json");
+        Assert.DoesNotContain(diagnostics, item => item.File == "modules/organization/entities/department.json");
     }
 
     private static WebApplicationFactory<Program> Factory(TemporaryFolder folder, string connectionString) =>

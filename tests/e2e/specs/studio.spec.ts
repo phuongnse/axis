@@ -88,7 +88,9 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)
     await page.getByTestId(`studio-field-/fields/${index}/maxLength`).getByRole('spinbutton').fill(String(next))
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    // This is the first write on a fresh server. It compiles the sample with its modules, which can take longer than the
+    // default wait on a busy machine.
+    await expect(page.getByTestId('studio-saved')).toBeVisible({ timeout: 60_000 })
 
     const after: unknown = JSON.parse(await readFile(file, 'utf8'))
     before.fields[index].maxLength = next

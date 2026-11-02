@@ -6,9 +6,10 @@ import { appPath } from '../purchase-requests'
 import { useSession } from '../sessions'
 
 // The purchase request sample declares the department-budgets module and maps its approver slot to
-// department-manager. A manager creates a budget on the module's Budgets page and submits it. The budget contract
-// refuses a decision by its creator, so a second manager decides the task. An employee, who does not hold the
-// role, is refused.
+// department-manager. The budget's department is an organization department, which the manager reads as the
+// member of the organization module, so the lookup lists all three departments. A manager creates a budget on
+// the module's Budgets page and submits it. The budget contract refuses a decision by its creator, so a second
+// manager decides the task. An employee, who does not hold the role, is refused.
 const budgetsPath = '/purchasing/department-budgets/budgets'
 const tasksPath = `${appPath}/tasks?pageSize=100`
 

@@ -175,7 +175,7 @@ and [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md)
 agree. Each step ends the milestone that builds it.
 
 1. The application declares the `department-budgets`
-   module, which depends on the `departments` module, and maps its approver
+   module, which depends on the `organization` module, and maps its approver
    slot to the manager role.
 2. _(planned for M22)_ The author drags a packaged "budget usage" widget onto
    a purchase request page in Studio.

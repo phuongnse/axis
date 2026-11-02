@@ -218,7 +218,8 @@ the purchasing system that the sample calls when a request is approved. It needs
 Docker. The images hold the built-in `organization` module and the `departments` and `department-budgets` sample modules in `/modules`.
 An existing local Compose volume that already ran `department-budgets` 1.0.0 needs `docker compose down -v` once to
 activate 1.1.0, for example when old budgets have no status. That deletes its data.
-The same holds for a volume that ran the leave request sample before it moved from `departments` to `organization`.
+The same holds for a volume that ran the leave request sample or the purchase request sample before it moved from `departments`
+to `organization`.
 Compose also starts one publisher, `axis-admin publisher`, which runs the
 publish requests of Studio. See [D47](decisions/d47-publishing-from-studio.md).
 It serves the tenants `default` and `default-preview`, so it runs preview requests too. It has no port and no health check, and writes `default ready` and `default-preview ready` once the server has migrated each tenant database.
@@ -310,6 +311,8 @@ The service desk sample, `samples/apps/service-desk`,
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
 at `/service-desk`. The asset management sample, `samples/apps/asset-management`, adds the `asset-manager` and `auditor` users
 and uses the `employee` user as the holder of assets, in a site at `/asset-management`.
+The purchase request sample declares the `organization` module too, seeds the same employees and departments as the leave request
+sample, and lets `operator` administer the organization and `department-manager` read it.
 The department budgets journey, `tests/e2e/specs/department-budgets-journey.spec.ts`, signs in as `manager` to create and submit a budget,
 as `manager-2` to approve it and as `employee` to be refused.
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
