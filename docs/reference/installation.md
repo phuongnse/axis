@@ -87,7 +87,7 @@ file.
 | --- | --- | --- | --- | --- |
 | `Tenancy:Source` | `Tenancy__Source` | server, worker | no | Set to `directory`. The default `configuration` reads a `Tenants` section, which is for development. |
 | `Tenancy:RefreshInterval` | `Tenancy__RefreshInterval` | server, worker | no | Optional. It defaults to 30 seconds. |
-| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The read-only platform database role. |
+| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server and the usage tables. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it only at start. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | no | Secret. Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value. Add the variable or a secret file yourself. |
@@ -200,7 +200,7 @@ CREATE DATABASE axis_identity OWNER axis_identity;
 | Database role | Used for |
 | --- | --- |
 | `axis_platform_schema` | `ConnectionStrings:PlatformSchema`. It owns the `platform` schema. |
-| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema and nothing else. |
+| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, and write access to the two usage tables `platform.tenant_usage` and `platform.tenant_usage_latest`. It has no access to `platform.audit_records`. |
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 | `axis_identity` | The identity provider's own database, `axis_identity`. It owns that database and nothing else. |
 

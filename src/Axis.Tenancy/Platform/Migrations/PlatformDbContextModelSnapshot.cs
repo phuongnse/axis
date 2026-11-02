@@ -458,6 +458,104 @@ namespace Axis.Tenancy.Platform.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageLatestRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long>("DatabaseBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("database_bytes");
+
+                    b.Property<long>("FileBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_bytes");
+
+                    b.Property<DateTimeOffset>("SampledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sampled_at");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_tenant_usage_latest");
+
+                    b.ToTable("tenant_usage_latest", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_usage_latest_database_bytes", "database_bytes >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_latest_file_bytes", "file_bytes >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<int?>("Applications")
+                        .HasColumnType("integer")
+                        .HasColumnName("applications");
+
+                    b.Property<long>("ConnectorCalls")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("connector_calls");
+
+                    b.Property<long>("DatabaseBytes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("database_bytes");
+
+                    b.Property<int>("EmailsSent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("emails_sent");
+
+                    b.Property<long>("FileBytes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("file_bytes");
+
+                    b.Property<int?>("Users")
+                        .HasColumnType("integer")
+                        .HasColumnName("users");
+
+                    b.Property<long>("WorkItemsRun")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("work_items_run");
+
+                    b.HasKey("TenantId", "Day")
+                        .HasName("pk_tenant_usage");
+
+                    b.ToTable("tenant_usage", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_usage_applications", "applications IS NULL OR applications >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_connector_calls", "connector_calls >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_database_bytes", "database_bytes >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_emails_sent", "emails_sent >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_file_bytes", "file_bytes >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_users", "users IS NULL OR users >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_work_items_run", "work_items_run >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>
                 {
                     b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
@@ -515,6 +613,26 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasForeignKey("PreviewOf")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenants_tenants_preview_of");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageLatestRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_usage_latest_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_usage_tenants_tenant_id");
                 });
 #pragma warning restore 612, 618
         }

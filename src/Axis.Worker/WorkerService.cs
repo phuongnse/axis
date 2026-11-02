@@ -8,6 +8,7 @@ using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
+using Axis.Tenancy.Platform;
 using Npgsql;
 
 namespace Axis.Worker;
@@ -32,7 +33,8 @@ namespace Axis.Worker;
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
 /// Once a tenant is ready, the poll also deletes its expired sessions and sweeps its deleted and abandoned files,
 /// and clears the files of its imports uploaded more than 24 hours ago, each at most every five minutes by its own clock,
-/// and deletes its old in-app notifications every 24 hours. That housekeeping is outside the rounds.
+/// and deletes its old in-app notifications every 24 hours. In a cell it also measures the storage of each ready tenant every
+/// hour and records the sample in the platform database as the tenant's usage. That housekeeping is outside the rounds.
 /// </summary>
 internal sealed partial class WorkerService(
     WorkerTenantCatalog tenants,
@@ -47,7 +49,9 @@ internal sealed partial class WorkerService(
     TenantQuotas quotas,
     PackageCatalog packages,
     StartupCheckState checkState,
-    ILogger<WorkerService> logger) : BackgroundService
+    CellOptions cell,
+    ILogger<WorkerService> logger,
+    TenantUsageStore? usage = null) : BackgroundService
 {
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts
     // the worker, so a ready tenant is not checked again. A tenant whose database settings change, or that
@@ -81,6 +85,9 @@ internal sealed partial class WorkerService(
 
     // The old in-app notifications of each ready tenant are deleted once a day. It has its own timer, so no other clean-up delays it.
     private readonly TenantSchedule _notificationsCleaned = new(NotificationRetention.Interval, time);
+
+    // The storage of each ready tenant is measured once an hour in a cell. It has its own timer, so no other clean-up delays it.
+    private readonly TenantSchedule _usageSampled = new(TimeSpan.FromHours(1), time);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -318,6 +325,7 @@ internal sealed partial class WorkerService(
                 _filesSweptAt.Remove(tenantId);
                 _importFilesCleared.Forget(tenantId);
                 _notificationsCleaned.Forget(tenantId);
+                _usageSampled.Forget(tenantId);
                 health.TenantDropped(tenantId);
             }
 
@@ -422,6 +430,7 @@ internal sealed partial class WorkerService(
             await SweepFilesAsync(tenantId, stoppingToken);
             await ClearExpiredImportFilesAsync(tenantId, stoppingToken);
             await RemoveOldNotificationsAsync(tenantId, stoppingToken);
+            await SampleUsageAsync(tenantId, stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
         {
@@ -571,6 +580,41 @@ internal sealed partial class WorkerService(
         }
     }
 
+    /// <summary>
+    /// In a cell, measures the storage of the tenant database and records the sample in the platform database, at most once per hour.
+    /// The time comes from the worker's clock. A database without the file table yet counts no file bytes. A database failure is logged
+    /// and does not hold back the work items. Self-hosted installations measure nothing.
+    /// </summary>
+    private async Task SampleUsageAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (!cell.IsCell || usage is null || !_usageSampled.TryStart(tenantId, out var now))
+        {
+            return;
+        }
+
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            TenantStorageSample sample;
+            await using (var connection = await connections.OpenConnectionAsync(cancellationToken))
+            {
+                sample = await TenantStorageSample.ReadAsync(connection, cancellationToken);
+            }
+
+            await usage.RecordSampleAsync(tenantId, sample.DatabaseBytes, sample.FileBytes, now, cancellationToken);
+            LogUsageSampled(sample.DatabaseBytes, sample.FileBytes, tenantId);
+        }
+        catch (NpgsqlException exception)
+        {
+            LogUsageSampleFailed(exception, tenantId);
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
+    }
+
     /// <exception cref="StartupCheckException">The runtime database role is a superuser, owns a schema or may create objects.</exception>
     private async Task CheckRuntimeRoleAsync(string tenantId, CancellationToken cancellationToken)
     {
@@ -690,6 +734,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Debug, "Removed {Count} old notification(s) of tenant {TenantId}.")]
     private partial void LogNotificationsRemoved(int count, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Measuring the storage of tenant {TenantId} failed.")]
+    private partial void LogUsageSampleFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Debug, "Measured {DatabaseBytes} database byte(s) and {FileBytes} file byte(s) of tenant {TenantId}.")]
+    private partial void LogUsageSampled(long databaseBytes, long fileBytes, string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Running work items for tenant {TenantId} failed.")]
     private partial void LogRunFailed(Exception exception, string tenantId);
