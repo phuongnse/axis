@@ -9,6 +9,7 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
+using Axis.Core.Tenancy;
 using Axis.Data.Profiles;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
@@ -114,7 +115,7 @@ internal static class StudioEndpoints
         }
 
         return Results.Ok(new StudioApplicationListResponse(
-            [.. StudioFolder.Applications(options).Select(name => new StudioApplicationItem(name))]));
+            [.. StudioFolder.Applications(ForRequest(httpContext, options)).Select(name => new StudioApplicationItem(name))]));
     }
 
     private static async Task<IResult> ListAsync(
@@ -939,10 +940,14 @@ internal static class StudioEndpoints
             return (null, refusal);
         }
 
-        return StudioFolder.Find(options, application) is { } folder
+        return StudioFolder.Find(ForRequest(httpContext, options), application) is { } folder
             ? (folder, null)
             : (null, NotFound("No Studio folder holds an application with this name."));
     }
+
+    // The options of this request: in a cell, the applications folder of the request's tenant alone.
+    internal static StudioOptions ForRequest(HttpContext httpContext, StudioOptions options) =>
+        options.ForTenant(httpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current?.TenantId);
 
     internal static IResult NotFound(string title) => Problem(StatusCodes.Status404NotFound, title);
 

@@ -223,7 +223,7 @@ builder.Services.AddSingleton(QueryTimeoutSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(ExportSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(FileSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(RecordImportSettings.Load(builder.Configuration));
-builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
+builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath, cell));
 builder.Services.AddSingleton(ConsoleSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(UsersSettings.Load(builder.Configuration));
 
