@@ -10,6 +10,7 @@ using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 
 namespace Axis.Worker;
 
@@ -29,6 +30,7 @@ public static class WorkerServiceCollectionExtensions
     /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none, and only a worker that runs in Development sends email
     /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>.
     /// With <c>Cell:Id</c> set the worker is part of a cell and needs <c>Tenancy:Source=directory</c>, <c>Cell:Region</c> and <c>Cell:TenantDomain</c>.
+    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs, in the platform database over <c>ConnectionStrings:Platform</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
@@ -100,6 +102,13 @@ public static class WorkerServiceCollectionExtensions
                 refreshInterval,
                 configuration.GetSection(TenantOptions.SectionName).Exists());
             keySource = new DirectoryTenantKeySource(platformConnectionString, cipher);
+
+            // A cell always reads the directory, so its usage is written to the same platform database.
+            if (cell.IsCell)
+            {
+                services.AddSingleton(new TenantUsageStore(NpgsqlDataSource.Create(platformConnectionString)));
+                services.AddSingleton<IWorkItemUsage, CellWorkItemUsage>();
+            }
         }
         else
         {

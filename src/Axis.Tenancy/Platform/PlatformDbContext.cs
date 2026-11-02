@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys and their quota overrides, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys and their quota overrides, their usage, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -25,6 +25,10 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantDataKeyRow> TenantDataKeys => Set<TenantDataKeyRow>();
 
     public DbSet<TenantQuotaRow> TenantQuotas => Set<TenantQuotaRow>();
+
+    public DbSet<TenantUsageLatestRow> TenantUsageLatest => Set<TenantUsageLatestRow>();
+
+    public DbSet<TenantUsageRow> TenantUsage => Set<TenantUsageRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
@@ -119,6 +123,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .HasForeignKey(quota => quota.TenantId)
                 .HasConstraintName("fk_tenant_quotas_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantUsageLatestRow>()
+                .WithOne()
+                .HasForeignKey(usage => usage.TenantId)
+                .HasConstraintName("fk_tenant_usage_latest_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantUsageRow>()
+                .WithOne()
+                .HasForeignKey(usage => usage.TenantId)
+                .HasConstraintName("fk_tenant_usage_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TenantHostRow>(host =>
@@ -187,6 +201,44 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             quota.Property(q => q.Quota).HasColumnName("quota");
             quota.Property(q => q.Value).HasColumnName("value").HasColumnType("bigint");
             quota.Property(q => q.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<TenantUsageLatestRow>(usage =>
+        {
+            usage.ToTable("tenant_usage_latest", table =>
+            {
+                table.HasCheckConstraint("ck_tenant_usage_latest_database_bytes", "database_bytes >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_latest_file_bytes", "file_bytes >= 0");
+            });
+            usage.HasKey(u => u.TenantId).HasName("pk_tenant_usage_latest");
+            usage.Property(u => u.TenantId).HasColumnName("tenant_id");
+            usage.Property(u => u.DatabaseBytes).HasColumnName("database_bytes").HasColumnType("bigint");
+            usage.Property(u => u.FileBytes).HasColumnName("file_bytes").HasColumnType("bigint");
+            usage.Property(u => u.SampledAt).HasColumnName("sampled_at").HasColumnType("timestamp with time zone");
+        });
+
+        modelBuilder.Entity<TenantUsageRow>(usage =>
+        {
+            usage.ToTable("tenant_usage", table =>
+            {
+                table.HasCheckConstraint("ck_tenant_usage_database_bytes", "database_bytes >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_file_bytes", "file_bytes >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_users", "users IS NULL OR users >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_applications", "applications IS NULL OR applications >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_emails_sent", "emails_sent >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_connector_calls", "connector_calls >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_work_items_run", "work_items_run >= 0");
+            });
+            usage.HasKey(u => new { u.TenantId, u.Day }).HasName("pk_tenant_usage");
+            usage.Property(u => u.TenantId).HasColumnName("tenant_id");
+            usage.Property(u => u.Day).HasColumnName("day").HasColumnType("date");
+            usage.Property(u => u.DatabaseBytes).HasColumnName("database_bytes").HasColumnType("bigint").HasDefaultValue(0L);
+            usage.Property(u => u.FileBytes).HasColumnName("file_bytes").HasColumnType("bigint").HasDefaultValue(0L);
+            usage.Property(u => u.Users).HasColumnName("users").HasColumnType("integer");
+            usage.Property(u => u.Applications).HasColumnName("applications").HasColumnType("integer");
+            usage.Property(u => u.EmailsSent).HasColumnName("emails_sent").HasColumnType("integer").HasDefaultValue(0);
+            usage.Property(u => u.ConnectorCalls).HasColumnName("connector_calls").HasColumnType("bigint").HasDefaultValue(0L);
+            usage.Property(u => u.WorkItemsRun).HasColumnName("work_items_run").HasColumnType("bigint").HasDefaultValue(0L);
         });
 
         modelBuilder.Entity<DataProtectionKeyRow>(key =>
