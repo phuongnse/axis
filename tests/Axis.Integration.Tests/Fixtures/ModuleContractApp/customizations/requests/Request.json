@@ -1,0 +1,9 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3c12",
+  "kind": "layer",
+  "formatVersion": 1,
+  "target": "requests/Request",
+  "changes": {
+    "fields": [{ "name": "status", "values": ["draft", "submitted", "approved", "archived", "onHold"] }]
+  }
+}

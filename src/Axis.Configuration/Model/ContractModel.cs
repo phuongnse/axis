@@ -76,8 +76,11 @@ public sealed record LifecycleModel
     public required IReadOnlyList<LifecycleTransitionModel> Transitions { get; init; }
 }
 
-/// <summary>A state of a lifecycle. <see cref="Initial"/> allows a create in it, and <see cref="Deletable"/> a delete.</summary>
-public sealed record LifecycleStateModel(string Name, bool Initial, bool Deletable);
+/// <summary>
+/// A state of a lifecycle. <see cref="Initial"/> allows a create in it, and <see cref="Deletable"/> a delete.
+/// Only a transition of the module itself enters a <see cref="Protected"/> state.
+/// </summary>
+public sealed record LifecycleStateModel(string Name, bool Initial, bool Deletable, bool Protected = false);
 
 /// <summary>A transition of a lifecycle from one or more states to another.</summary>
 public sealed record LifecycleTransitionModel
@@ -93,4 +96,7 @@ public sealed record LifecycleTransitionModel
 
     /// <summary>The text shown when the guard refuses the write, or null for a fixed text.</summary>
     public TextReference? Message { get; init; }
+
+    /// <summary>Whether the application's layer added the transition. The module's own transitions are not added.</summary>
+    public bool Added { get; init; }
 }

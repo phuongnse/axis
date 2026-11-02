@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Axis.Configuration.Resources;
 
 /// <summary>
@@ -21,6 +23,18 @@ public sealed record ContractResource : Resource
 
     /// <summary>The grant ceiling, or null when the contract has none.</summary>
     public ContractCeilingDefinition? Ceiling { get; init; }
+
+    /// <summary>The names of the states that the application's layer added to the lifecycle. Empty without a layer.</summary>
+    [JsonIgnore]
+    public IReadOnlySet<string> AddedStates { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>The names of the transitions that the application's layer added to the lifecycle. Empty without a layer.</summary>
+    [JsonIgnore]
+    public IReadOnlySet<string> AddedTransitions { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>The values that the layer of the entity added to the state field. Empty without a layer.</summary>
+    [JsonIgnore]
+    public IReadOnlySet<string> AddedValues { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 }
 
 /// <summary>An effect of a contract as written: when a transition happens, it creates a record of another entity.</summary>
@@ -108,6 +122,9 @@ public sealed record LifecycleStateDefinition
 
     /// <summary>Whether a record may be deleted in this state.</summary>
     public bool? Deletable { get; init; }
+
+    /// <summary>Whether only the module's own transitions may enter this state.</summary>
+    public bool? Protected { get; init; }
 }
 
 /// <summary>A transition of a lifecycle as written.</summary>

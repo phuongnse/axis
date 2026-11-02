@@ -17,12 +17,13 @@ internal static class ContractPoints
         foreach (var contract in contracts)
         {
             var entity = contract.Entity;
-            foreach (var transition in contract.Lifecycle?.Transitions ?? [])
+            // An added state or transition belongs to the application, so it is no point of the module.
+            foreach (var transition in (contract.Lifecycle?.Transitions ?? []).Where(transition => !contract.AddedTransitions.Contains(transition.Name)))
             {
                 points.Add($"{entity}/transitions/{transition.Name}");
             }
 
-            foreach (var state in contract.Lifecycle?.States ?? [])
+            foreach (var state in (contract.Lifecycle?.States ?? []).Where(state => !contract.AddedStates.Contains(state.Name)))
             {
                 if (state.Initial != true)
                 {

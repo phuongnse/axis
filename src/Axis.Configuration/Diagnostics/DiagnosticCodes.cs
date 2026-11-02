@@ -350,6 +350,9 @@ public static class DiagnosticCodes
     public const string UnknownLayerProperty = "AXC0366";
     public const string LayerAfterAndBefore = "AXC0367";
     public const string UnknownLayerAnchor = "AXC0368";
-    public const string LayerKeyDroppedByModuleUpgrade = "AXC0369";
-    public const string ModuleUpgradeBreaksLayers = "AXC0370";
+    public const string ContractLayerNotAddition = "AXC0369";
+    public const string AddedTransitionIntoProtectedState = "AXC0370";
+    public const string LifecycleAdditionMismatch = "AXC0371";
+    public const string LayerKeyDroppedByModuleUpgrade = "AXC0372";
+    public const string ModuleUpgradeBreaksLayers = "AXC0373";
 }

@@ -3083,7 +3083,7 @@ public static partial class ApplicationCompiler
                 : new LifecycleModel
                 {
                     Field = FindField(entity, lifecycle.Field)!.Name,
-                    States = [.. lifecycle.States.Select(state => new LifecycleStateModel(state.Name, state.Initial == true, state.Deletable == true))],
+                    States = [.. lifecycle.States.Select(state => new LifecycleStateModel(state.Name, state.Initial == true, state.Deletable == true, state.Protected == true))],
                     Transitions = [.. lifecycle.Transitions.Select(transition => new LifecycleTransitionModel
                     {
                         Name = transition.Name,
@@ -3091,6 +3091,7 @@ public static partial class ApplicationCompiler
                         To = transition.To,
                         Guard = transition.Guard is null ? null : ExpressionModel.Compile(transition.Guard, scope, ExpressionType.Boolean, contract: true),
                         Message = transition.Message,
+                        Added = contract.AddedTransitions.Contains(transition.Name),
                     })],
                 },
             Validations = [.. (contract.Validations ?? []).Select(validation => new CoreValidationModel(

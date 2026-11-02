@@ -10,7 +10,7 @@ namespace Axis.Data.Records;
 /// storage writes, so no caller can skip it. A create must be in an initial state, a state change
 /// must follow a transition whose guard is <c>true</c>, and a delete must be in a deletable state.
 /// Each check returns <see langword="null"/> when the entity has no lifecycle or the write is
-/// allowed. A refusal is keyed <c>/values/&lt;state field&gt;</c> and names the point of the contract
+/// allowed. A transition that the application's layer added never enters a protected state. A refusal is keyed <c>/values/&lt;state field&gt;</c> and names the point of the contract
 /// that refused it. Its message is the transition's text key, or a fixed English text.
 /// </summary>
 internal static class RecordLifecycle
@@ -83,6 +83,11 @@ internal static class RecordLifecycle
             return new LifecycleUpdateCheck(Refused(lifecycle, $"No transition goes from '{from}' to '{to}'.", point: null));
         }
 
+        if (EntersProtectedState(lifecycle, transition))
+        {
+            return new LifecycleUpdateCheck(Refused(lifecycle, $"The state '{to}' is protected. Only the module's transitions enter it.", point: null));
+        }
+
         if (transition.Guard is not { } guard)
         {
             return new LifecycleUpdateCheck(null, transition, stored);
@@ -97,6 +102,13 @@ internal static class RecordLifecycle
                 transition.Message?.TextKey ?? $"The transition '{transition.Name}' does not allow this change.",
                 $"{PlainName(entity)}/transitions/{transition.Name}"));
     }
+
+    /// <summary>
+    /// Whether <paramref name="transition"/> is one that the application's layer added and its target state is
+    /// protected. The compile refuses such a transition already, so this is a second safeguard.
+    /// </summary>
+    internal static bool EntersProtectedState(LifecycleModel lifecycle, LifecycleTransitionModel transition) =>
+        transition.Added && lifecycle.States.Any(state => state.Protected && state.Name == transition.To);
 
     /// <summary>
     /// Checks that the stored state is deletable. It reads the state with <c>FOR UPDATE</c>, so a

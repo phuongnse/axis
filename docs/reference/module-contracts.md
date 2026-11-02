@@ -145,7 +145,7 @@ The lifecycle is a state machine on one field of the entity.
   - `initial: true` marks a state a record may be created in. At least one state is initial.
   - `deletable: true` marks a state a record may be deleted in. No state is deletable unless it
     says so.
-  - `protected: true` _(planned for M25)_ marks a state that only the contract's own transitions
+  - `protected: true` marks a state that only the contract's own transitions
     enter, see [extending a lifecycle](customization-layers.md#extending-a-lifecycle).
 - **Transitions.** Each has a `name`, `from`, a non-empty list of states, a `to` state, and an
   optional `guard` and `message`.
@@ -160,10 +160,10 @@ The lifecycle is a state machine on one field of the entity.
     refuses the write, as a validation does.
   - An update that keeps the state makes no transition. The core validations still run.
   - A delete is refused unless the stored state is deletable.
-- **Extending the lifecycle.** An application cannot add states or transitions in M24, and a relax
-  entry never can, see [relax entries](#relax-entries). A
-  [customization layer](customization-layers.md#extending-a-lifecycle) adds them _(planned for
-  M25)_, except into a protected state.
+- **Extending the lifecycle.** A relax entry never adds states or transitions, see
+  [relax entries](#relax-entries). A
+  [customization layer](customization-layers.md#extending-a-lifecycle) adds them, except into a
+  protected state, and the record API enforces them like the module's own.
 
 ## Core validations
 
@@ -385,7 +385,9 @@ point is written `<entity>/<part>/<name>`:
 | `Request/ceiling/requester` | The ceiling entries of the `requester` slot |
 | `Request/ceiling/others` | The ceiling of roles mapped to no slot |
 
-The list of states and transitions is no point. It never relaxes.
+The list of states and transitions is no point. It never relaxes. A state or transition that an
+application's [layer](customization-layers.md#extending-a-lifecycle) added is no point either, so
+a relax entry cannot name it.
 
 ## Relax entries
 

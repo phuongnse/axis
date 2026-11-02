@@ -383,7 +383,7 @@ internal static class ContractChecker
                 "/lifecycle/field");
         }
 
-        CheckStates(lifecycle, problem is null ? field!.Values ?? [] : null, report);
+        CheckStates(contract, lifecycle, problem is null ? field!.Values ?? [] : null, report);
         CheckTransitions(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, report);
     }
 
@@ -396,8 +396,12 @@ internal static class ContractChecker
         : field.Sensitive == true ? "is sensitive"
         : null;
 
-    /// <summary>Checks the states. <paramref name="values"/> is the state field's values, or null when the field is not valid.</summary>
+    /// <summary>
+    /// Checks the states. <paramref name="values"/> is the state field's values, or null when the field is not valid.
+    /// A state or a value that a layer added on one side only is not reported here, as the layer check reports it.
+    /// </summary>
     private static void CheckStates(
+        ContractResource contract,
         ContractLifecycleDefinition lifecycle,
         IReadOnlyList<string>? values,
         Action<string, string, string> report)
@@ -415,7 +419,7 @@ internal static class ContractChecker
                     path);
             }
 
-            if (values is not null && !values.Contains(name, StringComparer.Ordinal))
+            if (values is not null && !values.Contains(name, StringComparer.Ordinal) && !contract.AddedStates.Contains(name))
             {
                 report(
                     DiagnosticCodes.LifecycleStatesMismatch,
@@ -426,7 +430,7 @@ internal static class ContractChecker
 
         if (values is not null)
         {
-            foreach (var value in values.Where(value => !lifecycle.States.Any(state => string.Equals(state.Name, value, StringComparison.Ordinal))))
+            foreach (var value in values.Where(value => !lifecycle.States.Any(state => string.Equals(state.Name, value, StringComparison.Ordinal)) && !contract.AddedValues.Contains(value)))
             {
                 report(
                     DiagnosticCodes.LifecycleStatesMismatch,
@@ -506,7 +510,10 @@ internal static class ContractChecker
                 }
             }
 
-            if (transition.Message is { } message && !message.TextKey.StartsWith($"{moduleId}.", StringComparison.Ordinal))
+            // An added transition and its text belong to the application, not to the module.
+            if (transition.Message is { } message
+                && !contract.AddedTransitions.Contains(transition.Name)
+                && !message.TextKey.StartsWith($"{moduleId}.", StringComparison.Ordinal))
             {
                 report(
                     DiagnosticCodes.ModuleTextKeyWithoutPrefix,
