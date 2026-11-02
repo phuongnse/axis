@@ -8,6 +8,7 @@
     "role.employee": "Employee",
     "ticket.main": "Ticket",
     "ticket.review": "Review the ticket",
-    "ticket.go": "Go"
+    "ticket.go": "Go",
+    "ticket.blockedByLayer": "This title is blocked by the application."
   }
 }
