@@ -184,6 +184,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
     {
         "app" => "RecordsApp",
         "entity" => "Item",
+        "field" => "name",
         "module" => "m",
         "id" => id.ToString("D"),
         "dataSource" => "ItemNames",

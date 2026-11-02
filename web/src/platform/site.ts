@@ -134,6 +134,8 @@ export interface FieldMetadata {
   uploadPath?: string | null
   /** The path to which a client appends a file's id to download it, or missing or `null` on a field that is not a file. */
   downloadPath?: string | null
+  /** The path of the user search route of a text field marked `userId`, or missing or `null` on any other field. */
+  usersPath?: string | null
   target: ReferenceTarget | null
   fields: FieldMetadata[] | null
 }

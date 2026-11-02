@@ -312,6 +312,7 @@ sessions.MapConsoleEndpoints();
 sessions.MapAboutEndpoints();
 sessions.MapSessionEndpoints();
 sessions.MapUserPickerEndpoints();
+sessions.MapUserIdFieldEndpoints();
 sessions.MapStudioEndpoints();
 
 app.MapGroup(string.Empty).WithBearerRateLimit().MapInboundEndpoints();

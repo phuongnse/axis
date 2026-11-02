@@ -97,8 +97,8 @@ describe('fieldSettings', () => {
 })
 
 describe('fieldKeysEditedElsewhere', () => {
-  it('holds only the name, the type, the label, the help and the match', () => {
-    expect(Object.keys(fieldKeysEditedElsewhere)).toEqual(['name', 'type', 'label', 'help', 'match'])
+  it('holds only the name, the type, the label, the help, the match and the user id', () => {
+    expect(Object.keys(fieldKeysEditedElsewhere)).toEqual(['name', 'type', 'label', 'help', 'match', 'userId'])
   })
 })
 
