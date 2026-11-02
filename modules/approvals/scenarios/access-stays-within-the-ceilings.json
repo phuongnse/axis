@@ -1,0 +1,59 @@
+{
+  "id": "4865a637-dfe0-472f-ae24-13cb954db8c3",
+  "kind": "scenario",
+  "name": "AccessStaysWithinTheCeilings",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": {
+    "covers": ["Request/ceiling/admin", "Request/ceiling/member", "Decision/ceiling/admin", "Decision/ceiling/member"]
+  },
+  "users": {
+    "admin": ["admin"],
+    "ann": ["member"],
+    "bob": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "purchase",
+      "values": { "name": "Purchase", "code": "PURCHASE", "steps": [{ "sequence": 1, "approver": "employee" }] }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "monitor",
+      "values": { "type": "purchase", "title": "Monitor", "amount": 400 }
+    },
+    { "type": "updateRecord", "record": "monitor", "as": "bob", "values": { "title": "Bob's monitor" }, "expect": "notFound" },
+    { "type": "deleteRecord", "record": "monitor", "as": "bob", "expect": "notFound" },
+    { "type": "updateRecord", "record": "monitor", "as": "ann", "values": { "stepsRequired": 0 }, "expect": "denied" },
+    { "type": "updateRecord", "record": "monitor", "as": "ann", "values": { "step": 2 }, "expect": "denied" },
+    { "type": "updateRecord", "record": "monitor", "as": "admin", "values": { "title": "Admin's monitor" }, "expect": "denied" },
+    { "type": "deleteRecord", "record": "monitor", "as": "admin", "expect": "denied" },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "admin",
+      "values": { "type": "purchase", "title": "Admin's request", "amount": 400 },
+      "expect": "denied"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Decision",
+      "as": "ann",
+      "values": { "request": "monitor", "outcome": "approved", "decidedBy": "ann" },
+      "expect": "denied"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Decision",
+      "as": "admin",
+      "values": { "request": "monitor", "outcome": "approved", "decidedBy": "admin" },
+      "expect": "denied"
+    },
+    { "type": "expectRecord", "record": "monitor", "values": { "title": "Monitor", "status": "draft" } }
+  ]
+}

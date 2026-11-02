@@ -10,8 +10,8 @@ idea, and [D124](../decisions/d124-the-organization-and-approvals-modules.md) ag
 hold. `organization` 1.0.0 exists under `modules/organization`, with its entities, data sources, rule,
 role slots, contracts, policies, contract scenarios, pages, one form and texts. `approvals` 1.0.0 exists under
 `modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots, contracts,
-process, policies, pages and texts. Its contract scenarios and the built-in
-application are _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
+process, policies, contract scenarios, pages and texts. Its built-in
+application is _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check.
@@ -126,8 +126,9 @@ the sequence `RequestNumber` with the format `RQ-{yyyy}-{n:5}`, `amount` and `mi
 with precision 18 and scale 2, the contracts of `Request`, `RequestType` and `Decision`, the process
 `RequestApproval`, the form `RequestReview`, the policies `MemberAccess` and `AdminAccess`, four module
 scenarios, `RequestGoesToManagerThenNamedEmployee`, `DepartmentHeadReturnsAndRejects`,
-`DelegateDecidesWhileApproverIsAway` and `DepartmentHeadRequestGoesToAdmin`, the pages, the forms
-`RequestForm` and `RequestDetail`, and the texts. Its contract scenarios are _(planned for M26)_.
+`DelegateDecidesWhileApproverIsAway` and `DepartmentHeadRequestGoesToAdmin`, the contract scenarios
+listed under [the request contract](#the-request-contract), the pages, the forms `RequestForm` and
+`RequestDetail`, and the texts.
 
 ### Request types
 
@@ -197,7 +198,13 @@ once**, whatever process change a business makes.
     decision.
 - **Contract scenarios** cover each point: a requester who approves their own request through any
   step is refused, one task decision that moves `step` twice is refused, and a request above a
-  step's `minAmount` reaches `approved` only after that step.
+  step's `minAmount` reaches `approved` only after that step. Seven scenarios run when an application
+  that declares the module is published or validated: `RequesterCannotDecideOwnRequest`,
+  `OneDecisionMovesOneStep`, `RequestGoesToManagerThenNamedEmployee`,
+  `RequestMovesOnlyThroughItsLifecycle`, `AmountIsFrozenAfterSubmit`,
+  `AccessStaysWithinTheCeilings` and `RequestTypeNeedsAStepForEveryAmount`. Each covers the points
+  its name says. `OneDecisionMovesOneStep` shows that one decision moves a request one step. No
+  scenario user may write `step`, so no scenario can provoke the refusal itself.
 
 ### The approval process
 
