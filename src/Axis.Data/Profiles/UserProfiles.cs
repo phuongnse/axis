@@ -29,6 +29,7 @@ public static class UserProfiles
         """
         SELECT "user_id", "display_name" FROM "axis"."user_profiles"
         WHERE position(lower(@search) in lower("display_name")) > 0
+           OR position(lower(@search) in lower(coalesce("email", ''))) > 0
         ORDER BY "display_name", "user_id"
         LIMIT @limit
         """;
@@ -179,8 +180,8 @@ public static class UserProfiles
     }
 
     /// <summary>
-    /// The profiles whose display name contains <paramref name="search"/>, ignoring letter case, sorted by display name and
-    /// then user id. An empty search matches every profile.
+    /// The profiles whose display name or email contains <paramref name="search"/>, ignoring letter case, sorted by display
+    /// name and then user id. An empty search matches every profile.
     /// </summary>
     /// <param name="limit">The most profiles to return.</param>
     public static async Task<IReadOnlyList<UserProfileSummary>> SearchAsync(

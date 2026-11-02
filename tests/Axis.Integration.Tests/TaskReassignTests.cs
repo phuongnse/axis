@@ -183,7 +183,7 @@ public sealed class TaskReassignTests(TaskApiFixture fixture) : IClassFixture<Ta
     public async Task The_picker_lists_the_profiles_that_match_mixed_case_text_for_a_grant_holder_and_is_403_for_anyone_else()
     {
         var name = $"Zelda {Guid.NewGuid():N}";
-        await fixture.InsertProfileAsync(TenantA, "zelda-picker", name);
+        await fixture.InsertProfileAsync(TenantA, "zelda-picker", name, email: $"{name[6..]}@picker.example");
         await fixture.InsertProfileAsync(TenantA, "zelda-other", "Somebody Else " + Guid.NewGuid().ToString("N"));
         using var ines = fixture.CreateClient().SignedInAs("ines");
 
@@ -194,6 +194,10 @@ public sealed class TaskReassignTests(TaskApiFixture fixture) : IClassFixture<Ta
         var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
         Assert.Equal(["displayName", "id"], item.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal(("zelda-picker", name), (item.GetProperty("id").GetString(), item.GetProperty("displayName").GetString()));
+
+        using var byEmail = await GetUsersAsync(ines, TenantA, "?search=" + Uri.EscapeDataString($"{name[6..]}@PICKER"));
+        using var emailList = await ReadJsonAsync(byEmail);
+        Assert.Equal("zelda-picker", Assert.Single(emailList.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetString());
 
         foreach (var user in new[] { "otto", "maria", "ada" })
         {

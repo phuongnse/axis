@@ -530,6 +530,16 @@ is `AXC0013`.
   `required: true`, `expression` or `sequence`, and a child entity's field
   cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
   [Record creator](roles-and-policies.md#record-creator).
+- `userId` marks a `text` field that holds a user id. It is allowed only on a
+  `text` field, even as `false`. It cannot be combined with `creator`,
+  `expression` or `sequence`, and a child entity's field cannot have it. Each is
+  `AXC0013` at `/fields/{i}/userId`. The server does not check a written value.
+  The field gets `GET /api/apps/{app}/entities/{entity}/fields/{field}/users?search=&id=`
+  (`.../entities/{module}/{entity}/...` for a module's entity), its `usersPath`
+  in page metadata. It is checked in order: signed in (401, never a service
+  account), the entity and field (404), a `create` or `update` grant covering
+  the field (403). It lists 20 profiles at most whose display name or email
+  contains `search`, or with `id` only that one, as `{ "items": [{ "id", "displayName" }] }`.
 - `sensitive` is allowed on `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `money`, and defaults to
   `false`. `true` on a `reference`, `references` or `file` field is `AXC0308` at `/fields/{i}/sensitive`, on the `displayField`
   at `/displayField`, on `child-collection` `AXC0013`. `exactLookup` needs `sensitive` and a name of at most 54 characters,

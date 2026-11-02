@@ -323,7 +323,11 @@ public static class ApplicationSites
             entity.Label?.TextKey,
             entity.DisplayField,
             RecordsPath(application, entity.Name),
-            [.. entity.Fields.Select(field => Field(application, field, UploadBase(application, entity.Name)))]);
+            [.. entity.Fields.Select(field => Field(
+                application,
+                field,
+                UploadBase(application, entity.Name),
+                $"/api/apps/{application.Manifest.Name}/entities/{entity.Name}/fields"))]);
     }
 
     /// <summary>
@@ -430,7 +434,7 @@ public static class ApplicationSites
     private static string? UploadBase(ApplicationModel application, string entityName) =>
         entityName.Contains('/', StringComparison.Ordinal) ? null : $"/api/apps/{application.Manifest.Name}/entities/{entityName}/fields";
 
-    private static FieldMetadata Field(ApplicationModel application, FieldModel field, string? uploadBase) =>
+    private static FieldMetadata Field(ApplicationModel application, FieldModel field, string? uploadBase, string? usersBase) =>
         new(
             field.Name,
             FieldTypes.Name(field.Type),
@@ -455,6 +459,7 @@ public static class ApplicationSites
             field.Type == FieldType.File ? field.Accept : null,
             field.Type == FieldType.File && uploadBase is not null ? $"{uploadBase}/{field.Name}/files" : null,
             field.Type == FieldType.File ? $"/api/apps/{application.Manifest.Name}/files" : null,
+            field.UserId && usersBase is not null ? $"{usersBase}/{field.Name}/users" : null,
             field.Type is FieldType.Reference or FieldType.References
                 ? new ReferenceTarget(field.Target!.Name, field.TargetDisplayField, RecordsPath(application, field.Target.Name))
                 : null,
@@ -472,7 +477,7 @@ public static class ApplicationSites
         var child = application.FindEntity(collection.Target!.Id)
             ?? throw new InvalidOperationException("The application has no entity for the child collection.");
         var childBase = uploadBase is null ? null : $"{uploadBase}/{collection.Name}";
-        return [.. child.Fields.Select(field => Field(application, field, childBase))];
+        return [.. child.Fields.Select(field => Field(application, field, childBase, null))];
     }
 
     private static string RecordsPath(ApplicationModel application, string entityName) =>
