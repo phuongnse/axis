@@ -273,6 +273,9 @@ A `seed` holds records with fixed ids for one entity:
 }
 ```
 
+- `entity` is the name of an entity of the application, or a module entity written as
+  `module/Entity`, such as `organization/Employee`. Seeds apply in path order, so a seed
+  that names a record of another seed, such as a department's `head`, sorts after it.
 - Each record's `id` is the record id, fixed so that the startup step
   inserts the record once. It is unique across every seed file of the
   application (`AXC0034`).

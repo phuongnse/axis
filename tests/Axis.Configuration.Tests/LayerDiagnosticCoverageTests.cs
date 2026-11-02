@@ -23,8 +23,11 @@ public sealed class LayerDiagnosticCoverageTests
     public static TheoryData<string, string> Resources()
     {
         var rows = new TheoryData<string, string>();
-        foreach (var module in SampleModules.Modules)
+        var pinned = ApplicationCompiler.Compile(
+            Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules).Model!.Modules.Select(module => module.Id).ToHashSet();
+        foreach (var module in SampleModules.Modules.Where(module => pinned.Contains(module.Manifest.Id)))
         {
+            // The test layers the resources onto the purchase request sample, so only the modules it pins have rows.
             var kindsByName = LayerChecker.KindsByName(module);
             foreach (var file in module.Files)
             {

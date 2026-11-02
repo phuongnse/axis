@@ -41,7 +41,7 @@
       "type": "createRecord",
       "entity": "Department",
       "as": "ann",
-      "values": { "code": "FIN", "name": "Finance" },
+      "values": { "code": "TEST-FIN", "name": "Finance" },
       "expect": "denied"
     }
   ]

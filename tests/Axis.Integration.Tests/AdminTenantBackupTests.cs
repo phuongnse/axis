@@ -350,7 +350,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
 /// <see cref="Host"/>. The tenant has a <c>url</c> binding and a <c>secret</c> binding for the purchasing system, and the
 /// Company sign-in bindings. The server holds the tenant's data and lookup keys of the directory, so it can save a sensitive value, and the
 /// archive of the tenant carries the keys that encrypted it. The server activates the purchase request and leave request samples in it, so releases pin the
-/// payment references package and the departments and department-budgets modules.
+/// payment references package and the departments, department-budgets and organization modules.
 /// </summary>
 public sealed class AdminBackupFixture : IAsyncLifetime
 {

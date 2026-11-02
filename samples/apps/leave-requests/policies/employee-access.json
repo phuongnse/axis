@@ -13,8 +13,8 @@
       "filter": "employee == currentUser() and status in ('draft', 'returned')",
       "fields": ["title", "department", "leaveType", "firstDay", "lastDay", "reason", "status"]
     },
-    { "name": "departmentRead", "entity": "departments/Department", "actions": ["read"] },
-    { "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
     { "name": "leaveRequestListRead", "dataSource": "LeaveRequestList", "actions": ["read"] },
     { "name": "leaveRequestApprovalStart", "process": "LeaveRequestApproval", "actions": ["start"] }
   ]

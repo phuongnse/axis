@@ -206,8 +206,10 @@ Later samples of different shapes follow from M11: a service desk, see
   is `sensitive`, so it is stored encrypted.
 - Days are calendar days, counting both ends:
   `daysBetween(firstDay, lastDay) + 1`. Weekends and holidays are not left out.
-- **Department**: comes from the `departments` module, with its seed
-  departments (see [D40](decisions/d40-reusable-modules.md)).
+- **Department**: comes from the built-in `organization` module. The sample
+  seeds an employee for each of its users and the departments, each with a head
+  (see [D40](decisions/d40-reusable-modules.md) and
+  [D124](decisions/d124-the-organization-and-approvals-modules.md)).
 
 ### Flow
 

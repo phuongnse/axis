@@ -21,7 +21,7 @@
       "name": "managerApproval",
       "type": "task",
       "label": { "textKey": "leaveRequest.managerApproval" },
-      "assignee": { "user": "department.manager" },
+      "assignee": { "user": "department.head.user" },
       "form": "LeaveRequestReview",
       "dueIn": "P3D",
       "outcomes": [

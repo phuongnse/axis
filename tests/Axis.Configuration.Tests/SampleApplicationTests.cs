@@ -125,22 +125,22 @@ public sealed class SampleApplicationTests
     }
 
     [Fact]
-    public void Leave_request_sample_maps_the_manager_slot_of_the_departments_module_to_department_manager()
+    public void Leave_request_sample_maps_both_slots_of_the_organization_module()
     {
         var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "leave-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
         var module = Assert.Single(result.Model.Modules);
-        Assert.Equal("departments", module.Id);
-        Assert.Equal("1.1.0", module.Version);
-        var policy = Assert.Single(result.Model.Policies, policy => policy.Name == "departments/ManagerAccess");
-        Assert.Equal(["department-manager"], policy.Roles);
-        var entityGrant = Assert.Single(policy.Grants, grant => grant.Entity is not null);
-        Assert.Equal("departments/Department", entityGrant.Entity!.Name);
-        Assert.NotNull(entityGrant.Filter);
-        var dataSourceGrant = Assert.Single(policy.Grants, grant => grant.DataSource is not null);
-        Assert.Equal("departments/Departments", dataSourceGrant.DataSource!.Name);
+        Assert.Equal(("organization", "1.0.0"), (module.Id, module.Version));
+        Assert.Equal(
+            [("admin", "department-manager"), ("member", "employee")],
+            module.Roles.OrderBy(slot => slot.Key, StringComparer.Ordinal).Select(slot => (slot.Key, slot.Value)));
+        Assert.DoesNotContain(result.Model.Modules, pinned => pinned.Id == "departments");
+        var leaveRequest = Assert.Single(result.Model.Entities, entity => entity.Name == "LeaveRequest");
+        var department = Assert.Single(leaveRequest.Fields, field => field.Name == "department");
+        Assert.Equal("organization/Department", department.Target!.Name);
+        Assert.Equal(["organization/Employee", "organization/Department"], result.Model.Seeds.Select(seed => seed.Entity.Name));
     }
 
     [Fact]
