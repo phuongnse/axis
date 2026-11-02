@@ -78,6 +78,22 @@
         "refreshInterval": { "type": "string" }
       }
     },
+    "cell": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "region": { "type": "string" },
+        "tenantDomain": { "type": "string" },
+        "internalDomain": { "type": "string" },
+        "tenantCap": { "type": ["string", "integer"] },
+        "consoleHost": { "type": "string" },
+        "consoleAllowedNetworks": { "type": "array", "items": { "type": "string" } },
+        "internalUrl": { "type": "string" },
+        "operatorRealm": { "type": "string" },
+        "operatorRole": { "type": "string" },
+        "backupKeyFile": { "type": "string" }
+      }
+    },
     "extensions": {
       "type": "object",
       "properties": { "volume": { "$ref": "#/definitions/volume" } }

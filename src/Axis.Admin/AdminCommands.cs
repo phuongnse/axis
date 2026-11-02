@@ -147,7 +147,19 @@ internal static partial class AdminCommands
             }
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken));
+        // Checked before any command runs, so no command starts with cell settings that a host would refuse.
+        CellOptions cell;
+        try
+        {
+            cell = CellOptions.Load(configuration);
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine(exception.Message);
+            return 2;
+        }
+
+        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken));
     }
 
     /// <summary>

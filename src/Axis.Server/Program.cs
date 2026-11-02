@@ -54,6 +54,10 @@ builder.Services.AddSingleton<RateLimitRefusals>();
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, RateLimitRefusals>(RateLimits.Configure);
 
+// Read before any database work too, so a bad value stops the start.
+var cell = CellOptions.Load(builder.Configuration);
+builder.Services.AddSingleton(cell);
+
 // Both sources need the schema connection, a reader role and the key, so a missing setting stops the start
 // before any database work.
 var platformSchemaConnectionString = builder.Configuration.GetConnectionString("PlatformSchema");
