@@ -136,6 +136,33 @@ public sealed class StudioStarterTests : IAsyncLifetime
         Assert.Equal(expected.Order(StringComparer.Ordinal), others);
     }
 
+    [Fact]
+    public async Task A_page_created_from_the_starter_has_a_named_widget_and_only_the_empty_title_diagnostic()
+    {
+        var starter = Starters().Single(pair => pair.Key == "page").Value;
+        var id = Guid.NewGuid().ToString();
+        var body = new JsonObject { ["id"] = id, ["kind"] = "page", ["name"] = "NewThing", ["formatVersion"] = 1 };
+        foreach (var (key, value) in starter["content"]!.AsObject())
+        {
+            body[key] = value?.DeepClone();
+        }
+
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        var response = await Create(client, body.ToJsonString());
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var file = answer.RootElement.GetProperty("file").GetString()!;
+        var saved = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(Folder, file), CancellationToken))!;
+        Assert.Equal("taskInbox1", saved["widgets"]![0]!["name"]!.GetValue<string>());
+        var own = answer.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Where(item => item.GetProperty("resourceId").GetString() == id)
+            .Select(item => item.GetProperty("path").GetString());
+        Assert.Equal(["/title/textKey"], own);
+    }
+
     private static string Describe(JsonElement diagnostic) =>
         string.Join('|', diagnostic.GetProperty("code").GetString(), diagnostic.GetProperty("file").GetString(), diagnostic.GetProperty("path").GetString());
 

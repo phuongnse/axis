@@ -125,9 +125,10 @@ test.describe('Studio builds a page with two columns', () => {
     expect(saved.widgets).toEqual([
       {
         type: 'columns',
+        name: 'columns1',
         columns: [
-          { width: 8, widgets: [{ type: 'table', entity: 'Request' }] },
-          { width: 4, widgets: [{ type: 'taskInbox' }] },
+          { name: 'column1', width: 8, widgets: [{ type: 'table', name: 'table1', entity: 'Request' }] },
+          { name: 'column2', width: 4, widgets: [{ type: 'taskInbox', name: 'taskInbox1' }] },
         ],
       },
     ])

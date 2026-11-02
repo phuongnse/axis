@@ -14,6 +14,7 @@ import {
   listLevel,
   movePlace,
   moveTo,
+  namedWidget,
   newColumn,
   newTab,
   newWidget,
@@ -22,6 +23,7 @@ import {
   typeChanges,
   widgetKeys,
   widgetLists,
+  widgetName,
   widgetPointerOf,
   widgetSummary,
   widgetTypes,
@@ -195,11 +197,14 @@ describe('newWidget', () => {
     expect(newWidget('columns')).toEqual({
       type: 'columns',
       columns: [
-        { width: 6, widgets: [] },
-        { width: 6, widgets: [] },
+        { name: 'column1', width: 6, widgets: [] },
+        { name: 'column2', width: 6, widgets: [] },
       ],
     })
-    expect(newWidget('tabs')).toEqual({ type: 'tabs', tabs: [{ label: { textKey: '' }, widgets: [] }] })
+    expect(newWidget('tabs')).toEqual({
+      type: 'tabs',
+      tabs: [{ name: 'tab1', label: { textKey: '' }, widgets: [] }],
+    })
     expect(newWidget('section')).toEqual({ type: 'section', title: { textKey: '' }, widgets: [] })
   })
 
@@ -235,20 +240,59 @@ describe('newWidget', () => {
 
 describe('newColumn', () => {
   it('takes what is left of 12', () => {
-    expect(newColumn([{ width: 6 }])).toEqual({ width: 6, widgets: [] })
-    expect(newColumn([])).toEqual({ width: 12, widgets: [] })
+    expect(newColumn([{ width: 6 }])).toEqual({ name: 'column1', width: 6, widgets: [] })
+    expect(newColumn([])).toEqual({ name: 'column1', width: 12, widgets: [] })
   })
 
   it('takes 1 when nothing is left or the widths are not numbers', () => {
-    expect(newColumn([{ width: 6 }, { width: 6 }])).toEqual({ width: 1, widgets: [] })
-    expect(newColumn([{ width: 8 }, { width: 8 }])).toEqual({ width: 1, widgets: [] })
-    expect(newColumn(['x', { width: '6' }])).toEqual({ width: 12, widgets: [] })
+    expect(newColumn([{ width: 6 }, { width: 6 }])).toEqual({ name: 'column1', width: 1, widgets: [] })
+    expect(newColumn([{ width: 8 }, { width: 8 }])).toEqual({ name: 'column1', width: 1, widgets: [] })
+    expect(newColumn(['x', { width: '6' }])).toEqual({ name: 'column1', width: 12, widgets: [] })
+  })
+
+  it('takes the first free name, ignoring letter case', () => {
+    expect(newColumn([{ name: 'COLUMN1', width: 6 }])).toEqual({ name: 'column2', width: 6, widgets: [] })
+    expect(
+      newColumn([
+        { name: 'column2', width: 6 },
+        { name: 'Column1', width: 3 },
+      ]).name,
+    ).toBe('column3')
   })
 })
 
 describe('newTab', () => {
-  it('has an empty label key and no widgets', () => {
-    expect(newTab()).toEqual({ label: { textKey: '' }, widgets: [] })
+  it('has the first free name, an empty label key and no widgets', () => {
+    expect(newTab([])).toEqual({ name: 'tab1', label: { textKey: '' }, widgets: [] })
+    expect(newTab([{ name: 'Tab1' }, { name: 'tab3' }]).name).toBe('tab2')
+  })
+})
+
+describe('widgetName', () => {
+  it('is the type and 1 on a page without a widget of that name', () => {
+    expect(widgetName([], 'table')).toBe('table1')
+    expect(widgetName(tree, 'table')).toBe('table1')
+  })
+
+  it('skips a name used at any depth, ignoring letter case', () => {
+    const nested = [{ type: 'section', widgets: [{ type: 'table', name: 'TABLE1' }] }]
+    expect(widgetName(nested, 'table')).toBe('table2')
+    expect(widgetName(nested, 'kpi')).toBe('kpi1')
+  })
+})
+
+describe('namedWidget', () => {
+  it('puts a free name after the type', () => {
+    const named = namedWidget([{ type: 'kpi', name: 'kpi1' }], newWidget('kpi'))
+    expect(named).toEqual({ type: 'kpi', name: 'kpi2', dataSource: '', measure: '', label: { textKey: '' } })
+    expect(Object.keys(named).slice(0, 2)).toEqual(['type', 'name'])
+  })
+
+  it('keeps the columns and tabs a new layout widget starts with', () => {
+    expect(namedWidget([], newWidget('columns'))).toMatchObject({
+      name: 'columns1',
+      columns: [{ name: 'column1' }, { name: 'column2' }],
+    })
   })
 })
 

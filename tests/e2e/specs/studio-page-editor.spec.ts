@@ -150,10 +150,12 @@ test.describe("Studio builds pages in the page editor", () => {
     expect(form.widgets).toEqual([
       {
         type: "form",
+        name: "taskInbox1",
         entity: "PurchaseRequest",
         actions: [
           {
             type: "startProcess",
+            name: "startProcess1",
             process: "PurchaseRequestApproval",
             label: { textKey: expect.stringMatching(/^pages\./) },
           },
@@ -168,10 +170,12 @@ test.describe("Studio builds pages in the page editor", () => {
     expect(list.widgets).toEqual([
       {
         type: "table",
+        name: "taskInbox1",
         dataSource: "PurchaseRequestList",
         rowActions: [
           {
             type: "navigate",
+            name: "navigate1",
             page: "ReviewForm",
             label: { textKey: expect.stringMatching(/^pages\./) },
             record: "id",

@@ -480,16 +480,17 @@ Run and the Test results list, the read-only views of a module entity, a module 
     with a text box for each locale, and a list of its widgets, each with its
     type and a summary such as `table · PurchaseRequestList`. A panel per
     widget type, `table`, `form`, `taskInbox`, `processInspector`, `kpi`,
-    `chart`, `detail`, `columns`, `tabs` and `section`, shows the properties the widget has today. The `columns`, `tabs` and `section` panels edit the width of each column, the label of each tab, and the title and collapsed state of a section. A `table` panel has entity and data source
-    pickers, then a `rowActions` list of navigate or delete actions and a
+    `chart`, `detail`, `columns`, `tabs` and `section`, shows the properties
+    the widget has today. A `table` panel has entity and data source pickers,
+    then a `rowActions` list of navigate or delete actions and a
     `toolbarActions` list of navigate actions. A delete action has a label and
     an optional `visibleWhen` expression. A `form` panel has entity and form
     pickers and its `actions`, each a `startProcess` action with a process
-    picker and a label, or a navigate action. A
-    `taskInbox` panel has no properties. A `processInspector` panel has a
-    process picker. A `detail` panel has the entity and form pickers and the
-    actions of a form, and a record picker between them. The widget is described
-    in [detail, chart and KPI widgets](detail-chart-kpi-widgets.md), per
+    picker and a label, or a navigate action. A `taskInbox` panel has no
+    properties. A `processInspector` panel has a process picker. A `detail`
+    panel has the entity and form pickers and the actions of a form, and a
+    record picker between them. The widget is described in [detail, chart and
+    KPI widgets](detail-chart-kpi-widgets.md), per
     [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The record picker
     lists the page's parameters that are required and of type `reference`. When
     the widget names an entity, it lists only the parameters whose `target` is
@@ -499,12 +500,9 @@ Run and the Test results list, the read-only views of a module entity, a module 
     after the save. The JSON view stays as a second view of the same draft.
     - **Type change.** Choosing another type removes the known properties the
       new type does not take, because the compiler rejects them. A switch to
-      `processInspector` adds an empty `process`, which the schema requires. A
-      switch to `detail` adds an empty `record`, which the schema also requires.
-      A switch to `kpi` or `chart` adds the empty keys its type requires. A new
-      chart starts with the `bar` kind and one measure with an empty name and
-      label, because the schema accepts only `bar`, `line` or `pie` and needs
-      at least one measure.
+      `processInspector`, `detail`, `kpi` or `chart` adds the empty keys the
+      schema requires, such as `process` or `record`. A new chart starts with
+      the `bar` kind and one empty measure, which the schema requires.
     - **KPI and chart panels.** A `kpi` panel has a data source picker, a
       measure picker and a label with a text box for each locale. Add
       comparison adds a comparison with its own measure picker and label, and
@@ -541,9 +539,11 @@ Run and the Test results list, the read-only views of a module entity, a module 
       page picker, a label with a text box for each locale, an optional
       `record` expression and parameter expressions. The page picker lists
       every page, including the current one, because a page may open itself
-      with other parameters. A table offers only navigate actions. A form
-      offers Add action for `startProcess` and Add navigate action. An empty
-      Record box removes the `record` key.
+      with other parameters. A table offers only Add navigate action, and a
+      form also Add action for `startProcess`. An empty Record box removes the
+      `record` key. A new action is named `<action type><n>`, such as
+      `navigate1`, with the first free n in its list. A KPI's `navigate` has
+      no name, because the schema refuses one.
       - **Parameter expressions.** When the names list the target page, the
         action shows one expression box for each parameter the page declares,
         with the parameter's type and `required` beside it. An empty box
@@ -553,9 +553,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
         ignoring letter case. While the names have not loaded, or when the page
         is not in them, the action keeps rows where the author types the
         parameter name, and a wrong name shows as a diagnostic after the save.
-    - **Pickers.** The action's process picker lists every process. It does
-      not check what the choice holds, so a wrong choice shows as a diagnostic
-      after the save.
+    - **Pickers.** The action's process picker lists every process and does
+      not check the choice, so a wrong one shows as a diagnostic after the save.
     - **Page parameters.** A Parameters list sits between the title and the
       widgets. Each parameter has a name, a type picker over `text`,
       `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and
@@ -567,28 +566,29 @@ Run and the Test results list, the read-only views of a module entity, a module 
       each page's parameters, which is how a navigate action knows them
       ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md)).
       `parameters` that is not a list points to the JSON view.
-    - **Widget tree** _(built)_. The editor shows the page's widgets as
-      nested rows. A container shows its columns, tabs or section body as
-      nested lists, and a row opens that widget's panel at its own pointer,
-      such as `/widgets/0/columns/1/widgets/0`. Every list has an Add widget
-      picker with all ten types. A new `columns` starts with two columns of
-      width 6, a new `tabs` with one tab and a new `section` empty. Every row
-      has Move up, Move down and Remove, which replace only the list that holds
-      the widget, and a Move to picker. Move to lists every other widget list
-      as a path such as `Page › columns 1 › Column 2`, leaves out the widget's
-      own list and the lists inside it, and replaces the page's `widgets` in
-      one change. A container's type is fixed, and its panel edits the rest. The
-      editor does not check the depth limit or an empty list, so the
-      compiler reports them after the save. A widget keeps every key the editor
-      does not know when it moves.
-    - **Container panels** _(built)_. Each container type has a panel under
-      its fixed type. A `columns` panel shows one width box from 1 to 12 for
-      each column. The editor does not check that the widths add up to 12, so
-      the compiler reports it after the save. Add column adds a column that
-      takes what is left of 12, or 1 when nothing is left, and keeps the other
-      widths. Remove column drops a column with the widgets in it. A `tabs`
-      panel shows each tab's label as a key with one text box per locale, and
-      has Add tab and Remove tab. A `section` panel shows the title the same
+    - **Widget tree** _(built)_. The editor shows the page's widgets as nested
+      rows. A container shows its columns, tabs or section body as nested lists,
+      and a row opens that widget's panel at its own pointer, such as
+      `/widgets/0/columns/1/widgets/0`. Every list has an Add widget picker with
+      all ten types. A new widget is named `<type><n>`, such as `table1`, with
+      the first n free on the page at any depth, ignoring letter case. A type
+      change or a move keeps the name. A new `columns` starts with columns
+      `column1` and `column2` of width 6, a new `tabs` with `tab1` and a new
+      `section` empty. Every row has Move up, Move down and Remove, which
+      replace only the list that holds the widget, and a Move to picker. Move to
+      lists every other widget list as a path such as `Page › columns 1 › Column
+      2`, leaves out the widget's own list and the lists inside it, and replaces
+      the page's `widgets` in one change. A container's type is fixed. The
+      compiler reports the depth limit and an empty list after the save.
+    - **Container panels** _(built)_. Each container type has a panel under its
+      fixed type. A `columns` panel shows one width box from 1 to 12 for each
+      column, and the compiler reports widths that do not add up to 12 after the
+      save. Add column adds a column that takes what is left of 12, or 1 when
+      nothing is left, and keeps the other widths. Remove column drops a column
+      with its widgets. A `tabs` panel shows each tab's label as a key with one
+      text box per locale, and has Add tab and Remove tab. An added column or
+      tab is named with the first free `column<n>` or `tab<n>` among its
+      siblings, ignoring letter case. A `section` panel shows the title the same
       way, and a Collapsed switch. Switching Collapsed off removes the
       `collapsed` key, because a section starts expanded. Remove column and
       Remove tab are disabled when one is left, because the schema needs at
@@ -596,8 +596,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
       stays in the saved file. A container whose parts are malformed, such as
       `columns` that is not a list, points to the JSON view. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
-      widget, is saved unchanged. A widget of a type with no panel shows its
-      type and points to the JSON view.
+      widget, is saved unchanged, also when the widget moves. A widget of a
+      type with no panel shows its type and points to the JSON view.
   - **Process step editor.** The Form tab opens the process with its name,
     subject and optional start condition, and its start step. The JSON view
     stays as a second view of the same draft.

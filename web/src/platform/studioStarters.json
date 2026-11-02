@@ -56,7 +56,7 @@
   "page": {
     "content": {
       "title": { "textKey": "" },
-      "widgets": [{ "type": "taskInbox" }]
+      "widgets": [{ "type": "taskInbox", "name": "taskInbox1" }]
     },
     "emptyReferences": ["/title/textKey"]
   },
