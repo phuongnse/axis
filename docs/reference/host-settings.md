@@ -597,6 +597,13 @@ agrees. With no `Cell:Id`, the `Cell` and `Quotas` settings do not apply and the
 self-hosted installation. The `Worker` settings apply to every installation, because the worker
 shares its time the same way everywhere.
 
+The server, the worker and `Axis.Admin`, the publisher included, read and check the `Cell`
+settings at start. With `Cell:Id` set they need `Tenancy:Source=directory`, `Cell:Region` and
+`Cell:TenantDomain`. The id is the region, a hyphen and a number, such as `vn-1`, and the region
+uses lowercase letters and digits. A wrong value stops the start and the message names the
+setting. `Axis.Admin` refuses every command with exit code 2. The features the settings turn on
+are still planned.
+
 | Setting | Read by | Meaning |
 | --- | --- | --- |
 | `Cell:Id` | All hosts | The cell id, such as `vn-1`. Setting it turns on quotas, per-tenant Studio folders and the cell console. |

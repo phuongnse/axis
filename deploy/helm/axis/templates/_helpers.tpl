@@ -119,6 +119,50 @@ readOnly: true
 - name: Tenancy__RefreshInterval
   value: {{ . | quote }}
 {{- end }}
+{{- with .Values.cell.id }}
+- name: Cell__Id
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.region }}
+- name: Cell__Region
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.tenantDomain }}
+- name: Cell__TenantDomain
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.internalDomain }}
+- name: Cell__InternalDomain
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.tenantCap }}
+- name: Cell__TenantCap
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.consoleHost }}
+- name: Cell__ConsoleHost
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.internalUrl }}
+- name: Cell__InternalUrl
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.operatorRealm }}
+- name: Cell__OperatorRealm
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.operatorRole }}
+- name: Cell__OperatorRole
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.cell.backupKeyFile }}
+- name: Cell__BackupKeyFile
+  value: {{ . | quote }}
+{{- end }}
+{{- range $i, $network := .Values.cell.consoleAllowedNetworks }}
+- name: Cell__ConsoleAllowedNetworks__{{ $i }}
+  value: {{ $network | quote }}
+{{- end }}
 {{- end }}
 
 {{/* The probes of a host. Call with the name of the container port. A port named https is probed over HTTPS. */}}

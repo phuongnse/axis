@@ -339,6 +339,38 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(none, /KC_PROXY_/)
   })
 
+  test('the cell values render Cell__ variables on the server, the worker and the publisher, and not on the migrate Job', () => {
+    const output = renderOk()
+    for (const name of ['axis-server', 'axis-worker', 'axis-publisher']) {
+      const host = find(output, 'Deployment', name)
+      assert.match(host, /- name: Cell__Id\n\s+value: "vn-1"\n/, name)
+      assert.match(host, /- name: Cell__Region\n\s+value: "vn"\n/, name)
+      assert.match(host, /- name: Cell__TenantCap\n\s+value: "500"\n/, name)
+      assert.match(host, /- name: Cell__ConsoleAllowedNetworks__0\n\s+value: "192\.168\.0\.0\/16"\n/, name)
+    }
+    assert.doesNotMatch(find(output, 'Job', 'axis-migrate'), /Cell__/)
+  })
+
+  test('empty cell values render no Cell__ variable anywhere', () => {
+    const output = renderOk(
+      ...[
+        'id',
+        'region',
+        'tenantDomain',
+        'internalDomain',
+        'tenantCap',
+        'consoleHost',
+        'internalUrl',
+        'operatorRealm',
+        'operatorRole',
+        'backupKeyFile',
+      ].flatMap((key) => ['--set', `cell.${key}=`]),
+      '--set',
+      'cell.consoleAllowedNetworks=null',
+    )
+    assert.doesNotMatch(output, /Cell__/)
+  })
+
   test('the database authority volume mounts only when set', () => {
     const identity = find(renderOk(), 'Deployment', 'axis-identity')
     assert.match(identity, /- name: db-ca\n\s+mountPath: \/db-ca\n\s+readOnly: true\n/)
