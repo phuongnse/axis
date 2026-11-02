@@ -218,6 +218,7 @@ the purchasing system that the sample calls when a request is approved. It needs
 Docker. The images hold the built-in `organization` module and the `departments` and `department-budgets` sample modules in `/modules`.
 An existing local Compose volume that already ran `department-budgets` 1.0.0 needs `docker compose down -v` once to
 activate 1.1.0, for example when old budgets have no status. That deletes its data.
+The same holds for a volume that ran the leave request sample before it moved from `departments` to `organization`.
 Compose also starts one publisher, `axis-admin publisher`, which runs the
 publish requests of Studio. See [D47](decisions/d47-publishing-from-studio.md).
 It serves the tenants `default` and `default-preview`, so it runs preview requests too. It has no port and no health check, and writes `default ready` and `default-preview ready` once the server has migrated each tenant database.
@@ -303,7 +304,9 @@ sample's `company` provider reads them. Development, Compose, `scripts/dev.sh` a
 `PurchaseRequestApprovedWebhookSecret` (the stub's default webhook secret), for the purchase request sample's approval webhook, which delivers there.
 The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
-`department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
+`department-manager` users, in a site at `/leave`. It declares the `organization` module, seeds an employee for each of its
+users and three departments headed by `finance-reviewer`, `manager` and `manager-2`, and sends a leave request to the head of its department.
+The service desk sample, `samples/apps/service-desk`,
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
 at `/service-desk`. The asset management sample, `samples/apps/asset-management`, adds the `asset-manager` and `auditor` users
 and uses the `employee` user as the holder of assets, in a site at `/asset-management`.

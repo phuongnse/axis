@@ -1,0 +1,15 @@
+{
+  "id": "4c656b29-b5eb-4704-a45a-4d49c6f552f0",
+  "kind": "seed",
+  "name": "Employees",
+  "formatVersion": 1,
+  "entity": "organization/Employee",
+  "sync": true,
+  "records": [
+    { "id": "590a701d-659d-4a09-a39b-6a965fd92753", "values": { "fullName": "Requester User", "workEmail": "requester@axis.local", "user": "requester" } },
+    { "id": "10517045-97e2-4c93-96d9-3d24d50633a3", "values": { "fullName": "Employee User", "workEmail": "employee@axis.local", "user": "employee" } },
+    { "id": "7896d457-117d-4263-9133-fd6ba47dd25a", "values": { "fullName": "Manager User", "workEmail": "manager@axis.local", "user": "manager" } },
+    { "id": "38da2343-87f8-48b8-9a25-53c6e7ff5713", "values": { "fullName": "Manager 2 User", "workEmail": "manager-2@axis.local", "user": "manager-2" } },
+    { "id": "ce016969-dfdc-4f33-962e-dc322944b0fb", "values": { "fullName": "Finance Reviewer User", "workEmail": "finance-reviewer@axis.local", "user": "finance-reviewer" } }
+  ]
+}

@@ -439,8 +439,8 @@ operator uses it. The test then:
    client roles and the accounts `requester` and `author` to the realm of tenant `one` through the identity provider's
    admin API, because a new realm has none and the activation copies them to the site client.
 4. Activates the leave request sample, `samples/apps/leave-requests`, for both.
-   The sample needs the `departments` module, so the test mounts it from
-   `artifacts/modules` at `/modules` for the test only. The production images
+   The sample needs the built-in `organization` module, so the test mounts the modules from
+   `artifacts/modules` at `/modules`. The production images
    still hold no sample module.
 5. Checks that both hosts are ready, that each tenant's host serves `/leave`
    and holds the active site in its database, and that each tenant's sign-in

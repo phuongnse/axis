@@ -65,8 +65,8 @@ departments and `en` and `vi` texts. The `Department` entity has a validation th
 calls `IsDepartmentCode`, so a department code must be in capital letters.
 It has a `manager` role slot, labelled in `en` and `vi`, and a `ManagerAccess` module
 policy for the slot. The policy lets the role read the departments whose `manager` is the
-current user, and read the `Departments` data source. The leave request sample maps the
-slot to its `department-manager` role, and so does the purchase request sample.
+current user, and read the `Departments` data source. Only the purchase request sample maps the
+slot to its `department-manager` role.
 `department-budgets` is the second sample module, see
 [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 `scripts/build.sh`, `scripts/dev.sh` and the E2E run install them under

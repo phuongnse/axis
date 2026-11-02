@@ -260,8 +260,8 @@ flowchart LR
      a known section (`AXC0228`) that is in no other step (`AXC0229`), and
      when there are steps, every section has a name and is in one step
      (`AXC0230`).
-   - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
-     case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
+   - **Seeds.** A seed's `entity` must name a loaded entity, `Entity` or `module/Entity`, ignoring
+     letter case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
      was not loaded because of its own errors is not reported again. Seed
      record ids are unique across every seed file of the application,
      compared as UUIDs: a record whose id an earlier record already uses, in

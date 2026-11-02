@@ -19,9 +19,9 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
 
     private const string Host = "a.example.test";
 
-    private const string DepartmentId = "3a5633d1-fc29-4997-b93d-36a1a865c8e3";
+    private const string DepartmentId = "25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95";
 
-    private const string ModulePageId = "5fc44a93-1087-417f-b29d-85ea3ce86be1";
+    private const string ModulePageId = "f7e6e78e-2ef4-49f4-9d38-c9db95fc2ba2";
 
     private readonly PostgreSqlFixture _database = new();
 
@@ -75,7 +75,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     public async Task An_author_reads_a_module_entity_with_its_fields()
     {
         using var client = _factory.CreateClient().SignedInAs("author");
-        using var response = await client.SendAsync(Request("LeaveRequests", "departments", DepartmentId), CancellationToken);
+        using var response = await client.SendAsync(Request("LeaveRequests", "organization", DepartmentId), CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.False(response.Headers.Contains("ETag"));
@@ -83,10 +83,10 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
         Assert.Equal(DepartmentId, body.GetProperty("id").GetString());
         Assert.Equal("entity", body.GetProperty("kind").GetString());
         Assert.Equal("Department", body.GetProperty("name").GetString());
-        Assert.Equal("modules/departments/entities/department.json", body.GetProperty("file").GetString());
+        Assert.Equal("modules/organization/entities/department.json", body.GetProperty("file").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("version").GetString()));
         Assert.Equal(
-            ["code", "name", "manager"],
+            ["code", "name", "parent", "head", "active"],
             body.GetProperty("content").GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
         Assert.Equal(JsonValueKind.Null, body.GetProperty("layer").ValueKind);
         Assert.Equal(0, body.GetProperty("marks").GetArrayLength());
@@ -141,19 +141,20 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     public async Task The_route_needs_a_session_and_the_author_role()
     {
         using var anonymous = _factory.CreateClient();
-        using var anonymousResponse = await anonymous.SendAsync(Request("LeaveRequests", "departments", DepartmentId), CancellationToken);
+        using var anonymousResponse = await anonymous.SendAsync(Request("LeaveRequests", "organization", DepartmentId), CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
 
         using var employee = _factory.CreateClient().SignedInAs("requester");
-        using var employeeResponse = await employee.SendAsync(Request("LeaveRequests", "departments", DepartmentId), CancellationToken);
+        using var employeeResponse = await employee.SendAsync(Request("LeaveRequests", "organization", DepartmentId), CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, employeeResponse.StatusCode);
     }
 
     [Theory]
-    [InlineData("Unknown", "departments", DepartmentId)]
+    [InlineData("Unknown", "organization", DepartmentId)]
     [InlineData("LeaveRequests", "nope", DepartmentId)]
-    [InlineData("LeaveRequests", "departments", "5b0f6e3c-2d8a-4c1e-9a77-0e4f1d2c3b4a")]
-    [InlineData("LeaveRequests", "departments", "not-a-guid")]
+    [InlineData("LeaveRequests", "organization", "5b0f6e3c-2d8a-4c1e-9a77-0e4f1d2c3b4a")]
+    [InlineData("LeaveRequests", "organization", "not-a-guid")]
+    [InlineData("LeaveRequests", "departments", DepartmentId)]
     public async Task The_route_answers_404_for_an_unknown_application_module_or_resource(string application, string module, string id)
     {
         using var client = _factory.CreateClient().SignedInAs("author");
@@ -166,12 +167,12 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     public async Task An_author_reads_the_metadata_of_a_module_page()
     {
         using var client = _factory.CreateClient().SignedInAs("author");
-        using var response = await client.SendAsync(PageRequest("LeaveRequests", "departments", ModulePageId), CancellationToken);
+        using var response = await client.SendAsync(PageRequest("PurchaseRequests", "department-budgets", ModulePageId), CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken)).RootElement;
         var page = body.GetProperty("page");
-        Assert.Equal("departments/Departments", page.GetProperty("name").GetString());
+        Assert.Equal("department-budgets/Budgets", page.GetProperty("name").GetString());
         var widget = page.GetProperty("widgets")[0];
         Assert.Equal("table", widget.GetProperty("type").GetString());
         Assert.Equal("/widgets/0", widget.GetProperty("path").GetString());
@@ -182,20 +183,20 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     public async Task The_module_page_route_needs_a_session_and_the_author_role()
     {
         using var anonymous = _factory.CreateClient();
-        using var anonymousResponse = await anonymous.SendAsync(PageRequest("LeaveRequests", "departments", ModulePageId), CancellationToken);
+        using var anonymousResponse = await anonymous.SendAsync(PageRequest("PurchaseRequests", "department-budgets", ModulePageId), CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
 
         using var employee = _factory.CreateClient().SignedInAs("requester");
-        using var employeeResponse = await employee.SendAsync(PageRequest("LeaveRequests", "departments", ModulePageId), CancellationToken);
+        using var employeeResponse = await employee.SendAsync(PageRequest("PurchaseRequests", "department-budgets", ModulePageId), CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, employeeResponse.StatusCode);
     }
 
     [Theory]
-    [InlineData("Unknown", "departments", ModulePageId)]
-    [InlineData("LeaveRequests", "nope", ModulePageId)]
-    [InlineData("LeaveRequests", "departments", DepartmentId)]
-    [InlineData("LeaveRequests", "departments", "5b0f6e3c-2d8a-4c1e-9a77-0e4f1d2c3b4a")]
-    [InlineData("LeaveRequests", "departments", "not-a-guid")]
+    [InlineData("Unknown", "department-budgets", ModulePageId)]
+    [InlineData("PurchaseRequests", "nope", ModulePageId)]
+    [InlineData("PurchaseRequests", "department-budgets", BudgetApprovalId)]
+    [InlineData("PurchaseRequests", "department-budgets", "5b0f6e3c-2d8a-4c1e-9a77-0e4f1d2c3b4a")]
+    [InlineData("PurchaseRequests", "department-budgets", "not-a-guid")]
     public async Task The_module_page_route_answers_404_for_an_unknown_application_module_or_resource_or_one_that_is_not_a_page(
         string application, string module, string id)
     {

@@ -418,7 +418,7 @@ file, and the realm accepts a code more than once. See [development realm and us
 | `employee`          | `employee`              | Purchase request, leave request and asset management samples (holds assets); E2E journeys                                                     |
 | `manager`           | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
 | `manager-2`         | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
-| `finance-reviewer`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
+| `finance-reviewer`  | `finance-reviewer`      | Purchase request and leave request sample seeds; E2E journeys                                                                                 |
 | `operator`          | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
 | `author`            | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
 | `agent`             | `agent`                 | Service desk sample; E2E journeys                                                                                                             |

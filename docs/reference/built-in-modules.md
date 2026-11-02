@@ -269,8 +269,10 @@ The built-in application `approvals` is what a business starts from.
 
 The samples become the built-in modules, as D102 agrees:
 
-- **`departments`** becomes `organization`. The purchase request and leave request samples declare
-  `organization` and map its slots, and `department-budgets` depends on it. The `departments`
+- **`departments`** becomes `organization`. The leave request sample declares `organization`, maps
+  both of its slots (`admin` to `department-manager`, `member` to `employee`) and seeds its employees
+  and departments, and a leave request goes to the head of its department. The purchase request
+  sample and `department-budgets` still use `departments` until they move, and then the `departments`
   sample module is removed.
 - **The `request-approval` template** becomes the `approvals` application, and is removed. The
   Studio journeys that create an application from it create one from the built-in application.

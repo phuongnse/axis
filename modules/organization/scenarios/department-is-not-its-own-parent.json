@@ -14,14 +14,14 @@
       "entity": "Department",
       "as": "admin",
       "save": "finance",
-      "values": { "code": "FIN", "name": "Finance" }
+      "values": { "code": "TEST-FIN", "name": "Finance" }
     },
     {
       "type": "createRecord",
       "entity": "Department",
       "as": "admin",
       "save": "accounting",
-      "values": { "code": "ACC", "name": "Accounting", "parent": "finance" }
+      "values": { "code": "TEST-ACC", "name": "Accounting", "parent": "finance" }
     },
     {
       "type": "updateRecord",
