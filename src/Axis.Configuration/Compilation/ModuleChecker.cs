@@ -81,9 +81,11 @@ internal static class ModuleChecker
     /// the pins of the modules without problems, the application's entries as written and then each
     /// dependency in the order it is first reached, the canonical files of the pinned versions that
     /// are valid and the resources read from those files. The resources read are those of the module with the
-    /// <paramref name="layers"/> of the application applied, and the files are the module's own.
+    /// <paramref name="layers"/> of the application applied, and the files are the module's own. The traces
+    /// are the layer and the merge of each module file a layer changed, by the file's path, for
+    /// <see cref="LayerDiagnostics.MapToLayers"/>.
     /// </summary>
-    public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources) Check(
+    public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources, IReadOnlyDictionary<string, LayerTrace> Traces) Check(
         ApplicationManifest application,
         IReadOnlyCollection<InstalledModule> installed,
         List<Diagnostic> diagnostics,
@@ -214,6 +216,7 @@ internal static class ModuleChecker
         var pins = new List<PinnedModuleModel>();
         var files = new List<ResourceContent>();
         var resources = new ModuleResourceCollector();
+        var traces = new Dictionary<string, LayerTrace>(StringComparer.Ordinal);
         var declaredByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         var slotsByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         var manifests = new Dictionary<string, ModuleManifest>(StringComparer.Ordinal);
@@ -232,7 +235,7 @@ internal static class ModuleChecker
             var moduleLayers = first.Asker is null
                 ? layers.Where(layer => LayerModuleId(layer) == id).ToList()
                 : [];
-            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, diagnostics);
+            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, traces, diagnostics);
             if (first.Asker is null)
             {
                 references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
@@ -260,7 +263,7 @@ internal static class ModuleChecker
             .ToList();
         var chained = new ModuleSlotChains(manifests, dependencies, connectors, diagnostics).Apply(pins);
 
-        return (chained, files, resources.ToResources(declaredByModule, slotsByModule));
+        return (chained, files, resources.ToResources(declaredByModule, slotsByModule), traces);
     }
 
     /// <summary>
@@ -643,6 +646,7 @@ internal static class ModuleChecker
         List<LayerResource> layers,
         List<ResourceContent> files,
         ModuleResourceCollector resources,
+        Dictionary<string, LayerTrace> traces,
         List<Diagnostic> diagnostics)
     {
         var kindsByName = layers.Count == 0 ? null : LayerChecker.KindsByName(module);
@@ -676,7 +680,7 @@ internal static class ModuleChecker
                 {
                     // The model reads the resource with the layer applied. The release keeps the file as the
                     // module wrote it, so that compiling the stored release applies the layer once.
-                    using var merged = ApplyLayer(root, layers, kindsByName, diagnostics, out var layer, out var additions);
+                    using var merged = ApplyLayer(root, layers, kindsByName, path, traces, diagnostics, out var layer, out var additions);
                     var effective = merged?.RootElement ?? root;
                     if (!CheckKind(path, effective, resourceId, diagnostics))
                     {
@@ -873,6 +877,8 @@ internal static class ModuleChecker
         JsonElement root,
         List<LayerResource> layers,
         ILookup<string, string>? kindsByName,
+        string path,
+        Dictionary<string, LayerTrace> traces,
         List<Diagnostic> diagnostics,
         out LayerResource? found,
         out ContractAdditions? additions)
@@ -919,6 +925,7 @@ internal static class ModuleChecker
             return null;
         }
 
+        traces[path] = new LayerTrace(layer, result);
         return JsonSerializer.SerializeToDocument(result.Merged);
     }
 
@@ -1402,6 +1409,9 @@ internal sealed record ModuleResources(
     IReadOnlySet<string> UnloadedProcessNames,
     IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredModules,
     IReadOnlyDictionary<string, IReadOnlySet<string>> RoleSlots);
+
+/// <summary>A layer that changed a module file, and the merge of its changes into that file.</summary>
+internal sealed record LayerTrace(LayerResource Layer, LayerMergeResult Merge);
 
 /// <summary>A contract of a pinned module, with the id of that module. The contract's name is qualified and its entity is as written.</summary>
 internal sealed record ModuleContract(string ModuleId, ContractResource Contract);
