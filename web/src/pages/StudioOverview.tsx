@@ -1,6 +1,7 @@
 import { Flex, Typography } from 'antd'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
+import { sizeTokens } from '../platform/designTokens'
 import { fetchSites, siteTitle, type SiteListItem } from '../platform/site'
 import {
   folderDiffers,
@@ -12,7 +13,6 @@ import {
 import { useText } from '../platform/texts'
 import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
-import { useTileGrid } from './homeGrid'
 import { SiteTile, TileFocusStyle } from './SiteTile'
 import { studioKindGroups, type StudioView } from './studioViews'
 
@@ -46,8 +46,8 @@ export function StudioOverview({
   const published = active !== null
   const site = resources.find((item) => item.kind === 'site')
 
-  return (
-    <Flex vertical gap={spacing.md} data-testid="studio-overview">
+  const main = (
+    <>
       {starting && (
         <Panel title={t('shell.studio.overview.start.title')} testId="studio-overview-start">
           <Typography.Text style={{ color: colour.textMuted }}>
@@ -65,12 +65,36 @@ export function StudioOverview({
           </ol>
         </Panel>
       )}
-      {active !== null && <Live application={application} releaseId={active.releaseId} locale={locale} />}
       {(!starting || published) && releases !== undefined && (
         <Release releases={releases} resources={resources} locale={locale} addressOf={addressOf} />
       )}
       <More resources={resources} skip={starting ? startKinds : []} addressOf={addressOf} />
-    </Flex>
+    </>
+  )
+  if (active === null) {
+    return (
+      <Flex vertical gap={spacing.md} data-testid="studio-overview">
+        {main}
+      </Flex>
+    )
+  }
+  // Proposed: two columns, as a project's overview has them. The main column holds the work, what to build, what
+  // differs from the live release and what can be added; a side column of the `aside` size holds what runs now. When
+  // the content area is too narrow for both, such as with the problems panel open, the side column goes under the
+  // main one at full width. The main column keeps at least half the width, so the content area's width decides, never
+  // the window's.
+  return (
+    <div
+      data-testid="studio-overview"
+      style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.md, alignItems: 'flex-start' }}
+    >
+      <Flex vertical gap={spacing.md} style={{ flex: '999 1 0', minWidth: '50%' }}>
+        {main}
+      </Flex>
+      <aside style={{ flex: `1 1 ${sizeTokens.aside}px`, minWidth: 0 }}>
+        <Live application={application} releaseId={active.releaseId} locale={locale} />
+      </aside>
+    </div>
   )
 }
 
@@ -289,14 +313,13 @@ function kindName(kind: string, t: (key: string) => string): string {
 
 /**
  * Proposed: what runs now, the application's live sites as the home page shows them, each its mark, its title as the
- * link and its description, in the home page's grid and order. They come from the sites list, which holds only what is live, so a
+ * link and its description, in the home page's order, in the Overview's side column. They come from the sites list, which holds only what is live, so a
  * site added since the live release is not here, and a site's title and description are the live release's. Each opens
  * in a new tab, so Studio stays open. The block shows once the application has a live release.
  */
 function Live({ application, releaseId, locale }: { application: string; releaseId: string; locale: string }) {
   const t = useText()
-  const { colour } = useDesignTokens()
-  const grid = useTileGrid()
+  const { colour, spacing } = useDesignTokens()
   const [sites, setSites] = useState<SiteListItem[] | 'failed'>()
   useEffect(() => {
     const controller = new AbortController()
@@ -321,7 +344,16 @@ function Live({ application, releaseId, locale }: { application: string; release
     body = <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.live.none')}</Typography.Text>
   } else {
     body = (
-      <div data-testid="studio-overview-sites" style={grid}>
+      // Proposed: one tile a row beside the main column, and as many as fit when the column is under it.
+      <div
+        data-testid="studio-overview-sites"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${sizeTokens.tile}px), 1fr))`,
+          gridAutoRows: '1fr',
+          gap: spacing.md,
+        }}
+      >
         <TileFocusStyle />
         {sites.map((site) => (
           <SiteTile

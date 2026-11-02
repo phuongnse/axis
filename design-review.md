@@ -111,3 +111,11 @@ the review.
 - **More you can add, in natural words.** The owner found that every "when" line began "Add one when…". Agreed: each
   line says in its own words when the kind is needed, such as "Handy for lists that must be ready on the first day"
   or "For a process that starts on its own, on a schedule or when a record changes", in English and Vietnamese.
+- **The Overview in two columns.** The owner asked whether blocks suit the Overview, as each block holds one row and
+  leaves the right half empty. Recommended and agreed to try: blocks stay, as each answers one question, laid out as a
+  project's overview is, in two columns. The main column holds the work: Get started, Changes since the live release
+  and More you can add. A side column, the new `aside` size token, 320 px, holds what runs now: the Live block, one
+  site tile a row. The main column keeps at least half the content area, so when the area is too narrow for both the
+  side column goes under it at full width, and its tiles fill the row, no narrower than the new `tile` size token,
+  240 px. An application with no live release has one column. The problems panel lies over the page, so it covers the
+  side column while it is open.
