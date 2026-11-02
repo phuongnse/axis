@@ -353,4 +353,5 @@ public static class DiagnosticCodes
     public const string ContractLayerNotAddition = "AXC0369";
     public const string AddedTransitionIntoProtectedState = "AXC0370";
     public const string LifecycleAdditionMismatch = "AXC0371";
+    public const string RemovedResourceCoveredByContract = "AXC0372";
 }

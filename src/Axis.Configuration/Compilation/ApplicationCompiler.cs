@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
@@ -218,6 +219,18 @@ public static partial class ApplicationCompiler
         return modules;
     }
 
+    private static JsonNode? ParseContent(string? content)
+    {
+        try
+        {
+            return content is null ? null : JsonNode.Parse(content);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     internal static bool IsModuleResource(Resource resource) =>
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
@@ -251,13 +264,14 @@ public static partial class ApplicationCompiler
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlyDictionary<string, LayerTrace> layerTraces = new Dictionary<string, LayerTrace>();
+        IReadOnlyList<RemovedResource> removedResources = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
         var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
-            (modules, moduleFiles, moduleResources, layerTraces) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames, loaded.Layers);
+            (modules, moduleFiles, moduleResources, layerTraces, removedResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames, loaded.Layers);
             LayerChecker.Check(loaded.Layers, manifest, modules, installedModules, diagnostics);
             var pinnedManifests = modules
                 .Select(pin => (pin.Id, installedModules.First(candidate => candidate.Manifest.Id == pin.Id && candidate.Manifest.Version == pin.Version).Manifest))
@@ -791,6 +805,22 @@ public static partial class ApplicationCompiler
         }
 
         LayerDiagnostics.MapToLayers(diagnostics, layerTraces);
+        if (removedResources.Count > 0)
+        {
+            var parsed = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
+            LayerDiagnostics.MapRemovedReferences(diagnostics, removedResources, file =>
+            {
+                if (!parsed.TryGetValue(file, out var node))
+                {
+                    node = layerTraces.TryGetValue(file, out var trace)
+                        ? trace.Merge.Merged
+                        : ParseContent(loaded.Resources.Concat(moduleFiles).FirstOrDefault(resource => resource.Path == file)?.Content);
+                    parsed[file] = node;
+                }
+
+                return node;
+            });
+        }
 
         if (probe is not null)
         {
