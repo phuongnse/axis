@@ -53,6 +53,13 @@
     "approvals.decision.comment": "Nhận xét",
     "approvals.decision.decidedAt": "Thời điểm quyết định",
     "approvals.decision.label": "Quyết định",
+    "approvals.request.onlyRequesterSubmits": "Chỉ người yêu cầu mới có thể gửi yêu cầu, và yêu cầu cần ít nhất một bước duyệt.",
+    "approvals.request.approveNeedsEveryStep": "Yêu cầu chỉ được duyệt bởi người khác người yêu cầu, và chỉ sau khi mọi bước đã được quyết định.",
+    "approvals.request.noSelfDecision": "Chỉ người khác người yêu cầu mới có thể trả lại hoặc từ chối yêu cầu.",
+    "approvals.request.onlyRequesterCancels": "Chỉ người yêu cầu mới có thể hủy yêu cầu.",
+    "approvals.request.oneDecisionPerStep": "Mỗi bước chỉ được quyết định một lần, bởi người khác người yêu cầu, với một tác vụ mới.",
+    "approvals.request.frozenAfterSubmit": "Loại, số tiền và số bước cần duyệt không thể thay đổi sau khi yêu cầu được gửi.",
+    "approvals.requestType.hasStepForEveryAmount": "Loại yêu cầu cần ít nhất một bước duyệt không có số tiền tối thiểu.",
     "approvals.roles.admin": "Quản trị viên",
     "approvals.roles.member": "Thành viên"
   }

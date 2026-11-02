@@ -92,7 +92,7 @@ public sealed partial class ApprovalsModuleTests(ApprovalsAppFixture fixture) : 
     }
 
     private static string RequestType() =>
-        $$"""{ "name": "Type", "code": "{{Guid.NewGuid().ToString("N")[..10].ToUpperInvariant()}}" }""";
+        $$"""{ "name": "Type", "code": "{{Guid.NewGuid().ToString("N")[..10].ToUpperInvariant()}}", "steps": [{ "sequence": 1, "approver": "lineManager" }] }""";
 
     private static string Employee(string? user = null)
     {
