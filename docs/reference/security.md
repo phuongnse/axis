@@ -736,11 +736,11 @@ the session, the service account or the endpoint caller. It follows
   static files stay public. The OIDC handler answers the sign-in callback inside
   authentication, so it is outside the routes.
 - **The answers.** A session route answers `401` with the title "Sign in to read
-  or write this data.". A service account route with a token keeps its bearer
-  answer. An inbound endpoint route keeps its `WWW-Authenticate: Bearer`
-  challenge and its title. The answer is problem details, never an empty body.
-  An anonymous request for a file path that matches no route and no file answers
-  `401`, not `404`.
+  or write this data.". A service account route keeps its bearer answer. An
+  inbound endpoint route keeps its `WWW-Authenticate: Bearer` challenge and its
+  title. Every answer is problem details. An anonymous request for a file path
+  that matches no route and no file answers `401`, not `404`. A signed-in GET to
+  an unknown `/api` path answers `404`, not the page.
 - **The test.** `AuthorizationRouteTests` calls every route with no session and
   no token and expects a `401` or `403` problem off the open list, and a bearer
   challenge on each inbound endpoint route. It also checks that the routes marked
