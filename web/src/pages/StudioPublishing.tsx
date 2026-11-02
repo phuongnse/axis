@@ -41,7 +41,8 @@ export interface StudioPublishingHandle {
  * sends a publish request. A Roll back button in the history sends a rollback request.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
- * selecting a failed scenario calls `onOpenScenario`.
+ * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
+ * stored under the status line, when it stored any.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
  * status meanwhile. When it ends, its diagnostics go to the diagnostics panel. A succeeded publish or rollback
  * shows its release number, found in the release history by the request's `releaseId`. Publish and Roll back show
@@ -262,7 +263,9 @@ export function StudioPublishing({
         <Alert data-testid="studio-request-error" type="error" title={t('shell.studio.request.sendFailed')} />
       )}
       {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
-      {request?.kind === 'test' && <StudioTestResults request={request} onSelect={onOpenScenario} />}
+      {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
+        <StudioTestResults request={request} onSelect={onOpenScenario} />
+      )}
       {previewLinks.length > 0 && (
         <Flex vertical gap={4}>
           {previewLinks.map((link) => (

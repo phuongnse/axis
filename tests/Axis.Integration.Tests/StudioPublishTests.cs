@@ -265,6 +265,53 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.Equal(2L, await CountRequestsAsync(connectionString));
     }
 
+    [Fact]
+    public async Task The_status_route_answers_the_skipped_contract_scenarios_of_a_publish_and_null_once_none_are_stored()
+    {
+        using var folder = NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("studio_publish_skipped", CancellationToken);
+        await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        var applicationFile = Path.Combine(folder.Path, "application.json");
+        var application = JsonNode.Parse(await File.ReadAllTextAsync(applicationFile, CancellationToken))!;
+        var budgets = application["modules"]!.AsArray()
+            .Single(module => module!["id"]!.GetValue<string>() == "department-budgets")!.AsObject();
+        budgets["relax"] = new JsonArray(new JsonObject { ["point"] = "Budget/effects/decisionRecorded", ["reason"] = "Tests skip it." });
+        await File.WriteAllTextAsync(applicationFile, application.ToJsonString(), CancellationToken);
+
+        using var accepted = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        using var queued = await ReadAsync(accepted);
+        Assert.Equal(JsonValueKind.Null, queued.RootElement.GetProperty("scenarios").ValueKind);
+
+        await using (var publisher = RunPublisher("a", HostA, connectionString))
+        {
+            using var finished = await WaitForFinalAsync(client, accepted.Headers.Location!.OriginalString, HostA);
+            Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
+            var results = finished.RootElement.GetProperty("scenarios").EnumerateArray().ToList();
+            Assert.Equal(3, results.Count);
+            var skipped = Assert.Single(results, item => item.GetProperty("outcome").GetString() == "skipped");
+            Assert.Equal("department-budgets/ApprovalRecordsDecision", skipped.GetProperty("name").GetString());
+            Assert.Equal("Budget/effects/decisionRecorded", skipped.GetProperty("point").GetString());
+            Assert.Equal(2, results.Count(item => item.GetProperty("outcome").GetString() == "passed"));
+        }
+
+        // A copy of the sample modules without the department budgets scenarios: nothing runs, so nothing is stored.
+        using var modules = new TemporaryFolder();
+        CopyDirectory(SampleModules.Path, modules.Path);
+        Directory.Delete(Path.Combine(modules.Path, "department-budgets", "1.1.0", "scenarios"), recursive: true);
+        using var second = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
+        Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
+
+        await using (var publisher = RunPublisher("a", HostA, connectionString, modulesPath: modules.Path))
+        {
+            using var ended = await WaitForFinalAsync(client, second.Headers.Location!.OriginalString, HostA);
+            Assert.Equal("succeeded", ended.RootElement.GetProperty("status").GetString());
+            Assert.Equal(JsonValueKind.Null, ended.RootElement.GetProperty("scenarios").ValueKind);
+        }
+    }
+
     internal static TemporaryFolder NewFolder()
     {
         var folder = new TemporaryFolder();
@@ -321,7 +368,8 @@ public sealed class StudioPublishTests : IAsyncLifetime
 
     // Runs the publisher of one tenant in this process until it is disposed. The server has migrated the database by now.
     // With a previewConnectionString, it serves the tenant's preview tenant too.
-    internal static RunningPublisher RunPublisher(string tenant, string host, string connectionString, string? previewConnectionString = null)
+    internal static RunningPublisher RunPublisher(
+        string tenant, string host, string connectionString, string? previewConnectionString = null, string? modulesPath = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -334,7 +382,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
             [$"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",
             [$"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Value"] = "https://purchasing.example.test",
             ["Extensions:Path"] = SamplePackages.Path,
-            ["Modules:Path"] = SampleModules.Path,
+            ["Modules:Path"] = modulesPath ?? SampleModules.Path,
             // The sample's modules hold contract scenarios, which every publish and validate runs in a database of their own.
             ["Scenarios:ServerConnectionString"] = new NpgsqlConnectionStringBuilder(connectionString)
             {

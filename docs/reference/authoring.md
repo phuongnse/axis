@@ -733,7 +733,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `finishedAt` | When it reached `succeeded` or `failed`, or null before |
 | `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` and a `test` have none |
 | `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
-| `scenarios` | Null for every kind but `test`. For `test`, an array with one item for each scenario that ran, in file order, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
+| `scenarios` | For `test`, an array with one item for each scenario that ran, in file order, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends. For `publish` and `validate`, the stored results of their [contract scenarios](module-contracts.md#contract-scenarios), in the same form for each one that ran. A contract scenario that a relax entry skipped is an item in the form `{ name, file, outcome: "skipped", point }`, where `point` is the relaxed point it covers. Null until the request ends, when no contract scenario ran, and for `rollback` |
 
 - **A snapshot.** `validate` and `publish` store the folder as it is when the
   request is made: every `*.json` file that Studio can reach, with its `version`, as for
@@ -749,10 +749,10 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   of the pinned modules. It then runs every activation check against the tenant inside a transaction that
   it rolls back. It returns the codes of [startup activation](host-settings.md#startup-activation),
   including the checks that the in-memory diagnostics skip: bindings, name and site path conflicts, and
-  storage changes. It stores no release and changes nothing. It ends `succeeded` when there is no error.
+  storage changes. It stores no release and changes nothing. It ends `succeeded` when there is no error. Its contract scenario results, skipped ones included, are in `scenarios`.
 - **`publish`.** The publisher first runs the contract scenarios, as for `validate`. A failing one ends
   the request `failed` with `AXC0342`, and nothing is stored or activated. Their outcomes are stored
-  with the request, and `scenarios` stays null. Then it compiles the snapshot against the tenant, stores
+  with the request, and the status route returns them as `scenarios`. Then it compiles the snapshot against the tenant, stores
   the release and activates it, then seeds, with the same steps as
   [`axis-admin activate`](administration.md#activate). A `seed` failure happens after activation has
   committed, so the request ends `failed` with `releaseId` set, and the release stays active.
