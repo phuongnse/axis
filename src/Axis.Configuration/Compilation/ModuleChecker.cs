@@ -665,6 +665,10 @@ internal static class ModuleChecker
         var contractEntities = layers.Count == 0 ? null : ContractEntitiesOf(module);
         var pendingContracts = new List<PendingContract>();
         var addedValuesByEntity = new Dictionary<string, (LayerResource Layer, Dictionary<string, HashSet<string>>? Values)>(StringComparer.OrdinalIgnoreCase);
+        var removedByEntity = new Dictionary<string, RemovedFields>(StringComparer.OrdinalIgnoreCase);
+        var contractReaders = new List<FieldReader>();
+        var dataSourceReaders = new List<FieldReader>();
+        var formReaders = new List<FieldReader>();
         foreach (var file in module.Files)
         {
             var path = $"modules/{module.Manifest.Id}/{file.Path}";
@@ -714,6 +718,11 @@ internal static class ModuleChecker
                     }
 
                     resources.Add(module.Manifest.Id, declared, path, effective, diagnostics);
+                    if (layers.Count > 0)
+                    {
+                        CollectFieldReads(root, effective, path, layer, traces, removedByEntity, contractReaders, dataSourceReaders, formReaders);
+                    }
+
                     if (layer is not null && root.GetProperty("kind").GetString() == ResourceKinds.Entity)
                     {
                         addedValuesByEntity[root.GetProperty("name").GetString()!] = (layer, merged is null ? null : AddedValues(root, effective));
@@ -746,6 +755,51 @@ internal static class ModuleChecker
         foreach (var pending in pendingContracts)
         {
             CheckLifecycleAdditions(module.Manifest.Id, pending, addedValuesByEntity, resources, diagnostics);
+        }
+
+        RemovedFieldChecker.Check(removedByEntity, contractReaders, dataSourceReaders, formReaders, diagnostics);
+    }
+
+    /// <summary>
+    /// Keeps what <see cref="RemovedFieldChecker"/> needs from a file: the fields that an applied layer removes from
+    /// an entity, the contract, and the data sources and forms that have no layer of their own.
+    /// </summary>
+    private static void CollectFieldReads(
+        JsonElement root,
+        JsonElement effective,
+        string path,
+        LayerResource? layer,
+        Dictionary<string, LayerTrace> traces,
+        Dictionary<string, RemovedFields> removedByEntity,
+        List<FieldReader> contracts,
+        List<FieldReader> dataSources,
+        List<FieldReader> forms)
+    {
+        var kind = root.GetProperty("kind").GetString();
+        if (kind == ResourceKinds.Entity)
+        {
+            if (layer is not null
+                && traces.TryGetValue(path, out var trace)
+                && RemovedFieldChecker.FieldRemoves(trace.Merge) is { Count: > 0 } removes)
+            {
+                removedByEntity[root.GetProperty("name").GetString()!] = new RemovedFields(layer, removes);
+            }
+
+            return;
+        }
+
+        List<FieldReader>? readers = kind switch
+        {
+            ResourceKinds.Contract => contracts,
+            ResourceKinds.DataSource when layer is null => dataSources,
+            ResourceKinds.Form when layer is null => forms,
+            _ => null,
+        };
+        if (readers is not null
+            && effective.TryGetProperty("entity", out var entity)
+            && entity.ValueKind == JsonValueKind.String)
+        {
+            readers.Add(new FieldReader(path, entity.GetString()!, effective.Clone()));
         }
     }
 

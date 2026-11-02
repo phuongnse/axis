@@ -197,8 +197,9 @@ schemas.
 
 A layer on a module entity changes the application's copy of it, which is the application's own
 table. Adding fields and adding validations are built: activation adds the column of an added field
-to the copy, and the record API reads and writes the field. Changing and removing a field are
-_(planned for M25)_.
+to the copy, and the record API reads and writes the field. Refusing a removed field that the module
+still reads is built, and an application [migration](migrations.md#migrations) drops the column of a removed field.
+Changing a field is _(planned for M25)_.
 
 - **Adding fields** adds columns to the copy. A new field is the application's, and the module's
   forms, pages and processes do not show it until a layer on them adds it.
@@ -209,8 +210,11 @@ _(planned for M25)_.
   refused, and the schema diagnostic (`AXC0015` for a column with no field, `AXC0016` for an
   incompatible change) is reported in the layer file at the remove or at the changed property.
   The active release stays.
-- **Removing a field** _(planned for M25)_ that the contract, or a module resource the layer does not also change,
-  still reads is a diagnostic at the removed field.
+- **Removing a field** that the module still reads is refused with `AXC0375` at the remove, `/changes/fields/{i}`
+  of the layer file. The readers are the entity's contract, and the module's data sources and forms on the entity
+  that the application does not also layer, because a layer of its own can stop the reading. The names match
+  ignoring letter case. The message names the first reader's file. The application's
+  [migration](migrations.md#migrations) drops the column of the removed field, by naming `<module id>/<entity>`.
 - **Validations** that the layer adds run with the entity's own, before the core validations.
 
 ## Extending a lifecycle
