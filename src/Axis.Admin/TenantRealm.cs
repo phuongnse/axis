@@ -30,7 +30,7 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
 /// must hold the theme and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
 /// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the theme again. An error names the step and the status code,
-/// never a response body or a secret.
+/// never a response body or a secret. A server error (5xx) makes it read the realm again and repeat, up to three attempts.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 {
@@ -50,6 +50,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
     private const string ManagementClientId = "realm-management";
     private const string CreateUserIfUnique = "idp-create-user-if-unique";
+    private const int ServerErrorAttempts = 3;
 
     private static readonly string[] _activationRoles =
     [
@@ -129,6 +130,25 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     }
 
     public async Task EnsureAsync(
+        string realm, string displayName, TenantRealmSecrets secrets, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await EnsureOnceAsync(realm, displayName, secrets, smtpServer, cancellationToken);
+                return;
+            }
+            catch (ServerErrorException) when (attempt < ServerErrorAttempts)
+            {
+                // The identity provider failed for a moment. Read the realm again, so a step that did land turns into
+                // an update, and wait a little longer each time with some jitter.
+                await Task.Delay(TimeSpan.FromMilliseconds((200 * attempt) + Random.Shared.Next(0, 200)), cancellationToken);
+            }
+        }
+    }
+
+    private async Task EnsureOnceAsync(
         string realm, string displayName, TenantRealmSecrets secrets, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
     {
         var token = await AdminTokenAsync(cancellationToken);
@@ -462,7 +482,11 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     {
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"The identity provider step '{step}' failed with status {(int)response.StatusCode}.");
+            var message = $"The identity provider step '{step}' failed with status {(int)response.StatusCode}.";
+            throw (int)response.StatusCode >= 500 ? new ServerErrorException(message) : new InvalidOperationException(message);
         }
     }
+
+    /// <summary>The identity provider answered a server error (5xx), which <see cref="EnsureAsync"/> may repeat.</summary>
+    private sealed class ServerErrorException(string message) : InvalidOperationException(message);
 }

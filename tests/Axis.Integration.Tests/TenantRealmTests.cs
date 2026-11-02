@@ -9,7 +9,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// <see cref="TenantRealm"/> creates a tenant's realm in a real Keycloak with its display name, sessions of at most
 /// 8 hours and three clients. The activation client has rights over providers and clients but not users, and the users
-/// client has rights over users only. A second run brings the realm in step and leaves one of each client.
+/// client has rights over users only. A second run brings the realm in step and leaves one of each client. A server error from the identity provider
+/// makes it read the realm again and repeat, up to three attempts, and any other failed status fails at once.
 /// </summary>
 public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
@@ -117,6 +118,49 @@ public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, stale.StatusCode);
     }
 
+    [Fact]
+    public async Task A_server_error_on_the_role_grant_reads_the_realm_again_and_completes()
+    {
+        var realm = NewRealm();
+        using var handler = new GrantFailingHandler(HttpStatusCode.InternalServerError, 1);
+
+        await EnsureWithAsync(handler, realm);
+
+        var token = await TokenAsync(realm, "axis-activation", _secrets.Activation);
+        using var clients = await SendAsync(token, HttpMethod.Get, $"admin/realms/{realm}/clients");
+        Assert.Equal(HttpStatusCode.OK, clients.StatusCode);
+        var master = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users" })
+        {
+            Assert.Equal(1, await CountClientsAsync(master, realm, clientId));
+        }
+    }
+
+    [Fact]
+    public async Task A_server_error_on_every_attempt_fails_after_three_attempts_naming_the_step()
+    {
+        var realm = NewRealm();
+        using var handler = new GrantFailingHandler(HttpStatusCode.InternalServerError, int.MaxValue);
+
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => EnsureWithAsync(handler, realm));
+
+        Assert.Contains("grant the admin roles", error.Message);
+        Assert.Contains("status 500", error.Message);
+        Assert.Equal(3, handler.GrantRequests);
+    }
+
+    [Fact]
+    public async Task A_forbidden_role_grant_fails_at_once_without_a_retry()
+    {
+        var realm = NewRealm();
+        using var handler = new GrantFailingHandler(HttpStatusCode.Forbidden, int.MaxValue);
+
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => EnsureWithAsync(handler, realm));
+
+        Assert.Contains("status 403", error.Message);
+        Assert.Equal(1, handler.GrantRequests);
+    }
+
     private string NewRealm()
     {
         var realm = $"t{Guid.NewGuid():N}"[..16];
@@ -127,6 +171,13 @@ public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
     private Task EnsureAsync(string realm, string displayName, TenantRealmSecrets secrets) =>
         new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
             .EnsureAsync(realm, displayName, secrets, new Dictionary<string, string>(), TestContext.Current.CancellationToken);
+
+    private async Task EnsureWithAsync(HttpMessageHandler handler, string realm)
+    {
+        using var http = new HttpClient(handler, disposeHandler: false);
+        await new TenantRealm(http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+            .EnsureAsync(realm, "Acme Corporation", _secrets, new Dictionary<string, string>(), TestContext.Current.CancellationToken);
+    }
 
     private async Task<int> CountClientsAsync(string token, string realm, string clientId)
     {
@@ -170,5 +221,25 @@ public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
             ["client_secret"] = secret,
         });
         return await _http.PostAsync(new Uri(_baseAddress, $"realms/{realm}/protocol/openid-connect/token"), content, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>Answers the first <c>failures</c> role-grant requests with <c>status</c> without sending them on, and sends everything else on.</summary>
+    private sealed class GrantFailingHandler(HttpStatusCode status, int failures) : DelegatingHandler(new HttpClientHandler())
+    {
+        private int _grantRequests;
+
+        public int GrantRequests => _grantRequests;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Post
+                && request.RequestUri!.AbsolutePath.Contains("/role-mappings/clients/", StringComparison.Ordinal)
+                && Interlocked.Increment(ref _grantRequests) <= failures)
+            {
+                return Task.FromResult(new HttpResponseMessage(status));
+            }
+
+            return base.SendAsync(request, cancellationToken);
+        }
     }
 }

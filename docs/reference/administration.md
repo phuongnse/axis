@@ -218,7 +218,7 @@ with code 2.
   name is the tenant id too. The step signs in to the `master` realm with the admin client, creates the realm
   with sessions of at most 8 hours, `en` and `vi` and the three clients, and gives the activation client `manage-realm`
   among its rights, and its mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names
-  the step of the identity provider and its status code, never a response body or a secret.
+  the step of the identity provider and its status code, never a response body or a secret. After a server error (5xx) the step reads the realm again and repeats, up to three attempts, before it fails.
 - `roles` saves each generated password, encrypted, before it creates the role.
   It never alters a role that exists. A role that exists with no password
   stored for this tenant fails the step.
