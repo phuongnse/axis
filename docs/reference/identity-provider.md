@@ -275,7 +275,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   `axis first login` for brokered users. It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
   page that asks for a missing profile field, such as the last name that a `saml` provider may not send. It allows two users to share an email, which turns sign-in by email off: an
   account's username is its email, see [accounts](user-administration.md#accounts). Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
-  `IdentityProvider` settings of its own, see [administration](administration.md#settings).
+  `IdentityProvider` settings of its own, see [administration](administration.md#settings). When the identity provider answers a server error (5xx), the realm step reads the realm again and repeats, up to three attempts, and then fails as before, naming the step and its status.
 - **The breached-password list:** the realm's password policy names the file `axis-breached-passwords.txt`, which every
   identity provider that `tenant create` targets must hold in its `data/password-blacklists` folder. The repository
   keeps it in `deploy/keycloak/password-blacklists`, see `deploy/keycloak/README.md`. Without the file, `tenant create`
