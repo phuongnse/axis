@@ -4,6 +4,7 @@
   "name": "RequestGoesToManagerThenNamedEmployee",
   "formatVersion": 1,
   "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["Request/transitions/approve"] },
   "users": {
     "admin": ["admin"],
     "ann": ["member"],

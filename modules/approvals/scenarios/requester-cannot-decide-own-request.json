@@ -1,0 +1,88 @@
+{
+  "id": "a04f0bc7-0b93-46b8-b3cb-a887b6241646",
+  "kind": "scenario",
+  "name": "RequesterCannotDecideOwnRequest",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": {
+    "covers": ["Request/transitions/approve", "Request/transitions/return", "Request/transitions/reject"]
+  },
+  "users": {
+    "admin": ["admin"],
+    "ann": ["member"],
+    "mia": ["member"],
+    "fin": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "mia",
+      "values": { "fullName": "Mia Tran", "workEmail": "mia@example.com", "user": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "fin",
+      "values": { "fullName": "Fin Le", "workEmail": "fin@example.com", "user": "fin" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "annEmployee",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com", "user": "ann", "manager": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "chain",
+      "values": {
+        "name": "Chain",
+        "code": "CHAIN",
+        "steps": [
+          { "sequence": 1, "approver": "lineManager" },
+          { "sequence": 2, "approver": "employee", "employee": "fin" },
+          { "sequence": 3, "approver": "employee", "employee": "annEmployee" }
+        ]
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "trip",
+      "values": { "type": "chain", "title": "Conference trip", "amount": 800 }
+    },
+    { "type": "startProcess", "process": "RequestApproval", "record": "trip", "as": "ann" },
+    { "type": "expectTask", "record": "trip", "step": "decide", "assignee": { "user": "mia" } },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "approved" }, "expect": "conflict" },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "returned" }, "expect": "conflict" },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "rejected" }, "expect": "conflict" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "approve", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "return", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "reject", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "approve", "as": "mia" },
+    { "type": "expectTask", "record": "trip", "step": "decide", "assignee": { "user": "fin" } },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "approved" }, "expect": "conflict" },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "returned" }, "expect": "conflict" },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "rejected" }, "expect": "conflict" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "approve", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "return", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "reject", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "decide", "outcome": "approve", "as": "fin" },
+    { "type": "expectTask", "record": "trip", "step": "adminDecide", "assignee": { "role": "admin" } },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "approved" }, "expect": "conflict" },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "returned" }, "expect": "conflict" },
+    { "type": "updateRecord", "record": "trip", "as": "ann", "values": { "status": "rejected" }, "expect": "conflict" },
+    { "type": "completeTask", "record": "trip", "step": "adminDecide", "outcome": "approve", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "adminDecide", "outcome": "return", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "adminDecide", "outcome": "reject", "as": "ann", "expect": "denied" },
+    { "type": "completeTask", "record": "trip", "step": "adminDecide", "outcome": "approve", "as": "admin" },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "trip", "state": "completed" },
+    { "type": "expectRecord", "record": "trip", "values": { "status": "approved", "step": 3 } }
+  ]
+}

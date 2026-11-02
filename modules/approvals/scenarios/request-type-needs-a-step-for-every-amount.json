@@ -1,0 +1,45 @@
+{
+  "id": "aae94463-391f-4779-bf5d-c106ed212c77",
+  "kind": "scenario",
+  "name": "RequestTypeNeedsAStepForEveryAmount",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["RequestType/validations/hasStepForEveryAmount"] },
+  "users": {
+    "admin": ["admin"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "values": {
+        "name": "Purchase",
+        "code": "PURCHASE",
+        "steps": [{ "sequence": 1, "approver": "lineManager", "minAmount": 1000 }]
+      },
+      "expect": { "invalid": "steps" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "purchase",
+      "values": {
+        "name": "Purchase",
+        "code": "PURCHASE",
+        "steps": [
+          { "sequence": 1, "approver": "lineManager" },
+          { "sequence": 2, "approver": "lineManager", "minAmount": 1000 }
+        ]
+      }
+    },
+    {
+      "type": "updateRecord",
+      "record": "purchase",
+      "as": "admin",
+      "values": { "steps": [{ "sequence": 1, "approver": "lineManager", "minAmount": 500 }] },
+      "expect": { "invalid": "steps" }
+    }
+  ]
+}
