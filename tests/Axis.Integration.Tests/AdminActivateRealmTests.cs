@@ -352,7 +352,7 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
                 """)
             .With("pages/orders.json", $$"""
                 { "id": "{{application.PageId}}", "kind": "page", "name": "Orders", "formatVersion": 1,
-                  "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] }
+                  "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Order" } ] }
                 """)
             .With("identity-providers/accounts.json", $$"""{ "id": "{{application.AccountsId}}", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""");
         if (vietnamese)

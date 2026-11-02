@@ -923,7 +923,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
                 """)
             .With("pages/notes.json", """
                 { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a21", "kind": "page", "name": "Notes", "formatVersion": 1,
-                  "title": { "textKey": "notes.title" }, "widgets": [ { "type": "table", "entity": "Note" } ] }
+                  "title": { "textKey": "notes.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Note" } ] }
                 """)
             .With("identity-providers/accounts.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a22", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""");
         foreach (var path in paths)

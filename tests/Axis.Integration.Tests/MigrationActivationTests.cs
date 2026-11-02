@@ -897,7 +897,7 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
                 """)
             .With("pages/orders.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "page", "name": "Orders", "formatVersion": 1,
-                  "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] }
+                  "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Order" } ] }
                 """)
             .With("sites/main.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "site", "name": "Main", "formatVersion": 1, "path": "{{path}}",

@@ -526,7 +526,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
                 """)
             .With("pages/home.json", """
                 { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b12", "kind": "page", "name": "Home", "formatVersion": 1,
-                  "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox" } ] }
+                  "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }
                 """)
             .With("identity-providers/accounts.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b13", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""")
             .With("sites/sitesaccounts.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b15", "sitesaccounts", "accounts"));

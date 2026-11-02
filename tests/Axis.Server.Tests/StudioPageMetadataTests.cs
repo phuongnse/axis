@@ -279,7 +279,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient().SignedInAs("author");
-        var broken = new JsonObject { ["type"] = 7 };
+        var broken = new JsonObject { ["type"] = 7, ["name"] = "chart" };
 
         var response = await Post(client, TwoColumns(broken).ToJsonString());
 
@@ -300,6 +300,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
             new JsonObject
             {
                 ["type"] = "section",
+                ["name"] = "section",
                 ["title"] = new JsonObject { ["textKey"] = "pages.purchaseRequests.title" },
                 ["widgets"] = new JsonArray(BrokenChart()),
             },
@@ -418,6 +419,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     private static JsonObject ValidChart() => new()
     {
         ["type"] = "chart",
+        ["name"] = "chart",
         ["kind"] = "bar",
         ["dataSource"] = "RequestsByDepartment",
         ["category"] = "department",
@@ -459,9 +461,10 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         page["widgets"] = new JsonArray(new JsonObject
         {
             ["type"] = "columns",
+            ["name"] = "columns",
             ["columns"] = new JsonArray(
-                new JsonObject { ["width"] = 8, ["widgets"] = new JsonArray(page["widgets"]![0]!.DeepClone()) },
-                new JsonObject { ["width"] = 4, ["widgets"] = new JsonArray(second) }),
+                new JsonObject { ["name"] = "column1", ["width"] = 8, ["widgets"] = new JsonArray(page["widgets"]![0]!.DeepClone()) },
+                new JsonObject { ["name"] = "column2", ["width"] = 4, ["widgets"] = new JsonArray(second) }),
         });
         return page;
     }
