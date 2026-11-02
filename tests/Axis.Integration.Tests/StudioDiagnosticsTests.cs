@@ -52,7 +52,7 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
 
         var entityPath = Path.Combine(folder.Path, "entities", "purchase-request.json");
         var entity = await File.ReadAllTextAsync(entityPath, CancellationToken);
-        await File.WriteAllTextAsync(entityPath, entity.Replace("\"target\": \"Department\"", "\"target\": \"NoSuchEntity\"", StringComparison.Ordinal), CancellationToken);
+        await File.WriteAllTextAsync(entityPath, entity.Replace("\"target\": \"Supplier\"", "\"target\": \"NoSuchEntity\"", StringComparison.Ordinal), CancellationToken);
         Assert.Contains("AXC0012", await ErrorsAsync(client));
 
         Assert.Equal(releasesBefore, await CountReleasesAsync(connectionString));

@@ -84,7 +84,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var fields = entity.GetProperty("fields").EnumerateArray().ToList();
         Assert.All(fields, field => Assert.False(string.IsNullOrEmpty(field.GetProperty("type").GetString())));
         var department = fields.Single(field => field.GetProperty("name").GetString() == "department");
-        Assert.Equal("Department", department.GetProperty("target").GetString());
+        Assert.Equal("organization/Department", department.GetProperty("target").GetString());
 
         var rule = Named(names, "rules", "FinanceThreshold");
         Assert.Empty(rule.GetProperty("parameters").EnumerateArray());
