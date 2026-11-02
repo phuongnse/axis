@@ -9,10 +9,12 @@
   "widgets": [
     {
       "type": "form",
+      "name": "requestForm",
       "entity": "Request",
       "actions": [
         {
           "type": "startProcess",
+          "name": "submit",
           "process": "RequestApproval",
           "label": {
             "textKey": "request.submit"

@@ -4,5 +4,5 @@
   "name": "ItemForm",
   "formatVersion": 1,
   "title": { "textKey": "itemForm.title" },
-  "widgets": [{ "type": "form", "entity": "Item" }]
+  "widgets": [{ "type": "form", "name": "form", "entity": "Item" }]
 }

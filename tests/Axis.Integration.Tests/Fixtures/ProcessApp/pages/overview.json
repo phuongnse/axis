@@ -7,34 +7,40 @@
   "widgets": [
     {
       "type": "columns",
+      "name": "columns",
       "columns": [
         {
           "width": 8,
+          "name": "column1",
           "widgets": [
             {
               "type": "table",
+              "name": "table",
               "entity": "Request",
               "rowActions": [
                 {
                   "type": "navigate",
+                  "name": "navigate",
                   "page": "Submissions",
                   "label": { "textKey": "request.showSubmissions" },
                   "parameters": { "request": "id" }
                 },
-                { "type": "navigate", "page": "RequestForm", "label": { "textKey": "pages.requestForm.title" }, "record": "id" },
-                { "type": "startProcess", "process": "Submit", "label": { "textKey": "request.submit" } }
+                { "type": "navigate", "name": "navigate2", "page": "RequestForm", "label": { "textKey": "pages.requestForm.title" }, "record": "id" },
+                { "type": "startProcess", "name": "startProcess", "process": "Submit", "label": { "textKey": "request.submit" } }
               ],
-              "toolbarActions": [{ "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }]
+              "toolbarActions": [{ "type": "navigate", "name": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }]
             }
           ]
         },
         {
           "width": 4,
+          "name": "column2",
           "widgets": [
             {
               "type": "section",
+              "name": "section",
               "title": { "textKey": "pages.overview.inspector" },
-              "widgets": [{ "type": "processInspector", "process": "Submit" }]
+              "widgets": [{ "type": "processInspector", "name": "processInspector", "process": "Submit" }]
             }
           ]
         }

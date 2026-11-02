@@ -5,5 +5,5 @@
   "formatVersion": 1,
   "title": { "textKey": "pages.assetDetail.title" },
   "parameters": [{ "name": "asset", "type": "reference", "target": "Asset", "required": true }],
-  "widgets": [{ "type": "detail", "entity": "Asset", "record": "asset" }]
+  "widgets": [{ "type": "detail", "name": "detail", "entity": "Asset", "record": "asset" }]
 }

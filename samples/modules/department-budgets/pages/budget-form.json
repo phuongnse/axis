@@ -4,5 +4,5 @@
   "name": "BudgetForm",
   "formatVersion": 1,
   "title": { "textKey": "department-budgets.pages.budgetForm.title" },
-  "widgets": [{ "type": "form", "form": "BudgetReview" }]
+  "widgets": [{ "type": "form", "name": "budgetForm", "form": "BudgetReview" }]
 }

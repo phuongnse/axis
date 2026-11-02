@@ -4,5 +4,5 @@
   "name": "NoteWizard",
   "formatVersion": 1,
   "title": { "textKey": "pages.noteForm.title" },
-  "widgets": [{ "type": "form", "form": "NoteWizard" }]
+  "widgets": [{ "type": "form", "name": "form", "form": "NoteWizard" }]
 }

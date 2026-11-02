@@ -4,5 +4,5 @@
   "name": "PurchaseRequestForm",
   "formatVersion": 1,
   "title": { "textKey": "pages.requestForm.title" },
-  "widgets": [{ "type": "form", "entity": "PurchaseRequest" }]
+  "widgets": [{ "type": "form", "name": "form", "entity": "PurchaseRequest" }]
 }

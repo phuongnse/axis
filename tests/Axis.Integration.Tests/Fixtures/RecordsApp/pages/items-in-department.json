@@ -5,5 +5,5 @@
   "formatVersion": 1,
   "title": { "textKey": "itemsInDepartment.title" },
   "parameters": [{ "name": "departmentName", "type": "text" }],
-  "widgets": [{ "type": "table", "entity": "Item" }]
+  "widgets": [{ "type": "table", "name": "table", "entity": "Item" }]
 }

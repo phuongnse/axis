@@ -7,16 +7,19 @@
   "widgets": [
     {
       "type": "table",
+      "name": "table",
       "dataSource": "NoteRows",
       "rowActions": [
         {
           "type": "navigate",
+          "name": "navigate",
           "page": "NoteForm",
           "label": { "textKey": "noteRows.open" },
           "record": "id"
         },
         {
           "type": "navigate",
+          "name": "navigate2",
           "page": "NoteForm",
           "label": { "textKey": "noteRows.edit" },
           "record": "id"

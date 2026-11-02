@@ -4,5 +4,5 @@
   "name": "Departments",
   "formatVersion": 1,
   "title": { "textKey": "pages.departments.title" },
-  "widgets": [{ "type": "table", "entity": "Department" }]
+  "widgets": [{ "type": "table", "name": "departments", "entity": "Department" }]
 }
