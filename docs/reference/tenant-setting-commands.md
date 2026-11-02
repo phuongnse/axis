@@ -403,6 +403,8 @@ keys. It can be rotated without signing anyone out.
   database pool and the sign-in client of each tenant once.
 - **Tenant keys.** Rekey re-encrypts each tenant's data keys and lookup keys in `platform.tenant_data_keys` with the
   other tenant secrets, and counts them in `tenant secrets`.
+- **Tenant backup keys.** Rekey leaves `platform.tenant_backup_keys` alone, because the cell's backup key wraps it and not the
+  installation key.
 - **Locks.** The transaction takes an `EXCLUSIVE` lock on `platform.tenants`,
   `platform.tenant_bindings`, `platform.tenant_data_keys` and `platform.data_protection_keys`. Another admin command, and a
   server that stores a new data protection key, wait for the commit. Readers are not blocked.
