@@ -6,6 +6,7 @@ using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace Axis.Processes.Work;
 
@@ -15,7 +16,8 @@ namespace Axis.Processes.Work;
 /// still current, so a worker that lost its claim commits nothing. An
 /// <see cref="IExternalWorkItemHandler"/> runs with no transaction open, and checks the claim in
 /// each transaction it opens. Every statement of a run is under the statement limit of
-/// <see cref="WorkItemSettings"/>, one minute by default.
+/// <see cref="WorkItemSettings"/>, one minute by default. When an <see cref="IWorkItemUsage"/> is given, it is told of
+/// each item that ran, right after the item's own transaction ended.
 /// </summary>
 public sealed partial class WorkItemRunner
 {
@@ -26,6 +28,7 @@ public sealed partial class WorkItemRunner
     private readonly Dictionary<string, IExternalWorkItemHandler> _externalHandlers = new(StringComparer.Ordinal);
     private readonly string[] _kinds;
     private readonly TimeSpan _statementTimeout;
+    private readonly IWorkItemUsage? _usage;
 
     /// <exception cref="InvalidOperationException">Two handlers of either sort have the same kind.</exception>
     public WorkItemRunner(
@@ -34,9 +37,11 @@ public sealed partial class WorkItemRunner
         IEnumerable<IWorkItemHandler> handlers,
         ILogger<WorkItemRunner> logger,
         IEnumerable<IExternalWorkItemHandler>? externalHandlers = null,
-        WorkItemSettings? settings = null)
+        WorkItemSettings? settings = null,
+        IWorkItemUsage? usage = null)
     {
         ArgumentNullException.ThrowIfNull(handlers);
+        _usage = usage;
         _connections = connections;
         _accessor = accessor;
         _logger = logger;
@@ -125,11 +130,33 @@ public sealed partial class WorkItemRunner
     /// and calls the handler's failure callback. Both commit only if the claim is still current.
     /// Cancellation rolls back with no failure callback, so the item is claimed again after its lease.
     /// An external handler gets the open connection with no transaction, and reports its own outcome.
+    /// After the item's transaction ended with any outcome but <see cref="WorkItemOutcome.LostClaim"/>, the usage is
+    /// counted in the platform database. That write cannot share the tenant transaction. A failed write is logged
+    /// and never fails the item.
     /// </summary>
     /// <exception cref="InvalidOperationException">No handler is registered for the item's kind.</exception>
     public async Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(item);
+        var outcome = await RunAsync(item, cancellationToken);
+        if (_usage is not null && outcome != WorkItemOutcome.LostClaim)
+        {
+            try
+            {
+                await _usage.CountAsync(item.TenantId, item.Kind, cancellationToken);
+            }
+            catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+            {
+                // The tenant and the kind only: the exception can quote a connection string.
+                LogUsageNotCounted(item.Kind, item.TenantId);
+            }
+        }
+
+        return outcome;
+    }
+
+    private async Task<WorkItemOutcome> RunAsync(ClaimedWorkItem item, CancellationToken cancellationToken)
+    {
         var start = Stopwatch.GetTimestamp();
         _handlers.TryGetValue(item.Kind, out var handler);
         IExternalWorkItemHandler? externalHandler = null;
@@ -264,6 +291,9 @@ public sealed partial class WorkItemRunner
 
     [LoggerMessage(LogLevel.Warning, "Work item {ItemId} of kind {Kind} for tenant {TenantId} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, string kind, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "The usage of a work item of kind {Kind} for tenant {TenantId} was not counted.")]
+    private partial void LogUsageNotCounted(string kind, string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Work item {ItemId} of kind {Kind} for tenant {TenantId} failed with {ErrorType}. Its writes were rolled back.")]
     private partial void LogFailed(Guid itemId, string kind, string tenantId, string errorType);

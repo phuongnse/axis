@@ -231,9 +231,9 @@ and creates no tables. See
   inherits rights through membership. The `platform.audit_records` table is
   the one exception: the role gets no right on it at all. The same step revokes
   the right that the default privileges would give it on that table.
-- **One write grant.** The same role also gets `INSERT` on
-  `platform.data_protection_keys`, and on no other table. Key rotation happens
-  while the server runs, so the server must add keys. It never updates or
+- **Two write grants.** The same role also gets `INSERT` on `platform.data_protection_keys`, and
+  `INSERT`, `UPDATE` and `DELETE` on the [usage](tenant-quotas.md#usage) tables, and on no other
+  table. Key rotation happens while the server runs, so the server must add keys. It never updates or
   deletes one. `platform rekey` is the one writer that updates these rows. It
   re-encrypts them with a new installation key, over the schema role, see
   [installation key](tenant-setting-commands.md#installation-key). At start the
