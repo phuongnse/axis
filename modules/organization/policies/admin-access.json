@@ -7,7 +7,7 @@
   "grants": [
     { "name": "departmentAll", "entity": "Department", "actions": ["read", "create", "update", "delete", "export", "import"] },
     { "name": "employeeAll", "entity": "Employee", "actions": ["read", "create", "update", "delete", "export", "import"] },
-    { "name": "departmentsRead", "dataSource": "Departments", "actions": ["read"] },
-    { "name": "employeesRead", "dataSource": "Employees", "actions": ["read"] }
+    { "name": "departmentsAll", "dataSource": "Departments", "actions": ["read", "export"] },
+    { "name": "employeesAll", "dataSource": "Employees", "actions": ["read", "export"] }
   ]
 }

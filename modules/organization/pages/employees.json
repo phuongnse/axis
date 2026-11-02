@@ -1,0 +1,16 @@
+{
+  "id": "a298a3cf-613e-4bc4-91ed-a1ca8e253eb3",
+  "kind": "page",
+  "name": "Employees",
+  "formatVersion": 1,
+  "title": { "textKey": "organization.pages.employees.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "name": "employees",
+      "dataSource": "Employees",
+      "rowActions": [{ "type": "navigate", "name": "open", "page": "EmployeeForm", "label": { "textKey": "organization.actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "EmployeeForm", "label": { "textKey": "organization.actions.new" } }]
+    }
+  ]
+}

@@ -29,6 +29,15 @@
     "organization.employee.notOwnDelegate": "Nhân viên không thể tự ủy quyền cho chính mình.",
     "organization.employee.delegateHasDates": "Nhập cả hai ngày khi chọn người được ủy quyền.",
     "organization.employee.delegateDatesInOrder": "Ngày kết thúc không được trước ngày bắt đầu.",
+    "organization.pages.departments.title": "Phòng ban",
+    "organization.pages.departmentForm.title": "Phòng ban",
+    "organization.pages.employees.title": "Nhân viên",
+    "organization.pages.employeeForm.title": "Nhân viên",
+    "organization.pages.outOfOffice.title": "Vắng mặt",
+    "organization.pages.absenceForm.title": "Vắng mặt",
+    "organization.absence.title": "Thời gian vắng mặt",
+    "organization.actions.new": "Thêm mới",
+    "organization.actions.open": "Mở",
     "organization.roles.admin": "Quản trị viên tổ chức",
     "organization.roles.member": "Thành viên tổ chức"
   }

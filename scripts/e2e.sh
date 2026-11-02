@@ -13,11 +13,11 @@
 # This script creates the PostgreSQL role axis_admin and gives Playwright AXIS_E2E_ADMIN_DATABASE and
 # AXIS_E2E_IDENTITY_ADMIN_SECRET. tests/e2e/admin-tool.ts runs Axis.Admin with them, and the realm emails go to
 # mailpit:1025.
-# The server starts with seven applications active: the generic E2E test application in
+# The server starts with eight applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests, the
 # leave request sample in samples/apps/leave-requests, the service desk sample in
 # samples/apps/service-desk, the asset management sample in samples/apps/asset-management and the
-# sub-process fixture in tests/e2e/fixtures/subprocess-app and the host site fixture in tests/e2e/fixtures/host-site-app.
+# sub-process fixture in tests/e2e/fixtures/subprocess-app, the host site fixture in tests/e2e/fixtures/host-site-app and the organization fixture in tests/e2e/fixtures/organization-app.
 # The host site's site has the host hostsite.localhost, one of the main tenant's hosts, which serves only that site.
 # A spec can activate another folder during the run: tests/e2e/activate.ts starts the built server
 # once more on a spare port with that folder in ActivateOnStartup, waits until it is ready and

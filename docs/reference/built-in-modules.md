@@ -8,9 +8,9 @@ changes anything else in Studio through [customization layers](customization-lay
 [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees the
 idea, and [D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees what the modules
 hold. `organization` 1.0.0 exists under `modules/organization`, with its entities, data sources, rule,
-role slots, contracts, policies, contract scenarios and texts. `approvals` 1.0.0 exists under
+role slots, contracts, policies, contract scenarios, pages, one form and texts. `approvals` 1.0.0 exists under
 `modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots, contracts and
-texts. Its process, policies, pages and contract scenarios, the pages of `organization` and the built-in
+texts. Its process, policies, pages and contract scenarios and the built-in
 application are _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
@@ -44,8 +44,8 @@ issues that build each check.
 
 `organization` holds the departments and the employees of the business, which other modules route
 work by. It keeps no personal data beyond what that needs. Version 1.0.0 holds the entities, the
-data sources, the rule, the contracts, the role slots, the policies, the contract scenarios and the
-texts below. The pages are _(planned for M26)_.
+data sources, the rule, the contracts, the role slots, the policies, the contract scenarios, the pages,
+the form and the texts below.
 
 - **`Department`:** `code`, unique, in capital letters, `name`, `parent`, a reference to another
   department, `head`, a reference to an employee, and `active`.
@@ -65,6 +65,8 @@ texts below. The pages are _(planned for M26)_.
   which lists the tenant's users _(planned for M26)_. Until then `user` is a text field.
 - **Data sources.** `Departments` lists the department fields. `Employees` lists the employee
   fields except `phone`, so a list carries no personal data. A form can still show the phone.
+  `OutOfOffice` lists `fullName`, `delegate`, `delegateFrom` and `delegateUntil` of the employees
+  whose `user` is the person who reads, so it holds at most their own record.
 - **Rules.** `IsDelegating(from, until)` is true when today, in the application's time zone, is
   between the two dates, both days included, and false when either date is empty. Other modules
   call it as `organization:IsDelegating(…)`.
@@ -84,17 +86,32 @@ texts below. The pages are _(planned for M26)_.
     these entities, and that includes the roles of other modules until an application maps them to
     a slot. The points are `Department/ceiling/admin`, `Department/ceiling/member`,
     `Employee/ceiling/admin` and `Employee/ceiling/member`.
-- **Policies.** `AdminAccess` grants the `admin` slot every action on both entities, and `MemberAccess`
-  grants the `member` slot its ceiling, each with read on the `Departments` and `Employees` data
-  sources. An application that only maps the slots needs no policy of its own, and a grant of its
-  own that goes past a ceiling fails the compile with `AXC0334`.
+- **Policies.**
+  - `AdminAccess` grants the `admin` slot every action on both entities, and read and export on the
+    `Departments` and `Employees` data sources.
+  - `MemberAccess` grants the `member` slot read on departments, read on every employee field except
+    `phone`, the update of its own absence, and read on the `OutOfOffice` data source. It grants no
+    read on the `Departments` and `Employees` data sources, so a member gets `403` on their rows and
+    on the pages that list them. It reads no phone, its own included, because the fields a role reads
+    belong to the entity and not to a record. A member still updates their own `phone`, `delegate`,
+    `delegateFrom` and `delegateUntil`.
+  - Only `MemberAccess` reads `OutOfOffice`, so an administrator who does not hold the `member` slot
+    has no Out of office page.
+  - An application that only maps the slots needs no policy of its own, and a grant of its own that
+    goes past a ceiling fails the compile with `AXC0334`.
 - **Contract scenarios.** Five scenarios run when an application that declares the module is
   published or validated: `DepartmentIsNotItsOwnParent`, `EmployeeIsNotTheirOwnManagerOrDelegate`,
   `DelegateNeedsDatesInOrder`, `AdminManagesOrganization` and `MemberUpdatesOnlyTheirOwnAbsence`. Each
   covers the points its name says.
 - **Role slots.** `admin` and `member`.
-- **Pages** _(planned for M26)_**.** Departments and Employees, each a table with a form, and "Out of office", where a
-  member sets their own delegate and dates.
+- **Pages.** Each is a [module page](modules-and-templates.md#modules), and a site lists it as
+  `organization/<name>`.
+  - `Departments` and `Employees` are for the `admin` slot. Each is a table with a New button and an
+    Open action that leads to the form page `DepartmentForm` or `EmployeeForm`, a form widget on the
+    entity. A page is readable only to a person who reads its data source, so a member is refused both.
+  - `OutOfOffice` is for the `member` slot. Its table lists the `OutOfOffice` data source, so a member
+    sees only their own record, and has no New button. Open leads to `AbsenceForm`, a form widget on
+    the `Absence` form, which holds only `delegate`, `delegateFrom` and `delegateUntil`.
 - **Texts** in `en` and `vi`.
 
 ## The approvals module
