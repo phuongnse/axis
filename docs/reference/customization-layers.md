@@ -204,7 +204,11 @@ _(planned for M25)_.
   forms, pages and processes do not show it until a layer on them adds it.
 - **Changing a field** _(planned for M25)_. A layer may change a label, a default, `required`, a length, a range or an
   enum's `values`. A change of type, and a field removed, follow the
-  [migration](migrations.md#migrations) rules of the application's own entities.
+  [migration](migrations.md#migrations) rules of the application's own entities. The
+  application's `migration` names the entity as `<module id>/<entity>`. Without it, activation is
+  refused, and the schema diagnostic (`AXC0015` for a column with no field, `AXC0016` for an
+  incompatible change) is reported in the layer file at the remove or at the changed property.
+  The active release stays.
 - **Removing a field** _(planned for M25)_ that the contract, or a module resource the layer does not also change,
   still reads is a diagnostic at the removed field.
 - **Validations** that the layer adds run with the entity's own, before the core validations.

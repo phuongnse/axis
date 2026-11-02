@@ -29,6 +29,9 @@ public sealed record EntityModel
     /// <summary>The contract of the module that holds the entity, or null when it has none.</summary>
     public ContractModel? Contract { get; init; }
 
+    /// <summary>The customization layer that changed the module entity, or null when no layer did.</summary>
+    public EntityLayerModel? Layer { get; init; }
+
     /// <summary>Whether any field of the entity is computed.</summary>
     public bool HasComputedFields => Fields.Any(candidate => candidate.IsComputed);
 

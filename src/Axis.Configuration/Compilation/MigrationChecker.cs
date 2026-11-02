@@ -27,8 +27,11 @@ namespace Axis.Configuration.Compilation;
 /// drops or converts the field, when the value comes after a <c>dropEntity</c>, or when it reads a
 /// field that this migration's own undo leaves without a type. The stored schema is known only at
 /// activation, which a later issue builds, so a name that never existed in the stored table is not
-/// caught here. A migration cannot name a module entity, so one whose <c>entity</c> contains <c>/</c>
-/// is reported with <see cref="DiagnosticCodes.MigrationOfModuleEntity"/> and checked no further. An entity that is not loaded is not reported when its file failed to load or some
+/// caught here. A migration may name an entity of a module that <c>application.json</c> declares as
+/// <c>&lt;module id&gt;/&lt;entity&gt;</c>, and it is checked like one on the application's own entity, except that it
+/// cannot drop the entity. A migration whose <c>entity</c> contains <c>/</c> and names a module that is not declared, and a
+/// <c>dropEntity</c> of a module entity, are reported with <see cref="DiagnosticCodes.MigrationOfModuleEntity"/> and checked
+/// no further. An entity that is not loaded is not reported when its file failed to load or some
 /// migration of that name drops it.
 /// </summary>
 internal static class MigrationChecker
@@ -41,6 +44,7 @@ internal static class MigrationChecker
         IReadOnlyList<MigrationResource> migrations,
         Func<string, EntityResource?> findEntity,
         IReadOnlySet<string> unloadedEntityNames,
+        IReadOnlySet<string> declaredModules,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -59,17 +63,43 @@ internal static class MigrationChecker
         {
             if (entityName.Contains('/', StringComparison.Ordinal))
             {
-                foreach (var migration in group)
+                if (!declaredModules.Contains(entityName[..entityName.IndexOf('/', StringComparison.Ordinal)]))
                 {
-                    diagnostics.Add(new Diagnostic(
-                        DiagnosticCodes.MigrationOfModuleEntity,
-                        $"The migration names the module entity '{migration.Entity}'. A migration cannot change a module entity.",
-                        migration.File,
-                        "/entity",
-                        migration.Id));
+                    foreach (var migration in group)
+                    {
+                        diagnostics.Add(new Diagnostic(
+                            DiagnosticCodes.MigrationOfModuleEntity,
+                            $"The migration names the entity '{migration.Entity}' of a module that application.json does not declare. A migration may change only the entities of a declared module.",
+                            migration.File,
+                            "/entity",
+                            migration.Id));
+                    }
+
+                    continue;
                 }
 
-                continue;
+                var drops = false;
+                foreach (var migration in group)
+                {
+                    for (var index = 0; index < migration.Changes.Count; index++)
+                    {
+                        if (migration.Changes[index].Type == "dropEntity")
+                        {
+                            drops = true;
+                            diagnostics.Add(new Diagnostic(
+                                DiagnosticCodes.MigrationOfModuleEntity,
+                                $"A migration cannot drop the module entity '{migration.Entity}'.",
+                                migration.File,
+                                $"/changes/{index}/type",
+                                migration.Id));
+                        }
+                    }
+                }
+
+                if (drops)
+                {
+                    continue;
+                }
             }
 
             var entity = findEntity(entityName);
