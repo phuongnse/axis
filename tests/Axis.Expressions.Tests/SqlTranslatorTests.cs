@@ -189,6 +189,7 @@ public sealed class SqlTranslatorTests
     [InlineData("min(lines, qty) > 0", 0, "Function 'min'")]
     [InlineData("max(lines, qty) > 0", 0, "Function 'max'")]
     [InlineData("all(lines, ok)", 0, "Function 'all'")]
+    [InlineData("first(lines, ok, qty) > 0", 0, "Function 'first'")]
     [InlineData("any(lines, lower(name) == 'a')", 11, "Function 'lower'")]
     [InlineData("b and count(lines, trim(name) == 'a') > 0", 19, "Function 'trim'")]
     public void Construct_outside_the_subset_is_reported_at_it(string expression, int offset, string named)

@@ -465,7 +465,8 @@ public static class ExpressionTypeChecker
             return ExpressionType.Integer;
         }
 
-        ExpressionType[] types = [ExpressionType.Null, Infer(call.Arguments[1], context with { Scope = collection.Items, InAggregateItem = true, Outer = context.Outer ?? context.Scope })];
+        var itemContext = context with { Scope = collection.Items, InAggregateItem = true, Outer = context.Outer ?? context.Scope };
+        ExpressionType[] types = [ExpressionType.Null, .. call.Arguments.Skip(1).Select(argument => Infer(argument, itemContext))];
         ExpressionType result;
         switch (name)
         {
@@ -476,6 +477,11 @@ public static class ExpressionTypeChecker
             case "any" or "all":
                 Need(call, name, types, 1, type => type.Kind == ExpressionTypeKind.Boolean, "boolean");
                 return ExpressionType.Boolean;
+
+            case "first":
+                Need(call, name, types, 1, type => type.Kind == ExpressionTypeKind.Boolean, "boolean");
+                result = types[2];
+                break;
 
             case "sum":
                 Need(call, name, types, 1, IsNumber, "a number");

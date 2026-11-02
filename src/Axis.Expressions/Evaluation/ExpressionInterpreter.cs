@@ -324,7 +324,8 @@ public static class ExpressionInterpreter
         /// reference part of a path to a collection is evaluated, as the path of a scalar field is. Every row
         /// is evaluated, even after <c>any</c> or <c>all</c> knows its result. <c>sum</c>,
         /// <c>avg</c>, <c>min</c> and <c>max</c> skip <c>null</c> items, and a <c>null</c> condition
-        /// counts as false.
+        /// counts as false. <c>first</c> evaluates its condition on every row too, but its item only
+        /// on the first row whose condition is true, and gives <c>null</c> when there is none.
         /// </summary>
         private object? Aggregate(CallNode call, string name)
         {
@@ -332,6 +333,22 @@ public static class ExpressionInterpreter
             if (call.Arguments.Count == 1)
             {
                 return (long)rows.Count;
+            }
+
+            if (name == "first")
+            {
+                Evaluator? picked = null;
+                foreach (var row in rows)
+                {
+                    var evaluator = new Evaluator(row, checkResult, budget, records, now, timeZone, accountability: accountability, outer: outer ?? values);
+                    var condition = evaluator.Eval(call.Arguments[1]);
+                    if (picked is null && Boolean(condition) == true)
+                    {
+                        picked = evaluator;
+                    }
+                }
+
+                return picked is null ? null : Widen(call, picked.Eval(call.Arguments[2]));
             }
 
             var item = call.Arguments[1];
