@@ -31,7 +31,7 @@ public static class WorkerServiceCollectionExtensions
     /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none, and only a worker that runs in Development sends email
     /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>.
     /// With <c>Cell:Id</c> set the worker is part of a cell and needs <c>Tenancy:Source=directory</c>, <c>Cell:Region</c> and <c>Cell:TenantDomain</c>.
-    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs, in the platform database over <c>ConnectionStrings:Platform</c>.
+    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs and the emails it sends for each tenant per UTC day, in the platform database over <c>ConnectionStrings:Platform</c>. An email past the tenant's <c>emailsPerDay</c> quota waits until 00:00 UTC.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
@@ -119,10 +119,13 @@ public static class WorkerServiceCollectionExtensions
                 runtimeAddress);
             keySource = new DirectoryTenantKeySource(platformConnectionString, cipher);
 
-            // A cell always reads the directory, so its usage is written to the same platform database.
+            // A cell always reads the directory, so its usage and its daily email count are written to the same platform database.
             if (cell.IsCell)
             {
-                services.AddSingleton(new TenantUsageStore(NpgsqlDataSource.Create(platformConnectionString)));
+                var platform = NpgsqlDataSource.Create(platformConnectionString);
+                services.AddSingleton(new TenantUsageStore(platform));
+                services.AddSingleton(new TenantDailyCounterStore(platform));
+                services.AddSingleton<IEmailQuota, CellEmailQuota>();
                 services.AddSingleton<IWorkItemUsage, CellWorkItemUsage>();
             }
         }
