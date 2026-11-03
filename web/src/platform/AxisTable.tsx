@@ -10,13 +10,10 @@ import { useNarrowWidth } from './useNarrowWidth'
  * Proposed: how wide a column is.
  * - `fit`: a value of a fixed form, such as a number, a date, a date and time, a status tag or the row's icon actions,
  *   as wide as its content and never wrapping.
- * - `text`: free text, as wide as its content but no narrower than the `textColumn` size and no wider than 320 px,
- *   where it wraps, so a short value such as a person's name neither crowds nor leaves empty width.
- * - `fill`: the one column of free text that takes the width the others leave, the longest and the one most worth
- *   reading. Its text still wraps at 320 px. A table that marks none gives the width left to its last `text` column,
- *   as an identifying code usually comes first and a name or a description later, else to its last column.
+ * - `text`: free text. The columns of free text share the width the others leave in equal parts, and their text wraps
+ *   at 320 px. A table with none gives that width to its last column.
  */
-export type ColumnKind = 'fit' | 'text' | 'fill'
+export type ColumnKind = 'fit' | 'text'
 
 /** A column of an {@link AxisTable}: Ant Design's column, whose width and cells the table sets from its kind. */
 export type AxisColumn<T> = Omit<TableColumnType<T>, 'render' | 'onCell' | 'onHeaderCell' | 'width' | 'key'> & {
@@ -76,14 +73,8 @@ const cellInline = spacingTokens.lg
 /** A column as wide as its content, never wrapping. */
 const fitted: CSSProperties = { width: '1%', whiteSpace: 'nowrap', paddingInline: cellInline }
 
-/** The value of a `text` or `fill` cell: no narrower than `textColumn`, wrapping at 320 px. */
-const textValue: CSSProperties = {
-  width: 'max-content',
-  minWidth: sizeTokens.textColumn,
-  maxWidth: 320,
-  overflowWrap: 'anywhere',
-  whiteSpace: 'normal',
-}
+/** The value of a `text` cell, wrapping at 320 px (D96). */
+const textValue: CSSProperties = { maxWidth: 320, overflowWrap: 'anywhere', whiteSpace: 'normal' }
 
 /** The row's actions fold into one menu from this many on, and at narrow width whatever their number (D96). */
 const foldFrom = 3
@@ -127,23 +118,29 @@ export function AxisTable<T extends object>({
   instead?: ReactNode
 }) {
   const narrow = useNarrowWidth()
-  const fillKey =
-    columns.find((column) => column.kind === 'fill')?.key ??
-    columns.findLast((column) => column.kind === 'text')?.key ??
-    columns.at(-1)?.key
+  const texts = columns.filter((column) => column.kind === 'text').length
+  // Each column of free text takes an equal share of the width; a table with none gives it all to its last column.
+  const share = texts > 0 ? `${100 / texts}%` : undefined
+  const lastKey = columns.at(-1)?.key
   const fold = narrow || (rowActions?.count ?? 0) >= foldFrom
 
   const antColumns: TableColumnType<T>[] = columns.map(({ kind, numeric, render, ...column }) => {
-    const fills = column.key === fillKey
     const numbers: CSSProperties = numeric ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {}
-    const cell: CSSProperties = fills
-      ? { paddingInline: cellInline, ...rowLine, ...numbers }
-      : kind === 'fit'
-        ? { ...fitted, ...rowLine, ...numbers }
-        : { width: '1%', paddingInline: cellInline, ...rowLine }
-    const header: CSSProperties = fills
-      ? { paddingInline: cellInline, ...rowLine, ...(numeric ? { textAlign: 'right' } : {}) }
-      : { ...fitted, ...rowLine, ...(numeric ? { textAlign: 'right' } : {}) }
+    const width = kind === 'text' ? share : texts === 0 && column.key === lastKey ? undefined : '1%'
+    const cell: CSSProperties = {
+      width,
+      paddingInline: cellInline,
+      ...(kind === 'fit' ? { whiteSpace: 'nowrap' } : {}),
+      ...rowLine,
+      ...numbers,
+    }
+    const header: CSSProperties = {
+      width,
+      paddingInline: cellInline,
+      whiteSpace: 'nowrap',
+      ...rowLine,
+      ...(numeric ? { textAlign: 'right' } : {}),
+    }
     return {
       ...column,
       onHeaderCell: () => ({ style: header }),

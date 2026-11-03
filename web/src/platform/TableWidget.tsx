@@ -476,9 +476,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       dataIndex: ['values', field.name],
       title: field.labelKey ? t(field.labelKey) : field.name,
       // Proposed: a value of a fixed form fits its content; text, a reference and a file are free text.
-      // Proposed: the identifying column, which comes first and is the row's link, is the one most read, so when it
-      // is free text it takes the width the others leave.
-      kind: freeTextTypes.includes(field.type) ? (column === 0 ? 'fill' : 'text') : 'fit',
+      // Proposed: a value of a fixed form fits its content; text, a reference and a file are free text.
+      kind: freeTextTypes.includes(field.type) ? 'text' : 'fit',
       numeric: isNumeric(field.type),
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',

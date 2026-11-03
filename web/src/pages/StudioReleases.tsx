@@ -91,10 +91,10 @@ export function StudioReleasesList({
             render: (release) => releaseActorName(release.published, t),
           },
           {
-            // Proposed: the note, the longest text and the most often missing, comes last and takes the width left.
+            // Proposed: the note, the longest text and the most often missing, comes last.
             key: 'note',
             title: t('shell.studio.releases.note'),
-            kind: 'fill',
+            kind: 'text',
             render: (release) => release.note ?? <EmptyDash />,
           },
         ]}

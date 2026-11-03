@@ -58,7 +58,7 @@ the review.
 - **Table columns.** The owner's rule, for every table, the `table` widget included: a column whose values have a fixed
   form, such as a number, a date, a date and time, a status tag or the row's icon actions, is as wide as its content and
   never wraps, with spacing-lg on each side so fitted columns do not crowd; free text takes the rest and wraps at
-  320 px. Every row is one height whatever it holds, 40 px since "The table's rows" below, icon buttons included: a row of one line is centred in it, and a
+  320 px, the columns of free text in equal shares (see "Free text in equal shares" below). Every row is one height whatever it holds, 40 px since "The table's rows" below, icon buttons included: a row of one line is centred in it, and a
   row of more lines grows and reads from the same first line. A table narrower than its columns' content scrolls
   sideways rather than squeezing them, as the console's tables already do: Studio is not used on very small screens.
   Built on the Releases list.
@@ -173,26 +173,13 @@ the review.
     table as the `table` widget, which draws the toolbar, the row actions and their fold into a menu below 992 px, the
     paging and a cell with no value. The Releases list today lacks the fold and the paging because it is drawn on its
     own.
-- **One column takes the width left.** The owner saw Published by far wider than "System", as the three columns of
-  free text shared the width left over. Agreed: a table has one column that takes the width the others leave, the
-  longest text and the one most worth reading, the note on the Releases list; every other column of free text is as
-  wide as its content up to 320 px, where it wraps, with its title on one line and spacing-lg on each side, as a
-  fitted column has. Built in `tableColumns.ts` as `freeText`, `fillText` and `textCell`, on the Releases list; the
-  `table` widget does not follow these column rules yet, which the shared table of the issue brings to every table.
 - **The shared table, built.** The owner wanted to see the shared table before agreeing to it, and found the label
   column too narrow when it holds no value. Built: `AxisTable` in `web/src/platform/`, which the `table` widget and
   the Releases list now draw on, and which replaces `tableColumns.ts`. It draws D96's toolbar (view controls on the
   left; Refresh, the secondary actions and the main action last on the right), the columns by their kind, 48 px rows,
   the row actions as icons for an action the platform knows and text for a configured one, folded into one "…" menu
-  from three on or below 992 px, the paging, and sideways scrolling. A column's kind decides its width:
-  - `fit`, a value of a fixed form, as wide as its content;
-  - `text`, free text, as wide as its content but no narrower than the new `textColumn` size token, 160 px, and no
-    wider than 320 px, where it wraps;
-  - `fill`, the one column that takes the width the others leave. The Releases list fills its note; a `table` widget
-    fills its identifying column, the first, when it is free text, as the one most read; a table that marks none
-    fills its last free text column.
-  For the issue: Studio's resource lists, the console's tables and the users page move onto `AxisTable` too. Open:
-  whether an author may say which column of a `table` widget fills, which is configuration.
+  from three on or below 992 px, the paging, and sideways scrolling.
+  For the issue: Studio's resource lists, the console's tables and the users page move onto `AxisTable` too.
 - **The table's rows, and only the shared table.** The owner found the table loose and asked for it tighter, by
   tokens alone, meaning the height of its rows, the header's too. Built: every row and the header are the new
   `tableRow` size token high, 40 px, spacing-xs above and below a `smallControl` line, where 48 px, the `bar` size,
@@ -200,3 +187,8 @@ the review.
   The owner agreed that nothing draws Ant Design's `Table` but `AxisTable`. For the issue: a lint rule,
   `no-restricted-imports` in oxlint, refuses `Table` from `antd` anywhere but `AxisTable.tsx`, so no table goes its
   own way again.
+- **Free text in equal shares.** On the way the owner saw a column of free text take only its content's width, then a
+  160 px floor for it, then one column taking the width left, and found none right. The owner's rule: a column of a
+  fixed form is as wide as its content; the columns of free text share the width left in equal parts, and their text
+  wraps at 320 px; a table with no free text gives the width left to its last column. No `textColumn` size token, no
+  column that fills.

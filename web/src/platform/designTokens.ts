@@ -55,13 +55,11 @@ export const radiusTokens = { base: 6 }
 
 /**
  * Proposed: the sizes every page shares. `bar` is the height of a bar, 48 px: the shell's header, a page's band,
- * Studio's application row and a table's row, so their rules line up. `smallControl` is the height of a small control,
- * 24 px, such as a small icon button, and the line of text that sits beside one. `textColumn` is the narrowest a
- * table's column of free text gets, 160 px, so a column of short or missing values is not squeezed. `tableRow` is
- * the height of a table's row and of its header, 40 px, a `smallControl` line with spacing-xs above and below. Like the
+ * Studio's application row, so their rules line up. `smallControl` is the height of a small control,
+ * 24 px, such as a small icon button, and the line of text that sits beside one. `tableRow` is the height of a table's row and of its header, 40 px, a `smallControl` line with spacing-xs above and below. Like the
  * breakpoint, a page cannot change them.
  */
-export const sizeTokens = { bar: 48, smallControl: 24, textColumn: 160, tableRow: 40 }
+export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40 }
 
 /** The one layout breakpoint (D96). Below it is narrow width. A page cannot change it: media queries read no CSS property. */
 export const breakpointTokens = { narrowWidth: 992 }
