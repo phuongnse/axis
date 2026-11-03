@@ -1,4 +1,4 @@
-import { GlobalOutlined } from '@ant-design/icons'
+import { TranslationOutlined } from '@ant-design/icons'
 import { Alert, Button, Flex, Input, Modal, Space, Typography } from 'antd'
 import { useContext, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
@@ -81,7 +81,7 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
                 role="icon"
                 size="small"
                 nameKey="shell.studio.translations.open"
-                icon={<GlobalOutlined />}
+                icon={<TranslationOutlined />}
                 onClick={() => setTranslating(shown)}
                 data-testid="studio-label-translations"
                 style={{ marginInlineEnd: -4, marginBlock: -1 }}

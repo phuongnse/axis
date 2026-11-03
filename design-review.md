@@ -127,7 +127,7 @@ Shopify's settings pages:
 - **A label is one text box, in the author's language.** The owner asked whether a box per language is the standard;
   it is not, as it grows with every language. Agreed, as Contentful, Sanity and Webflow edit one language at a time and
   Shopify, Salesforce and WPML translate on a screen of their own: one box in the author's language, or the
-  application's first when it lacks that one; Translations…, a globe icon beside it, opens every language of the label
+  application's first when it lacks that one; Translations…, the translate icon (A and a glyph, as Google Translate and Material draw it), opens every language of the label
   in a medium dialog (Done keeps, Cancel puts back), the icon sitting inside the box at its end, as a password
   box holds its eye, so the box keeps the width and the 32 px height of every field; a muted line under the box names the languages it lacks, "Missing
   in Vietnamese". Many labels at once are translated in the text resources' table. The key is Studio's own, made from
