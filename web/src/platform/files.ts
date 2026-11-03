@@ -1,9 +1,10 @@
 import { apiFetch } from './api'
+import { quotaRefusalTitle } from './quota'
 import { parseRecordJson, type FileValue } from './records'
 import type { FieldMetadata } from './site'
 
-/** The outcome of an upload: the stored file, or the status the server refused it with. */
-export type UploadResult = { ok: true; file: FileValue } | { ok: false; status: number }
+/** The outcome of an upload: the stored file, or the status the server refused it with and the quota title when it is a quota refusal. */
+export type UploadResult = { ok: true; file: FileValue } | { ok: false; status: number; title?: string }
 
 /**
  * Uploads a picked file to a file field's upload route as `multipart/form-data` with one part, `file`.
@@ -16,7 +17,8 @@ export async function uploadFile(uploadPath: string, file: File, signal?: AbortS
   // No Content-Type: the browser writes it with the multipart boundary.
   const response = await apiFetch(uploadPath, { method: 'POST', body, signal })
   if (response.status !== 201) {
-    return { ok: false, status: response.status }
+    const title = await quotaRefusalTitle(response)
+    return title === null ? { ok: false, status: response.status } : { ok: false, status: response.status, title }
   }
   return { ok: true, file: parseRecordJson<FileValue>(await response.text()) }
 }

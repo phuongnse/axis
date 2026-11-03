@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import { quotaRefusalTitle } from './quota'
 
 /**
  * A value of a record as the SPA holds it. Integers and decimals keep their JSON source text, so
@@ -104,7 +105,10 @@ export async function fetchRecords(recordsPath: string, query: string, signal?: 
   }
 }
 
-/** A 400 or 409 problem of the record API. `errors` maps a JSON Pointer into the body to its messages. */
+/**
+ * A 400 or 409 problem of the record API, or a quota refusal of a 403, which has no `errors`. `errors` maps a JSON Pointer
+ * into the body to its messages.
+ */
 export interface RecordProblem {
   status: number
   title: string
@@ -144,8 +148,8 @@ export async function deleteRecord(recordsPath: string, id: string, signal?: Abo
 /**
  * Creates a record when `id` is `null`, and updates the record otherwise. `body` is the prepared
  * body text, so number text reaches the server unchanged. With `form`, the request names that form
- * in `?form=`, so the server also enforces the form's `requiredWhen`. A 400 or 409 comes back as
- * the problem; any other failure throws.
+ * in `?form=`, so the server also enforces the form's `requiredWhen`. A 400 or 409, and a 403 for a
+ * quota refusal, come back as the problem; any other failure throws.
  */
 export async function saveRecord(
   recordsPath: string,
@@ -170,6 +174,10 @@ export async function saveRecord(
       ok: false,
       problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
     }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    return { ok: false, problem: { status: 403, title, errors: {} } }
   }
   throw new Error(`Saving a record of '${recordsPath}' failed with status ${response.status}.`)
 }

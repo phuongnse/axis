@@ -1775,6 +1775,31 @@ describe('FormWidget', () => {
     expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
   })
 
+  it('shows the quota title when a save is refused past the storage quota', async () => {
+    stubFetch({
+      status: 403,
+      body: JSON.stringify({
+        title: 'This tenant has reached its storage quota.',
+        status: 403,
+        reason: 'quota-exceeded',
+        quota: 'storage',
+      }),
+    })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('form-error')).toHaveTextContent('This tenant has reached its storage quota.')
+  })
+
+  it('keeps the generic message for a 403 without a reason', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubFetch({ status: 403, body: '{"title":"You may not save this record.","status":403}' })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
+  })
+
   describe('steps', () => {
     const titleRequired = '{"sections":[],"fields":{},"errors":{"/values/title":["Required."]}}'
 

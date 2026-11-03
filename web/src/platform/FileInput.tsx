@@ -85,7 +85,7 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false 
         onChange(result.file)
         setAnnouncement(`${t('shell.form.uploaded')} ${result.file.name}`)
       } else {
-        setError(t(errorKey(result.status)))
+        setError(result.title ?? t(errorKey(result.status)))
       }
     } catch {
       setError(t('shell.form.uploadFailed'))

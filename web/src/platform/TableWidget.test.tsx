@@ -1617,11 +1617,14 @@ describe('TableWidget import', () => {
   }
 
   /** Stubs `fetch`: the records, the upload, then each read of the import in turn, then the commit. */
-  function stubImport(reads: Response[], uploadStatus = 202, commitStatus = 202) {
+  function stubImport(reads: Response[], upload: number | Response = 202, commitStatus = 202) {
     const remaining = [...reads]
     const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
       if (input === importsPath) {
-        return uploadStatus === 202 ? answer('pending', {}, 202) : new Response(null, { status: uploadStatus })
+        if (upload instanceof Response) {
+          return upload
+        }
+        return upload === 202 ? answer('pending', {}, 202) : new Response(null, { status: upload })
       }
       if (input === `${importsPath}/${importId}/commit`) {
         return commitStatus === 202 ? answer('checked', {}, 202) : new Response(null, { status: commitStatus })
@@ -1735,6 +1738,26 @@ describe('TableWidget import', () => {
     await chooseAndCheck()
 
     expect(await screen.findByTestId('import-problem')).toHaveTextContent(message)
+  })
+
+  it('shows the quota title when an upload is refused past the storage quota', async () => {
+    stubImport(
+      [],
+      new Response(
+        JSON.stringify({
+          title: 'This tenant has reached its storage quota.',
+          status: 403,
+          reason: 'quota-exceeded',
+          quota: 'storage',
+        }),
+        { status: 403 },
+      ),
+    )
+    renderWidget('', importWidget)
+
+    await chooseAndCheck()
+
+    expect(await screen.findByTestId('import-problem')).toHaveTextContent('This tenant has reached its storage quota.')
   })
 })
 

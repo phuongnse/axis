@@ -4,8 +4,8 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// Writes the usage of a cell's tenants to <c>platform.tenant_usage_latest</c> and <c>platform.tenant_usage</c> over
-/// the platform database. It writes counts and sizes only. The platform role that the data source connects as has the
-/// write grant of <see cref="PlatformRoleGrants"/> on these two tables.
+/// the platform database, and reads a tenant's latest storage sample. It writes counts and sizes only. The platform
+/// role that the data source connects as has the write grant of <see cref="PlatformRoleGrants"/> on these two tables.
 /// </summary>
 public sealed class TenantUsageStore(NpgsqlDataSource platform)
 {
@@ -72,6 +72,19 @@ public sealed class TenantUsageStore(NpgsqlDataSource platform)
         }
 
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The tenant's latest storage sample as database bytes plus file bytes, or <c>null</c> when the tenant has no
+    /// sample yet.
+    /// </summary>
+    public async Task<long?> LatestStorageBytesAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        await using var command = platform.CreateCommand(
+            "SELECT database_bytes + file_bytes FROM platform.tenant_usage_latest WHERE tenant_id = @tenant");
+        command.Parameters.AddWithValue("tenant", tenantId);
+        return await command.ExecuteScalarAsync(cancellationToken) as long?;
     }
 
     /// <summary>

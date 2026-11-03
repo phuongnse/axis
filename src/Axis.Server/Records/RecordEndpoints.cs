@@ -19,7 +19,8 @@ namespace Axis.Server.Records;
 
 /// <summary>
 /// Endpoints for the records of an entity in the active release of an application. Every request
-/// is checked in order: session or bearer token (401), then the path (404), then the user's grant for
+/// is checked in order: session or bearer token (401), then for a create or an update, in a cell, the tenant's
+/// storage quota (403 <c>quota-exceeded</c>), then the path (404), then the user's grant for
 /// the entity and the action (403), then, for a list, the tenant's <c>concurrentQueries</c> lease (503 with
 /// <c>Retry-After: 1</c> when none is free after five seconds), and only then the query or body. A request without a session or with
 /// a bad bearer token is a 401 before the path is read, so it learns nothing about what exists.
@@ -89,8 +90,8 @@ internal static class RecordEndpoints
             records.MapGet("", ListAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
             records.MapGet("/{id}", GetAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
             records.MapGet("/{id}/history", HistoryAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
-            records.MapPost("", CreateAsync).WithWriteTimeout();
-            records.MapPatch("/{id}", UpdateAsync).WithWriteTimeout();
+            records.MapPost("", CreateAsync).WithStorageQuota().WithWriteTimeout();
+            records.MapPatch("/{id}", UpdateAsync).WithStorageQuota().WithWriteTimeout();
             records.MapDelete("/{id}", DeleteAsync).WithWriteTimeout();
 
             // Only a signed-in user exports, so a service account never reaches it. The literal segment wins over {id}.

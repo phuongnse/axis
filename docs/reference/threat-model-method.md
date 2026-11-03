@@ -12,7 +12,8 @@ How the threat model is filled, as [D106](../decisions/d106-a-threat-model-kept-
   - OWASP's agentic AI threats find the threats to the AI agents that write and review code.
 - **One row per threat.** The table has these columns: id, threat, boundary, category, rating,
   status and evidence. A scope letter and a number make an id, such as `P1`, `I1` or `B1`. An id is
-  unique on the whole page, so a later row or issue can name a threat by its id alone.
+  unique across every threat model file, so a later row or issue can name a threat by its id alone.
+  The model is split by scope, one file for each, see [threat model](threat-model.md).
 - **Rating.** The rating is Low, Medium, High or Critical. It comes from likelihood and impact, a
   short form of the OWASP Risk Rating Methodology.
   - A **Gap** has time to close, as a vulnerable dependency does, see
@@ -27,7 +28,7 @@ How the threat model is filled, as [D106](../decisions/d106-a-threat-model-kept-
   - **Accepted:** the owner accepts the threat. The evidence gives the reason and the date, as
     YYYY-MM-DD. Only the owner accepts a threat.
 - **Checked.** `scripts/check-docs.mjs` fails on these problems:
-  - an id that another row already uses, on the whole page
+  - an id that another row already uses, in the same file or in another threat model file
   - a status that is not one of the four above
   - a rating that is missing or is not one of the four above
   - a row without evidence

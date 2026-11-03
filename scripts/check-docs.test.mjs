@@ -434,6 +434,46 @@ describe('threat model table', () => {
     assert.deepEqual(messages(), [`${page}:${second}: P1 has a row already, on line ${first}`])
   })
 
+  describe('in more than one file', () => {
+    const scopeFile = 'docs/reference/threat-model-installation.md'
+    const writeScope = (rows) => {
+      const text = ['# Threat model: the installation', '', '## The installation', '', threatHeader, threatSeparator, ...rows, ''].join('\n')
+      write(scopeFile, text)
+      return text
+    }
+
+    beforeEach(() => {
+      write(
+        'docs/README.md',
+        '# Documentation\n\n| [Decisions](decisions.md) | [Guide](reference/guide.md) | [Threat model](reference/threat-model.md) | [Installation](reference/threat-model-installation.md) |\n',
+      )
+    })
+
+    test('reports an id that a row in another file already uses, naming that file and line', () => {
+      // The files are checked in path order, so the installation file comes first and threat-model.md has the repeat.
+      const first = writeScope([row('P1')])
+      const second = writePage()
+
+      assert.deepEqual(messages(), [
+        `${page}:${lineOf(second, '| P1 |')}: P1 has a row already, in ${scopeFile} on line ${lineOf(first, '| P1 |')}`,
+      ])
+    })
+
+    test('reports a bad row in a file other than threat-model.md, on that file and line', () => {
+      const text = writeScope([row('I10'), row('I11', { status: '**Done**' })])
+
+      assert.deepEqual(messages(), [
+        `${scopeFile}:${lineOf(text, '| I11 |')}: I11 status '**Done**' is not one of **Mitigated**, **Gap**, **Delegated**, **Accepted**`,
+      ])
+    })
+
+    test('finds a threat table in a file that no list of names holds', () => {
+      write('docs/reference/guide.md', ['# Guide', '', threatHeader, threatSeparator, row('G1', { rating: 'Severe' }), ''].join('\n'))
+
+      assert.deepEqual(messages(), [`docs/reference/guide.md:5: G1 rating 'Severe' is not one of Low, Medium, High, Critical`])
+    })
+  })
+
   test('reports a Mitigated row that names a test class no .cs file declares', () => {
     const text = writePage({ product: [row('P1', { status: '**Mitigated**', evidence: '`FooTests` and `MissingTests`.' }), row('P2')] })
 
@@ -458,19 +498,22 @@ describe('threat model table', () => {
 })
 
 describe('the repository threat model', () => {
-  const text = readFileSync(path.join(repositoryRoot, 'docs/reference/threat-model.md'), 'utf8').split('\n')
+  const scopes = [
+    ['threat-model-product.md', '## The product'],
+    ['threat-model-installation.md', '## The installation'],
+    ['threat-model-build.md', '## The way Axis is built'],
+  ]
 
-  test('has a threat table under each scope section', () => {
-    for (const heading of ['## The product', '## The installation', '## The way Axis is built']) {
-      const start = text.indexOf(heading)
-      assert.notEqual(start, -1, `${heading} is a section`)
-      const next = text.findIndex((line, i) => i > start && line.startsWith('## '))
-      assert.ok(text.slice(start + 1, next < 0 ? text.length : next).includes(threatHeader), `${heading} has the threat table`)
+  test('has a threat table under each scope section, in a file of its own', () => {
+    for (const [file, heading] of scopes) {
+      const text = readFileSync(path.join(repositoryRoot, 'docs/reference', file), 'utf8').split('\n')
+      assert.ok(text.includes(heading), `${file} has the section ${heading}`)
+      assert.ok(text.includes(threatHeader), `${file} has the threat table`)
     }
   })
 
-  test('finds no problem in the threat model', () => {
-    const found = checkDocs(repositoryRoot).filter(({ file }) => file === 'docs/reference/threat-model.md')
+  test('finds no problem in any threat model file', () => {
+    const found = checkDocs(repositoryRoot).filter(({ file }) => file.startsWith('docs/reference/threat-model'))
 
     assert.deepEqual(found, [])
   })

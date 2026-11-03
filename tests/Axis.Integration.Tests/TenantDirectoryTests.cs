@@ -771,6 +771,35 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             CancellationToken);
 
     [Fact]
+    public async Task In_a_cell_a_tenant_over_its_storage_quota_cannot_write_records_but_another_tenant_can()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
+        await SetQuotaAsync(platform, "a", QuotaKeys.Storage, 1000);
+        await using (var context = PlatformContext(platform))
+        {
+            context.TenantUsageLatest.Add(new TenantUsageLatestRow { TenantId = "a", DatabaseBytes = 2000, SampledAt = DateTimeOffset.UtcNow });
+            await context.SaveChangesAsync(CancellationToken);
+        }
+
+        await using var factory = CreateFactory(platform, new LogCollector(), _cellSettings);
+        using var client = factory.CreateClient().SignedInAs("requester");
+
+        using var refused = Request(HttpMethod.Post, Departments, "a.example.test", """{ "values": { "name": "Sales-a" } }""");
+        using var refusedResponse = await client.SendAsync(refused, CancellationToken);
+        await CreateDepartmentAsync(client, "b.example.test", "Sales-b");
+
+        using var problem = await ReadProblemAsync(refusedResponse, HttpStatusCode.Forbidden);
+        Assert.Equal("This tenant has reached its storage quota.", problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal("quota-exceeded", problem.RootElement.GetProperty("reason").GetString());
+        Assert.Equal(1000, problem.RootElement.GetProperty("limit").GetInt64());
+        Assert.Equal(2000, problem.RootElement.GetProperty("used").GetInt64());
+        Assert.DoesNotContain("Sales-a", await ListAsync(client, "a.example.test"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task In_a_cell_a_changed_quota_row_is_seen_after_the_next_directory_refresh()
     {
         var role = NewRole();

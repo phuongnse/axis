@@ -14,6 +14,7 @@ import {
   type MigrationChange,
 } from '../platform/entityMigrations'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
+import { QuotaRefusedError } from '../platform/quota'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
@@ -206,7 +207,7 @@ export function StudioEditor({
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [saveFailed, setSaveFailed] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
@@ -253,7 +254,7 @@ export function StudioEditor({
     setJsonInvalid(false)
     setConflict(false)
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
     setHistory(emptyHistory)
   }
 
@@ -270,7 +271,7 @@ export function StudioEditor({
     setJsonText(snapshot.jsonText)
     setJsonInvalid(snapshot.jsonText !== null && !isContent(tryParse(snapshot.jsonText)))
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
   }
 
   const undo = () => step(undoStep)
@@ -579,7 +580,7 @@ export function StudioEditor({
     setJsonText(null)
     setJsonInvalid(false)
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
   }
 
   function changeJson(text: string) {
@@ -588,7 +589,7 @@ export function StudioEditor({
     }
     setJsonText(text)
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
     let parsed: unknown
     try {
       parsed = JSON.parse(text)
@@ -637,7 +638,7 @@ export function StudioEditor({
       return
     }
     setSaving(true)
-    setSaveFailed(false)
+    setSaveError(null)
     try {
       let version: string
       let diagnostics: StudioDiagnostic[]
@@ -685,7 +686,7 @@ export function StudioEditor({
         lost()
       } else {
         console.warn(`Saving the resource '${item.id}' failed`, error)
-        setSaveFailed(true)
+        setSaveError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.saveFailed'))
       }
     } finally {
       setSaving(false)
@@ -958,7 +959,7 @@ export function StudioEditor({
           action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
         />
       )}
-      {saveFailed && <Alert data-testid="studio-save-error" type="error" title={t('shell.studio.saveFailed')} />}
+      {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
       {deleteFailed && <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />}
       <Flex gap="small" align="center">
         {undoable && (
