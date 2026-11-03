@@ -87,7 +87,7 @@ file.
 | --- | --- | --- | --- | --- |
 | `Tenancy:Source` | `Tenancy__Source` | server, worker | no | Set to `directory`. The default `configuration` reads a `Tenants` section, which is for development. |
 | `Tenancy:RefreshInterval` | `Tenancy__RefreshInterval` | server, worker | no | Optional. It defaults to 30 seconds. |
-| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server and the usage tables. |
+| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server, the usage tables, the leases and the daily counters. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it only at start. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | no | Secret. Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value. Add the variable or a secret file yourself. |
