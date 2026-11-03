@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import type { OwnAuthenticators } from '../platform/ownAuthenticators'
 import type { OwnSessions } from '../platform/ownSessions'
 import { assignLocation } from '../platform/navigation'
 import { TextProvider } from '../platform/TextProvider'
@@ -32,13 +33,34 @@ const sessions = (endAllowed: boolean): OwnSessions => ({
   ],
 })
 
+const authenticator = (id: string, label: string | null = 'Phone') => ({
+  id,
+  label,
+  createdAt: '2026-10-20T10:00:00Z',
+})
+
+const authenticatorsOf = (...ids: string[]): OwnAuthenticators => ({
+  account: true,
+  authenticators: ids.map((id) => authenticator(id)),
+})
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Stubs `fetch` with the list, which answers `list()`, and the end routes, which answer `end()`. */
-function stubServer(list: () => Response, end: () => Response = () => new Response(null, { status: 204 })) {
+/**
+ * Stubs `fetch` with the list, which answers `list()`, the end routes, which answer `end()`, and the
+ * authenticators, which answer `ownAuthenticators()`.
+ */
+function stubServer(
+  list: () => Response,
+  end: () => Response = () => new Response(null, { status: 204 }),
+  ownAuthenticators: () => Response = () => json(authenticatorsOf('totp-1')),
+) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (input === '/api/me/authenticators') {
+      return ownAuthenticators()
+    }
     if (input === '/api/me/sessions' && (init?.method ?? 'GET') === 'GET') {
       return list()
     }
@@ -107,7 +129,11 @@ describe('AccountPage', () => {
     const [input, init] = deleteCalls(fetchMock)[0]
     expect(input).toBe('/api/me/sessions/other%20id%2F1')
     expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([, init]) => !init?.method)).toHaveLength(2))
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([input, init]) => input === '/api/me/sessions' && !init?.method),
+      ).toHaveLength(2),
+    )
   })
 
   it('ends all other sessions, then loads the list again', async () => {
@@ -120,7 +146,11 @@ describe('AccountPage', () => {
     const [input, init] = deleteCalls(fetchMock)[0]
     expect(input).toBe('/api/me/sessions')
     expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([, init]) => !init?.method)).toHaveLength(2))
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([input, init]) => input === '/api/me/sessions' && !init?.method),
+      ).toHaveLength(2),
+    )
   })
 
   it('loads the list again after a 403, which now shows Sign in again', async () => {
@@ -166,6 +196,78 @@ describe('AccountPage', () => {
     renderPage()
 
     expect(await screen.findByText('Your sessions could not be loaded.')).toBeInTheDocument()
+    warn.mockRestore()
+  })
+
+  it('disables Remove on the only authenticator and enables it on each of two', async () => {
+    stubServer(
+      () => json(sessions(true)),
+      undefined,
+      () => json(authenticatorsOf('totp-1')),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Remove' })).toBeDisabled()
+  })
+
+  it('enables Remove when the person has two authenticators', async () => {
+    stubServer(
+      () => json(sessions(true)),
+      undefined,
+      () => json(authenticatorsOf('totp-1', 'totp-2')),
+    )
+    renderPage()
+
+    const buttons = await screen.findAllByRole('button', { name: 'Remove' })
+    expect(buttons).toHaveLength(2)
+    buttons.forEach((button) => expect(button).toBeEnabled())
+  })
+
+  it('sends Change password, Add and Remove to the identity provider through the sign-in route', async () => {
+    stubServer(
+      () => json(sessions(true)),
+      undefined,
+      () => json(authenticatorsOf('totp-1', 'totp-2')),
+    )
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Change password' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1])
+
+    expect(vi.mocked(assignLocation).mock.calls).toEqual([
+      ['/api/auth/sign-in?returnUrl=%2Faccount&action=UPDATE_PASSWORD'],
+      ['/api/auth/sign-in?returnUrl=%2Faccount&action=CONFIGURE_TOTP'],
+      ['/api/auth/sign-in?returnUrl=%2Faccount&action=delete_credential%3Atotp-2'],
+    ])
+  })
+
+  it('shows neither action to a user who is not an account, but still lists the sessions', async () => {
+    stubServer(
+      () => json(sessions(true)),
+      undefined,
+      () => json({ account: false, authenticators: [] }),
+    )
+    renderPage()
+
+    expect(await screen.findByText('This session')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Change password' })).not.toBeInTheDocument())
+    expect(screen.queryByText('Authenticators')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+  })
+
+  it('shows an error and no actions when the authenticators cannot be loaded', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer(
+      () => json(sessions(true)),
+      undefined,
+      () => new Response(null, { status: 500 }),
+    )
+    renderPage()
+
+    expect(await screen.findByTestId('authenticators-error')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Change password' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
     warn.mockRestore()
   })
 })
