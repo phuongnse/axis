@@ -580,10 +580,10 @@ This route has its own order of checks. The first failure is the response:
 1. The CSRF header `X-Axis-Csrf: 1`, `403`.
 2. The session, `401`.
 3. The author role, `403`.
-4. `Studio:ApplicationsPath` not set, `403`, titled "Studio cannot create
-   applications here."
-5. A body that is not `application/json`, `415`.
-6. A bad body, `400`. That is:
+4. `Studio:ApplicationsPath` not set, `403`, titled "Studio cannot create applications here."
+5. In a cell, the tenant at its applications quota, `403` with `reason` `quota-exceeded`, see [refusals](tenant-quotas.md#refusals).
+6. A body that is not `application/json`, `415`.
+7. A bad body, `400`. That is:
    - a body that is not a JSON object, or has a key other than `name` and
      `template`;
    - a `name` that does not match `^[A-Za-z][A-Za-z0-9]*$` or is longer than 60
@@ -591,11 +591,9 @@ This route has its own order of checks. The first failure is the response:
    - a `name` whose [kebab-case](#writes) form is longer than 60 characters, or
      is a reserved site path: `api`, `health`, `assets`, `studio`, `account`, `users` or `licences` _(planned for M31)_;
    - a `template` that is not a string.
-7. An unknown template, `404`. It is an `id` that no installed template has.
-8. A write lock that cannot be taken, `503`. See [Versions](#versions).
-9. A name already used, ignoring letter case, by an application of
-   `Studio:Folders` or of `Studio:ApplicationsPath`, or a target folder that
-   already exists, `409`.
+8. An unknown template, `404`. It is an `id` that no installed template has.
+9. A write lock that cannot be taken, `503`. See [Versions](#versions).
+10. A name already used, ignoring letter case, by an application of `Studio:Folders` or of `Studio:ApplicationsPath`, or a target folder that already exists, `409`.
 
 - **Atomic.** The whole folder is written to a hidden temporary folder,
   `.<kebab>-<random>`, inside `Studio:ApplicationsPath`, and then renamed to
