@@ -8,10 +8,11 @@ import type { AddAuthenticatorContext } from './signInContext'
 /**
  * The page that adds an authenticator: the QR code, the key to type by hand, the 6-digit code in six boxes and the
  * device name. The form is a real `<form method="post">` to the login address, with the code in `totp`, the secret in
- * `totpSecret`, the device name in `userLabel` and Keycloak's `mode` when it gave one.
+ * `totpSecret`, the device name in `userLabel` and Keycloak's `mode` when it gave one. When an application started the
+ * step, a second form below posts `cancel-aia=true`, which skips the checks and returns to the application.
  */
 export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorContext }) {
-  const { texts, error, loginAction, qrCode, manualKey, secret, mode, deviceNameRequired } = context
+  const { texts, error, loginAction, qrCode, manualKey, secret, mode, deviceNameRequired, appInitiated } = context
   const { colour } = useDesignTokens()
   const formId = useId()
   const [form] = Form.useForm<{ code?: string; userLabel?: string }>()
@@ -57,6 +58,14 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
           {texts.submit}
         </Button>
       </Form>
+      {appInitiated && (
+        <form method="post" action={loginAction}>
+          <input type="hidden" name="cancel-aia" value="true" />
+          <Button htmlType="submit" name="cancel-aia" value="true" block>
+            {texts.cancel}
+          </Button>
+        </form>
+      )}
     </IdentityFrame>
   )
 }

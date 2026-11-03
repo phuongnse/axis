@@ -1,6 +1,6 @@
 <#-- The Axis page that adds an authenticator, where the person scans the QR code or types the key and enters the 6-digit
      code. It writes Keycloak's data as JSON into the same element as login.ftl and the React bundle draws the page from
-     it. The "page" field tells the bundle which page to draw. Keycloak escapes output as HTML, so every string goes
+     it. When an application started the step, the page shows Cancel. The "page" field tells the bundle which page to draw. Keycloak escapes output as HTML, so every string goes
      through ?json_string?no_esc: ?json_string also escapes "</", which keeps the script element closed. -->
 <#import "frame.ftl" as frame>
 <!DOCTYPE html>
@@ -26,6 +26,9 @@
     "mode": "${mode?json_string?no_esc}",
     </#if>
     "deviceNameRequired": ${(totp.otpCredentials?size gte 1)?c},
+    <#if isAppInitiatedAction??>
+    "appInitiated": true,
+    </#if>
     <@frame.locales/>
     <@frame.texts/>
     "texts": {
@@ -37,7 +40,8 @@
       "codeRequired": "${msg("axisTwoStepMessage")?json_string?no_esc}",
       "deviceName": "${msg("axisDeviceName")?json_string?no_esc}",
       "deviceNameRequired": "${msg("axisDeviceNameRequired")?json_string?no_esc}",
-      "submit": "${msg("axisAddAuthenticator")?json_string?no_esc}"
+      "submit": "${msg("axisAddAuthenticator")?json_string?no_esc}",
+      "cancel": "${msg("axisCancel")?json_string?no_esc}"
     }
   }
   </script>
