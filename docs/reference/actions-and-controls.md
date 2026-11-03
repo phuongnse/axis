@@ -38,6 +38,9 @@ A button's level follows its role, so the same kind of action always has the sam
   as its accessible name, from the text resources. Configuration never names an icon, so the platform gives an icon
   only to an action whose meaning it knows. At narrow width row actions fold into a menu of text entries, so touch
   users lose nothing.
+- **A tooltip goes with the pointer** _(planned for M31)_. A click on an icon-only button closes its tooltip until the
+  pointer comes back, and focus that a click or a closing dialog gives the button opens none. Keyboard focus still
+  shows it.
 
 ## Menus
 
@@ -62,3 +65,43 @@ shared `ConfigProvider`, so no widget keeps its own copy _(planned for M31)_.
 - **An error border keeps 3:1.** An input, number input, select, date picker, mentions, cascader or tree select with
   an error, and an unticked checkbox or radio in a field with an error, take `dangerText` for their border, the colour
   of the field's message. The `danger` fill stays for fills such as a danger button, whose white text needs it.
+
+## Text
+
+These rules hold for every word the SPA shows ([D129](../decisions/d129-rules-from-the-studio-editors-review.md))
+_(planned for M31)_.
+
+- **No technical name.** What the UI shows is a text, never an internal code, a resource's file or a key: a label,
+  else a name an author gave, see [names](studio-workspace.md#names).
+- **No middle dot as a separator.** Peers join as words do, with a comma, as in "2 errors, 1 warning". A state is a
+  sentence, as in "Release 7 is live". Facts of different kinds take a column or a line of their own, such as when a
+  release was published and by whom. The "·" glues facts of different kinds into one line with no order, and a screen
+  reader may read it out.
+- **No value is a dash.** A table cell with no value shows the muted em dash, a form or a detail "Not set", see the
+  empty values of [frontend](frontend.md). Never nothing, which cannot tell "not given" from "not loaded", and never
+  N/A, which says "does not apply" and does not translate.
+
+## Tables
+
+Every table of the platform, the `table` widget, Studio's, the console's and the users page's, is drawn by one shared
+table, `AxisTable` in `web/src/platform/`, on Ant Design's table
+([D129](../decisions/d129-rules-from-the-studio-editors-review.md)) _(planned for M31)_. Tables that each go their own
+way cannot be kept right, so a lint rule refuses `Table` from `antd` anywhere but `AxisTable.tsx`.
+
+- **Toolbar.** D96's toolbar holds for every table: the view controls, search and filters, on the left; Refresh, the
+  secondary actions such as Import and Export, and the main action last, on the right. Their places and looks are
+  fixed; whether a table has each depends on what it needs, so a short list has no search.
+- **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a status tag or the
+  row's icon actions, is as wide as its content and never wraps. The columns of free text share the width left in
+  equal parts, and their text wraps at 320 px. A table with no free text gives the width left to its last column.
+  Every cell keeps `spacing-lg` on each side. Numbers sit on the right in tabular figures.
+- **Rows.** Every row and the header are the `tableRow` size high, 40 px, whatever they hold, icon buttons included:
+  `spacing-xs` above and below a `smallControl` line. A row of more lines grows and reads from the same first line.
+- **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as open, delete
+  or activate a release, is an icon button; one an author configured keeps its text. From three actions on, or below
+  992 px, they fold into one "…" menu of text entries.
+- **Paging and scrolling.** A long table pages, and one narrower than its columns' content scrolls sideways rather
+  than squeezing them.
+- **Bulk actions** _(Proposed)_. Selecting rows is for bulk actions alone: a table shows checkboxes only when it has a
+  bulk action, and a selection shows an "N selected" bar that holds them.
+  [D59](../decisions/d59-table-row-and-toolbar-actions.md) left bulk actions for later.

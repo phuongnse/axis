@@ -331,11 +331,108 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         Assert.Empty(await mailpit.MessagesToAsync(address, CancellationToken));
     }
 
+    [Fact]
+    public async Task Cell_worker_with_a_quota_of_two_sends_two_emails_holds_the_third_until_the_next_UTC_day_and_then_sends_it_in_order()
+    {
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var staged = new[]
+        {
+            await StageAsync(releaseId, model, viProfile: false),
+            await StageAsync(releaseId, model, viProfile: false),
+            await StageAsync(releaseId, model, viProfile: false),
+        };
+        var held = Assert.Single(await EmailsAsync(staged[2].Title));
+        var (platform, catalog) = await PlatformAsync();
+
+        // The next midnight is then in the future by the database clock too, so a held item is not claimed again at once.
+        var clock = new ManualClock(DateTimeOffset.UtcNow.AddDays(1));
+        await using var worker = CellWorker(platform, catalog, clock, new LogCollector(), cell: true);
+        var day = clock.Today;
+
+        await RunUntilIdleAsync(worker);
+
+        var first = await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true);
+        Assert.Equal(staged.Take(2).Select(email => $"Request {email.Title}"), first.Select(message => message.Subject));
+        Assert.Equal("pending", Assert.Single(await EmailsAsync(staged[2].Title)).State);
+        Assert.Equal(1L, await ItemCountAsync([held.Id]));
+        Assert.Equal(new DateTimeOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero), await DueAtAsync(held.Id));
+        Assert.Equal(2L, await CounterAsync(platform, day));
+
+        clock.Advance(TimeSpan.FromDays(1));
+        await fixture.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE email_id = @id", ("id", held.Id));
+        await RunUntilIdleAsync(worker);
+
+        var all = await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true);
+        Assert.Equal(staged.Select(email => $"Request {email.Title}"), all.Select(message => message.Subject));
+        Assert.Equal("sent", Assert.Single(await EmailsAsync(staged[2].Title)).State);
+        Assert.Equal(0L, await ItemCountAsync([held.Id]));
+        Assert.Equal(1L, await CounterAsync(platform, clock.Today));
+        Assert.Equal(2L, await CounterAsync(platform, day));
+    }
+
+    [Fact]
+    public async Task Cell_worker_with_the_days_quota_used_up_still_stores_the_in_app_notification_of_a_notify_step_and_keeps_its_email_pending()
+    {
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var subjectId = await fixture.InsertRequestAsync(500m, 4);
+        var title = $"Request {subjectId:N}";
+        var (platform, catalog) = await PlatformAsync();
+        var clock = new ManualClock(DateTimeOffset.UtcNow.AddDays(1));
+        await PostgreSqlServer.AdminScalarAsync(
+            platform,
+            $"INSERT INTO platform.tenant_daily_counters (tenant_id, day, counter, value) VALUES ('{fixture.Tenant}', '{clock.Today:yyyy-MM-dd}', 'emails', 2)",
+            CancellationToken);
+        await using var worker = CellWorker(platform, catalog, clock, new LogCollector(), cell: true);
+        await fixture.StartAsync("NotifyMail", subjectId, releaseId, model);
+
+        // The worker runs the steps itself, so the notify step runs under the cell's configuration.
+        await RunUntilIdleAsync(worker);
+
+        Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.notifications WHERE \"values\"->>'title' = @title", ("title", title)));
+        var email = Assert.Single(await EmailsAsync(title));
+        Assert.Equal("pending", email.State);
+        Assert.Equal(1L, await ItemCountAsync([email.Id], "AND due_at > now() AND claim_token IS NULL"));
+        Assert.Empty(await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true));
+        Assert.Equal(2L, await CounterAsync(platform, clock.Today));
+    }
+
+    [Fact]
+    public async Task Worker_without_a_cell_id_sends_all_three_emails_and_writes_no_daily_counter()
+    {
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var titles = new List<string>();
+        for (var i = 0; i < 3; i++)
+        {
+            titles.Add((await StageAsync(releaseId, model, viProfile: false)).Title);
+        }
+
+        var (platform, catalog) = await PlatformAsync();
+
+        // The quota default is ignored outside a cell.
+        await using var worker = CellWorker(platform, catalog, new ManualClock(DateTimeOffset.UtcNow), new LogCollector(), cell: false);
+
+        await RunUntilIdleAsync(worker);
+
+        Assert.Equal(titles.Select(title => $"Request {title}"), (await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true)).Select(message => message.Subject));
+        Assert.All(titles, async title => Assert.Equal("sent", Assert.Single(await EmailsAsync(title)).State));
+        Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_daily_counters", CancellationToken));
+    }
+
     /// <summary>
     /// A directory catalog loaded from a platform database whose tenant has its own mail settings, which point at the Mailpit
     /// server that needs a password. The tenant's database is the fixture's.
     /// </summary>
-    private async Task<DirectoryTenantCatalog> DirectoryCatalogAsync()
+    private async Task<DirectoryTenantCatalog> DirectoryCatalogAsync() => (await PlatformAsync()).Catalog;
+
+    /// <summary>
+    /// The admin connection string of a migrated platform database, which the reader role of the cell grants are applied to, and the
+    /// directory catalog loaded from it. Its tenant is the fixture's and has its own mail settings, which point at the Mailpit
+    /// server that needs a password.
+    /// </summary>
+    private async Task<(string Platform, DirectoryTenantCatalog Catalog)> PlatformAsync()
     {
         var platform = await fixture.CreateDatabaseAsync("platform");
         var cipher = AdminScenario.Cipher;
@@ -363,7 +460,13 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
             await context.SaveChangesAsync(CancellationToken);
         }
 
-        return await DirectoryTenantCatalog.LoadAsync(platform, cipher, CancellationToken);
+        await using (var connection = new NpgsqlConnection(platform))
+        {
+            await connection.OpenAsync(CancellationToken);
+            await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, CancellationToken);
+        }
+
+        return (platform, await DirectoryTenantCatalog.LoadAsync(platform, cipher, CancellationToken));
     }
 
     private static string UniqueAddress() => $"ops+{Guid.NewGuid():N}@example.test";
@@ -476,6 +579,52 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         return services.BuildServiceProvider();
     }
 
+    /// <summary>
+    /// A worker that reads the tenant from <paramref name="platform"/> and, with <paramref name="cell"/>, runs as part of a cell
+    /// whose default quota is two emails a day. The host never starts. It runs in Development, since Mailpit has no TLS.
+    /// </summary>
+    private static ServiceProvider CellWorker(string platform, ITenantCatalog catalog, TimeProvider clock, LogCollector logs, bool cell)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Tenancy:Source"] = "directory",
+            ["ConnectionStrings:Platform"] = PostgreSqlServer.RuntimeConnectionString(platform),
+            ["Platform:SecretKey"] = TestPlatform.SecretKey,
+            ["Quotas:Defaults:emailsPerDay"] = "2",
+        };
+        if (cell)
+        {
+            values["Cell:Id"] = "vn-1";
+            values["Cell:Region"] = "vn";
+            values["Cell:TenantDomain"] = "vn.example.test";
+        }
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        var services = new ServiceCollection()
+            .AddLogging(logging => logging.AddProvider(logs))
+            .AddSingleton(clock)
+            .AddAxisWorker(configuration, new HostingEnvironment { EnvironmentName = "Development" });
+
+        // The last registration wins, so the handler and the quota find the tenant in this catalog.
+        services.AddSingleton(catalog);
+        return services.BuildServiceProvider();
+    }
+
+    private async Task<DateTimeOffset> DueAtAsync(Guid emailId)
+    {
+        await using var command = fixture.DataSource.CreateCommand("SELECT due_at FROM axis.process_work_items WHERE email_id = @id");
+        command.Parameters.AddWithValue("id", emailId);
+        return new DateTimeOffset(DateTime.SpecifyKind((DateTime)(await command.ExecuteScalarAsync(CancellationToken))!, DateTimeKind.Utc));
+    }
+
+    private async Task<long> CounterAsync(string platform, DateOnly day) =>
+        Convert.ToInt64(
+            await PostgreSqlServer.AdminScalarAsync(
+                platform,
+                $"SELECT coalesce(sum(value), 0) FROM platform.tenant_daily_counters WHERE tenant_id = '{fixture.Tenant}' AND day = '{day:yyyy-MM-dd}' AND counter = 'emails'",
+                CancellationToken),
+            System.Globalization.CultureInfo.InvariantCulture);
+
     private async Task RunUntilIdleAsync(ServiceProvider worker)
     {
         var runner = worker.GetRequiredService<WorkItemRunner>();
@@ -518,4 +667,15 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     }
 
     private sealed record StagedEmail(Guid Id, string MessageId, string State, DateTimeOffset? SentAt);
+
+    private sealed class ManualClock(DateTimeOffset start) : TimeProvider
+    {
+        private long _ticks = start.UtcTicks;
+
+        public DateOnly Today => DateOnly.FromDateTime(GetUtcNow().UtcDateTime);
+
+        public override DateTimeOffset GetUtcNow() => new(Interlocked.Read(ref _ticks), TimeSpan.Zero);
+
+        public void Advance(TimeSpan by) => Interlocked.Add(ref _ticks, by.Ticks);
+    }
 }

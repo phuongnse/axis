@@ -184,6 +184,17 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     }
 
     [Fact]
+    public async Task Outside_a_cell_a_create_is_never_refused_for_a_quota()
+    {
+        using var setup = await Setup.StartAsync(database, quotaDefaults: true);
+        using var client = setup.Factory.CreateClient().SignedInAs("author");
+
+        using var response = await PostAsync(client, """{ "name": "PurchaseOrders" }""");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
     public async Task A_create_whose_second_file_fails_leaves_nothing_in_the_applications_path()
     {
         using var setup = await Setup.StartAsync(database, writer: new FailingOnSecondFileWriter());
@@ -276,7 +287,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
 
         public string TemplatesPath => _templates.Path;
 
-        public static async Task<Setup> StartAsync(PostgreSqlFixture database, bool applicationsPath = true, IStudioFileWriter? writer = null)
+        public static async Task<Setup> StartAsync(PostgreSqlFixture database, bool applicationsPath = true, IStudioFileWriter? writer = null, bool quotaDefaults = false)
         {
             var platform = await database.CreateDatabaseAsync("studio_create", CancellationToken);
             var setup = new Setup(null!);
@@ -297,6 +308,11 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                 }
 
                 builder.UseSetting("Templates:Path", setup._templates.Path);
+                if (quotaDefaults)
+                {
+                    builder.UseSetting("Quotas:Defaults:applications", "0");
+                }
+
                 builder.UseTestOidc("default");
                 builder.UseTestAuthentication(
                     new TestIdentity("author", "Author User", "author"),

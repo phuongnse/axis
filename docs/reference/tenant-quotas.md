@@ -9,7 +9,11 @@ self-hosted installation has no quotas: they are on only when `Cell:Id` is set.
 In place: the `platform.tenant_quotas` table, the cell's defaults and the reading of both with the
 directory. The server and the worker answer a tenant's effective quota from them, and answer no limit
 outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
-[usage](#usage) says. Refusals and leases are still planned, and so are the usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
+[usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
+`emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
+event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. The
+other refusals, among them the first sign-in of a brokered user, and the leases are still planned, and so are the
+usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
 
 The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
 what one tenant uses in total or at once. A rate limit limits how fast one caller asks.
@@ -19,7 +23,7 @@ what one tenant uses in total or at once. A rate limit limits how fast one calle
 | Quota | What it counts | Default | Kind |
 | --- | --- | --- | --- |
 | `storage` | The tenant database's size plus the bytes of its stored files, in bytes | 10 GiB | Sampled |
-| `users` | The enabled accounts of the tenant's realm, invited ones included | 50 | Exact |
+| `users` | The enabled users of the tenant's realm, invited and brokered ones included, without service accounts | 50 | Exact |
 | `applications` | The applications of the tenant: folders in its Studio folder and applications with a release | 10 | Exact |
 | `emailsPerDay` | Emails sent for the tenant since 00:00 UTC | 1,000 | Exact |
 | `concurrentImports` | Imports and exports that run at once | 2 | Lease |
@@ -101,11 +105,26 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 
 ## Emails a day
 
-- The worker counts each email it sends in `platform.tenant_daily_counters`, keyed by tenant, day
-  (UTC) and counter, in the transaction that marks the email sent.
-- An email past the quota is held, not dropped. Held emails are sent in order after 00:00 UTC, still
-  under the next day's quota. In-app notifications are never held.
+- **Counting.** In a cell the worker takes one slot of the tenant's count for the day just before it
+  sends an email. `platform.tenant_daily_counters` holds the count, keyed by tenant, day (UTC) and
+  counter, and emails use the counter `emails`. One statement on the platform database checks the
+  quota and adds one, so workers that send at the same time cannot pass it. It is a short
+  transaction of its own, since the platform and the tenant databases cannot commit together.
+- **Failure.** A send that fails gives its slot back. A worker that crashes between the send and the
+  mark of the row sends the email again and counts it twice. A send cancelled at shutdown keeps its slot.
+- **Held emails.** An email past the quota is held, not dropped. Its row stays `pending` and its work
+  item is due at the next 00:00 UTC by the worker's clock. After midnight held emails are sent in the
+  order their items were queued, to the millisecond, and count against the new day's quota. A quota of
+  0 holds every email. A tenant with no limit is counted and never held.
+- **In-app notifications** are never held. A `notify` step stores its in-app notification when the
+  day's emails are used up.
+- **Platform database down.** When a slot cannot be taken, the email is not sent, its item is due again
+  after one lease, and the worker logs one warning for the tenant.
+- **Outside a cell** nothing is counted or held.
+- The platform reader role gets `INSERT` and `UPDATE` on the table, and no `DELETE`. Old rows are kept,
+  one small row for each tenant and day.
 - The tenant's administrators get one in-app notification the first time a day that emails are held.
+  _(planned for M31)_
 
 ## Usage
 

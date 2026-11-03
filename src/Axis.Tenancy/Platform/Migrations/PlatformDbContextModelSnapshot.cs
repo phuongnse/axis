@@ -138,6 +138,33 @@ namespace Axis.Tenancy.Platform.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantDailyCounterRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<string>("Counter")
+                        .HasColumnType("text")
+                        .HasColumnName("counter");
+
+                    b.Property<long>("Value")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value");
+
+                    b.HasKey("TenantId", "Day", "Counter")
+                        .HasName("pk_tenant_daily_counters");
+
+                    b.ToTable("tenant_daily_counters", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_daily_counters_value", "value >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantDataKeyRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -591,6 +618,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_bindings_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantDailyCounterRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_daily_counters_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantDataKeyRow", b =>

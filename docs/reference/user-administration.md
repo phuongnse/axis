@@ -115,6 +115,11 @@ seven commands are built. The invite, resend an invitation, disable, enable and 
     scheme and host of the request. Resend checks in the same order up to the realm user (`404`, also for a service account)
     and answers `409` for a user of a brokered provider, for a person who has signed in, and for a user with a password, even
     one who never signed in to Axis. It needs no recent login, because it gives no new right.
+  - In a cell, the invite and enable routes also refuse a change that would pass the tenant's `users` quota, see
+    [refusals](tenant-quotas.md#refusals). Invite answers the quota `403` after `401`, `403` and `404` and before it reads
+    the body, so a malformed body gets the quota `403` too. Enable of a disabled user answers it after the realm user
+    lookup. Enabling a user who is already enabled is never refused, and the other commands are not checked. Nothing is
+    changed in the realm. When the identity provider fails while counting, the route answers `502`.
   - Enable and reset an authenticator need no recent login. For a user of a brokered provider, reset an authenticator
     answers `409` and changes nothing.
   - The realm steps run first. When the identity provider fails, the route answers `502` with a fixed title, and the
