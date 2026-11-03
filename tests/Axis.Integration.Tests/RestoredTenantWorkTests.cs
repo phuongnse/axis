@@ -172,7 +172,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         new NpgsqlConnectionStringBuilder(fixture.Scenario.Platform) { Database = row.DatabaseName }.ConnectionString;
 
     // A worker on the tenant directory. It runs as Development, the only environment that lets a connector call an http URL.
-    private static async Task<WebApplication> BuildWorkerAsync(string platform)
+    internal static async Task<WebApplication> BuildWorkerAsync(string platform)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>

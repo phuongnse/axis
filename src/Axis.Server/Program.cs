@@ -247,6 +247,12 @@ app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment()
 // Outermost after the security headers, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
 
+// Only the directory source has a platform database to send the wake signal on.
+if (directorySource)
+{
+    app.UseWorkSignals();
+}
+
 // Before tenant resolution, so the forwarded host picks the tenant. The built-in middleware skips the proxy check
 // when a request has no client address, so such a request is kept out of it. Off when no proxy is named.
 if (!forwardedHeaders.IsEmpty)

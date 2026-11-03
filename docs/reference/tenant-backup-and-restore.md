@@ -278,7 +278,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `cell backup` command and the chart's CronJob, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `cell backup` command with its metric `axis.backup.last_success`, and the chart's CronJob, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -315,9 +315,15 @@ format and the steps above stay, with the changes below.
   object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`, where the date is the UTC date when the run starts. A
   `provisioning` tenant is skipped. Each archive is encrypted with the tenant's own backup key,
   written to a temporary folder that only its owner can use, uploaded and deleted. The command writes one platform audit
-  record for each tenant, `cell backup`, before the first try, and a retry writes none. The metric
-  `axis.backup.last_success` for each tenant is _(planned for M31)_. A failed tenant is tried again once, at once,
+  record for each tenant, `cell backup`, before the first try, and a retry writes none. A failed tenant is tried again once, at once,
   and the others go on. The run ends within 6 hours: after that it stops and exits with code `1`.
+  - **Last success** _(built)_. After a tenant's archive is uploaded, the command stores the time of the upload, from the clock of the
+    admin tool, in `platform.tenant_backups`. A tenant that fails keeps the time it had. At the end of the run, also when it
+    stopped at its limit, the command records the gauge `axis.backup.last_success` for each `active` and `suspended` tenant that has a
+    stored time. The value is in Unix seconds and the tag `axis.tenant` names the tenant. A tenant that never succeeded has no
+    point. When `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` is set, the command exports the gauge over
+    OTLP before it exits, see [telemetry export](host-settings.md#telemetry-export). With no endpoint, nothing is exported. An alert
+    on a gauge that is too old is _(planned for M31)_.
   - **Settings.** `Cell:BackupStorage:ServiceUrl`, `:Region`, `:Bucket`, `:AccessKeyId` and `:SecretAccessKey` name
     an S3-compatible service, reached with the AWS SDK and path-style addressing, see
     [host settings](host-settings.md#cell-settings). All five are required. The command also needs `Cell:Id`,
@@ -327,9 +333,12 @@ format and the steps above stay, with the changes below.
     `key` (the tenant has no backup key or it does not unwrap), `check` (the tenant cannot be backed up, for example
     because it is no longer in the directory), `dump`, `archive` or `upload`. The message of `upload` is the error code of the service or the
     name of the error type, never the address or a key. When the time runs out, the last line is
-    `cell backup stopped: the run reached its 6-hour limit`. No line holds the secret access key.
+    `cell backup stopped: the run reached its 6-hour limit`. A tenant whose upload time cannot be stored writes
+    `<tenant id> record failed: <message>` after its upload, counts as failed and is not uploaded again. When the gauge cannot be
+    recorded, the last line is `cell backup metric failed: <message>`, and the command exits `1`. No line holds the secret access key.
   - **Exit codes.** `0` when every tenant succeeded. `1` when any tenant failed or the time ran out. `2` outside a cell
-    or when a setting or `pg_dump` is missing, before anything is uploaded or audited.
+    or when a setting or `pg_dump` is missing, or when an OTLP endpoint setting is not an absolute `https` URL outside Development,
+    before anything is uploaded or audited.
 - **Object lock.** The bucket has object lock in compliance mode for 30 days and a lifecycle rule
   that deletes an archive after 30 days. Nobody, the operator included, can delete or change an
   archive before then.

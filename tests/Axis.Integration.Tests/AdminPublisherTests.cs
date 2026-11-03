@@ -54,6 +54,53 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task A_publish_sends_the_wake_signal_only_when_a_schedule_trigger_is_already_past_due()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        await using var listener = await WorkSignalListener.StartAsync(scenario.Platform);
+        var snapshot = await SnapshotAsync(
+            null,
+            ("triggers/wake-test.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "trigger",
+              "name": "WakeTest",
+              "formatVersion": 1,
+              "type": "schedule",
+              "schedule": "0 6 * * *",
+              "timeZone": "UTC",
+              "dataSource": "WakeTestRequests",
+              "process": "PurchaseRequestApproval"
+            }
+            """),
+            ("data-sources/wake-test-requests.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "dataSource",
+              "name": "WakeTestRequests",
+              "formatVersion": 1,
+              "entity": "PurchaseRequest",
+              "fields": [{ "name": "title", "path": "title" }]
+            }
+            """));
+
+        // The next occurrence is in the future, so the publish adds nothing that is due.
+        var first = await QueueAsync(scenario, ids[0], snapshot);
+        Assert.Equal(0, (await RunPublisherAsync(scenario, ids[0], first)).Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{first}'"));
+        Assert.False(await listener.ReceivesAsync(ids[0], TimeSpan.FromSeconds(2)));
+
+        // A trigger with the same schedule keeps its stored occurrence, which is now past.
+        await ScalarAsync(scenario, ids[0], "UPDATE axis.trigger_schedules SET next_occurrence_at = now() - interval '1 hour'");
+        var second = await QueueAsync(scenario, ids[0], snapshot);
+        Assert.Equal(0, (await RunPublisherAsync(scenario, ids[0], second)).Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{second}'"));
+        Assert.True(await listener.ReceivesAsync(ids[0], TimeSpan.FromSeconds(10)));
+        Assert.False(await listener.ReceivesAsync(ids[1], TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
     public async Task A_publish_that_does_not_compile_fails_with_the_diagnostic_and_keeps_the_active_release()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -814,7 +861,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     // Every JSON file of the sample, as the publish route will store it. A title field that is replaced makes the entity not compile.
-    private static async Task<string> SnapshotAsync(string? breakTitle)
+    private static async Task<string> SnapshotAsync(string? breakTitle, params (string File, string Content)[] extra)
     {
         var items = new JsonArray();
         foreach (var path in Directory.EnumerateFiles(_sample, "*.json", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
@@ -830,6 +877,11 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
             }
 
             items.Add(new JsonObject { ["file"] = file, ["version"] = Convert.ToHexStringLower(SHA256.HashData(bytes)), ["content"] = content });
+        }
+
+        foreach (var (file, content) in extra)
+        {
+            items.Add(new JsonObject { ["file"] = file, ["version"] = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))), ["content"] = content });
         }
 
         return items.ToJsonString();
