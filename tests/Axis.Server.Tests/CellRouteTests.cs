@@ -1,0 +1,126 @@
+using Axis.Server.Authentication;
+using Axis.Server.CellApi;
+using Axis.Tenancy;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
+
+namespace Axis.Server.Tests;
+
+/// <summary>
+/// Every route under <c>/api/cell/</c> is a route of the provisioning API: it carries the operator route marker and
+/// the cell operator policy, and it is never open. The routes come from the server's endpoint data source, so a route added
+/// to the group later is checked without anyone adding it here. A cell with a console host also needs the address of the
+/// identity provider at start.
+/// </summary>
+public sealed class CellRouteTests
+{
+    // Port 1 on loopback refuses connections immediately, and these tests never reach the database.
+    private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
+
+    [Fact]
+    public async Task Every_route_under_api_cell_needs_the_operator_policy_and_is_never_open()
+    {
+        await using var factory = CreateFactory();
+
+        var routes = CellRoutes(factory).ToList();
+
+        Assert.NotEmpty(routes);
+        Assert.All(routes, route =>
+        {
+            var name = route.RoutePattern.RawText;
+            Assert.True(route.Metadata.GetMetadata<CellOperatorRoute>() is not null, $"{name} has no operator route marker.");
+            Assert.Contains(
+                route.Metadata.GetOrderedMetadata<IAuthorizeData>(),
+                data => data.Policy == CellOperator.Policy);
+            Assert.True(route.Metadata.GetMetadata<IAllowAnonymous>() is null, $"{name} allows anonymous access.");
+        });
+    }
+
+    [Fact]
+    public async Task The_provisioning_API_reads_the_tenants_and_changes_nothing_yet()
+    {
+        await using var factory = CreateFactory();
+
+        var names = CellRoutes(factory)
+            .SelectMany(route => (route.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["*"])
+                .Select(method => $"{method} {route.RoutePattern.RawText}"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(["GET /api/cell/tenants", "GET /api/cell/tenants/{id}"], names);
+    }
+
+    [Fact]
+    public async Task A_cell_with_a_console_host_and_no_identity_provider_address_stops_at_start_naming_the_setting()
+    {
+        await using var factory = CreateFactory(
+            ("Tenancy:Source", "directory"),
+            ("Cell:Id", "vn-1"),
+            ("Cell:Region", "vn"),
+            ("Cell:TenantDomain", "vn.example.test"),
+            ("Cell:ConsoleHost", "console.test"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("IdentityProvider:Url", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_cell_without_a_console_or_internal_host_needs_no_identity_provider_address()
+    {
+        var cell = new CellOptions { Id = "vn-1", Region = "vn", TenantDomain = "vn.example.test" };
+        var configuration = new ConfigurationBuilder().Build();
+
+        var authority = CellOperator.Load(configuration, cell, new HostingEnvironment());
+
+        Assert.Null(authority);
+    }
+
+    [Fact]
+    public void The_operator_realm_is_found_under_the_identity_provider_address()
+    {
+        var cell = new CellOptions
+        {
+            Id = "vn-1",
+            Region = "vn",
+            TenantDomain = "vn.example.test",
+            ConsoleHost = "console.test",
+            OperatorRealm = "ops",
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["IdentityProvider:Url"] = "https://id.example.test/auth" })
+            .Build();
+
+        var authority = CellOperator.Load(configuration, cell, new HostingEnvironment { EnvironmentName = Environments.Production });
+
+        Assert.Equal(new Uri("https://id.example.test/auth/realms/ops"), authority);
+    }
+
+    private static IEnumerable<RouteEndpoint> CellRoutes(WebApplicationFactory<Program> factory) =>
+        factory.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
+            .Where(route => route.RoutePattern.RawText?.StartsWith("/api/cell", StringComparison.Ordinal) == true);
+
+    private static WebApplicationFactory<Program> CreateFactory(params (string Key, string Value)[] settings) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseTestPlatform();
+            foreach (var (key, value) in settings)
+            {
+                builder.UseSetting(key, value);
+            }
+
+            builder.UseSetting("Tenants:default:Hosts:0", "localhost");
+            builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
+            builder.UseTestOidc("default");
+        });
+}

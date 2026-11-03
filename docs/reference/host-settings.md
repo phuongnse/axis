@@ -611,7 +611,8 @@ settings at start. With `Cell:Id` set they need `Tenancy:Source=directory`, `Cel
 `Cell:TenantDomain`. The id is the region, a hyphen and a number, such as `vn-1`, and the region
 uses lowercase letters and digits. A wrong value stops the start and the message names the
 setting. `Axis.Admin` refuses every command with exit code 2. The features the settings turn on
-are still planned.
+are still planned, except the read routes of the
+[provisioning API](tenant-lifecycle.md#provisioning-api).
 
 In a cell the server and the worker also read and check `Quotas:Defaults`. Each child must be a
 [quota](tenant-quotas.md#quotas) key and its value a whole number of zero or more. An unknown key or a
@@ -631,6 +632,7 @@ does not read `Quotas:Defaults` yet.
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
+| `IdentityProvider:Url` | Server | In a cell with `Cell:ConsoleHost` or `Cell:InternalUrl` set, the server reads the identity provider's address, described in the [admin settings](#admin-settings), and finds the operator realm at `realms/<Cell:OperatorRealm>` under it. A missing or wrong value stops the start, and the message names the setting. |
 | `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup` and `tenant restore` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |
 | `Worker:Concurrency` | Worker | The loops that claim work at once, 4 by default, see [fair share](worker-scheduling.md#fair-share). |

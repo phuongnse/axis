@@ -4,8 +4,9 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_. A self-hosted installation keeps the `Axis.Admin`
-commands of [administration](administration.md). The conventions of
+Everything in this file is _(planned for M31)_, except the two read routes of the
+[provisioning API](#provisioning-api), which answer in a cell that has a console or internal host. A
+self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
 ## Provisioning API
@@ -15,28 +16,37 @@ commands run against a cell and M33's control plane all call it, so each operati
 implementation.
 
 - **Where it answers.** Under `/api/cell/` on the cell console's host, `Cell:ConsoleHost`, and on
-  the server's internal listener, `Cell:InternalUrl`, which only the cell's network reaches. A tenant
-  host answers `404` for every path under `/api/cell/`.
+  the host of the server's internal listener, `Cell:InternalUrl`, which only the cell's network
+  reaches. Both are platform hosts: they resolve no tenant, the health probes still answer there, and
+  every path outside `/api/cell/` answers `404`, the page at `/` included. A tenant host answers `404`
+  for every path under `/api/cell/`, before any sign-in work. A self-hosted installation has no
+  platform host, so every `/api/cell/` path answers `404`. The server opens no separate internal
+  listener yet, and `Cell:ConsoleAllowedNetworks` is not enforced yet _(planned for M31)_.
 - **Who may call.** A caller signs in through the cell's [operator realm](cell-console.md#sign-in):
-  the cell console with the operator's session, and a machine caller, such as the control plane or a
-  script, with a bearer token of a client of that realm. Every route needs the role
-  `Cell:OperatorRole` (`403` without it). A tenant realm's token is refused with `401`. Every write
-  through a session needs the CSRF header, as the other session routes do.
-- **Jobs.** A route that changes a tenant answers `202` with a job: `{ "id", "kind", "tenantId",
+  the cell console with the operator's session _(planned for M31)_, and a machine caller, such as the
+  control plane or a script, with a bearer token of a client of that realm. The server finds the realm at
+  `IdentityProvider:Url` plus `realms/<Cell:OperatorRealm>`, and in a cell with a console or internal
+  host it stops at start without that setting. It checks the token's issuer, signature, expiry and type,
+  and no audience, because the realm serves only the cell. It reads the caller's roles from
+  the `realm_access.roles` claim, where Keycloak puts realm roles. Every route needs the role
+  `Cell:OperatorRole` (`403` without it). A missing token, and a tenant realm's token, are refused with
+  `401`. Every write through a session needs the CSRF header, as the other session routes do
+  _(planned for M31)_.
+- **Jobs.** _(planned for M31)_ A route that changes a tenant answers `202` with a job: `{ "id", "kind", "tenantId",
   "state", "createdAt" }`. The [publisher](administration.md#publisher) runs the job with the same
   code as the `Axis.Admin` command, over the schema role. `GET /api/cell/jobs/{id}` answers the job,
   with `state` `queued`, `running`, `succeeded` or `failed`, its steps, and the error of a failed
   step. A failed job can be run again, and it skips the steps already done, as `tenant create` does.
-- **Idempotency.** Each `POST` needs an `Idempotency-Key` header. The same key with the same body
+- **Idempotency.** _(planned for M31)_ Each `POST` needs an `Idempotency-Key` header. The same key with the same body
   answers the first job again for 24 hours. The same key with another body answers `422`.
-- **Audit.** Each job writes one platform audit record when it ends, with the operator or the
+- **Audit.** _(planned for M31)_ Each job writes one platform audit record when it ends, with the operator or the
   machine caller as actor, the tenant and the job kind, and no secret. A refused call writes a log
   event, not a record.
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/cell/tenants` | Lists the tenants of the cell with their status, application, hosts, usage, quotas and failed work counts, see [views](cell-console.md#views). |
-| `GET /api/cell/tenants/{id}` | Answers one tenant, with its usage history. |
+| `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application` and `hosts`, read from the platform tables. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. Usage, quotas and failed work counts, see [views](cell-console.md#views), are _(planned for M31)_. |
+| `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, and `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
 | `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does. |
 | `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does. |

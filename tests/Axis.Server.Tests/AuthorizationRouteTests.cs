@@ -4,6 +4,7 @@ using Axis.Server.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
@@ -15,6 +16,9 @@ namespace Axis.Server.Tests;
 /// <summary>
 /// Every route of the server is either on the open list or refuses a request without a session or a token (D111). The
 /// routes come from the server's endpoint data source, so a route added later is checked without anyone adding it here.
+/// The requests here use the tenant host <c>localhost</c>, and a tenant host answers <c>404</c> for every path under
+/// <c>/api/cell/</c> before any sign-in work, so those routes expect a <c>404</c> problem instead of <c>401</c> or <c>403</c>.
+/// <c>CellRouteTests</c> and the cell provisioning API integration tests cover their own authorization.
 /// </summary>
 public sealed partial class AuthorizationRouteTests
 {
@@ -73,7 +77,11 @@ public sealed partial class AuthorizationRouteTests
             var contentType = response.Content.Headers.ContentType?.MediaType;
             var refused = response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
                 && contentType == "application/problem+json";
-            if (EndpointCaller.IsEndpointPath(path))
+            if (new PathString(path).StartsWithSegments("/api/cell", StringComparison.OrdinalIgnoreCase))
+            {
+                refused = response.StatusCode == HttpStatusCode.NotFound && contentType == "application/problem+json";
+            }
+            else if (EndpointCaller.IsEndpointPath(path))
             {
                 refused = refused
                     && response.StatusCode == HttpStatusCode.Unauthorized
