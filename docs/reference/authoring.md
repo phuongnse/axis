@@ -877,7 +877,7 @@ newest first.
 - `active` is the application's active release in this tenant, or null when there is none.
 - `folderContentHash` is the content hash that the folder would compile to now, so Studio can show that the live release
   and the folder differ. It is null when the folder has errors.
-- `changes` _(Proposed, planned for M31,_ [_D129_](../decisions/d129-rules-from-the-studio-editors-review.md)_)_: the
+- `changes` _(planned for M31,_ [_D129_](../decisions/d129-rules-from-the-studio-editors-review.md)_)_: the
   files that differ from the active release as canonical JSON, by path, `[{ path, change, kind, name, titles, locale }]`
   with `change` `added`, `changed` or `removed`; a removed file's other fields come from the active release and its
   texts, null for the rest. A folder with errors is read file by file, without the modules' copies on either side.
