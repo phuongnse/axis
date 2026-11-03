@@ -1182,6 +1182,7 @@ internal static partial class AdminCommands
         IReadOnlyList<TenantRow> tenants;
         Dictionary<string, ActivationBindings> bindings;
         Dictionary<string, IReadOnlyDictionary<string, TenantBinding>> realmBindings;
+        Dictionary<string, RealmLegal> realmLegal;
         try
         {
             var tablesProblem = await PlatformTablesProblemAsync(settings.Platform.PlatformConnectionString, cancellationToken);
@@ -1217,6 +1218,7 @@ internal static partial class AdminCommands
 
             bindings = await ReadBindingsAsync(platform, [.. tenants.Select(row => row.Id)], cancellationToken);
             realmBindings = await ReadRealmBindingsAsync(platform, [.. tenants.Select(row => row.Id)], settings.Platform.Cipher, cancellationToken);
+            realmLegal = await ReadRealmLegalAsync(platform, tenants, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -1240,6 +1242,7 @@ internal static partial class AdminCommands
             tenants,
             bindings,
             realmBindings,
+            realmLegal,
             settings.Mail,
             http,
             folder,
@@ -1464,6 +1467,23 @@ internal static partial class AdminCommands
         return ids.ToDictionary(
             id => id,
             id => DirectoryTenantCatalog.Bindings(id, rows.Where(row => row.TenantId == id), cipher),
+            StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Reads what the realm sync writes of the legal settings of <paramref name="tenants"/> from the directory: the hosts and the site links, in one query each.
+    /// </summary>
+    internal static async Task<Dictionary<string, RealmLegal>> ReadRealmLegalAsync(
+        PlatformDbContext platform,
+        IReadOnlyCollection<TenantRow> tenants,
+        CancellationToken cancellationToken)
+    {
+        var ids = tenants.Select(row => row.Id).ToList();
+        var hosts = await platform.TenantHosts.AsNoTracking().Where(host => ids.Contains(host.TenantId)).ToListAsync(cancellationToken);
+        var siteRows = await platform.TenantSiteLegalLinks.AsNoTracking().Where(link => ids.Contains(link.TenantId)).ToListAsync(cancellationToken);
+        return tenants.ToDictionary(
+            row => row.Id,
+            row => DirectoryTenantCatalog.RealmLegalOf(row, hosts.Where(host => host.TenantId == row.Id), siteRows.Where(link => link.TenantId == row.Id)),
             StringComparer.Ordinal);
     }
 

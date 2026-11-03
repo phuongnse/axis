@@ -856,7 +856,13 @@ internal sealed class TenantRestore : IAsyncDisposable
                 MissingBinding(byName, provider.Type, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding, provider.ClientKeyBinding, provider.MetadataBinding) is null)],
         })]).Plan;
         await ActivationRealmSync.SyncAsync(
-            _http, DirectoryTenantCatalog.Realm(row, cipher), DirectoryTenantCatalog.Bindings(_id, rows, cipher), plan, _cancellationToken);
+            _http,
+            DirectoryTenantCatalog.Realm(row, cipher),
+            DirectoryTenantCatalog.Bindings(_id, rows, cipher),
+            plan,
+            await DirectoryTenantCatalog.ReadRealmLegalAsync(_platform, row, _cancellationToken),
+            DirectoryTenantCatalog.RealmUsers(row, cipher),
+            _cancellationToken);
 
         // The realm is named after the tenant id, as EnsureForTenantAsync makes it.
         if (_plan.Realm is { } document)

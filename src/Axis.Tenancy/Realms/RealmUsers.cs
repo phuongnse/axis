@@ -14,7 +14,7 @@ namespace Axis.Tenancy.Realms;
 /// alias of the first federated identity. It counts the enabled users. It also finds one user, disables or enables a user, ends a user's realm
 /// sessions or one realm session by its id and removes a user's authenticators. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
-/// also normalises an email address. An error names the step and the status code, never a response body or a secret.
+/// adds a required action to every user. It also normalises an email address. An error names the step and the status code, never a response body or a secret.
 /// </summary>
 public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 {
@@ -123,6 +123,45 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         user["enabled"] = enabled;
         using var written = await SendAsync(token, HttpMethod.Put, path, user, cancellationToken);
         EnsureSuccess(written, enabled ? "enable the user" : "disable the user");
+    }
+
+    /// <summary>
+    /// Adds the required <paramref name="action"/> to every user of the realm that does not have it, so the next sign-in shows it. A service
+    /// account is not a user here, because the search of * leaves it out. Each user is read in full and written back, because a partial update can clear fields.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task AddRequiredActionAsync(string action, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(action);
+
+        const int pageSize = 100;
+        var token = await TokenAsync(cancellationToken);
+        var usersPath = $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users";
+        for (var first = 0; ; first += pageSize)
+        {
+            using var listed = await GetAsync(token, $"{usersPath}?briefRepresentation=false&search=*&first={first}&max={pageSize}", cancellationToken);
+            EnsureSuccess(listed, "list the users");
+            var users = (await listed.Content.ReadFromJsonAsync<JsonArray>(cancellationToken))!;
+            foreach (var node in users)
+            {
+                var user = node!.AsObject();
+                var actions = user["requiredActions"] as JsonArray ?? [];
+                if (actions.Any(existing => existing?.GetValue<string>() == action))
+                {
+                    continue;
+                }
+
+                actions.Add(action);
+                user["requiredActions"] = actions;
+                using var written = await SendAsync(token, HttpMethod.Put, $"{usersPath}/{Uri.EscapeDataString(user["id"]!.GetValue<string>())}", user, cancellationToken);
+                EnsureSuccess(written, "ask the user to accept the terms");
+            }
+
+            if (users.Count < pageSize)
+            {
+                return;
+            }
+        }
     }
 
     /// <summary>Ends every session of the user in the realm.</summary>

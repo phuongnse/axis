@@ -276,11 +276,13 @@ command prints `<id> legal ok`.
 
 - **The whole block.** Each `set` replaces the tenant's, or the site's, whole legal block, so an option left out is
   cleared.
-- **A new version asks again** _(planned for M31)_. When `--terms-version` differs from the stored one, the next realm
-  sync asks every user of the realm to accept the terms again. Changing only the addresses asks nothing.
-- **Kept in the realm** _(planned for M31)_. Both commands update the tenant's realm, as the mail settings do, see
-  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). Until then the commands only store the
-  addresses.
+- **A new version asks again.** When `--terms-version` differs from the version the realm holds, the realm sync asks
+  every user of the realm to accept the terms again. Changing only the addresses asks nothing.
+- **Kept in the realm.** Both commands update the tenant's realm right after they store the change, as the mail
+  settings do, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). This includes `--site`,
+  because a site's links live on its `site-<path>` client. If the identity provider fails, the command prints
+  `<id> realm failed: ...`, exits with code 1 and keeps the stored change. The next activation or legal command brings
+  the realm in step.
 - **Stored in the tenant directory.** The tenant's addresses and terms version are in `platform.tenants`, and a site's
   addresses in `platform.tenant_site_legal_links`, see [storage](storage.md#platform-database). A site that does not
   exist yet keeps its addresses until it does.
@@ -288,8 +290,8 @@ command prints `<id> legal ok`.
   that is not reserved.
 - **Which tenants.** The commands work on an `active`, `suspended` or preview tenant. A tenant that is still
   `provisioning` exits with code 2, as the binding commands do.
-- **Settings.** Both commands need `ConnectionStrings:PlatformSchema` and `Tenancy:Source=directory`. They need no
-  `Platform:SecretKey` and no identity provider, because they store no secret.
+- **Settings.** Both commands need `ConnectionStrings:PlatformSchema` and `Tenancy:Source=directory`. When the tenant
+  has a realm, they also need `Platform:SecretKey`, to read the realm's secrets, and the identity provider settings.
 - **Audited.** Each run writes one [platform audit record](#platform-audit-records) with the change, in one
   transaction. For `set` it names the options that were given, in this order: `privacyUrl`, `termsUrl` and
   `termsVersion`, then `site:<path>` when `--site` is given. For `clear` it names `legal`, and `site:<path>` after it
