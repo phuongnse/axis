@@ -125,3 +125,7 @@ the review.
   spacing-lg between, and on More you can add, where each kind is the link on its own line, what it is for under it
   and when one is needed in textMuted. For the issue: the other dots in Studio, in the form, page and process
   designers, the policy matrix, the references, the problems panel and the Releases list, follow the same rule.
+- **More you can add, once everything is there.** The owner asked what the block shows when the application has
+  every kind. Recommended and agreed: nothing, no block, as it is help for getting started and its work is done; no
+  line that says so, no "add another" links, which New resource… on every list already gives, and no other block to
+  fill the space. The Overview is then Live and Changes since the live release alone.
