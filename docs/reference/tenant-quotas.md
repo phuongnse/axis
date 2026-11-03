@@ -13,7 +13,8 @@ outside a cell. The worker in a cell also samples each tenant's storage and coun
 `emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
 event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
 are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
-saves and publishes. The other `users` refusals, among them the first sign-in of a brokered user, and the leases are
+saves and publishes. So are `platform.tenant_leases` and the `concurrentQueries` lease of a record list read and a data
+source rows read. The other `users` refusals, among them the first sign-in of a brokered user, and the other leases are
 still planned, and so are the usage columns that the text marks. The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -106,6 +107,9 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
   - A data source query or a record list read waits up to 5 seconds for a lease. It then answers
     `503` problem details titled "This tenant is busy. Try again in a moment.", with
     `Retry-After: 1`. The query timeout counts from the start of the query, not of the wait.
+- **When the platform database is down.** A read that cannot reach the platform database runs without
+  a lease, and the server logs a warning. Under `directory` the server keeps serving from the last good
+  directory then, and the limit would otherwise turn a platform outage into a cell-wide read outage.
 - **Cost.** A lease costs two short statements on the platform database. The
   [cell load test](performance.md#cell-load-test) shows whether the objectives still hold with them.
 

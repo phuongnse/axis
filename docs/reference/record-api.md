@@ -483,6 +483,10 @@ otherwise the answer is the stale-version `409`. See
   [start lock](processes.md#releases-and-running-work). The server already ran
   the request again on the new release each time. Nothing was written, and the
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
+- **`503` for a busy tenant.** A list in a cell, when the tenant's `concurrentQueries` quota has no free
+  lease for 5 seconds, after the sign-in, path and grant checks. The title is "This tenant is busy. Try
+  again in a moment.", the answer carries `Retry-After: 1` and nothing was queried. See
+  [work at once](tenant-quotas.md#work-at-once).
 - **`503` for a query timeout.** A read past `Data:QueryTimeout`, or a create,
   update or delete past `Data:WriteTimeout`, is cancelled by PostgreSQL. The
   title is "The query took too long. Try again or narrow it." for a read, and

@@ -21,7 +21,8 @@ namespace Axis.Server.Records;
 /// Endpoints for the records of an entity in the active release of an application. Every request
 /// is checked in order: session or bearer token (401), then for a create or an update, in a cell, the tenant's
 /// storage quota (403 <c>quota-exceeded</c>), then the path (404), then the user's grant for
-/// the entity and the action (403), and only then the query or body. A request without a session or with
+/// the entity and the action (403), then, for a list, the tenant's <c>concurrentQueries</c> lease (503 with
+/// <c>Retry-After: 1</c> when none is free after five seconds), and only then the query or body. A request without a session or with
 /// a bad bearer token is a 401 before the path is read, so it learns nothing about what exists.
 /// A request with an <c>Authorization: Bearer</c> header is a service account request. It is judged by the
 /// token alone, never reads or renews the session cookie and needs no CSRF header. Its roles come from the
@@ -113,6 +114,7 @@ internal static class RecordEndpoints
         TenantDatabase database,
         SensitiveValues sensitive,
         ITenantContextAccessor tenants,
+        QueryLeases leases,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -133,6 +135,14 @@ internal static class RecordEndpoints
             return Grants.Forbidden();
         }
 
+        // The lease comes before the tenant connection, so a waiting read holds no pool connection.
+        var lease = await leases.TakeAsync(cancellationToken);
+        if (lease.Busy)
+        {
+            return QueryLeases.Busy(request.HttpContext);
+        }
+
+        await using var _ = lease.Lease;
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application!, model, pendingFilters, loggerFactory, cancellationToken))

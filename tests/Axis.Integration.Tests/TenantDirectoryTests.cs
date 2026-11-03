@@ -683,6 +683,93 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         Assert.Equal(QuotaDefaults.BuiltIn[QuotaKeys.Storage], quotas.Limit("b", QuotaKeys.Storage));
     }
 
+    private const string DepartmentNames = "/api/apps/RecordsApp/data-sources/DepartmentNames/rows";
+
+    [Fact]
+    public async Task In_a_cell_a_read_past_concurrentQueries_waits_five_seconds_then_answers_503_and_a_freed_slot_serves_reads_without_leaving_a_lease()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await SetQuotaAsync(platform, "a", QuotaKeys.ConcurrentQueries, 1);
+        await InsertLeaseAsync(platform, "a", "other", "60 seconds");
+        await using var factory = CreateFactory(platform, new LogCollector(), _cellSettings);
+        using var client = factory.CreateClient().SignedInAs("requester");
+        using var anonymous = factory.CreateClient();
+
+        var started = DateTime.UtcNow;
+        var pending = client.SendAsync(Request(Departments, "a.example.test"), CancellationToken);
+
+        // The sign-in check comes before the lease, so it answers at once while the slot is held and the read above still waits.
+        using var unauthorized = await anonymous.SendAsync(Request(Departments, "a.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        Assert.False(pending.IsCompleted);
+
+        using var busy = await pending;
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, busy.StatusCode);
+        Assert.True(DateTime.UtcNow - started >= TimeSpan.FromSeconds(5), "The read answered before the 5 second wait ended.");
+        Assert.Equal("1", Assert.Single(busy.Headers.GetValues("Retry-After")));
+        using (var problem = JsonDocument.Parse(await busy.Content.ReadAsStringAsync(CancellationToken)))
+        {
+            Assert.Equal("This tenant is busy. Try again in a moment.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        await PostgreSqlServer.AdminScalarAsync(platform, "DELETE FROM platform.tenant_leases", CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(Request(Departments, "a.example.test"), CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(Request(DepartmentNames, "a.example.test"), CancellationToken)).StatusCode);
+        Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_leases", CancellationToken));
+    }
+
+    [Fact]
+    public async Task In_a_cell_an_expired_lease_does_not_count_against_concurrentQueries()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await SetQuotaAsync(platform, "a", QuotaKeys.ConcurrentQueries, 1);
+        await InsertLeaseAsync(platform, "a", "dead", "-1 second");
+        await using var factory = CreateFactory(platform, new LogCollector(), _cellSettings);
+        using var client = factory.CreateClient().SignedInAs("requester");
+
+        using var response = await client.SendAsync(Request(Departments, "a.example.test"), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_leases", CancellationToken));
+    }
+
+    [Fact]
+    public async Task In_a_cell_a_read_runs_without_a_lease_and_logs_a_warning_while_the_platform_database_refuses_connections()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await SetQuotaAsync(platform, "a", QuotaKeys.ConcurrentQueries, 1);
+        var logs = new LogCollector();
+        await using var factory = CreateFactory(platform, logs, _cellSettings);
+        using var client = factory.CreateClient().SignedInAs("requester");
+        await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
+
+        await StopPlatformAsync(platform);
+        try
+        {
+            await RefreshAsync(factory);
+
+            Assert.Contains("Sales-a", await ListAsync(client, "a.example.test"), StringComparison.Ordinal);
+            Assert.Contains(logs.Entries, entry => entry.StartsWith("Warning:", StringComparison.Ordinal) && entry.Contains("concurrentQueries lease", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await AllowPlatformConnectionsAsync(platform);
+        }
+    }
+
+    // Adds a lease of the tenant that ends at the database clock plus the interval, such as '60 seconds'.
+    private static Task<object?> InsertLeaseAsync(string platform, string tenantId, string holder, string expiresIn) =>
+        PostgreSqlServer.AdminScalarAsync(
+            platform,
+            $"INSERT INTO platform.tenant_leases (lease_id, tenant_id, quota, holder, expires_at) VALUES (gen_random_uuid(), '{tenantId}', 'concurrentQueries', '{holder}', now() + interval '{expiresIn}')",
+            CancellationToken);
+
     [Fact]
     public async Task In_a_cell_a_tenant_over_its_storage_quota_cannot_write_records_but_another_tenant_can()
     {
