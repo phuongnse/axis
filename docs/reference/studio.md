@@ -361,7 +361,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     added in the same session asks nothing, except a `fill` question when it is
     required. Those questions come after the loaded fields, in row order. A new
     row with the name of a removed loaded field counts as that loaded field.
-  - A rename asks Keep data, Drop data or Cancel, the last two as text buttons beside the solid one _(planned for M31)_. Keep data adds
+  - A rename asks Keep data, Drop data or Cancel, the last two as text buttons beside the solid one. Keep data adds
     `renameField`, and Drop data adds `dropField` for the old name. Cancel
     stops the whole save and keeps the draft. A removal asks Drop data or Keep
     field. Keep field puts the field back where it was, and the save goes on

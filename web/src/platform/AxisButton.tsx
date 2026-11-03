@@ -1,5 +1,5 @@
-import { Button, Tooltip, type ButtonProps } from 'antd'
-import type { CSSProperties, ReactNode, Ref } from 'react'
+import { Button, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
+import { createContext, useContext, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -25,16 +25,42 @@ export type AxisButtonProps =
       joined?: boolean
     })
 
+const ActionRowContext = createContext(false)
+
+/**
+ * A row of actions that has a solid `finish` button (D128). Beside it, `main`, `secondary` and `destructive` buttons
+ * are text buttons in their own colour, so the finish button is the only filled shape.
+ */
+export function AxisActionRow({
+  children,
+  justify,
+  align,
+}: {
+  children: ReactNode
+  justify?: FlexProps['justify']
+  align?: FlexProps['align']
+}) {
+  return (
+    <ActionRowContext.Provider value={true}>
+      <Flex gap="small" wrap justify={justify} align={align}>
+        {children}
+      </Flex>
+    </ActionRowContext.Provider>
+  )
+}
+
 /**
  * The one button of Axis (D96). `finish` completes a form or a dialog and is solid primary. `main` is the main
  * action of a page and is an outline in `primaryText`. `secondary` is every other action and is the grey outline.
  * `destructive` removes data and is an outline in `dangerText`. `icon` has no text, so it takes a text key and shows
  * the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless `joined` draws it as a bordered
- * default button for a control joined to an input. The role is not passed on to the DOM.
+ * default button for a control joined to an input. Inside an `AxisActionRow`, `main`, `secondary` and `destructive` are
+ * text buttons, `main` in `primaryText` and `destructive` in `dangerText`. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const t = useText()
   const { colour } = useDesignTokens()
+  const inRow = useContext(ActionRowContext)
 
   if (props.role === 'icon') {
     const { role: _role, nameKey, destructive, nameSuffix, joined, icon, style, disabled, ...rest } = props
@@ -56,6 +82,8 @@ export function AxisButton(props: AxisButtonProps) {
 
   const { role, style, disabled, ...rest } = props
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
+  const tinted = (text: string): CSSProperties => (disabled ? {} : { color: text })
+  const variant = inRow ? 'text' : 'outlined'
   switch (role) {
     case 'finish':
       return <Button {...rest} type="primary" disabled={disabled} style={style} />
@@ -64,9 +92,9 @@ export function AxisButton(props: AxisButtonProps) {
         <Button
           {...rest}
           color="primary"
-          variant="outlined"
+          variant={variant}
           disabled={disabled}
-          style={{ ...outline(colour.primaryText), ...style }}
+          style={{ ...(inRow ? tinted(colour.primaryText) : outline(colour.primaryText)), ...style }}
         />
       )
     case 'destructive':
@@ -74,12 +102,12 @@ export function AxisButton(props: AxisButtonProps) {
         <Button
           {...rest}
           color="danger"
-          variant="outlined"
+          variant={variant}
           disabled={disabled}
-          style={{ ...outline(colour.dangerText), ...style }}
+          style={{ ...(inRow ? tinted(colour.dangerText) : outline(colour.dangerText)), ...style }}
         />
       )
     case 'secondary':
-      return <Button {...rest} type="default" disabled={disabled} style={style} />
+      return <Button {...rest} type={inRow ? 'text' : 'default'} disabled={disabled} style={style} />
   }
 }

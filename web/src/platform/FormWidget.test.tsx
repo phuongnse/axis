@@ -1952,6 +1952,24 @@ describe('FormWidget', () => {
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
     })
 
+    it('draws Cancel and the action as text buttons beside a solid Save', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, actionWidget)
+
+      const action = await screen.findByRole('button', { name: 'Close note' })
+      expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('ant-btn-variant-solid')
+      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('ant-btn-variant-text')
+      expect(action).toHaveClass('ant-btn-variant-text')
+      expect(action).toHaveStyle({ color: designTokensFor('light').colour.primaryText })
+    })
+
+    it('keeps the action outlined when the user cannot save the record', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, { ...actionWidget, access: { actions: ['read'], createFields: [], updateFields: [] } })
+
+      expect(await screen.findByRole('button', { name: 'Close note' })).toHaveClass('ant-btn-variant-outlined')
+    })
+
     it('shows a navigate button on a saved record that opens the target with the record values', async () => {
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
 
