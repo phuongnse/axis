@@ -715,6 +715,7 @@ internal static class StudioEndpoints
         int number,
         HttpContext httpContext,
         StudioOptions options,
+        PackageCatalog packageCatalog,
         TenantDatabase database)
     {
         var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
@@ -776,6 +777,10 @@ internal static class StudioEndpoints
         var modules = Modules(current)
             .Select(module => module with { PreviousVersion = previous is null ? null : beforeModules.GetValueOrDefault(module.Id) ?? "" })
             .ToList();
+        // Proposed: a package is named by the label of its installed manifest, as a module is by its own.
+        var packageLabels = packageCatalog.Packages
+            .GroupBy(package => package.Manifest.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last().Manifest.Label, StringComparer.Ordinal);
         var pinned = await context.ReleasePackages
             .AsNoTracking()
             .Where(package => ids.Contains(package.ReleaseId))
@@ -786,8 +791,24 @@ internal static class StudioEndpoints
             .Where(package => package.ReleaseId == release.ReleaseId)
             .OrderBy(package => package.PackageId, StringComparer.Ordinal)
             .Select(package => new StudioReleasePackage(
-                package.PackageId, package.Version, previous is null ? null : beforePackages.GetValueOrDefault(package.PackageId) ?? ""))
+                package.PackageId,
+                package.Version,
+                previous is null ? null : beforePackages.GetValueOrDefault(package.PackageId) ?? "",
+                packageLabels.GetValueOrDefault(package.PackageId)))
             .ToList();
+        // Proposed: how the modules and packages differ from the previous release, which the changes list shows beside
+        // the files: one added, removed, upgraded or downgraded, by its version.
+        var partChanges = new List<StudioReleasePartChange>();
+        if (previous is not null)
+        {
+            var beforeModuleRows = Modules(before).ToList();
+            partChanges.AddRange(PartChanges("module", modules.Select(module => (module.Id, module.Label, module.Version)), beforeModuleRows.Select(module => (module.Id, module.Label, module.Version))));
+            partChanges.AddRange(PartChanges(
+                "package",
+                packages.Select(package => (package.Id, package.Label, package.Version)),
+                pinned.Where(package => package.ReleaseId != release.ReleaseId).Select(package => (package.PackageId, packageLabels.GetValueOrDefault(package.PackageId), package.Version))));
+        }
+
         // Proposed: whether the release can replace the live one, told before Activate… is sent. A module's tables hold
         // data once it is live, so a release that lacks a module the live release pins, or pins a version without some
         // of its entities or fields, is refused on activation (AXC0213). The same check runs here on the two stored
@@ -822,7 +843,37 @@ internal static class StudioEndpoints
             modules,
             packages,
             liveRow?.Number,
-            blockers));
+            blockers,
+            partChanges));
+
+        static IEnumerable<StudioReleasePartChange> PartChanges(
+            string type, IEnumerable<(string Id, string? Label, string Version)> now, IEnumerable<(string Id, string? Label, string Version)> then)
+        {
+            var old = then.ToDictionary(part => part.Id, StringComparer.Ordinal);
+            var current = now.ToDictionary(part => part.Id, StringComparer.Ordinal);
+            foreach (var part in current.Values)
+            {
+                if (!old.TryGetValue(part.Id, out var was))
+                {
+                    yield return new StudioReleasePartChange(type, part.Id, part.Label, "added", part.Version, null);
+                }
+                else if (was.Version != part.Version)
+                {
+                    var change = CompareVersions(part.Version, was.Version) > 0 ? "upgraded" : "downgraded";
+                    yield return new StudioReleasePartChange(type, part.Id, part.Label, change, part.Version, was.Version);
+                }
+            }
+
+            foreach (var was in old.Values.Where(part => !current.ContainsKey(part.Id)))
+            {
+                yield return new StudioReleasePartChange(type, was.Id, was.Label, "removed", null, was.Version);
+            }
+        }
+
+        static int CompareVersions(string left, string right) =>
+            System.Version.TryParse(left.Split('-')[0], out var a) && System.Version.TryParse(right.Split('-')[0], out var b)
+                ? a.CompareTo(b)
+                : string.CompareOrdinal(left, right);
 
         static IEnumerable<StudioReleaseModule> Modules(Dictionary<string, string> releaseFiles) =>
             releaseFiles
@@ -1447,7 +1498,14 @@ internal sealed record StudioReleaseDetail(
     IReadOnlyList<StudioReleaseModule> Modules,
     IReadOnlyList<StudioReleasePackage> Packages,
     int? Live = null,
-    IReadOnlyList<StudioReleaseBlocker>? Blockers = null);
+    IReadOnlyList<StudioReleaseBlocker>? Blockers = null,
+    IReadOnlyList<StudioReleasePartChange>? PartChanges = null);
+
+/// <summary>
+/// Proposed: a module or package that differs from the previous release: <c>added</c>, <c>removed</c>,
+/// <c>upgraded</c> or <c>downgraded</c>, with its version now and before, each null when it had none.
+/// </summary>
+internal sealed record StudioReleasePartChange(string Type, string Id, string? Label, string Change, string? Version, string? PreviousVersion);
 
 /// <summary>
 /// Proposed: a module that stops a release from replacing the live one: its id, its label, the version the live release
@@ -1462,7 +1520,7 @@ internal sealed record StudioReleaseBlocker(string Module, string? Label, string
 internal sealed record StudioReleaseModule(string Id, string? Label, string Version, string? PreviousVersion = null);
 
 /// <summary>Proposed: a package a release pins, its version and the previous release's, as for a module.</summary>
-internal sealed record StudioReleasePackage(string Id, string Version, string? PreviousVersion = null);
+internal sealed record StudioReleasePackage(string Id, string Version, string? PreviousVersion = null, string? Label = null);
 
 /// <summary>The active release: its id, its number and its content hash.</summary>
 internal sealed record StudioActiveRelease(Guid ReleaseId, int Number, string ContentHash);

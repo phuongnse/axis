@@ -444,16 +444,15 @@ function StudioReleaseDetail({
       {(release.relaxed.length > 0 || (shown && shown !== 'failed' && shown.modules.length > 0)) && (
         <ReleaseSection
           title={t('shell.studio.releases.relaxed')}
-          intro={
-            release.relaxed.length > 0 ? t('shell.studio.release.relaxedIntro') : t('shell.studio.release.relaxed.none')
-          }
+          intro={t('shell.studio.release.relaxedIntro')}
           testId="studio-release-relaxed"
         >
-          {release.relaxed.length > 0 && (
+          {/* Proposed: an empty table keeps its header and says what it means in its body, as every table does. */}
+          {
             <AxisTable<StudioRelaxedPoint>
               rows={release.relaxed}
               rowKey={(point) => `${point.module}/${point.point}`}
-              emptyText=""
+              emptyText={t('shell.studio.release.relaxed.none')}
               pagination={false}
               onRow={() => ({ 'data-testid': 'release-relaxed-point' }) as HTMLAttributes<HTMLElement>}
               columns={[
@@ -486,7 +485,7 @@ function StudioReleaseDetail({
                 },
               ]}
             />
-          )}
+          }
         </ReleaseSection>
       )}
       {shown === 'failed' && (
@@ -495,110 +494,68 @@ function StudioReleaseDetail({
       {shown && shown !== 'failed' && (
         <>
           <ReleaseSection
-            // Proposed: what this release changed, from the release just below it, as the Overview lists the changes
-            // not live yet. The names are the release's own, as the folder may have moved on, so none is a link.
+            // Proposed: what this release changed from the release just below it, as a table: its resources, named from
+            // the release that holds each, and its modules and packages, by their versions.
             title={
               previous === null
                 ? t('shell.studio.release.changes.title')
                 : t('shell.studio.release.changes.from').replace('{previous}', String(previous))
             }
-            intro={
-              previous === null
-                ? t('shell.studio.release.changes.first')
-                : shown.changes.length === 0
-                  ? t('shell.studio.release.changes.none').replace('{previous}', String(previous))
-                  : undefined
-            }
+            intro={previous === null ? t('shell.studio.release.changes.first') : undefined}
             testId="studio-release-changes"
           >
-            {shown.changes.length > 0 && (
-              <ul
-                style={{
-                  margin: 0,
-                  padding: 0,
-                  listStyle: 'none',
-                  display: 'grid',
-                  gridTemplateColumns: 'fit-content(320px) max-content max-content',
-                  columnGap: spacing.lg,
-                  rowGap: spacing.xs,
-                  alignItems: 'baseline',
-                }}
-              >
-                {shown.changes.map((change) => (
-                  <li key={change.path} style={{ display: 'contents' }}>
-                    <Typography.Text>
-                      {resourceTitle(
-                        {
-                          file: change.path,
-                          name: change.name ?? null,
-                          titles: change.titles ?? null,
-                          locale: change.locale ?? null,
-                        },
-                        locale,
-                      )}
-                    </Typography.Text>
-                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
-                      {change.kind ? kindName(change.kind, t) : ''}
-                    </Typography.Text>
-                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
-                      {t(`shell.studio.overview.change.${change.change}`)}
-                    </Typography.Text>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </ReleaseSection>
-          <ReleaseSection
-            title={t('shell.studio.release.parts')}
-            intro={parts.length === 0 ? t('shell.studio.release.parts.none') : undefined}
-            testId="studio-release-parts"
-          >
-            {parts.length > 0 && (
-              <AxisTable<StudioReleasePartRow>
-                rows={parts}
-                rowKey={(part) => `${part.type}/${part.id}`}
-                emptyText=""
+            {previous !== null && (
+              <AxisTable<ReleaseChangeRow>
+                rows={changeRows(shown, locale, t)}
+                rowKey={(row) => row.key}
+                emptyText={t('shell.studio.release.changes.none').replace('{previous}', String(previous))}
                 pagination={false}
+                onRow={() => ({ 'data-testid': 'studio-release-change' }) as HTMLAttributes<HTMLElement>}
                 columns={[
                   {
                     key: 'name',
-                    title: t('shell.studio.release.part.name'),
+                    title: t('shell.studio.release.change.name'),
                     kind: 'text',
-                    render: (part) => part.label ?? part.id,
+                    render: (row) => row.name,
                   },
+                  { key: 'kind', title: t('shell.studio.release.change.kind'), kind: 'fit', render: (row) => row.kind },
                   {
-                    key: 'type',
-                    title: t('shell.studio.release.part.type'),
-                    kind: 'fit',
-                    render: (part) => t(`shell.studio.release.part.${part.type}`),
+                    key: 'change',
+                    title: t('shell.studio.release.change.change'),
+                    kind: 'text',
+                    render: (row) => row.change,
                   },
-                  {
-                    key: 'version',
-                    title: t('shell.studio.release.part.version'),
-                    kind: 'fit',
-                    render: (part) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{part.version}</span>,
-                  },
-                  ...(previous === null
-                    ? []
-                    : [
-                        {
-                          // Proposed: how the part differs from the previous release: added, or the version it had.
-                          key: 'previous',
-                          title: t('shell.studio.release.part.from').replace('{previous}', String(previous)),
-                          kind: 'fit' as const,
-                          render: (part: StudioReleasePartRow) =>
-                            part.previousVersion === '' ? (
-                              t('shell.studio.overview.change.added')
-                            ) : part.previousVersion && part.previousVersion !== part.version ? (
-                              t('shell.studio.release.part.was').replace('{version}', part.previousVersion)
-                            ) : (
-                              <EmptyDash />
-                            ),
-                        },
-                      ]),
                 ]}
               />
             )}
+          </ReleaseSection>
+          <ReleaseSection title={t('shell.studio.release.parts')} testId="studio-release-parts">
+            <AxisTable<StudioReleasePartRow>
+              rows={parts}
+              rowKey={(part) => `${part.type}/${part.id}`}
+              emptyText={t('shell.studio.release.parts.none')}
+              pagination={false}
+              columns={[
+                {
+                  key: 'name',
+                  title: t('shell.studio.release.part.name'),
+                  kind: 'text',
+                  render: (part) => part.label ?? part.id,
+                },
+                {
+                  key: 'type',
+                  title: t('shell.studio.release.part.type'),
+                  kind: 'fit',
+                  render: (part) => t(`shell.studio.release.part.${part.type}`),
+                },
+                {
+                  key: 'version',
+                  title: t('shell.studio.release.part.version'),
+                  kind: 'fit',
+                  render: (part) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{part.version}</span>,
+                },
+              ]}
+            />
           </ReleaseSection>
         </>
       )}
@@ -646,3 +603,32 @@ function StudioReleaseDetail({
 }
 
 type StudioReleasePartRow = StudioReleasePart & { type: 'module' | 'package' }
+
+/** Proposed: one row of a release's changes: a resource, or a module or package by its version. */
+interface ReleaseChangeRow {
+  key: string
+  name: string
+  kind: string
+  change: string
+}
+
+function changeRows(detail: StudioReleaseDetailData, locale: string, t: (key: string) => string): ReleaseChangeRow[] {
+  const files = detail.changes.map((change) => ({
+    key: `file/${change.path}`,
+    name: resourceTitle(
+      { file: change.path, name: change.name ?? null, titles: change.titles ?? null, locale: change.locale ?? null },
+      locale,
+    ),
+    kind: change.kind ? kindName(change.kind, t) : '',
+    change: t(`shell.studio.overview.change.${change.change}`),
+  }))
+  const parts = (detail.partChanges ?? []).map((part) => ({
+    key: `${part.type}/${part.id}`,
+    name: part.label ?? part.id,
+    kind: t(`shell.studio.release.part.${part.type}`),
+    change: t(`shell.studio.release.partChange.${part.change}`)
+      .replace('{version}', part.version ?? '')
+      .replace('{previous}', part.previousVersion ?? ''),
+  }))
+  return [...files, ...parts]
+}

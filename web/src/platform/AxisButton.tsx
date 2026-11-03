@@ -147,7 +147,9 @@ export function NamedIconButton({
   }
 
   return (
-    <Tooltip title={name} trigger={['hover', 'focus']} open={open} onOpenChange={openChange}>
+    // Proposed: the tooltip listens to hover alone, and the button opens it on keyboard focus itself. Ant Design's own
+    // focus trigger closes it with flushSync on blur, which a dialog that takes focus as it opens sets off mid-render.
+    <Tooltip title={name} trigger={['hover']} open={open} onOpenChange={openChange}>
       <Button
         {...rest}
         ref={(element) => {
@@ -172,8 +174,15 @@ export function NamedIconButton({
           clicked.current = false
           onMouseLeave?.(event)
         }}
+        onFocus={(event) => {
+          if (!clicked.current && event.currentTarget.matches(':focus-visible')) {
+            setOpen(true)
+          }
+          rest.onFocus?.(event)
+        }}
         onBlur={(event) => {
           clicked.current = false
+          setOpen(false)
           onBlur?.(event)
         }}
       />

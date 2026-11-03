@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Input, Result, Tag, Typography } from 'antd'
+import { Alert, Button, Flex, Input, Result, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -51,7 +51,6 @@ import { HomeTile } from '../platform/HomeTile'
 import { SiteMark } from '../platform/SiteMark'
 import { PlatformContext } from './context'
 import { useDesignTokens } from '../platform/themeMode'
-import { hasRelaxEntry } from './relaxEntries'
 
 /** The read-only view of a module resource, by its kind. */
 function ModuleResourceView({
@@ -528,20 +527,12 @@ function StudioWorkspace() {
         }
         status={
           loaded && 'resources' in loaded ? (
-            <Flex align="center" gap={spacing.xs}>
-              {/* Proposed: while the folder has a relax entry, the Off-standard tag leads the band's state. */}
-              {manifest && hasRelaxEntry(manifest.content) && (
-                <Tag data-testid="studio-off-standard" color="warning">
-                  {t('shell.studio.offStandard')}
-                </Tag>
-              )}
-              <StudioStatus
-                diagnostics={loaded.diagnostics}
-                releases={releases?.application === application ? releases.history : undefined}
-                problemsOpen={problemsOpen}
-                onProblems={() => setProblemsOpen((current) => !current)}
-              />
-            </Flex>
+            <StudioStatus
+              diagnostics={loaded.diagnostics}
+              releases={releases?.application === application ? releases.history : undefined}
+              problemsOpen={problemsOpen}
+              onProblems={() => setProblemsOpen((current) => !current)}
+            />
           ) : undefined
         }
         actions={

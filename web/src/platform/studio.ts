@@ -1018,6 +1018,15 @@ export interface StudioReleaseDetail {
   live?: number | null
   /** Proposed: the modules that stop this release from replacing the live one; empty when it can. */
   blockers?: { module: string; label?: string | null; liveVersion: string; version?: string | null }[]
+  /** Proposed: the modules and packages that differ from the previous release. */
+  partChanges?: {
+    type: 'module' | 'package'
+    id: string
+    label?: string | null
+    change: 'added' | 'removed' | 'upgraded' | 'downgraded'
+    version?: string | null
+    previousVersion?: string | null
+  }[]
 }
 
 /** Proposed: loads what one release holds beyond its history row. */

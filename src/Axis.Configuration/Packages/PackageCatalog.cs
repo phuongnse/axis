@@ -231,7 +231,8 @@ public sealed class PackageCatalog
             root.GetProperty("id").GetString()!,
             root.GetProperty("version").GetString()!,
             root.GetProperty("assembly").GetString()!,
-            [.. root.GetProperty("operations").EnumerateArray().Select(ParseOperation)]);
+            [.. root.GetProperty("operations").EnumerateArray().Select(ParseOperation)],
+            root.TryGetProperty("label", out var label) ? label.GetString() : null);
 
     private static PackageOperation ParseOperation(JsonElement operation)
     {

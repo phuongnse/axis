@@ -78,3 +78,20 @@ industry practice (GitHub's issue sidebar, Salesforce and Jira record pages, Fio
 - **Hide only what does not apply or is not allowed.** A part that does not apply to the object's kind or state, such
   as relaxed points for a release that pins no module, or a field the person may not read, is left out.
 - **Loading and failing are never empty.** A part that is still loading or failed to load says so, never Not set.
+- **The band says off-standard in words.** The owner found the band's Off-standard tag a repeat of the heading's and
+  asked why it led the band, against the standard. It broke D129's rule that the band's states are words with no icon
+  or tag, and it marked the folder, not the release. Agreed: the band reads "Release 3 is live, off-standard" in
+  textMuted; the Off-standard tag stays only beside a release's number, in the list and on its page.
+- **Changes are a table, modules and packages included.** The owner did not understand the plain list nor the "Since
+  release 2" column. Agreed: Changes from release N is a table of Name, Kind and Change, whose rows are the changed
+  resources and the modules and packages that differ ("Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0", "Removed, was
+  1.0.0"); Modules and packages lists Name, Type and Version only.
+- **An empty table keeps its header.** The owner noted that the standard empty table, as the artifact's Table card
+  shows, keeps its header with the empty text in its body. Agreed for every table, the release page's included. The
+  empty text is textMuted: Ant Design drew it at a quarter of the text colour, 1.8:1, which fails 4.5:1; fixed in
+  AxisTable for every table.
+- **Packages have a label.** A package's manifest gains `label`, as a module's has, so Studio never names a package by
+  its id. A configuration change, so it needs a decision; the issue makes it required and adds it to every package.
+- **An icon button's tooltip and a dialog.** Opening a dialog from an icon button logged React's flushSync warning:
+  Ant Design's focus trigger closes the tooltip with flushSync when the dialog takes focus mid-render. The tooltip now
+  listens to hover alone and the button opens it on keyboard focus itself.

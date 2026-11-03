@@ -37,7 +37,11 @@ export function StudioStatus({
     } else if (folderDiffers(releases)) {
       state = t('shell.studio.status.changes')
     } else if (diagnostics.length === 0) {
-      state = t('shell.studio.status.live').replace('{number}', String(live.number))
+      // Proposed: an off-standard live release says so in the band's words, as the band holds no tag or icon.
+      state = t(live.offStandard ? 'shell.studio.status.liveOffStandard' : 'shell.studio.status.live').replace(
+        '{number}',
+        String(live.number),
+      )
     }
   }
 
