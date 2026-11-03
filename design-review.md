@@ -246,3 +246,6 @@ Group and Material advise, and as mail and documents do:
   so an Edit icon is redundant. Agreed, as D96 and D129 have it: the first column, the module or package by its label,
   is the link that opens the item's Edit dialog, a button styled as a link as it goes to no address; each row keeps
   Remove alone.
+- **Uses and Used by keep the form's rhythm.** The owner saw Uses half as far from the form as the sections are from
+  each other: the editor set its parts 8 px apart. They are spacing-md apart now, as the form's sections are; and Uses
+  names modules and packages by their labels, as the catalog now reaches it.

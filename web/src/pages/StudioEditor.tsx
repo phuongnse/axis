@@ -845,9 +845,11 @@ export function StudioEditor({
   }
 
   return (
+    // Proposed: the editor's parts, its form's sections, Uses, Used by and the Danger zone, are spacing-md apart, as
+    // the form's sections are with each other.
     <Flex
       vertical
-      gap="small"
+      gap={spacing.md}
       data-testid="studio-editor"
       ref={rootRef}
       onBlur={undoable ? () => setHistory(endStep) : undefined}
@@ -1054,7 +1056,7 @@ export function StudioEditor({
       <Flex gap="small" align="center">
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
-      {references}
+      <StudioCatalogContext.Provider value={catalog}>{references}</StudioCatalogContext.Provider>
       {item.kind !== 'application' && (
         // Proposed: deleting a resource is the last section of its page, a Danger zone as GitHub's settings have, so the
         // one destructive action is apart from every edit and says what it does before its dialog asks again.
