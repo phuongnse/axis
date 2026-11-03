@@ -13,6 +13,7 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
 {
     private readonly string? _platformConnectionString;
     private readonly TenantSecretCipher? _cipher;
+    private readonly TenantRuntimeAddress? _runtimeAddress;
     private volatile ITenantCatalog? _current;
     private volatile DirectoryTenantCatalog? _directory;
     private volatile bool _refreshFailed;
@@ -22,9 +23,11 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         string? platformConnectionString,
         TenantSecretCipher? cipher,
         TimeSpan refreshInterval,
-        bool tenantsSectionIgnored)
+        bool tenantsSectionIgnored,
+        TenantRuntimeAddress? runtimeAddress = null)
     {
         _current = catalog;
+        _runtimeAddress = runtimeAddress;
         _platformConnectionString = platformConnectionString;
         _cipher = cipher;
         RefreshInterval = refreshInterval;
@@ -67,11 +70,12 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         string platformConnectionString,
         TenantSecretCipher cipher,
         TimeSpan refreshInterval,
-        bool tenantsSectionIgnored)
+        bool tenantsSectionIgnored,
+        TenantRuntimeAddress? runtimeAddress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
         ArgumentNullException.ThrowIfNull(cipher);
-        return new WorkerTenantCatalog(null, platformConnectionString, cipher, refreshInterval, tenantsSectionIgnored);
+        return new WorkerTenantCatalog(null, platformConnectionString, cipher, refreshInterval, tenantsSectionIgnored, runtimeAddress);
     }
 
     /// <summary>Reads the active tenants from the tenant directory and keeps them.</summary>
@@ -83,7 +87,7 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
             return;
         }
 
-        var loaded = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken);
+        var loaded = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress);
         _directory = loaded;
         _current = loaded;
     }
@@ -108,7 +112,7 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         DirectoryTenantCatalog loaded;
         try
         {
-            loaded = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken);
+            loaded = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress);
         }
         catch (InvalidOperationException)
         {

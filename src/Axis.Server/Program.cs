@@ -56,6 +56,7 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, R
 
 // Read before any database work too, so a bad value stops the start.
 var cell = CellOptions.Load(builder.Configuration);
+var runtimeAddress = TenantRuntimeAddress.Load(builder.Configuration, cell);
 builder.Services.AddSingleton(cell);
 builder.Services.AddSingleton(QuotaDefaults.Load(builder.Configuration, cell));
 builder.Services.AddSingleton<TenantQuotas>();
@@ -107,7 +108,7 @@ if (directorySource)
     }
 
     await PlatformMigration.ApplyAsync(platformMigration, CancellationToken.None);
-    var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
+    var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None, runtimeAddress);
 
     // The server serves a tenant only on its own schema version. Axis.Admin migrate brings a tenant there.
     var otherSchema = loaded.OnOtherSchemaVersion(TenantSchemaVersion.Current);
@@ -119,7 +120,7 @@ if (directorySource)
     // Registered first, so it logs before the release check runs.
     builder.Services.AddSingleton(directory);
     builder.Services.AddSingleton<TenantDirectoryRefreshStatus>();
-    builder.Services.AddSingleton(new TenantDirectoryRefreshOptions(platformConnectionString, refreshInterval));
+    builder.Services.AddSingleton(new TenantDirectoryRefreshOptions(platformConnectionString, refreshInterval, runtimeAddress));
     builder.Services.AddSingleton<TenantDirectoryRefresh>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<TenantDirectoryRefresh>());
     builder.Services.AddSingleton(new TenantDirectoryStart(

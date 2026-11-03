@@ -83,8 +83,10 @@ cell puts PgBouncer in front of it.
   - the worker's one `LISTEN` connection on the platform database, see
     [waking a tenant](worker-scheduling.md#waking-a-tenant);
   - the platform database connections of the server and the worker, which are few.
-- **Settings.** The connection strings name PgBouncer's address for the runtime role and
-  PostgreSQL's for the rest. TLS with a full certificate check holds on both legs, as
+- **Settings.** The server and the worker send every tenant's runtime connection to
+  `Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, PgBouncer's address, see
+  [cell settings](host-settings.md#cell-settings). The tenant directory row and the platform
+  connection strings keep PostgreSQL's address for everything else. TLS with a full certificate check holds on both legs, as
   [TLS](installation.md#tls) asks.
 
 ## Cell size
