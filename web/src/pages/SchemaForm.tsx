@@ -799,8 +799,14 @@ function SlotMap({
     )
   }
   return (
-    // Proposed: each slot is a field of its own, its label above its select, as every field has it.
-    <Flex vertical gap={spacing.sm}>
+    // Proposed: each slot is a field of its own, its label above its select, as every field has it. The slots sit in
+    // from the group's label behind a thin rule, so they read as the group's fields, not its peers.
+    <Flex
+      vertical
+      gap={spacing.sm}
+      data-testid="studio-slot-group"
+      style={{ paddingInlineStart: spacing.md, borderInlineStart: `2px solid ${colour.borderSubtle}` }}
+    >
       {module[slots].map((slot) => {
         const label = slot.titles[locale] ?? slot.titles.en ?? slot.name
         const id = `studio-slot-${pointer}-${slot.name}`

@@ -231,4 +231,6 @@ Group and Material advise, and as mail and documents do:
   stays shown, with "0.9.0 is not installed. Choose an installed version." in warningText under it.
 - **A label is above its input, everywhere.** The owner set the convention: every field's label sits above its input,
   as the form widget has it (D96), never beside it. A module's role and connector maps follow it: each slot is a field
-  of its own, its label (the field label's style, tied to the select) above its select.
+  of its own, its label (the field label's style, tied to the select) above its select. A group's fields sit in from
+  the group's label behind a thin 2 px rule in borderSubtle, so they read as its fields and not its peers, as GitHub
+  and Linear set sub-fields apart.
