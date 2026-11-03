@@ -32,6 +32,7 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// must hold the themes and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
 /// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the themes, the client and the roles again. An error names the step and the status code,
 /// never a response body or a secret. A server error (5xx) makes it read the realm again and repeat, up to three attempts.
+/// <see cref="DeleteAsync"/> deletes a realm, and a realm that is already gone counts as deleted.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 {
@@ -134,6 +135,19 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
         EnsureSuccess(response, "read the realm");
         return true;
+    }
+
+    /// <summary>Deletes the realm with its users and clients. A realm that does not exist (404) counts as deleted. Any other failure throws.</summary>
+    public async Task DeleteAsync(string realm, CancellationToken cancellationToken)
+    {
+        var token = await AdminTokenAsync(cancellationToken);
+        using var response = await SendAsync(token, HttpMethod.Delete, $"admin/realms/{Uri.EscapeDataString(realm)}", null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return;
+        }
+
+        EnsureSuccess(response, "delete the realm");
     }
 
     public async Task EnsureAsync(
