@@ -498,7 +498,9 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             }
 
             builder.UseTestAuthentication(
-                new TestIdentity("requester", "Requester User", "employee"), new TestIdentity("author", "Author User", "author"));
+                new TestIdentity("requester", "Requester User", "employee"),
+                new TestIdentity("author", "Author User", "author"),
+                new TestIdentity("eve", "Eve Exporter", "exporter"));
         });
 
     [Fact]
@@ -684,6 +686,8 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
     }
 
     private const string DepartmentNames = "/api/apps/RecordsApp/data-sources/DepartmentNames/rows";
+    private const string ItemExport = "/api/apps/RecordsApp/entities/Item/records/export?format=csv";
+    private const string DataSourceExport = "/api/apps/RecordsApp/data-sources/ItemCountsByDepartment/export?format=csv";
 
     [Fact]
     public async Task In_a_cell_a_read_past_concurrentQueries_waits_five_seconds_then_answers_503_and_a_freed_slot_serves_reads_without_leaving_a_lease()
@@ -717,6 +721,36 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         await PostgreSqlServer.AdminScalarAsync(platform, "DELETE FROM platform.tenant_leases", CancellationToken);
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(Request(Departments, "a.example.test"), CancellationToken)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(Request(DepartmentNames, "a.example.test"), CancellationToken)).StatusCode);
+        Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_leases", CancellationToken));
+    }
+
+    [Fact]
+    public async Task In_a_cell_an_export_past_concurrentImports_answers_503_and_a_read_still_runs()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
+        await SetQuotaAsync(platform, "a", QuotaKeys.ConcurrentImports, 1);
+        await InsertLeaseAsync(platform, "a", "other", "60 seconds", QuotaKeys.ConcurrentImports);
+        await using var factory = CreateFactory(platform, new LogCollector(), _cellSettings);
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var exporter = factory.CreateClient().SignedInAs("eve");
+
+        foreach (var path in new[] { ItemExport, DataSourceExport })
+        {
+            using var busy = await exporter.SendAsync(Request(path, "a.example.test"), CancellationToken);
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, busy.StatusCode);
+            Assert.Equal("1", Assert.Single(busy.Headers.GetValues("Retry-After")));
+            using var problem = JsonDocument.Parse(await busy.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal("This tenant is busy. Try again in a moment.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        // The slot of the exports is not the slot of the reads.
+        Assert.Equal(HttpStatusCode.OK, (await requester.SendAsync(Request(Departments, "a.example.test"), CancellationToken)).StatusCode);
+
+        await PostgreSqlServer.AdminScalarAsync(platform, "DELETE FROM platform.tenant_leases", CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, (await exporter.SendAsync(Request(ItemExport, "a.example.test"), CancellationToken)).StatusCode);
         Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_leases", CancellationToken));
     }
 
@@ -764,10 +798,10 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
     }
 
     // Adds a lease of the tenant that ends at the database clock plus the interval, such as '60 seconds'.
-    private static Task<object?> InsertLeaseAsync(string platform, string tenantId, string holder, string expiresIn) =>
+    private static Task<object?> InsertLeaseAsync(string platform, string tenantId, string holder, string expiresIn, string quota = QuotaKeys.ConcurrentQueries) =>
         PostgreSqlServer.AdminScalarAsync(
             platform,
-            $"INSERT INTO platform.tenant_leases (lease_id, tenant_id, quota, holder, expires_at) VALUES (gen_random_uuid(), '{tenantId}', 'concurrentQueries', '{holder}', now() + interval '{expiresIn}')",
+            $"INSERT INTO platform.tenant_leases (lease_id, tenant_id, quota, holder, expires_at) VALUES (gen_random_uuid(), '{tenantId}', '{quota}', '{holder}', now() + interval '{expiresIn}')",
             CancellationToken);
 
     [Fact]
