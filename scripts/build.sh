@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Builds the SPA into the server web root, checks its size against web/bundle-budget.json and its font files
 # and license texts, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
-# files and fonts, then builds the .NET solution, which installs the sample extension package in
-# artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates in
+# files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the .NET solution,
+# which installs the sample extension package in artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates in
 # artifacts/templates.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,6 +20,15 @@ test -f "$theme/login-update-password.ftl"
 test -f "$theme/login-config-totp.ftl"
 test -f "$theme/resources/assets/axis-sign-in.js"
 node scripts/check-fonts.mjs "$theme/resources"
+email=artifacts/keycloak-theme/axis/email
+test -f "$email/theme.properties"
+test -f "$email/html/template.ftl"
+test -f "$email/html/executeActions.ftl"
+test -f "$email/html/password-reset.ftl"
+test -f "$email/text/executeActions.ftl"
+test -f "$email/text/password-reset.ftl"
+test -f "$email/messages/messages_en.properties"
+test -f "$email/messages/messages_vi.properties"
 dotnet build Axis.slnx -c Release --no-restore
 bash scripts/lib/install-modules.sh
 test -f artifacts/modules/department-budgets/1.2.0/module.json

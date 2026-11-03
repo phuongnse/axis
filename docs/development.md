@@ -357,7 +357,8 @@ works on a fresh clone:
   `web/package-lock.json` changed since the last install. It installs no
   Playwright browser.
 - It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service mounts.
-  _(planned for M31)_: with it the email theme and the sample themes of `samples/keycloak/themes`, and the list of
+  It also copies the email theme, and fails when one of its files is missing.
+  _(planned for M31)_: with it the sample themes of `samples/keycloak/themes`, and the list of
   [open source licences](reference/legal.md#open-source-licences) that `/licences` shows.
 - It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker
   Compose. It waits until PostgreSQL accepts connections, Keycloak's `axis`
