@@ -14,7 +14,8 @@ public interface IExternalWorkItemHandler
 
     /// <summary>
     /// Runs the item with an open connection and no transaction. Each transaction the handler opens
-    /// must check the claim token, and the handler deletes the item itself.
+    /// must begin with <see cref="WorkItemQueue.BeginAsync"/>, so it runs under the item's statement limit.
+    /// It must check the claim token, and the handler deletes the item itself.
     /// </summary>
     Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, NpgsqlConnection connection, CancellationToken cancellationToken);
 }

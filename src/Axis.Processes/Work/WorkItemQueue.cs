@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Axis.Core.Telemetry;
 using Axis.Expressions.Sql;
+using Axis.Tenancy;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -318,6 +319,32 @@ public static class WorkItemQueue
         command.Parameters.AddWithValue("id", item.Id);
         command.Parameters.AddWithValue("token", item.ClaimToken);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    /// <summary>
+    /// Begins a transaction for <paramref name="item"/> and sets the item's statement limit in it, if it has one. The limit
+    /// ends with the transaction, so it never reaches the next user of a pooled connection.
+    /// </summary>
+    public static async Task<NpgsqlTransaction> BeginAsync(NpgsqlConnection connection, ClaimedWorkItem item, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(item);
+
+        var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        if (item.StatementTimeout is { } limit)
+        {
+            try
+            {
+                await StatementTimeout.SetLocalAsync(transaction, limit, cancellationToken);
+            }
+            catch
+            {
+                await transaction.DisposeAsync();
+                throw;
+            }
+        }
+
+        return transaction;
     }
 
     /// <summary>

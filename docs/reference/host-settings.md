@@ -442,10 +442,10 @@ reads `Data:ImportMaxRows` and, for the statements of its work items,
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's
   next user. An interactive read runs in one short read-only transaction that
-  is always rolled back. The worker's `Worker:StatementTimeout` is set the same
-  way for a work item that runs in one transaction. For any other work item it
-  is set on the item's connection for the whole run and then reset, so it never
-  reaches the connection's next user either.
+  is always rolled back. The worker sets `Worker:StatementTimeout` the same
+  way in every transaction of a work item, including each transaction of a
+  handler that calls an outside system. A statement such a handler runs outside
+  a transaction has no limit.
 - **Page reads.** These are the page metadata route
   `GET /api/sites/{path}/pages/{page}` and the record and data source routes
   that a page's widgets call. Lookups use the record list route. Form state,

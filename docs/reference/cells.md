@@ -76,7 +76,8 @@ cell puts PgBouncer in front of it.
   `SET LOCAL`, which end with it. Axis's run-time locks are of that kind. Nothing on a pooled
   connection may rely on state that outlives a transaction: a session advisory lock, a plain `SET`,
   a prepared statement kept by name, `LISTEN` or a temporary table. Npgsql's automatic preparation
-  is off on pooled connections.
+  is off on pooled connections. A guard test fails on such a statement in `src`, outside the listed
+  files that use direct connections.
 - **Direct connections.** These connect to PostgreSQL directly, not through PgBouncer:
   - `Axis.Admin` and the publisher, with the schema role, because activation and provisioning take
     session advisory locks and change tables;

@@ -339,6 +339,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             Assert.True(await runner.RunNextAsync("a", _longLease, CancellationToken));
         }
 
+        Assert.Equal("0", handler.Outside);
         Assert.Equal("5s", handler.Limit);
         connections.Accessor.Current = new TenantContext("a");
         await using var connection = await connections.Factory.OpenConnectionAsync(CancellationToken);
@@ -706,16 +707,27 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             Task.CompletedTask;
     }
 
-    /// <summary>Reads <c>statement_timeout</c> on the open connection, then deletes the item or throws.</summary>
+    /// <summary>
+    /// Reads <c>statement_timeout</c> on the bare connection, then in a transaction that begins through
+    /// <see cref="WorkItemQueue.BeginAsync"/>, where it deletes the item or throws.
+    /// </summary>
     private sealed class LimitReadingExternalHandler(bool throws) : IExternalWorkItemHandler
     {
         public string Kind => LimitKind;
+
+        public string? Outside { get; private set; }
 
         public string? Limit { get; private set; }
 
         public async Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, NpgsqlConnection connection, CancellationToken cancellationToken)
         {
             await using (var command = new NpgsqlCommand("SHOW statement_timeout", connection))
+            {
+                Outside = (string?)await command.ExecuteScalarAsync(cancellationToken);
+            }
+
+            await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
+            await using (var command = new NpgsqlCommand("SHOW statement_timeout", connection, transaction))
             {
                 Limit = (string?)await command.ExecuteScalarAsync(cancellationToken);
             }
@@ -725,7 +737,6 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
                 throw new InvalidOperationException("boom");
             }
 
-            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
             Assert.True(await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken));
             await transaction.CommitAsync(cancellationToken);
             return WorkItemOutcome.Completed;

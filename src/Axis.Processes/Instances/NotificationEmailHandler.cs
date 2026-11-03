@@ -69,7 +69,7 @@ internal sealed partial class NotificationEmailHandler(
                 : WorkItemOutcome.LostClaim;
         }
 
-        var email = item.EmailId is { } id ? await LoadAsync(connection, id, cancellationToken) : null;
+        var email = item.EmailId is { } id ? await LoadAsync(item, connection, id, cancellationToken) : null;
         if (email is null)
         {
             LogNoEmail(item.Id, item.EmailId);
@@ -137,7 +137,7 @@ internal sealed partial class NotificationEmailHandler(
     /// </summary>
     private async Task<bool> RescheduleAsync(ClaimedWorkItem item, NpgsqlConnection connection, TimeSpan delay, CancellationToken cancellationToken)
     {
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -155,7 +155,7 @@ internal sealed partial class NotificationEmailHandler(
     /// </summary>
     private async Task<WorkItemOutcome> CompleteAsync(ClaimedWorkItem item, NpgsqlConnection connection, Guid? markSentId, CancellationToken cancellationToken)
     {
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -190,7 +190,7 @@ internal sealed partial class NotificationEmailHandler(
         CancellationToken cancellationToken)
     {
         var error = DeliveryFailures.ErrorText(exception);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var attempts = await DeliveryFailures.CountAsync(transaction, DeliveryFailures.NotificationEmailKind, emailId.ToString("D"), error, cancellationToken);
         if (attempts >= deliverySettings.Attempts)
         {
@@ -243,11 +243,13 @@ internal sealed partial class NotificationEmailHandler(
             : throw new InvalidOperationException($"Process instance '{instanceId}' of the email work item does not exist.");
     }
 
-    private static async Task<StagedEmail?> LoadAsync(NpgsqlConnection connection, Guid id, CancellationToken cancellationToken)
+    private static async Task<StagedEmail?> LoadAsync(ClaimedWorkItem item, NpgsqlConnection connection, Guid id, CancellationToken cancellationToken)
     {
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         await using var command = new NpgsqlCommand(
             "SELECT address, subject, body, message_id, state FROM axis.email_outbox WHERE id = @id",
-            connection);
+            connection,
+            transaction);
         command.Parameters.AddWithValue("id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
