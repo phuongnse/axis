@@ -101,14 +101,20 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 - **Shared by every host.** The count is one for the whole cell, whatever the number of replicas and
   workers. A limit kept in each host's memory would multiply with the hosts.
 - **What waits, and how.**
-  - An import or an export waits in its queue, and the SPA shows it as queued.
+  - In a cell, the dry run or the commit of an import takes a `concurrentImports` lease before it
+    runs. When none is free it does not run. Its work item is due again in 1 second and the import
+    keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. The
+    lease is held until the work has committed.
   - A connector or package call is not claimed by the worker while the tenant has no lease free.
     The work item stays due, and the worker runs other tenants' work.
-  - A data source query or a record list read waits up to 5 seconds for a lease. It then answers
-    `503` problem details titled "This tenant is busy. Try again in a moment.", with
-    `Retry-After: 1`. The query timeout counts from the start of the query, not of the wait.
-- **When the platform database is down.** A read that cannot reach the platform database runs without
-  a lease, and the server logs a warning. Under `directory` the server keeps serving from the last good
+  - A data source query, a record list read, a record export or a data source export waits up to
+    5 seconds for a lease. It then answers `503` problem details titled "This tenant is busy. Try
+    again in a moment.", with `Retry-After: 1`. The query timeout counts from the start of the
+    query, not of the wait. A query or a list read takes a `concurrentQueries` lease and an export
+    takes a `concurrentImports` lease, so a busy slot of one never blocks the other. An export
+    releases its lease when its file is complete, before the file is sent.
+- **When the platform database is down.** A read, an export or an import that cannot reach the
+  platform database runs without a lease, and the server or the worker logs a warning. Under `directory` the server keeps serving from the last good
   directory then, and the limit would otherwise turn a platform outage into a cell-wide read outage.
 - **Cost.** A lease costs two short statements on the platform database. The
   [cell load test](performance.md#cell-load-test) shows whether the objectives still hold with them.

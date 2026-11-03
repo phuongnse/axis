@@ -1,8 +1,5 @@
-using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using static Axis.Integration.Tests.Polling;
@@ -16,9 +13,6 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed class TenantLeasesTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
-    private static readonly TenantSecretCipher _cipher = TenantSecretCipher.Load(
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestPlatform.SecretKey }).Build());
-
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -83,37 +77,7 @@ public sealed class TenantLeasesTests(PostgreSqlFixture database) : IClassFixtur
     }
 
     // A platform database with the tables, the tenants a and b and the reader role's grants.
-    private async Task<string> PreparePlatformAsync()
-    {
-        var platform = await database.CreateDatabaseAsync("leases_platform", CancellationToken);
-        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
-        await context.Database.MigrateAsync(CancellationToken);
-        foreach (var id in new[] { "a", "b" })
-        {
-            context.Tenants.Add(new TenantRow
-            {
-                Id = id,
-                Status = "active",
-                SchemaVersion = TenantSchemaVersion.Current,
-                DatabaseHost = "127.0.0.1",
-                DatabasePort = 5432,
-                DatabaseName = $"tenant_{id}",
-                RuntimeUser = "runtime",
-                SchemaUser = "schema",
-                RuntimePassword = _cipher.Encrypt(id, TenantSecretFields.RuntimePassword, "x"),
-                SchemaPassword = _cipher.Encrypt(id, TenantSecretFields.SchemaPassword, "x"),
-                OidcAuthority = "https://127.0.0.1:1/realms/axis",
-                OidcClientId = "axis",
-                OidcClientSecret = _cipher.Encrypt(id, TenantSecretFields.OidcClientSecret, "x"),
-            });
-        }
-
-        await context.SaveChangesAsync(CancellationToken);
-        await using var connection = new NpgsqlConnection(platform);
-        await connection.OpenAsync(CancellationToken);
-        await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, CancellationToken);
-        return platform;
-    }
+    private Task<string> PreparePlatformAsync() => TestLeasePlatform.CreateAsync(database.CreateDatabaseAsync, "leases_platform", CancellationToken, "a", "b");
 
     private static async Task<long> CountAsync(string platform) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_leases", CancellationToken))!;
