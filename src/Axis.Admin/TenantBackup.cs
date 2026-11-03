@@ -24,7 +24,8 @@ namespace Axis.Admin;
 /// dump. Each step writes one line that names the tenant and never a password, a host or a connection string. The whole archive
 /// is encrypted with the operator's backup key, see <see cref="BackupArchive"/>. It holds the tenant's data keys and lookup keys,
 /// and no other secret: the manifest is built from explicit fields, and the binding secrets are never read. The plain dump is in a
-/// temporary file that only its owner can read until the archive is written, and the file is deleted then.
+/// temporary file that only its owner can read until the archive is written, and the file is deleted then. In a cell the archive also
+/// holds each file of the tenant's Studio folder as a <c>studio/&lt;path&gt;</c> entry, between the manifest and the dump. A symbolic link is skipped.
 /// </summary>
 internal sealed class TenantBackup : IAsyncDisposable
 {
@@ -35,6 +36,8 @@ internal sealed class TenantBackup : IAsyncDisposable
     private const string ManifestEntry = "manifest.json";
 
     private const string DumpEntry = "tenant.dump";
+
+    private const string StudioPrefix = "studio/";
 
     private static readonly UnixFileMode _ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
@@ -432,12 +435,39 @@ internal sealed class TenantBackup : IAsyncDisposable
         await using (var writer = new TarWriter(encrypted, TarEntryFormat.Pax, leaveOpen: true))
         {
             await writer.WriteEntryAsync(NewEntry(ManifestEntry, new MemoryStream(manifest)), _cancellationToken);
+            foreach (var (relative, path) in StudioFiles())
+            {
+                await using var studio = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                await writer.WriteEntryAsync(NewEntry(StudioPrefix + relative, studio), _cancellationToken);
+            }
+
             await using var dump = new FileStream(_dumpTemp, FileMode.Open, FileAccess.Read, FileShare.Read);
             await writer.WriteEntryAsync(NewEntry(DumpEntry, dump), _cancellationToken);
         }
 
         // Moving without overwrite keeps an --out that appeared during the backup.
         File.Move(_archiveTemp, _plan.OutPath, overwrite: false);
+    }
+
+    // The files of the tenant's Studio folder, by their path below it with "/" as separator, in ordinal order. A symbolic link is skipped, so a
+    // link cannot pull in a file from outside the folder. A cell without the setting or a tenant without a folder has none.
+    private IEnumerable<(string Relative, string Path)> StudioFiles()
+    {
+        if (_settings.StudioApplicationsPath is not { } root)
+        {
+            return [];
+        }
+
+        var folder = Path.Combine(root, _id);
+        if (!Directory.Exists(folder))
+        {
+            return [];
+        }
+
+        var options = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false };
+        return Directory.EnumerateFiles(folder, "*", options)
+            .Select(path => (Relative: Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/'), Path: path))
+            .OrderBy(file => file.Relative, StringComparer.Ordinal);
     }
 
     private static PaxTarEntry NewEntry(string name, Stream data) =>
