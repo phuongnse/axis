@@ -165,6 +165,19 @@ readOnly: true
 {{- end }}
 {{- end }}
 
+{{/*
+The settings that send the runtime connections to PgBouncer. Server and worker only: the publisher
+connects to PostgreSQL directly. Renders nothing when PgBouncer is off. Call with the root context.
+*/}}
+{{- define "axis.pgbouncerEnv" -}}
+{{- if .Values.cell.pgbouncer.enabled -}}
+- name: Cell__RuntimeDatabaseHost
+  value: {{ printf "%s-pgbouncer" .Release.Name | quote }}
+- name: Cell__RuntimeDatabasePort
+  value: "6432"
+{{- end }}
+{{- end }}
+
 {{/* The probes of a host. Call with the name of the container port. A port named https is probed over HTTPS. */}}
 {{- define "axis.probes" -}}
 startupProbe:

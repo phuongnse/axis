@@ -1,0 +1,103 @@
+{{- if .Values.cell.pgbouncer.enabled }}
+# PgBouncer in transaction mode. It always runs one replica, because each replica would add its own
+# max_db_connections to PostgreSQL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-pgbouncer
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgbouncer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "axis.selectorLabels" (dict "root" . "component" "pgbouncer") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "axis.labels" . | nindent 8 }}
+        app.kubernetes.io/component: pgbouncer
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/pgbouncer-configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- include "axis.podSecurityContext" . | nindent 8 }}
+        # The user and group of the image, 70, as numbers because runAsNonRoot rejects a name.
+        runAsUser: 70
+        runAsGroup: 70
+      containers:
+        - name: pgbouncer
+          image: {{ .Values.cell.pgbouncer.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # The image's entrypoint writes files, which the read-only root file system forbids.
+          command:
+            - /usr/bin/pgbouncer
+            - /etc/pgbouncer/pgbouncer.ini
+          ports:
+            - name: pgbouncer
+              containerPort: 6432
+          readinessProbe:
+            tcpSocket:
+              port: pgbouncer
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: pgbouncer
+            periodSeconds: 10
+          securityContext:
+            {{- include "axis.containerSecurityContext" . | nindent 12 }}
+          {{- with .Values.cell.pgbouncer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pgbouncer
+              readOnly: true
+            - name: pgbouncer-tls
+              mountPath: /pgbouncer-tls
+              readOnly: true
+            {{- if .Values.cell.pgbouncer.databaseAuthority.volume }}
+            - name: db-ca
+              mountPath: /db-ca
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          projected:
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            sources:
+              - configMap:
+                  name: {{ .Release.Name }}-pgbouncer
+                  items:
+                    - key: pgbouncer.ini
+                      path: pgbouncer.ini
+              - secret:
+                  name: {{ required "secrets.pgbouncerAuth.name is required: the Kubernetes Secret that holds the auth user's line of userlist.txt" .Values.secrets.pgbouncerAuth.name | quote }}
+                  items:
+                    - key: {{ .Values.secrets.pgbouncerAuth.key | default "userlist.txt" | quote }}
+                      path: userlist.txt
+        - name: pgbouncer-tls
+          secret:
+            secretName: {{ required "secrets.pgbouncerCertificate.name is required: the Kubernetes TLS Secret (tls.crt, tls.key) of PgBouncer's endpoint, issued for the DNS name of the PgBouncer Service" .Values.secrets.pgbouncerCertificate.name | quote }}
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        {{- if .Values.cell.pgbouncer.databaseAuthority.volume }}
+        - name: db-ca
+          {{- toYaml .Values.cell.pgbouncer.databaseAuthority.volume | nindent 10 }}
+        {{- end }}
+{{- end }}

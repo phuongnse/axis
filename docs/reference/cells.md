@@ -95,7 +95,8 @@ cell puts PgBouncer in front of it.
   `Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, PgBouncer's address, see
   [cell settings](host-settings.md#cell-settings). The tenant directory row and the platform
   connection strings keep PostgreSQL's address for everything else. TLS with a full certificate
-  check holds on both legs, as [TLS](installation.md#tls) asks.
+  check holds on both legs, as [TLS](installation.md#tls) asks. The Helm chart's `cell.pgbouncer`
+  deploys PgBouncer and sets both settings, see [installation](installation.md#in-the-cloud).
 
 ## Cell size
 

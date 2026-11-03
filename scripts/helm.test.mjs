@@ -163,7 +163,11 @@ describe('the Axis Helm chart', () => {
   test('no Secret object and no secret setting in any env entry', () => {
     const output = renderOk()
     assert.doesNotMatch(output, /^kind: Secret$/m)
-    assert.doesNotMatch(output, /^\s*(stringData|data):/m)
+    assert.doesNotMatch(output, /^\s*stringData:/m)
+    // A ConfigMap holds data. Every other kind may not.
+    for (const document of documents(output).filter((d) => !/^kind: ConfigMap$/m.test(d))) {
+      assert.doesNotMatch(document, /^\s*data:/m)
+    }
     assert.doesNotMatch(
       output,
       /- name: (ConnectionStrings__|Platform__SecretKey|Admin__ConnectionString|AXIS_OIDC_CLIENT_SECRET|KC_DB_URL|KC_DB_USERNAME|KC_DB_PASSWORD|KC_BOOTSTRAP_ADMIN_CLIENT_SECRET|IdentityProvider__AdminClientSecret)/,
@@ -369,6 +373,8 @@ describe('the Axis Helm chart', () => {
       'cell.consoleAllowedNetworks=null',
       '--set',
       'cell.certificate.enabled=false',
+      '--set',
+      'cell.pgbouncer.enabled=false',
     )
     assert.doesNotMatch(output, /Cell__/)
   })
@@ -443,6 +449,10 @@ describe('the Axis Helm chart', () => {
     ['cell.certificate.issuer.dns01.tokenSecret.name', 'cell.certificate.issuer.dns01.tokenSecret.name='],
     ['cell.certificate.secretName', 'cell.certificate.secretName='],
     ['cell.certificate.issuer.server', 'cell.certificate.issuer.server='],
+    ['secrets.pgbouncerAuth.name', 'secrets.pgbouncerAuth.name='],
+    ['secrets.pgbouncerCertificate.name', 'secrets.pgbouncerCertificate.name='],
+    ['cell.pgbouncer.databaseHost', 'cell.pgbouncer.databaseHost='],
+    ['cell.pgbouncer.authUser', 'cell.pgbouncer.authUser='],
   ]) {
     test(`a missing ${value} fails and names it`, () => {
       const result = render('--set', set)
@@ -450,4 +460,125 @@ describe('the Axis Helm chart', () => {
       assert.match(result.stderr, new RegExp(value.replaceAll('.', '\\.')))
     })
   }
+
+  test('with PgBouncer on, the server and the worker send runtime connections to its Service, and no other pod does', () => {
+    const output = renderOk()
+    for (const name of ['axis-server', 'axis-worker']) {
+      const host = find(output, 'Deployment', name)
+      assert.match(host, /- name: Cell__RuntimeDatabaseHost\n\s+value: "axis-pgbouncer"\n/, name)
+      assert.match(host, /- name: Cell__RuntimeDatabasePort\n\s+value: "6432"\n/, name)
+    }
+    for (const [kind, name] of [
+      ['Deployment', 'axis-publisher'],
+      ['Job', 'axis-migrate'],
+      ['Deployment', 'axis-identity'],
+    ]) {
+      assert.doesNotMatch(find(output, kind, name), /Cell__RuntimeDatabase/, name)
+    }
+  })
+
+  test('the PgBouncer ConfigMap pools in transaction mode, with the pool sizes, a wildcard database and TLS on both legs', () => {
+    const config = find(renderOk(), 'ConfigMap', 'axis-pgbouncer')
+    for (const line of [
+      '* = host=db.internal.example.com port=5432',
+      'pool_mode = transaction',
+      'default_pool_size = 3',
+      'max_db_connections = 10',
+      'max_client_conn = 10000',
+      'auth_user = axis_pgbouncer',
+      'auth_dbname = postgres',
+      'auth_query = SELECT uname, phash FROM pgbouncer.user_lookup($1)',
+      'client_tls_sslmode = require',
+      'client_tls_cert_file = /pgbouncer-tls/tls.crt',
+      'client_tls_key_file = /pgbouncer-tls/tls.key',
+      'server_tls_sslmode = verify-full',
+      'server_tls_ca_file = /db-ca/root.crt',
+    ]) {
+      assert.match(config, new RegExp(`^    ${line.replaceAll(/[$*.()]/g, '\\$&')}$`, 'm'), line)
+    }
+  })
+
+  test('the PgBouncer pool sizes and database port are values', () => {
+    const config = find(
+      renderOk(
+        '--set', 'cell.pgbouncer.defaultPoolSize=4',
+        '--set', 'cell.pgbouncer.maxDbConnections=12',
+        '--set', 'cell.pgbouncer.maxClientConn=500',
+        '--set', 'cell.pgbouncer.databasePort=6000',
+      ),
+      'ConfigMap',
+      'axis-pgbouncer',
+    )
+    assert.match(config, /default_pool_size = 4\n/)
+    assert.match(config, /max_db_connections = 12\n/)
+    assert.match(config, /max_client_conn = 500\n/)
+    assert.match(config, /port=6000\n/)
+  })
+
+  test('the PgBouncer Deployment is one non-root pod with a read-only root file system and its two Secrets', () => {
+    const deployment = find(renderOk(), 'Deployment', 'axis-pgbouncer')
+    assert.match(deployment, /replicas: 1\n/)
+    assert.match(deployment, /image: "edoburu\/pgbouncer:v1\.24\.1-p1"/)
+    assert.match(deployment, /runAsNonRoot: true\n/)
+    assert.match(deployment, /runAsUser: 70\n\s+runAsGroup: 70\n/)
+    assert.match(deployment, /readOnlyRootFilesystem: true\n/)
+    assert.match(deployment, /command:\n\s+- \/usr\/bin\/pgbouncer\n\s+- \/etc\/pgbouncer\/pgbouncer\.ini\n/)
+    assert.match(deployment, /- name: pgbouncer\n\s+containerPort: 6432\n/)
+    assert.match(deployment, /readinessProbe:\n\s+tcpSocket:\n\s+port: pgbouncer\n/)
+    assert.match(deployment, /livenessProbe:\n\s+tcpSocket:\n\s+port: pgbouncer\n/)
+    assert.match(deployment, /checksum\/config: [0-9a-f]{64}\n/)
+    assert.match(deployment, /- configMap:\n\s+name: axis-pgbouncer\n\s+items:\n\s+- key: pgbouncer\.ini\n\s+path: pgbouncer\.ini\n/)
+    assert.match(deployment, /- secret:\n\s+name: "axis-pgbouncer-auth"\n\s+items:\n\s+- key: "userlist\.txt"\n\s+path: userlist\.txt\n/)
+    assert.match(deployment, /- name: pgbouncer-tls\n\s+secret:\n\s+secretName: "axis-pgbouncer-tls"\n(\s+#.*\n)?\s+defaultMode: 292\n/)
+    assert.match(deployment, /- name: pgbouncer-tls\n\s+mountPath: \/pgbouncer-tls\n\s+readOnly: true\n/)
+    assert.match(deployment, /- name: db-ca\n\s+mountPath: \/db-ca\n\s+readOnly: true\n/)
+  })
+
+  test('the PgBouncer Service is port 6432 named pgbouncer', () => {
+    const service = find(renderOk(), 'Service', 'axis-pgbouncer')
+    assert.match(service, /^  type: ClusterIP$/m)
+    assert.match(service, /ports:\n\s+- name: pgbouncer\n\s+port: 6432\n\s+targetPort: pgbouncer\n/)
+    assert.match(service, /app\.kubernetes\.io\/component: pgbouncer\n\s+ports:/)
+  })
+
+  test('the PgBouncer database authority is used only when set', () => {
+    const output = renderOk('--set', 'cell.pgbouncer.databaseAuthority.volume=null')
+    assert.doesNotMatch(find(output, 'ConfigMap', 'axis-pgbouncer'), /server_tls_ca_file/)
+    assert.match(find(output, 'ConfigMap', 'axis-pgbouncer'), /server_tls_sslmode = verify-full/)
+    assert.doesNotMatch(find(output, 'Deployment', 'axis-pgbouncer'), /db-ca/)
+  })
+
+  test('with PgBouncer off, no PgBouncer object and no Cell__RuntimeDatabase variable renders', () => {
+    const output = renderOk('--set', 'cell.pgbouncer.enabled=false')
+    assert.doesNotMatch(output, /^  name: axis-pgbouncer$/m)
+    assert.doesNotMatch(output, /pgbouncer/i)
+    assert.doesNotMatch(output, /Cell__RuntimeDatabase/)
+  })
+
+  test('PgBouncer is off by default', () => {
+    const values = spawnSync(process.env.HELM ?? 'helm', ['show', 'values', chart], { encoding: 'utf8' })
+    assert.equal(values.status, 0, values.stderr)
+    assert.match(values.stdout, /^  pgbouncer:\n    enabled: false\n/m)
+  })
+
+  test('PgBouncer on without cell.id fails and names it', () => {
+    const result = render('--set', 'cell.id=')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /cell\.id/)
+  })
+
+  test('a value inside a PgBouncer Secret reference is rejected and never rendered', () => {
+    for (const path of ['secrets.pgbouncerAuth.value', 'secrets.pgbouncerCertificate.value']) {
+      const result = render('--set', `${path}=leak`)
+      assert.notEqual(result.status, 0, path)
+      assert.match(result.stderr, /value/, path)
+      assert.doesNotMatch(result.stdout, /leak/, path)
+    }
+  })
+
+  test('an unknown cell.pgbouncer value is rejected', () => {
+    const result = render('--set', 'cell.pgbouncer.password=leak')
+    assert.notEqual(result.status, 0)
+    assert.doesNotMatch(result.stdout, /leak/)
+  })
 })

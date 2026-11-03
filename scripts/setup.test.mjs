@@ -11,6 +11,9 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const toolsSh = readFileSync(join(root, 'scripts/lib/tools.sh'), 'utf8')
 const version = (name) => toolsSh.match(new RegExp(`^${name}=(\\S+)$`, 'm'))[1]
+const list = (name) => toolsSh.match(new RegExp(`^${name}=\\(([^)]*)\\)$`, 'm'))[1].split(/\s+/)
+const kubernetesSchemaFiles = list('KUBERNETES_SCHEMA_FILES')
+const crdSchemaFiles = list('CRD_SCHEMA_FILES')
 
 const stub = `#!/usr/bin/env bash
 line="$(basename "$0") $*"
@@ -56,7 +59,8 @@ const ciCommands = [
   'npx --prefix tests/e2e playwright install chromium',
 ]
 
-function cacheTools(home, { schemas = true } = {}) {
+// Fills the home cache. With schemas, every schema file is cached except the ones in missing.
+function cacheTools(home, { schemas = true, missing = [] } = {}) {
   const tools = join(home, '.cache', 'axis-tools')
   for (const file of [
     `helm-${version('HELM_VERSION')}/helm`,
@@ -66,8 +70,18 @@ function cacheTools(home, { schemas = true } = {}) {
     writeFileSync(join(tools, file), '', { mode: 0o755 })
   }
   if (schemas) {
-    mkdirSync(join(tools, `kubernetes-schemas-${version('KUBERNETES_VERSION')}`), { recursive: true })
-    mkdirSync(join(tools, `crd-schemas-${version('CRDS_CATALOG_COMMIT')}`), { recursive: true })
+    const kubernetes = join(tools, `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
+    const crd = join(tools, `crd-schemas-${version('CRDS_CATALOG_COMMIT')}`)
+    mkdirSync(kubernetes, { recursive: true })
+    mkdirSync(crd, { recursive: true })
+    for (const [folder, file] of [
+      ...kubernetesSchemaFiles.map((file) => [kubernetes, file]),
+      ...crdSchemaFiles.map((file) => [crd, file]),
+    ]) {
+      if (missing.includes(file)) continue
+      mkdirSync(dirname(join(folder, `${file}.json`)), { recursive: true })
+      writeFileSync(join(folder, `${file}.json`), '{}')
+    }
   }
 }
 
@@ -175,10 +189,11 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         },
       })
       assert.equal(result.status, 0, result.stderr)
-      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 20)
+      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 24)
       assert.match(result.stderr, /Attempt 1 of 4 failed with status 22/)
       const schemas = join(home, '.cache', 'axis-tools', `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
       assert.deepEqual(readdirSync(schemas).sort(), [
+        'configmap-v1.json',
         'deployment-apps-v1.json',
         'job-batch-v1.json',
         'service-v1.json',
@@ -188,6 +203,66 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('scripts/lib/tools.sh fetches the schema files that a cached folder lacks', () => {
+  function installTools({ missing }) {
+    const dir = mkdtempSync(join(tmpdir(), 'axis-tools-'))
+    try {
+      const bin = join(dir, 'bin')
+      const counts = join(dir, 'counts')
+      const log = join(dir, 'log')
+      const home = join(dir, 'home')
+      mkdirSync(bin)
+      mkdirSync(counts)
+      writeFileSync(join(bin, 'curl'), curlStub, { mode: 0o755 })
+      cacheTools(home, { missing })
+
+      const result = spawnSync('bash', ['-c', 'source scripts/lib/tools.sh; install_tools'], {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          HOME: home,
+          AXIS_RETRY_DELAY_SECONDS: '0',
+          STUB_LOG: log,
+          STUB_COUNTS: counts,
+        },
+      })
+      const tools = join(home, '.cache', 'axis-tools')
+      return {
+        ...result,
+        requested: [...new Set(existsSync(log) ? readFileSync(log, 'utf8').trimEnd().split('\n') : [])],
+        schemas: readdirSync(join(tools, `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)).sort(),
+        leftovers: readdirSync(tools).filter((name) => name.startsWith('.install.')),
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('a cached folder that lacks one file gets only that file downloaded', () => {
+    const result = installTools({ missing: ['configmap-v1'] })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.requested.length, 1)
+    assert.match(result.requested[0], /\/v1\.33\.0-standalone-strict\/configmap-v1\.json$/)
+    assert.deepEqual(result.schemas, ['configmap-v1.json', 'deployment-apps-v1.json', 'job-batch-v1.json', 'service-v1.json'])
+    assert.deepEqual(result.leftovers, [])
+  })
+
+  test('a complete cache downloads nothing', () => {
+    const result = installTools({ missing: [] })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.requested, [])
+  })
+
+  test('a fresh cache gets configmap-v1.json', () => {
+    const result = installTools({ missing: [...kubernetesSchemaFiles, ...crdSchemaFiles] })
+    assert.equal(result.status, 0, result.stderr)
+    assert.ok(result.schemas.includes('configmap-v1.json'))
+    assert.equal(result.requested.length, kubernetesSchemaFiles.length + crdSchemaFiles.length)
   })
 })
 
