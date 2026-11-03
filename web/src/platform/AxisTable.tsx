@@ -57,20 +57,21 @@ export interface AxisTableToolbar {
   main?: ReactNode
 }
 
-/** Every row is 48 px high, a row of one line centred in it, a row of more lines reading from the same first line. */
+/**
+ * Proposed: every row, the header's too, is the `tableRow` size high, 40 px, whatever it holds: spacing-xs above and
+ * below a line of the `smallControl` size, which a line of text and a small icon button both fill. A row of more lines
+ * grows and reads from the same first line.
+ */
 const rowLine: CSSProperties = {
-  height: sizeTokens.bar,
+  height: sizeTokens.tableRow,
   boxSizing: 'border-box',
-  paddingBlock: spacingTokens.sm,
+  paddingBlock: spacingTokens.xs,
   lineHeight: `${sizeTokens.smallControl}px`,
   verticalAlign: 'top',
 }
 
-/**
- * Proposed: every cell keeps spacing-md on each side, so two columns sit spacing-xl apart, close enough to read a row
- * as one line and far enough apart that columns fitted to their content do not crowd each other.
- */
-const cellInline = spacingTokens.md
+/** Every cell keeps spacing-lg on each side, so columns fitted to their content do not crowd each other. */
+const cellInline = spacingTokens.lg
 
 /** A column as wide as its content, never wrapping. */
 const fitted: CSSProperties = { width: '1%', whiteSpace: 'nowrap', paddingInline: cellInline }
@@ -89,7 +90,7 @@ const foldFrom = 3
 
 /**
  * Proposed: the one table of the platform, which every table is built on: the `table` widget, Studio's and the
- * console's. It draws the toolbar, the columns by their kind, 48 px rows, the row actions, folded into one "…" menu
+ * console's. It draws the toolbar, the columns by their kind, rows of the `tableRow` size, the row actions, folded into one "…" menu
  * from three on or below 992 px, the paging, and sideways scrolling when the table is narrower than its columns. A
  * cell with no value shows `EmptyDash`, which the column's `render` returns.
  */
@@ -141,8 +142,8 @@ export function AxisTable<T extends object>({
         ? { ...fitted, ...rowLine, ...numbers }
         : { width: '1%', paddingInline: cellInline, ...rowLine }
     const header: CSSProperties = fills
-      ? { paddingInline: cellInline, ...(numeric ? { textAlign: 'right' } : {}) }
-      : { ...fitted, ...(numeric ? { textAlign: 'right' } : {}) }
+      ? { paddingInline: cellInline, ...rowLine, ...(numeric ? { textAlign: 'right' } : {}) }
+      : { ...fitted, ...rowLine, ...(numeric ? { textAlign: 'right' } : {}) }
     return {
       ...column,
       onHeaderCell: () => ({ style: header }),
@@ -154,7 +155,7 @@ export function AxisTable<T extends object>({
   if (rowActions && rowActions.count > 0) {
     antColumns.push({
       key: '$actions',
-      onHeaderCell: () => ({ style: fitted }),
+      onHeaderCell: () => ({ style: { ...fitted, ...rowLine } }),
       onCell: () => ({ style: { ...fitted, ...rowLine } }),
       render: (_: unknown, row: T) => <RowActions actions={rowActions.of(row)} fold={fold} />,
     })

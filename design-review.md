@@ -57,9 +57,8 @@ the review.
   decision that renames the rollback concept and route.
 - **Table columns.** The owner's rule, for every table, the `table` widget included: a column whose values have a fixed
   form, such as a number, a date, a date and time, a status tag or the row's icon actions, is as wide as its content and
-  never wraps, with spacing-md on each side so fitted columns do not crowd (first spacing-lg, narrowed at the owner's
-  ask); free text takes the rest and wraps at
-  320 px. Every row is 48 px high whatever it holds, icon buttons included: a row of one line is centred in it, and a
+  never wraps, with spacing-lg on each side so fitted columns do not crowd; free text takes the rest and wraps at
+  320 px. Every row is one height whatever it holds, 40 px since "The table's rows" below, icon buttons included: a row of one line is centred in it, and a
   row of more lines grows and reads from the same first line. A table narrower than its columns' content scrolls
   sideways rather than squeezing them, as the console's tables already do: Studio is not used on very small screens.
   Built on the Releases list.
@@ -73,7 +72,7 @@ the review.
 - **Every design value is a token.** The owner's rule: no size, space, type, radius or colour is a number of its own in
   a component, or it cannot be controlled. A layout technique, such as a column's 1 % width, needs no token but takes
   its size from one. Built: `sizeTokens` in `designTokens.ts`, `bar` 48 px for the shell's header, a page's band,
-  Studio's application row and a table's row, and `smallControl` 24 px for a small icon button and the line of text
+  Studio's application row, and `smallControl` 24 px for a small icon button and the line of text
   beside it; the review's own sizes use them. For the issue: the sizes already written as numbers elsewhere, such as
   48 px in the shell and 12 px in forms and menus, move to tokens too.
 - **The Overview.** The owner asked how the Overview reads, then which of its problems list and the problems panel to
@@ -177,7 +176,7 @@ the review.
 - **One column takes the width left.** The owner saw Published by far wider than "System", as the three columns of
   free text shared the width left over. Agreed: a table has one column that takes the width the others leave, the
   longest text and the one most worth reading, the note on the Releases list; every other column of free text is as
-  wide as its content up to 320 px, where it wraps, with its title on one line and spacing-md on each side, as a
+  wide as its content up to 320 px, where it wraps, with its title on one line and spacing-lg on each side, as a
   fitted column has. Built in `tableColumns.ts` as `freeText`, `fillText` and `textCell`, on the Releases list; the
   `table` widget does not follow these column rules yet, which the shared table of the issue brings to every table.
 - **The shared table, built.** The owner wanted to see the shared table before agreeing to it, and found the label
@@ -194,8 +193,10 @@ the review.
     fills its last free text column.
   For the issue: Studio's resource lists, the console's tables and the users page move onto `AxisTable` too. Open:
   whether an author may say which column of a `table` widget fills, which is configuration.
-- **The table's gaps, and only the shared table.** The owner found the gaps between columns too wide and asked for
-  them tighter, by tokens alone. Built: every cell keeps spacing-md on each side, so columns sit spacing-xl apart,
-  where spacing-lg on each side left 48 px. The owner agreed that nothing draws Ant Design's `Table` but `AxisTable`.
-  For the issue: a lint rule, `no-restricted-imports` in oxlint, refuses `Table` from `antd` anywhere but
-  `AxisTable.tsx`, so no table goes its own way again.
+- **The table's rows, and only the shared table.** The owner found the table loose and asked for it tighter, by
+  tokens alone, meaning the height of its rows, the header's too. Built: every row and the header are the new
+  `tableRow` size token high, 40 px, spacing-xs above and below a `smallControl` line, where 48 px, the `bar` size,
+  was before; a table's row no longer lines up with the band. The gaps between columns stay spacing-lg on each side.
+  The owner agreed that nothing draws Ant Design's `Table` but `AxisTable`. For the issue: a lint rule,
+  `no-restricted-imports` in oxlint, refuses `Table` from `antd` anywhere but `AxisTable.tsx`, so no table goes its
+  own way again.
