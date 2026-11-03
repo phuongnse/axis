@@ -116,7 +116,7 @@ export function InviteUserModal({
       <Modal
         open
         title={t('shell.users.invite.title')}
-        okText={t('shell.users.invite')}
+        okText={t('shell.users.invite.send')}
         cancelText={t('shell.users.roles.cancel')}
         onOk={() =>
           void form.validateFields().then(
@@ -179,7 +179,7 @@ export function InviteUserModal({
       <Modal
         open={pending !== null}
         title={t('shell.users.invite.confirm')}
-        okText={t('shell.users.invite')}
+        okText={t('shell.users.invite.send')}
         cancelText={t('shell.users.roles.cancel')}
         confirmLoading={busy}
         onOk={() => void send()}

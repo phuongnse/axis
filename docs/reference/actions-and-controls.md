@@ -17,6 +17,7 @@ A button's level follows its role, so the same kind of action always has the sam
 - _Secondary_: the default grey outline, and a text button in an action row, such as Cancel and Import.
 - _Icon_: a text button with only an icon, for small actions such as Refresh. Choose and Clear of a `reference` field
   are bordered and joined.
+- _Plain_: a borderless text button in the text colour, for header controls such as the account button.
 - _Destructive_: in `dangerText` at any level, outlined or a text button in an action row, such as Remove row and Delete.
 - Ant Design writes the text of text, outlined and danger buttons in the fill colours `primary` and `danger`, which
   fail contrast on a dark surface, so Axis writes them in `primaryText` and `dangerText`. One shared Axis button,
@@ -29,10 +30,10 @@ A button's level follows its role, so the same kind of action always has the sam
   theme, and `AxisButton`'s action row, `AxisActionRow`, does it for the form widget's footer when it draws Save or Next, the import
   dialog, Studio's publishing and editor rows and its field questions. A main action with no solid button beside
   it, such as a table's first toolbar action, stays outlined.
-- **Text or an icon, never both** _(planned for M31)_. An action shows its text or its icon. An icon goes with text
+- **Text or an icon, never both**. An action shows its text or its icon. An icon goes with text
   only where it does what text cannot: navigation that collapses to icons, a status or a severity, and the mark that
   identifies an application or a site.
-- **An action that asks for more ends in an ellipsis** _(planned for M31)_, such as New application…, New resource…,
+- **An action that asks for more ends in an ellipsis**, such as New application…, New resource…,
   Publish…, Import…, Invite…, Reassign… and Choose…, so the person knows a dialog follows. The dialog's own button
   keeps the bare verb, such as Invite.
 - **Icon-only buttons.** Only for actions repeated on every row, or where space is tight. Main toolbar actions keep
@@ -50,8 +51,9 @@ A button's level follows its role, so the same kind of action always has the sam
   `primaryText`. Destructive menu entries use `dangerText`. A menu that marks a choice, such as the open application
   in Studio's application menu, draws it in `primaryText` on the selected tint, never in Ant Design's selected colour,
   which is hard to read in dark mode _(planned for M31)_.
-- **A text trigger ends in a caret** _(planned for M31)_. A button with text that opens a menu, such as the account
-  button and Studio's application switcher, ends in a caret. An icon-only trigger has none.
+- **A text trigger ends in a caret**. A button with text that opens a menu, such as the account
+  button and Studio's application switcher, ends in a caret. An icon-only trigger has none. `AxisButton`'s `caret`
+  option draws it.
 - **Actions come after the choices** _(planned for M31)_. In a menu that holds both, such as the application menu,
   the choices come first and an action, such as New application…, follows them.
 

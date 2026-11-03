@@ -20,7 +20,7 @@ test("an asset manager imports a CSV, sees its error by row and field, fixes it 
   });
 
   await page.goto(assetsPage);
-  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.getByRole("button", { name: "Import…", exact: true }).click();
   const dialog = await waitForDialog(page);
   const status = dialog.getByTestId("import-status");
 
@@ -53,6 +53,6 @@ test("an auditor sees the assets and no Import button", async ({ page }) => {
 
   await expect(page.getByRole("table")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Import", exact: true }),
+    page.getByRole("button", { name: "Import…", exact: true }),
   ).toHaveCount(0);
 });

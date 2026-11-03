@@ -161,7 +161,7 @@ test("lead claims a triage task so lead-2 no longer lists it, then reassigns it 
   await openTask(page, title, "Triage ticket");
   await page.getByRole("button", { name: "Claim", exact: true }).click();
   await expect(page.getByRole("button", { name: "Release", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Reassign", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reassign…", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Claim", exact: true })).toHaveCount(0);
 
   // The claim hides the task from the other lead.
@@ -190,7 +190,7 @@ test("lead claims a triage task so lead-2 no longer lists it, then reassigns it 
   }).toPass({ timeout: 30_000 });
   await expect(row.getByText("Claimed by you", { exact: true })).toBeVisible();
   await row.getByRole("link", { name: "Triage ticket", exact: true }).click();
-  await page.getByRole("button", { name: "Reassign", exact: true }).click();
+  await page.getByRole("button", { name: "Reassign…", exact: true }).click();
 
   const dialog = await waitForDialog(page);
   await dialog.getByRole("radio", { name: "Person", exact: true }).check();
