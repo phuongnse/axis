@@ -28,7 +28,10 @@ for (const { mode, canvas } of [
     await page.goto('/')
 
     await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
-    await expect(page.getByText(/^© \d{4} Axis$/)).toBeVisible()
+    // Startup activation writes the licences link of the development tenant's host onto the client.
+    const legal = page.getByRole('navigation', { name: 'Legal', exact: true })
+    await expect(legal.getByRole('link', { name: 'Licences', exact: true })).toHaveAttribute('href', /\/licences$/)
+    await expect(page.getByText(`© ${new Date().getFullYear()} Axis`, { exact: true })).toBeVisible()
     await expect(page.locator('#root > div')).toHaveCSS('background-color', canvas)
 
     await submitPassword(page, 'requester', 'axis')

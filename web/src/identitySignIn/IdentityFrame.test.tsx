@@ -1,13 +1,13 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { identitySignInContext } from '../designSystem/fixtures'
+import { identityLegal, identitySignInContext } from '../designSystem/fixtures'
 import { ThemeModeProvider } from '../platform/theme'
 import { IdentityFrame } from './IdentityFrame'
 
-function renderFrame() {
+function renderFrame(frame = identitySignInContext) {
   return render(
-    <IdentityFrame title="Sign in" frame={identitySignInContext}>
+    <IdentityFrame title="Sign in" frame={frame}>
       <p>Body</p>
     </IdentityFrame>,
     { wrapper: ThemeModeProvider },
@@ -54,5 +54,24 @@ describe('IdentityFrame', () => {
 
     expect(await screen.findByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
     expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("draws the legal line after the card with the links of the page's context", () => {
+    renderFrame()
+
+    const legal = screen.getByRole('navigation', { name: 'Legal' })
+    const links = within(legal).getAllByRole('link')
+    expect(links.map((link) => link.textContent)).toEqual(['Privacy', 'Terms', 'Licences'])
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['#privacy', '#terms', '#licences'])
+    expect(screen.getByText(`© ${new Date().getFullYear()} Axis`)).toBeInTheDocument()
+    const title = screen.getByRole('heading', { name: 'Sign in' })
+    expect(title.compareDocumentPosition(legal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('shows the copyright alone when the context has no addresses', () => {
+    renderFrame({ ...identitySignInContext, legal: { texts: identityLegal.texts } })
+
+    expect(screen.getByText(`© ${new Date().getFullYear()} Axis`)).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Legal' })).toBeNull()
   })
 })
