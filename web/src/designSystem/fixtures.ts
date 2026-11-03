@@ -29,6 +29,8 @@ import type {
   ResetPasswordContext,
   ResetPasswordTexts,
   SamlPostContext,
+  SelectAuthenticatorContext,
+  SelectAuthenticatorTexts,
   SignInContext,
   SignInTexts,
   SignOutContext,
@@ -36,6 +38,8 @@ import type {
   TwoStepTexts,
   UpdatePasswordContext,
   UpdatePasswordTexts,
+  UpdateProfileContext,
+  UpdateProfileTexts,
 } from '../identitySignIn/signInContext'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
@@ -958,6 +962,61 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
   texts: identityAddAuthenticatorTexts,
+}
+
+/** The texts of the page behind "Try another way", in English. */
+export const identitySelectAuthenticatorTexts: SelectAuthenticatorTexts = {
+  title: 'Choose how to sign in',
+  message: 'Pick another way to verify that it is you.',
+  backToSignIn: 'Back to sign in',
+}
+
+/** What the identity provider's page behind "Try another way" draws in the design system. */
+export const identitySelectAuthenticatorContext: SelectAuthenticatorContext = {
+  page: 'selectAuthenticator',
+  title: identitySelectAuthenticatorTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#select-authenticator',
+  restartUrl: '#restart',
+  methods: [
+    { id: 'otp', label: 'Authenticator app', help: 'Enter a verification code from your authenticator app.' },
+    { id: 'password', label: 'Password', help: 'Sign in with your password.' },
+  ],
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  texts: identitySelectAuthenticatorTexts,
+}
+
+/** The texts of the pages that update a profile, in English. */
+export const identityUpdateProfileTexts: UpdateProfileTexts = {
+  submit: 'Save',
+  fieldRequired: '{field} is required.',
+}
+
+/** What the identity provider's update profile page draws in the design system. */
+export const identityUpdateProfileContext: UpdateProfileContext = {
+  page: 'updateProfile',
+  title: 'Update your profile',
+  realmName: identitySignInContext.realmName,
+  notice: 'You need to update your user profile to activate your account.',
+  loginAction: '#update-profile',
+  fields: [
+    {
+      name: 'email',
+      label: 'Email',
+      value: 'alex.morgan@contoso.example',
+      required: true,
+      readOnly: false,
+      autoComplete: 'email',
+    },
+    { name: 'firstName', label: 'First name', value: 'Alex', required: true, readOnly: false },
+    { name: 'lastName', label: 'Last name', value: 'Morgan', required: true, readOnly: false },
+  ],
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  texts: identityUpdateProfileTexts,
 }
 
 /** What the identity provider's sign-out question draws in the design system. */

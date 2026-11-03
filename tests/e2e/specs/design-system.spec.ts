@@ -145,6 +145,10 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
       state.getByLabel("Confirm password", { exact: true }),
     "Add an authenticator": (state) =>
       state.getByText("Device name", { exact: true }),
+    "Choose how to sign in": (state) =>
+      state.getByText("Authenticator app", { exact: true }),
+    "Update your profile": (state) =>
+      state.getByLabel("First name", { exact: true }),
     "Sign out": (state) =>
       state.getByRole("button", { name: "Sign out", exact: true }),
     Notice: (state) =>

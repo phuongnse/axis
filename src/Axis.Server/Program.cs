@@ -324,6 +324,7 @@ sessions.MapConsoleEndpoints();
 sessions.MapAboutEndpoints();
 sessions.MapLicenceEndpoints();
 sessions.MapSessionEndpoints();
+sessions.MapAuthenticatorEndpoints();
 sessions.MapUserPickerEndpoints();
 sessions.MapUserIdFieldEndpoints();
 sessions.MapStudioEndpoints();
