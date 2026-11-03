@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys of a cell's tenants and their quota overrides, their usage, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys of a cell's tenants and their quota overrides, their usage and daily counts, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -33,6 +33,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantUsageRow> TenantUsage => Set<TenantUsageRow>();
 
     public DbSet<TenantLeaseRow> TenantLeases => Set<TenantLeaseRow>();
+
+    public DbSet<TenantDailyCounterRow> TenantDailyCounters => Set<TenantDailyCounterRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
@@ -146,6 +148,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .WithOne()
                 .HasForeignKey(lease => lease.TenantId)
                 .HasConstraintName("fk_tenant_leases_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantDailyCounterRow>()
+                .WithOne()
+                .HasForeignKey(counter => counter.TenantId)
+                .HasConstraintName("fk_tenant_daily_counters_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -273,6 +280,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             lease.Property(l => l.Holder).HasColumnName("holder");
             lease.Property(l => l.ExpiresAt).HasColumnName("expires_at").HasColumnType("timestamp with time zone");
             lease.HasIndex(l => new { l.TenantId, l.Quota, l.ExpiresAt }).HasDatabaseName("ix_tenant_leases_tenant_id_quota_expires_at");
+        });
+
+        modelBuilder.Entity<TenantDailyCounterRow>(counter =>
+        {
+            counter.ToTable("tenant_daily_counters", table => table.HasCheckConstraint("ck_tenant_daily_counters_value", "value >= 0"));
+            counter.HasKey(c => new { c.TenantId, c.Day, c.Counter }).HasName("pk_tenant_daily_counters");
+            counter.Property(c => c.TenantId).HasColumnName("tenant_id");
+            counter.Property(c => c.Day).HasColumnName("day").HasColumnType("date");
+            counter.Property(c => c.Counter).HasColumnName("counter");
+            counter.Property(c => c.Value).HasColumnName("value").HasColumnType("bigint");
         });
 
         modelBuilder.Entity<DataProtectionKeyRow>(key =>
