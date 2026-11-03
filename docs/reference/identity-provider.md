@@ -246,8 +246,8 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   [platform sign-in](tenant-setting-commands.md#platform-sign-in).
 - **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
   email. The realm never links them by email, because another provider's email is not proof of who signed in.
-  Built by the realm sync: every `oidc-` and `saml-` provider uses the realm's own first-login flow `axis first login`, whose only
-  step creates a new user, so the realm never shows an "account already exists, link it?" page. A brokered user's
+  Built by the realm sync: every `oidc-` and `saml-` provider uses the realm's own first-login flow `axis first login`, whose first
+  step denies access and is off when `tenant create` adds it, and a rerun keeps it as it is, and whose second step creates a new user, so the realm never shows an "account already exists, link it?" page. A brokered user's
   username is the provider's alias, a dot and the person's subject, such as `oidc-companyissuer.<sub>`, or for a `saml`
   provider its alias, a dot and the NameID, such as `saml-agencymetadata.<NameID>`, so two providers never clash on a
   username. The realm allows two users to share an email. Linking that the person proves on both sides
@@ -273,7 +273,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   _(planned for M31)_: it leaves the Terms and Conditions required action off until the tenant sets terms, see
   [accepting the terms](legal.md#accepting-the-terms). It turns on language support in the realm, with `en` and `vi` and `en` as the default, so
   `kc_locale` and the theme's language links work. It also creates the first-login flow
-  `axis first login` for brokered users. It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
+  `axis first login` for brokered users, with a deny step that is off, before the create-user step. It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
   page that asks for a missing profile field, such as the last name that a `saml` provider may not send. It allows two users to share an email, which turns sign-in by email off: an
   account's username is its email, see [accounts](user-administration.md#accounts). Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
   `IdentityProvider` settings of its own, see [administration](administration.md#settings). When the identity provider answers a server error (5xx), the realm step reads the realm again and repeats, up to three attempts, and then fails as before, naming the step and its status.

@@ -90,7 +90,7 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
 
         if (uri.AbsolutePath.EndsWith("/authentication/flows/axis%20first%20login/executions", StringComparison.Ordinal))
         {
-            return """[{"id":"c","providerId":"idp-create-user-if-unique","requirement":"REQUIRED"}]""";
+            return """[{"id":"d","providerId":"deny-access-authenticator","requirement":"DISABLED","authenticationConfig":"dc"},{"id":"c","providerId":"idp-create-user-if-unique","requirement":"REQUIRED"}]""";
         }
 
         return uri.AbsolutePath.EndsWith("/service-account-user", StringComparison.Ordinal)

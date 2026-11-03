@@ -15,7 +15,7 @@ holds one, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota
 event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
 are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
 saves and publishes. So are `platform.tenant_leases`, the `concurrentQueries` lease of a record list read and a data
-source rows read, and the `concurrentConnectorCalls` lease of a connector or package call in the worker. The other `users` refusals, among them the first sign-in of a brokered user, and the other leases are
+source rows read, and the `concurrentConnectorCalls` lease of a connector or package call in the worker. The realm's first-login flow holds a deny step, and `RealmUsersQuota.RefreshAsync` switches it on at the `users` quota and off below it, but nothing calls it yet. So the other `users` refusals, among them the first sign-in of a brokered user, and the other leases are
 still planned, and so are the usage columns that the text marks. The conventions of
 [architecture.md](../architecture.md) apply.
 
