@@ -590,6 +590,7 @@ function StudioWorkspace() {
                         key={`references-${selected.id}`}
                         application={application!}
                         resourceId={selected.id}
+                        kind={selected.kind}
                       />
                     }
                     key={`editor-${selected.id}`}

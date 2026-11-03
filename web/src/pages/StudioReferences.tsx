@@ -10,7 +10,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { EmptyState } from '../platform/EmptyState'
 import { useDesignTokens } from '../platform/themeMode'
-import { StudioCatalogContext } from './schemaFormSections'
+import { neverUsed, StudioCatalogContext, usesShownByForm } from './schemaFormSections'
 import { StudioChangeList, type StudioChangeRow } from './StudioChangeList'
 import { StudioResourceTitle } from './studioResourceTitle'
 import { kindName, kindOrder } from './studioViews'
@@ -24,7 +24,15 @@ export type OpenResource = (id: string, path: string | null) => void
  * The Uses and Used by lists of a selected resource. A load failure shows an alert in their place. An entry
  * expands one more step, and its own lists load once.
  */
-export function StudioReferences({ application, resourceId }: { application: string; resourceId: string }) {
+export function StudioReferences({
+  application,
+  resourceId,
+  kind,
+}: {
+  application: string
+  resourceId: string
+  kind: string
+}) {
   const t = useText()
   const { generation, lost } = useStudioConnection()
   const [references, setReferences] = useState<StudioResourceReferences>()
@@ -53,24 +61,39 @@ export function StudioReferences({ application, resourceId }: { application: str
     return null
   }
   // Proposed: Uses and Used by are two panels, as the form's sections are, each Studio's one change list: the other
-  // resource by its label as the link that opens it, its kind, and how the one uses the other, in words. A label's text
-  // is left out of Uses, as the form shows the label itself. The same resource used the same way shows once.
+  // resource by its label as the link that opens it, its kind, and how the one uses the other, in words. Uses leaves out
+  // what the kind's form already shows, its labels' texts on every kind, and Used by is left out for a kind nothing can
+  // refer to, as it never applies; a panel with nothing left to show is left out. The same resource used the same way
+  // shows once.
+  const shown = usesShownByForm[kind] ?? new Set(['text'])
+  const uses = references.uses.filter(
+    (entry) => !shown.has(entry.node.type === 'resource' ? entry.node.kind : entry.node.type),
+  )
+  const showUses = !(usesShownByForm[kind] && uses.length === 0)
+  const showUsedBy = !neverUsed.has(kind)
+  if (!showUses && !showUsedBy) {
+    return null
+  }
   return (
     <Flex vertical gap="middle">
-      <ReferencePanel
-        testId="studio-uses"
-        title={t('shell.studio.uses')}
-        entries={references.uses.filter((entry) => entry.node.type !== 'text')}
-        application={application}
-        direction="uses"
-      />
-      <ReferencePanel
-        testId="studio-used-by"
-        title={t('shell.studio.usedBy')}
-        entries={references.usedBy}
-        application={application}
-        direction="usedBy"
-      />
+      {showUses && (
+        <ReferencePanel
+          testId="studio-uses"
+          title={t('shell.studio.uses')}
+          entries={uses}
+          application={application}
+          direction="uses"
+        />
+      )}
+      {showUsedBy && (
+        <ReferencePanel
+          testId="studio-used-by"
+          title={t('shell.studio.usedBy')}
+          entries={references.usedBy}
+          application={application}
+          direction="usedBy"
+        />
+      )}
     </Flex>
   )
 }

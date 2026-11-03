@@ -249,3 +249,9 @@ Group and Material advise, and as mail and documents do:
 - **Uses and Used by keep the form's rhythm.** The owner saw Uses half as far from the form as the sections are from
   each other: the editor set its parts 8 px apart. They are spacing-md apart now, as the form's sections are; and Uses
   names modules and packages by their labels, as the catalog now reaches it.
+- **Uses leaves out what the form shows; Used by only where it can apply.** On Settings, Uses repeated the Modules and
+  Packages tables above it, and Used by was always empty, as nothing in Axis refers to the application. Agreed, by the
+  rules already set, not as an exception: each kind declares the references its form already shows (every kind its
+  labels' texts; the application its modules and packages), which Uses leaves out, and a kind nothing can refer to
+  (the application) has no Used by, as it never applies; a panel with nothing left is left out. Settings therefore
+  ends at File storage; every other kind keeps both panels.
