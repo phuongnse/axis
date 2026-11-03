@@ -110,10 +110,10 @@ internal static partial class KeycloakSignIn
         return await browser.SendAsync(request, cancellationToken);
     }
 
-    /// <summary>The address the Axis theme's form posts to: loginAction of the context that login.ftl, login-otp.ftl or login-config-totp.ftl writes as JSON.</summary>
+    /// <summary>The address the Axis theme's form posts to: loginAction of the context that login.ftl, login-otp.ftl, login-config-totp.ftl, login-reset-password.ftl or login-update-password.ftl writes as JSON.</summary>
     public static Uri LoginAction(string html) => new(Property(html, "loginAction")!);
 
-    /// <summary>The page the Axis theme draws: "signIn" for the password, "twoStep" for the code, "addAuthenticator" for a new authenticator.</summary>
+    /// <summary>The page the Axis theme draws: "signIn" for the password, "twoStep" for the code, "addAuthenticator" for a new authenticator, "updatePassword" for a new password, "notice" for a notice with its link onward.</summary>
     public static string Page(string html) => Property(html, "page")!;
 
     /// <summary>The error that the context shows above the form, or null when it has none.</summary>

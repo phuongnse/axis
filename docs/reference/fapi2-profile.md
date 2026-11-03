@@ -98,12 +98,14 @@ verification bullet below is _(planned for M32)_.
   [ASVS](asvs.md). Axis seeks no certification.
 - **Keycloak.** The development realm has a second client, `axis-fapi`, so
   tests cover both profiles. Only an integration test host uses it. It has no
-  secret and authenticates with `private_key_jwt`, and it requires PAR and
-  PKCE `S256`. A client policy applies to a client that has a `fapi2` role, and
+  secret and authenticates with `private_key_jwt`, and it requires PAR, PKCE `S256`
+  and DPoP-bound tokens. A client policy applies to a client that has a `fapi2` role, and
   only `axis-fapi` has one, so it never touches the other clients. Its profile `axis-fapi2`
-  has three executors: the PKCE enforcer, the secure client authenticator that
-  allows only `client-jwt`, and the signature algorithm check for signed JWT
-  client assertions. The client's JWKS holds the public keys of two EC P-256
+  has four executors: the PKCE enforcer, the secure client authenticator that
+  allows only `client-jwt`, the signature algorithm check for signed JWT
+  client assertions and the DPoP enforcer. The DPoP enforcer refuses every update of a
+  client that has DPoP-bound tokens off, so the client has them on, and the
+  [legal sync](identity-provider.md#keeping-the-realm-in-step) can write its links. The client's JWKS holds the public keys of two EC P-256
   keys, `key-1` and `key-2`. It lists each key under that name and under its key id from
   `tenant oidc set --client-key`, the JWK thumbprint, so Keycloak accepts both. Their private keys are committed as
   `samples/keycloak/axis-fapi-key-1.pem` and `axis-fapi-key-2.pem`, for

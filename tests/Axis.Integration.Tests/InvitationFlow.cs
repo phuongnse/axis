@@ -26,10 +26,6 @@ public sealed partial class InvitationFlow
     [GeneratedRegex("""https?://[^\s<>"]*login-actions/action-token[^\s<>"]*""")]
     private static partial Regex ActionTokenLinkPattern();
 
-    // The info page's own link, not the links of its language menu.
-    [GeneratedRegex("""id="kc-info-message".*?<a href="(?<address>[^"]*)"+""", RegexOptions.Singleline)]
-    private static partial Regex ProceedLinkPattern();
-
 
     public static async Task<IReadOnlyList<MailpitMessage>> WaitForMailsAsync(MailpitFixture mailpit, string address, int count)
     {
@@ -50,25 +46,27 @@ public sealed partial class InvitationFlow
 
 
     /// <summary>
-    /// Opens the emailed link in the browser. Keycloak shows an info page with a link that proceeds, and then the page that sets a password.
+    /// Opens the emailed link in the browser. Keycloak shows a notice with a link that proceeds, and then the page that sets a password.
     /// Returns the HTML of that page, or null when the link leads somewhere else, such as an error page.
     /// </summary>
     public static async Task<string?> OpenLinkAsync(RealmBrowser browser, string link)
     {
         var html = await FollowAsync(browser, await browser.GetAsync(new Uri(link)));
 
-        for (var hops = 0; hops < 3 && html is not null && !html.Contains("axis-sign-in-context", StringComparison.Ordinal); hops++)
+        for (var hops = 0; hops < 3 && html is not null && HoldsContext(html) && KeycloakSignIn.Page(html) == "notice"; hops++)
         {
-            if (ProceedLinkPattern().Match(html) is not { Success: true } proceed)
+            if (KeycloakSignIn.Property(html, "linkUrl") is not { } proceed)
             {
                 return null;
             }
 
-            html = await FollowAsync(browser, await browser.GetAsync(new Uri(new Uri(link), WebUtility.HtmlDecode(proceed.Groups["address"].Value))));
+            html = await FollowAsync(browser, await browser.GetAsync(new Uri(new Uri(link), proceed)));
         }
 
-        return html is not null && html.Contains("axis-sign-in-context", StringComparison.Ordinal) ? html : null;
+        return html is not null && HoldsContext(html) && KeycloakSignIn.Page(html) != "notice" ? html : null;
     }
+
+    private static bool HoldsContext(string html) => html.Contains("axis-sign-in-context", StringComparison.Ordinal);
 
     // Follows redirects and returns the HTML of the page it ends on, or null when that page is not a 200.
     private static async Task<string?> FollowAsync(RealmBrowser browser, HttpResponseMessage response)
@@ -136,9 +134,10 @@ public sealed partial class InvitationFlow
             {
                 var done = await response.Content.ReadAsStringAsync(CancellationToken);
                 Assert.True(response.StatusCode == HttpStatusCode.OK, done);
+                Assert.Equal("notice", KeycloakSignIn.Page(done));
                 if (homeLink is not null)
                 {
-                    Assert.Contains($"href=\"{homeLink}\"", done, StringComparison.Ordinal);
+                    Assert.Equal(homeLink, KeycloakSignIn.Property(done, "linkUrl"));
                 }
             }
         }

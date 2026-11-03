@@ -21,11 +21,17 @@ import type { TaskPage } from '../platform/tasks'
 import type {
   AddAuthenticatorContext,
   AddAuthenticatorTexts,
+  ErrorContext,
   FrameTexts,
+  FrontChannelSignOutContext,
+  NoticeContext,
+  PageExpiredContext,
   ResetPasswordContext,
   ResetPasswordTexts,
+  SamlPostContext,
   SignInContext,
   SignInTexts,
+  SignOutContext,
   TwoStepContext,
   TwoStepTexts,
   UpdatePasswordContext,
@@ -950,6 +956,96 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
   texts: identityAddAuthenticatorTexts,
+}
+
+/** What the identity provider's sign-out question draws in the design system. */
+export const identitySignOutContext: SignOutContext = {
+  page: 'signOut',
+  title: 'Sign out',
+  realmName: identitySignInContext.realmName,
+  action: '#sign-out',
+  sessionCode: 'fixture-session-code',
+  backUrl: '#application',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  texts: { message: 'Do you want to sign out?', signOut: 'Sign out', backToApplication: 'Back to application' },
+}
+
+/** What the identity provider's notice page draws in the design system. */
+export const identityNoticeContext: NoticeContext = {
+  page: 'notice',
+  title: 'Notice',
+  realmName: identitySignInContext.realmName,
+  message: 'Your account has been updated.',
+  linkUrl: '#application',
+  linkText: 'Back to application',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+}
+
+/** The message of the identity provider's error page in the design system. */
+export const identityErrorMessage = 'The link is no longer valid.'
+
+/** What the identity provider's error page draws in the design system. */
+export const identityErrorContext: ErrorContext = {
+  page: 'error',
+  title: 'Something went wrong',
+  realmName: identitySignInContext.realmName,
+  error: identityErrorMessage,
+  backUrl: '#application',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  texts: { backToApplication: 'Back to application' },
+}
+
+/** What the identity provider's expired page draws in the design system. */
+export const identityPageExpiredContext: PageExpiredContext = {
+  page: 'pageExpired',
+  title: 'Page expired',
+  realmName: identitySignInContext.realmName,
+  continueUrl: '#continue',
+  restartUrl: '#start-again',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  texts: {
+    message: 'This page took too long and has expired. Continue where you were, or start again.',
+    continue: 'Continue',
+    startAgain: 'Start again',
+  },
+}
+
+/** What the identity provider's SAML redirect draws in the design system. */
+export const identitySamlPostContext: SamlPostContext = {
+  page: 'samlPost',
+  title: 'Redirecting',
+  realmName: identitySignInContext.realmName,
+  action: '#saml',
+  samlResponse: 'fixture-saml-response',
+  relayState: 'fixture-relay-state',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  texts: { message: 'Taking you to the next step. If nothing happens, select Continue.', continue: 'Continue' },
+}
+
+/** What the identity provider's front-channel sign-out draws in the design system. */
+export const identityFrontChannelSignOutContext: FrontChannelSignOutContext = {
+  page: 'frontChannelSignOut',
+  title: 'Signing out',
+  realmName: identitySignInContext.realmName,
+  clients: [
+    { name: 'Purchase requests', url: '#purchase-requests-sign-out' },
+    { name: 'Leave requests', url: '#leave-requests-sign-out' },
+  ],
+  redirectUrl: '#signed-out',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  texts: { message: 'Signing you out of your applications. This page goes on by itself.', continue: 'Continue' },
 }
 
 /** The site texts, in English. */
