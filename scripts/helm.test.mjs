@@ -454,6 +454,8 @@ describe('the Axis Helm chart', () => {
     ['cell.pgbouncer.databaseHost', 'cell.pgbouncer.databaseHost='],
     ['cell.pgbouncer.authUser', 'cell.pgbouncer.authUser='],
     ['backup.timeZone', 'backup.timeZone='],
+    ['backup.serviceUrl', 'backup.serviceUrl='],
+    ['backup.region', 'backup.region='],
     ['secrets.backupStorageAccessKeyId.name', 'secrets.backupStorageAccessKeyId.name='],
     ['secrets.backupStorageSecretAccessKey.name', 'secrets.backupStorageSecretAccessKey.name='],
     ['secrets.cellBackupKey.name', 'secrets.cellBackupKey.name='],
@@ -602,12 +604,6 @@ describe('the Axis Helm chart', () => {
     assert.match(job, /- name: Cell__BackupStorage__Region\n\s+value: "vn-hcm"\n/)
     assert.equal(job.match(/- name: Cell__BackupKeyFile\n/g).length, 1)
     assert.match(job, /- name: Cell__BackupKeyFile\n\s+value: "\/cell-backup-key\/key"\n/)
-  })
-
-  test('the CronJob leaves out the service URL and the region when they are empty', () => {
-    const job = find(renderOk('--set', 'backup.serviceUrl=', '--set', 'backup.region='), 'CronJob', 'axis-cell-backup')
-    assert.match(job, /- name: Cell__BackupStorage__Bucket\n/)
-    assert.doesNotMatch(job, /Cell__BackupStorage__(ServiceUrl|Region)/)
   })
 
   test('the storage credentials are files from Secret references in the CronJob, and never env entries', () => {

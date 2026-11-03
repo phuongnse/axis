@@ -116,7 +116,7 @@ cell:
 
 # Backups in a cell. It is used in a cell only. Setting bucket renders a CronJob that runs
 # "axis-admin cell backup" every day at 01:00 in timeZone, an IANA time zone name such as
-# "Asia/Ho_Chi_Minh" that is required with a bucket. serviceUrl and region are optional. The storage
+# "Asia/Ho_Chi_Minh". timeZone, serviceUrl and region are required with a bucket. The storage
 # credentials are the two Secret references secrets.backupStorageAccessKeyId and
 # secrets.backupStorageSecretAccessKey, and never values. The operator sets the bucket's object lock
 # in compliance mode for 30 days and a lifecycle rule that deletes an archive after 30 days. The chart

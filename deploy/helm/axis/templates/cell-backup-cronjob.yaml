@@ -53,14 +53,10 @@ spec:
                 {{- include "axis.hostEnv" (dict "Values" $values) | nindent 16 }}
                 - name: Cell__BackupStorage__Bucket
                   value: {{ .Values.backup.bucket | quote }}
-                {{- with .Values.backup.serviceUrl }}
                 - name: Cell__BackupStorage__ServiceUrl
-                  value: {{ . | quote }}
-                {{- end }}
-                {{- with .Values.backup.region }}
+                  value: {{ required "backup.serviceUrl is required when backup.bucket is set in a cell: the endpoint of the object storage" .Values.backup.serviceUrl | quote }}
                 - name: Cell__BackupStorage__Region
-                  value: {{ . | quote }}
-                {{- end }}
+                  value: {{ required "backup.region is required when backup.bucket is set in a cell: the region of the object storage" .Values.backup.region | quote }}
               volumeMounts:
                 - {{ include "axis.secretsVolumeMount" . | nindent 18 | trim }}
                 - name: cell-backup-key
