@@ -15,7 +15,7 @@ namespace Axis.Admin;
 
 /// <summary>
 /// <c>tenant binding list</c>, <c>set</c> and <c>remove</c> and <c>tenant host add</c>, <c>remove</c> and <c>move</c>, and
-/// <c>tenant email set</c> and <c>clear</c>, and <c>tenant session end</c>. The host and email commands also write the tenant's realm. The rules are in <c>Axis.Administration</c>. This class parses the arguments, reads
+/// <c>tenant email set</c> and <c>clear</c>, <c>tenant legal set</c> and <c>clear</c>, and <c>tenant session end</c>. The host and email commands also write the tenant's realm. The rules are in <c>Axis.Administration</c>. This class parses the arguments, reads
 /// the settings and prints. A message never holds a secret value, and the usage text never echoes an argument.
 /// </summary>
 internal static class TenantSettings
@@ -130,6 +130,37 @@ internal static class TenantSettings
             run.Args[3],
             "binding",
             (platform, command) => TenantBindingCommands.RemoveAsync(platform, command, run.Args[3], run.Args[4], run.CancellationToken));
+    }
+
+    public static async Task<int> LegalSetAsync(AdminRun run)
+    {
+        var change = ParseLegalSet(run.Args);
+        if (change is null)
+        {
+            return Usage(run);
+        }
+
+        return await ChangeAsync(
+            run,
+            run.Args[3],
+            "legal",
+            (platform, command) => TenantLegalSettings.SetAsync(platform, command, run.Args[3], change, run.CancellationToken));
+    }
+
+    public static async Task<int> LegalClearAsync(AdminRun run)
+    {
+        var args = run.Args;
+        var withSite = args.Length == 6 && args[4] == "--site" && IsName(args[5]);
+        if (!(args.Length == 4 || withSite) || !IsName(args[3]))
+        {
+            return Usage(run);
+        }
+
+        return await ChangeAsync(
+            run,
+            args[3],
+            "legal",
+            (platform, command) => TenantLegalSettings.ClearAsync(platform, command, args[3], withSite ? args[5] : null, run.CancellationToken));
     }
 
     public static async Task<int> EmailSetAsync(AdminRun run)
@@ -738,6 +769,48 @@ internal static class TenantSettings
         return host is null || from is null
             ? null
             : new EmailSetRequest(withPassword, new TenantEmailChange(host, port, useTls, userName, null, from));
+    }
+
+    // Duplicates, unknown options and a missing value are all usage errors. The usage text never echoes an argument.
+    private static TenantLegalChange? ParseLegalSet(string[] args)
+    {
+        if (args.Length < 4 || !IsName(args[3]))
+        {
+            return null;
+        }
+
+        string? privacyUrl = null;
+        string? termsUrl = null;
+        string? termsVersion = null;
+        string? site = null;
+        for (var i = 4; i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || !IsName(args[i + 1]))
+            {
+                return null;
+            }
+
+            var value = args[i + 1];
+            switch (args[i])
+            {
+                case "--privacy-url" when privacyUrl is null:
+                    privacyUrl = value;
+                    break;
+                case "--terms-url" when termsUrl is null:
+                    termsUrl = value;
+                    break;
+                case "--terms-version" when termsVersion is null:
+                    termsVersion = value;
+                    break;
+                case "--site" when site is null:
+                    site = value;
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return new TenantLegalChange(privacyUrl, termsUrl, termsVersion, site);
     }
 
     private sealed class ProviderBuilder(string name)

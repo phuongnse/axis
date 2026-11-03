@@ -95,6 +95,15 @@ public sealed class TenantRow
     /// </summary>
     public bool PlatformAccounts { get; set; }
 
+    /// <summary>The tenant's privacy address, an absolute <c>https</c> address. <c>null</c> when the tenant has none.</summary>
+    public string? PrivacyUrl { get; set; }
+
+    /// <summary>The tenant's terms address, an absolute <c>https</c> address. It is set exactly when <see cref="TermsVersion"/> is.</summary>
+    public string? TermsUrl { get; set; }
+
+    /// <summary>The version of the tenant's terms. A new version asks users to accept the terms again. It is set exactly when <see cref="TermsUrl"/> is.</summary>
+    public string? TermsVersion { get; set; }
+
     /// <summary>The newest migration applied to the tenant database. Empty until the first migration.</summary>
     public string SchemaVersion { get; set; } = "";
 }
