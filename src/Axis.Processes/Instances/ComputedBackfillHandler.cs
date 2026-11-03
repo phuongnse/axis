@@ -30,7 +30,7 @@ internal sealed partial class ComputedBackfillHandler(ReleaseModelCache models, 
         ArgumentNullException.ThrowIfNull(connection);
 
         var entityId = item.EntityId ?? throw new InvalidOperationException($"The work item '{item.Id}' names no entity.");
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);

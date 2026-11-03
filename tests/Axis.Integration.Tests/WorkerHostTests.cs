@@ -321,7 +321,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         var handler = new LimitReadingExternalHandler(throws);
 
         // The pool holds one connection, which No Reset On Close would hand on with a plain SET still in force.
-        await using var connections = CreateConnections(tenantA, ";Maximum Pool Size=1;No Reset On Close=true");
+        await using var connections = CreateConnections(tenantA, new TenantPoolSettings(1, 0, TimeSpan.FromSeconds(60)), ";No Reset On Close=true");
         var runner = new WorkItemRunner(
             connections.Factory,
             connections.Accessor,
@@ -339,6 +339,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             Assert.True(await runner.RunNextAsync("a", _longLease, CancellationToken));
         }
 
+        Assert.Equal("0", handler.Outside);
         Assert.Equal("5s", handler.Limit);
         connections.Accessor.Current = new TenantContext("a");
         await using var connection = await connections.Factory.OpenConnectionAsync(CancellationToken);
@@ -439,12 +440,12 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         return new HandBuiltWorker(runner, handler, connections);
     }
 
-    private static Connections CreateConnections(string connectionString, string poolSettings = "")
+    private static Connections CreateConnections(string connectionString, TenantPoolSettings? pool = null, string connectionStringSuffix = "")
     {
         var options = new TenantOptions();
-        options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) + poolSettings };
+        options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) + connectionStringSuffix };
         var accessor = new TenantContextAccessor();
-        return new Connections(new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor), accessor);
+        return new Connections(new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor, pool ?? TenantPoolSettings.Default), accessor);
     }
 
     private async Task<string> CreateTenantDatabaseAsync(string prefix, bool migrate = true)
@@ -706,16 +707,27 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             Task.CompletedTask;
     }
 
-    /// <summary>Reads <c>statement_timeout</c> on the open connection, then deletes the item or throws.</summary>
+    /// <summary>
+    /// Reads <c>statement_timeout</c> on the bare connection, then in a transaction that begins through
+    /// <see cref="WorkItemQueue.BeginAsync"/>, where it deletes the item or throws.
+    /// </summary>
     private sealed class LimitReadingExternalHandler(bool throws) : IExternalWorkItemHandler
     {
         public string Kind => LimitKind;
+
+        public string? Outside { get; private set; }
 
         public string? Limit { get; private set; }
 
         public async Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, NpgsqlConnection connection, CancellationToken cancellationToken)
         {
             await using (var command = new NpgsqlCommand("SHOW statement_timeout", connection))
+            {
+                Outside = (string?)await command.ExecuteScalarAsync(cancellationToken);
+            }
+
+            await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
+            await using (var command = new NpgsqlCommand("SHOW statement_timeout", connection, transaction))
             {
                 Limit = (string?)await command.ExecuteScalarAsync(cancellationToken);
             }
@@ -725,7 +737,6 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
                 throw new InvalidOperationException("boom");
             }
 
-            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
             Assert.True(await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken));
             await transaction.CommitAsync(cancellationToken);
             return WorkItemOutcome.Completed;

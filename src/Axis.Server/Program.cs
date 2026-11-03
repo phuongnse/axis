@@ -177,7 +177,7 @@ builder.Services.AddExceptionHandler<TenantDataKeyMissingHandler>();
 builder.Services.AddServerTelemetry(builder.Configuration, builder.Environment);
 // The clients that startup activation uses to bring a tenant's realm in step.
 builder.Services.AddHttpClient();
-builder.Services.AddTenancy(tenants);
+builder.Services.AddTenancy(tenants, TenantPoolSettings.Load(builder.Configuration));
 builder.Services.AddTenantKeys(directorySource
     ? new DirectoryTenantKeySource(platformConnectionString, cipher)
     : new ConfigurationTenantKeySource(builder.Configuration));

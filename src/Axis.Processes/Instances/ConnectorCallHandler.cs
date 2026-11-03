@@ -77,7 +77,7 @@ internal sealed partial class ConnectorCallHandler(
         ConnectorOperationModel? lookup = null;
         string? error = null;
         var sending = false;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             var call = item.ConnectorCallId is { } callId ? await ConnectorCalls.LoadAsync(transaction, callId, cancellationToken) : null;
             var instance = call is null ? null : await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
@@ -825,7 +825,7 @@ internal sealed partial class ConnectorCallHandler(
         var call = attempt.Call;
         string? failure;
         string? rowFailure;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
             {
@@ -1067,7 +1067,7 @@ internal sealed partial class ConnectorCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
         if (!IsWaitingAt(instance, call, attempt))
         {
@@ -1117,7 +1117,7 @@ internal sealed partial class ConnectorCallHandler(
     {
         var call = attempt.Call;
         var lookup = FindLookup(target) is not null;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
         var waiting = IsWaitingAt(instance, call, attempt);
         var claimed = waiting && lookup
@@ -1180,7 +1180,7 @@ internal sealed partial class ConnectorCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
         if (!IsWaitingAt(instance, call, attempt))
         {
@@ -1227,7 +1227,7 @@ internal sealed partial class ConnectorCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);

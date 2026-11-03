@@ -74,7 +74,7 @@ internal sealed partial class PackageCallHandler(
         string? error = null;
         var errorClass = ErrorClass.Failed;
         var counted = true;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             var call = item.PackageCallId is { } callId ? await PackageCalls.LoadAsync(transaction, callId, cancellationToken) : null;
             var instance = call is null ? null : await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
@@ -445,7 +445,7 @@ internal sealed partial class PackageCallHandler(
     {
         var call = attempt.Call;
         string? failure;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
             {
@@ -678,7 +678,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
         if (!IsWaitingAt(instance, call, attempt))
         {
@@ -723,7 +723,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
         var waiting = IsWaitingAt(instance, call, attempt);
         if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
@@ -773,7 +773,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);

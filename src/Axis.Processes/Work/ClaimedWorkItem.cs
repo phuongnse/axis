@@ -21,6 +21,10 @@ namespace Axis.Processes.Work;
 /// <param name="EmailId">The outbox email a <c>notification.email</c> item sends, or <see langword="null"/> for other work.</param>
 /// <param name="WebhookDeliveryId">The webhook delivery a <c>webhook.deliver</c> item sends, or <see langword="null"/> for other work.</param>
 /// <param name="ClaimDelay">How long after its due time the item was claimed, by the clock of the claim.</param>
+/// <param name="StatementTimeout">
+/// The <c>statement_timeout</c> that <see cref="WorkItemQueue.BeginAsync"/> sets in each transaction of the item, or
+/// <see langword="null"/> to set none. The runner fills it in before a handler runs.
+/// </param>
 public sealed record ClaimedWorkItem(
     Guid Id,
     string TenantId,
@@ -43,4 +47,5 @@ public sealed record ClaimedWorkItem(
     int? Escalation = null,
     Guid? EmailId = null,
     TimeSpan ClaimDelay = default,
-    Guid? WebhookDeliveryId = null);
+    Guid? WebhookDeliveryId = null,
+    TimeSpan? StatementTimeout = null);

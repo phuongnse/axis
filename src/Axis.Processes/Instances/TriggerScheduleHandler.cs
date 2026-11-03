@@ -25,7 +25,7 @@ internal sealed partial class TriggerScheduleHandler(ReleaseModelCache models, I
         ArgumentNullException.ThrowIfNull(connection);
 
         var triggerId = item.TriggerId ?? throw new InvalidOperationException($"The work item '{item.Id}' names no trigger.");
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         Guid releaseId;
         DateTimeOffset occurrence;
         await using (var select = new NpgsqlCommand(
