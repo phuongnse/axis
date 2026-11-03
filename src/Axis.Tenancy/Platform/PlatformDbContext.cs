@@ -32,6 +32,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<TenantUsageRow> TenantUsage => Set<TenantUsageRow>();
 
+    public DbSet<TenantLeaseRow> TenantLeases => Set<TenantLeaseRow>();
+
     public DbSet<TenantDailyCounterRow> TenantDailyCounters => Set<TenantDailyCounterRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
@@ -141,6 +143,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .WithOne()
                 .HasForeignKey(usage => usage.TenantId)
                 .HasConstraintName("fk_tenant_usage_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantLeaseRow>()
+                .WithOne()
+                .HasForeignKey(lease => lease.TenantId)
+                .HasConstraintName("fk_tenant_leases_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
             tenant.HasMany<TenantDailyCounterRow>()
                 .WithOne()
@@ -261,6 +268,18 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             usage.Property(u => u.EmailsSent).HasColumnName("emails_sent").HasColumnType("integer").HasDefaultValue(0);
             usage.Property(u => u.ConnectorCalls).HasColumnName("connector_calls").HasColumnType("bigint").HasDefaultValue(0L);
             usage.Property(u => u.WorkItemsRun).HasColumnName("work_items_run").HasColumnType("bigint").HasDefaultValue(0L);
+        });
+
+        modelBuilder.Entity<TenantLeaseRow>(lease =>
+        {
+            lease.ToTable("tenant_leases");
+            lease.HasKey(l => l.LeaseId).HasName("pk_tenant_leases");
+            lease.Property(l => l.LeaseId).HasColumnName("lease_id");
+            lease.Property(l => l.TenantId).HasColumnName("tenant_id");
+            lease.Property(l => l.Quota).HasColumnName("quota");
+            lease.Property(l => l.Holder).HasColumnName("holder");
+            lease.Property(l => l.ExpiresAt).HasColumnName("expires_at").HasColumnType("timestamp with time zone");
+            lease.HasIndex(l => new { l.TenantId, l.Quota, l.ExpiresAt }).HasDatabaseName("ix_tenant_leases_tenant_id_quota_expires_at");
         });
 
         modelBuilder.Entity<TenantDailyCounterRow>(counter =>

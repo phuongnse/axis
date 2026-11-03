@@ -219,6 +219,41 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("tenant_hosts", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantLeaseRow", b =>
+                {
+                    b.Property<Guid>("LeaseId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Holder")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("holder");
+
+                    b.Property<string>("Quota")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("quota");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("LeaseId")
+                        .HasName("pk_tenant_leases");
+
+                    b.HasIndex("TenantId", "Quota", "ExpiresAt")
+                        .HasDatabaseName("ix_tenant_leases_tenant_id_quota_expires_at");
+
+                    b.ToTable("tenant_leases", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantPlatformProviderRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -648,6 +683,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_hosts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantLeaseRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_leases_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantPlatformProviderRow", b =>

@@ -21,7 +21,8 @@ namespace Axis.Server.DataSources;
 /// <summary>
 /// The read endpoint of a data source in the active release of an application. Only <c>GET</c>
 /// is routed. A request is checked in order: session or service account bearer token (401), then the path (404), then the user's
-/// grants (403), then the user's read filters (409), and only then the query. A request without a
+/// grants (403), then the tenant's <c>concurrentQueries</c> lease (503 with <c>Retry-After: 1</c> when none is free after
+/// five seconds), then the user's read filters (409), and only then the query. A request without a
 /// session or a valid bearer token is a 401 before the path is read. A path that names no active application or data source is a 404. Reading the rows takes
 /// a <c>read</c> grant on the data source, a <c>read</c> grant on its root entity, and a grant to
 /// read every field along the path of every projected field, as <see cref="DataSourceFieldAccess"/>
@@ -80,6 +81,7 @@ internal static class DataSourceEndpoints
         TenantDatabase database,
         SensitiveValues sensitive,
         ITenantContextAccessor tenants,
+        QueryLeases leases,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -107,6 +109,15 @@ internal static class DataSourceEndpoints
         // AllowsRead found the root entity, so it is in the model.
         var root = application.FindEntity(model.Entity.Id)!;
         var read = PolicyEvaluator.Access(application, user.RolesIn(application), root, PolicyAction.Read);
+
+        // The lease comes before the tenant connection, so a waiting read holds no pool connection.
+        var lease = await leases.TakeAsync(cancellationToken);
+        if (lease.Busy)
+        {
+            return QueryLeases.Busy(context);
+        }
+
+        await using var _ = lease.Lease;
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application, root, pendingFilters, loggerFactory, cancellationToken))
