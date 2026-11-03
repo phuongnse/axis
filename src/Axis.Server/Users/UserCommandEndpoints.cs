@@ -58,7 +58,9 @@ namespace Axis.Server.Users;
 /// In a cell, invite checks the tenant's users quota after the opening checks and before it reads the body, and enable of a
 /// disabled user checks it after the realm user lookup. Both answer the quota 403 when the enabled users of the realm, invited
 /// and brokered ones included and service accounts left out, have reached the limit, and change nothing. A failed count is a 502.
-/// Outside a cell, or for a tenant with no users limit, the realm is not asked for a count.
+/// Outside a cell, or for a tenant with no users limit, the realm is not asked for a count. In a cell, a successful invite, enable
+/// or disable then rechecks the count and switches the deny step of the realm's first-login flow, which refuses a brokered person's
+/// first sign-in while the tenant is at its users quota. A failed recheck is logged and never changes the answer.
 /// </para>
 /// </summary>
 internal static partial class UserCommandEndpoints
@@ -177,6 +179,11 @@ internal static partial class UserCommandEndpoints
             new AuditEntry(caller.Id, Action(command), null, null, null, null, new JsonObject { ["userId"] = id }),
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (command is Command.Enable or Command.Disable)
+        {
+            await UsersQuotaStep.RefreshAsync(services, tenant.TenantId);
+        }
+
         return Results.NoContent();
     }
 
@@ -392,6 +399,7 @@ internal static partial class UserCommandEndpoints
             await transaction.CommitAsync(cancellationToken);
         }
 
+        await UsersQuotaStep.RefreshAsync(services, opening.Tenant.TenantId);
         if (await SendInvitationAsync(realm, id, httpContext, opening, "Invite", cancellationToken) is { } failed)
         {
             return failed;
