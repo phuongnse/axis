@@ -10,7 +10,11 @@ public sealed record SiteList(IReadOnlyList<SiteListItem> Sites);
 /// <param name="Titles">The site title in each available locale, keyed by the locale as the site declares it.</param>
 /// <param name="Descriptions">The site description in each available locale, or null when the site has none.</param>
 /// <param name="Application">The application the site belongs to, so a client can group sites by application.</param>
-public sealed record SiteListItem(string Path, string TitleKey, IReadOnlyDictionary<string, string> Titles, IReadOnlyDictionary<string, string>? Descriptions, SiteApplication Application);
+/// <param name="Legal">The site's own privacy and terms links, or else its tenant's, or null when neither sets any.</param>
+public sealed record SiteListItem(string Path, string TitleKey, IReadOnlyDictionary<string, string> Titles, IReadOnlyDictionary<string, string>? Descriptions, SiteApplication Application, SiteListLegal? Legal = null);
+
+/// <summary>The privacy and terms links of a listed site. A link the site and its tenant leave unset is null.</summary>
+public sealed record SiteListLegal(string? PrivacyUrl, string? TermsUrl);
 
 /// <summary>The application of a listed site.</summary>
 /// <param name="Name">The application's declared name.</param>

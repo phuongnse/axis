@@ -317,10 +317,13 @@ As environment variables they are `Tenancy__Source`,
   hosts for one site stop the start. Under `directory`, `tenant host add --site` gives it. The E2E server
   uses this for its site host.
 
-- **Legal links** _(planned for M31)_. Under `configuration`, `Tenants:{id}:Legal:PrivacyUrl`, `Tenants:{id}:Legal:TermsUrl`
+- **Legal links.** Under `configuration`, `Tenants:{id}:Legal:PrivacyUrl`, `Tenants:{id}:Legal:TermsUrl`
   and `Tenants:{id}:Legal:TermsVersion` give the tenant's [legal links](legal.md#legal-settings), and
   `Tenants:{id}:Legal:Sites:{path}:PrivacyUrl` and `...:TermsUrl` a site's own. Under `directory` the
-  [legal links commands](tenant-setting-commands.md#legal-links) set them.
+  [legal links commands](tenant-setting-commands.md#legal-links) set them. The same checks apply to both. An
+  address that is not an `https` address, a terms address without a version, a version without a terms address, a
+  `TermsVersion` on a site, and a site path that is not valid or is reserved stop the start, and the message names the
+  setting. A preview tenant takes its main tenant's block, and a `Legal` block of its own stops the start.
 - **Tenant keys.** Under `configuration`, `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}`
   give a tenant's data keys and lookup keys, each 32 bytes in base64, as the environment variables
   `Tenants__<id>__DataKeys__<number>` and `Tenants__<id>__LookupKeys__<number>`. A number is an integer of at least 1.

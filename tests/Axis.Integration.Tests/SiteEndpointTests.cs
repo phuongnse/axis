@@ -18,7 +18,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         var sitesInA = listInA.RootElement.GetProperty("sites").EnumerateArray().ToList();
         Assert.Equal(["records", "second"], sitesInA.Select(site => site.GetProperty("path").GetString()));
         var records = sitesInA[0];
-        Assert.Equal(["path", "titleKey", "titles", "descriptions", "application"], records.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["path", "titleKey", "titles", "descriptions", "application", "legal"], records.EnumerateObject().Select(property => property.Name));
         Assert.Equal("site.title", records.GetProperty("titleKey").GetString());
         Assert.Equal(
             [("en", "Records"), ("vi", "Hồ sơ")],
@@ -51,6 +51,24 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         var sitesInB = listInB.RootElement.GetProperty("sites").EnumerateArray().ToList();
         Assert.Equal(["records"], sitesInB.Select(site => site.GetProperty("path").GetString()));
+    }
+
+    [Fact]
+    public async Task List_gives_each_site_its_own_links_or_its_tenants_and_null_when_neither_sets_any()
+    {
+        using var listInA = await GetJsonAsync("/api/sites", HostA);
+        using var listInB = await GetJsonAsync("/api/sites", HostB);
+
+        var sitesInA = listInA.RootElement.GetProperty("sites").EnumerateArray().ToList();
+        var records = sitesInA[0].GetProperty("legal");
+        Assert.Equal("https://a.example.test/privacy", records.GetProperty("privacyUrl").GetString());
+        Assert.Equal("https://a.example.test/terms", records.GetProperty("termsUrl").GetString());
+        var second = sitesInA[1].GetProperty("legal");
+        Assert.Equal("https://a.example.test/second-privacy", second.GetProperty("privacyUrl").GetString());
+        Assert.Equal(JsonValueKind.Null, second.GetProperty("termsUrl").ValueKind);
+
+        var sitesInB = listInB.RootElement.GetProperty("sites").EnumerateArray().ToList();
+        Assert.Equal(JsonValueKind.Null, sitesInB[0].GetProperty("legal").ValueKind);
     }
 
     [Fact]
