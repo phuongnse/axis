@@ -46,7 +46,8 @@ changes start at the tag `design-review/2026-10-30-studio`.
   is needed, and has no block once the application has every kind. The Overview lists no problems and repeats
   nothing the band says. See [Overview](../reference/studio-workspace.md#overview).
 - **`GET .../releases` gives the changes.** A `changes` list names the files that differ from the live release, with
-  a removed file's kind, name and label from the live release _(Proposed)_. See
+  a removed file's kind, name and label from the live release. The owner agreed it with the rest on 2026-11-03, as
+  the Overview's changes need it. See
   [release history](../reference/authoring.md#release-history).
 - **Seeing a change waits for its diff.** A row of the changes opens its resource as it is now. The diff view that
   [D119](d119-ai-authoring-in-studio.md) and [D125](d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md)
