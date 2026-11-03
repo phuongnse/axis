@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
+import { Alert, Button, Flex, Input, Modal, Tabs, Typography } from 'antd'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAnswers,
@@ -19,8 +19,10 @@ import {
   deleteStudioResource,
   fetchResourceReferences,
   fetchStudioResource,
+  fetchStudioCatalog,
   patchStudioResource,
   putStudioTexts,
+  type StudioCatalog,
   saveStudioChanges,
   ServerUnreachableError,
   type StudioDiagnostic,
@@ -47,7 +49,9 @@ import { PageEditor } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
+import { StudioCatalogContext } from './schemaFormSections'
 import { SaveBar } from '../platform/SaveBar'
+import { AxisButton } from '../platform/AxisButton'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
 import type { FormUse } from './StudioFormUsedOn'
@@ -194,7 +198,7 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const { type } = useDesignTokens()
+  const { type, colour, radius, spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -210,6 +214,17 @@ export function StudioEditor({
   const [saving, setSaving] = useState(false)
   // Proposed: the label texts edited since the last Save, by key, which the one Save writes with the resource.
   const [pendingTexts, setPendingTexts] = useState<Record<string, Record<string, string>>>({})
+  // Proposed: the installed modules and packages, which the form names and offers by their labels.
+  const [catalog, setCatalog] = useState<StudioCatalog | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchStudioCatalog(controller.signal).then(setCatalog, (error: unknown) => {
+      if (!controller.signal.aborted) {
+        console.warn('Loading the Studio catalog failed', error)
+      }
+    })
+    return () => controller.abort()
+  }, [])
   const [saved, setSaved] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -809,33 +824,14 @@ export function StudioEditor({
     >
       <ExpressionCheckContext.Provider value={checkContext}>
         <LabelTextsContext.Provider value={labelContext}>
-          <Tabs
-            activeKey={tab}
-            onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
-            items={[
-              // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
-              // guard on return, and clears the guard when the author leaves. Its code loads on first use.
-              ...(item.kind === 'page' && schema
-                ? [
-                    {
-                      key: 'design',
-                      label: t('shell.studio.design'),
-                      children:
-                        tab === 'design' ? (
-                          <Suspense fallback={null}>
-                            <LazyStudioPageDesign
-                              application={application}
-                              resourceId={item.id}
-                              draft={draft}
-                              selected={widgetPath}
-                              onSelect={setWidgetPath}
-                              onChange={change}
-                            />
-                          </Suspense>
-                        ) : null,
-                    },
-                  ]
-                : item.kind === 'form' && schema
+          <StudioCatalogContext.Provider value={catalog}>
+            <Tabs
+              activeKey={tab}
+              onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
+              items={[
+                // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
+                // guard on return, and clears the guard when the author leaves. Its code loads on first use.
+                ...(item.kind === 'page' && schema
                   ? [
                       {
                         key: 'design',
@@ -843,21 +839,19 @@ export function StudioEditor({
                         children:
                           tab === 'design' ? (
                             <Suspense fallback={null}>
-                              <LazyStudioFormDesign
+                              <LazyStudioPageDesign
                                 application={application}
                                 resourceId={item.id}
                                 draft={draft}
-                                selected={formPath}
-                                onSelect={setFormPath}
+                                selected={widgetPath}
+                                onSelect={setWidgetPath}
                                 onChange={change}
-                                usedOn={usedOn}
-                                onOpen={onOpen}
                               />
                             </Suspense>
                           ) : null,
                       },
                     ]
-                  : item.kind === 'process' && schema
+                  : item.kind === 'form' && schema
                     ? [
                         {
                           key: 'design',
@@ -865,126 +859,154 @@ export function StudioEditor({
                           children:
                             tab === 'design' ? (
                               <Suspense fallback={null}>
-                                <LazyStudioProcessDesign
-                                  schema={schema}
+                                <LazyStudioFormDesign
+                                  application={application}
+                                  resourceId={item.id}
                                   draft={draft}
-                                  diagnosticPaths={diagnosticPaths}
-                                  selected={processStep}
-                                  onSelect={setProcessStep}
+                                  selected={formPath}
+                                  onSelect={setFormPath}
                                   onChange={change}
+                                  usedOn={usedOn}
+                                  onOpen={onOpen}
                                 />
                               </Suspense>
                             ) : null,
                         },
                       ]
-                    : []),
-              {
-                key: 'form',
-                label: t('shell.studio.form'),
-                children: (
-                  <Drawn onDrawn={setFormDrawn}>
-                    {seedSchema ? (
-                      <Flex vertical gap="middle">
-                        <SchemaForm schema={seedSchema} value={draft} onChange={change} />
-                        <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={update} />
-                      </Flex>
-                    ) : item.kind === 'scenario' ? (
-                      <ScenarioEditor value={draft} onChange={update} />
-                    ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
-                      <TextTable
-                        columns={resources
-                          .filter((resource) => resource.kind === 'text')
-                          .map((resource) =>
-                            resource.id === item.id
-                              ? {
-                                  id: item.id,
-                                  locale: String(loaded.content.locale),
-                                  texts: draft.texts as Record<string, unknown>,
-                                  editable: true,
-                                }
-                              : otherTexts.find((column) => column.id === resource.id),
-                          )
-                          .filter((column): column is TextColumn => column !== undefined)}
-                        onChange={update}
-                        onAdd={addTextKey}
-                      />
-                    ) : item.kind === 'entity' && schema ? (
-                      <EntityDesigner
-                        value={draft}
-                        onChange={change}
-                        origins={origins}
-                        warnings={fieldWarnings(loaded.content, draft, origins)}
-                        onOriginsChange={(next, removed) => {
-                          setOrigins(next)
-                          if (removed) {
-                            touch(removed)
-                          }
-                        }}
-                      />
-                    ) : item.kind === 'connector' && schema ? (
-                      <ConnectorEditor value={draft} onChange={change} />
-                    ) : item.kind === 'identityProvider' && schema ? (
-                      <IdentityProviderEditor value={draft} onChange={change} />
-                    ) : processSchema ? (
-                      <ProcessEditor schema={processSchema} value={draft} onChange={change} />
-                    ) : item.kind === 'page' && schema ? (
-                      <PageEditor value={draft} onChange={change} selected={widgetPath} onSelect={setWidgetPath} />
-                    ) : endpointSchema ? (
-                      <Flex vertical gap="middle">
-                        <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
-                        <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
-                        <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
-                      </Flex>
-                    ) : siteSchema ? (
-                      <Flex vertical gap="middle">
-                        <SchemaForm schema={siteSchema} value={draft} onChange={change} />
-                        <SiteSignIn
-                          providers={resources
-                            .filter((resource) => resource.kind === 'identityProvider' && resource.name)
-                            .map((resource) => resource.name!)}
-                          value={draft.signIn}
-                          onChange={change}
+                    : item.kind === 'process' && schema
+                      ? [
+                          {
+                            key: 'design',
+                            label: t('shell.studio.design'),
+                            children:
+                              tab === 'design' ? (
+                                <Suspense fallback={null}>
+                                  <LazyStudioProcessDesign
+                                    schema={schema}
+                                    draft={draft}
+                                    diagnosticPaths={diagnosticPaths}
+                                    selected={processStep}
+                                    onSelect={setProcessStep}
+                                    onChange={change}
+                                  />
+                                </Suspense>
+                              ) : null,
+                          },
+                        ]
+                      : []),
+                {
+                  key: 'form',
+                  label: t('shell.studio.form'),
+                  children: (
+                    <Drawn onDrawn={setFormDrawn}>
+                      {seedSchema ? (
+                        <Flex vertical gap="middle">
+                          <SchemaForm schema={seedSchema} value={draft} onChange={change} />
+                          <SeedGrid
+                            fields={seedFields!}
+                            records={draft.records}
+                            problems={problems}
+                            onChange={update}
+                          />
+                        </Flex>
+                      ) : item.kind === 'scenario' ? (
+                        <ScenarioEditor value={draft} onChange={update} />
+                      ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
+                        <TextTable
+                          columns={resources
+                            .filter((resource) => resource.kind === 'text')
+                            .map((resource) =>
+                              resource.id === item.id
+                                ? {
+                                    id: item.id,
+                                    locale: String(loaded.content.locale),
+                                    texts: draft.texts as Record<string, unknown>,
+                                    editable: true,
+                                  }
+                                : otherTexts.find((column) => column.id === resource.id),
+                            )
+                            .filter((column): column is TextColumn => column !== undefined)}
+                          onChange={update}
+                          onAdd={addTextKey}
                         />
-                      </Flex>
-                    ) : formSchema ? (
-                      <Flex vertical gap="middle">
-                        <SchemaForm schema={formSchema} value={draft} onChange={change} />
-                        <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
-                      </Flex>
-                    ) : schema ? (
-                      <SchemaForm
-                        schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
-                        value={draft}
-                        onChange={change}
-                        kind={item.kind}
+                      ) : item.kind === 'entity' && schema ? (
+                        <EntityDesigner
+                          value={draft}
+                          onChange={change}
+                          origins={origins}
+                          warnings={fieldWarnings(loaded.content, draft, origins)}
+                          onOriginsChange={(next, removed) => {
+                            setOrigins(next)
+                            if (removed) {
+                              touch(removed)
+                            }
+                          }}
+                        />
+                      ) : item.kind === 'connector' && schema ? (
+                        <ConnectorEditor value={draft} onChange={change} />
+                      ) : item.kind === 'identityProvider' && schema ? (
+                        <IdentityProviderEditor value={draft} onChange={change} />
+                      ) : processSchema ? (
+                        <ProcessEditor schema={processSchema} value={draft} onChange={change} />
+                      ) : item.kind === 'page' && schema ? (
+                        <PageEditor value={draft} onChange={change} selected={widgetPath} onSelect={setWidgetPath} />
+                      ) : endpointSchema ? (
+                        <Flex vertical gap="middle">
+                          <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
+                          <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                          <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
+                        </Flex>
+                      ) : siteSchema ? (
+                        <Flex vertical gap="middle">
+                          <SchemaForm schema={siteSchema} value={draft} onChange={change} />
+                          <SiteSignIn
+                            providers={resources
+                              .filter((resource) => resource.kind === 'identityProvider' && resource.name)
+                              .map((resource) => resource.name!)}
+                            value={draft.signIn}
+                            onChange={change}
+                          />
+                        </Flex>
+                      ) : formSchema ? (
+                        <Flex vertical gap="middle">
+                          <SchemaForm schema={formSchema} value={draft} onChange={change} />
+                          <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
+                        </Flex>
+                      ) : schema ? (
+                        <SchemaForm
+                          schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
+                          value={draft}
+                          onChange={change}
+                          kind={item.kind}
+                        />
+                      ) : (
+                        <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+                      )}
+                    </Drawn>
+                  ),
+                },
+                {
+                  key: 'json',
+                  label: t('shell.studio.json'),
+                  children: (
+                    <Flex vertical gap="small">
+                      <Input.TextArea
+                        aria-label={t('shell.studio.json')}
+                        autoSize={{ minRows: 10, maxRows: 40 }}
+                        spellCheck={false}
+                        style={{ fontFamily: type.codeFontFamily }}
+                        value={jsonText ?? JSON.stringify(draft, null, 2)}
+                        onChange={(event) => changeJson(event.target.value)}
                       />
-                    ) : (
-                      <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
-                    )}
-                  </Drawn>
-                ),
-              },
-              {
-                key: 'json',
-                label: t('shell.studio.json'),
-                children: (
-                  <Flex vertical gap="small">
-                    <Input.TextArea
-                      aria-label={t('shell.studio.json')}
-                      autoSize={{ minRows: 10, maxRows: 40 }}
-                      spellCheck={false}
-                      style={{ fontFamily: type.codeFontFamily }}
-                      value={jsonText ?? JSON.stringify(draft, null, 2)}
-                      onChange={(event) => changeJson(event.target.value)}
-                    />
-                    {jsonInvalid && (
-                      <Alert data-testid="studio-json-error" type="error" title={t('shell.studio.invalidJson')} />
-                    )}
-                  </Flex>
-                ),
-              },
-            ]}
-          />
+                      {jsonInvalid && (
+                        <Alert data-testid="studio-json-error" type="error" title={t('shell.studio.invalidJson')} />
+                      )}
+                    </Flex>
+                  ),
+                },
+              ]}
+            />
+          </StudioCatalogContext.Provider>
         </LabelTextsContext.Provider>
       </ExpressionCheckContext.Provider>
       {conflict && (
@@ -1012,13 +1034,33 @@ export function StudioEditor({
             </Button>
           </>
         )}
-        {item.kind !== 'application' && (
-          <Button danger disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
-            {t('shell.studio.delete')}
-          </Button>
-        )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
+      {item.kind !== 'application' && (
+        // Proposed: deleting a resource is the last section of its page, a Danger zone as GitHub's settings have, so the
+        // one destructive action is apart from every edit and says what it does before its dialog asks again.
+        <section
+          data-testid="studio-danger-zone"
+          style={{
+            border: `1px solid ${colour.dangerText}`,
+            borderRadius: radius.base,
+            padding: spacing.lg,
+            display: 'flex',
+            alignItems: 'center',
+            gap: spacing.md,
+          }}
+        >
+          <Flex vertical gap={4} style={{ flex: 1 }}>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              {t('shell.studio.dangerZone')}
+            </Typography.Title>
+            <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.dangerZone.delete')}</Typography.Text>
+          </Flex>
+          <AxisButton role="destructive" disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
+            {t('shell.studio.deleteResource')}
+          </AxisButton>
+        </section>
+      )}
       <SaveBar
         dirty={patch.length > 0 || Object.keys(pendingTexts).length > 0}
         saving={saving}

@@ -503,8 +503,10 @@ function StudioWorkspace() {
         compact
         title={title}
         subtitle={
+          // Proposed: an open resource's heading has no muted line: its file and path are technical names, which the
+          // JSON view shows to whoever needs them.
           selected
-            ? [selected.file, ...(path ? [path] : [])].join(' · ')
+            ? undefined
             : selectedModuleItem
               ? `${t('shell.studio.module')}: ${selectedModuleItem.module}`
               : view.name === 'overview' && openApp

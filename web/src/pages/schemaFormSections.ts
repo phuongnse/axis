@@ -34,3 +34,17 @@ export function fieldTextKey(kind: string, pointer: string): string {
     .join('.')
   return `shell.studio.field.${kind}.${path}`
 }
+
+/** Proposed: the installed modules and packages, which a form names and offers by their labels. */
+export const StudioCatalogContext = createContext<import('../platform/studio').StudioCatalog | null>(null)
+
+/**
+ * Proposed: the fields whose control knows what they hold, by their path under the kind: a module or package to choose
+ * from those installed, or the map of a module's role or connector slots to the application's roles or connectors.
+ */
+export const fieldControls: Record<string, 'module' | 'package' | 'moduleRoles' | 'moduleConnectors'> = {
+  'application.modules.id': 'module',
+  'application.packages.id': 'package',
+  'application.modules.roles': 'moduleRoles',
+  'application.modules.connectors': 'moduleConnectors',
+}

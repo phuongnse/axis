@@ -129,5 +129,17 @@ Shopify's settings pages:
 - **One save bar.** While there are unsaved changes, a bar stays at the foot of the window across the content:
   "Unsaved changes" on the left, Discard and Save on the right. With nothing to save it is not drawn. Save writes the
   label texts first, then the resource.
-- **Still to come in this review:** lists as tables with Add… (modules, packages), no "Edit this value in the JSON
-  view" for maps, a Danger zone for Delete, and Uses and Used by by name.
+- **A list of objects is a table.** One column per property, named by its field text; a value of a known kind by its
+  label (a module or package by the label of its manifest), a nested list or map by its count. Add… (such as Add
+  module…) is the table's main action; each row has Edit… and Remove as icons. Edit… and Add… open the item in a
+  dialog, medium for plain values and large for an item holding a list or a map; Done keeps it, Cancel puts it back,
+  or removes a new one. Inside the dialog a nested list is rows of inputs with Add row, as a dialog never opens another.
+- **A field that knows what it holds has its control.** A module or package is chosen from those installed, by label,
+  from a new `GET /api/studio/catalog`; a module's role and connector maps are one row per slot of the chosen module,
+  its label, then the application's role or connector to choose. No "Edit this value in the JSON view" for them.
+- **Danger zone.** Delete… is the last section of a resource's page, framed in dangerText, with a line that says what
+  deleting does; its dialog still asks. The application has none.
+- **No file line under a resource's heading.** The owner agreed to drop the muted file and path line D129 put there: a
+  technical name, which the JSON view shows to whoever needs it. Amends D129's "Every page has one heading".
+- **Still to come:** Uses and Used by by name, after the Danger zone moves below them.
+

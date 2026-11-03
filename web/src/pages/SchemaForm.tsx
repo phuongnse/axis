@@ -1,5 +1,11 @@
-import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext, type ReactNode } from 'react'
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { Button, Checkbox, Flex, Input, InputNumber, Modal, Select, Typography } from 'antd'
+import { createContext, lazy, Suspense, useContext, useState, type ReactNode } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import { AxisTable } from '../platform/AxisTable'
+import { dialogWidth } from '../platform/dialogButtons'
+import { EmptyDash } from '../platform/EmptyValue'
+import { getAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
 import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
@@ -10,7 +16,15 @@ import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
 import { ReferencePicker } from './ReferencePicker'
-import { fieldTextKey, identityProperties, SchemaFormKindContext, schemaFormSections } from './schemaFormSections'
+import {
+  fieldControls,
+  fieldTextKey,
+  identityProperties,
+  SchemaFormKindContext,
+  schemaFormSections,
+  StudioCatalogContext,
+} from './schemaFormSections'
+import { StudioResourceTitle } from './studioResourceTitle'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -202,6 +216,282 @@ function FieldHeading({ label, help, helpId }: { label: string; help: string | n
   )
 }
 
+/** Proposed: whether a node is drawn inside a list's dialog, where a nested list is rows of inputs, never a dialog. */
+const InListDialogContext = createContext(false)
+
+/** The text of `key`, or of `fallback` when no text holds `key`. */
+function textOr(t: (key: string) => string, key: string, fallback: string): string {
+  const text = t(key)
+  return text === key ? t(fallback) : text
+}
+
+/** Proposed: what a list's cell shows for a value: its label for a known kind of value, a count for a list or a map. */
+function CellValue({ schema, value, path }: { schema: JsonSchema; value: unknown; path: string }) {
+  const t = useText()
+  const catalog = useContext(StudioCatalogContext)
+  const control = fieldControls[path]
+  if (control === 'module' && typeof value === 'string') {
+    return <>{catalog?.modules.find((module) => module.id === value)?.label ?? value}</>
+  }
+  if (control === 'package' && typeof value === 'string') {
+    return <>{catalog?.packages.find((pkg) => pkg.id === value)?.label ?? value}</>
+  }
+  const count = Array.isArray(value)
+    ? value.length
+    : typeof value === 'object' && value !== null
+      ? Object.keys(value).length
+      : undefined
+  if (count !== undefined || schema.type === 'array' || schema.type === 'object') {
+    return count ? <>{count}</> : <EmptyDash />
+  }
+  if (typeof value === 'boolean') {
+    return <>{t(value ? 'shell.table.yes' : 'shell.table.no')}</>
+  }
+  return value === undefined || value === null || value === '' ? <EmptyDash /> : <>{String(value)}</>
+}
+
+/**
+ * Proposed: a list of objects in a resource's form is a table, as every list of the platform is: one column per
+ * property of an item, named by its field text, a value of a known kind by its label and a nested list by its count.
+ * Add… on the right of its toolbar adds an item and opens it in a dialog; each row has Edit… and Remove as icons.
+ * The dialog edits the item in place, medium for an item of plain values and large for one that holds a list or a
+ * map; Done keeps the edit, Cancel puts the item back as it was or, for a new one, removes it.
+ */
+function ListTable({ node, root, rootValue, pointer, value, onChange, kind }: NodeProps & { kind: string }) {
+  const t = useText()
+  const items = Array.isArray(value) ? (value as unknown[]) : []
+  const itemSchema = resolveSchema(node.items!, root)
+  const properties = Object.entries(itemSchema.properties ?? {})
+  const listKey = fieldTextKey(kind, pointer)
+  const [open, setOpen] = useState<{ index: number; isNew: boolean; before: unknown } | null>(null)
+  const nested = properties.some(([, child]) => {
+    const resolved = resolveSchema(child, root)
+    return resolved.type === 'array' || (resolved.type === 'object' && resolved.properties === undefined)
+  })
+  const itemTitle = textOr(t, `${listKey}.item`, 'shell.studio.list.item')
+
+  function add() {
+    const next = [...items, defaultFor(node.items!, root)]
+    onChange(pointer, next)
+    setOpen({ index: next.length - 1, isNew: true, before: undefined })
+  }
+
+  function cancel() {
+    if (open) {
+      onChange(`${pointer}/${open.index}`, open.isNew ? undefined : open.before)
+    }
+    setOpen(null)
+  }
+
+  return (
+    <>
+      <AxisTable<{ index: number; item: unknown }>
+        rows={items.map((item, index) => ({ index, item }))}
+        rowKey={(row) => row.index}
+        emptyText={textOr(t, `${listKey}.empty`, 'shell.studio.list.empty')}
+        pagination={false}
+        testId={`studio-list-${pointer}`}
+        toolbar={{
+          main: (
+            <AxisButton role="main" onClick={add} data-testid={`studio-list-add-${pointer}`}>
+              {textOr(t, `${listKey}.add`, 'shell.studio.list.add')}
+            </AxisButton>
+          ),
+        }}
+        columns={properties.map(([name, child]) => ({
+          key: name,
+          title: textOrNull(t, fieldTextKey(kind, `${pointer}/0/${name}`)) ?? name,
+          kind: 'text' as const,
+          render: (row: { index: number; item: unknown }) => (
+            <CellValue
+              schema={resolveSchema(child, root)}
+              value={(row.item as Record<string, unknown> | undefined)?.[name]}
+              path={fieldTextKey(kind, `${pointer}/0/${name}`).replace('shell.studio.field.', '')}
+            />
+          ),
+        }))}
+        rowActions={{
+          count: 2,
+          of: (row) => [
+            {
+              key: 'edit',
+              labelKey: 'shell.studio.list.edit',
+              nameSuffix: `${itemTitle} ${row.index + 1}`,
+              icon: <EditOutlined />,
+              onClick: () => setOpen({ index: row.index, isNew: false, before: items[row.index] }),
+            },
+            {
+              key: 'remove',
+              labelKey: 'shell.studio.list.remove',
+              nameSuffix: `${itemTitle} ${row.index + 1}`,
+              icon: <DeleteOutlined />,
+              destructive: true,
+              onClick: () => onChange(`${pointer}/${row.index}`, undefined),
+            },
+          ],
+        }}
+      />
+      <Modal
+        open={open !== null}
+        width={dialogWidth(nested ? 'large' : 'medium')}
+        title={
+          open?.isNew ? textOr(t, `${listKey}.new`, 'shell.studio.list.new').replace('{item}', itemTitle) : itemTitle
+        }
+        okText={t('shell.studio.list.done')}
+        cancelText={t('shell.studio.cancel')}
+        onOk={() => setOpen(null)}
+        onCancel={cancel}
+        destroyOnHidden
+      >
+        {open && (
+          <InListDialogContext.Provider value={true}>
+            <Flex vertical gap="middle" data-testid="studio-list-dialog">
+              {properties.map(([name, child]) => (
+                <SchemaNode
+                  key={name}
+                  node={child}
+                  root={root}
+                  rootValue={rootValue}
+                  pointer={`${pointer}/${open.index}/${escapeSegment(name)}`}
+                  name={name}
+                  value={(items[open.index] as Record<string, unknown> | undefined)?.[name]}
+                  required={new Set(itemSchema.required).has(name)}
+                  onChange={onChange}
+                />
+              ))}
+            </Flex>
+          </InListDialogContext.Provider>
+        )}
+      </Modal>
+    </>
+  )
+}
+
+/**
+ * Proposed: a list inside a list's dialog: rows of inputs under one header of field texts, with Remove on each row and
+ * Add row under them, as a dialog never opens another.
+ */
+function InlineRows({ node, root, rootValue, pointer, value, onChange, kind }: NodeProps & { kind: string }) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const items = Array.isArray(value) ? (value as unknown[]) : []
+  const itemSchema = resolveSchema(node.items!, root)
+  const properties = Object.entries(itemSchema.properties ?? {})
+  const columns = `${properties.map(() => 'minmax(0, 1fr)').join(' ')} 32px`
+  return (
+    <Flex vertical gap={spacing.xs}>
+      {items.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: columns, columnGap: spacing.xs, rowGap: spacing.xs }}>
+          {properties.map(([name]) => (
+            <Typography.Text key={name} style={{ color: colour.textMuted, fontWeight: 500 }}>
+              {textOrNull(t, fieldTextKey(kind, `${pointer}/0/${name}`)) ?? name}
+            </Typography.Text>
+          ))}
+          <span />
+          {items.map((item, index) => [
+            ...properties.map(([name, child]) => (
+              <SchemaNode
+                key={`${index}/${name}`}
+                node={child}
+                root={root}
+                rootValue={rootValue}
+                pointer={`${pointer}/${index}/${escapeSegment(name)}`}
+                name={name}
+                value={(item as Record<string, unknown> | undefined)?.[name]}
+                required={new Set(itemSchema.required).has(name)}
+                bare
+                onChange={onChange}
+              />
+            )),
+            <AxisButton
+              key={`${index}/remove`}
+              role="icon"
+              nameKey="shell.studio.list.remove"
+              destructive
+              icon={<DeleteOutlined />}
+              onClick={() => onChange(`${pointer}/${index}`, undefined)}
+            />,
+          ])}
+        </div>
+      )}
+      <div>
+        <AxisButton role="secondary" onClick={() => onChange(pointer, [...items, defaultFor(node.items!, root)])}>
+          {t('shell.studio.list.addRow')}
+        </AxisButton>
+      </div>
+    </Flex>
+  )
+}
+
+/**
+ * Proposed: the map of a module's role or connector slots: one row per slot of the chosen module, its label, then the
+ * application's role or connector that plays it, to choose. A module not yet chosen has no slots to map.
+ */
+function SlotMap({
+  pointer,
+  value,
+  rootValue,
+  slots,
+  onChange,
+}: {
+  pointer: string
+  value: unknown
+  rootValue: unknown
+  slots: 'roles' | 'connectors'
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const catalog = useContext(StudioCatalogContext)
+  const names = useContext(StudioNamesContext)
+  const titleOf = useContext(StudioResourceTitle)
+  const locale = document.documentElement.lang || 'en'
+  const moduleId = getAt(rootValue, `${pointer.slice(0, pointer.lastIndexOf('/'))}/id`)
+  const module = catalog?.modules.find((entry) => entry.id === moduleId)
+  const map = typeof value === 'object' && value !== null ? (value as Record<string, string>) : {}
+  const options = (slots === 'roles' ? names?.roles : names?.connectors)?.map((entry) => ({
+    value: entry.name,
+    label: titleOf?.(entry.id) ?? entry.name,
+  }))
+  if (!module || module[slots].length === 0) {
+    return (
+      <Typography.Text style={{ color: colour.textMuted }}>{t(`shell.studio.slots.${slots}.none`)}</Typography.Text>
+    )
+  }
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'max-content minmax(0, 1fr)',
+        columnGap: spacing.md,
+        rowGap: spacing.xs,
+        alignItems: 'center',
+      }}
+    >
+      {module[slots].map((slot) => {
+        const label = slot.titles[locale] ?? slot.titles.en ?? slot.name
+        return [
+          <Typography.Text key={`${slot.name}/label`}>{label}</Typography.Text>,
+          <Select
+            key={`${slot.name}/value`}
+            aria-label={label}
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            value={map[slot.name]}
+            options={options}
+            onChange={(next) => {
+              const rest = Object.fromEntries(Object.entries(map).filter(([key]) => key !== slot.name))
+              const updated = next === undefined ? rest : { ...rest, [slot.name]: next }
+              onChange(pointer, Object.keys(updated).length > 0 ? updated : undefined)
+            }}
+          />,
+        ]
+      })}
+    </div>
+  )
+}
+
 interface NodeProps {
   node: JsonSchema
   root: JsonSchema
@@ -276,8 +566,65 @@ function SchemaNode({
     schema.type === 'object' && schema.properties === undefined && keyMark !== undefined && names !== undefined
   const unsupported = !isMarkedMap && !isSupported(schema)
 
+  const inDialog = useContext(InListDialogContext)
+  const catalog = useContext(StudioCatalogContext)
+  const control =
+    kind !== null ? fieldControls[fieldTextKey(kind, pointer).replace('shell.studio.field.', '')] : undefined
+
   let input
-  if (unsupported) {
+  if (control === 'module' || control === 'package') {
+    // Proposed: a module or package is chosen from those installed, by its label.
+    const entries = control === 'module' ? catalog?.modules : catalog?.packages
+    input = (
+      <Select
+        aria-label={title}
+        showSearch
+        optionFilterProp="label"
+        style={{ minWidth: 240 }}
+        value={typeof value === 'string' ? value : undefined}
+        options={entries?.map((entry) => ({ value: entry.id, label: entry.label ?? entry.id }))}
+        onChange={(next) => onChange(pointer, next)}
+      />
+    )
+  } else if (control === 'moduleRoles' || control === 'moduleConnectors') {
+    input = (
+      <SlotMap
+        pointer={pointer}
+        value={value}
+        rootValue={rootValue}
+        slots={control === 'moduleRoles' ? 'roles' : 'connectors'}
+        onChange={onChange}
+      />
+    )
+  } else if (
+    kind !== null &&
+    !item &&
+    schema.type === 'array' &&
+    schema.items !== undefined &&
+    resolveSchema(schema.items, root).type === 'object'
+  ) {
+    input = inDialog ? (
+      <InlineRows
+        node={schema}
+        root={root}
+        rootValue={rootValue}
+        pointer={pointer}
+        value={value}
+        onChange={onChange}
+        kind={kind}
+      />
+    ) : (
+      <ListTable
+        node={schema}
+        root={root}
+        rootValue={rootValue}
+        pointer={pointer}
+        value={value}
+        onChange={onChange}
+        kind={kind}
+      />
+    )
+  } else if (unsupported) {
     input = (
       <Typography.Text type="secondary" data-testid="studio-json-only">
         {t('shell.studio.editInJson')}

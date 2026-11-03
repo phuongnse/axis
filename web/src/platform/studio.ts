@@ -1239,3 +1239,30 @@ export function moduleResources(names: StudioNames | null, search: string): Modu
 function compareOrdinal(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
 }
+
+/** Proposed: a slot of a module, by name, with its label in each locale. */
+export interface StudioCatalogSlot {
+  name: string
+  titles: Record<string, string>
+}
+
+/** Proposed: the modules and packages installed for Studio, from `GET /api/studio/catalog`. */
+export interface StudioCatalog {
+  modules: {
+    id: string
+    label: string
+    versions: string[]
+    roles: StudioCatalogSlot[]
+    connectors: StudioCatalogSlot[]
+  }[]
+  packages: { id: string; label: string | null; versions: string[] }[]
+}
+
+/** Proposed: loads the modules and packages Studio offers. */
+export async function fetchStudioCatalog(signal?: AbortSignal): Promise<StudioCatalog> {
+  const response = await studioFetch('/api/studio/catalog', { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '/api/studio/catalog' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioCatalog
+}
