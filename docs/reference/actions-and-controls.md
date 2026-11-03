@@ -58,7 +58,7 @@ A button's level follows its role, so the same kind of action always has the sam
 ## Fields
 
 These rules hold for every Ant Design form in the SPA and in the identity provider's pages, through one setting on the
-shared `ConfigProvider`, so no widget keeps its own copy _(planned for M31)_.
+shared `ConfigProvider`, so no widget keeps its own copy.
 
 - **A field's error keeps the gap.** The message sits 4 px under its control, in 14/20 text, and the field keeps its
   own gap below the message: `spacing-lg` in a form, none in a table cell or an inline form.

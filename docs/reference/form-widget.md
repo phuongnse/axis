@@ -101,7 +101,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - **Validation messages.** A message is 14px at a 20px line height, 4px
       under its input, followed by a whole field gap (`spacing-lg`, 24px)
       before the next field, so the layout grows when a message appears. Every form follows the same
-      rule, see [fields](actions-and-controls.md#fields) _(planned for M31)_.
+      rule, see [fields](actions-and-controls.md#fields).
     - **Read-only values.** A field the form makes read-only, by `readOnly` or
       `readOnlyWhen`, and a `computed`, `sequence` or `creator` field show
       plain text, not an input. A boolean shows Yes or No. The value starts
