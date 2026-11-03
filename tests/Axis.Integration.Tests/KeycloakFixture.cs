@@ -1,4 +1,6 @@
+using Npgsql;
 using Testcontainers.Keycloak;
+using Testcontainers.PostgreSql;
 
 [assembly: AssemblyFixture(typeof(Axis.Integration.Tests.KeycloakFixture))]
 
@@ -11,7 +13,8 @@ namespace Axis.Integration.Tests;
 /// <c>npm run build:keycloak-theme --prefix web</c>. It also holds the breached-password list that the realms made by <c>TenantRealm</c> name in their password policy. The fixture removes
 /// the container when the run ends. It joins the <see cref="IntegrationNetwork"/>, so it reaches the Mailpit servers of <see cref="MailpitFixture"/> by their network aliases. It also holds the organization realm <c>company</c>, which plays an
 /// organization's own identity provider. A test may create and delete a realm of its own, but must not change the
-/// <c>axis</c> or <c>company</c> realm.
+/// <c>axis</c> or <c>company</c> realm. Keycloak keeps its data in a PostgreSQL container of its own, on the same network, so that a test reads its
+/// <c>credential</c> table as the read-only role <see cref="CredentialsConnectionStringAsync"/> returns, which only has <c>SELECT</c> on that table.
 /// </summary>
 public sealed class KeycloakFixture : IAsyncDisposable
 {
@@ -47,8 +50,16 @@ public sealed class KeycloakFixture : IAsyncDisposable
     /// <summary>The client that the realm's FAPI 2.0 client policy covers. It has no secret, only the two keys below.</summary>
     public const string FapiClientId = "axis-fapi";
 
+    /// <summary>The read-only login role of Keycloak's database, for the backup of a realm's credentials. It is for tests only.</summary>
+    public const string ReaderRole = "keycloak_reader";
+
+    public const string ReaderPassword = "keycloak-reader-development-password";
+
+    private const string DatabaseAlias = "keycloak-db";
+    private const string DatabaseName = "keycloak";
+
     // The start takes no test's cancellation token, so cancelling one test does not fail the other.
-    private readonly Lazy<Task<KeycloakContainer>> _container = new(StartContainerAsync);
+    private readonly Lazy<Task<Containers>> _container = new(StartContainersAsync);
 
     /// <summary>
     /// The private key of <c>axis-fapi</c> with the key id <paramref name="keyId"/>, <c>key-1</c> or <c>key-2</c>, as a PEM.
@@ -61,15 +72,26 @@ public sealed class KeycloakFixture : IAsyncDisposable
     /// <summary>Starts the container if no test has yet, and returns the issuer of the axis realm.</summary>
     public async Task<Uri> StartAsync()
     {
-        var container = await _container.Value;
-        return new Uri(new Uri(container.GetBaseAddress()), "realms/axis");
+        var containers = await _container.Value;
+        return new Uri(new Uri(containers.Keycloak.GetBaseAddress()), "realms/axis");
     }
 
     /// <summary>Starts the container if no test has yet, and returns its base address, which serves every realm and the admin API.</summary>
     public async Task<Uri> BaseAddressAsync()
     {
-        var container = await _container.Value;
-        return new Uri(container.GetBaseAddress());
+        var containers = await _container.Value;
+        return new Uri(containers.Keycloak.GetBaseAddress());
+    }
+
+    /// <summary>Starts the containers if no test has yet, and returns the connection string of <see cref="ReaderRole"/> to Keycloak's database.</summary>
+    public async Task<string> CredentialsConnectionStringAsync()
+    {
+        var containers = await _container.Value;
+        return new NpgsqlConnectionStringBuilder(containers.Database.GetConnectionString())
+        {
+            Username = ReaderRole,
+            Password = ReaderPassword,
+        }.ConnectionString;
     }
 
     public async ValueTask DisposeAsync()
@@ -81,7 +103,7 @@ public sealed class KeycloakFixture : IAsyncDisposable
         }
     }
 
-    private static async Task<KeycloakContainer> StartContainerAsync()
+    private static async Task<Containers> StartContainersAsync()
     {
         var theme = new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "KeycloakTheme"));
         if (!File.Exists(Path.Combine(theme.FullName, "axis", "login", "login.ftl")))
@@ -92,8 +114,16 @@ public sealed class KeycloakFixture : IAsyncDisposable
 
         var network = await IntegrationNetwork.GetAsync();
 
+        var database = new PostgreSqlBuilder(PostgreSqlServer.Image)
+            .WithNetwork(network)
+            .WithNetworkAliases(DatabaseAlias)
+            .WithDatabase(DatabaseName)
+            .WithUsername(DatabaseName)
+            .WithPassword(DatabaseName)
+            .Build();
+
         // The builder already runs start-dev, and the command adds --import-realm to it.
-        var container = new KeycloakBuilder(Image)
+        var keycloak = new KeycloakBuilder(Image)
             .WithNetwork(network)
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-realm.json")), "/opt/keycloak/data/import/")
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "company-realm.json")), "/opt/keycloak/data/import/")
@@ -102,16 +132,40 @@ public sealed class KeycloakFixture : IAsyncDisposable
             .WithCommand("--import-realm")
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_ID", AdminClientId)
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_SECRET", AdminClientSecret)
+            .WithEnvironment("KC_DB", "postgres")
+            .WithEnvironment("KC_DB_URL", $"jdbc:postgresql://{DatabaseAlias}:5432/{DatabaseName}")
+            .WithEnvironment("KC_DB_USERNAME", DatabaseName)
+            .WithEnvironment("KC_DB_PASSWORD", DatabaseName)
             .Build();
+        var containers = new Containers(keycloak, database);
         try
         {
-            await container.StartAsync();
-            return container;
+            await database.StartAsync();
+            await keycloak.StartAsync();
+
+            // Keycloak has made its schema once it has started, so the role can be granted on its table now.
+            await using var connection = new NpgsqlConnection(database.GetConnectionString());
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(
+                $"CREATE ROLE {ReaderRole} LOGIN PASSWORD '{ReaderPassword}'; GRANT CONNECT ON DATABASE {DatabaseName} TO {ReaderRole}; GRANT USAGE ON SCHEMA public TO {ReaderRole}; GRANT SELECT ON credential TO {ReaderRole};",
+                connection);
+            await command.ExecuteNonQueryAsync();
+            return containers;
         }
         catch
         {
-            await container.DisposeAsync();
+            await containers.DisposeAsync();
             throw;
+        }
+    }
+
+    // Keycloak goes first, because it holds connections to the database.
+    private sealed record Containers(KeycloakContainer Keycloak, PostgreSqlContainer Database) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await Keycloak.DisposeAsync();
+            await Database.DisposeAsync();
         }
     }
 }

@@ -20,6 +20,7 @@ takes no key file: it uses the tenant's own backup key, see [backups in a cell](
 | `--backup-key-file <file>` | The backup key: a file that holds 32 bytes in base64, such as the output of `openssl rand -base64 32`. Surrounding white space is ignored. The key is read from the file only, never from the command line or a setting. The operator keeps it outside the installation. Required outside a cell, and refused in a cell. |
 
 The archive holds a tar with two entries, `manifest.json` and `tenant.dump`, and the whole file is encrypted with the backup key.
+A tenant with its own realm may also have a third entry, `realm.json`, right after `manifest.json`, see step 2 below.
 In a cell the tar also holds the tenant's Studio folder, one `studio/<path>` entry for each file of
 `<Studio:ApplicationsPath>/<tenant id>/`, between `manifest.json` and `tenant.dump`, see
 [backups in a cell](#backups-in-a-cell). Outside a cell it has no `studio/` entry.
@@ -41,7 +42,16 @@ can recover them.
    arguments. The tool holds one transaction open until the dump ends, so
    vacuum on the tenant database waits, and so does an activation that changes
    tables.
-2. `archive`: write the manifest, the Studio files in a cell and the dump into `--out`, encrypted with the backup key. The dump is first written to a temporary
+2. `realm`: only for a tenant with its own realm, and only when `IdentityProvider:DatabaseConnectionString` is set, see
+   [settings](administration.md#settings). It builds `realm.json` in memory. The file holds the realm's roles (the realm roles and the roles of the `axis`
+   and `site-` clients), its groups, and its users. Each user comes with its `id`, role mappings, groups, required actions and credentials. It holds no client
+   and no service-account user. Roles come from the identity provider's admin API as the realm's `axis-activation` client, and groups and users as its `axis-users` client.
+   The credentials, which are password hashes and authenticator secrets that the admin API never returns, come from the `credential` table of the identity
+   provider's database, for the users that the admin API returned, through that setting. The field names are those of the identity provider's realm export.
+   The entry is [secret](keys-and-data-protection.md#secret) data: it is written only inside the encrypted archive, and no file, output line or error line
+   holds any part of it. A tenant without its own realm, such as a preview tenant or one that signs in elsewhere, gets no `realm` line. Without the setting, no tenant does.
+   The users and the credentials are two reads, not one snapshot, so a credential added between them can be missing.
+3. `archive`: write the manifest, `realm.json` when there is one, the Studio files in a cell and the dump into `--out`, encrypted with the backup key. The dump is first written to a temporary
    file next to `--out` that only its owner can read. The tool deletes it when the step ends.
 
 A tenant in any status except `provisioning` can be backed up, also a
@@ -95,12 +105,13 @@ start check `AXC0146` rebuilds, see
 [extension packages](extension-packages.md). Other stored releases are listed
 with `required` set to `false`.
 
-**Failures.** A failed dump or write exits `1` and leaves no partial file. A
+**Failures.** A failed dump, realm read or write exits `1` and leaves no partial file. A failed `realm` step writes `<id> realm failed: <message>`, and the message
+names the identity provider step and its status, or the database error, and never a response body, a host or a secret. A
 `--out` that appears during the backup is never overwritten.
 
-**Exit codes.** `0` when the archive is written. `1` when the dump or the write
+**Exit codes.** `0` when the archive is written. `1` when the dump, the realm read or the write
 failed. `2` for an unknown tenant, a `provisioning` tenant, an `--out` file that
-exists, a missing option, a missing or malformed `--backup-key-file`, a missing tool or a missing setting.
+exists, a missing option, a missing or malformed `--backup-key-file`, a missing tool or a missing setting, and also for an `IdentityProvider:DatabaseConnectionString` that is not a connection string or, outside Development and Testing, does not set `SSL Mode=VerifyFull`.
 In a cell, `2` also covers a `--backup-key-file` (it is refused), a missing or unreadable `Cell:BackupKeyFile` and a tenant that has no backup key.
 A key file problem goes to standard error.
 
@@ -236,7 +247,7 @@ option or a missing setting.
    secret from `AXIS_OIDC_CLIENT_SECRET`, and a tenant with a new realm has its client secret already.
 2. Run [`tenant resume <id>`](tenant-status-commands.md#tenant-resume).
 
-A tenant with a new realm has no accounts, because the archive carries no account, credential or role mapping. Its people
+A tenant with a new realm has no accounts, because a restore does not import `realm.json` yet, even when the archive holds one. Its people
 need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
 
 Set each `secret` binding with
@@ -278,7 +289,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `cell backup` command with its metric `axis.backup.last_success`, and the chart's CronJob, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive, the `cell backup` command with its metric `axis.backup.last_success`, and the chart's CronJob, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -329,9 +340,9 @@ format and the steps above stay, with the changes below.
     [host settings](host-settings.md#cell-settings). All five are required. The command also needs `Cell:Id`,
     `Cell:BackupKeyFile`, the platform database, the installation key and `pg_dump` on `PATH`.
   - **Output.** Each line starts with the tenant id. A try writes the lines of the `tenant backup` steps,
-    `dump` and `archive`, and then `upload ok`. A step that fails writes `<step> failed: <message>`, where the step is
+    `dump`, `realm` (only with `IdentityProvider:DatabaseConnectionString` set, for a tenant with its own realm) and `archive`, and then `upload ok`. A step that fails writes `<step> failed: <message>`, where the step is
     `key` (the tenant has no backup key or it does not unwrap), `check` (the tenant cannot be backed up, for example
-    because it is no longer in the directory), `dump`, `archive` or `upload`. The message of `upload` is the error code of the service or the
+    because it is no longer in the directory), `dump`, `realm`, `archive` or `upload`. The message of `upload` is the error code of the service or the
     name of the error type, never the address or a key. When the time runs out, the last line is
     `cell backup stopped: the run reached its 6-hour limit`. A tenant whose upload time cannot be stored writes
     `<tenant id> record failed: <message>` after its upload, counts as failed and is not uploaded again. When the gauge cannot be
@@ -342,9 +353,9 @@ format and the steps above stay, with the changes below.
 - **Object lock.** The bucket has object lock in compliance mode for 30 days and a lifecycle rule
   that deletes an archive after 30 days. Nobody, the operator included, can delete or change an
   archive before then.
-- **The realm in the archive.** The archive gets a third entry, `realm.json`: the tenant's realm with
+- **The realm in the archive** _(the backup half is built, the restore import is planned for M31)_. The archive gets a third entry, `realm.json`: the tenant's realm with
   its users, role mappings, credentials and required actions, as the identity provider's export
-  writes it. The credentials are hashes and authenticator secrets, so the entry is
+  writes it. `tenant backup` writes it when `IdentityProvider:DatabaseConnectionString` is set, see step 2 of [tenant backup](#tenant-backup). The chart and the Compose files do not set that setting yet, so the daily `cell backup` writes no `realm.json` until they do. The credentials are hashes and authenticator secrets, so the entry is
   [secret](keys-and-data-protection.md#secret) data, and the archive's encryption covers it. A
   restore imports it into the new tenant's realm, so its people sign in as before, and needs no new
   invitation. An archive without `realm.json` restores as today.
