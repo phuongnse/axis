@@ -229,3 +229,6 @@ Group and Material advise, and as mail and documents do:
   "Fixes only (1.2.x)" for `~`, "This version only" for exact. The file keeps the range as written, so no
   configuration changes. A table shows it in words, "1.2.0 and later 1.x", "1.2.0 only". A version no longer installed
   stays shown, with "0.9.0 is not installed. Choose an installed version." in warningText under it.
+- **A label is above its input, everywhere.** The owner set the convention: every field's label sits above its input,
+  as the form widget has it (D96), never beside it. A module's role and connector maps follow it: each slot is a field
+  of its own, its label (the field label's style, tied to the select) above its select.

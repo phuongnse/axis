@@ -777,7 +777,7 @@ function SlotMap({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { colour, spacing, type } = useDesignTokens()
   const catalog = useContext(StudioCatalogContext)
   const names = useContext(StudioNamesContext)
   const titleOf = useContext(StudioResourceTitle)
@@ -799,36 +799,42 @@ function SlotMap({
     )
   }
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'max-content minmax(0, 1fr)',
-        columnGap: spacing.md,
-        rowGap: spacing.xs,
-        alignItems: 'center',
-      }}
-    >
+    // Proposed: each slot is a field of its own, its label above its select, as every field has it.
+    <Flex vertical gap={spacing.sm}>
       {module[slots].map((slot) => {
         const label = slot.titles[locale] ?? slot.titles.en ?? slot.name
-        return [
-          <Typography.Text key={`${slot.name}/label`}>{label}</Typography.Text>,
-          <Select
-            key={`${slot.name}/value`}
-            aria-label={label}
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            value={map[slot.name]}
-            options={options}
-            onChange={(next) => {
-              const rest = Object.fromEntries(Object.entries(map).filter(([key]) => key !== slot.name))
-              const updated = next === undefined ? rest : { ...rest, [slot.name]: next }
-              onChange(pointer, Object.keys(updated).length > 0 ? updated : undefined)
-            }}
-          />,
-        ]
+        const id = `studio-slot-${pointer}-${slot.name}`
+        return (
+          <Flex vertical key={slot.name}>
+            <label
+              htmlFor={id}
+              style={{
+                fontWeight: 500,
+                color: colour.textMuted,
+                fontSize: type.fontSize,
+                lineHeight: '22px',
+                marginBottom: 6,
+              }}
+            >
+              {label}
+            </label>
+            <Select
+              id={id}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              value={map[slot.name]}
+              options={options}
+              onChange={(next) => {
+                const rest = Object.fromEntries(Object.entries(map).filter(([key]) => key !== slot.name))
+                const updated = next === undefined ? rest : { ...rest, [slot.name]: next }
+                onChange(pointer, Object.keys(updated).length > 0 ? updated : undefined)
+              }}
+            />
+          </Flex>
+        )
       })}
-    </div>
+    </Flex>
   )
 }
 
