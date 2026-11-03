@@ -1,7 +1,7 @@
-import { DownOutlined } from '@ant-design/icons'
 import { Avatar, Button, Dropdown, type MenuProps } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
+import { AxisButton } from './AxisButton'
 import { startSignIn } from './api'
 import { fetchCurrentUser, signOutSession, type CurrentUser } from './currentUser'
 import { colourTokens } from './designTokens'
@@ -67,11 +67,12 @@ export function UserMenu() {
 
   return (
     <Dropdown trigger={['click']} menu={{ items, 'aria-label': t('shell.account.label') }}>
-      <Button
-        type="text"
+      <AxisButton
+        role="plain"
+        caret
         style={{ display: 'inline-flex', alignItems: 'center', gap: spacing.xs, minWidth: 0, maxWidth: 200 }}
       >
-        {/* The avatar and the caret are hidden from assistive technology, so the name alone names the button. */}
+        {/* The avatar is hidden from assistive technology, so the name alone names the button. */}
         <Avatar
           aria-hidden
           size={24}
@@ -80,8 +81,7 @@ export function UserMenu() {
           {initials(user.displayName)}
         </Avatar>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName}</span>
-        <DownOutlined aria-hidden style={{ flex: 'none', fontSize: 12 }} />
-      </Button>
+      </AxisButton>
     </Dropdown>
   )
 }

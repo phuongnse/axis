@@ -170,7 +170,7 @@ const texts = {
   'shell.table.deleteMissing': 'This record no longer exists.',
   'shell.table.deleteInUse': 'This record is in use and cannot be deleted.',
   'shell.table.deleteFailed': 'The record could not be deleted.',
-  'shell.table.import': 'Import',
+  'shell.table.import': 'Import…',
   'shell.table.importTitle': 'Import records',
   'shell.table.importChoose': 'Choose a CSV or Excel file',
   'shell.table.importCheck': 'Check',
@@ -212,7 +212,7 @@ const texts = {
   'note.close': 'Close note',
   'shell.form.processRunning': 'This record is already in a running process.',
   'shell.form.startFailed': 'The process could not be started.',
-  'shell.form.choose': 'Choose',
+  'shell.form.choose': 'Choose…',
   'shell.form.clear': 'Clear',
   'filter.title': 'Title contains',
   'filter.minCount': 'Minimum count',
@@ -908,7 +908,7 @@ describe('TableWidget', () => {
     expect(screen.getByLabelText('Maximum price')).toHaveAttribute('inputmode', 'decimal')
     expect(screen.getByLabelText('In category')).toHaveAttribute('readonly')
     const bar = screen.getByTestId('filter-bar')
-    expect(within(bar).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Choose…' })).toBeInTheDocument()
     expect(within(bar).queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
   })
 
@@ -1018,7 +1018,7 @@ describe('TableWidget', () => {
     const view = renderWidget('', filteredWidget)
     await screen.findByText('No records yet.')
 
-    await userEvent.click(within(screen.getByTestId('filter-bar')).getByRole('button', { name: 'Choose' }))
+    await userEvent.click(within(screen.getByTestId('filter-bar')).getByRole('button', { name: 'Choose…' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByRole('row', { name: /Office/ }))
 
     await waitFor(() => expect(search()).toBe(`?categoryFilter=${categoryId}`))
@@ -1290,7 +1290,7 @@ describe('TableWidget', () => {
         within(bar)
           .getAllByRole('button')
           .map((button) => button.textContent || button.getAttribute('aria-label')),
-      ).toEqual(['Refresh', 'Import', 'Export', 'Close note', 'Add note'])
+      ).toEqual(['Refresh', 'Import…', 'Export', 'Close note', 'Add note'])
     })
   })
 
@@ -1643,7 +1643,7 @@ describe('TableWidget import', () => {
   }
 
   async function chooseAndCheck(name = 'notes.csv') {
-    await userEvent.click(await screen.findByRole('button', { name: 'Import' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Import…' }))
     const dialog = await screen.findByRole('dialog')
     const input = dialog.querySelector('input[type=file]') as HTMLInputElement
     await userEvent.upload(input, new File(['title\nBuy\n'], name, { type: 'application/vnd.ms-excel' }))
@@ -1655,20 +1655,20 @@ describe('TableWidget import', () => {
     stubRecords()
     renderWidget('', noteWidget)
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import…' })).not.toBeInTheDocument()
   })
 
   it('shows the Import button when the access lists import', async () => {
     stubRecords()
     renderWidget('', importWidget)
-    expect(await screen.findByRole('button', { name: 'Import' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Import…' })).toBeInTheDocument()
   })
 
   it('has no Import button on a data source table', async () => {
     stubRecords()
     renderWidget('', { ...noteListWidget, access: withImport })
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import…' })).not.toBeInTheDocument()
   })
 
   it('lists the dry run errors by row and field label and offers no Commit', async () => {
@@ -1716,7 +1716,7 @@ describe('TableWidget import', () => {
     const { uploads } = stubImport([])
     renderWidget('', importWidget)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Import' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Import…' }))
     const dialog = await screen.findByRole('dialog')
     const input = dialog.querySelector('input[type=file]') as HTMLInputElement
     await userEvent.upload(input, new File(['x'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false })

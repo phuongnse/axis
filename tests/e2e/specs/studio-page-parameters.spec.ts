@@ -161,7 +161,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     };
     expect(list.widgets[0].rowActions[1].parameters).toEqual({ request: "id" });
 
-    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    await page.getByRole("button", { name: "Publish…", exact: true }).click();
     await confirmDialog(page, "Publish");
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",

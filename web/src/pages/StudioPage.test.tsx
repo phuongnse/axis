@@ -1126,7 +1126,16 @@ describe('StudioPage publishing', () => {
     renderPage()
 
     expect(await screen.findByRole('button', { name: 'Validate' })).toBeEnabled()
-    await waitFor(() => expect(screen.queryAllByRole('button', { name: 'Publish' })).toHaveLength(shown ? 1 : 0))
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: 'Publish…' })).toHaveLength(shown ? 1 : 0))
+  })
+
+  it('opens the publish dialog from Publish… and confirms with its own Publish button', async () => {
+    stubPublishing(publisher)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+
+    expect(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
   })
 
   it('shows the status while a publish runs and the release number when it succeeds', async () => {
@@ -1136,7 +1145,7 @@ describe('StudioPage publishing', () => {
       request('succeeded', { releaseId, diagnostics: [published] }),
     ])
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Publish' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Label (optional)' }), 'May')
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
 
@@ -1179,7 +1188,7 @@ describe('StudioPage publishing', () => {
         : base(input, init),
     )
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Publish' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
 
     expect(await screen.findByTestId('studio-request-error')).toHaveTextContent(
@@ -1385,7 +1394,7 @@ describe('StudioPage publishing', () => {
     }
 
     async function fillDialog(kind: string, value: string, valueLabel: string) {
-      await userEvent.click(await screen.findByRole('button', { name: 'New resource' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'New resource…' }))
       await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
       await userEvent.click(await screen.findByTitle(kind))
       await userEvent.type(screen.getByRole('textbox', { name: valueLabel }), value)
@@ -1396,7 +1405,7 @@ describe('StudioPage publishing', () => {
       stubCreate(201)
       renderPage()
 
-      await userEvent.click(await screen.findByRole('button', { name: 'New resource' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'New resource…' }))
       await userEvent.type(screen.getByRole('combobox', { name: 'Kind' }), 'proc')
 
       expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['process'])

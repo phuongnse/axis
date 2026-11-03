@@ -343,7 +343,7 @@ const texts = {
   'shell.form.conflict': 'This record was changed since you opened it.',
   'shell.form.saveFailed': 'The record could not be saved.',
   'shell.form.loadFailed': 'The record could not be loaded.',
-  'shell.form.choose': 'Choose',
+  'shell.form.choose': 'Choose…',
   'shell.form.clear': 'Clear',
   'shell.form.addRow': 'Add row',
   'shell.form.removeRow': 'Remove',
@@ -581,7 +581,7 @@ describe('FormWidget', () => {
 
     const group = await screen.findByTestId('reference-category')
     expect(within(group).getByLabelText('Category')).toHaveValue('Office')
-    expect(within(group).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: 'Choose…' })).toBeInTheDocument()
   })
 
   it('shows Choose and Clear as icon buttons with no visible text', async () => {
@@ -589,7 +589,7 @@ describe('FormWidget', () => {
     renderForm(noteId)
     await screen.findByLabelText('Category')
 
-    const choose = screen.getByRole('button', { name: 'Choose' })
+    const choose = screen.getByRole('button', { name: 'Choose…' })
     const clear = screen.getByRole('button', { name: 'Clear' })
     expect(choose.textContent).toBe('')
     expect(clear.textContent).toBe('')
@@ -603,7 +603,7 @@ describe('FormWidget', () => {
     await screen.findByLabelText('Category')
 
     const group = screen.getByTestId('reference-category')
-    const choose = within(group).getByRole('button', { name: 'Choose' })
+    const choose = within(group).getByRole('button', { name: 'Choose…' })
     const clear = within(group).getByRole('button', { name: 'Clear' })
     expect(choose).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item')
     expect(clear).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item', 'ant-btn-compact-last-item')
@@ -614,9 +614,9 @@ describe('FormWidget', () => {
     renderForm(noteId)
     await screen.findByLabelText('Category')
 
-    act(() => screen.getByRole('button', { name: 'Choose' }).focus())
+    act(() => screen.getByRole('button', { name: 'Choose…' }).focus())
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose…')
   })
 
   it('names Clear on keyboard focus', async () => {
@@ -835,7 +835,7 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 200, body: categoryPageJson }, { status: 201, body: noteJson('Buy paper', 1) })
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     // The dialog renders into the document body, outside the form.
     const dialog = await screen.findByRole('dialog')
     await userEvent.click(await within(dialog).findByText('Office'))
@@ -868,7 +868,7 @@ describe('FormWidget', () => {
     renderForm(noteId)
     const title = await screen.findByRole('textbox', { name: 'Title' })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Office'))
     await userEvent.type(title, '!')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -886,7 +886,7 @@ describe('FormWidget', () => {
     )
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('Office')
     await userEvent.click(within(dialog).getByTitle('2'))
@@ -906,7 +906,7 @@ describe('FormWidget', () => {
     stubFetch({ status: 500, body: '{}' })
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
 
     expect(await screen.findByTestId('reference-lookup-error')).toHaveTextContent('The records could not be loaded.')
   })
@@ -944,7 +944,7 @@ describe('FormWidget', () => {
     }
     const { unmount } = renderForm(noteId, requiredWidget)
     expect(await screen.findByRole('textbox', { name: 'Category' })).toHaveValue('Office')
-    expect(screen.getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose…' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
     unmount()
 
@@ -1188,7 +1188,7 @@ describe('FormWidget', () => {
     renderForm(null, lineCategoryWidget)
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
 
-    const choose = screen.getByRole('button', { name: 'Choose Category 1' })
+    const choose = screen.getByRole('button', { name: 'Choose… Category 1' })
     expect(choose.textContent).toBe('')
     expect(choose.querySelector('.anticon-search')).not.toBeNull()
     expect(choose).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item')
@@ -1198,7 +1198,7 @@ describe('FormWidget', () => {
     stubFetch({ status: 200, body: categoryPageJson })
     renderForm(null, lineCategoryWidget)
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Choose Category 1' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose… Category 1' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Office'))
 
     const clear = await screen.findByRole('button', { name: 'Clear Category 1' })
@@ -1435,7 +1435,7 @@ describe('FormWidget', () => {
     await screen.findByTestId('field-value-code')
     expect(screen.queryByRole('textbox', { name: 'Code' })).not.toBeInTheDocument()
     expect(screen.getByTestId('field-value-category')).toHaveTextContent('Office')
-    expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Choose…' })).not.toBeInTheDocument()
     expect(screen.getByTestId('cell-lines-0-description')).toHaveTextContent('Pens')
     expect(screen.queryByRole('textbox', { name: 'Description 1' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
@@ -1472,7 +1472,7 @@ describe('FormWidget', () => {
     const title = await screen.findByRole('textbox', { name: 'Title' })
     expect(screen.getByTestId('field-value-priority')).toHaveTextContent('7')
     expect(screen.queryByRole('textbox', { name: 'Priority' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Choose…' })).not.toBeInTheDocument()
 
     await userEvent.clear(title)
     await userEvent.type(title, 'New')

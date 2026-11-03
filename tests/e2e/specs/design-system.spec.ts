@@ -262,7 +262,7 @@ for (const mode of modes) {
     const reference = figure(page, 'Reference and computed cells')
     await expectShown(cellValue(reference, 'lines', 0, 'amount'), '1,700.00')
     await expect(
-      reference.getByTestId('reference-lines-0-category').getByRole('button', { name: 'Choose Category 1', exact: true }),
+      reference.getByTestId('reference-lines-0-category').getByRole('button', { name: 'Choose… Category 1', exact: true }),
     ).toBeVisible()
     await expect(figure(page, 'Cell error').getByTestId('field-error-lines-1-unitPrice')).toHaveText(
       'Unit price cannot be negative.',
@@ -523,7 +523,7 @@ test('the field-reference preview lists the fixture categories in its lookup', a
   const recording = await openHarness(page, '?preview=field-reference&mode=light')
   await figure(page, 'Editable')
     .getByTestId('reference-category')
-    .getByRole('button', { name: 'Choose', exact: true })
+    .getByRole('button', { name: 'Choose…', exact: true })
     .click()
 
   const dialog = await waitForDialog(page, 'Category')

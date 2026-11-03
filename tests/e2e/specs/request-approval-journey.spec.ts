@@ -59,7 +59,7 @@ test.describe('the author builds an application from the request-approval templa
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=EquipmentRequests`)
 
-    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 120_000,

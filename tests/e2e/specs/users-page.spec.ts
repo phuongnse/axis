@@ -99,7 +99,7 @@ test.describe('invitations', () => {
     const email = inviteeEmail()
     await useSession(page, 'administrator')
     await page.goto('/users')
-    await page.getByRole('main').getByRole('button', { name: 'Invite', exact: true }).click()
+    await page.getByRole('main').getByRole('button', { name: 'Invite…', exact: true }).click()
 
     const form = await waitForDialog(page, 'Invite a person')
     await form.getByLabel('Email', { exact: true }).fill(email)
