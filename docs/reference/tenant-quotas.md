@@ -10,7 +10,9 @@ In place: the `platform.tenant_quotas` table, the cell's defaults and the readin
 directory. The server and the worker answer a tenant's effective quota from them, and answer no limit
 outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
 [usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
-`emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. Refusals and leases are still planned, and so are the usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
+`emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
+event and the `applications` refusal of Studio are in place. The other refusals and the leases are still planned, and
+so are the usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
 
 The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
 what one tenant uses in total or at once. A rate limit limits how fast one caller asks.
