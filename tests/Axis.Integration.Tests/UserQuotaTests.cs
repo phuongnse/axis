@@ -27,7 +27,9 @@ namespace Axis.Integration.Tests;
 /// quota of 2 users. The count is the realm's enabled users, so a disabled user and the realm's service accounts do not count. At the
 /// quota an invite and the enable of a disabled user answer 403 <c>quota-exceeded</c> and change nothing, an existing account still
 /// signs in, and below the quota both succeed. The host replaces its quotas with a cell's over the configured tenant, because a full
-/// directory-backed cell would make the test much heavier, and the path from the directory to the limit has its own tests.
+/// directory-backed cell would make the test much heavier, and the path from the directory to the limit has its own tests. A
+/// successful invite or disable then rechecks the count and switches the deny step of the realm's first-login flow, which is on
+/// while the realm is at the quota, and a failed recheck never changes the answer.
 /// </summary>
 public sealed class UserQuotaTests(KeycloakFixture keycloak, MailpitFixture mailpit, PostgreSqlFixture database)
     : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
@@ -37,6 +39,7 @@ public sealed class UserQuotaTests(KeycloakFixture keycloak, MailpitFixture mail
     private const string AuthenticatorSecret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
     private const string PlatformSecret = "platform-secret-1";
     private const string UsersSecret = "users-secret-1";
+    private const string ActivationSecret = "activation-secret-1";
 
     private readonly string _realm = $"t{Guid.NewGuid():N}"[..16];
     private readonly string _password = Guid.NewGuid().ToString("N");
@@ -136,6 +139,37 @@ public sealed class UserQuotaTests(KeycloakFixture keycloak, MailpitFixture mail
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
     }
 
+    [Fact]
+    public async Task An_invite_that_reaches_the_quota_switches_the_deny_step_on_and_a_disable_switches_it_off()
+    {
+        var admin = await SessionCookieAsync(Administrator, Administrator);
+
+        using var invited = await InviteAsync(admin, NewEmail());
+        var onAfterInvite = await DenyRequirementAsync();
+        using var disabled = await PostAsync($"/api/users/{await PatIdAsync()}/disable", admin);
+
+        Assert.Equal(HttpStatusCode.Created, invited.StatusCode);
+        Assert.Equal("REQUIRED", onAfterInvite);
+        Assert.Equal(HttpStatusCode.NoContent, disabled.StatusCode);
+        Assert.Equal("DISABLED", await DenyRequirementAsync());
+    }
+
+    [Fact]
+    public async Task A_failed_recheck_leaves_the_invite_answering_201()
+    {
+        var admin = await SessionCookieAsync(Administrator, Administrator);
+        var email = NewEmail();
+        var path = $"admin/realms/{_realm}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions";
+        var deny = (await GetJsonAsync(path)).EnumerateArray().Single(execution => execution.GetProperty("providerId").GetString() == RealmUsersQuota.DenyAccessProvider);
+        using var deleted = await SendAsync(HttpMethod.Delete, $"admin/realms/{_realm}/authentication/executions/{deny.GetProperty("id").GetString()}");
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        using var invited = await InviteAsync(admin, email);
+
+        Assert.Equal(HttpStatusCode.Created, invited.StatusCode);
+        Assert.Single((await GetJsonAsync($"admin/realms/{_realm}/users?email={Uri.EscapeDataString(email)}&exact=true")).EnumerateArray());
+    }
+
     public async ValueTask InitializeAsync()
     {
         _baseAddress = await keycloak.BaseAddressAsync();
@@ -149,7 +183,7 @@ public sealed class UserQuotaTests(KeycloakFixture keycloak, MailpitFixture mail
         };
         await mailpit.SmtpHostAsync();
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, "activation-secret-1", UsersSecret), smtpServer, CancellationToken);
+            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, ActivationSecret, UsersSecret), smtpServer, CancellationToken);
         await ConfigureClientAsync();
         await CreatePatAsync();
         _danaId = await CreateUserAsync("dana", "dana@example.test", enabled: false);
@@ -167,6 +201,8 @@ public sealed class UserQuotaTests(KeycloakFixture keycloak, MailpitFixture mail
             builder.UseSetting("Tenants:a:Oidc:ClientId", "axis");
             builder.UseSetting("Tenants:a:Oidc:ClientSecret", PlatformSecret);
             builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", UsersSecret);
+            builder.UseSetting("Tenants:a:Realm:Name", _realm);
+            builder.UseSetting("Tenants:a:Realm:ActivationClientSecret", ActivationSecret);
             builder.UseSetting("Tenants:a:Oidc:RolesClaim", "roles");
             builder.UseSetting("Users:AdministratorRole", Administrator);
             builder.UseSetting("Console:OperatorRole", "operator");
@@ -210,6 +246,14 @@ public sealed class UserQuotaTests(KeycloakFixture keycloak, MailpitFixture mail
 
     private async Task<string> PatIdAsync() =>
         (await GetJsonAsync($"admin/realms/{_realm}/users?username=pat&exact=true")).EnumerateArray().Single().GetProperty("id").GetString()!;
+
+    private async Task<string?> DenyRequirementAsync()
+    {
+        var executions = await GetJsonAsync($"admin/realms/{_realm}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions");
+        return executions.EnumerateArray()
+            .Single(execution => execution.GetProperty("providerId").GetString() == RealmUsersQuota.DenyAccessProvider)
+            .GetProperty("requirement").GetString();
+    }
 
     private async Task<bool> IsEnabledAsync(string id) => (await GetJsonAsync($"admin/realms/{_realm}/users/{id}")).GetProperty("enabled").GetBoolean();
 

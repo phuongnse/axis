@@ -6,10 +6,13 @@ using System.Web;
 using Axis.Admin;
 using Axis.Configuration.Tests;
 using Axis.Server.Authentication;
+using Axis.Tenancy;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.Integration.Tests;
@@ -369,6 +372,33 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     }
 
     [Fact]
+    public async Task A_brokered_sign_in_that_reaches_the_users_quota_switches_the_deny_step_on()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress, usersQuota: 1);
+            await using var hosted = host;
+            var callback = await realms.LogInAsync(await host.AuthorizeAsync("/sitespartner"), upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+            Assert.Equal("/sitespartner", signedIn.Headers.Location!.OriginalString);
+            Assert.Equal(1L, await CountAsync("axis.sessions"));
+            var tenant = host.Authority.Segments[^1];
+            var executions = await realms.GetJsonAsync(
+                $"admin/realms/{tenant}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions");
+            var deny = executions.EnumerateArray().Single(execution => execution.GetProperty("providerId").GetString() == RealmUsersQuota.DenyAccessProvider);
+            Assert.Equal("REQUIRED", deny.GetProperty("requirement").GetString());
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
     public async Task A_site_callback_whose_upstream_acr_the_provider_does_not_accept_is_refused()
     {
         var baseAddress = await keycloak.BaseAddressAsync();
@@ -437,7 +467,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// server before the server starts, so the site clients that its activation makes accept them too. Returns the host and the
     /// upstream realm. A <paramref name="partnerAcr"/> list becomes the <c>acr</c> of the provider.
     /// </summary>
-    private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress, string[]? partnerAcr = null, string? groups = null)
+    private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress, string[]? partnerAcr = null, string? groups = null, long? usersQuota = null)
     {
         var tenant = await NewTenantRealmAsync(realms, baseAddress);
         var upstream = await realms.NewUpstreamRealmAsync(groups);
@@ -452,7 +482,8 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             siteClient: UpstreamRealms.ClientId,
             siteSecret: UpstreamRealms.BrokerSecret,
             partnerAcr: partnerAcr,
-            roles: groups is not null);
+            roles: groups is not null,
+            usersQuota: usersQuota);
         await realms.PointBackChannelAtTheContainerAsync(tenant, "oidc-siteissuer", upstream);
         return (host, upstream);
     }
@@ -580,7 +611,8 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         string siteSecret = "site-secret-value",
         string[]? partnerAcr = null,
         Uri? samlMetadata = null,
-        bool roles = false)
+        bool roles = false,
+        long? usersQuota = null)
     {
         var baseAddress = await keycloak.BaseAddressAsync();
         var applications = Applications(partner, partnerAcr, saml: samlMetadata is not null, roles);
@@ -609,10 +641,33 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             }
 
             builder.UseSetting("ActivateOnStartup:0", applications.Path);
-            if (provider is not null)
+            if (usersQuota is not null)
+            {
+                builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", _realmSecrets.Users);
+            }
+
+            if (provider is not null || usersQuota is not null)
             {
                 builder.ConfigureTestServices(services =>
-                    services.Configure<OpenIdConnectOptions>(TenantSignIn.SchemeName("a"), options => options.BackchannelHttpHandler = provider));
+                {
+                    if (provider is not null)
+                    {
+                        services.Configure<OpenIdConnectOptions>(TenantSignIn.SchemeName("a"), options => options.BackchannelHttpHandler = provider);
+                    }
+
+                    if (usersQuota is { } quota)
+                    {
+                        // A cell's quotas over the configured tenant catalog, with the given users default.
+                        services.AddSingleton(services =>
+                        {
+                            var cell = new CellOptions { Id = "vn-1" };
+                            var settings = new ConfigurationBuilder()
+                                .AddInMemoryCollection(new Dictionary<string, string?> { ["Quotas:Defaults:users"] = $"{quota}" })
+                                .Build();
+                            return new TenantQuotas(cell, QuotaDefaults.Load(settings, cell), services.GetRequiredService<ITenantCatalog>());
+                        });
+                    }
+                });
             }
         });
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions
