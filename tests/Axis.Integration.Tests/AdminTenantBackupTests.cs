@@ -185,6 +185,59 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
     }
 
     [Fact]
+    public async Task The_manifest_counts_equal_the_rows_of_each_table_in_the_dump()
+    {
+        using var client = fixture.CreateClient();
+        await AdminBackupFixture.CreateRequestAsync(client);
+        await AdminBackupFixture.CreateRequestAsync(client);
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+
+        var result = await fixture.BackupAsync(file);
+
+        Assert.Equal(0, result.Exit);
+        var archive = ReadArchive(file, folder.Path);
+        using var manifest = JsonDocument.Parse(archive.Manifest);
+        var counts = manifest.RootElement.GetProperty("counts").EnumerateObject().ToDictionary(count => count.Name, count => count.Value.GetInt64());
+
+        // The restored dump is compared, not the live tenant, because the running server can write rows after the backup.
+        var restored = await fixture.NewDatabaseAsync("counted");
+        await fixture.Tools.RestoreAsync(archive.DumpFile, CancellationToken, "--no-owner", "--no-privileges", "-d", new NpgsqlConnectionStringBuilder(restored).Database!);
+        var tables = new List<(string Schema, string Table)>();
+        var admin = new NpgsqlConnectionStringBuilder(await PostgreSqlServer.AdminConnectionStringAsync())
+        {
+            Database = new NpgsqlConnectionStringBuilder(restored).Database,
+            Pooling = false,
+        };
+        await using var connection = new NpgsqlConnection(admin.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using (var list = new NpgsqlCommand(
+            """
+            SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp%'
+            """,
+            connection))
+        await using (var reader = await list.ExecuteReaderAsync(CancellationToken))
+        {
+            while (await reader.ReadAsync(CancellationToken))
+            {
+                tables.Add((reader.GetString(0), reader.GetString(1)));
+            }
+        }
+
+        var expected = new Dictionary<string, long>();
+        foreach (var (schema, table) in tables)
+        {
+            await using var count = new NpgsqlCommand($"SELECT count(*) FROM {EntityNaming.Quote(schema)}.{EntityNaming.Quote(table)}", connection);
+            expected[$"{schema}.{table}"] = (long)(await count.ExecuteScalarAsync(CancellationToken))!;
+        }
+
+        Assert.Equal(expected.OrderBy(pair => pair.Key, StringComparer.Ordinal), counts.OrderBy(pair => pair.Key, StringComparer.Ordinal));
+        Assert.True(counts["entities." + EntityNaming.Table(_purchaseRequestEntity)] >= 2);
+    }
+
+    [Fact]
     public async Task The_archive_and_the_output_hold_no_secret_of_the_tenant()
     {
         using var client = fixture.CreateClient();

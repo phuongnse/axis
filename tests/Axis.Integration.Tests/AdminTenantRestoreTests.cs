@@ -389,6 +389,23 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task An_archive_without_counts_restores_with_the_usual_steps()
+    {
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
+        Assert.Contains("\"counts\"", ReadManifest(file), StringComparison.Ordinal);
+        var old = Rewrite(file, folder.Path, "no-counts", manifest => manifest.Remove("counts"));
+        var id = fixture.Scenario.NewTenantId();
+
+        var result = await RestoreAsync(old, id, $"{id}.example.test");
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(_steps.Select(step => $"{id} {step} ok"), result.Output);
+        Assert.Empty(result.Error);
+    }
+
+    [Fact]
     public async Task A_preview_tenants_archive_is_refused_with_the_preview_message_and_creates_nothing()
     {
         var scenario = fixture.Scenario;

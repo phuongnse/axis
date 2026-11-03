@@ -9,6 +9,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Axis.Configuration.Loading;
+using Axis.Data.Naming;
 using Axis.Processes.Instances;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -55,6 +56,7 @@ internal sealed class TenantBackup : IAsyncDisposable
 
     private List<ManifestPackage> _packages = [];
     private List<ManifestModule> _modules = [];
+    private SortedDictionary<string, long> _counts = new(StringComparer.Ordinal);
 
     public TenantBackup(BackupSettings settings, BackupPlan plan, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
     {
@@ -228,7 +230,7 @@ internal sealed class TenantBackup : IAsyncDisposable
         return options;
     }
 
-    // Reads the manifest data and runs pg_dump inside one exported snapshot, so both see the same database state.
+    // Reads the manifest data, including the row counts, and runs pg_dump inside one exported snapshot, so all see the same database state.
     private async Task DumpAsync()
     {
         var row = _plan.Row;
@@ -256,6 +258,7 @@ internal sealed class TenantBackup : IAsyncDisposable
 
         _packages = await ReadPackagesAsync(connection, transaction);
         _modules = await ReadModulesAsync(connection, transaction);
+        _counts = await ReadCountsAsync(connection, transaction);
         await RunPgDumpAsync(snapshot, password);
         await transaction.CommitAsync(_cancellationToken);
     }
@@ -319,6 +322,40 @@ internal sealed class TenantBackup : IAsyncDisposable
         }
 
         return [.. modules.OrderBy(module => module.Id, StringComparer.Ordinal).ThenBy(module => module.Version, StringComparer.Ordinal)];
+    }
+
+    // The row count of each ordinary table outside the system schemas, keyed schema.table, as the dump holds them.
+    private async Task<SortedDictionary<string, long>> ReadCountsAsync(NpgsqlConnection connection, NpgsqlTransaction transaction)
+    {
+        // Npgsql allows one open reader per connection, so the tables are listed before any count runs.
+        var tables = new List<(string Schema, string Table)>();
+        await using (var list = new NpgsqlCommand(
+            """
+            SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp%'
+            """,
+            connection,
+            transaction))
+        await using (var reader = await list.ExecuteReaderAsync(_cancellationToken))
+        {
+            while (await reader.ReadAsync(_cancellationToken))
+            {
+                tables.Add((reader.GetString(0), reader.GetString(1)));
+            }
+        }
+
+        var counts = new SortedDictionary<string, long>(StringComparer.Ordinal);
+        foreach (var (schema, table) in tables)
+        {
+            await using var count = new NpgsqlCommand(
+                $"SELECT count(*) FROM {EntityNaming.Quote(schema)}.{EntityNaming.Quote(table)}",
+                connection,
+                transaction);
+            counts[$"{schema}.{table}"] = (long)(await count.ExecuteScalarAsync(_cancellationToken))!;
+        }
+
+        return counts;
     }
 
     private async Task RunPgDumpAsync(string snapshot, string password)
@@ -437,7 +474,8 @@ internal sealed class TenantBackup : IAsyncDisposable
             directory,
             _packages,
             _modules,
-            _plan.Keys);
+            _plan.Keys,
+            _counts);
     }
 
     private static string AxisVersion()
@@ -496,7 +534,11 @@ internal sealed record BackupPlan(
 /// <summary>A binding of the tenant as the backup reads it. A <c>secret</c> binding has no value here.</summary>
 internal sealed record BackupBinding(string Name, string Kind, string? Url);
 
-/// <summary>The content of <c>manifest.json</c>. Each field is named here, so a new directory column never reaches the archive by accident.</summary>
+/// <summary>
+/// The content of <c>manifest.json</c>. Each field is named here, so a new directory column never reaches the archive by accident.
+/// <paramref name="Counts"/> holds the row count of each table of the tenant database, keyed <c>schema.table</c>, read in the dump's
+/// snapshot. An archive with no <c>counts</c> reads as null.
+/// </summary>
 internal sealed record BackupManifest(
     int Format,
     string TenantId,
@@ -506,7 +548,8 @@ internal sealed record BackupManifest(
     ManifestDirectory Directory,
     IReadOnlyList<ManifestPackage> Packages,
     IReadOnlyList<ManifestModule> Modules,
-    IReadOnlyList<ManifestKey>? Keys = null);
+    IReadOnlyList<ManifestKey>? Keys = null,
+    IReadOnlyDictionary<string, long>? Counts = null);
 
 /// <summary>
 /// One data key or lookup key of the tenant: <paramref name="Kind"/> is <c>data</c> or <c>lookup</c>, and <paramref name="Key"/> is the
