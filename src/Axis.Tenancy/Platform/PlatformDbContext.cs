@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys of a cell's tenants and their quota overrides, their usage and daily counts, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their usage and daily counts, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -25,6 +25,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantDataKeyRow> TenantDataKeys => Set<TenantDataKeyRow>();
 
     public DbSet<TenantBackupKeyRow> TenantBackupKeys => Set<TenantBackupKeyRow>();
+
+    public DbSet<TenantBackupRow> TenantBackups => Set<TenantBackupRow>();
 
     public DbSet<TenantQuotaRow> TenantQuotas => Set<TenantQuotaRow>();
 
@@ -129,6 +131,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .HasForeignKey(key => key.TenantId)
                 .HasConstraintName("fk_tenant_backup_keys_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantBackupRow>()
+                .WithOne()
+                .HasForeignKey(backup => backup.TenantId)
+                .HasConstraintName("fk_tenant_backups_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
             tenant.HasMany<TenantQuotaRow>()
                 .WithOne()
                 .HasForeignKey(quota => quota.TenantId)
@@ -220,6 +227,14 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             key.HasKey(k => k.TenantId).HasName("pk_tenant_backup_keys");
             key.Property(k => k.TenantId).HasColumnName("tenant_id");
             key.Property(k => k.Key).HasColumnName("key").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<TenantBackupRow>(backup =>
+        {
+            backup.ToTable("tenant_backups");
+            backup.HasKey(b => b.TenantId).HasName("pk_tenant_backups");
+            backup.Property(b => b.TenantId).HasColumnName("tenant_id");
+            backup.Property(b => b.LastSuccessAt).HasColumnName("last_success_at").HasColumnType("timestamp with time zone");
         });
 
         modelBuilder.Entity<TenantQuotaRow>(quota =>

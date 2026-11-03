@@ -1,9 +1,12 @@
+using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Globalization;
 using System.Security.Cryptography;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Axis.Admin;
 using Axis.Configuration.Tests;
+using Axis.Core.Telemetry;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +16,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// <c>cell backup</c> backs up every active and suspended tenant of a cell with the tenant's own backup key and uploads
 /// <c>&lt;tenant id&gt;/&lt;date&gt;.axisbak</c> to an object-locked bucket. A failed tenant is tried twice and the others still go
-/// up. Each tenant gets one platform audit record. Outside a cell, or with a missing setting, the command uploads nothing.
+/// up. Each tenant gets one platform audit record. A tenant's last success is stored and recorded as the gauge
+/// <c>axis.backup.last_success</c>. Outside a cell, or with a missing setting, the command uploads nothing.
 /// </summary>
 public sealed class AdminCellBackupTests(PostgreSqlFixture database, MinioFixture minio) : IClassFixture<PostgreSqlFixture>, IClassFixture<MinioFixture>, IDisposable
 {
@@ -134,6 +138,96 @@ public sealed class AdminCellBackupTests(PostgreSqlFixture database, MinioFixtur
     }
 
     [Fact]
+    public async Task The_gauge_has_a_point_for_each_succeeded_tenant_equal_to_its_stored_time_and_none_for_the_tenant_that_failed()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var tools = await PostgresClientTools.CreateAsync();
+        using var s3 = minio.NewClient();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = CellSettings(bucket);
+        var (a, b, c) = (scenario.NewTenantId(), scenario.NewTenantId(), scenario.NewTenantId());
+        foreach (var id in new[] { a, b, c })
+        {
+            Assert.Equal(0, (await scenario.RunAsync(AdminScenario.CreateArgs(id, $"{id}.example.test"), extra: cell)).Exit);
+        }
+
+        await PostgreSqlServer.DropDatabaseAsync($"axis_{b}", CancellationToken);
+
+        using var gauge = new GaugeCapture(a, b, c);
+        var result = await scenario.RunAsync(["cell", "backup"], path: tools.PathSetting, extra: cell);
+
+        Assert.Equal(1, result.Exit);
+        var stored = await StoredAsync(scenario);
+        Assert.Equal(Sorted(a, c), stored.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(Sorted(a, c), gauge.Points.Keys.Order(StringComparer.Ordinal));
+        foreach (var id in new[] { a, c })
+        {
+            Assert.Equal(stored[id].ToUnixTimeSeconds(), gauge.Points[id]);
+        }
+
+        Assert.False(gauge.Points.ContainsKey(b));
+        Assert.False(stored.ContainsKey(b));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_tenant_that_fails_in_a_later_run_keeps_the_stored_time_and_the_gauge_value_of_its_last_success()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var tools = await PostgresClientTools.CreateAsync();
+        using var s3 = minio.NewClient();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = CellSettings(bucket);
+        var (a, b) = (scenario.NewTenantId(), scenario.NewTenantId());
+        foreach (var id in new[] { a, b })
+        {
+            Assert.Equal(0, (await scenario.RunAsync(AdminScenario.CreateArgs(id, $"{id}.example.test"), extra: cell)).Exit);
+        }
+
+        Assert.Equal(0, (await scenario.RunAsync(["cell", "backup"], path: tools.PathSetting, extra: cell)).Exit);
+        var first = await StoredAsync(scenario);
+        Assert.Equal(Sorted(a, b), first.Keys.Order(StringComparer.Ordinal));
+
+        await PostgreSqlServer.DropDatabaseAsync($"axis_{b}", CancellationToken);
+        using var gauge = new GaugeCapture(a, b);
+        var second = await scenario.RunAsync(["cell", "backup"], path: tools.PathSetting, extra: cell);
+
+        Assert.Equal(1, second.Exit);
+        var stored = await StoredAsync(scenario);
+        Assert.Equal(first[b], stored[b]);
+        Assert.True(stored[a] >= first[a]);
+        Assert.Equal(first[b].ToUnixTimeSeconds(), gauge.Points[b]);
+        Assert.Equal(stored[a].ToUnixTimeSeconds(), gauge.Points[a]);
+    }
+
+    [Fact]
+    public async Task An_http_otlp_endpoint_outside_development_makes_the_command_exit_2_name_the_setting_and_upload_nothing()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var tools = await PostgresClientTools.CreateAsync();
+        using var s3 = minio.NewClient();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = CellSettings(bucket);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.RunAsync(AdminScenario.CreateArgs(id, $"{id}.example.test"), extra: cell)).Exit);
+
+        var result = await scenario.RunAsync(
+            ["cell", "backup"],
+            path: tools.PathSetting,
+            extra: new Dictionary<string, string?>(cell) { ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://collector.example.test:4318" });
+
+        Assert.Equal(2, result.Exit);
+        Assert.Equal(["'OTEL_EXPORTER_OTLP_ENDPOINT' must be an https URL outside Development."], result.Error);
+        Assert.Empty(result.Output);
+        Assert.Empty(await KeysAsync(s3, bucket));
+        Assert.Empty(await AuditedAsync(scenario));
+        Assert.Empty(await StoredAsync(scenario));
+    }
+
+    [Fact]
     public async Task Outside_a_cell_or_with_a_missing_setting_the_command_exits_2_uploads_nothing_and_writes_no_audit_record()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -237,6 +331,48 @@ public sealed class AdminCellBackupTests(PostgreSqlFixture database, MinioFixtur
     /// <summary>The tenant of each <c>cell backup</c> audit record, one entry for each record.</summary>
     private static async Task<List<string>> AuditedAsync(AdminScenario scenario) =>
         [.. (await scenario.AuditRecordsAsync()).Where(record => record.Command == Command).Select(record => record.TenantId ?? "")];
+
+    /// <summary>The stored last success of each tenant of the scenario, by tenant id.</summary>
+    private static async Task<Dictionary<string, DateTimeOffset>> StoredAsync(AdminScenario scenario)
+    {
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options);
+        return await context.TenantBackups.AsNoTracking().ToDictionaryAsync(row => row.TenantId, row => row.LastSuccessAt, CancellationToken);
+    }
+
+    /// <summary>
+    /// Collects the points of the gauge <see cref="AxisMetrics.BackupLastSuccess"/> for the given tenants. Other tests that run at the
+    /// same time record on the same meter, so points of other tenants are left out.
+    /// </summary>
+    private sealed class GaugeCapture : IDisposable
+    {
+        private readonly MeterListener _listener = new();
+
+        public GaugeCapture(params string[] tenants)
+        {
+            _listener.InstrumentPublished = (instrument, listener) =>
+            {
+                if (instrument.Meter.Name == AxisMetrics.MeterName && instrument.Name == AxisMetrics.BackupLastSuccess)
+                {
+                    listener.EnableMeasurementEvents(instrument);
+                }
+            };
+            _listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+            {
+                foreach (var tag in tags)
+                {
+                    if (tag.Key == AxisTelemetry.TenantTag && tag.Value is string tenant && tenants.Contains(tenant))
+                    {
+                        Points[tenant] = value;
+                    }
+                }
+            });
+            _listener.Start();
+        }
+
+        public ConcurrentDictionary<string, long> Points { get; } = new();
+
+        public void Dispose() => _listener.Dispose();
+    }
 
     /// <summary>The tenant's backup key, unwrapped with the cell's key.</summary>
     private static async Task<byte[]> UnwrapAsync(AdminScenario scenario, string id, byte[] cellKey)

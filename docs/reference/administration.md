@@ -774,7 +774,11 @@ is set. The behaviour is in [backups in a cell](tenant-backup-and-restore.md#bac
 - **Output.** Each line starts with the tenant id, then the step and `ok` or `failed: <message>`. A tenant that
   fails is tried once more, so its failed line comes twice.
 - **Exit codes.** `0` when every tenant succeeded, `1` when a tenant failed or the run reached its 6-hour limit, and
-  `2` outside a cell or for a missing setting or `pg_dump`, with nothing uploaded.
+  `2` outside a cell, for a missing setting or `pg_dump`, or for an OTLP endpoint setting that is not an `https` URL outside
+  Development, with nothing uploaded.
+- **Last success.** After an upload, the tenant's time goes to `platform.tenant_backups`. At the end of the run the command records
+  the gauge `axis.backup.last_success` and, when an OTLP endpoint is set, exports it, see
+  [host settings](host-settings.md#telemetry-export).
 - **Audit.** One platform audit record for each tenant, written before its first try. A retry writes no second record.
 
 ## Version

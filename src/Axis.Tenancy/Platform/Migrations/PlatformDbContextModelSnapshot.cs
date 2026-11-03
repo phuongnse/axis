@@ -106,6 +106,22 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("tenant_backup_keys", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantBackupRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("LastSuccessAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_success_at");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_tenant_backups");
+
+                    b.ToTable("tenant_backups", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -643,6 +659,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_backup_keys_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantBackupRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_backups_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>

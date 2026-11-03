@@ -217,8 +217,7 @@ and creates no tables. See
   start over `ConnectionStrings:PlatformSchema` under both tenant sources, and
   uses that setting for nothing else. `Axis.Admin migrate` applies them too, before it migrates the tenants, so an
   upgrade that runs `migrate` first has every new platform table before the new
-  server starts. `migrate` does not run the reader role's grants. The server
-  does that at its next start.
+  server starts. `migrate` does not run the reader role's grants. The server does that at its next start.
 - **Read-only hosts.** The server reads the directory over
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
   and `SELECT` on its tables, and nothing else. The server sets this in one
@@ -254,6 +253,7 @@ The tables:
 | `platform.data_protection_keys`      | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. The server only inserts rows and never updates or deletes one. `platform rekey` updates the encrypted XML. Every server replica reads them.                                                                                                                                                     |
 | `platform.tenant_data_keys`          | The tenant id, the `kind` (`data` or `lookup`), the `number` and the encrypted key, the primary key together. The kind is checked, the number is at least 1, and a row goes with its tenant. `platform rekey` updates the encrypted key. See [data encryption](data-encryption.md#tenant-keys).                                                                         |
 | `platform.tenant_backup_keys`        | The tenant id, the primary key, and the tenant's backup key, wrapped by the cell's backup key. A cell's `tenant create` and `tenant restore` write a row and `tenant backup` and `tenant restore` read it. A row goes with its tenant. `platform rekey` does not touch it. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
+| `platform.tenant_backups` | The tenant id, the primary key, and `last_success_at` (`timestamp with time zone`), when the last `cell backup` upload of the tenant succeeded. A tenant that never succeeded has no row, and a failed backup keeps the time it had. A row goes with its tenant. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
 | `platform.tenant_leases` | The `lease_id`, the primary key, the tenant id, the `quota` key, the `holder` (the host and process) and `expires_at` (`timestamp with time zone`). One row is one piece of work that runs under a concurrency quota, see [work at once](tenant-quotas.md#work-at-once). A lease lasts 60 seconds and its holder renews it every 20. The reader role inserts, updates and deletes rows. A row goes with its tenant. |
 | `platform.tenant_daily_counters` | The tenant id, the UTC `day`, the `counter` name and the `value` (`bigint`, at least 0), the primary key being the first three. A cell's worker counts the emails it sends in the counter `emails`, see [emails a day](tenant-quotas.md#emails-a-day). A row goes with its tenant. The reader role inserts and updates rows and never deletes one. |
 | `platform.tenant_quotas` | The tenant id and the `quota` key, the primary key together, the `value` (`bigint`, null means no limit) and `updated_at`. One row is one quota the tenant overrides, and a quota with no row takes the cell's default. The value is null or at least 0, and a row goes with its tenant. Hosts read the rows with the directory, see [tenant quotas](tenant-quotas.md#quotas). |

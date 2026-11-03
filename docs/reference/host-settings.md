@@ -589,7 +589,7 @@ variables:
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | The endpoint for logs only |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | The OTLP protocol |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Headers sent with every export |
-| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker` |
+| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker`, and to `axis-admin` for `cell backup` |
 | `OTEL_RESOURCE_ATTRIBUTES` | More resource attributes |
 
 With no endpoint, nothing is exported and logs still go to the console. The
@@ -598,6 +598,11 @@ never from a committed file. Docker Compose and `scripts/dev.sh` set no
 endpoint and start no collector. Outside Development every endpoint variable that
 is set must be an absolute `https` URL, or the server and the worker stop at start
 and the error names the variable, never its value. Development accepts `http`.
+
+The admin tool's `cell backup` also reads these variables, from its own settings, and exports the gauge
+`axis.backup.last_success` as metrics only, see
+[backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). Outside Development it
+applies the same `https` rule and exits with code `2`, naming the variable, before it uploads anything.
 
 ## Cell settings
 
