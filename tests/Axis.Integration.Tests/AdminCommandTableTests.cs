@@ -31,6 +31,8 @@ public sealed class AdminCommandTableTests
                 ["tenant host move"] = AuditMark.OnePerTenant,
                 ["tenant email set"] = AuditMark.OnePerTenant,
                 ["tenant email clear"] = AuditMark.OnePerTenant,
+                ["tenant legal set"] = AuditMark.OnePerTenant,
+                ["tenant legal clear"] = AuditMark.OnePerTenant,
                 ["tenant session end"] = AuditMark.OnePerTenant,
                 ["tenant data-key rotate"] = AuditMark.OnePerTenant,
                 ["tenant data-key retire"] = AuditMark.OnePerTenant,
