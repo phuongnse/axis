@@ -21,7 +21,8 @@ public static class WorkerServiceCollectionExtensions
     /// background service that runs the due work items of every tenant, and the health checks
     /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
     /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
-    /// <c>Tenancy:RefreshInterval</c>. The dry run of an import fails a file with more data rows than
+    /// <c>Tenancy:RefreshInterval</c>. Under <c>directory</c> the worker also holds one direct connection to the platform database, named <c>axis-worker-listen</c>,
+    /// that runs <c>LISTEN axis_work</c>: a wake signal for a tenant runs its work at once, and the worker connects again when the connection drops. The dry run of an import fails a file with more data rows than
     /// <c>Data:ImportMaxRows</c>, which defaults to 10000. Every statement of a work item runs under <c>Worker:StatementTimeout</c>,
     /// which defaults to one minute. The tenant connection pools take their sizes from <c>Data:TenantPoolMaxSize</c>,
     /// <c>Data:TenantPoolMinSize</c> and <c>Data:TenantPoolIdleLifetime</c>. The worker deletes in-app notifications older than
@@ -119,6 +120,13 @@ public static class WorkerServiceCollectionExtensions
                 runtimeAddress);
             keySource = new DirectoryTenantKeySource(platformConnectionString, cipher);
 
+            // Listens for the wake signals of the server and the publisher, on one direct connection that does not use a pool.
+            services.AddHostedService(provider => new WakeSignalListener(
+                platformConnectionString,
+                provider.GetRequiredService<WakeSignals>(),
+                provider.GetRequiredService<WorkerOptions>(),
+                provider.GetRequiredService<ILogger<WakeSignalListener>>()));
+
             // A cell always reads the directory, so its usage and its daily email count are written to the same platform database.
             if (cell.IsCell)
             {
@@ -147,6 +155,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddModules(configuration, environment);
         services.AddProcesses(environment.IsDevelopment(), environment.IsDevelopment(), options.DeliveryAttempts, statementTimeout, ImportMaxRows(configuration), EmailDefaults.Load(configuration));
         services.AddSingleton(options);
+        services.AddSingleton<WakeSignals>();
         services.AddSingleton(new NotificationOptions { RetentionDays = RetentionDays(configuration) });
         services.AddSingleton(health);
         services.TryAddSingleton(TimeProvider.System);
