@@ -3,7 +3,7 @@
 Detailed reference for how the worker shares its time between the tenants of a [cell](cells.md). It
 follows [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-[Fair share](#fair-share) is built. Waking a tenant, the metrics and the concurrency quotas are
+[Fair share](#fair-share) and the concurrency quotas are built. Waking a tenant and the metrics are
 _(planned for M31)_. All of it applies to every installation, not only to a cell, so the worker has
 one way to run. How the worker runs one work item is in
 [process execution](process-execution.md), and it does not change. The conventions of
@@ -35,10 +35,11 @@ The worker runs weighted deficit round-robin over the tenants that have work due
   two workers may today: the claim takes items with `FOR UPDATE SKIP LOCKED`, so no item runs twice.
 - **Several workers.** Each worker keeps its own list and deficits. Over several workers the shares
   stay fair on average, with no coordination between them.
-- **Concurrency quotas.** _(planned for M31)_ In a cell, a connector or package call needs a lease of the tenant's
+- **Concurrency quotas.** In a cell, a connector or package call needs a lease of the tenant's
   `concurrentConnectorCalls` quota before it is claimed, see
   [work at once](tenant-quotas.md#work-at-once). With no lease free, the tenant's turn passes to the
-  next tenant, and the tenant keeps its place in the list.
+  next tenant, and the tenant keeps its place in the list. The tenant is idle until one of its items
+  ends in that worker, or until the next poll.
 - **Housekeeping.** Deleting expired sessions, sweeping files and clearing old notifications and
   import files run on a timer of their own for each tenant, at most every 5 minutes, outside the
   round.

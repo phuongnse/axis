@@ -20,6 +20,8 @@ namespace Axis.Worker;
 /// their <c>workerWeight</c> in each turn. A loop takes the tenant whose turn it is, claims and runs one of its work items, and
 /// takes the next. A tenant leaves the list when a claim finds nothing due and none of its other items runs, or when a run fails, and the next poll puts it back.
 /// So a tenant with a large backlog does not hold back the others, and a tenant alone runs at full speed.
+/// In a cell a call waits when its tenant has no <c>concurrentConnectorCalls</c> lease free: the claim leaves it due, the tenant's
+/// turn ends, and the tenant stays in the list, idle until one of its items ends or the next poll.
 /// The poll checks the tenants in ordinal order of their ids, then adds every tenant that is ready to the list in one step.
 /// A tenant whose database the server has not migrated yet is skipped until it has. Under the directory source the poll
 /// reads the directory again every <c>Tenancy:RefreshInterval</c>. The refresh pauses the loops, waits for the work items
@@ -199,6 +201,7 @@ internal sealed partial class WorkerService(
     private async Task RunNextAsync(int loop, string tenantId, long ticket, CancellationToken stoppingToken)
     {
         var found = false;
+        var waiting = false;
         var failed = false;
         try
         {
@@ -212,7 +215,9 @@ internal sealed partial class WorkerService(
             health.ItemStarted(loop);
             try
             {
-                found = await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken);
+                var next = await runner.TryRunNextAsync(tenantId, options.LeaseDuration, stoppingToken);
+                found = next == NextRun.Ran;
+                waiting = next == NextRun.Waiting;
             }
             finally
             {
@@ -232,6 +237,10 @@ internal sealed partial class WorkerService(
             if (failed)
             {
                 _rounds.Fail(tenantId);
+            }
+            else if (waiting)
+            {
+                _rounds.Wait(tenantId);
             }
             else
             {

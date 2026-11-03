@@ -128,6 +128,7 @@ public static class WorkerServiceCollectionExtensions
                 services.AddSingleton<IEmailQuota, CellEmailQuota>();
                 services.AddSingleton(provider => new TenantLeases(platform, provider.GetRequiredService<ILogger<TenantLeases>>()));
                 services.AddSingleton<IImportLeases, CellImportLeases>();
+                services.AddSingleton<ICallLeases, CellCallLeases>();
                 services.AddSingleton<IWorkItemUsage, CellWorkItemUsage>();
             }
         }
