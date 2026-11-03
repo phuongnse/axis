@@ -2,9 +2,12 @@ using System.Globalization;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Axis.Core.Telemetry;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Npgsql;
 
 namespace Axis.Admin;
 
@@ -12,10 +15,13 @@ namespace Axis.Admin;
 /// <c>cell backup</c>: the daily backup job of a cell. It backs up every <c>active</c> and <c>suspended</c> tenant, four at a time,
 /// with the tenant's own backup key, and uploads <c>&lt;tenant id&gt;/&lt;yyyy-mm-dd&gt;.axisbak</c> to the storage of
 /// <see cref="CellBackupStorage"/>. The date is the UTC date at the start of the run. A tenant whose backup fails is tried once more
-/// at once, and the other tenants go on. The run stops after 6 hours. Each tenant gets one platform audit record,
+/// at once, and the other tenants go on. A tenant whose archive is uploaded gets its upload time stored in <c>platform.tenant_backups</c>,
+/// and a tenant that fails keeps the time it had. At the end of the run, also when it stopped at its limit, the command records
+/// <see cref="AxisMetrics.BackupLastSuccess"/> for each tenant that has a stored time, and exports it over OTLP when an OTLP endpoint is set.
+/// The run stops after 6 hours. Each tenant gets one platform audit record,
 /// written before its first attempt, and a retry writes none. Each archive is written to a folder that only its owner can use,
 /// uploaded and deleted. Exit 0 means that every tenant succeeded, 1 that a tenant failed or the time ran out, and 2 that nothing
-/// ran: outside a cell, or a missing setting or <c>pg_dump</c>.
+/// ran: outside a cell, or a missing setting or <c>pg_dump</c>, or an OTLP endpoint that is not <c>https</c> outside Development.
 /// </summary>
 internal static class CellBackup
 {
@@ -39,6 +45,13 @@ internal static class CellBackup
         if (!run.Cell.IsCell)
         {
             run.Error.WriteLine("This command runs only in a cell: Cell:Id is not set.");
+            return 2;
+        }
+
+        var environment = run.Configuration[AdminCommands.DotnetEnvironmentSetting] ?? Environments.Production;
+        if (environment != Environments.Development && AxisTelemetry.InsecureOtlpEndpoint(name => run.Configuration[name]) is { } insecure)
+        {
+            run.Error.WriteLine($"'{insecure}' must be an https URL outside Development.");
             return 2;
         }
 
@@ -102,6 +115,7 @@ internal static class CellBackup
         var output = TextWriter.Synchronized(run.Output);
         var audit = new TenantAudit(run.Command.Name, settings.PlatformConnectionString);
         using var client = storage.NewClient();
+        using var metrics = CellBackupMetrics.Start(run.Configuration);
         var failed = 0;
         var stopped = false;
         try
@@ -126,10 +140,47 @@ internal static class CellBackup
             }
         }
 
+        try
+        {
+            await RecordLastSuccessAsync(settings.PlatformConnectionString, ids);
+        }
+        catch (Exception exception)
+        {
+            output.WriteLine($"cell backup metric failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
+
         return stopped || failed > 0 ? 1 : 0;
     }
 
-    // One tenant: its audit record once, then up to two tries, stopping at the first success.
+    // The gauge of each tenant that has a stored time. It reads without the run's tokens, because the limit must not skip it.
+    private static async Task RecordLastSuccessAsync(string connectionString, string[] ids)
+    {
+        await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(connectionString).Options);
+        var backups = await platform.TenantBackups.AsNoTracking()
+            .Where(backup => ids.Contains(backup.TenantId))
+            .ToArrayAsync();
+        foreach (var backup in backups)
+        {
+            AxisMetrics.RecordBackupLastSuccess(backup.TenantId, backup.LastSuccessAt);
+        }
+    }
+
+    // Upserts the moment the upload succeeded as the last success of the tenant.
+    private static async Task StoreLastSuccessAsync(string connectionString, string id, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES (@id, @at) "
+            + "ON CONFLICT (tenant_id) DO UPDATE SET last_success_at = excluded.last_success_at",
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("at", at);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    // One tenant: its audit record once, then up to two tries, stopping at the first success, which stores the upload time.
     private static async Task<bool> BackUpTenantAsync(
         BackupSettings settings,
         TenantSecretCipher cellCipher,
@@ -150,7 +201,16 @@ internal static class CellBackup
         {
             if (await AttemptAsync(settings, cellCipher, storage, client, id, date, output, cancellationToken))
             {
-                return true;
+                try
+                {
+                    await StoreLastSuccessAsync(settings.PlatformConnectionString, id, DateTimeOffset.UtcNow, cancellationToken);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    output.WriteLine($"{id} record failed: {TenantDatabaseSteps.Safe(exception)}");
+                    return false;
+                }
             }
         }
 
