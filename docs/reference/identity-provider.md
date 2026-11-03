@@ -427,13 +427,21 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   and match. Keycloak checks the password rules and its error shows above the form. Setting a password signs the
   person out on other devices, as Keycloak does by default.
 - Add an authenticator, where a person who must add one sees the QR code, the key to type by hand, the 6-digit code in the same six boxes and the device name. The device name is required only when the person already has an authenticator.
-- **Every other page** _(planned for M31)_. No page keeps Keycloak's look. Shared Axis pages draw the rest from the same
-  frame: the sign-out question, which shows only when the server could not end the session itself (Sign out posts the
-  session code, see [sign-in and the session](security.md#sign-in-and-the-session)), notices, errors as an error alert,
-  the expired page with Continue and Start again, the front-channel sign-out (its hidden frames, then on), the SAML
-  redirect, which posts at once, the choice of method behind "Try another way", one row per method, and the update
-  profile and review profile steps, drawn from the user profile's fields with Keycloak's reminder as an info alert and
-  its field errors under the fields. The terms step is in [accepting the terms](legal.md#accepting-the-terms).
+- **Every other page** _(built, apart from four pages planned for M31)_. No page keeps Keycloak's look. Shared Axis
+  pages draw the pages below from the same frame:
+  - _(built)_ The sign-out question, which shows only when the server could not end the session itself (Sign out
+    posts the session code, see [sign-in and the session](security.md#sign-in-and-the-session)), with "Back to
+    application" when Keycloak gives an address.
+  - _(built)_ Notices, with the message and the link onward: Keycloak's page redirect address, then its action
+    address, then the client's home address, and none when Keycloak says to skip the link. The title is Keycloak's
+    message header when it gives one, and "Notice" otherwise.
+  - _(built)_ Errors as an error alert, with "Back to application" when the client has a home address.
+  - _(built)_ The expired page, which explains what happened and offers Continue and Start again.
+  - _(built)_ The SAML redirect, a short card whose form posts at once, and the front-channel sign-out, whose hidden
+    frames load before the page goes on to the redirect address.
+  - _(planned for M31)_ The choice of method behind "Try another way", one row per method, and the update profile and
+    review profile steps, drawn from the user profile's fields with Keycloak's reminder as an info alert and its field
+    errors under the fields. The terms step is in [accepting the terms](legal.md#accepting-the-terms).
 - **Cancel from the account page** _(planned for M31)_. When a person starts Change password or Authenticators from Axis's
   [account page](platform-pages.md#account-page), the page that sets a password and the page that adds an
   authenticator show Cancel, which returns to the account page with nothing changed.
@@ -470,14 +478,16 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   of an app-initiated action. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
-  context: its `login.ftl`, `login-otp.ftl`, `login-config-totp.ftl`, `login-reset-password.ftl` and `login-update-password.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep`, `addAuthenticator`, `resetPassword` or `updatePassword`, and a React bundle draws the page. `scripts/build.sh`
+  context: its `login.ftl`, `login-otp.ftl`, `login-config-totp.ftl`, `login-reset-password.ftl`, `login-update-password.ftl`, `logout-confirm.ftl`, `info.ftl`, `error.ftl`, `login-page-expired.ftl`, `saml-post-form.ftl` and `frontchannel-logout.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep`, `addAuthenticator`, `resetPassword`, `updatePassword`, `signOut`, `notice`, `error`, `pageExpired`, `samlPost` or `frontChannelSignOut`, and a React bundle draws the page.
+  The sign-out page (`signOut`) is a real `<form method="post">` to `action` that posts the session code as `session_code` with `confirmLogout=on`, and links "Back to application" to `backUrl`. The notice page (`notice`)
+  holds a `message` and, when Keycloak offers a link, the flat fields `linkUrl` and `linkText`. The error page (`error`) draws `error` as an error alert and links `backUrl`.
+  The expired page (`pageExpired`) links Continue to `continueUrl`, Keycloak's login action, and Start again to `restartUrl`. The SAML page (`samlPost`) posts a form to `action` with the hidden `SAMLRequest`, `SAMLResponse` and `RelayState` that Keycloak gave, as soon as the page loads, and needs JavaScript for that.
+  The front-channel page (`frontChannelSignOut`) loads one hidden frame per client in `clients`, and calls `location.replace` on `redirectUrl` once every frame has loaded, or at once when there are none, with a Continue link as the way out. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
   fonts. It also copies the email theme from `web/keycloak-theme/email/` into `artifacts/keycloak-theme/axis/email/`
   and fails when one of its files is missing. `frame.ftl` holds the head, realm name, locales and frame texts macros that
-  the five templates share, and `scripts/build.sh` checks it too. The pages the theme has no template for still come from Keycloak's `keycloak` parent theme
-  (none is left _(planned for M31)_: `logout-confirm.ftl`, `info.ftl`, `error.ftl`, `login-page-expired.ftl`,
-  `select-authenticator.ftl`, `login-update-profile.ftl`, `idp-review-user-profile.ftl`, `saml-post-form.ftl`,
-  `frontchannel-logout.ftl` and `terms.ftl` join them, using the macros of `frame.ftl`). The development realm `axis` uses the theme as
+  the eleven templates share, and `scripts/build.sh` checks it too. The pages the theme has no template for still come from Keycloak's `keycloak` parent theme
+  (none is left _(planned for M31)_: `select-authenticator.ftl`, `login-update-profile.ftl`, `idp-review-user-profile.ftl` and `terms.ftl` join them, using the macros of `frame.ftl`). The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
   theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see
