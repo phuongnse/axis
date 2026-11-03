@@ -54,6 +54,12 @@ namespace Axis.Server.Users;
 /// <c>user.invited</c> or <c>user.invitationResent</c> record, with <c>details.userId</c> and <c>details.email</c> and never the
 /// link. Invite also writes a <c>user.roleGiven</c> record for each role.
 /// </para>
+/// <para>
+/// In a cell, invite checks the tenant's users quota after the opening checks and before it reads the body, and enable of a
+/// disabled user checks it after the realm user lookup. Both answer the quota 403 when the enabled users of the realm, invited
+/// and brokered ones included and service accounts left out, have reached the limit, and change nothing. A failed count is a 502.
+/// Outside a cell, or for a tenant with no users limit, the realm is not asked for a count.
+/// </para>
 /// </summary>
 internal static partial class UserCommandEndpoints
 {
@@ -121,6 +127,16 @@ internal static partial class UserCommandEndpoints
             if (command == Command.ResetAuthenticator && user.ProviderAlias is not null)
             {
                 return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only an account has an authenticator to reset.");
+            }
+
+            // Enabling a user who is already enabled adds nobody, so only a disabled user counts against the quota.
+            if (command == Command.Enable && !user.Enabled)
+            {
+                step = "count the users";
+                if (await RefuseUsersQuotaAsync(services, tenant.TenantId, realm, cancellationToken) is { } quota)
+                {
+                    return quota;
+                }
             }
 
             switch (command)
@@ -251,6 +267,29 @@ internal static partial class UserCommandEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// In a cell, returns the quota 403 when the tenant's enabled users have reached its users quota, or null. Outside a cell, or for
+    /// a tenant with no users limit, <see cref="TenantQuotas.Limit"/> answers null and the realm is not asked for a count.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The identity provider answered an error status while counting.</exception>
+    private static async Task<IResult?> RefuseUsersQuotaAsync(
+        IServiceProvider services, string tenantId, RealmUsers realm, CancellationToken cancellationToken)
+    {
+        if (services.GetRequiredService<TenantQuotas>().Limit(tenantId, QuotaKeys.Users) is not { } limit)
+        {
+            return null;
+        }
+
+        var used = await realm.CountEnabledAsync(cancellationToken);
+        if (used < limit)
+        {
+            return null;
+        }
+
+        QuotaRefusal.Log(services.GetRequiredService<ILoggerFactory>(), tenantId, QuotaKeys.Users);
+        return QuotaRefusal.Problem(QuotaKeys.Users, limit, used);
+    }
+
     /// <summary>Invites a person: the realm user, the given roles and the audit records, then the email.</summary>
     private static async Task<IResult> InviteAsync(HttpContext httpContext, CancellationToken cancellationToken)
     {
@@ -259,6 +298,22 @@ internal static partial class UserCommandEndpoints
         if (opening is null)
         {
             return refusal!;
+        }
+
+        // The quota comes before the body, so a refused invite learns nothing about the body, as in the studio's applications route.
+        using var client = services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(UserCommandEndpoints));
+        var realm = new RealmUsers(client, opening.Access);
+        try
+        {
+            if (await RefuseUsersQuotaAsync(services, opening.Tenant.TenantId, realm, cancellationToken) is { } quota)
+            {
+                return quota;
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            LogCommandFailed(services.GetRequiredService<ILogger<UserLog>>(), opening.Tenant.TenantId, "Invite", "count the users", exception.Message);
+            return Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The identity provider could not run the command.");
         }
 
         InviteRequest? body;
@@ -304,8 +359,6 @@ internal static partial class UserCommandEndpoints
 
         var step = "search the users by email";
         string id;
-        using var client = services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(UserCommandEndpoints));
-        var realm = new RealmUsers(client, opening.Access);
         try
         {
             if (await realm.AccountUsesEmailAsync(email, cancellationToken))
