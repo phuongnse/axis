@@ -26,6 +26,7 @@ namespace Axis.Admin;
 /// and no other secret: the manifest is built from explicit fields, and the binding secrets are never read. The plain dump is in a
 /// temporary file that only its owner can read until the archive is written, and the file is deleted then. In a cell the archive also
 /// holds each file of the tenant's Studio folder as a <c>studio/&lt;path&gt;</c> entry, between the manifest and the dump. A symbolic link is skipped.
+/// With no audit, the caller has written the platform audit record, as <c>cell backup</c> does once for a tenant that it tries twice.
 /// </summary>
 internal sealed class TenantBackup : IAsyncDisposable
 {
@@ -50,7 +51,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     private readonly BackupSettings _settings;
     private readonly TenantDatabaseTls _tls;
     private readonly BackupPlan _plan;
-    private readonly TenantAudit _audit;
+    private readonly TenantAudit? _audit;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
     private readonly string _id;
@@ -61,7 +62,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     private List<ManifestModule> _modules = [];
     private SortedDictionary<string, long> _counts = new(StringComparer.Ordinal);
 
-    public TenantBackup(BackupSettings settings, BackupPlan plan, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
+    public TenantBackup(BackupSettings settings, BackupPlan plan, TenantAudit? audit, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _tls = TenantDatabaseTls.From(settings.PlatformConnectionString);
@@ -186,7 +187,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     {
         try
         {
-            if (!await _audit.WriteAsync(_id, _output, _cancellationToken))
+            if (_audit is not null && !await _audit.WriteAsync(_id, _output, _cancellationToken))
             {
                 return 1;
             }

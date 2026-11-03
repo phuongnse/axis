@@ -8,7 +8,7 @@ and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant sign-in set`, `tenant binding list|set|remove`,
-`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `cell operator invite`, `publisher` and `version`.
+`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `cell operator invite`, `cell backup`, `publisher` and `version`.
 `platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). `tenant suspend`, `tenant resume` and
 `tenant list` are in [tenant status commands](tenant-status-commands.md). The
 commands that change a tenant after it is created are in
@@ -762,6 +762,20 @@ changes nothing outside one.
 - **Audit.** Each run writes one platform audit record with no tenant, before any change. It lists
   `realm: <name>` and `role: <name>` and never the email.
 - **Second factor.** The realm asks for an authenticator app. Passkeys are not set up yet.
+
+## Cell backup
+
+`cell backup` is the daily backup of a cell: it backs up every `active` and `suspended` tenant, four at a time, and
+uploads each archive to object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`. It runs only in a cell, where `Cell:Id`
+is set. The behaviour is in [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+
+- **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Cell:BackupKeyFile`, the five
+  `Cell:BackupStorage` settings and `PATH`, to find `pg_dump`. It needs no `Admin:ConnectionString`.
+- **Output.** Each line starts with the tenant id, then the step and `ok` or `failed: <message>`. A tenant that
+  fails is tried once more, so its failed line comes twice.
+- **Exit codes.** `0` when every tenant succeeded, `1` when a tenant failed or the run reached its 6-hour limit, and
+  `2` outside a cell or for a missing setting or `pg_dump`, with nothing uploaded.
+- **Audit.** One platform audit record for each tenant, written before its first try. A retry writes no second record.
 
 ## Version
 
