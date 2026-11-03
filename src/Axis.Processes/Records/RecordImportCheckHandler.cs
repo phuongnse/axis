@@ -49,7 +49,7 @@ internal sealed partial class RecordImportCheckHandler(
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(connection);
 
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);

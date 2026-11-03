@@ -51,7 +51,7 @@ internal sealed partial class WebhookDeliveryHandler(
         StagedDelivery delivery;
         WebhookModel webhook;
         EventModel @event;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             var staged = item.WebhookDeliveryId is { } id ? await WebhookDeliveries.LoadAsync(connection, transaction, id, cancellationToken) : null;
             if (staged is null || staged.State == WebhookDeliveries.Delivered)
@@ -172,7 +172,7 @@ internal sealed partial class WebhookDeliveryHandler(
         int status,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -215,7 +215,7 @@ internal sealed partial class WebhookDeliveryHandler(
         CancellationToken cancellationToken)
     {
         var error = answer.Error!;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var attempts = await DeliveryFailures.CountAsync(transaction, DeliveryFailures.WebhookDeliverKind, delivery.Id.ToString("D"), error, cancellationToken);
         await WebhookDeliveries.CountAttemptAsync(connection, transaction, delivery.Id, answer.Status, cancellationToken);
         if (attempts >= deliverySettings.Attempts)
