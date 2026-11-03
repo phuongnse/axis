@@ -12,4 +12,10 @@ export const LabelTextsContext = createContext<{
   name: string | null
   saved: Record<string, unknown>
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
+  /**
+   * Proposed: the texts edited but not saved, by key. With `setPending`, a label is part of the resource's one Save:
+   * it holds its texts here, and the editor writes them with the resource, so a label has no Write texts of its own.
+   */
+  pending?: Record<string, Record<string, string>>
+  setPending?: (key: string, texts: Record<string, string>) => void
 } | null>(null)

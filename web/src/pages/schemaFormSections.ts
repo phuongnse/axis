@@ -1,0 +1,36 @@
+import { createContext } from 'react'
+
+/**
+ * Proposed: the sections a resource kind's form shows, in order, each with the root properties it holds. A property
+ * that no section names goes to a last section with no heading. A kind without sections shows its properties in one.
+ * Each section's heading and line are the texts `shell.studio.section.<kind>.<key>` and `….description`.
+ */
+export const schemaFormSections: Record<string, readonly { key: string; properties: readonly string[] }[]> = {
+  application: [
+    { key: 'general', properties: ['name', 'label', 'description', 'timeZone'] },
+    { key: 'modules', properties: ['modules'] },
+    { key: 'packages', properties: ['packages'] },
+    { key: 'fileStorage', properties: ['fileStorage'] },
+  ],
+}
+
+/** Proposed: the root properties that are the file's identity, which the author never edits, so the form hides them. */
+export const identityProperties = new Set(['id', 'kind', 'formatVersion'])
+
+/** Proposed: the kind whose texts name the form's fields, or null for a form that names them as written. */
+export const SchemaFormKindContext = createContext<string | null>(null)
+
+/**
+ * Proposed: the text key of a field: `shell.studio.field.<kind>.<path>`, the path being the property names from the
+ * root joined by dots, with array positions left out, such as `application.fileStorage.binding`. Its help text is the
+ * same key ending in `.help`.
+ */
+export function fieldTextKey(kind: string, pointer: string): string {
+  const path = pointer
+    .split('/')
+    .slice(1)
+    .filter((segment) => !/^\d+$/.test(segment))
+    .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'))
+    .join('.')
+  return `shell.studio.field.${kind}.${path}`
+}

@@ -107,3 +107,27 @@ industry practice (GitHub's issue sidebar, Salesforce and Jira record pages, Fio
 - **An icon button's tooltip and a dialog.** Opening a dialog from an icon button logged React's flushSync warning:
   Ant Design's focus trigger closes the tooltip with flushSync when the dialog takes focus mid-render. The tooltip now
   listens to hover alone and the button opens it on keyboard focus itself.
+
+## The resource form standard
+
+The owner noted that many Studio views are the same schema form as Settings, so its rules are the standard for every
+resource without a designer of its own (application, role, policy, rule, event, trigger, sequence, data source,
+migration, webhook) and for the schema part of the editors that have one. Agreed, from GitHub's, Vercel's and
+Shopify's settings pages:
+
+- **Sections.** The root properties sit in the kind's sections, each a panel on surface, as the Overview's blocks,
+  with a heading and a line that says what it holds. Settings: General (name, title, description, time zone),
+  Modules, Packages, File storage. A property no section names goes to a last section with no heading. A section that
+  holds one field names it in its heading, so the field has no label of its own; one that holds one object shows the
+  object's fields itself.
+- **Fields named in words.** Every field has a label and may have a help text, the texts
+  `shell.studio.field.<kind>.<path>` and `….help`, drawn as the form widget draws them: the label in medium textMuted,
+  the help in small textMuted between the label and the input. No `formatVersion`, `textKey` or `modules 1`.
+- **The file's identity is hidden.** `id`, `kind` and `formatVersion` are not shown; `name` is, with its help.
+- **A label is a text box per language,** named by the language. Its key is Studio's own, made from the resource and
+  the path, and never shown. Its texts are part of the resource's one Save: no Write texts button.
+- **One save bar.** While there are unsaved changes, a bar stays at the foot of the window across the content:
+  "Unsaved changes" on the left, Discard and Save on the right. With nothing to save it is not drawn. Save writes the
+  label texts first, then the resource.
+- **Still to come in this review:** lists as tables with Add… (modules, packages), no "Edit this value in the JSON
+  view" for maps, a Danger zone for Delete, and Uses and Used by by name.

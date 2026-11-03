@@ -1,5 +1,5 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
+import { lazy, Suspense, useContext, type ReactNode } from 'react'
 import type { StudioNames } from '../platform/studio'
 import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
@@ -10,6 +10,7 @@ import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
 import { ReferencePicker } from './ReferencePicker'
+import { fieldTextKey, identityProperties, SchemaFormKindContext, schemaFormSections } from './schemaFormSections'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -31,11 +32,24 @@ export function SchemaForm({
   schema,
   value,
   onChange,
+  kind,
 }: {
   schema: JsonSchema
   value: Record<string, unknown>
   onChange: ChangeHandler
+  /**
+   * Proposed: the resource kind of a whole resource's form. With it, the form follows Studio's form standard: the
+   * file's identity is hidden, the root properties sit in the kind's sections, and every field is named by its text.
+   */
+  kind?: string
 }) {
+  if (kind !== undefined) {
+    return (
+      <SchemaFormKindContext.Provider value={kind}>
+        <SectionedForm kind={kind} schema={schema} value={value} onChange={onChange} />
+      </SchemaFormKindContext.Provider>
+    )
+  }
   return (
     <Properties
       node={schema}
@@ -46,6 +60,145 @@ export function SchemaForm({
       onChange={onChange}
       readOnlyNames={readOnlyRootProperties}
     />
+  )
+}
+
+/**
+ * Proposed: a resource's form as sections, each a panel on surface with a heading and a line that says what it holds,
+ * the panel the Overview's blocks use. A section that holds one object shows that object's fields itself, with no
+ * frame around them.
+ */
+function SectionedForm({
+  kind,
+  schema,
+  value,
+  onChange,
+}: {
+  kind: string
+  schema: JsonSchema
+  value: Record<string, unknown>
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  const required = new Set(schema.required)
+  const all = Object.keys(schema.properties ?? {}).filter((name) => !identityProperties.has(name))
+  const declared = schemaFormSections[kind] ?? []
+  const placed = new Set(declared.flatMap((section) => section.properties))
+  const rest = all.filter((name) => !placed.has(name))
+  const sections = [
+    ...declared.map((section) => ({
+      key: section.key,
+      properties: section.properties.filter((name) => all.includes(name)),
+    })),
+    ...(rest.length > 0 ? [{ key: '', properties: rest }] : []),
+  ]
+  // Proposed: a section that holds one field names it in its heading, so the field shows no label of its own.
+  const field = (name: string, only: boolean) => (
+    <SchemaNode
+      bare={only}
+      key={name}
+      node={schema.properties![name]}
+      root={schema}
+      rootValue={value}
+      pointer={`/${escapeSegment(name)}`}
+      name={name}
+      value={value[name]}
+      required={required.has(name)}
+      onChange={onChange}
+    />
+  )
+  return (
+    <Flex vertical gap={spacing.md} data-testid="studio-form-sections">
+      {sections.map((section) => {
+        const titleKey = `shell.studio.section.${kind}.${section.key}`
+        const title = section.key && t(titleKey) !== titleKey ? t(titleKey) : null
+        const description = section.key ? textOrNull(t, `${titleKey}.description`) : null
+        const only = section.properties.length === 1 ? schema.properties![section.properties[0]] : undefined
+        const resolved = only ? resolveSchema(only, schema) : undefined
+        const flatten = resolved?.type === 'object' && resolved.properties !== undefined && !isLabelSchema(resolved)
+        return (
+          <SectionPanel key={section.key || 'more'} title={title} description={description} testId={section.key}>
+            {flatten ? (
+              <Properties
+                node={resolved}
+                root={schema}
+                rootValue={value}
+                pointer={`/${escapeSegment(section.properties[0])}`}
+                value={value[section.properties[0]]}
+                onChange={onChange}
+              />
+            ) : (
+              section.properties.map((name) => field(name, section.properties.length === 1 && section.key !== ''))
+            )}
+          </SectionPanel>
+        )
+      })}
+    </Flex>
+  )
+}
+
+function SectionPanel({
+  title,
+  description,
+  testId,
+  children,
+}: {
+  title: string | null
+  description: string | null
+  testId: string
+  children: ReactNode
+}) {
+  const { colour, radius, spacing } = useDesignTokens()
+  return (
+    <section
+      data-testid={`studio-form-section-${testId || 'more'}`}
+      style={{
+        background: colour.surface,
+        border: `1px solid ${colour.borderSubtle}`,
+        borderRadius: radius.base,
+        padding: spacing.lg,
+      }}
+    >
+      <Flex vertical gap={spacing.md}>
+        {(title || description) && (
+          <Flex vertical gap={4}>
+            {title && (
+              <Typography.Title level={5} style={{ margin: 0 }}>
+                {title}
+              </Typography.Title>
+            )}
+            {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
+          </Flex>
+        )}
+        {children}
+      </Flex>
+    </section>
+  )
+}
+
+function textOrNull(t: (key: string) => string, key: string): string | null {
+  const text = t(key)
+  return text === key ? null : text
+}
+
+/**
+ * Proposed: a field's label and help text, as the form widget draws them: the label in medium weight and textMuted,
+ * the help in small textMuted text between the label and the input.
+ */
+function FieldHeading({ label, help, helpId }: { label: string; help: string | null; helpId: string }) {
+  const { colour, type } = useDesignTokens()
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
+        {label}
+      </div>
+      {help && (
+        <div id={helpId} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
+          {help}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -99,9 +252,16 @@ function SchemaNode({
   readOnly = false,
   item = false,
   onChange,
-}: NodeProps & { name: string; required: boolean; readOnly?: boolean; item?: boolean }) {
+  bare = false,
+}: NodeProps & { name: string; required: boolean; readOnly?: boolean; item?: boolean; bare?: boolean }) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
+  const kind = useContext(SchemaFormKindContext)
+  // Proposed: under a kind, a field is named by its text and has its help; without one, by its name as written.
+  const textKey = kind !== null && !item ? fieldTextKey(kind, pointer) : null
+  const title = textKey ? (textOrNull(t, textKey) ?? name) : name
+  const help = textKey ? textOrNull(t, `${textKey}.help`) : null
+  const helpId = `studio-help-${pointer}`
   const names = useContext(StudioNamesContext)
   const check = useContext(ExpressionCheckContext)
   const label = useContext(LabelTextsContext)
@@ -128,7 +288,7 @@ function SchemaNode({
   } else if (schema.enum !== undefined) {
     input = (
       <Select
-        aria-label={name}
+        aria-label={title}
         showSearch
         optionFilterProp="label"
         virtual={false}
@@ -152,7 +312,7 @@ function SchemaNode({
   } else if (schema.type === 'string' && schema['x-axis-expression'] === true && check) {
     const text = typeof value === 'string' ? value : ''
     input = (
-      <Suspense fallback={<Input aria-label={name} value={text} readOnly />}>
+      <Suspense fallback={<Input aria-label={title} value={text} readOnly />}>
         <LazyExpressionEditor
           application={check.application}
           resourceId={check.resourceId}
@@ -168,7 +328,7 @@ function SchemaNode({
   } else if (schema.type === 'string') {
     input = (
       <Input
-        aria-label={name}
+        aria-label={title}
         value={typeof value === 'string' ? value : ''}
         onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
       />
@@ -176,7 +336,7 @@ function SchemaNode({
   } else if (schema.type === 'integer' || schema.type === 'number') {
     input = (
       <InputNumber
-        aria-label={name}
+        aria-label={title}
         precision={schema.type === 'integer' ? 0 : undefined}
         min={schema.minimum}
         max={schema.maximum}
@@ -192,7 +352,7 @@ function SchemaNode({
   } else if (schema.type === 'boolean') {
     input = (
       <Checkbox
-        aria-label={name}
+        aria-label={title}
         checked={value === true}
         onChange={(event) => onChange(pointer, event.target.checked)}
       />
@@ -212,16 +372,19 @@ function SchemaNode({
       />
     )
   } else if (isLabel) {
-    input = (
-      <fieldset style={{ margin: 0 }}>
-        <legend>{name}</legend>
+    input =
+      kind !== null ? (
         <LabelTexts pointer={pointer} value={value} onChange={onChange} />
-      </fieldset>
-    )
+      ) : (
+        <fieldset style={{ margin: 0 }}>
+          <legend>{name}</legend>
+          <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+        </fieldset>
+      )
   } else if (isObject) {
     input = (
       <fieldset style={{ margin: 0 }}>
-        <legend>{name}</legend>
+        <legend>{title}</legend>
         <Properties
           node={schema}
           root={root}
@@ -269,10 +432,11 @@ function SchemaNode({
     )
   }
 
-  const showsLabel = !isObject
+  const showsLabel = !bare && (!isObject || (isLabel && kind !== null))
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      {showsLabel && <div>{name}</div>}
+      {showsLabel &&
+        (kind !== null && !item ? <FieldHeading label={title} help={help} helpId={helpId} /> : <div>{name}</div>)}
       {input}
     </div>
   )

@@ -39,6 +39,43 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
 
   const known = names.texts.find((text) => text.key === key)
   const others = known ? known.usedBy - (getAt(resource.saved, `${pointer}/textKey`) === key ? 1 : 0) : 0
+  // Proposed: inside an editor with one Save, a label is a text box per language, named by the language, and its key
+  // is Studio's own: it is made from the resource and the path and never shown.
+  if (resource.setPending) {
+    const setPending = resource.setPending
+    const shown = resource.pending?.[key] ?? textsOf(names, key)
+    const language = new Intl.DisplayNames([document.documentElement.lang || 'en'], { type: 'language' })
+    return (
+      <Flex vertical gap="small" data-testid="studio-label">
+        {names.locales.map((locale) => (
+          <Space.Compact key={locale} block>
+            <Space.Addon style={{ minWidth: 112 }}>{language.of(locale) ?? locale}</Space.Addon>
+            <Input
+              aria-label={language.of(locale) ?? locale}
+              value={shown[locale] ?? ''}
+              onChange={(event) => {
+                setPending(key, { ...shown, [locale]: event.target.value })
+                if (getAt(value, '/textKey') !== key) {
+                  onChange(pointer, { ...(isRecord(value) ? value : {}), textKey: key })
+                }
+              }}
+            />
+          </Space.Compact>
+        ))}
+        {others > 0 && (
+          <Alert
+            data-testid="studio-label-used-by"
+            type="warning"
+            title={
+              <>
+                {t('shell.studio.labelUsedBy')} <strong>{others}</strong>
+              </>
+            }
+          />
+        )}
+      </Flex>
+    )
+  }
 
   function changeKey(next: string) {
     setKey(next)

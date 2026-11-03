@@ -20,6 +20,7 @@ import {
   fetchResourceReferences,
   fetchStudioResource,
   patchStudioResource,
+  putStudioTexts,
   saveStudioChanges,
   ServerUnreachableError,
   type StudioDiagnostic,
@@ -46,6 +47,7 @@ import { PageEditor } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
+import { SaveBar } from '../platform/SaveBar'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
 import type { FormUse } from './StudioFormUsedOn'
@@ -206,6 +208,8 @@ export function StudioEditor({
   const [jsonInvalid, setJsonInvalid] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Proposed: the label texts edited since the last Save, by key, which the one Save writes with the resource.
+  const [pendingTexts, setPendingTexts] = useState<Record<string, Record<string, string>>>({})
   const [saved, setSaved] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -256,6 +260,7 @@ export function StudioEditor({
     setSaved(false)
     setSaveFailed(false)
     setHistory(emptyHistory)
+    setPendingTexts({})
   }
 
   /** Steps through the history. It restores the snapshot, and it does nothing while a save runs. */
@@ -452,8 +457,11 @@ export function StudioEditor({
       name: item.name,
       saved: loaded?.content ?? {},
       onTextsWritten,
+      pending: pendingTexts,
+      setPending: (key: string, texts: Record<string, string>) =>
+        setPendingTexts((current) => ({ ...current, [key]: texts })),
     }),
-    [application, item.file, item.name, loaded?.content, onTextsWritten],
+    [application, item.file, item.name, loaded?.content, onTextsWritten, pendingTexts],
   )
   const checkContext = useMemo(
     () => ({ application, resourceId: item.id, kind: item.kind, draft, names: names ?? null }),
@@ -630,7 +638,34 @@ export function StudioEditor({
    */
   async function write(final: Content, changes: MigrationChange[], finalOrigins?: FieldOrigin[]) {
     const operations = diffPatch(loaded!.content, final)
+    // Proposed: the label texts go first, so the resource never names a key whose texts were not written.
+    const texts = Object.entries(pendingTexts)
+    if (texts.length > 0) {
+      setSaving(true)
+      setSaveFailed(false)
+      try {
+        let diagnostics: StudioDiagnostic[] = []
+        for (const [key, entries] of texts) {
+          diagnostics = (await putStudioTexts(application, key, entries)).diagnostics
+        }
+        setPendingTexts({})
+        onTextsWritten(diagnostics)
+      } catch (error) {
+        if (error instanceof ServerUnreachableError) {
+          lost()
+        } else {
+          console.warn(`Writing the label texts of '${item.id}' failed`, error)
+          setSaveFailed(true)
+        }
+        setSaving(false)
+        return
+      }
+      setSaving(false)
+    }
     if (changes.length === 0 && operations.length === 0) {
+      if (texts.length > 0) {
+        setSaved(true)
+      }
       setDraft(final)
       setOrigins(finalOrigins ?? loadedOrigins(final))
       setTouched([])
@@ -921,6 +956,7 @@ export function StudioEditor({
                         schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
                         value={draft}
                         onChange={change}
+                        kind={item.kind}
                       />
                     ) : (
                       <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
@@ -976,14 +1012,6 @@ export function StudioEditor({
             </Button>
           </>
         )}
-        <Button
-          type="primary"
-          data-testid="studio-save"
-          disabled={patch.length === 0 || jsonInvalid || problems.size > 0 || conflict || saving || reconnecting}
-          onClick={save}
-        >
-          {t('shell.studio.save')}
-        </Button>
         {item.kind !== 'application' && (
           <Button danger disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
             {t('shell.studio.delete')}
@@ -991,6 +1019,13 @@ export function StudioEditor({
         )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
+      <SaveBar
+        dirty={patch.length > 0 || Object.keys(pendingTexts).length > 0}
+        saving={saving}
+        canSave={!jsonInvalid && problems.size === 0 && !conflict && !saving && !reconnecting}
+        onDiscard={() => void reload()}
+        onSave={() => void save()}
+      />
       {questions && (
         <EntityMigrationQuestions
           questions={questions}
