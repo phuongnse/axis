@@ -7,12 +7,14 @@ using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
+using Axis.Tenancy;
 using Axis.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 using Record = Axis.Data.Records.Record;
 
 namespace Axis.Integration.Tests;
@@ -27,7 +29,9 @@ namespace Axis.Integration.Tests;
 /// <c>PackageDescribe</c>, which waits on a task, then runs <c>test-package/describe</c> and writes its
 /// <c>version</c> to <c>packageVersion</c>. Versions 1.0.0 and 1.1.0 of the package are installed. The
 /// worker has them installed, its log entries go to <see cref="Logs"/>, and its host is never started,
-/// so a test runs the work items itself. A second worker has no package installed.
+/// so a test runs the work items itself. A second worker has no package installed. With <c>throughPgBouncer</c>, the
+/// workers connect to the tenant database as the runtime role through <see cref="PgBouncerServer"/>, and the fixture claims
+/// work items through it too. Everything else, such as starting an instance and reading a record, uses the schema role directly.
 /// </summary>
 public sealed class PackageCallFixture : IAsyncLifetime
 {
@@ -160,9 +164,17 @@ public sealed class PackageCallFixture : IAsyncLifetime
     private readonly TemporaryFolder _application = new();
     private readonly TemporaryFolder _noPackages = new();
     private PackageCatalog? _catalog;
+    private readonly bool _throughPgBouncer;
+    private NpgsqlDataSource? _claimDataSource;
     private ServiceProvider? _worker;
     private ServiceProvider? _workerWithoutPackages;
     private ApplicationModel? _model;
+
+    public PackageCallFixture()
+    {
+    }
+
+    internal PackageCallFixture(bool throughPgBouncer) => _throughPgBouncer = throughPgBouncer;
 
     /// <summary>Every log entry of the worker.</summary>
     internal LogCollector Logs { get; } = new();
@@ -203,8 +215,16 @@ public sealed class PackageCallFixture : IAsyncLifetime
         Assert.Empty(catalog.Diagnostics);
         (ReleaseId, _model) = await _tenant.ActivateAsync(_application.Path, catalog.Versions, _bindings);
 
-        _worker = BuildWorker(_packages.Path);
-        _workerWithoutPackages = BuildWorker(_noPackages.Path);
+        var runtime = _throughPgBouncer
+            ? await PgBouncerServer.RuntimeConnectionStringAsync(_tenant.ConnectionString)
+            : PostgreSqlServer.RuntimeConnectionString(_tenant.ConnectionString);
+        if (_throughPgBouncer)
+        {
+            _claimDataSource = NpgsqlDataSource.Create(TenantPoolSettings.Default.Apply(runtime));
+        }
+
+        _worker = BuildWorker(_packages.Path, runtime);
+        _workerWithoutPackages = BuildWorker(_noPackages.Path, runtime);
     }
 
     public async ValueTask DisposeAsync()
@@ -217,6 +237,11 @@ public sealed class PackageCallFixture : IAsyncLifetime
         if (_workerWithoutPackages is not null)
         {
             await _workerWithoutPackages.DisposeAsync();
+        }
+
+        if (_claimDataSource is not null)
+        {
+            await _claimDataSource.DisposeAsync();
         }
 
         await _tenant.DisposeAsync();
@@ -379,13 +404,13 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .Replace("{name}", name, StringComparison.Ordinal)
             .Replace("{attempts}", attempts.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
 
-    private ServiceProvider BuildWorker(string packagesPath)
+    private ServiceProvider BuildWorker(string packagesPath, string runtimeConnectionString)
     {
         var settings = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [$"Tenants:{_tenant.Tenant}:Hosts:0"] = $"{_tenant.Tenant}.example.test",
-                [$"Tenants:{_tenant.Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(_tenant.ConnectionString),
+                [$"Tenants:{_tenant.Tenant}:ConnectionString"] = runtimeConnectionString,
                 [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Kind"] = "url",
                 [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Value"] = "https://test.example.test",
                 [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Kind"] = "secret",
@@ -402,7 +427,13 @@ public sealed class PackageCallFixture : IAsyncLifetime
     private async Task<WorkItemOutcome?> RunAsync(string kind, CancellationToken cancellationToken, ServiceProvider? worker = null)
     {
         var runner = (worker ?? _worker ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
-        var item = await _tenant.ClaimAsync(kind, _lease, cancellationToken);
+        var item = _claimDataSource is null ? await _tenant.ClaimAsync(kind, _lease, cancellationToken) : await ClaimThroughPgBouncerAsync(kind, cancellationToken);
         return item is null ? null : await runner.ExecuteAsync(item, cancellationToken);
+    }
+
+    private async Task<ClaimedWorkItem?> ClaimThroughPgBouncerAsync(string kind, CancellationToken cancellationToken)
+    {
+        await using var connection = await _claimDataSource!.OpenConnectionAsync(cancellationToken);
+        return await WorkItemQueue.ClaimAsync(connection, _tenant.Tenant, [kind], _lease, cancellationToken);
     }
 }
