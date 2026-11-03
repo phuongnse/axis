@@ -25,6 +25,8 @@ public sealed class AdminDatabaseTlsTests
         { AdminCommands.AdminSetting, NoMode },
         { AdminCommands.ScenarioServerSetting, Prefer },
         { AdminCommands.ScenarioServerSetting, NoMode },
+        { AdminCommands.IdentityProviderDatabaseSetting, Prefer },
+        { AdminCommands.IdentityProviderDatabaseSetting, NoMode },
     };
 
     [Theory]

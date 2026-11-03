@@ -659,7 +659,7 @@ integration tests, on their Testcontainers PostgreSQL. See
 The integration tests share one Keycloak container with the development realm
 per run. It starts the first time a test needs it, so a run with no such test
 starts none. It is removed when the run ends. A test class never starts its own
-Keycloak. A test that changes realm state must not use the shared container.
+Keycloak. A test that changes realm state must not use the shared container. It keeps its data in a PostgreSQL container of its own, with a read-only role that has `SELECT` on the `credential` table.
 
 The integration tests also share one PostgreSQL 18 container per run. It starts
 the first time a test needs it, so a run with no such test starts none, and it is

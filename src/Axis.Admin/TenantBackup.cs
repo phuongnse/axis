@@ -26,6 +26,8 @@ namespace Axis.Admin;
 /// and no other secret: the manifest is built from explicit fields, and the binding secrets are never read. The plain dump is in a
 /// temporary file that only its owner can read until the archive is written, and the file is deleted then. In a cell the archive also
 /// holds each file of the tenant's Studio folder as a <c>studio/&lt;path&gt;</c> entry, between the manifest and the dump. A symbolic link is skipped.
+/// For a tenant with its own realm, and when <c>IdentityProvider:DatabaseConnectionString</c> is set, the <c>realm</c> step runs after the dump and builds
+/// <c>realm.json</c> with <see cref="TenantRealmExport"/>, which the archive holds right after the manifest. It lives only in memory and in the encrypted archive.
 /// With no audit, the caller has written the platform audit record, as <c>cell backup</c> does once for a tenant that it tries twice.
 /// </summary>
 internal sealed class TenantBackup : IAsyncDisposable
@@ -35,6 +37,8 @@ internal sealed class TenantBackup : IAsyncDisposable
     private const string PgDump = "pg_dump";
 
     private const string ManifestEntry = "manifest.json";
+
+    private const string RealmEntry = "realm.json";
 
     private const string DumpEntry = "tenant.dump";
 
@@ -54,6 +58,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     private readonly TenantAudit? _audit;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
+    private readonly HttpMessageHandler? _identityProviderHandler;
     private readonly string _id;
     private readonly string _archiveTemp;
     private readonly string _dumpTemp;
@@ -61,8 +66,15 @@ internal sealed class TenantBackup : IAsyncDisposable
     private List<ManifestPackage> _packages = [];
     private List<ManifestModule> _modules = [];
     private SortedDictionary<string, long> _counts = new(StringComparer.Ordinal);
+    private byte[]? _realm;
 
-    public TenantBackup(BackupSettings settings, BackupPlan plan, TenantAudit? audit, TextWriter output, CancellationToken cancellationToken)
+    public TenantBackup(
+        BackupSettings settings,
+        BackupPlan plan,
+        TenantAudit? audit,
+        TextWriter output,
+        CancellationToken cancellationToken,
+        HttpMessageHandler? identityProviderHandler = null)
     {
         _settings = settings;
         _tls = TenantDatabaseTls.From(settings.PlatformConnectionString);
@@ -70,6 +82,7 @@ internal sealed class TenantBackup : IAsyncDisposable
         _audit = audit;
         _output = output;
         _cancellationToken = cancellationToken;
+        _identityProviderHandler = identityProviderHandler;
         _id = plan.Row.Id;
         var random = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6));
         _archiveTemp = $"{plan.OutPath}.{random}.tmp";
@@ -192,7 +205,7 @@ internal sealed class TenantBackup : IAsyncDisposable
                 return 1;
             }
 
-            return await Step("dump", DumpAsync) && await Step("archive", ArchiveAsync) ? 0 : 1;
+            return await Step("dump", DumpAsync) && await RealmStepAsync() && await Step("archive", ArchiveAsync) ? 0 : 1;
         }
         finally
         {
@@ -204,6 +217,11 @@ internal sealed class TenantBackup : IAsyncDisposable
     {
         Delete(_dumpTemp);
         Delete(_archiveTemp);
+        if (_realm is not null)
+        {
+            CryptographicOperations.ZeroMemory(_realm);
+        }
+
         return ValueTask.CompletedTask;
     }
 
@@ -428,6 +446,23 @@ internal sealed class TenantBackup : IAsyncDisposable
         }
     }
 
+    // The realm step runs only when the backup can read the credentials and the tenant has its own realm. Any other tenant gets no line.
+    private async Task<bool> RealmStepAsync()
+    {
+        if (_settings.IdentityProviderDatabase is not { } database
+            || DirectoryTenantCatalog.Realm(_plan.Row, _settings.Cipher) is not { } activation
+            || DirectoryTenantCatalog.RealmUsers(_plan.Row, _settings.Cipher) is not { } users)
+        {
+            return true;
+        }
+
+        return await Step("realm", async () =>
+        {
+            using var http = AdminCommands.IdentityProviderClient(_identityProviderHandler);
+            _realm = await new TenantRealmExport(http, activation, users, database).ExportAsync(_cancellationToken);
+        });
+    }
+
     private async Task ArchiveAsync()
     {
         var manifest = JsonSerializer.SerializeToUtf8Bytes(BuildManifest(), _json);
@@ -436,6 +471,11 @@ internal sealed class TenantBackup : IAsyncDisposable
         await using (var writer = new TarWriter(encrypted, TarEntryFormat.Pax, leaveOpen: true))
         {
             await writer.WriteEntryAsync(NewEntry(ManifestEntry, new MemoryStream(manifest)), _cancellationToken);
+            if (_realm is not null)
+            {
+                await writer.WriteEntryAsync(NewEntry(RealmEntry, new MemoryStream(_realm)), _cancellationToken);
+            }
+
             foreach (var (relative, path) in StudioFiles())
             {
                 await using var studio = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
