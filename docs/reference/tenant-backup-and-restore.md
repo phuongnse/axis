@@ -20,6 +20,9 @@ takes no key file: it uses the tenant's own backup key, see [backups in a cell](
 | `--backup-key-file <file>` | The backup key: a file that holds 32 bytes in base64, such as the output of `openssl rand -base64 32`. Surrounding white space is ignored. The key is read from the file only, never from the command line or a setting. The operator keeps it outside the installation. Required outside a cell, and refused in a cell. |
 
 The archive holds a tar with two entries, `manifest.json` and `tenant.dump`, and the whole file is encrypted with the backup key.
+In a cell the tar also holds the tenant's Studio folder, one `studio/<path>` entry for each file of
+`<Studio:ApplicationsPath>/<tenant id>/`, between `manifest.json` and `tenant.dump`, see
+[backups in a cell](#backups-in-a-cell). Outside a cell it has no `studio/` entry.
 It starts with `AXISBAK1` and 8 random bytes. The tar follows in chunks of 1 MiB, each encrypted with AES-256-GCM, so the file
 shows nothing of the dump, the manifest or the tenant id. See [encrypted backups](data-encryption.md#encrypted-backups).
 The manifest holds the tenant's data keys and lookup keys, which is why the archive is encrypted. No database password, OIDC
@@ -38,7 +41,7 @@ can recover them.
    arguments. The tool holds one transaction open until the dump ends, so
    vacuum on the tenant database waits, and so does an activation that changes
    tables.
-2. `archive`: write the manifest and the dump into `--out`, encrypted with the backup key. The dump is first written to a temporary
+2. `archive`: write the manifest, the Studio files in a cell and the dump into `--out`, encrypted with the backup key. The dump is first written to a temporary
    file next to `--out` that only its owner can read. The tool deletes it when the step ends.
 
 A tenant in any status except `provisioning` can be backed up, also a
@@ -134,6 +137,9 @@ what is missing:
   encrypted, which can no longer be restored. The message is `the archive is not an encrypted backup`.
 - The backup key does not open the archive. The first chunk does not decrypt, so the key is wrong or the file is cut or changed.
   The message is `the backup key does not open the archive`.
+- The archive holds an unsafe Studio path, in a cell or not. A `studio/` entry is unsafe when it is not a regular file, when its
+  path is empty or rooted, holds a backslash or a control character, or has an empty, `.` or `..` segment, or when its name
+  repeats. `tenant backup` never writes one. The message is `the archive holds an unsafe Studio path: <name>`, one line for each.
 - The archive's `schemaVersion` is newer than this build's, or is not the id of
   one of its migrations.
 - The tenant id exists in the directory as `active` or `suspended`.
@@ -146,6 +152,8 @@ what is missing:
 - A package version with `required` set to `true` is not installed under
   `Extensions:Path`. The message lists every missing version, not only the first.
 - The archive's `realm` is `true` and `IdentityProvider:Url` is not set, or the identity provider cannot say whether the realm exists.
+- In a cell, the archive holds Studio files and `Studio:ApplicationsPath` is not set. The message is
+  `the archive holds Studio files and the setting Studio:ApplicationsPath is not set`.
 - The restored tenant keeps the archive's sign-in and `AXIS_OIDC_CLIENT_SECRET` is missing. This one is written to standard error, before any `check` line.
 
 Every failed check is reported, not only the first. Each one is a
@@ -168,7 +176,7 @@ it keeps working without the module installed.
 **Steps, in order.** Each step writes its own line.
 
 1. `check`: read the archive and make every check above. It decrypts the archive only as far as the manifest and the start of
-   `tenant.dump`. It asks the identity provider whether the archive's realm exists.
+   `tenant.dump`. It reads the `studio/` entries before the dump and no other. It asks the identity provider whether the archive's realm exists.
 2. `entry`: write the directory entry with status `provisioning`. It takes the
    new id and hosts, and everything else from `directory` in the manifest. A `--host` that matches a `sites` entry's `host`, ignoring letter case, gets its site. A tenant that gets a new realm has empty sign-in settings until the `realm` step. A
    `secret` binding is restored by name and kind, without a value. A `url` or `storage`
@@ -203,7 +211,12 @@ it keeps working without the module installed.
     identity provider. The archive holds no secret value, so a provider whose bindings have no value yet is left out, with a
     `<id> warning ...` line on standard error that names the provider and the binding. The next `activate`, publish or
     server start adds it once the operator has set those bindings.
-13. `version`: record the schema version and set the entry `suspended`. The step
+13. `studio`: only in a cell, and only when the archive holds `studio/` entries. Write each of them as a file under
+    `<Studio:ApplicationsPath>/<new id>/`, creating its folders. A file of the same path is overwritten and any other file of
+    the folder stays, so a rerun writes them again. Outside a cell, a restore of an archive with Studio files runs no `studio`
+    step and writes one `<id> warning ...` line on standard error: the files are skipped. An archive without `studio/` entries
+    has no `studio` line and no warning, in a cell or not.
+14. `version`: record the schema version and set the entry `suspended`. The step
     fails unless the database is on the schema of this build, which catches an
     archive whose manifest does not match its dump.
 
@@ -265,7 +278,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant and the counts in the manifest, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest and the Studio folder in the archive, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -284,6 +297,14 @@ format and the steps above stay, with the changes below.
   `tenant create`, `tenant backup` and `tenant restore` stop with exit code `2` when `Cell:BackupKeyFile`
   is missing or cannot be read. A tenant made in a cell before this key existed has no key, and `tenant backup` refuses it.
   `platform rekey` leaves `platform.tenant_backup_keys` alone, because the installation key does not wrap it.
+- **The Studio folder in the archive** _(built)_. The archive gets one `studio/<path>` entry for each file of
+  `<Studio:ApplicationsPath>/<tenant id>/`, with `/` as separator, in ordinal order of the path and between `manifest.json` and
+  `tenant.dump`. A symbolic link is skipped, so a link cannot pull in a file from outside the folder. A tenant with no folder
+  adds no entry. `tenant backup` and `tenant restore` read `Studio:ApplicationsPath` themselves and resolve a relative path
+  against their working directory. `tenant restore` checks every Studio path in its `check` step, see the refusals above, and
+  its `studio` step writes the files under the new tenant's folder. A cell with no `Studio:ApplicationsPath` refuses an archive
+  that holds Studio files. A restore outside a cell skips them with a warning. An archive without `studio/` entries restores as
+  before.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
   key. Its archives stay in object storage until their lock ends, and nothing can read them. One
   leaked tenant key opens only that tenant's archives.

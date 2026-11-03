@@ -11,7 +11,7 @@ namespace Axis.Worker;
 /// turn the same way: the tenant stays in the list, idle until one of its items ends or the next poll joins it. All members are thread-safe, because the loops
 /// of the worker share one list.
 /// </summary>
-internal sealed class TenantRounds(int quantum, Func<string, long> weight)
+public sealed class TenantRounds(int quantum, Func<string, long> weight)
 {
     private readonly object _gate = new();
     private readonly LinkedList<Entry> _list = new();
@@ -168,7 +168,8 @@ internal sealed class TenantRounds(int quantum, Func<string, long> weight)
 
     /// <summary>
     /// Ends a hand-out whose claim found a call with no lease free. The tenant's turn ends and it stays in the list, idle until
-    /// one of its items ends or the next poll joins it.
+    /// one of its items ends or the next poll joins it. Its deficit is cleared, so a tenant that waits across many polls cannot
+    /// save up a burst.
     /// </summary>
     public void Wait(string tenantId)
     {
@@ -180,11 +181,15 @@ internal sealed class TenantRounds(int quantum, Func<string, long> weight)
                 _busy.Remove(tenantId);
             }
 
-            if (_index.TryGetValue(tenantId, out var node) && !node.Value.Idle)
+            if (_index.TryGetValue(tenantId, out var node))
             {
-                node.Value.Idle = true;
-                node.Value.TurnStarted = false;
-                _idle++;
+                node.Value.Deficit = 0;
+                if (!node.Value.Idle)
+                {
+                    node.Value.Idle = true;
+                    node.Value.TurnStarted = false;
+                    _idle++;
+                }
             }
 
             UpdateSignal();

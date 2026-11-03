@@ -27,7 +27,10 @@ namespace Axis.Admin;
 /// connection string. The archive is encrypted with the operator's backup key, see <see cref="BackupArchive"/>. The <c>check</c> step
 /// decrypts it as far as the manifest and the start of the dump. The <c>restore</c> step decrypts it to the end, so a chunk that is changed
 /// or missing anywhere fails that step. The manifest's data keys and lookup keys come back under this installation's key, in the entry step.
-/// The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk.
+/// The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk. The <c>check</c> step also
+/// reads the <c>studio/</c> entries before the dump and refuses a path that is not safe. In a cell, a <c>studio</c> step before <c>version</c>
+/// writes them under the new tenant's folder in <c>Studio:ApplicationsPath</c>, over a file of the same path and leaving others alone.
+/// Outside a cell they are skipped with a warning.
 /// </summary>
 internal sealed class TenantRestore : IAsyncDisposable
 {
@@ -38,6 +41,8 @@ internal sealed class TenantRestore : IAsyncDisposable
     private const string ManifestEntry = "manifest.json";
 
     private const string DumpEntry = "tenant.dump";
+
+    private const string StudioPrefix = "studio/";
 
     private const int SupportedFormat = 1;
 
@@ -121,7 +126,15 @@ internal sealed class TenantRestore : IAsyncDisposable
         }
 
         output.WriteLine($"{request.Id} check ok");
-        return new RestorePlan(request with { File = Path.GetFullPath(request.File) }, refusal.Manifest!, backupKey, pgRestore, refusal.NewRealm);
+        return new RestorePlan(
+            request with { File = Path.GetFullPath(request.File) },
+            refusal.Manifest!,
+            backupKey,
+            pgRestore,
+            refusal.NewRealm,
+            refusal.StudioEntries,
+            settings.InCell,
+            settings.StudioApplicationsPath);
     }
 
     public async Task<int> RunAsync()
@@ -151,6 +164,7 @@ internal sealed class TenantRestore : IAsyncDisposable
                 && await Step("sessions", EmptySessionsAsync)
                 && await Step("role-check", () => Steps.CheckRuntimeRoleAsync())
                 && (!_newRealm || await Step("realm", RealmAsync))
+                && (_plan.StudioEntries == 0 || await StudioOrWarnAsync())
                 && await Step("version", SuspendAsync))
             {
                 return 0;
@@ -162,6 +176,18 @@ internal sealed class TenantRestore : IAsyncDisposable
         {
             await DisposeAsync();
         }
+    }
+
+    // In a cell the Studio files are written in their own step. Outside a cell they are not written, and a warning says so.
+    private async Task<bool> StudioOrWarnAsync()
+    {
+        if (_plan.InCell)
+        {
+            return await Step("studio", StudioAsync);
+        }
+
+        _error.WriteLine($"{_id} warning the archive holds Studio files, and a restore outside a cell does not write them");
+        return true;
     }
 
     public async ValueTask DisposeAsync()
@@ -188,7 +214,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         RestoreSettings settings, TenantRestoreRequest request, byte[] backupKey, TenantRealm? realm, CancellationToken cancellationToken)
     {
         var problems = new List<string>();
-        var (manifest, readProblem) = ReadManifest(request.File, backupKey);
+        var (manifest, readProblem, studio) = ReadManifest(request.File, backupKey);
         var trusted = false;
         var preview = false;
         if (manifest is null)
@@ -232,6 +258,16 @@ internal sealed class TenantRestore : IAsyncDisposable
                     problems.Add("the OIDC client id of the archive is blank");
                 }
             }
+        }
+
+        foreach (var name in studio.Unsafe)
+        {
+            problems.Add($"the archive holds an unsafe Studio path: {Printable(name)}");
+        }
+
+        if (settings.InCell && studio.Count > 0 && settings.StudioApplicationsPath is null)
+        {
+            problems.Add($"the archive holds Studio files and the setting {AdminCommands.StudioApplicationsPathSetting} is not set");
         }
 
         var typed = request.Hosts.Select(host => host.Trim()).ToArray();
@@ -321,7 +357,7 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
         }
 
-        return new CheckResult(manifest, problems, newRealm);
+        return new CheckResult(manifest, problems, newRealm, studio.Count);
     }
 
     // The realm of the archive is the realm its authority names, on this installation's identity provider.
@@ -343,7 +379,8 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     // Decrypts the archive as far as the manifest and the start of the dump. Returns the manifest, or null and the reason when the file is
     // not an encrypted archive that the key opens, with a complete manifest and a dump. Chunks after that are checked by the restore step.
-    private static (BackupManifest? Manifest, string Problem) ReadManifest(string file, byte[] key)
+    // It also lists the studio/ entries before the dump, and only those, so the check sees every entry that the studio step writes.
+    private static (BackupManifest? Manifest, string Problem, StudioListing Studio) ReadManifest(string file, byte[] key)
     {
         const string Unreadable = "the archive cannot be read";
         try
@@ -353,13 +390,27 @@ internal sealed class TenantRestore : IAsyncDisposable
             using var reader = new TarReader(decrypted);
             BackupManifest? manifest = null;
             var hasDump = false;
+            var studioCount = 0;
+            var unsafeNames = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             while ((manifest is null || !hasDump) && reader.GetNextEntry() is { } entry)
             {
-                if (entry.Name == ManifestEntry && entry.DataStream is { } data && manifest is null)
+                if (!hasDump && entry.Name.StartsWith(StudioPrefix, StringComparison.Ordinal))
+                {
+                    if (IsSafeStudioEntry(entry) && seen.Add(entry.Name))
+                    {
+                        studioCount++;
+                    }
+                    else
+                    {
+                        unsafeNames.Add(entry.Name);
+                    }
+                }
+                else if (entry.Name == ManifestEntry && entry.DataStream is { } data && manifest is null)
                 {
                     if (entry.Length > MaxManifestBytes)
                     {
-                        return (null, Unreadable);
+                        return (null, Unreadable, StudioListing.None);
                     }
 
                     manifest = JsonSerializer.Deserialize<BackupManifest>(data, _json);
@@ -370,16 +421,61 @@ internal sealed class TenantRestore : IAsyncDisposable
                 }
             }
 
-            return hasDump && manifest is not null && IsComplete(manifest) ? (manifest, "") : (null, Unreadable);
+            return hasDump && manifest is not null && IsComplete(manifest)
+                ? (manifest, "", new StudioListing(studioCount, unsafeNames))
+                : (null, Unreadable, StudioListing.None);
         }
         catch (BackupArchiveException exception)
         {
-            return (null, exception.Message);
+            return (null, exception.Message, StudioListing.None);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or FormatException
             or JsonException or NotSupportedException or ArgumentException)
         {
-            return (null, Unreadable);
+            return (null, Unreadable, StudioListing.None);
+        }
+    }
+
+    // A Studio entry is a regular file whose path below studio/ stays inside the tenant's folder: no empty, "." or ".." segment, no root,
+    // no backslash and no control character. Tenant backup writes no other kind.
+    private static bool IsSafeStudioEntry(TarEntry entry)
+    {
+        if (entry.EntryType != TarEntryType.RegularFile)
+        {
+            return false;
+        }
+
+        var relative = entry.Name[StudioPrefix.Length..];
+        return relative.Length > 0
+            && !Path.IsPathRooted(relative)
+            && !relative.Any(character => character == '\\' || char.IsControl(character))
+            && relative.Split('/').All(segment => segment.Length > 0 && segment != "." && segment != "..");
+    }
+
+    // Writes the Studio files of the archive under the new tenant's folder. A file of the same path is overwritten and other files stay, so a
+    // rerun writes them again. The archive is decrypted again, up to the dump: the check step read the same entries and found their paths safe.
+    private async Task StudioAsync()
+    {
+        var folder = Path.GetFullPath(Path.Combine(_plan.StudioApplicationsPath!, _id));
+        using var stream = new FileStream(_plan.Request.File, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var decrypted = BackupArchive.Decrypt(stream, _plan.BackupKey);
+        using var reader = new TarReader(decrypted);
+        while (reader.GetNextEntry() is { } entry && entry.Name != DumpEntry)
+        {
+            if (!entry.Name.StartsWith(StudioPrefix, StringComparison.Ordinal) || entry.DataStream is not { } data)
+            {
+                continue;
+            }
+
+            var target = Path.GetFullPath(Path.Combine(folder, entry.Name[StudioPrefix.Length..]));
+            if (!target.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("a Studio path leaves the tenant's folder");
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            await using var file = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None);
+            await data.CopyToAsync(file, _cancellationToken);
         }
     }
 
@@ -822,11 +918,26 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     private void Failed(string step, string message) => _output.WriteLine($"{_id} {step} failed: {message}");
 
-    private sealed record CheckResult(BackupManifest? Manifest, IReadOnlyList<string> Problems, bool NewRealm);
+    private sealed record CheckResult(BackupManifest? Manifest, IReadOnlyList<string> Problems, bool NewRealm, int StudioEntries);
+
+    // The studio/ entries before the dump: how many are safe, and the names of those that are not.
+    private sealed record StudioListing(int Count, IReadOnlyList<string> Unsafe)
+    {
+        public static StudioListing None { get; } = new(0, []);
+    }
 }
 
 /// <summary>
 /// What the <c>check</c> step found: the request with the archive's full path, the manifest, the backup key, the path of <c>pg_restore</c> and whether
-/// the tenant gets a new realm (<paramref name="NewRealm"/>) or keeps the archive's sign-in.
+/// the tenant gets a new realm (<paramref name="NewRealm"/>) or keeps the archive's sign-in. <paramref name="StudioEntries"/> counts the
+/// <c>studio/</c> entries of the archive. The folder is <paramref name="StudioApplicationsPath"/> and is set only in a cell (<paramref name="InCell"/>).
 /// </summary>
-internal sealed record RestorePlan(TenantRestoreRequest Request, BackupManifest Manifest, byte[] BackupKey, string PgRestore, bool NewRealm);
+internal sealed record RestorePlan(
+    TenantRestoreRequest Request,
+    BackupManifest Manifest,
+    byte[] BackupKey,
+    string PgRestore,
+    bool NewRealm,
+    int StudioEntries = 0,
+    bool InCell = false,
+    string? StudioApplicationsPath = null);
