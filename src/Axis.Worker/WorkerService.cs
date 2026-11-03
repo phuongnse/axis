@@ -10,6 +10,7 @@ using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Npgsql;
 
 namespace Axis.Worker;
@@ -38,7 +39,8 @@ namespace Axis.Worker;
 /// Once a tenant is ready, the poll also deletes its expired sessions and sweeps its deleted and abandoned files,
 /// and clears the files of its imports uploaded more than 24 hours ago, each at most every five minutes by its own clock,
 /// and deletes its old in-app notifications every 24 hours. In a cell it also measures the storage of each ready tenant every
-/// hour and records the sample in the platform database as the tenant's usage. That housekeeping is outside the rounds.
+/// hour and records the sample in the platform database as the tenant's usage, and brings the users quota step of the tenant's realm in step
+/// with its <c>users</c> quota. That housekeeping is outside the rounds.
 /// </summary>
 internal sealed partial class WorkerService(
     WorkerTenantCatalog tenants,
@@ -56,7 +58,8 @@ internal sealed partial class WorkerService(
     CellOptions cell,
     WakeSignals wake,
     ILogger<WorkerService> logger,
-    TenantUsageStore? usage = null) : BackgroundService
+    TenantUsageStore? usage = null,
+    IHttpClientFactory? httpClients = null) : BackgroundService
 {
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts
     // the worker, so a ready tenant is not checked again. A tenant whose database settings change, or that
@@ -687,9 +690,9 @@ internal sealed partial class WorkerService(
     }
 
     /// <summary>
-    /// In a cell, measures the storage of the tenant database and records the sample in the platform database, at most once per hour.
-    /// The time comes from the worker's clock. A database without the file table yet counts no file bytes. A database failure is logged
-    /// and does not hold back the work items. Self-hosted installations measure nothing.
+    /// In a cell, at most once per hour, measures the storage of the tenant database and records the sample in the platform database,
+    /// then brings the users quota step of the tenant's realm in step with its <c>users</c> quota. The time comes from the worker's clock.
+    /// A failure of either part is logged and does not hold back the other part or the work items. Self-hosted installations do neither.
     /// </summary>
     private async Task SampleUsageAsync(string tenantId, CancellationToken cancellationToken)
     {
@@ -698,6 +701,13 @@ internal sealed partial class WorkerService(
             return;
         }
 
+        await SampleStorageAsync(tenantId, usage, now, cancellationToken);
+        await RefreshUsersQuotaAsync(tenantId, cancellationToken);
+    }
+
+    // A database without the file table yet counts no file bytes.
+    private async Task SampleStorageAsync(string tenantId, TenantUsageStore store, DateTimeOffset now, CancellationToken cancellationToken)
+    {
         var previous = accessor.Current;
         accessor.Current = new TenantContext(tenantId);
         try
@@ -708,7 +718,7 @@ internal sealed partial class WorkerService(
                 sample = await TenantStorageSample.ReadAsync(connection, cancellationToken);
             }
 
-            await usage.RecordSampleAsync(tenantId, sample.DatabaseBytes, sample.FileBytes, now, cancellationToken);
+            await store.RecordSampleAsync(tenantId, sample.DatabaseBytes, sample.FileBytes, now, cancellationToken);
             LogUsageSampled(sample.DatabaseBytes, sample.FileBytes, tenantId);
         }
         catch (NpgsqlException exception)
@@ -718,6 +728,26 @@ internal sealed partial class WorkerService(
         finally
         {
             accessor.Current = previous;
+        }
+    }
+
+    // Only a tenant with realm details takes part. A failure of its identity provider is logged and the pass goes on.
+    private async Task RefreshUsersQuotaAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (httpClients is null || tenants.Find(tenantId) is not { Realm: { } realm, RealmUsers: { } users })
+        {
+            return;
+        }
+
+        try
+        {
+            using var client = httpClients.CreateClient(nameof(RealmUsersQuota));
+            var on = await new RealmUsersQuota(client).RefreshAsync(realm, users, quotas.Limit(tenantId, QuotaKeys.Users), cancellationToken);
+            LogUsersQuotaStep(tenantId, on ? "on" : "off");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            LogUsersQuotaRefreshFailed(exception, tenantId);
         }
     }
 
@@ -849,6 +879,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Debug, "Measured {DatabaseBytes} database byte(s) and {FileBytes} file byte(s) of tenant {TenantId}.")]
     private partial void LogUsageSampled(long databaseBytes, long fileBytes, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Bringing the users quota step of tenant {TenantId} in step failed.")]
+    private partial void LogUsersQuotaRefreshFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Debug, "The users quota step of tenant {TenantId} is {State}.")]
+    private partial void LogUsersQuotaStep(string tenantId, string state);
 
     [LoggerMessage(LogLevel.Error, "Running work items for tenant {TenantId} failed.")]
     private partial void LogRunFailed(Exception exception, string tenantId);
