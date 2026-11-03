@@ -65,6 +65,7 @@ flowchart LR
 | P7 | A user reads or changes a page or record without a grant. | Browser and server | Elevation of privilege | High | **Mitigated** | `RecordPolicyTests` (every route is a 401 without a session and a 403 without a grant), `AuthorizationRouteTests` (every route off the open list answers 401 or 403 with no session and no token), `PageAccessTests` (a department manager can read purchase requests but cannot submit them). |
 | P8 | A session stays open past its time limit or after an admin ends it. | Browser and server | Elevation of privilege | Medium | **Mitigated** | `SessionLifetimeTests` (a session ends after an hour idle or eight hours after sign in), `AdminTenantSessionEndTests` (ending one person's sessions leaves other people signed in). |
 | P100 | Crafted input to a parser, in a record body, an import file or an expression, crashes the parser or reaches SQL. | Browser and server | Tampering | High | **Mitigated** | `RecordBodyFuzzTests` (a body is accepted or refused with a 400 problem), `RecordImportFuzzTests` (any bytes give rows or refusals), `ExpressionFuzzTests` (no SQL the translator emits holds input text outside a parameter). |
+| P113 | The public `/licences` page tells an attacker which package versions Axis runs, and so which known weaknesses to try. | Browser and server | Information disclosure | Low | **Mitigated** | `LicenceEndpointTests` (an anonymous caller gets a 401 problem, and only a signed-in caller gets the versions). The public `/licences.json` holds names and licences only. |
 
 ### Server and databases
 
@@ -506,12 +507,6 @@ Open, waiting for an issue:
   [sites and sign-in](identity-provider.md#sites-and-sign-in).
 
 Each becomes a **Gap** row, linked to its issue, once that issue exists.
-
-Planned with [D128](../decisions/d128-rules-from-the-studio-review.md) _(planned for M31)_, each to become a row with
-its test when it is built:
-
-- (Information disclosure, Low) the public `/licences` page shows which libraries Axis ships. It shows versions only to
-  a signed-in person, as the footer does.
 
 ### Personal data
 

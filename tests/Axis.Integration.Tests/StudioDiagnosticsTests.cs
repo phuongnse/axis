@@ -87,6 +87,32 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
         Assert.DoesNotContain(diagnostics, item => item.File == "modules/organization/entities/department.json");
     }
 
+    [Fact]
+    public async Task A_site_with_the_path_licences_is_reported_at_the_path()
+    {
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_reserved_site_path", CancellationToken);
+        await using var factory = Factory(folder, connectionString);
+        using var client = factory.CreateClient().SignedInAs("author");
+        Assert.Empty(await ErrorsAsync(client));
+
+        const string siteFile = "sites/purchasing.json";
+        var sitePath = Path.Combine(folder.Path, siteFile);
+        var site = await File.ReadAllTextAsync(sitePath, CancellationToken);
+        await File.WriteAllTextAsync(sitePath, site.Replace("\"path\": \"purchasing\"", "\"path\": \"licences\"", StringComparison.Ordinal), CancellationToken);
+
+        using var request = RecordApiFixture.Request(DiagnosticsUrl, Host);
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var diagnostics = body.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Select(item => (Code: item.GetProperty("code").GetString(), File: item.GetProperty("file").GetString(), Path: item.GetProperty("path").GetString()))
+            .ToList();
+
+        Assert.Contains((DiagnosticCodes.InvalidSitePath, siteFile, "/path"), diagnostics);
+    }
+
     private static WebApplicationFactory<Program> Factory(TemporaryFolder folder, string connectionString) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
