@@ -98,7 +98,9 @@ describe('UserMenu', () => {
 
     const avatar = within(button).getByText('RU')
     expect(avatar.closest('.ant-avatar')).toHaveAttribute('aria-hidden', 'true')
-    expect(button.querySelector('.anticon-down')).toHaveAttribute('aria-hidden', 'true')
+    expect(button.lastElementChild).toHaveClass('anticon-down')
+    expect(button.lastElementChild).toHaveAttribute('aria-hidden', 'true')
+    expect(button).toHaveAccessibleName('Requester User')
     expect(button).toHaveTextContent('RURequester User')
   })
 

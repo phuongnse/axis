@@ -1,17 +1,23 @@
+import { DownOutlined } from '@ant-design/icons'
 import { Button, Tooltip, type ButtonProps } from 'antd'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /** The level of an action. Each level has one style, so the same kind of action always looks the same. */
-export type ButtonRole = 'finish' | 'main' | 'secondary' | 'icon' | 'destructive'
+export type ButtonRole = 'finish' | 'main' | 'secondary' | 'icon' | 'destructive' | 'plain'
 
 type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' | 'icon'> & {
   ref?: Ref<HTMLButtonElement>
 }
 
 export type AxisButtonProps =
-  | (Base & { role: Exclude<ButtonRole, 'icon'>; icon?: never })
+  | (Base & {
+      role: Exclude<ButtonRole, 'icon'>
+      icon?: never
+      /** A text trigger that opens a menu ends in a caret (D128). */
+      caret?: boolean
+    })
   | (Omit<Base, 'children' | 'aria-label'> & {
       role: 'icon'
       icon: ReactNode
@@ -30,7 +36,9 @@ export type AxisButtonProps =
  * action of a page and is an outline in `primaryText`. `secondary` is every other action and is the grey outline.
  * `destructive` removes data and is an outline in `dangerText`. `icon` has no text, so it takes a text key and shows
  * the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless `joined` draws it as a bordered
- * default button for a control joined to an input. The role is not passed on to the DOM.
+ * default button for a control joined to an input. `plain` is a borderless text button in the text colour, for header
+ * controls such as the account button. `caret` adds a down caret after the text of any text role. The role is not
+ * passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const t = useText()
@@ -54,15 +62,21 @@ export function AxisButton(props: AxisButtonProps) {
     )
   }
 
-  const { role, style, disabled, ...rest } = props
+  const { role, style, disabled, caret, children, ...rest } = props
+  const body = {
+    ...rest,
+    children: caret
+      ? [children, <DownOutlined key="caret" aria-hidden style={{ flex: 'none', fontSize: 12 }} />]
+      : children,
+  }
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
   switch (role) {
     case 'finish':
-      return <Button {...rest} type="primary" disabled={disabled} style={style} />
+      return <Button {...body} type="primary" disabled={disabled} style={style} />
     case 'main':
       return (
         <Button
-          {...rest}
+          {...body}
           color="primary"
           variant="outlined"
           disabled={disabled}
@@ -72,7 +86,7 @@ export function AxisButton(props: AxisButtonProps) {
     case 'destructive':
       return (
         <Button
-          {...rest}
+          {...body}
           color="danger"
           variant="outlined"
           disabled={disabled}
@@ -80,6 +94,8 @@ export function AxisButton(props: AxisButtonProps) {
         />
       )
     case 'secondary':
-      return <Button {...rest} type="default" disabled={disabled} style={style} />
+      return <Button {...body} type="default" disabled={disabled} style={style} />
+    case 'plain':
+      return <Button {...body} type="text" disabled={disabled} style={style} />
   }
 }

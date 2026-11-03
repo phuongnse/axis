@@ -112,6 +112,23 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
   })
 })
 
+describe('the text button with a caret', () => {
+  it('ends in an aria-hidden down caret and keeps its name', () => {
+    renderIn(
+      'light',
+      <AxisButton role="plain" caret>
+        Account
+      </AxisButton>,
+    )
+
+    const button = screen.getByRole('button', { name: 'Account' })
+    expect(button.lastElementChild).toHaveClass('anticon-down')
+    expect(button.lastElementChild).toHaveAttribute('aria-hidden', 'true')
+    expect(button).toHaveClass('ant-btn-variant-text')
+    expect(button).not.toHaveAttribute('caret')
+  })
+})
+
 describe('a disabled button', () => {
   it('keeps no inline colour', () => {
     renderIn(

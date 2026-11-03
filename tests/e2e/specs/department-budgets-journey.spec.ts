@@ -92,7 +92,7 @@ test('a manager creates and submits a budget of the module, a second manager app
 
 /** Opens the lookup of the Department field and picks the row named `department`. */
 async function chooseDepartment(page: Page, department: string) {
-  await page.getByTestId('reference-department').getByRole('button', { name: 'Choose', exact: true }).click()
+  await page.getByTestId('reference-department').getByRole('button', { name: 'Choose…', exact: true }).click()
   const dialog = await waitForDialog(page)
   await dialog.getByRole('row', { name: new RegExp(department) }).click()
   await expect(dialog).toBeHidden()

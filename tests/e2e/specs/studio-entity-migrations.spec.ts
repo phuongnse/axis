@@ -62,7 +62,7 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
     await useSession(page, "author");
     await slowAnimations(page);
     await page.goto(`${server.url}/studio?app=${name}`);
-    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    await page.getByRole("button", { name: "Publish…", exact: true }).click();
     await confirmDialog(page, "Publish");
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",

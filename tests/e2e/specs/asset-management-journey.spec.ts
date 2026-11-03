@@ -1194,7 +1194,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 120_000,
@@ -1256,7 +1256,7 @@ test.describe('the author builds the asset management application with Studio on
     await date.fill('10/01/2026')
     await date.press('Enter')
     await expect(date).toHaveValue('10/01/2026')
-    await page.getByRole('button', { name: 'Choose Vendor 1', exact: true }).click()
+    await page.getByRole('button', { name: 'Choose… Vendor 1', exact: true }).click()
     const lookup = await waitForDialog(page)
     await lookup.getByTestId('reference-lookup-search').fill(vendor)
     await lookup.getByRole('row', { name: new RegExp(vendor) }).click()
@@ -1297,7 +1297,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'asset-manager')
     await page.goto(`${journeyURL}/asset-management/assets`)
 
-    await page.getByRole('button', { name: 'Import', exact: true }).click()
+    await page.getByRole('button', { name: 'Import…', exact: true }).click()
     const dialog = await waitForDialog(page)
     await dialog
       .locator('input[type=file]')
@@ -1323,7 +1323,7 @@ test.describe('the author builds the asset management application with Studio on
     await page.goto(`${journeyURL}/asset-management/assets`)
     await expect(page.getByRole('table')).toBeVisible()
     await expect(page.getByRole('button', { name: 'New', exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Import', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Import…', exact: true })).toHaveCount(0)
 
     // While a file is being made the button names its spinner too, 'loading Export', so the name ends with Export.
     const exportAs = async (format: string) => {
@@ -1370,7 +1370,7 @@ test.describe('the author builds the asset management application with Studio on
     for (const name of imported) {
       await expect(page.getByRole('row', { name: new RegExp(name) })).toHaveCount(0)
     }
-    for (const name of ['Export', 'Import', 'New']) {
+    for (const name of ['Export', 'Import…', 'New']) {
       await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
     }
   })
