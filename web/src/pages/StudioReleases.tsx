@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
 import { EmptyDash, NotSet } from '../platform/EmptyValue'
+import { EmptyState } from '../platform/EmptyState'
 import {
   fetchStudioRelease,
   relaxedPointWords,
@@ -520,15 +521,22 @@ function StudioReleaseDetail({
             }
             testId="studio-release-changes"
           >
-            {previous !== null && changeRows(shown, locale, t).length > 0 && (
-              <StudioChangeList testId="studio-release-change-list" rows={changeRows(shown, locale, t)} />
-            )}
+            {previous !== null &&
+              (changeRows(shown, locale, t).length > 0 ? (
+                <StudioChangeList testId="studio-release-change-list" rows={changeRows(shown, locale, t)} />
+              ) : (
+                <EmptyState
+                  text={t(
+                    previousIsLive ? 'shell.studio.release.changes.noneLive' : 'shell.studio.release.changes.none',
+                  ).replace('{previous}', String(previous))}
+                />
+              ))}
           </ReleaseSection>
           <ReleaseSection title={t('shell.studio.release.parts')} testId="studio-release-parts">
             <AxisTable<StudioReleasePartRow>
               rows={parts}
               rowKey={(part) => `${part.type}/${part.id}`}
-              emptyText={t('shell.studio.release.parts.none')}
+              emptyText=""
               pagination={false}
               columns={[
                 {

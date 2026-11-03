@@ -2,9 +2,9 @@ import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Table, Tooltip, type TableColumnType, type TableProps } from 'antd'
 import type { CSSProperties, HTMLAttributes, Key, ReactNode } from 'react'
 import { AxisButton } from './AxisButton'
+import { EmptyState } from './EmptyState'
 import { sizeTokens, spacingTokens } from './designTokens'
 import { useText } from './texts'
-import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
 
 /**
@@ -119,7 +119,6 @@ export function AxisTable<T extends object>({
   instead?: ReactNode
 }) {
   const narrow = useNarrowWidth()
-  const tokens = useDesignTokens()
   const texts = columns.filter((column) => column.kind === 'text').length
   // Each column of free text takes an equal share of the width; a table with none gives it all to its last column.
   const share = texts > 0 ? `${100 / texts}%` : undefined
@@ -196,7 +195,7 @@ export function AxisTable<T extends object>({
           loading={loading}
           // Proposed: an empty table keeps its header and says so in its body in textMuted. Ant Design draws the text
           // at a quarter of the text colour, 1.8:1 on surface, which fails the 4.5:1 that text needs.
-          locale={{ emptyText: <span style={{ color: tokens.colour.textMuted }}>{emptyText}</span> }}
+          locale={{ emptyText: <EmptyState text={emptyText || undefined} /> }}
           pagination={pagination}
           onChange={onChange}
           onRow={onRow}

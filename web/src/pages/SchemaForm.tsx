@@ -442,7 +442,8 @@ function ListTable({
       <AxisTable<{ index: number; item: unknown }>
         rows={tableRows}
         rowKey={(row) => row.index}
-        emptyText={textOr(t, `${listKey}.empty`, 'shell.studio.list.empty')}
+        // Proposed: an empty list says No data yet., as every empty table does.
+        emptyText=""
         pagination={false}
         testId={`studio-list-${pointer}`}
         toolbar={inHeading && slot ? undefined : { main: addButton }}

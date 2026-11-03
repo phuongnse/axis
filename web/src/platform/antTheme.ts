@@ -114,6 +114,10 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         colorInfo: colour.infoText,
       },
       Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
+      // Proposed: a dialog draws on the surface token, as panels do, not on Ant Design's own elevated grey, which is no
+      // Axis token: so the tables, inputs and empty states in it sit on the colour they were made for, and the mask
+      // behind sets it apart from the page.
+      Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
     },
   }
 }

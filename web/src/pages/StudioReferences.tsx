@@ -8,6 +8,7 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
+import { EmptyState } from '../platform/EmptyState'
 import { useDesignTokens } from '../platform/themeMode'
 import { StudioCatalogContext } from './schemaFormSections'
 import { StudioChangeList, type StudioChangeRow } from './StudioChangeList'
@@ -60,7 +61,6 @@ export function StudioReferences({ application, resourceId }: { application: str
         testId="studio-uses"
         title={t('shell.studio.uses')}
         entries={references.uses.filter((entry) => entry.node.type !== 'text')}
-        empty={t('shell.studio.uses.none')}
         application={application}
         direction="uses"
       />
@@ -68,7 +68,6 @@ export function StudioReferences({ application, resourceId }: { application: str
         testId="studio-used-by"
         title={t('shell.studio.usedBy')}
         entries={references.usedBy}
-        empty={t('shell.studio.usedBy.none')}
         application={application}
         direction="usedBy"
       />
@@ -80,14 +79,12 @@ function ReferencePanel({
   testId,
   title,
   entries,
-  empty,
   application,
   direction,
 }: {
   testId: string
   title: string
   entries: StudioReference[]
-  empty: string
   application: string
   direction: Direction
 }) {
@@ -149,11 +146,7 @@ function ReferencePanel({
         <Typography.Title level={5} style={{ margin: 0 }}>
           {title}
         </Typography.Title>
-        {rows.length === 0 ? (
-          <Typography.Text style={{ color: colour.textMuted }}>{empty}</Typography.Text>
-        ) : (
-          <StudioChangeList testId={`${testId}-list`} rows={rows} />
-        )}
+        {rows.length === 0 ? <EmptyState /> : <StudioChangeList testId={`${testId}-list`} rows={rows} />}
       </Flex>
     </section>
   )

@@ -208,3 +208,16 @@ Group and Material advise, and as mail and documents do:
   bar stays while a step can be redone, reading "No unsaved changes" once all are undone.
 - **What cannot be taken back is confirmed.** Discard drops every unsaved change at once and no Undo brings them back,
   so a small dialog asks "Discard all unsaved changes?" with a red Discard; deleting a resource keeps its dialog.
+
+## Surfaces and empty states
+
+- **A dialog draws on the surface token.** The owner saw a table's header sink inside a dialog. In dark mode the dialog
+  drew on Ant Design's own elevated grey, #1f1f1f, which is no Axis token, while tables and inputs drew on `surface`,
+  #141414, so they sat in a darker patch. Agreed, as D129 has every design value a token: the theme gives dialogs the
+  `surface` colour, as panels have, so every part inside sits on the colour it was made for and the mask behind sets
+  the dialog apart. One theme setting, no part fixed on its own.
+- **One empty state.** The owner found every place showing emptiness its own way, and chose the simple one: Ant
+  Design's simple empty picture with one line in textMuted. `EmptyState` draws it for every empty table (through
+  AxisTable) and list (Uses, Used by, a release's changes). Its line is "No data yet." unless the emptiness says
+  something the reader needs, such as a release following every contract or matching the live release. A field with
+  no value keeps Not set, a cell the dash.
