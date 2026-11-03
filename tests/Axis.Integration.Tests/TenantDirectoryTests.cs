@@ -589,6 +589,71 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         }
     }
 
+    [Fact]
+    public async Task In_a_cell_a_tenant_at_its_applications_quota_cannot_create_another_but_still_saves_and_publishes()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
+
+        // Tenant a already has one application with an active release, so a quota of 2 leaves room for one folder.
+        await SetQuotaAsync(platform, "a", QuotaKeys.Applications, 2);
+        var root = Directory.CreateTempSubdirectory("axis-studio-quota-").FullName;
+        try
+        {
+            var logs = new LogCollector();
+            await using var factory = CreateFactory(
+                platform,
+                logs,
+                [.. _cellSettings, ("Studio:ApplicationsPath", root), ("Studio:AuthorRole", "author"), ("Studio:PublisherRole", "author")]);
+            using var client = factory.CreateClient().SignedInAs("author");
+
+            using var first = await client.SendAsync(
+                Request(HttpMethod.Post, "/api/studio/apps", "a.example.test", """{ "name": "AppA" }"""), CancellationToken);
+            Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+
+            // The tenant is at its quota, so the create is refused and writes no folder.
+            using var second = await client.SendAsync(
+                Request(HttpMethod.Post, "/api/studio/apps", "a.example.test", """{ "name": "AppB" }"""), CancellationToken);
+            Assert.Equal(HttpStatusCode.Forbidden, second.StatusCode);
+            using var refusal = JsonDocument.Parse(await second.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal("quota-exceeded", refusal.RootElement.GetProperty("reason").GetString());
+            Assert.Equal("applications", refusal.RootElement.GetProperty("quota").GetString());
+            Assert.Equal(2, refusal.RootElement.GetProperty("limit").GetInt64());
+            Assert.Equal(2, refusal.RootElement.GetProperty("used").GetInt64());
+            Assert.Equal("This tenant has reached its applications quota.", refusal.RootElement.GetProperty("title").GetString());
+            Assert.Equal(["app-a"], SubfolderNames(Path.Combine(root, "a")));
+            Assert.Contains(logs.Entries, entry => entry.Contains("quota.refused: tenant a reached its applications quota.", StringComparison.Ordinal));
+
+            // The existing application is still saved and published.
+            using var resources = await client.SendAsync(Request("/api/studio/apps/AppA/resources", "a.example.test"), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, resources.StatusCode);
+            using var list = JsonDocument.Parse(await resources.Content.ReadAsStringAsync(CancellationToken));
+            var texts = list.RootElement.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("file").GetString() == "texts/en.json");
+            using var patch = Request(
+                HttpMethod.Patch,
+                $"/api/studio/apps/AppA/resources/{texts.GetProperty("id").GetString()}",
+                "a.example.test",
+                """[{"op":"replace","path":"/texts/site.title","value":"Changed at the quota"}]""",
+                "application/json-patch+json");
+            patch.Headers.TryAddWithoutValidation("If-Match", $"\"{texts.GetProperty("version").GetString()}\"");
+            using var patched = await client.SendAsync(patch, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+            using var published = await client.SendAsync(Request(HttpMethod.Post, "/api/studio/apps/AppA/publish", "a.example.test"), CancellationToken);
+            Assert.Equal(HttpStatusCode.Accepted, published.StatusCode);
+
+            // Another tenant has the default quota and is not affected.
+            using var other = await client.SendAsync(
+                Request(HttpMethod.Post, "/api/studio/apps", "b.example.test", """{ "name": "AppB" }"""), CancellationToken);
+            Assert.Equal(HttpStatusCode.Created, other.StatusCode);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string[] SubfolderNames(string folder) =>
         [.. Directory.GetDirectories(folder).Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal)];
 
