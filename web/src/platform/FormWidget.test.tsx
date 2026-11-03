@@ -11,6 +11,8 @@ import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
+import type { ThemeMode } from './themeMode'
 import { hostileMarkup } from '../test/hostile'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
@@ -479,9 +481,9 @@ function CurrentLocation() {
   )
 }
 
-function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget) {
+function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget, mode?: ThemeMode) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
-  return render(
+  const form = (
     <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
       {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
       <ConfigProvider theme={{ token: { motion: false } }}>
@@ -497,8 +499,9 @@ function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata
         </TextProvider>
       </ConfigProvider>
       <CurrentLocation />
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+  return render(mode ? <ThemeModeProvider initialMode={mode}>{form}</ThemeModeProvider> : form)
 }
 
 describe('FormWidget', () => {
@@ -713,6 +716,21 @@ describe('FormWidget', () => {
       method: 'PATCH',
       body: '{"version":1,"values":{"title":"New"}}',
     })
+  })
+
+  it('sets a field error 4px under its input in 14/20 text, with the field gap below it', async () => {
+    stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
+    renderForm(null, noteWidget, 'light')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const message = await screen.findByTestId('field-error-title')
+    const explain = message.closest('.ant-form-item-explain')
+    const item = message.closest('.ant-form-item')
+    expect(explain).toHaveStyle({ marginTop: '4px', fontSize: '14px', lineHeight: '20px' })
+    expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe(
+      `${designTokensFor('light').spacing.lg}px`,
+    )
   })
 
   it('shows field errors under their field and other errors above the form', async () => {

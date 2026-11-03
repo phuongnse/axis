@@ -1,6 +1,6 @@
 import { ConfigProvider } from 'antd'
 import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
-import { antConfigFor } from '../platform/antTheme'
+import { antConfigFor, fieldRules } from '../platform/antTheme'
 import { designTokensFor, pageTokenPropertyNames, type PageTokenValues } from '../platform/designTokens'
 import { ThemeModeContext, type ThemeMode } from '../platform/themeMode'
 import { useReducedMotion } from '../platform/useReducedMotion'
@@ -53,7 +53,10 @@ export function PageTheme({ children }: { children: ReactNode }) {
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider {...config}>{children}</ConfigProvider>
+      <ConfigProvider {...config}>
+        <style>{fieldRules(mode, values)}</style>
+        {children}
+      </ConfigProvider>
     </ThemeModeContext.Provider>
   )
 }
