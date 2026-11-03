@@ -44,7 +44,7 @@ export const StudioCatalogContext = createContext<import('../platform/studio').S
  */
 export const fieldControls: Record<
   string,
-  'module' | 'package' | 'moduleRoles' | 'moduleConnectors' | 'relaxedPoints' | 'timeZone'
+  'module' | 'package' | 'moduleRoles' | 'moduleConnectors' | 'relaxedPoints' | 'timeZone' | 'versionRange'
 > = {
   'application.modules.id': 'module',
   'application.packages.id': 'package',
@@ -53,6 +53,8 @@ export const fieldControls: Record<
   'application.modules.relax': 'relaxedPoints',
   'application.timeZone': 'timeZone',
   'trigger.timeZone': 'timeZone',
+  'application.modules.version': 'versionRange',
+  'application.packages.version': 'versionRange',
 }
 
 /**

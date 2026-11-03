@@ -233,6 +233,105 @@ function FieldHeading({ label, help, helpId }: { label: string; help: string | n
   )
 }
 
+/** Proposed: a version range split into its version and how it takes updates: `^` compatible, `~` fixes, or exact. */
+function parseRange(value: unknown): { version: string; updates: 'compatible' | 'fixes' | 'exact' } | null {
+  const match = typeof value === 'string' ? /^([~^]?)(\d+\.\d+\.\d+)$/.exec(value) : null
+  if (!match) {
+    return null
+  }
+  return { version: match[2], updates: match[1] === '^' ? 'compatible' : match[1] === '~' ? 'fixes' : 'exact' }
+}
+
+/** Proposed: a version range in words, such as "1.2.0 and later 1.x", "1.2.0 and later 1.2.x" or "1.2.0 only". */
+function rangeWords(value: unknown, t: (key: string) => string): string {
+  const range = parseRange(value)
+  if (!range) {
+    return typeof value === 'string' ? value : ''
+  }
+  const [major, minor] = range.version.split('.')
+  return t(`shell.studio.version.${range.updates}`)
+    .replace('{version}', range.version)
+    .replace('{major}', major)
+    .replace('{minor}', minor)
+}
+
+/** The installed versions of the module or package whose entry holds `pointer`, newest first. */
+function useInstalledVersions(pointer: string, rootValue: unknown): string[] | undefined {
+  const catalog = useContext(StudioCatalogContext)
+  const id = getAt(rootValue, `${pointer.slice(0, pointer.lastIndexOf('/'))}/id`)
+  const list = pointer.includes('/packages/') ? catalog?.packages : catalog?.modules
+  return list?.find((entry) => entry.id === id)?.versions
+}
+
+/**
+ * Proposed: a module's or package's version range as two choices, as package managers split them: the version, from
+ * those installed, newest first, and how it takes updates, in words: compatible updates (`^`), fixes only (`~`), or
+ * this version only. The file keeps the range as written. A version no longer installed stays shown, marked Not
+ * installed, so the author sees what to change.
+ */
+function VersionRange({
+  pointer,
+  value,
+  rootValue,
+  title,
+  onChange,
+}: {
+  pointer: string
+  value: unknown
+  rootValue: unknown
+  title: string
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const versions = useInstalledVersions(pointer, rootValue) ?? []
+  const range = parseRange(value) ?? { version: undefined, updates: 'compatible' as const }
+  const known = range.version === undefined || versions.includes(range.version)
+  const options = [
+    ...versions.map((version, index) => ({
+      value: version,
+      label: index === 0 ? t('shell.studio.version.newest').replace('{version}', version) : version,
+    })),
+    ...(known || !range.version ? [] : [{ value: range.version, label: range.version }]),
+  ]
+  const write = (version: string | undefined, updates: string) =>
+    onChange(
+      pointer,
+      version ? `${updates === 'compatible' ? '^' : updates === 'fixes' ? '~' : ''}${version}` : undefined,
+    )
+  const [major, minor] = (range.version ?? versions[0] ?? '1.0.0').split('.')
+  return (
+    <Flex vertical gap={4}>
+      <Flex gap={spacing.xs}>
+        <Select
+          aria-label={title}
+          style={{ flex: 1 }}
+          placeholder={t('shell.studio.version.choose')}
+          value={range.version}
+          options={options}
+          onChange={(next) => write(next, range.updates)}
+        />
+        <Select
+          aria-label={t('shell.studio.version.updates')}
+          style={{ flex: 1 }}
+          value={range.updates}
+          disabled={!range.version}
+          options={(['compatible', 'fixes', 'exact'] as const).map((updates) => ({
+            value: updates,
+            label: t(`shell.studio.version.updates.${updates}`).replace('{major}', major).replace('{minor}', minor),
+          }))}
+          onChange={(next) => write(range.version, next)}
+        />
+      </Flex>
+      {!known && (
+        <Typography.Text style={{ color: colour.warningText, fontSize: 12 }}>
+          {t('shell.studio.version.notInstalled').replace('{version}', range.version ?? '')}
+        </Typography.Text>
+      )}
+    </Flex>
+  )
+}
+
 /** Proposed: a time zone as a person reads it: its offset from UTC, then its place, such as "(UTC+07:00) Asia/Ho Chi Minh". */
 function timeZoneLabel(zone: { id: string; offset: number }): string {
   const sign = zone.offset < 0 ? '-' : '+'
@@ -302,6 +401,9 @@ function CellValue({
         })}
       </Flex>
     )
+  }
+  if (control === 'versionRange') {
+    return <>{rangeWords(value, t)}</>
   }
   // Proposed: a module's relaxed points show as the Off-standard tag, as the Releases list marks a release; the points
   // themselves are in its dialog.
@@ -833,6 +935,8 @@ function SchemaNode({
         }}
       />
     )
+  } else if (control === 'versionRange') {
+    input = <VersionRange pointer={pointer} value={value} rootValue={rootValue} title={title} onChange={onChange} />
   } else if (control === 'timeZone') {
     // Proposed: a time zone is chosen from those the server knows, searched by any part of its name, each shown with
     // its offset from UTC now and listed by offset, as calendars list them. Cleared, the application's dates are UTC.

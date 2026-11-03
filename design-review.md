@@ -223,3 +223,9 @@ Group and Material advise, and as mail and documents do:
   AxisTable) and list (Uses, Used by, a release's changes). Its line is "No data yet." unless the emptiness says
   something the reader needs, such as a release following every contract or matching the live release. A field with
   no value keeps Not set, a cell the dash.
+- **A version range is chosen, not typed.** The owner asked why the version range was typed. A range has three forms
+  only (`1.2.0`, `~1.2.0`, `^1.2.0`), so it is two selects, as package managers split them: Version, from the installed
+  versions newest first ("1.2.0 (newest)"), and Updates in words, "Compatible updates (1.x)" for `^`, the default,
+  "Fixes only (1.2.x)" for `~`, "This version only" for exact. The file keeps the range as written, so no
+  configuration changes. A table shows it in words, "1.2.0 and later 1.x", "1.2.0 only". A version no longer installed
+  stays shown, with "0.9.0 is not installed. Choose an installed version." in warningText under it.
