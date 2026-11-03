@@ -12,8 +12,9 @@ one way to run. How the worker runs one work item is in
 **Today.** Every poll, after `Worker:PollInterval`, adds each tenant that is ready to the active list,
 and the loops run the tenants in the list. A tenant leaves the list when a claim finds nothing due and
 none of its other items runs, or when a run fails, and the next poll adds it again. So a tenant with a large backlog no longer holds back the
-others, but an idle cell still polls every database each round. Back-off and wake signals are planned,
-see [waking a tenant](#waking-a-tenant).
+others, but an idle cell still polls every database each round. Back-off is planned, see
+[waking a tenant](#waking-a-tenant). The server and the publisher already send the wake signal, but no
+worker listens to it yet.
 
 ## Fair share
 
@@ -60,7 +61,11 @@ An idle tenant is polled less and less often, and a wake signal brings it back a
   as a timer, a retry or an escalation. The worker polls the tenant again at that time, if it comes
   before the back-off ends.
 - **Wake signal.** When the server or the publisher commits a transaction that adds a work item due
-  now, it sends `NOTIFY axis_work, '<tenant id>'` on the platform database, after the commit. The
+  now, it sends `NOTIFY axis_work, '<tenant id>'` on the platform database, after the commit. This
+  sending side is built: the server sends once for each tenant a request touched, when the request
+  ends, and the publisher sends for the tenant it published or rolled back to, when the activation
+  left a schedule trigger past due. Each send is cut off after about 2 seconds, and a failed send is
+  logged and never fails the request or the publish. _(planned for M31)_ The
   worker holds one direct connection that runs `LISTEN axis_work`, see
   [connections](cells.md#connections). A signal puts the tenant at the end of the active list and
   resets its back-off. An installation under `Tenancy:Source=configuration` with no platform database

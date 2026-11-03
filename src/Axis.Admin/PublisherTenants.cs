@@ -36,6 +36,9 @@ internal interface IPublisherTenants
 
     /// <summary>The tenants to serve now, in ordinal order of id.</summary>
     Task<IReadOnlyList<PublisherTenant>> ReadAsync(CancellationToken cancellationToken);
+
+    /// <summary>Sends the wake signal for <paramref name="tenantId"/>, or nothing when the source has no platform database.</summary>
+    Task WakeAsync(string tenantId, CancellationToken cancellationToken);
 }
 
 /// <summary>The active tenants of the directory that are on this build's schema version.</summary>
@@ -45,6 +48,15 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, Realm
 
     public Task<string?> CheckAsync(CancellationToken cancellationToken) =>
         AdminCommands.PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+
+    public async Task WakeAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(settings.PlatformConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("SELECT pg_notify('axis_work', @tenant)", connection);
+        command.Parameters.AddWithValue("tenant", tenantId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<PublisherTenant>> ReadAsync(CancellationToken cancellationToken)
     {
@@ -107,6 +119,8 @@ internal sealed class ConfigurationPublisherTenants(
     public TimeSpan ReadInterval => TimeSpan.Zero;
 
     public Task<string?> CheckAsync(CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+
+    public Task WakeAsync(string tenantId, CancellationToken cancellationToken) => Task.CompletedTask;
 
     public async Task<IReadOnlyList<PublisherTenant>> ReadAsync(CancellationToken cancellationToken)
     {
