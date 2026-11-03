@@ -12,7 +12,7 @@ namespace Axis.Tenancy.Realms;
 /// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
 /// It reads one page of users with the number of all users that match the search, and for each user on the page the
 /// alias of the first federated identity. It counts the enabled users. It also finds one user, disables or enables a user, ends a user's realm
-/// sessions or one realm session by its id and removes a user's authenticators. It also invites a person: it finds an account by email, creates an account with
+/// sessions or one realm session by its id, lists a user's authenticators and removes them. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
 /// also normalises an email address. An error names the step and the status code, never a response body or a secret.
 /// </summary>
@@ -165,6 +165,29 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
                 token, HttpMethod.Delete, $"{path}/credentials/{Uri.EscapeDataString(credential.GetProperty("id").GetString()!)}", null, cancellationToken);
             EnsureSuccess(removed, "remove the authenticator of the user");
         }
+    }
+
+    /// <summary>Lists the user's authenticator apps (the <c>otp</c> credentials), oldest first. A credential without a created date comes last.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<IReadOnlyList<RealmAuthenticator>> ListAuthenticatorsAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var listed = await GetAsync(token, $"{UserPath(userId)}/credentials", cancellationToken);
+        EnsureSuccess(listed, "list the credentials of the user");
+        var credentials = await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return
+        [
+            .. credentials.EnumerateArray()
+                .Where(credential => Text(credential, "type") == "otp")
+                .Select(credential => new RealmAuthenticator(
+                    credential.GetProperty("id").GetString()!,
+                    Text(credential, "userLabel"),
+                    credential.TryGetProperty("createdDate", out var created) && created.ValueKind == JsonValueKind.Number && created.TryGetInt64(out var milliseconds)
+                        ? DateTimeOffset.FromUnixTimeMilliseconds(milliseconds)
+                        : null))
+                .OrderBy(authenticator => authenticator.CreatedAt is null)
+                .ThenBy(authenticator => authenticator.CreatedAt),
+        ];
     }
 
     /// <summary>
@@ -337,6 +360,9 @@ public sealed record RealmUser(string Id, string Username, string? FirstName, st
 
 /// <summary>The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
 public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias);
+
+/// <summary>One authenticator app of a realm account: the credential id, its label and when it was added.</summary>
+public sealed record RealmAuthenticator(string Id, string? Label, DateTimeOffset? CreatedAt);
 
 /// <summary>The fields of an invited user that a resend carries over, and whether the user has set a password.</summary>
 public sealed record RealmInvitee(string? Email, string? FirstName, string? LastName, bool HasPassword);

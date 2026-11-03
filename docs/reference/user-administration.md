@@ -73,6 +73,14 @@ seven commands are built. The invite, resend an invitation, disable, enable and 
   the list route (`401`, `403`, `404` for a preview tenant or a tenant without a users client), then answers `404` for a user
   that the realm does not have and for a service account. When the identity provider fails, it answers `502` with a fixed title.
   It only reads, so it accepts any signed-in caller who holds `Users:AdministratorRole`, not only a browser session.
+- **The authenticators route:** `GET /api/me/authenticators` answers `{ account, authenticators: [{ id, label, createdAt }] }` to
+  the signed-in person about themselves. `authenticators` holds the person's authenticator apps, the `otp` credentials of the
+  realm, oldest first, and never a password or another credential type. `label` is the realm's `userLabel` and is `null` when
+  empty, and `createdAt` is an ISO timestamp, or `null` when the realm has no date. `account` is `false` with an empty list for
+  a user of a brokered provider, a realm user that is missing or a service account, a preview tenant and a tenant without a
+  users client. The route takes a session only, so a signed-out caller and a service account's bearer token get `401`. It needs
+  no administrator role and no recent login at the identity provider, because it only reads. When the identity provider
+  fails, it answers `502` with a fixed title.
 - **A user:** clicking a row opens a side panel with the person's roles, one section for each active application and one
   for the platform. Each role shows the "Given" tag when the person has it. A given role that is not declared any more
   has a "Not declared" tag, and its section lists it even when its application is not active. A Give or Remove button
@@ -173,6 +181,7 @@ asks its development users for a code, because each one has an authenticator, an
 - **Self-service** _(planned for M31)_: a person changes their own password and adds or removes their own authenticators
   on Axis's [account page](platform-pages.md#account-page), which replaces Keycloak's account console. A user of a
   brokered provider has neither in the realm, so the page offers neither.
+  The route that lists a person's authenticators is built, see [the authenticators route](#the-users-page).
 - **Terms** _(planned for M31)_: when the tenant sets terms, a person accepts them after the first sign-in and again on
   each new version, see [accepting the terms](legal.md#accepting-the-terms).
 

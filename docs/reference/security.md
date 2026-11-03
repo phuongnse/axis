@@ -150,6 +150,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
       comes before the lookup of the id.
     - An id that is not one of the caller's live sessions of the request's
       host answers a `404` problem, whoever owns it.
+  - `GET /api/me/authenticators` lists the person's own authenticators and needs a session too, see the
+    [users page reference](user-administration.md#the-users-page).
 - **Audit.** Sign-in writes
   [audit records](storage.md#audit-records-and-sequence-counters)
   in the database of the tenant that the host resolves to, see
@@ -295,6 +297,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     before any `404`, so a caller without a session cannot learn which sites
     or pages exist;
   - `GET /api/me` and `GET /api/about`;
+  - `GET /api/me/authenticators`;
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions`.
 
