@@ -174,3 +174,9 @@ the review.
     table as the `table` widget, which draws the toolbar, the row actions and their fold into a menu below 992 px, the
     paging and a cell with no value. The Releases list today lacks the fold and the paging because it is drawn on its
     own.
+- **One column takes the width left.** The owner saw Published by far wider than "System", as the three columns of
+  free text shared the width left over. Agreed: a table has one column that takes the width the others leave, the
+  longest text and the one most worth reading, the note on the Releases list; every other column of free text is as
+  wide as its content up to 320 px, where it wraps, with its title on one line and spacing-lg on each side, as a
+  fitted column has. Built in `tableColumns.ts` as `freeText`, `fillText` and `textCell`, on the Releases list; the
+  `table` widget does not follow these column rules yet, which the shared table of the issue brings to every table.

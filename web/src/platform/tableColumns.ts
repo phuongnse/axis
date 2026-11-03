@@ -26,9 +26,26 @@ export const fitContent = {
 }
 
 /**
- * Free text wraps at 320 px (D96), so one long value does not widen its column past it. Proposed: a table narrower than
- * its columns' content scrolls sideways, as `scroll={{ x: 'max-content' }}`, rather than squeezing them.
+ * Free text wraps at 320 px (D96), so one long value does not widen its column past it. Proposed: a column of free text
+ * is as wide as its content up to that, so a short value such as a person's name leaves no empty width. Its `render`
+ * wraps the value in `textCell`. A table narrower than its columns' content scrolls sideways, as
+ * `scroll={{ x: 'max-content' }}`, rather than squeezing them.
  */
 export const freeText = {
-  onCell: () => ({ style: { maxWidth: 320, overflowWrap: 'anywhere', ...rowLine } as CSSProperties }),
+  // Its title never wraps, and it keeps spacing-lg on each side, as a column fitted to its content does.
+  onHeaderCell: () => ({ style: fitted }),
+  onCell: () => ({ style: { width: '1%', paddingInline: spacingTokens.lg, ...rowLine } as CSSProperties }),
 }
+
+/**
+ * Proposed: the one column of free text that takes the width the other columns leave, the longest and the one most
+ * worth reading, such as a release's note. Its text still wraps at 320 px. A table has one such column, else the
+ * columns of free text would share the width left over and each show empty space.
+ */
+export const fillText = {
+  onHeaderCell: () => ({ style: { paddingInline: spacingTokens.lg } }),
+  onCell: () => ({ style: { paddingInline: spacingTokens.lg, ...rowLine } as CSSProperties }),
+}
+
+/** The value of a free text cell: as wide as its content, up to 320 px, where it wraps. */
+export const textCell: CSSProperties = { width: 'max-content', maxWidth: 320, overflowWrap: 'anywhere' }

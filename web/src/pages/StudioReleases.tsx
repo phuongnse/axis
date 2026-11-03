@@ -3,7 +3,7 @@ import { Flex, Modal, Table, Tag, Typography } from 'antd'
 import { useContext, useState, type HTMLAttributes } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { releaseActorName, releaseGroups, type StudioReleaseGroup, type StudioReleases } from '../platform/studio'
-import { fitContent, freeText } from '../platform/tableColumns'
+import { fillText, fitContent, freeText, textCell } from '../platform/tableColumns'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { visuallyHidden } from '../platform/visuallyHidden'
@@ -79,7 +79,7 @@ export function StudioReleasesList({
               key: 'label',
               title: t('shell.studio.releases.label'),
               ...freeText,
-              render: (_, release) => release.label ?? <NoValue />,
+              render: (_, release) => <div style={textCell}>{release.label ?? <NoValue />}</div>,
             },
             {
               // Proposed: when and by whom a release was published are two columns, as facts of different kinds are.
@@ -92,14 +92,14 @@ export function StudioReleasesList({
               key: 'publishedBy',
               title: t('shell.studio.releases.publishedBy'),
               ...freeText,
-              render: (_, release) => releaseActorName(release.published, t),
+              render: (_, release) => <div style={textCell}>{releaseActorName(release.published, t)}</div>,
             },
             {
               // Proposed: the note, the longest text and the most often missing, comes last, so it takes the width left.
               key: 'note',
               title: t('shell.studio.releases.note'),
-              ...freeText,
-              render: (_, release) => release.note ?? <NoValue />,
+              ...fillText,
+              render: (_, release) => <div style={textCell}>{release.note ?? <NoValue />}</div>,
             },
             ...(canActivate
               ? [
