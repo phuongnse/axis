@@ -294,7 +294,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     application, so they count as application content. The session is checked
     before any `404`, so a caller without a session cannot learn which sites
     or pages exist;
-  - `GET /api/me` and `GET /api/about`;
+  - `GET /api/me`, `GET /api/about` and `GET /api/licences`;
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions`.
 

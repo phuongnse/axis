@@ -51,7 +51,10 @@ _(planned for M31)_
   hides the version: it tells an attacker which known weaknesses to try, see [layout](shell.md#layout). A search box filters both by name or licence. Each entry opens its licence text, or links the standard text on
   spdx.org.
 - **Built from what ships.** The build writes the list from the packages that ship, so it never falls behind them,
-  and the SPA serves it. No list is kept by hand.
+  and the SPA serves it. No list is kept by hand. `scripts/build.sh` runs `scripts/write-licences.mjs`, which writes
+  the public `/licences.json`, with names and licences and no versions, and a server-side `licences.json` that also
+  holds versions. `GET /api/licences` gives the server-side file only to a signed-in person and answers `401` without a
+  session.
 - **A reserved path.** `licences` joins the reserved site paths, so no site can take `/licences`, see
   [sites and pages](configuration.md).
 

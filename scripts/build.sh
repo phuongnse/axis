@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the SPA into the server web root, checks its size against web/bundle-budget.json and its font files
-# and license texts, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
+# and license texts, then writes the open source licence lists (the public wwwroot/licences.json and the server's
+# licences.json with versions) from the SPA's lock file and the NuGet project assets, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
 # files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the .NET solution,
 # which installs the sample extension package in artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates in
 # artifacts/templates.
@@ -10,6 +11,9 @@ cd "$(dirname "$0")/.."
 npm run build --prefix web
 node scripts/check-bundle.mjs src/Axis.Server/wwwroot
 node scripts/check-fonts.mjs src/Axis.Server/wwwroot
+node scripts/write-licences.mjs
+test -f src/Axis.Server/wwwroot/licences.json
+test -f src/Axis.Server/licences.json
 npm run build:keycloak-theme --prefix web
 theme=artifacts/keycloak-theme/axis/login
 test -f "$theme/theme.properties"
