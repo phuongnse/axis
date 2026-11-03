@@ -7,7 +7,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisTable } from '../platform/AxisTable'
 import { dialogWidth } from '../platform/dialogButtons'
 import { EmptyDash } from '../platform/EmptyValue'
-import { getAt } from '../platform/jsonPatch'
+import { getAt, setAt } from '../platform/jsonPatch'
 import {
   fetchStudioRelaxed,
   relaxedPointWords,
@@ -367,7 +367,9 @@ function ListTable({
     return true
   })
   const listKey = fieldTextKey(kind, pointer)
-  const [open, setOpen] = useState<{ index: number; isNew: boolean; before: unknown } | null>(null)
+  // Proposed: the dialog edits its own copy of the item. Done writes it to the list, as one step to undo; Cancel leaves
+  // the list as it was, so Add… adds no row until Done.
+  const [open, setOpen] = useState<{ index: number; isNew: boolean; item: unknown } | null>(null)
   const nested = properties.some(([, child]) => {
     const resolved = resolveSchema(child, root)
     return resolved.type === 'array' || (resolved.type === 'object' && resolved.properties === undefined)
@@ -375,17 +377,42 @@ function ListTable({
   const itemTitle = textOr(t, `${listKey}.item`, 'shell.studio.list.item')
 
   function add() {
-    const next = [...items, defaultFor(node.items!, root)]
-    onChange(pointer, next)
-    setOpen({ index: next.length - 1, isNew: true, before: undefined })
+    setOpen({ index: items.length, isNew: true, item: defaultFor(node.items!, root) })
   }
 
-  function cancel() {
+  function done() {
     if (open) {
-      onChange(`${pointer}/${open.index}`, open.isNew ? undefined : open.before)
+      onChange(open.isNew ? pointer : `${pointer}/${open.index}`, open.isNew ? [...items, open.item] : open.item)
     }
     setOpen(null)
   }
+
+  // A change inside the dialog lands on its copy: the pointer names the item's place in the list, as it will be.
+  const itemPointer = open ? `${pointer}/${open.index}` : ''
+  const changeItem: ChangeHandler = (target, next) => {
+    if (!open || !target.startsWith(itemPointer)) {
+      onChange(target, next)
+      return
+    }
+    const rest = target.slice(itemPointer.length)
+    // Each change builds on the copy as the one before left it, so two changes in one event both land.
+    setOpen((current) => current && { ...current, item: rest === '' ? next : setAt(current.item ?? {}, rest, next) })
+  }
+  // The rest of the form sees the copy in its place, so a field that reads a sibling, such as a module's roles reading
+  // its module, finds it.
+  const dialogRoot = open
+    ? setAt(
+        rootValue,
+        pointer,
+        open.isNew ? [...items, open.item] : items.map((item, index) => (index === open.index ? open.item : item)),
+      )
+    : rootValue
+  const missing = open
+    ? (itemSchema.required ?? []).some((name) => {
+        const value = (open.item as Record<string, unknown> | undefined)?.[name]
+        return value === undefined || value === null || value === ''
+      })
+    : false
 
   // Proposed: a list that is a set shows by name, a module or package by its label; each row keeps its place in the
   // file, which Edit… and Remove use.
@@ -442,7 +469,7 @@ function ListTable({
               labelKey: 'shell.studio.list.edit',
               nameSuffix: `${itemTitle} ${row.index + 1}`,
               icon: <EditOutlined />,
-              onClick: () => setOpen({ index: row.index, isNew: false, before: items[row.index] }),
+              onClick: () => setOpen({ index: row.index, isNew: false, item: items[row.index] }),
             },
             {
               key: 'remove',
@@ -466,8 +493,10 @@ function ListTable({
         }
         okText={t('shell.studio.list.done')}
         cancelText={t('shell.studio.cancel')}
-        onOk={() => setOpen(null)}
-        onCancel={cancel}
+        // Proposed: Done waits for the item's required fields, such as its module.
+        okButtonProps={{ disabled: missing }}
+        onOk={done}
+        onCancel={() => setOpen(null)}
         destroyOnHidden
       >
         {open && (
@@ -478,12 +507,12 @@ function ListTable({
                   key={name}
                   node={child}
                   root={root}
-                  rootValue={rootValue}
-                  pointer={`${pointer}/${open.index}/${escapeSegment(name)}`}
+                  rootValue={dialogRoot}
+                  pointer={`${itemPointer}/${escapeSegment(name)}`}
                   name={name}
-                  value={(items[open.index] as Record<string, unknown> | undefined)?.[name]}
+                  value={(open.item as Record<string, unknown> | undefined)?.[name]}
                   required={new Set(itemSchema.required).has(name)}
-                  onChange={onChange}
+                  onChange={changeItem}
                 />
               ))}
             </Flex>
@@ -655,7 +684,11 @@ function SlotMap({
   }))
   if (!module || module[slots].length === 0) {
     return (
-      <Typography.Text style={{ color: colour.textMuted }}>{t(`shell.studio.slots.${slots}.none`)}</Typography.Text>
+      <Typography.Text style={{ color: colour.textMuted }}>
+        {module
+          ? t(`shell.studio.slots.${slots}.empty`).replace('{module}', module.label)
+          : t(`shell.studio.slots.${slots}.none`)}
+      </Typography.Text>
     )
   }
   return (
@@ -783,7 +816,16 @@ function SchemaNode({
         style={{ width: '100%' }}
         value={typeof value === 'string' ? value : undefined}
         options={entries?.map((entry) => ({ value: entry.id, label: entry.label ?? entry.id }))}
-        onChange={(next) => onChange(pointer, next)}
+        onChange={(next) => {
+          onChange(pointer, next)
+          // Proposed: choosing a module or package fills an empty version range with its newest version, "^1.2.0", so
+          // the item is complete and the author changes it only to pin another.
+          const versionPointer = `${pointer.slice(0, pointer.lastIndexOf('/'))}/version`
+          const newest = entries?.find((entry) => entry.id === next)?.versions[0]
+          if (newest && !getAt(rootValue, versionPointer)) {
+            onChange(versionPointer, `^${newest}`)
+          }
+        }}
       />
     )
   } else if (control === 'timeZone') {
