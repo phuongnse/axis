@@ -45,10 +45,10 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-function stub(seed: unknown) {
+function stub(seed: unknown, patch: () => Response = () => json({ version: 's2', diagnostics: [] })) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     if (input === `${folder}/resources/${seedId}` && init?.method === 'PATCH') {
-      return json({ version: 's2', diagnostics: [] })
+      return patch()
     }
     if (input === `${folder}/resources/${seedId}`) {
       return json({ ...resources[0], content: seed })
@@ -189,6 +189,32 @@ describe('StudioEditor for a seed', () => {
     expect(JSON.parse(patches[0][1]!.body as string)).toEqual([
       { op: 'replace', path: '/records/0/values/size', value: 4 },
     ])
+  })
+
+  it('shows the quota title when a save is refused past the storage quota', async () => {
+    stub(
+      seedContent('Order', [{ id: 'a', values: { code: 'X1', size: 3 } }]),
+      () =>
+        new Response(
+          JSON.stringify({
+            title: 'This tenant has reached its storage quota.',
+            status: 403,
+            reason: 'quota-exceeded',
+            quota: 'storage',
+          }),
+          { status: 403 },
+        ),
+    )
+    renderEditor()
+    const size = await screen.findByRole('textbox', { name: 'size' }, slow)
+
+    await userEvent.clear(size)
+    await userEvent.type(size, '4')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('studio-save-error')).toHaveTextContent(
+      'This tenant has reached its storage quota.',
+    )
   })
 
   it('keeps a child collection and an unknown key when a record is added', async () => {

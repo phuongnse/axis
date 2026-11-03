@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import { quotaRefusalTitle } from './quota'
 
 /** The state of an import: `pending` until the dry run ends, then `checked` or `failed`, and `committed` after a commit. */
 export type ImportState = 'pending' | 'checked' | 'failed' | 'committed'
@@ -10,8 +11,8 @@ export interface RecordImport {
   errors: Record<string, string[]>
 }
 
-/** The outcome of a request on an import: the import, or the refused response's status. */
-export type ImportResult = { ok: true; import: RecordImport } | { ok: false; status: number }
+/** The outcome of a request on an import: the import, or the refused response's status and the quota title when it is a quota refusal. */
+export type ImportResult = { ok: true; import: RecordImport } | { ok: false; status: number; title?: string }
 
 const csvType = 'text/csv'
 const xlsxType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -35,7 +36,8 @@ export function importContentType(file: { name: string }): string | null {
 
 async function result(response: Response, accepted: number): Promise<ImportResult> {
   if (response.status !== accepted) {
-    return { ok: false, status: response.status }
+    const title = await quotaRefusalTitle(response)
+    return title === null ? { ok: false, status: response.status } : { ok: false, status: response.status, title }
   }
   const body = (await response.json()) as Partial<RecordImport>
   return { ok: true, import: { id: body.id!, state: body.state!, errors: body.errors ?? {} } }

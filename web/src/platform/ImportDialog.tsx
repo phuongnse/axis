@@ -105,8 +105,14 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
     setProblem(null)
   }
 
-  // An upload has its own message for a 403, 413 and 415. Any other refusal is a generic failure.
-  const refuse = (status: number, uploading: boolean) =>
+  // A quota refusal shows the server's title. An upload has its own message for a 403, 413 and 415.
+  // Any other refusal is a generic failure.
+  const refuse = (refused: { status: number; title?: string }, uploading: boolean) => {
+    if (refused.title !== undefined) {
+      setProblem(refused.title)
+      return
+    }
+    const { status } = refused
     setProblem(
       uploading && status === 403
         ? t('shell.table.importDenied')
@@ -116,6 +122,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
             ? t('shell.table.importWrongType')
             : t('shell.table.importUploadFailed'),
     )
+  }
 
   const upload = async () => {
     const contentType = file === null ? null : importContentType(file)
@@ -128,7 +135,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
     try {
       const result = await uploadImport(importsPath, file, contentType)
       if (!result.ok) {
-        refuse(result.status, true)
+        refuse(result, true)
         setPhase('idle')
         return
       }
@@ -151,7 +158,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
     try {
       const result = await commitImport(importsPath, importId)
       if (!result.ok) {
-        refuse(result.status, false)
+        refuse(result, false)
         setPhase('checked')
         return
       }

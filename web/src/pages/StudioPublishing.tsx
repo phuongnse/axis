@@ -1,5 +1,6 @@
 import { Alert, Button, Flex, Input, Modal } from 'antd'
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
@@ -38,7 +39,8 @@ export interface StudioPublishingHandle {
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
- * sends a publish request. A Roll back button in the history sends a rollback request.
+ * sends a publish request. A publish refused by a tenant quota shows the server's title in the error alert.
+ * A Roll back button in the history sends a rollback request.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
  * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
@@ -83,7 +85,7 @@ export function StudioPublishing({
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
   const [previewLinks, setPreviewLinks] = useState<string[]>([])
   const [sending, setSending] = useState(false)
-  const [sendFailed, setSendFailed] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [label, setLabel] = useState('')
   const [note, setNote] = useState('')
@@ -149,7 +151,7 @@ export function StudioPublishing({
         }
         console.warn(`Checking the request '${requestId}' failed`, error)
         setRequest(null)
-        setSendFailed(true)
+        setSendError(t('shell.studio.request.sendFailed'))
         setHistoryRevision((value) => value + 1)
       }
     }
@@ -194,11 +196,11 @@ export function StudioPublishing({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [application, requestId, running, generation, lost, previewHost])
+  }, [application, requestId, running, generation, lost, previewHost, t])
 
   async function send(start: () => Promise<StudioRequest>) {
     setSending(true)
-    setSendFailed(false)
+    setSendError(null)
     try {
       const sent = await start()
       setReleaseNumber(null)
@@ -209,7 +211,7 @@ export function StudioPublishing({
         lost()
       } else {
         console.warn(`Sending the request for '${application}' failed`, error)
-        setSendFailed(true)
+        setSendError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.request.sendFailed'))
       }
     } finally {
       setSending(false)
@@ -259,9 +261,7 @@ export function StudioPublishing({
           </Button>
         )}
       </Flex>
-      {sendFailed && (
-        <Alert data-testid="studio-request-error" type="error" title={t('shell.studio.request.sendFailed')} />
-      )}
+      {sendError !== null && <Alert data-testid="studio-request-error" type="error" title={sendError} />}
       {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
       {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
         <StudioTestResults request={request} onSelect={onOpenScenario} />
