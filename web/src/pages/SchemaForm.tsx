@@ -28,6 +28,7 @@ import {
   fieldControls,
   fieldTextKey,
   fitColumns,
+  RemovedNoticeContext,
   setLists,
   identityProperties,
   SchemaFormKindContext,
@@ -350,6 +351,7 @@ function ListTable({
 }: NodeProps & { kind: string; inHeading?: boolean }) {
   const t = useText()
   const slot = useContext(SectionActionSlot)
+  const notifyRemoved = useContext(RemovedNoticeContext)
   const catalog = useContext(StudioCatalogContext)
   const items = Array.isArray(value) ? (value as unknown[]) : []
   const itemSchema = resolveSchema(node.items!, root)
@@ -448,7 +450,10 @@ function ListTable({
               nameSuffix: `${itemTitle} ${row.index + 1}`,
               icon: <DeleteOutlined />,
               destructive: true,
-              onClick: () => onChange(`${pointer}/${row.index}`, undefined),
+              onClick: () => {
+                onChange(`${pointer}/${row.index}`, undefined)
+                notifyRemoved?.(rowName(row.item) || itemTitle)
+              },
             },
           ],
         }}

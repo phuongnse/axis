@@ -70,3 +70,6 @@ export const fitColumns = new Set([
  * list keeps the order it is written in. The file keeps its order either way.
  */
 export const setLists = new Set(['application.modules', 'application.packages'])
+
+/** Proposed: tells the editor a row was removed, by its name, so it offers Undo in a notice. */
+export const RemovedNoticeContext = createContext<((name: string) => void) | null>(null)

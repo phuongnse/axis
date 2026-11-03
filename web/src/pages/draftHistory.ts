@@ -2,6 +2,8 @@
 export interface DraftSnapshot {
   draft: Record<string, unknown>
   jsonText: string | null
+  /** Proposed: the label texts edited but not saved, so Undo takes a label's text back too. */
+  pendingTexts?: Record<string, Record<string, string>>
 }
 
 /**

@@ -188,3 +188,16 @@ server. Agreed, three rules chosen by what a list is:
   `application.json` only decides which entry AXC0306 reports, so it is no author's order.
 - **Sorting is for display only.** The file keeps its order, so adding a module adds one line to its diff. Studio's
   small tables have no sort by column, as their order is already the one to expect; the `table` widget keeps D96's rules.
+
+## Undo rather than confirm
+
+The owner asked why Remove asks nothing, and noted that Discard drops every change, not one. Agreed, as Nielsen Norman
+Group and Material advise, and as mail and documents do:
+
+- **What can be taken back is undone, not confirmed.** Removing a row changes only the draft, so it asks nothing; a
+  notice names it, "Organization removed.", with Undo, for ten seconds.
+- **Every editor keeps a history.** Undo and Redo, icons in the save bar with Ctrl+Z and Ctrl+Shift+Z, step through
+  every change of the draft, a label's texts among them, on every resource kind, no longer only on the designers. The
+  bar stays while a step can be redone, reading "No unsaved changes" once all are undone.
+- **What cannot be taken back is confirmed.** Discard drops every unsaved change at once and no Undo brings them back,
+  so a small dialog asks "Discard all unsaved changes?" with a red Discard; deleting a resource keeps its dialog.
