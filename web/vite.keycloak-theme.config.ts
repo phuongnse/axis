@@ -23,6 +23,12 @@ function copyThemeFiles(): Plugin {
         'select-authenticator.ftl',
         'login-update-profile.ftl',
         'idp-review-user-profile.ftl',
+        'logout-confirm.ftl',
+        'info.ftl',
+        'error.ftl',
+        'login-page-expired.ftl',
+        'saml-post-form.ftl',
+        'frontchannel-logout.ftl',
         'messages',
       ]) {
         cpSync(path.resolve(import.meta.dirname, 'keycloak-theme', name), path.join(themeFolder, name), {

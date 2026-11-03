@@ -249,6 +249,74 @@ export interface UpdateProfileContext extends IdentityFrameContext {
   texts: UpdateProfileTexts
 }
 
+/** What the sign-out question draws: Keycloak asks whether to end the session when the server could not do it itself. */
+export interface SignOutContext extends IdentityFrameContext {
+  page: 'signOut'
+  title: string
+  /** Where the form posts `session_code` and `confirmLogout`. */
+  action: string
+  /** Keycloak's code of the sign-out, which the form posts back as `session_code`. */
+  sessionCode: string
+  /** Where "Back to application" goes. Absent when Keycloak gives none. */
+  backUrl?: string
+  texts: { message: string; signOut: string; backToApplication: string }
+}
+
+/** What a notice draws, such as "Your account has been updated", with its link onward. */
+export interface NoticeContext extends IdentityFrameContext {
+  page: 'notice'
+  title: string
+  message: string
+  /** Where the notice goes on, such as the application or the next step. Absent when Keycloak offers no link. */
+  linkUrl?: string
+  /** The text of the link. Set together with `linkUrl`. */
+  linkText?: string
+}
+
+/** What an error page draws: Keycloak's message as an error alert. */
+export interface ErrorContext extends IdentityFrameContext {
+  page: 'error'
+  title: string
+  error: string
+  /** Where "Back to application" goes. Absent when the client has no home address. */
+  backUrl?: string
+  texts: { backToApplication: string }
+}
+
+/** What the expired page draws: what happened, with Continue and Start again. */
+export interface PageExpiredContext extends IdentityFrameContext {
+  page: 'pageExpired'
+  title: string
+  /** Where Continue goes, Keycloak's login action. */
+  continueUrl: string
+  /** Where Start again goes, Keycloak's restart address. */
+  restartUrl: string
+  texts: { message: string; continue: string; startAgain: string }
+}
+
+/** What the SAML redirect draws: a short card, and a form that posts at once. */
+export interface SamlPostContext extends IdentityFrameContext {
+  page: 'samlPost'
+  title: string
+  /** Where the form posts. */
+  action: string
+  samlRequest?: string
+  samlResponse?: string
+  relayState?: string
+  texts: { message: string; continue: string }
+}
+
+/** What the front-channel sign-out draws: the hidden sign-out frame of each client, then the redirect. */
+export interface FrontChannelSignOutContext extends IdentityFrameContext {
+  page: 'frontChannelSignOut'
+  title: string
+  /** The clients whose hidden frame signs them out. */
+  clients: { name: string; url: string }[]
+  /** Where the page goes on after the frames have loaded. Absent when Keycloak gives none. */
+  redirectUrl?: string
+  texts: { message: string; continue: string }
+}
+
 /** What the page of the identity provider's theme draws, told apart by `page`. */
 export type IdentityContext =
   | SignInContext
@@ -258,3 +326,9 @@ export type IdentityContext =
   | UpdatePasswordContext
   | SelectAuthenticatorContext
   | UpdateProfileContext
+  | SignOutContext
+  | NoticeContext
+  | ErrorContext
+  | PageExpiredContext
+  | SamlPostContext
+  | FrontChannelSignOutContext

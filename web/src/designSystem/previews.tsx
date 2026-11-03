@@ -285,6 +285,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Update your profile', draw: () => <IdentitySignIn page="updateProfile" />, frameHeight: 720 },
+    { caption: 'Sign out', draw: () => <IdentitySignIn page="signOut" />, frameHeight: 600 },
+    { caption: 'Notice', draw: () => <IdentitySignIn page="notice" />, frameHeight: 600 },
+    { caption: 'Error', draw: () => <IdentitySignIn page="error" />, frameHeight: 600 },
     {
       caption: 'Language and theme',
       draw: () => (
