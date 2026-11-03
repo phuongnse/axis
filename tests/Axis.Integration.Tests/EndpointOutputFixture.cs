@@ -110,7 +110,8 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(_connectionString);
             builder.UseSetting("Tenants:a:Hosts:0", Host);
-            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_connectionString) + ";Maximum Pool Size=1");
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(_connectionString));
+            builder.UseSetting("Data:TenantPoolMaxSize", "1");
             builder.UseSetting("Tenants:a:SchemaConnectionString", _connectionString);
             builder.UseTestOidc(Tenant);
             builder.UseTestAuthentication(new TestIdentity("ivy", "Ivy Importer", "importer"));

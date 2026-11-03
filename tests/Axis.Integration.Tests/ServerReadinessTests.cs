@@ -86,7 +86,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         await using var factory = CreateFactory(a, b, RecordsApp, new LogCollector(), services =>
         {
             services.AddSingleton(provider => new CountingTenantConnectionFactory(
-                new TenantConnectionFactory(provider.GetRequiredService<ITenantCatalog>(), provider.GetRequiredService<ITenantContextAccessor>())));
+                new TenantConnectionFactory(provider.GetRequiredService<ITenantCatalog>(), provider.GetRequiredService<ITenantContextAccessor>(), provider.GetRequiredService<TenantPoolSettings>())));
             services.AddSingleton<ITenantConnectionFactory>(provider => provider.GetRequiredService<CountingTenantConnectionFactory>());
         });
         using var client = factory.CreateClient();
@@ -129,7 +129,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
             await using var factory = CreateFactory(a, b, RecordsApp, new LogCollector(), services =>
             {
                 services.AddSingleton(provider => new HangingTenantConnectionFactory(
-                    new TenantConnectionFactory(provider.GetRequiredService<ITenantCatalog>(), provider.GetRequiredService<ITenantContextAccessor>()),
+                    new TenantConnectionFactory(provider.GetRequiredService<ITenantCatalog>(), provider.GetRequiredService<ITenantContextAccessor>(), provider.GetRequiredService<TenantPoolSettings>()),
                     provider.GetRequiredService<ITenantContextAccessor>(),
                     port));
                 services.AddSingleton<ITenantConnectionFactory>(provider => provider.GetRequiredService<HangingTenantConnectionFactory>());

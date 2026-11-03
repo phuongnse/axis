@@ -132,7 +132,7 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database) : IClassF
             ConnectionString = new NpgsqlConnectionStringBuilder(tenant.SchemaConnectionString) { Username = tenant.Role, Password = tenant.Password }.ConnectionString,
         };
         var accessor = new TenantContextAccessor();
-        await using var pools = new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor);
+        await using var pools = new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor, TenantPoolSettings.Default);
         var runner = new WorkItemRunner(
             pools,
             accessor,

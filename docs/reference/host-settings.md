@@ -424,7 +424,8 @@ The server reads `Data:QueryTimeout`, `Data:ExportQueryTimeout`,
 reads `Data:ImportMaxRows` and, for the statements of its work items,
 [`Worker:StatementTimeout`](process-execution.md#worker-settings).
 `Data:ActivationTimeout` is read by the server when startup activation is on, and by
-`admin activate` and the publisher. See
+`admin activate` and the publisher. Both the server and the worker read `Data:TenantPoolMaxSize`,
+`Data:TenantPoolMinSize` and `Data:TenantPoolIdleLifetime`. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
@@ -438,7 +439,13 @@ reads `Data:ImportMaxRows` and, for the statements of its work items,
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
 | `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. An upload is refused with `413` above the smaller of this and the field's `maxSize`. Publish checks a field's `maxSize` against the 25 MB default, not against this setting. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
+| `Data:TenantPoolMaxSize` | `5` | The most connections in the runtime role's pool of each tenant. It wins over `Maximum Pool Size` in the tenant's connection string. A value that is not an integer of at least 1 stops the start, and the error names the setting. |
+| `Data:TenantPoolMinSize` | `0` | The connections each tenant's pool keeps open when idle. It wins over `Minimum Pool Size` in the tenant's connection string. A value that is not an integer from 0 up to `Data:TenantPoolMaxSize` stops the start, and the error names the setting. |
+| `Data:TenantPoolIdleLifetime` | `00:01:00` | How long an idle connection of a tenant's pool stays open before it closes, a duration of whole seconds of at least one second. It wins over `Connection Idle Lifetime` in the tenant's connection string. A shorter value lowers the pruning interval to match. Any other value stops the start, and the error names the setting. |
 
+- **Tenant pools.** The three pool settings apply to the runtime role's pools in the server and
+  the worker. `Max Auto Prepare` is always 0 on these pools, as transaction-mode
+  PgBouncer needs, see [connections](cells.md#connections).
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's
   next user. An interactive read runs in one short read-only transaction that
