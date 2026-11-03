@@ -115,6 +115,26 @@
             }
           },
           "additionalProperties": false
+        },
+        "pgbouncer": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "image": { "type": "string" },
+            "databaseHost": { "type": "string" },
+            "databasePort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "authUser": { "type": "string" },
+            "authDatabase": { "type": "string" },
+            "defaultPoolSize": { "type": "integer", "minimum": 1 },
+            "maxDbConnections": { "type": "integer", "minimum": 1 },
+            "maxClientConn": { "type": "integer", "minimum": 1 },
+            "resources": { "type": "object" },
+            "databaseAuthority": {
+              "type": "object",
+              "properties": { "volume": { "$ref": "#/definitions/volume" } }
+            }
+          },
+          "additionalProperties": false
         }
       }
     },
@@ -182,7 +202,9 @@
         "identityDatabaseUsername": { "$ref": "#/definitions/secretReference" },
         "identityDatabasePassword": { "$ref": "#/definitions/secretReference" },
         "identityAdminClientSecret": { "$ref": "#/definitions/secretReference" },
-        "identityCertificate": { "$ref": "#/definitions/tlsSecretReference" }
+        "identityCertificate": { "$ref": "#/definitions/tlsSecretReference" },
+        "pgbouncerAuth": { "$ref": "#/definitions/secretReference" },
+        "pgbouncerCertificate": { "$ref": "#/definitions/tlsSecretReference" }
       },
       "additionalProperties": false
     }

@@ -85,6 +85,34 @@ cell:
         tokenSecret:
           name: ""
           key: api-token
+  # PgBouncer in transaction mode in front of PostgreSQL, so a cell's tenant databases fit within
+  # PostgreSQL's connection limit. Turning it on renders a ConfigMap, a Deployment of one replica
+  # and a Service named <release>-pgbouncer, and sends the runtime connections of the server and
+  # the worker to it with Cell__RuntimeDatabaseHost and Cell__RuntimeDatabasePort (6432). It needs
+  # cell.id, databaseHost, authUser, secrets.pgbouncerAuth and secrets.pgbouncerCertificate. The
+  # publisher and the migrate Job keep connecting to PostgreSQL directly.
+  pgbouncer:
+    enabled: false
+    # The whole image reference. The integration tests run the same image.
+    image: edoburu/pgbouncer:v1.24.1-p1
+    # Required. The host of PostgreSQL, and its port.
+    databaseHost: ""
+    databasePort: 5432
+    # Required. The role that PgBouncer looks passwords up with, see docs/reference/installation.md.
+    authUser: ""
+    # The database that holds the lookup function pgbouncer.user_lookup of the auth user.
+    authDatabase: postgres
+    # The pool sizes of docs/reference/cells.md#connections.
+    defaultPoolSize: 3
+    maxDbConnections: 10
+    maxClientConn: 10000
+    # A Kubernetes resources block: requests and limits.
+    resources: {}
+    # Optional. A volume with root.crt, the authority certificate of the PostgreSQL server, mounted
+    # read-only at /db-ca. Same form as identity.databaseAuthority.volume. Without it PgBouncer
+    # verifies PostgreSQL's certificate against the system store.
+    databaseAuthority:
+      volume: {}
 
 # Extension packages, mounted read-only at /extensions. Empty uses the empty
 # folder of the image. Give any Kubernetes volume source, for example:
@@ -209,4 +237,14 @@ secrets:
   # The identity provider's HTTPS endpoint: a Kubernetes TLS Secret with tls.crt and tls.key, issued for
   # the DNS name of the identity Service. Required. Your Ingress must connect over HTTPS and verify it.
   identityCertificate:
+    name: ""
+  # The auth user's line of PgBouncer's userlist.txt, and only that line, so PgBouncer can run the
+  # lookup query. Used by PgBouncer only, and required when cell.pgbouncer.enabled is true.
+  pgbouncerAuth:
+    name: ""
+    key: userlist.txt
+  # PgBouncer's TLS endpoint for the server and the worker: a Kubernetes TLS Secret with tls.crt and
+  # tls.key, issued for the DNS name of the PgBouncer Service. Required when cell.pgbouncer.enabled
+  # is true. The keys are fixed, so the reference holds only the name.
+  pgbouncerCertificate:
     name: ""

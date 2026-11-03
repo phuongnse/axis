@@ -91,7 +91,7 @@ file.
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it only at start. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | no | Secret. Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value. Add the variable or a secret file yourself. |
-| `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](#several-server-replicas). |
+| `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](several-server-replicas.md). |
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
 | `IdentityProvider:Url` | `IdentityProvider__Url` | admin | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https`. |
@@ -343,7 +343,7 @@ sets it, 30 seconds by default.
   on port 443. To use a reverse proxy of your own instead, put it on the same
   machine in front of the server, and make it connect over HTTPS and check the
   server certificate. It must also reach the identity provider. See
-  [forwarded headers](#several-server-replicas). The images hold no `curl`, so the
+  [forwarded headers](several-server-replicas.md). The images hold no `curl`, so the
   example has no container health check. Probe `/health/ready` from the host, for
   example `curl --cacert <ca> --resolve servers:8080:127.0.0.1 https://servers:8080/health/ready`.
 - **The server certificate.** Put `tls.crt` and `tls.key` in
@@ -585,6 +585,45 @@ DNS name of the identity Service, such as `axis-identity.<namespace>.svc`:
 kubectl create secret tls axis-identity-tls --cert=tls.crt --key=tls.key
 ```
 
+**PgBouncer.** A cell sets `cell.pgbouncer.enabled` to `true` to run PgBouncer in
+transaction mode in front of PostgreSQL, see [connections](cells.md#connections).
+The chart then renders a ConfigMap, a Deployment and a Service named
+`<release>-pgbouncer`, and none of them when it is off. The Service has port 6432. The
+server and the worker send their runtime connections to it, with `Cell__RuntimeDatabaseHost`
+and `Cell__RuntimeDatabasePort`. The publisher and the migrate Job connect to PostgreSQL
+directly. PgBouncer runs as one replica, because each replica adds its own
+`max_db_connections` to PostgreSQL. TLS holds on both legs. PgBouncer asks the hosts for TLS
+and verifies PostgreSQL's certificate in full. The hosts verify PgBouncer's certificate with
+the `SSL Mode` and `Root Certificate` of `ConnectionStrings:Platform`, so the certificate
+must name `<release>-pgbouncer` and chain to that authority.
+
+PgBouncer looks passwords up with one auth user. As a superuser, create the user, then a
+lookup function in `cell.pgbouncer.authDatabase`. The function returns a password only
+for the tenant runtime roles, `axis_<id>_runtime`, so the schema role cannot connect
+through PgBouncer. It reads `pg_authid`, so a managed service may need another way to
+grant that right.
+
+```sql
+CREATE ROLE axis_pgbouncer LOGIN PASSWORD '<password>';
+CREATE SCHEMA pgbouncer;
+CREATE FUNCTION pgbouncer.user_lookup(p_user text, OUT uname text, OUT phash text)
+RETURNS record LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog AS $$
+  SELECT rolname::text, rolpassword::text FROM pg_authid
+  WHERE rolname = p_user AND rolcanlogin AND rolname LIKE 'axis\_%\_runtime'
+$$;
+REVOKE ALL ON FUNCTION pgbouncer.user_lookup(text) FROM PUBLIC;
+GRANT USAGE ON SCHEMA pgbouncer TO axis_pgbouncer;
+GRANT EXECUTE ON FUNCTION pgbouncer.user_lookup(text) TO axis_pgbouncer;
+```
+
+`userlist.txt` holds the auth user's line only: `"axis_pgbouncer" "<password or SCRAM verifier>"`.
+The second Secret is a TLS Secret:
+
+```sh
+kubectl create secret generic axis-pgbouncer-auth --from-file=userlist.txt
+kubectl create secret tls axis-pgbouncer-tls --cert=tls.crt --key=tls.key
+```
+
 **Install.** Write a values file that names the Secrets, then run:
 
 ```sh
@@ -631,7 +670,8 @@ set. Neither has an `Admin:ConnectionString`. The identity provider gets the fou
 `axis-identity` files and no other secret, and no other pod gets them.
 The server also mounts the `serverCertificate` Secret read-only at `/server-tls`, and no
 other pod does. The identity provider mounts the `identityCertificate` Secret
-read-only at `/identity-tls` in the same way.
+read-only at `/identity-tls` in the same way. Only the PgBouncer pod mounts the
+`pgbouncerAuth` and `pgbouncerCertificate` Secrets.
 Rendering fails with a message that names the value when a `name` is missing.
 The values schema rejects any field in a reference other than `name` and `key`.
 
@@ -642,7 +682,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
 | `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. `migrate.repository` is also the publisher's image. |
-| `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, the replicas also share the `studio.persistence` volume, see [several server replicas](#several-server-replicas). |
+| `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, the replicas also share the `studio.persistence` volume, see [several server replicas](several-server-replicas.md). |
 | `worker.replicas` | 1 | Worker replicas. |
 | `studio.folders` | none | Server only. The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>`. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
@@ -667,7 +707,16 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
-| `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain`, `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. |
+| `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain`, `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. The `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort` pair comes from `cell.pgbouncer` and goes to the server and the worker only. |
+| `cell.pgbouncer.enabled` | `false` | `true` renders PgBouncer, see [PgBouncer](#in-the-cloud). Rendering then fails with a message that names the value when `cell.id`, `cell.pgbouncer.databaseHost`, `cell.pgbouncer.authUser`, `secrets.pgbouncerAuth.name` or `secrets.pgbouncerCertificate.name` is empty. The schema rejects any field under `cell.pgbouncer` that this table does not list. |
+| `cell.pgbouncer.image` | `edoburu/pgbouncer:v1.24.1-p1` | The whole image reference of PgBouncer. `image.registry` and `image.tag` do not apply to it. The pod runs as user 70 of that image, with a read-only root file system, and one replica. |
+| `cell.pgbouncer.databaseHost`, `cell.pgbouncer.databasePort` | none, required, and 5432 | The address of PostgreSQL, the target of the wildcard `* = host=... port=...` database line. |
+| `cell.pgbouncer.authUser`, `cell.pgbouncer.authDatabase` | none, required, and `postgres` | The role that PgBouncer looks passwords up with, and the database that holds its `pgbouncer.user_lookup` function. The `auth_query` is fixed: `SELECT uname, phash FROM pgbouncer.user_lookup($1)`. |
+| `cell.pgbouncer.defaultPoolSize`, `cell.pgbouncer.maxDbConnections`, `cell.pgbouncer.maxClientConn` | 3, 10 and 10000 | `default_pool_size`, `max_db_connections` and `max_client_conn`, the starting values of [connections](cells.md#connections). |
+| `cell.pgbouncer.resources` | none | Kubernetes resource requests and limits of PgBouncer. |
+| `cell.pgbouncer.databaseAuthority.volume` | empty | Optional. A volume source with `root.crt`, the authority certificate of the PostgreSQL server, mounted read-only at `/db-ca` and set as `server_tls_ca_file`. Without it PgBouncer verifies PostgreSQL against the system store. |
+| `secrets.pgbouncerAuth` | key `userlist.txt` | PgBouncer only. Secret `name` and `key` of the auth user's line of `userlist.txt`, and only that line. Required with PgBouncer. |
+| `secrets.pgbouncerCertificate` | none, required with PgBouncer | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the PgBouncer Service. It has no `key`. |
 | `cell.certificate.enabled` | `false` | `true` renders a cert-manager `Issuer` and a `Certificate` named `<release>-tenant-subdomains` for `*.<cell.tenantDomain>`, see [hosts and certificates](cells.md#hosts-and-certificates). cert-manager must be installed, or the install fails because its resource types are missing. The chart renders no Ingress. The ingress of the cell serves the TLS Secret. With the certificate on, rendering fails with a message that names the value when `cell.tenantDomain`, `cell.certificate.secretName`, `cell.certificate.issuer.server` or `cell.certificate.issuer.dns01.tokenSecret.name` is empty. The schema rejects any field under `cell.certificate` that this table does not list, so no value can hold a token. |
 | `cell.certificate.secretName` | empty | The Kubernetes TLS Secret that cert-manager writes the certificate into. Required when the certificate is on. |
 | `cell.certificate.issuer.server`, `cell.certificate.issuer.email` | Let's Encrypt production directory, empty | The ACME directory URL of the `Issuer`, and the optional contact email. The email renders only when set. cert-manager creates the ACME account key in the Secret `<release>-tenant-subdomains-acme-account`. |
@@ -694,59 +743,9 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas and the pinned cert-manager schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks that the identity secret files and certificate are mounted in the identity pod only and in no env entry, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume or the password-list volume. It checks the cert-manager `Certificate` and `Issuer` of the tenant subdomains: the wildcard name, the Secret name, the DNS-01 solver with a Secret reference for its token, that an inline token is rejected and never rendered, that nothing renders with the certificate off, and that rendering fails, naming the value, without the tenant domain, the Secret name, the ACME server or the token Secret name. `scripts/setup.sh` installs the pinned Helm,
-kubeconform, Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`. Axis has no test
+Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks that the identity secret files and certificate are mounted in the identity pod only and in no env entry, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume or the password-list volume. It checks the cert-manager `Certificate` and `Issuer` of the tenant subdomains: the wildcard name, the Secret name, the DNS-01 solver with a Secret reference for its token, that an inline token is rejected and never rendered, that nothing renders with the certificate off, and that rendering fails, naming the value, without the tenant domain, the Secret name, the ACME server or the token Secret name. It checks the PgBouncer objects: that only the server and the worker get the runtime database settings, the transaction pool mode, the pool sizes, the wildcard database line and the TLS modes in the ConfigMap, the non-root pod with a read-only root file system, the Service port 6432, that nothing renders with PgBouncer off, that rendering fails, naming the value, without `cell.id`, the database host, the auth user or either Secret name, and that a `value` in either Secret reference is rejected. No test runs PgBouncer from the chart on a live cluster. `scripts/setup.sh` installs the pinned Helm,
+kubeconform, Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`, and downloads any schema file that a cached folder lacks. Axis has no test
 against a live cluster.
-
-## Several server replicas
-
-The server can run as several replicas behind a reverse proxy that ends TLS.
-See [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
-The shared key ring, the forwarded headers and the platform settings under both
-tenant sources, the Studio write lock, the Helm chart's `studio.persistence`
-and the Compose example with two replicas behind a TLS proxy and a shared
-Studio folder, with its smoke test, are built.
-
-- **A shared key ring.** The server keeps its data protection keys in the
-  platform database, encrypted with `Platform:SecretKey`. See
-  [platform database](storage.md#platform-database). Sessions survive a
-  restart and work on every replica. Every replica needs the same
-  `Platform:SecretKey`. A replica with another one fails to start, and the
-  error names the setting. The server sets the data protection application name
-  to `Axis`, so replicas installed at different paths share the keys. Changing
-  `Platform:SecretKey` on an installation that holds keys follows the steps of
-  the [installation key](tenant-setting-commands.md#installation-key) rotation,
-  which signs nobody out. The first start after this change also signs
-  everyone out once.
-- **Forwarded headers.** Behind a proxy that ends TLS, the server does not see
-  the client's connection, only the proxy's. Name your proxies so the server can
-  read the real scheme and host:
-
-  | Setting | Environment variable | Meaning |
-  | --- | --- | --- |
-  | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | IP addresses of the proxies. Use `__1`, `__2` and so on for more. |
-  | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | CIDR ranges of the proxies, such as `10.0.0.0/8`. |
-
-- **What the proxy must send.** It must set `X-Forwarded-For`,
-  `X-Forwarded-Proto` and `X-Forwarded-Host`. It must replace any value a
-  client sent. The server reads these headers only from a named address, one
-  hop, and never reads `X-Forwarded-Prefix`. With both settings empty, it
-  reads none. Loopback is not trusted by default. The rules are in
-  [forwarded headers](host-settings.md#forwarded-headers).
-- **Studio folders.** Put them on a shared volume. Mount it at the same path on
-  every replica, because the write lock is keyed by the folder path. The lock
-  is built. It lives in the platform database. In
-  Kubernetes that needs a `ReadWriteMany` storage class, set with
-  `studio.persistence`. In Compose, set `AXIS_STUDIO_DIR`. Both servers mount
-  it. The volume must be writable by the non-root user of the image, UID 1654,
-  and the chart sets no `fsGroup`. See [Studio](host-settings.md#studio-settings).
-- **On premises.** The Compose example runs two server replicas behind a TLS
-  proxy. See "TLS proxy and a second replica" in [on premises](#on-premises)
-  and [TLS](#tls).
-- **Platform settings under both tenant sources.** The server needs
-  `ConnectionStrings:PlatformSchema` and `Platform:SecretKey` also under
-  `Tenancy:Source=configuration`, because it creates the platform tables there
-  too. A missing one stops the start. See [tenancy settings](host-settings.md#tenancy-settings).
 
 ## TLS
 
