@@ -13,6 +13,7 @@ node scripts/check-fonts.mjs src/Axis.Server/wwwroot
 npm run build:keycloak-theme --prefix web
 theme=artifacts/keycloak-theme/axis/login
 test -f "$theme/theme.properties"
+test -f "$theme/frame.ftl"
 test -f "$theme/login.ftl"
 test -f "$theme/login-otp.ftl"
 test -f "$theme/login-reset-password.ftl"

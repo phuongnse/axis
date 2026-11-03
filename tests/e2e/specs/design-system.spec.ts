@@ -85,6 +85,7 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     'Forgot password': (state) => state.getByRole('button', { name: 'Send link', exact: true }),
     'Set password': (state) => state.getByLabel('Confirm password', { exact: true }),
     'Add an authenticator': (state) => state.getByText('Device name', { exact: true }),
+    'Language and theme': (state) => state.getByRole('menuitemradio', { name: 'System', exact: true }),
   },
 }
 

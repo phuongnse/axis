@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { identityUpdatePasswordContext } from '../designSystem/fixtures'
+import { ThemeModeProvider } from '../platform/theme'
 import type { UpdatePasswordContext } from './signInContext'
 import { UpdatePasswordPage } from './UpdatePasswordPage'
 
@@ -17,7 +18,7 @@ describe('UpdatePasswordPage', () => {
   })
 
   it('asks for the new password twice under the title and the organization', () => {
-    render(<UpdatePasswordPage context={context} />)
+    render(<UpdatePasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.getByText('Set your password')).toBeInTheDocument()
     expect(screen.getByText('Contoso')).toBeInTheDocument()
@@ -28,7 +29,7 @@ describe('UpdatePasswordPage', () => {
   })
 
   it('posts password-new, password-confirm and logout-sessions to the login action as a real form', () => {
-    const { container } = render(<UpdatePasswordPage context={context} />)
+    const { container } = render(<UpdatePasswordPage context={context} />, { wrapper: ThemeModeProvider })
     const form = container.querySelector('form') as HTMLFormElement
 
     expect(form).toHaveAttribute('method', 'post')
@@ -40,7 +41,7 @@ describe('UpdatePasswordPage', () => {
 
   it('posts when both passwords are filled and the same', async () => {
     const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
-    render(<UpdatePasswordPage context={context} />)
+    render(<UpdatePasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     await userEvent.type(screen.getByLabelText('New password'), 'S3cret!pass')
     await userEvent.type(screen.getByLabelText('Confirm password'), 'S3cret!pass')
@@ -51,7 +52,7 @@ describe('UpdatePasswordPage', () => {
 
   it('shows that the passwords differ and does not post', async () => {
     const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
-    render(<UpdatePasswordPage context={context} />)
+    render(<UpdatePasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     await userEvent.type(screen.getByLabelText('New password'), 'S3cret!pass')
     await userEvent.type(screen.getByLabelText('Confirm password'), 'Other!pass')
@@ -63,7 +64,7 @@ describe('UpdatePasswordPage', () => {
 
   it('asks for the new password before it posts', async () => {
     const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {})
-    render(<UpdatePasswordPage context={context} />)
+    render(<UpdatePasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     await userEvent.click(screen.getByRole('button', { name: 'Set password' }))
 
@@ -72,13 +73,15 @@ describe('UpdatePasswordPage', () => {
   })
 
   it('shows an error above the form', () => {
-    render(<UpdatePasswordPage context={{ ...context, error: 'Invalid password: minimum length 8.' }} />)
+    render(<UpdatePasswordPage context={{ ...context, error: 'Invalid password: minimum length 8.' }} />, {
+      wrapper: ThemeModeProvider,
+    })
 
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid password: minimum length 8.')
   })
 
   it('shows no alert without an error', () => {
-    render(<UpdatePasswordPage context={context} />)
+    render(<UpdatePasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
