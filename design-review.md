@@ -129,3 +129,7 @@ the review.
   every kind. Recommended and agreed: nothing, no block, as it is help for getting started and its work is done; no
   line that says so, no "add another" links, which New resource… on every list already gives, and no other block to
   fill the space. The Overview is then Live and Changes since the live release alone.
+- **Seeing what changed: not in this review.** The owner asked whether a change can be seen, not only listed. It
+  cannot yet: a row opens the resource as it is now. D119 and D125 already agree a diff view, planned for M35, which
+  the publish dialog shows from the live release. The owner chose to leave it to that plan and not to design a second
+  one here; whether the Overview links to it is for when it is built.
