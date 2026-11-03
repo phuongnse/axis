@@ -44,6 +44,7 @@ import {
 import { useText } from './texts'
 import { isVisible } from './visibleWhen'
 import { setOwn } from './ownProperty'
+import { dialogWidth } from './dialogButtons'
 
 interface TableWidgetProps {
   sitePath: string
@@ -703,6 +704,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           )}
           {confirming !== null && (
             <Modal
+              width={dialogWidth('small')}
               open
               title={t('shell.table.deleteConfirm')}
               okText={t('shell.table.delete')}

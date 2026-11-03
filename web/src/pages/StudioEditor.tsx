@@ -52,6 +52,7 @@ import type { FormUse } from './StudioFormUsedOn'
 import type { OpenResource } from './StudioReferences'
 import { TextTable, type TextColumn } from './TextTable'
 import { triggerSchema } from './triggerSchema'
+import { dialogWidth } from '../platform/dialogButtons'
 
 type Content = Record<string, unknown>
 
@@ -998,6 +999,7 @@ export function StudioEditor({
         />
       )}
       <Modal
+        width={dialogWidth('small')}
         open={deleteOpen}
         title={t('shell.studio.deleteConfirm')}
         okText={t('shell.studio.delete')}

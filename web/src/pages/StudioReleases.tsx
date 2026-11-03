@@ -16,6 +16,7 @@ import {
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /**
  * Proposed: the releases of the open application, one row per release, the highest number first: its number, with
@@ -64,6 +65,7 @@ export function StudioReleasesList({
 
   const dialog = (
     <Modal
+      width={dialogWidth('small')}
       open={pending !== null}
       title={t('shell.studio.activate.title').replace('{number}', String(pending?.number ?? ''))}
       okText={t('shell.studio.activate.confirm')}

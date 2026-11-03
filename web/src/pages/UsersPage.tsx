@@ -16,6 +16,7 @@ import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { UserRolesDrawer } from './UserRolesDrawer'
+import { dialogWidth } from '../platform/dialogButtons'
 
 const pageSize = 20
 
@@ -241,6 +242,7 @@ export function UsersPage() {
         />
       )}
       <Modal
+        width={dialogWidth('small')}
         open={pending !== null}
         title={pending && t(`shell.users.${pending.command}.confirm`)}
         okText={pending && t(`shell.users.${pending.command}.ok`)}

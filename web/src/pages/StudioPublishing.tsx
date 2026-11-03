@@ -23,6 +23,7 @@ import { useText } from '../platform/texts'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** How long Studio waits between two checks of a request. */
 const pollDelay = 1000
@@ -339,6 +340,7 @@ export function StudioPublishing({
         </>
       )}
       <Modal
+        width={dialogWidth('medium')}
         open={dialogOpen}
         title={t('shell.studio.publish.title')}
         okText={t('shell.studio.publish.confirm')}

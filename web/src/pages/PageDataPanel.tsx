@@ -5,6 +5,7 @@ import { bindingTypes, paletteLimit, type DataBinding } from '../platform/pageWi
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { paletteReasons } from './pagePaletteSupport'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /**
  * The data panel of the Design tab: the application's entities and data sources, in two lists, each name a button. A
@@ -95,6 +96,7 @@ export function BindingChoice({
   const names = useContext(StudioNamesContext)
   return (
     <Modal
+      width={dialogWidth('small')}
       open={binding !== undefined}
       centered
       title={binding === undefined ? '' : `${t('shell.studio.data.bind')} ${binding.name}`}

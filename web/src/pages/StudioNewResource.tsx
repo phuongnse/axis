@@ -11,6 +11,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { createStarter, starterKinds, textResourceName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
 import { studioKindGroups } from './studioViews'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** The locale a new text resource copies when the application has no site. */
 const fallbackLocale = 'en'
@@ -109,6 +110,7 @@ export function StudioNewResource({
           : t('shell.studio.newResource.button')}
       </Button>
       <Modal
+        width={dialogWidth('medium')}
         open={open}
         title={
           fixedName

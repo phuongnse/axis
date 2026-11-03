@@ -2,6 +2,7 @@ import { Button, Modal } from 'antd'
 import { startSignIn } from './api'
 import { useSignInNeeded } from './signInNeeded'
 import { useText } from './texts'
+import { dialogWidth } from './dialogButtons'
 
 /**
  * The dialog a 401 shows. It cannot be dismissed. Only the click on **Sign in** starts sign-in, so
@@ -11,6 +12,7 @@ export function SignInPromptDialog({ open }: { open: boolean }) {
   const t = useText()
   return (
     <Modal
+      width={dialogWidth('small')}
       open={open}
       title={t('shell.signInPrompt.title')}
       // The test id sits on the dialog, because the modal root has no size and a browser test reads it as hidden.

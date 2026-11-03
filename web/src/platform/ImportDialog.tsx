@@ -11,6 +11,7 @@ import {
 } from './imports'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
+import { dialogWidth } from './dialogButtons'
 
 /** How long the dialog waits between two checks of an import. */
 const pollDelay = 1000
@@ -194,6 +195,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
 
   return (
     <Modal
+      width={dialogWidth('large')}
       open
       title={t('shell.table.importTitle')}
       onCancel={onClose}

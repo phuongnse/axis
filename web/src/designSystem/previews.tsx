@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { LargeDialogPreview, MediumDialogPreview, SmallDialogPreview } from './DialogPreview'
 import type { InitialEntry } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { SignInCard } from '../pages/HomePage'
@@ -209,6 +210,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
   tabs: typical(() => <WidgetTree widgets={[tabsWidget]} renderLeaf={renderLeaf} />),
   section: typical(() => <WidgetTree widgets={[sectionWidget]} renderLeaf={renderLeaf} />),
   // Loading and the load error look the same in every widget, so they are drawn once, in the table.
+  // Proposed: the three dialog sizes, each drawn by a dialog of its kind, in a frame that holds its mask.
+  dialogs: [
+    { caption: 'Small: a confirmation', draw: () => <SmallDialogPreview />, frameHeight: 280 },
+    { caption: 'Medium: a short form', draw: () => <MediumDialogPreview />, frameHeight: 380 },
+    { caption: 'Large: a list to choose from', draw: () => <LargeDialogPreview />, frameHeight: 420 },
+  ],
   states: [
     { caption: 'Loading', draw: () => requestTable(loadingTableWidget), routes: loadingRoutes },
     { caption: 'Load error', draw: () => requestTable(failingTableWidget), routes: failingRoutes },

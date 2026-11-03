@@ -2,6 +2,7 @@ import { Button, Flex, Input, Modal, Typography } from 'antd'
 import { useState } from 'react'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
 import { useText } from '../platform/texts'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** The answers so far, with a `skip` for each question that the earlier answers make unnecessary. */
 function advance(questions: FieldQuestion[], answers: FieldAnswer[]): FieldAnswer[] {
@@ -51,6 +52,7 @@ export function EntityMigrationQuestions({
 
   return (
     <Modal
+      width={dialogWidth('medium')}
       open
       centered
       title={t(rename ? 'shell.studio.entity.migration.renameTitle' : 'shell.studio.entity.migration.removeTitle')}
@@ -109,6 +111,7 @@ function ExpressionQuestion({
 
   return (
     <Modal
+      width={dialogWidth('medium')}
       open
       centered
       title={t(convert ? 'shell.studio.entity.migration.convertTitle' : 'shell.studio.entity.migration.fillTitle')}

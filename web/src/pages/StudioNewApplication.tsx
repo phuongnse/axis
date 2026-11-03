@@ -5,6 +5,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { isApplicationName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
 import { PlatformContext } from './context'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** What the server refused, as the text key to show under the name. */
 type Problem = 'exists' | 'invalid' | 'failed'
@@ -109,6 +110,7 @@ export function StudioNewApplication({
         </Button>
       )}
       <Modal
+        width={dialogWidth('medium')}
         open={open}
         title={t('shell.studio.newApplication.title')}
         okText={t('shell.studio.newApplication.create')}

@@ -61,6 +61,13 @@ export const radiusTokens = { base: 6 }
  */
 export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40 }
 
+/**
+ * Proposed: the three dialog widths, chosen by what a dialog holds: small for a confirmation or one question, medium
+ * for a short form, large for content that needs the width, such as a list to choose from. No larger one: what needs
+ * more is a page.
+ */
+export const dialogSizeTokens = { small: 400, medium: 560, large: 800 }
+
 /** The one layout breakpoint (D96). Below it is narrow width. A page cannot change it: media queries read no CSS property. */
 export const breakpointTokens = { narrowWidth: 992 }
 
