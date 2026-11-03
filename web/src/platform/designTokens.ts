@@ -56,11 +56,10 @@ export const radiusTokens = { base: 6 }
 /**
  * Proposed: the sizes every page shares. `bar` is the height of a bar, 48 px: the shell's header, a page's band,
  * Studio's application row and a table's row, so their rules line up. `smallControl` is the height of a small control,
- * 24 px, such as a small icon button, and the line of text that sits beside one. `aside` is the width of a page's
- * side column, 320 px, such as the Overview's Live block beside its main column. `tile` is the narrowest a tile of a
- * grid gets, 240 px, before the grid holds one column fewer. Like the breakpoint, a page cannot change them.
+ * 24 px, such as a small icon button, and the line of text that sits beside one. Like the breakpoint, a page cannot
+ * change them.
  */
-export const sizeTokens = { bar: 48, smallControl: 24, aside: 320, tile: 240 }
+export const sizeTokens = { bar: 48, smallControl: 24 }
 
 /** The one layout breakpoint (D96). Below it is narrow width. A page cannot change it: media queries read no CSS property. */
 export const breakpointTokens = { narrowWidth: 992 }

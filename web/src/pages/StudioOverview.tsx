@@ -1,23 +1,18 @@
 import { Flex, Typography } from 'antd'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { sizeTokens } from '../platform/designTokens'
 import { fetchSites, siteTitle, type SiteListItem } from '../platform/site'
-import { formatValue } from '../platform/formatValue'
 import {
-  fetchStudioDependencies,
-  fetchStudioLatestTest,
   folderDiffers,
   releaseGroups,
   resourceTitle,
-  type StudioDependency,
   type StudioReleases,
-  type StudioRequest,
   type StudioResourceItem,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
+import { useTileGrid } from './homeGrid'
 import { SiteTile, TileFocusStyle } from './SiteTile'
 import { studioKindGroups, type StudioView } from './studioViews'
 
@@ -51,8 +46,8 @@ export function StudioOverview({
   const published = active !== null
   const site = resources.find((item) => item.kind === 'site')
 
-  const main = (
-    <>
+  return (
+    <Flex vertical gap={spacing.md} data-testid="studio-overview">
       {starting && (
         <Panel title={t('shell.studio.overview.start.title')} testId="studio-overview-start">
           <Typography.Text style={{ color: colour.textMuted }}>
@@ -70,41 +65,12 @@ export function StudioOverview({
           </ol>
         </Panel>
       )}
+      {active !== null && <Live application={application} releaseId={active.releaseId} locale={locale} />}
       {(!starting || published) && releases !== undefined && (
         <Release releases={releases} resources={resources} locale={locale} addressOf={addressOf} />
       )}
       <More resources={resources} skip={starting ? startKinds : []} addressOf={addressOf} />
-    </>
-  )
-  if (active === null) {
-    return (
-      <Flex vertical gap={spacing.md} data-testid="studio-overview">
-        {main}
-      </Flex>
-    )
-  }
-  // Proposed: two columns, as a project's overview has them. The main column holds the work, what to build, what
-  // differs from the live release and what can be added; a side column of the `aside` size holds what runs now,
-  // how the last full test run went and the modules the application is built with. When
-  // the content area is too narrow for both, such as with the problems panel open, the side column goes under the
-  // main one at full width. The main column keeps at least half the width, so the content area's width decides, never
-  // the window's.
-  return (
-    <div
-      data-testid="studio-overview"
-      style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.md, alignItems: 'flex-start' }}
-    >
-      <Flex vertical gap={spacing.md} style={{ flex: '999 1 0', minWidth: '50%' }}>
-        {main}
-      </Flex>
-      <Flex vertical gap={spacing.md} style={{ flex: `1 1 ${sizeTokens.aside}px`, minWidth: 0 }}>
-        <Live application={application} releaseId={active.releaseId} locale={locale} />
-        {resources.some((item) => item.kind === 'scenario') && (
-          <Tests application={application} resources={resources} locale={locale} addressOf={addressOf} />
-        )}
-        <BuiltWith application={application} />
-      </Flex>
-    </div>
+    </Flex>
   )
 }
 
@@ -323,13 +289,14 @@ function kindName(kind: string, t: (key: string) => string): string {
 
 /**
  * Proposed: what runs now, the application's live sites as the home page shows them, each its mark, its title as the
- * link and its description, in the home page's order, in the Overview's side column. They come from the sites list, which holds only what is live, so a
+ * link and its description, in the home page's grid and order. They come from the sites list, which holds only what is live, so a
  * site added since the live release is not here, and a site's title and description are the live release's. Each opens
  * in a new tab, so Studio stays open. The block shows once the application has a live release.
  */
 function Live({ application, releaseId, locale }: { application: string; releaseId: string; locale: string }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
+  const grid = useTileGrid()
   const [sites, setSites] = useState<SiteListItem[] | 'failed'>()
   useEffect(() => {
     const controller = new AbortController()
@@ -354,16 +321,7 @@ function Live({ application, releaseId, locale }: { application: string; release
     body = <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.live.none')}</Typography.Text>
   } else {
     body = (
-      // Proposed: one tile a row beside the main column, and as many as fit when the column is under it.
-      <div
-        data-testid="studio-overview-sites"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${sizeTokens.tile}px), 1fr))`,
-          gridAutoRows: '1fr',
-          gap: spacing.md,
-        }}
-      >
+      <div data-testid="studio-overview-sites" style={grid}>
         <TileFocusStyle />
         {sites.map((site) => (
           <SiteTile
@@ -379,138 +337,6 @@ function Live({ application, releaseId, locale }: { application: string; release
   return (
     <Panel title={t('shell.studio.overview.live.title')} testId="studio-overview-live">
       {body}
-    </Panel>
-  )
-}
-
-/**
- * Proposed: how the newest run of every scenario went, which an author wants to know before Publish…: how many
- * passed of how many, in successText when all did and dangerText otherwise, when it ran and who ran it, and each
- * scenario that failed as a link that opens it. "Not run yet" before any full run. The band's Run tests starts one.
- */
-function Tests({
-  application,
-  resources,
-  locale,
-  addressOf,
-}: {
-  application: string
-  resources: readonly StudioResourceItem[]
-  locale: string
-  addressOf: (target: { resource: string; path?: string }) => string
-}) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const [latest, setLatest] = useState<StudioRequest | null | 'failed'>()
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchStudioLatestTest(application, controller.signal).then(
-      setLatest,
-      () => !controller.signal.aborted && setLatest('failed'),
-    )
-    return () => controller.abort()
-  }, [application])
-  if (latest === undefined) {
-    return null
-  }
-  let body: ReactNode
-  if (latest === 'failed') {
-    body = <Typography.Text type="danger">{t('shell.studio.overview.tests.loadFailed')}</Typography.Text>
-  } else if (latest === null) {
-    body = (
-      <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.tests.none')}</Typography.Text>
-    )
-  } else {
-    const scenarios = latest.scenarios ?? []
-    const failed = scenarios.filter((scenario) => scenario.outcome === 'failed')
-    const time = latest.finishedAt
-      ? formatValue({ name: 'finishedAt', type: 'date-time' }, latest.finishedAt, {}, { locale, text: t })
-      : ''
-    const summary =
-      scenarios.length === 0
-        ? t('shell.studio.overview.tests.noScenario')
-        : failed.length === 0
-          ? t('shell.studio.overview.tests.allPassed').replace('{total}', String(scenarios.length))
-          : t('shell.studio.overview.tests.someFailed')
-              .replace('{failed}', String(failed.length))
-              .replace('{total}', String(scenarios.length))
-    body = (
-      <>
-        <Flex vertical>
-          <Typography.Text
-            strong
-            style={{ color: failed.length === 0 && scenarios.length > 0 ? colour.successText : colour.dangerText }}
-          >
-            {summary}
-          </Typography.Text>
-          <Typography.Text style={{ color: colour.textMuted }}>
-            {t('shell.studio.overview.tests.run')
-              .replace('{time}', time)
-              .replace('{actor}', latest.requestedByName ?? latest.requestedBy ?? '')}
-          </Typography.Text>
-        </Flex>
-        {failed.length > 0 && (
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.xs }}>
-            {failed.map((scenario) => {
-              const item = resources.find((resource) => resource.id === scenario.resourceId)
-              return (
-                <li key={scenario.resourceId}>
-                  <Link
-                    to={addressOf({ resource: scenario.resourceId, ...(scenario.path ? { path: scenario.path } : {}) })}
-                    style={{ color: colour.primaryText }}
-                  >
-                    {item ? resourceTitle(item, locale) : scenario.name}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </>
-    )
-  }
-  return (
-    <Panel title={t('shell.studio.overview.tests.title')} testId="studio-overview-tests">
-      {body}
-    </Panel>
-  )
-}
-
-/**
- * Proposed: the modules the application is built with, each its label and, on the right in textMuted, the version
- * its folder pins, so an author sees what an upgrade would change. No block when it uses none.
- */
-function BuiltWith({ application }: { application: string }) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const [modules, setModules] = useState<StudioDependency[] | 'failed'>()
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchStudioDependencies(application, controller.signal).then(
-      setModules,
-      () => !controller.signal.aborted && setModules('failed'),
-    )
-    return () => controller.abort()
-  }, [application])
-  if (modules === undefined || (modules !== 'failed' && modules.length === 0)) {
-    return null
-  }
-  return (
-    <Panel title={t('shell.studio.overview.builtWith.title')} testId="studio-overview-built-with">
-      {modules === 'failed' ? (
-        <Typography.Text type="danger">{t('shell.studio.overview.builtWith.loadFailed')}</Typography.Text>
-      ) : (
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.xs }}>
-          {modules.map((module) => (
-            <li key={module.id} style={{ display: 'flex', justifyContent: 'space-between', gap: spacing.md }}>
-              <Typography.Text>{module.label ?? module.id}</Typography.Text>
-              <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
-                {module.version}
-              </Typography.Text>
-            </li>
-          ))}
-        </ul>
-      )}
     </Panel>
   )
 }

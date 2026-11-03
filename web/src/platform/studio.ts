@@ -787,42 +787,6 @@ export interface StudioRequest {
   releaseId: string | null
   diagnostics: StudioDiagnostic[]
   scenarios: StudioScenarioResult[] | null
-  requestedBy?: string
-  requestedByName?: string | null
-  finishedAt?: string | null
-}
-
-/**
- * Proposed: loads the newest test request that ran every scenario and has ended, or null when there is none. A 401
- * shows the sign-in prompt and throws, as any other failure does.
- */
-export async function fetchStudioLatestTest(application: string, signal?: AbortSignal): Promise<StudioRequest | null> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/tests/latest`
-  const response = await studioFetch(path, { signal })
-  if (response.status === 204) {
-    return null
-  }
-  if (!response.ok) {
-    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
-  }
-  return (await response.json()) as StudioRequest
-}
-
-/** Proposed: a module the application is built with: its id, its label, or null when it has none, and its pinned version. */
-export interface StudioDependency {
-  id: string
-  label: string | null
-  version: string
-}
-
-/** Proposed: loads the modules the application's folder pins. A 401 shows the sign-in prompt and throws, as any other failure does. */
-export async function fetchStudioDependencies(application: string, signal?: AbortSignal): Promise<StudioDependency[]> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/dependencies`
-  const response = await studioFetch(path, { signal })
-  if (!response.ok) {
-    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
-  }
-  return ((await response.json()) as { modules: StudioDependency[] }).modules
 }
 
 /**

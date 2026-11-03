@@ -111,25 +111,8 @@ the review.
 - **More you can add, in natural words.** The owner found that every "when" line began "Add one when…". Agreed: each
   line says in its own words when the kind is needed, such as "Handy for lists that must be ready on the first day"
   or "For a process that starts on its own, on a schedule or when a record changes", in English and Vietnamese.
-- **The Overview in two columns.** The owner asked whether blocks suit the Overview, as each block holds one row and
-  leaves the right half empty. Recommended and agreed to try: blocks stay, as each answers one question, laid out as a
-  project's overview is, in two columns. The main column holds the work: Get started, Changes since the live release
-  and More you can add. A side column, the new `aside` size token, 320 px, holds what runs now: the Live block, one
-  site tile a row. The main column keeps at least half the content area, so when the area is too narrow for both the
-  side column goes under it at full width, and its tiles fill the row, no narrower than the new `tile` size token,
-  240 px. An application with no live release has one column. The problems panel lies over the page, so it covers the
-  side column while it is open.
-- **More in the side column.** The owner found the side column too short with one or two sites, and asked what else
-  is worth it there. Recommended and agreed: what an author looks up rather than works on, one question a block,
-  never what the band or the main column already says. The Live block holds the sites alone: the band names the live
-  release and the Releases list says who published it and when. Under it:
-  - Tests: how the newest run of every scenario went, "All 6 scenarios passed" in successText or "1 of 6 scenarios
-    failed" in dangerText, "Run <time> by <person>" in textMuted, and each failed scenario as a link that opens it at
-    its failing step; "Not run yet. Run tests runs every scenario." before any; no block for an application with no
-    scenario. For the docs change: a Proposed `GET .../tests/latest`, the newest ended test request on the tenant
-    that ran every scenario, as `GET .../requests/{id}` answers it, or 204.
-  - Built with: each module the folder pins, its label and, on the right in textMuted, the pinned version; no block
-    when it uses none. For the docs change: a Proposed `GET .../dependencies`. Extension packages are left out until
-    a package manifest has a label, so no package id shows.
-  Not taken: the languages and sign-in, which the sidebar and the site already show, and run-time figures such as
-  open tasks or failed calls, which are the console's.
+- **Tried and dropped: a side column.** To fill the right half, a side column was tried beside the main one, with
+  the Live block, how the last full test run went and the modules the application is built with. The owner did not
+  find it right and dropped it: the Overview stays one column, the Live block first, then Changes since the live
+  release, then More you can add. Its routes, `GET .../tests/latest` and `GET .../dependencies`, and its `aside` and
+  `tile` size tokens went with it.
