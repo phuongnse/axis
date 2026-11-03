@@ -168,7 +168,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         await GrantRolesAsync(token, realmPath, management, users, _usersRoles, cancellationToken);
     }
 
-    private async Task<string> AdminTokenAsync(CancellationToken cancellationToken)
+    internal async Task<string> AdminTokenAsync(CancellationToken cancellationToken)
     {
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
@@ -182,7 +182,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task EnsureRealmAsync(
+    internal async Task EnsureRealmAsync(
         string token, string realm, string realmPath, string displayName, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
     {
         using var existing = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
@@ -255,7 +255,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// Makes the OTP form of the realm's browser flow, and the subflow that holds it, required. The built-in flow asks for a
     /// code only from an account that already has an authenticator, so a new account would sign in with its password alone.
     /// </summary>
-    private async Task EnsureSecondStepAsync(string token, string realmPath, CancellationToken cancellationToken)
+    internal async Task EnsureSecondStepAsync(string token, string realmPath, CancellationToken cancellationToken)
     {
         var path = $"{realmPath}/authentication/flows/browser/executions";
         using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
@@ -291,7 +291,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// Turns off Keycloak's Verify Profile required action, so no sign-in stops on a page that asks for a missing profile field,
     /// such as the last name that a <c>saml</c> provider may not send. An identity provider without the action has nothing to turn off.
     /// </summary>
-    private async Task EnsureNoProfileReviewAsync(string token, string realmPath, CancellationToken cancellationToken)
+    internal async Task EnsureNoProfileReviewAsync(string token, string realmPath, CancellationToken cancellationToken)
     {
         var path = $"{realmPath}/authentication/required-actions/VERIFY_PROFILE";
         using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
@@ -466,7 +466,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         EnsureSuccess(granted, "grant the admin roles");
     }
 
-    private async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
+    internal async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, new Uri(admin.BaseAddress, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -478,7 +478,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return await http.SendAsync(request, cancellationToken);
     }
 
-    private static void EnsureSuccess(HttpResponseMessage response, string step)
+    internal static void EnsureSuccess(HttpResponseMessage response, string step)
     {
         if (!response.IsSuccessStatusCode)
         {
