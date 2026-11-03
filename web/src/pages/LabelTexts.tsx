@@ -69,22 +69,26 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
     }
     return (
       <Flex vertical gap={4} data-testid="studio-label">
-        <Flex gap="small" align="center">
-          <Input
-            aria-label={nameOf(primary)}
-            value={shown[primary] ?? ''}
-            onChange={(event) => write(primary, event.target.value)}
-          />
-          {names.locales.length > 1 && (
-            <AxisButton
-              role="icon"
-              nameKey="shell.studio.translations.open"
-              icon={<GlobalOutlined />}
-              onClick={() => setTranslating(shown)}
-              data-testid="studio-label-translations"
-            />
-          )}
-        </Flex>
+        {/* Proposed: Translations sits inside the box, at its end, as a password box holds its eye, so the box is as wide
+            as every other field's. It stays a real button, reached with Tab and named by its tooltip. */}
+        <Input
+          aria-label={nameOf(primary)}
+          value={shown[primary] ?? ''}
+          onChange={(event) => write(primary, event.target.value)}
+          suffix={
+            names.locales.length > 1 ? (
+              <AxisButton
+                role="icon"
+                size="small"
+                nameKey="shell.studio.translations.open"
+                icon={<GlobalOutlined />}
+                onClick={() => setTranslating(shown)}
+                data-testid="studio-label-translations"
+                style={{ marginInlineEnd: -4, marginBlock: -1 }}
+              />
+            ) : undefined
+          }
+        />
         {missing.length > 0 && (
           <Typography.Text style={{ color: colour.textMuted, fontSize: 12 }} data-testid="studio-label-missing">
             {t('shell.studio.translations.missing').replace(
