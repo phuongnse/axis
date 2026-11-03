@@ -138,6 +138,17 @@
         }
       }
     },
+    "backup": {
+      "type": "object",
+      "properties": {
+        "bucket": { "type": "string" },
+        "serviceUrl": { "type": "string" },
+        "region": { "type": "string" },
+        "timeZone": { "type": "string" },
+        "resources": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "extensions": {
       "type": "object",
       "properties": { "volume": { "$ref": "#/definitions/volume" } }
@@ -204,7 +215,10 @@
         "identityAdminClientSecret": { "$ref": "#/definitions/secretReference" },
         "identityCertificate": { "$ref": "#/definitions/tlsSecretReference" },
         "pgbouncerAuth": { "$ref": "#/definitions/secretReference" },
-        "pgbouncerCertificate": { "$ref": "#/definitions/tlsSecretReference" }
+        "pgbouncerCertificate": { "$ref": "#/definitions/tlsSecretReference" },
+        "backupStorageAccessKeyId": { "$ref": "#/definitions/secretReference" },
+        "backupStorageSecretAccessKey": { "$ref": "#/definitions/secretReference" },
+        "cellBackupKey": { "$ref": "#/definitions/secretReference" }
       },
       "additionalProperties": false
     }

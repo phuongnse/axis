@@ -278,7 +278,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `cell backup` command and its metric `axis.backup.last_success`, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `cell backup` command with its metric `axis.backup.last_success`, and the chart's CronJob, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -308,8 +308,9 @@ format and the steps above stay, with the changes below.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
   key. Its archives stay in object storage until their lock ends, and nothing can read them. One
   leaked tenant key opens only that tenant's archives.
-- **Daily job.** A Kubernetes CronJob runs `cell backup` at 01:00 in the region's time zone
-  _(planned for M31)_. The command is _(built)_. It backs up
+- **Daily job** _(built)_. In a cell with `backup.bucket` set, the chart's CronJob runs
+  `cell backup` at 01:00 in `backup.timeZone`, never two at once, with no retry and a deadline of
+  6 hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets). The command is _(built)_. It backs up
   every `active` and `suspended` tenant, four at a time, and writes each archive to the region's
   object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`, where the date is the UTC date when the run starts. A
   `provisioning` tenant is skipped. Each archive is encrypted with the tenant's own backup key,

@@ -114,6 +114,21 @@ cell:
     databaseAuthority:
       volume: {}
 
+# Backups in a cell. It is used in a cell only. Setting bucket renders a CronJob that runs
+# "axis-admin cell backup" every day at 01:00 in timeZone, an IANA time zone name such as
+# "Asia/Ho_Chi_Minh". timeZone, serviceUrl and region are required with a bucket. The storage
+# credentials are the two Secret references secrets.backupStorageAccessKeyId and
+# secrets.backupStorageSecretAccessKey, and never values. The operator sets the bucket's object lock
+# in compliance mode for 30 days and a lifecycle rule that deletes an archive after 30 days. The chart
+# does not create or change the bucket. The schema rejects any other field.
+backup:
+  bucket: ""
+  serviceUrl: ""
+  region: ""
+  timeZone: ""
+  # A Kubernetes resources block: requests and limits.
+  resources: {}
+
 # Extension packages, mounted read-only at /extensions. Empty uses the empty
 # folder of the image. Give any Kubernetes volume source, for example:
 #   volume:
@@ -248,3 +263,19 @@ secrets:
   # is true. The keys are fixed, so the reference holds only the name.
   pgbouncerCertificate:
     name: ""
+  # Cell:BackupStorage:AccessKeyId, the access key id of the backup storage. Used by the cell backup
+  # CronJob only. Needed with backup.bucket.
+  backupStorageAccessKeyId:
+    name: ""
+    key: Cell__BackupStorage__AccessKeyId
+  # Cell:BackupStorage:SecretAccessKey, the secret access key of the backup storage. Used by the cell
+  # backup CronJob only. Needed with backup.bucket.
+  backupStorageSecretAccessKey:
+    name: ""
+    key: Cell__BackupStorage__SecretAccessKey
+  # The cell's backup key, which unwraps the keys of the tenants. Used by the cell backup CronJob
+  # only, which mounts it read-only at /cell-backup-key/key and points Cell:BackupKeyFile there.
+  # Needed with backup.bucket.
+  cellBackupKey:
+    name: ""
+    key: cell-backup-key

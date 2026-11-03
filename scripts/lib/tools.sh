@@ -12,7 +12,7 @@ KUBERNETES_VERSION=1.33.0
 # A commit of github.com/yannh/kubernetes-json-schema. A commit keeps the schemas fixed.
 KUBERNETES_SCHEMAS_COMMIT=93153a1458e24e93f386c50f9980d584fcba574b
 # The Kubernetes kinds the chart renders. A new kind needs its schema file here.
-KUBERNETES_SCHEMA_FILES=(configmap-v1 deployment-apps-v1 job-batch-v1 service-v1)
+KUBERNETES_SCHEMA_FILES=(configmap-v1 cronjob-batch-v1 deployment-apps-v1 job-batch-v1 service-v1)
 # A commit of github.com/datreeio/CRDs-catalog, which holds the schemas of cert-manager's kinds.
 CRDS_CATALOG_COMMIT=27233a506de0085e71c7f9702597806a7f95eb24
 # The cert-manager kinds the chart renders, as group/kind_version. A new kind needs its schema file here.
