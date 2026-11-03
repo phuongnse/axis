@@ -140,7 +140,7 @@ database, with history in `axis.__processes_migrations` (see
   | `process_instance_id` | `uuid` | The instance |
   | `process_id` | `uuid` | The process |
   | `release_id` | `uuid` | The release the instance is pinned to |
-  | `application_id` | `uuid`, null | The application. Null for a tenant notice |
+  | `application_id` | `uuid` | The application |
   | `step` | `text` | The declared name of the task step |
   | `subject_entity_id` | `uuid` | The subject entity |
   | `subject_id` | `uuid` | The subject record |
@@ -244,7 +244,7 @@ database, with history in `axis.__processes_migrations` (see
   | Column | Type | Meaning |
   | --- | --- | --- |
   | `id` | `uuid` | A version 7 UUID, the notification's id. Every recipient's row has it |
-  | `application_id` | `uuid` | The application |
+  | `application_id` | `uuid`, null | The application. Null for a tenant notice |
   | `release_id` | `uuid`, null | The release the notifying instance is pinned to. It resolves the text keys and the page. Null for a tenant notice, whose text keys are platform texts |
   | `recipient_kind` | `text` | `user` or `role`. A tenant notice uses `platformRole` |
   | `recipient` | `text` | The user id or the role name. For `platformRole`, the platform role kind, `administrator` |
