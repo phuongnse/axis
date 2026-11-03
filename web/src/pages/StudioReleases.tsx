@@ -1,12 +1,11 @@
 import { PlayCircleOutlined } from '@ant-design/icons'
-import { Flex, Modal, Table, Tag, Typography } from 'antd'
+import { Flex, Modal, Tag, Typography } from 'antd'
 import { useContext, useState, type HTMLAttributes } from 'react'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisTable } from '../platform/AxisTable'
+import { EmptyDash } from '../platform/EmptyValue'
 import { releaseActorName, releaseGroups, type StudioReleaseGroup, type StudioReleases } from '../platform/studio'
-import { fillText, fitContent, freeText, textCell } from '../platform/tableColumns'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { visuallyHidden } from '../platform/visuallyHidden'
 import { PlatformContext } from './context'
 
 /**
@@ -45,86 +44,82 @@ export function StudioReleasesList({
 
   return (
     <section data-testid="studio-releases">
-      <Flex vertical gap="small">
-        <Table<StudioReleaseGroup>
-          size="small"
-          pagination={false}
-          // Proposed: where the page is narrower than the columns' content, the table scrolls sideways.
-          scroll={{ x: 'max-content' }}
-          rowKey={(release) => release.releaseId}
-          dataSource={releaseGroups(history)}
-          locale={{ emptyText: t('shell.studio.releases.empty') }}
-          onRow={(release) =>
-            ({
-              'data-testid': 'studio-release-row',
-              'data-number': release.number,
-              'data-active': release.live ? 'true' : undefined,
-            }) as HTMLAttributes<HTMLElement>
-          }
-          columns={[
-            {
-              // Proposed: the release's number, with Live beside the one that runs, as the band says. No status column:
-              // a release that is not live has no state of its own to name.
-              key: 'number',
-              title: t('shell.studio.releases.number'),
-              ...fitContent,
-              render: (_, release) => (
-                <Flex align="center" gap="small">
-                  {release.number}
-                  {release.live && <Tag color="success">{t('shell.studio.releases.live')}</Tag>}
-                </Flex>
-              ),
-            },
-            {
-              key: 'label',
-              title: t('shell.studio.releases.label'),
-              ...freeText,
-              render: (_, release) => <div style={textCell}>{release.label ?? <NoValue />}</div>,
-            },
-            {
-              // Proposed: when and by whom a release was published are two columns, as facts of different kinds are.
-              key: 'published',
-              title: t('shell.studio.releases.published'),
-              ...fitContent,
-              render: (_, release) => time.format(new Date(release.published.activatedAt)),
-            },
-            {
-              key: 'publishedBy',
-              title: t('shell.studio.releases.publishedBy'),
-              ...freeText,
-              render: (_, release) => <div style={textCell}>{releaseActorName(release.published, t)}</div>,
-            },
-            {
-              // Proposed: the note, the longest text and the most often missing, comes last, so it takes the width left.
-              key: 'note',
-              title: t('shell.studio.releases.note'),
-              ...fillText,
-              render: (_, release) => <div style={textCell}>{release.note ?? <NoValue />}</div>,
-            },
-            ...(canActivate
-              ? [
-                  {
-                    key: 'activate',
-                    ...fitContent,
-                    render: (_: unknown, release: StudioReleaseGroup) =>
-                      release.live ? null : (
-                        <AxisButton
-                          role="icon"
-                          size="small"
-                          nameKey="shell.studio.activate"
-                          nameSuffix={`${t('shell.studio.rollback.release')} ${release.number}`}
-                          icon={<PlayCircleOutlined />}
-                          disabled={busy}
-                          data-testid={`studio-activate-${release.number}`}
-                          onClick={() => setPending(release)}
-                        />
-                      ),
-                  },
-                ]
-              : []),
-          ]}
-        />
-      </Flex>
+      <AxisTable<StudioReleaseGroup>
+        rows={releaseGroups(history)}
+        rowKey={(release) => release.releaseId}
+        emptyText={t('shell.studio.releases.empty')}
+        // Proposed: a long history pages as every table does, twenty releases a page, with no paging below that.
+        pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
+        onRow={(release) =>
+          ({
+            'data-testid': 'studio-release-row',
+            'data-number': release.number,
+            'data-active': release.live ? 'true' : undefined,
+          }) as HTMLAttributes<HTMLElement>
+        }
+        columns={[
+          {
+            // Proposed: the release's number, with Live beside the one that runs, as the band says. No status column:
+            // a release that is not live has no state of its own to name.
+            key: 'number',
+            title: t('shell.studio.releases.number'),
+            kind: 'fit',
+            render: (release) => (
+              <Flex align="center" gap="small">
+                {release.number}
+                {release.live && <Tag color="success">{t('shell.studio.releases.live')}</Tag>}
+              </Flex>
+            ),
+          },
+          {
+            key: 'label',
+            title: t('shell.studio.releases.label'),
+            kind: 'text',
+            render: (release) => release.label ?? <EmptyDash />,
+          },
+          {
+            // Proposed: when and by whom a release was published are two columns, as facts of different kinds are.
+            key: 'published',
+            title: t('shell.studio.releases.published'),
+            kind: 'fit',
+            render: (release) => time.format(new Date(release.published.activatedAt)),
+          },
+          {
+            key: 'publishedBy',
+            title: t('shell.studio.releases.publishedBy'),
+            kind: 'text',
+            render: (release) => releaseActorName(release.published, t),
+          },
+          {
+            // Proposed: the note, the longest text and the most often missing, comes last and takes the width left.
+            key: 'note',
+            title: t('shell.studio.releases.note'),
+            kind: 'fill',
+            render: (release) => release.note ?? <EmptyDash />,
+          },
+        ]}
+        rowActions={
+          canActivate
+            ? {
+                count: 1,
+                of: (release) =>
+                  release.live
+                    ? []
+                    : [
+                        {
+                          key: 'activate',
+                          labelKey: 'shell.studio.activate',
+                          nameSuffix: `${t('shell.studio.rollback.release')} ${release.number}`,
+                          icon: <PlayCircleOutlined />,
+                          disabled: busy,
+                          onClick: () => setPending(release),
+                          attributes: { 'data-testid': `studio-activate-${release.number}` },
+                        },
+                      ],
+              }
+            : undefined
+        }
+      />
       <Modal
         open={pending !== null}
         title={t('shell.studio.activate.title').replace('{number}', String(pending?.number ?? ''))}
@@ -145,22 +140,5 @@ export function StudioReleasesList({
         )}
       </Modal>
     </section>
-  )
-}
-
-/**
- * Proposed: a cell with no value shows an em dash in textMuted, never nothing, which cannot tell "not given" from
- * "not loaded", and never N/A, which says "does not apply". A screen reader hears "No value".
- */
-function NoValue() {
-  const t = useText()
-  const { colour } = useDesignTokens()
-  return (
-    <>
-      <span aria-hidden="true" style={{ color: colour.textMuted }}>
-        —
-      </span>
-      <span style={visuallyHidden}>{t('shell.value.none')}</span>
-    </>
   )
 }

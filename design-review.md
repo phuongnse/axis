@@ -156,10 +156,9 @@ the review.
     the longest text and the most often missing, comes last and takes the width left.
   - No Status column: a release that is not live has no state of its own to name, so Live is a tag beside the number
     of the one that runs, as the band says.
-  - A cell with no value shows an em dash in textMuted, which a screen reader hears as "No value": never nothing,
-    which cannot tell "not given" from "not loaded" or "failed", and never N/A, which says "does not apply" and does
-    not translate. For the issue: `formatValue` gives an empty string for no value, so every table of the platform,
-    the `table` widget included, shows nothing today; the same rule applies to them all.
+  - A cell with no value shows the platform's `EmptyDash`, the em dash every table cell already uses (a form or a
+    detail says "Not set"): never nothing, which cannot tell "not given" from "not loaded" or "failed", and never N/A,
+    which says "does not apply" and does not translate. The Releases list drew nothing before.
 - **One table for the whole platform.** The owner asked whether row actions or select-then-act is right, and whether
   every table should have the same search, filter, Refresh, Export and Import. The owner's rule: every table is built
   on one shared table, as tables that each go their own way cannot be kept right. Agreed:
@@ -180,3 +179,17 @@ the review.
   wide as its content up to 320 px, where it wraps, with its title on one line and spacing-lg on each side, as a
   fitted column has. Built in `tableColumns.ts` as `freeText`, `fillText` and `textCell`, on the Releases list; the
   `table` widget does not follow these column rules yet, which the shared table of the issue brings to every table.
+- **The shared table, built.** The owner wanted to see the shared table before agreeing to it, and found the label
+  column too narrow when it holds no value. Built: `AxisTable` in `web/src/platform/`, which the `table` widget and
+  the Releases list now draw on, and which replaces `tableColumns.ts`. It draws D96's toolbar (view controls on the
+  left; Refresh, the secondary actions and the main action last on the right), the columns by their kind, 48 px rows,
+  the row actions as icons for an action the platform knows and text for a configured one, folded into one "…" menu
+  from three on or below 992 px, the paging, and sideways scrolling. A column's kind decides its width:
+  - `fit`, a value of a fixed form, as wide as its content;
+  - `text`, free text, as wide as its content but no narrower than the new `textColumn` size token, 160 px, and no
+    wider than 320 px, where it wraps;
+  - `fill`, the one column that takes the width the others leave. The Releases list fills its note; a `table` widget
+    fills its identifying column, the first, when it is free text, as the one most read; a table that marks none
+    fills its last free text column.
+  For the issue: Studio's resource lists, the console's tables and the users page move onto `AxisTable` too. Open:
+  whether an author may say which column of a `table` widget fills, which is configuration.
