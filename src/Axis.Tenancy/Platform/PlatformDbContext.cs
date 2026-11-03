@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their usage and daily counts, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -29,6 +29,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantBackupRow> TenantBackups => Set<TenantBackupRow>();
 
     public DbSet<TenantQuotaRow> TenantQuotas => Set<TenantQuotaRow>();
+
+    public DbSet<TenantSiteLegalRow> TenantSiteLegalLinks => Set<TenantSiteLegalRow>();
 
     public DbSet<TenantUsageLatestRow> TenantUsageLatest => Set<TenantUsageLatestRow>();
 
@@ -59,6 +61,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 table.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
                 table.HasCheckConstraint("ck_tenants_smtp_from", "(smtp_host IS NULL) = (email_from IS NULL)");
+                table.HasCheckConstraint("ck_tenants_terms_version", "(terms_url IS NULL) = (terms_version IS NULL)");
                 table.HasCheckConstraint(
                     "ck_tenants_smtp_host",
                     "smtp_host IS NOT NULL OR (smtp_port IS NULL AND smtp_use_tls IS NULL AND smtp_user_name IS NULL AND smtp_password IS NULL)");
@@ -97,6 +100,9 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.RealmActivationClientSecret).HasColumnName("realm_activation_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.RealmUsersClientSecret).HasColumnName("realm_users_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.EmailFrom).HasColumnName("email_from");
+            tenant.Property(t => t.PrivacyUrl).HasColumnName("privacy_url");
+            tenant.Property(t => t.TermsUrl).HasColumnName("terms_url");
+            tenant.Property(t => t.TermsVersion).HasColumnName("terms_version");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
             tenant.Property(t => t.PlatformAccounts).HasColumnName("platform_accounts");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
@@ -140,6 +146,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .WithOne()
                 .HasForeignKey(quota => quota.TenantId)
                 .HasConstraintName("fk_tenant_quotas_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantSiteLegalRow>()
+                .WithOne()
+                .HasForeignKey(legal => legal.TenantId)
+                .HasConstraintName("fk_tenant_site_legal_links_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
             tenant.HasMany<TenantUsageLatestRow>()
                 .WithOne()
@@ -245,6 +256,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             quota.Property(q => q.Quota).HasColumnName("quota");
             quota.Property(q => q.Value).HasColumnName("value").HasColumnType("bigint");
             quota.Property(q => q.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<TenantSiteLegalRow>(legal =>
+        {
+            legal.ToTable("tenant_site_legal_links", table => table.HasCheckConstraint("ck_tenant_site_legal_links_url", "privacy_url IS NOT NULL OR terms_url IS NOT NULL"));
+            legal.HasKey(l => new { l.TenantId, l.SitePath }).HasName("pk_tenant_site_legal_links");
+            legal.Property(l => l.TenantId).HasColumnName("tenant_id");
+            legal.Property(l => l.SitePath).HasColumnName("site_path");
+            legal.Property(l => l.PrivacyUrl).HasColumnName("privacy_url");
+            legal.Property(l => l.TermsUrl).HasColumnName("terms_url");
         });
 
         modelBuilder.Entity<TenantUsageLatestRow>(usage =>

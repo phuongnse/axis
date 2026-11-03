@@ -75,6 +75,8 @@ internal static partial class AdminCommands
                tenant sign-in set <id> --accounts true|false [--provider <name> --type oidc|saml [--issuer <binding>] [--client-id <binding>] [--client-secret <binding>] [--client-key <binding>] [--metadata <binding>] [--claim <name>=<claim>]... [--roles-claim <claim>] [--role <value>=<role>]...]...
                tenant email set <id> --host <host> --from <address> [--port <n>] [--tls true|false] [--user-name <name>] [--password]
                tenant email clear <id>
+               tenant legal set <id> [--privacy-url <url>] [--terms-url <url> --terms-version <text>] [--site <path>]
+               tenant legal clear <id> [--site <path>]
                tenant session end <id> --user <user>
                tenant session end <id> --all
                tenant data-key rotate <id>
@@ -184,6 +186,8 @@ internal static partial class AdminCommands
         new("tenant sign-in set", AuditMark.OnePerTenant, TenantSettings.SignInSetAsync),
         new("tenant email set", AuditMark.OnePerTenant, TenantSettings.EmailSetAsync),
         new("tenant email clear", AuditMark.OnePerTenant, TenantSettings.EmailClearAsync),
+        new("tenant legal set", AuditMark.OnePerTenant, TenantSettings.LegalSetAsync),
+        new("tenant legal clear", AuditMark.OnePerTenant, TenantSettings.LegalClearAsync),
         new("tenant session end", AuditMark.OnePerTenant, TenantSettings.SessionEndAsync),
         new("tenant data-key rotate", AuditMark.OnePerTenant, TenantDataKeyCommands.RotateAsync),
         new("tenant data-key retire", AuditMark.OnePerTenant, TenantDataKeyCommands.RetireAsync),
