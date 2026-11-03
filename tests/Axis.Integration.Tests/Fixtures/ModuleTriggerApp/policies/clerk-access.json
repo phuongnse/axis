@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["clerk"],
   "grants": [
-    { "entity": "followups/Followup", "actions": ["read", "create", "delete"] },
-    { "entity": "followups/FollowupDeletion", "actions": ["read"] },
-    { "entity": "reviews/Review", "actions": ["read"] },
-    { "process": "FlagReview", "actions": ["start"] }
+    { "name": "followupRead", "entity": "followups/Followup", "actions": ["read", "create", "delete"] },
+    { "name": "followupDeletionRead", "entity": "followups/FollowupDeletion", "actions": ["read"] },
+    { "name": "reviewRead", "entity": "reviews/Review", "actions": ["read"] },
+    { "name": "flagReviewStart", "process": "FlagReview", "actions": ["start"] }
   ]
 }

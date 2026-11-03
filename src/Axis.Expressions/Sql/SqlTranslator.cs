@@ -187,6 +187,11 @@ public static class SqlTranslator
                 throw Fail("Paths that do not start at a field are not translated to SQL", member.Offset);
             }
 
+            if (string.Equals(first.Name, ExpressionTypeChecker.OuterName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw Fail("'outer' is not translated to SQL", member.Offset);
+            }
+
             names.Add(first.Name);
             names.Reverse();
             return names;
@@ -334,7 +339,7 @@ public static class SqlTranslator
             {
                 case "date" or "dateTime":
                     return DateLiteral(call, name);
-                case "lower" or "upper" or "trim":
+                case "lower" or "upper" or "trim" or "previous" or "accountableUser" or "decisionTask":
                     throw NotTranslated(name, call.Offset);
             }
 
@@ -369,9 +374,15 @@ public static class SqlTranslator
         /// <c>any</c> as <c>EXISTS</c> and <c>count</c> as <c>count(*)</c> over the rows of the collection
         /// that belong to the outer row and, with a condition, make it true, so a null condition keeps no row.
         /// Only the filter's top level translates one: a rule body has no collections, and an item expression has none either.
+        /// A path to a collection is not translated.
         /// </summary>
         private string Aggregate(CallNode call, string name)
         {
+            if (call.Arguments[0] is MemberNode)
+            {
+                throw Fail("A path to a collection is not translated to SQL", call.Offset);
+            }
+
             if (_bindings is not null || !ReferenceEquals(_column, _filterColumn) || call.Arguments[0] is not NameNode list)
             {
                 throw Fail("Aggregates are only translated at the filter's top level", call.Offset);

@@ -104,7 +104,11 @@ development or E2E server serves a real application without a separate step.
   values on top. A value that cannot be computed is `AXC0033` at
   `/records/{i}/values/<field>`, and the transaction is rolled back. The first record that storage refuses,
   for a missing reference, a duplicate unique value or a schema conflict, is
-  reported as `AXC0033`, and the transaction is rolled back. Any `AXC0033`
+  reported as `AXC0033`, and the transaction is rolled back. A write that the lifecycle of a
+  [module contract](module-contracts.md#where-the-contract-is-checked) refuses, such as a synced
+  seed that changes a stored state along no transition or along one whose guard is not true, is
+  `AXC0033` at the state field. Its message names the point that refused it, and the transaction
+  is rolled back. Any `AXC0033`
   stops the start like any other diagnostic, and the release stays active.
   The step logs how many seed records it inserted and updated.
 - **Database roles.** Migrations, compiling, storing and
@@ -150,10 +154,12 @@ and a JSON view, and shows the diagnostics.
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **In a cell.** _(planned for M31)_ When `Cell:Id` is set, each tenant's applications are under
+- **In a cell.** When `Cell:Id` is set, each tenant's applications are under
   `<Studio:ApplicationsPath>/<tenant id>/`, and Studio on a tenant's host reads, writes and creates
-  only there. A non-empty `Studio:Folders` stops the start, because it would name folders that every
-  tenant reaches. The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell),
+  only there. Studio creates the folder the first time it uses it. Another tenant's application, by
+  name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
+  message names `Studio:Folders` and `Cell:Id`, because the folders would be reached by every tenant.
+  _(planned for M31)_ The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell),
   [export and deletion](tenant-lifecycle.md), see [cells](cells.md).
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
@@ -263,7 +269,7 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
 | `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start. |
 | `Platform:PreviousSecretKey` | none | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key). |
-| `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema, and insert rows into `platform.data_protection_keys`. Both hosts need it under `directory`. Outside Development and Testing the server, and the worker under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `ConnectionStrings:Platform` | none | A role that reads the `platform` schema and writes only three things: rows it inserts into `platform.data_protection_keys`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, and rows it inserts and updates in `platform.tenant_daily_counters`. Both hosts need it under `directory`. Outside Development and Testing the server, and the worker under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 | `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations, under both sources. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. Outside Development and Testing the server refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 
 As environment variables they are `Tenancy__Source`,
@@ -310,6 +316,10 @@ As environment variables they are `Tenancy__Source`,
   hosts for one site stop the start. Under `directory`, `tenant host add --site` gives it. The E2E server
   uses this for its site host.
 
+- **Legal links** _(planned for M31)_. Under `configuration`, `Tenants:{id}:Legal:PrivacyUrl`, `Tenants:{id}:Legal:TermsUrl`
+  and `Tenants:{id}:Legal:TermsVersion` give the tenant's [legal links](legal.md#legal-settings), and
+  `Tenants:{id}:Legal:Sites:{path}:PrivacyUrl` and `...:TermsUrl` a site's own. Under `directory` the
+  [legal links commands](tenant-setting-commands.md#legal-links) set them.
 - **Tenant keys.** Under `configuration`, `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}`
   give a tenant's data keys and lookup keys, each 32 bytes in base64, as the environment variables
   `Tenants__<id>__DataKeys__<number>` and `Tenants__<id>__LookupKeys__<number>`. A number is an integer of at least 1.
@@ -414,7 +424,8 @@ The server reads `Data:QueryTimeout`, `Data:ExportQueryTimeout`,
 reads `Data:ImportMaxRows` and, for the statements of its work items,
 [`Worker:StatementTimeout`](process-execution.md#worker-settings).
 `Data:ActivationTimeout` is read by the server when startup activation is on, and by
-`admin activate` and the publisher. See
+`admin activate` and the publisher. Both the server and the worker read `Data:TenantPoolMaxSize`,
+`Data:TenantPoolMinSize` and `Data:TenantPoolIdleLifetime`. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
@@ -428,14 +439,20 @@ reads `Data:ImportMaxRows` and, for the statements of its work items,
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
 | `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. An upload is refused with `413` above the smaller of this and the field's `maxSize`. Publish checks a field's `maxSize` against the 25 MB default, not against this setting. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
+| `Data:TenantPoolMaxSize` | `5` | The most connections in the runtime role's pool of each tenant. It wins over `Maximum Pool Size` in the tenant's connection string. A value that is not an integer of at least 1 stops the start, and the error names the setting. |
+| `Data:TenantPoolMinSize` | `0` | The connections each tenant's pool keeps open when idle. It wins over `Minimum Pool Size` in the tenant's connection string. A value that is not an integer from 0 up to `Data:TenantPoolMaxSize` stops the start, and the error names the setting. |
+| `Data:TenantPoolIdleLifetime` | `00:01:00` | How long an idle connection of a tenant's pool stays open before it closes, a duration of whole seconds of at least one second. It wins over `Connection Idle Lifetime` in the tenant's connection string. A shorter value lowers the pruning interval to match. Any other value stops the start, and the error names the setting. |
 
+- **Tenant pools.** The three pool settings apply to the runtime role's pools in the server and
+  the worker. `Max Auto Prepare` is always 0 on these pools, as transaction-mode
+  PgBouncer needs, see [connections](cells.md#connections).
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's
   next user. An interactive read runs in one short read-only transaction that
-  is always rolled back. The worker's `Worker:StatementTimeout` is set the same
-  way for a work item that runs in one transaction. For any other work item it
-  is set on the item's connection for the whole run and then reset, so it never
-  reaches the connection's next user either.
+  is always rolled back. The worker sets `Worker:StatementTimeout` the same
+  way in every transaction of a work item, including each transaction of a
+  handler that calls an outside system. A statement such a handler runs outside
+  a transaction has no limit.
 - **Page reads.** These are the page metadata route
   `GET /api/sites/{path}/pages/{page}` and the record and data source routes
   that a page's widgets call. Lookups use the record list route. Form state,
@@ -589,6 +606,24 @@ agrees. With no `Cell:Id`, the `Cell` and `Quotas` settings do not apply and the
 self-hosted installation. The `Worker` settings apply to every installation, because the worker
 shares its time the same way everywhere.
 
+The server, the worker and `Axis.Admin`, the publisher included, read and check the `Cell`
+settings at start. With `Cell:Id` set they need `Tenancy:Source=directory`, `Cell:Region` and
+`Cell:TenantDomain`. The id is the region, a hyphen and a number, such as `vn-1`, and the region
+uses lowercase letters and digits. A wrong value stops the start and the message names the
+setting. `Axis.Admin` refuses every command with exit code 2. The features the settings turn on
+are still planned.
+
+The runtime database address is the exception. Only the server and the worker read and check
+`Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, and only with `Cell:Id` set. A port that is
+not a whole number from 1 to 65535, or a port with no host, stops their start and the message names
+the setting. `Axis.Admin` and the publisher never read them, so a wrong value does not stop them.
+
+In a cell the server and the worker also read and check `Quotas:Defaults`. Each child must be a
+[quota](tenant-quotas.md#quotas) key and its value a whole number of zero or more. An unknown key or a
+wrong value stops the start, and the message names the setting, never its value. A quota with no setting
+takes the default of the quotas table, and `authoringRequests` has none, which is no limit. `Axis.Admin`
+does not read `Quotas:Defaults` yet.
+
 | Setting | Read by | Meaning |
 | --- | --- | --- |
 | `Cell:Id` | All hosts | The cell id, such as `vn-1`. Setting it turns on quotas, per-tenant Studio folders and the cell console. |
@@ -600,8 +635,10 @@ shares its time the same way everywhere.
 | `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
-| `Cell:OperatorRole` | Server | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
-| `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. |
+| `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
+| `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup` and `tenant restore` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
+| `Cell:RuntimeDatabaseHost` | Server, worker | The address of every tenant's runtime database connection, such as PgBouncer, see [connections](cells.md#connections). Those connections also take `Maximum Pool Size=5`, `Minimum Pool Size=0`, `Connection Idle Lifetime=60` and `Max Auto Prepare=0`. Without it each connection uses the host of the tenant's directory row. The schema role, the publisher, the worker's `LISTEN` connection and the platform connections never use it. |
+| `Cell:RuntimeDatabasePort` | Server, worker | The port of that address. It defaults to the port of the tenant's directory row. Setting it without `Cell:RuntimeDatabaseHost` stops the start. |
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |
 | `Worker:Concurrency` | Worker | The loops that claim work at once, 4 by default, see [fair share](worker-scheduling.md#fair-share). |
 | `Worker:Quantum` | Worker | The work items a tenant of weight 1 runs in a round, 10 by default. |

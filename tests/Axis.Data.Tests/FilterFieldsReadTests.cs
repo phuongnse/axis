@@ -42,7 +42,7 @@ public sealed class FilterFieldsReadTests
     private static EntityModel? FindEntity(string name) => _application.TryGetEntity(name, out var entity) ? entity : null;
 
     private static ExpressionModel Compile(string filter) =>
-        ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(_job.Fields, [], FindEntity), ExpressionType.Boolean, policyFilter: true);
+        ExpressionModel.Compile(filter, ExpressionScopes.ForDataSource(_job.Fields, [], FindEntity), ExpressionType.Boolean, currentUser: true);
 
     [Fact]
     public void Policy_filter_reads_the_fields_of_the_linked_record_and_of_the_entities_on_its_paths()

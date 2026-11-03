@@ -1,0 +1,11 @@
+{
+  "id": "a872ff4c-b6dd-411d-a85c-017770d31f59",
+  "kind": "trigger",
+  "name": "ApproveDaily",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 6 * * *",
+  "timeZone": "UTC",
+  "dataSource": "ScheduledRequests",
+  "process": "ApproveAtOnce"
+}

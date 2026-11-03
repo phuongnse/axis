@@ -14,7 +14,7 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
 {
     private const string UrlBinding = "PurchasingSystemUrl";
     private const string Site = "/api/sites/purchasing";
-    private const string Departments = "/api/apps/PurchaseRequests/entities/Department/records";
+    private const string Departments = "/api/apps/PurchaseRequests/entities/organization/Department/records";
 
     private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
 
@@ -131,7 +131,7 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
                 $"INSERT INTO {EntityNaming.QualifiedTable(table)} (id, f_code, f_name) SELECT gen_random_uuid(), 'IX-' || n, 'Supplier ' || n FROM generate_series(1, 25) n");
             var file = Path.Combine(folder, "entities", "supplier.json");
             var text = await File.ReadAllTextAsync(file, CancellationToken);
-            var indexed = text.Replace("\"fields\": [", "\"indexes\": [{ \"fields\": [\"name\"] }],\n  \"fields\": [", StringComparison.Ordinal);
+            var indexed = text.Replace("\"fields\": [", "\"indexes\": [{ \"name\": \"name\", \"fields\": [\"name\"] }],\n  \"fields\": [", StringComparison.Ordinal);
             Assert.NotEqual(text, indexed);
             await File.WriteAllTextAsync(file, indexed, CancellationToken);
 

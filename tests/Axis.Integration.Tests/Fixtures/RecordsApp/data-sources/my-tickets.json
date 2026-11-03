@@ -1,0 +1,13 @@
+{
+  "id": "6d1f0c3e-5a47-4b8e-9c52-3f7a8e21b4d9",
+  "kind": "dataSource",
+  "name": "MyTickets",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "requester", "path": "requester" }
+  ],
+  "filter": "requester == currentUser()",
+  "sort": "title"
+}

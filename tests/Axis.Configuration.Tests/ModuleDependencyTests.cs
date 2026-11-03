@@ -399,7 +399,7 @@ public sealed class ModuleDependencyTests
               "fields": [
                 { "name": "beta", "type": "reference", "target": "{{target}}" },
                 { "name": "name", "type": "text", "required": true } ],
-              "validations": [ { "expression": "{{validation}}", "message": { "textKey": "{{id}}.item.invalid" }, "field": "name" } ] }
+              "validations": [ { "name": "check1", "expression": "{{validation}}", "message": { "textKey": "{{id}}.item.invalid" }, "field": "name" } ] }
             """);
         modules.With($"{id}/1.0.0/TextsEn.json", Texts($"c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5c{id.Length:00}", $$"""{ "{{id}}.item.invalid": "Not valid." }"""));
     }

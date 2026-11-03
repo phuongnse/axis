@@ -30,7 +30,7 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
 /// must hold the theme and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
 /// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the theme again. An error names the step and the status code,
-/// never a response body or a secret.
+/// never a response body or a secret. A server error (5xx) makes it read the realm again and repeat, up to three attempts.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 {
@@ -50,6 +50,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
     private const string ManagementClientId = "realm-management";
     private const string CreateUserIfUnique = "idp-create-user-if-unique";
+    private const int ServerErrorAttempts = 3;
 
     private static readonly string[] _activationRoles =
     [
@@ -131,6 +132,25 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     public async Task EnsureAsync(
         string realm, string displayName, TenantRealmSecrets secrets, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
     {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await EnsureOnceAsync(realm, displayName, secrets, smtpServer, cancellationToken);
+                return;
+            }
+            catch (ServerErrorException) when (attempt < ServerErrorAttempts)
+            {
+                // The identity provider failed for a moment. Read the realm again, so a step that did land turns into
+                // an update, and wait a little longer each time with some jitter.
+                await Task.Delay(TimeSpan.FromMilliseconds((200 * attempt) + Random.Shared.Next(0, 200)), cancellationToken);
+            }
+        }
+    }
+
+    private async Task EnsureOnceAsync(
+        string realm, string displayName, TenantRealmSecrets secrets, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
+    {
         var token = await AdminTokenAsync(cancellationToken);
         var realmPath = $"admin/realms/{Uri.EscapeDataString(realm)}";
 
@@ -148,7 +168,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         await GrantRolesAsync(token, realmPath, management, users, _usersRoles, cancellationToken);
     }
 
-    private async Task<string> AdminTokenAsync(CancellationToken cancellationToken)
+    internal async Task<string> AdminTokenAsync(CancellationToken cancellationToken)
     {
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
@@ -162,7 +182,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task EnsureRealmAsync(
+    internal async Task EnsureRealmAsync(
         string token, string realm, string realmPath, string displayName, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
     {
         using var existing = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
@@ -235,7 +255,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// Makes the OTP form of the realm's browser flow, and the subflow that holds it, required. The built-in flow asks for a
     /// code only from an account that already has an authenticator, so a new account would sign in with its password alone.
     /// </summary>
-    private async Task EnsureSecondStepAsync(string token, string realmPath, CancellationToken cancellationToken)
+    internal async Task EnsureSecondStepAsync(string token, string realmPath, CancellationToken cancellationToken)
     {
         var path = $"{realmPath}/authentication/flows/browser/executions";
         using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
@@ -271,7 +291,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// Turns off Keycloak's Verify Profile required action, so no sign-in stops on a page that asks for a missing profile field,
     /// such as the last name that a <c>saml</c> provider may not send. An identity provider without the action has nothing to turn off.
     /// </summary>
-    private async Task EnsureNoProfileReviewAsync(string token, string realmPath, CancellationToken cancellationToken)
+    internal async Task EnsureNoProfileReviewAsync(string token, string realmPath, CancellationToken cancellationToken)
     {
         var path = $"{realmPath}/authentication/required-actions/VERIFY_PROFILE";
         using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
@@ -446,7 +466,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         EnsureSuccess(granted, "grant the admin roles");
     }
 
-    private async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
+    internal async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, new Uri(admin.BaseAddress, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -458,11 +478,15 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return await http.SendAsync(request, cancellationToken);
     }
 
-    private static void EnsureSuccess(HttpResponseMessage response, string step)
+    internal static void EnsureSuccess(HttpResponseMessage response, string step)
     {
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"The identity provider step '{step}' failed with status {(int)response.StatusCode}.");
+            var message = $"The identity provider step '{step}' failed with status {(int)response.StatusCode}.";
+            throw (int)response.StatusCode >= 500 ? new ServerErrorException(message) : new InvalidOperationException(message);
         }
     }
+
+    /// <summary>The identity provider answered a server error (5xx), which <see cref="EnsureAsync"/> may repeat.</summary>
+    private sealed class ServerErrorException(string message) : InvalidOperationException(message);
 }

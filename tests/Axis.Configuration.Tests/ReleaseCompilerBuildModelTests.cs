@@ -134,7 +134,7 @@ public sealed class ReleaseCompilerBuildModelTests
                   "startCondition": { "expression": "number is not null", "message": { "textKey": "order.cannotStart" } },
                   "start": "check",
                   "steps": [
-                    { "name": "check", "type": "decision", "branches": [{ "when": "length(number) > 5", "next": "long" }], "otherwise": "short" },
+                    { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "length(number) > 5", "next": "long" }], "otherwise": "short" },
                     { "name": "long", "type": "end" },
                     { "name": "short", "type": "end" }
                   ] }
@@ -167,7 +167,7 @@ public sealed class ReleaseCompilerBuildModelTests
                   "parameters": [{ "name": "limit", "type": "decimal" }, { "name": "label", "type": "text" }],
                   "start": "check",
                   "steps": [
-                    { "name": "check", "type": "decision", "branches": [{ "when": "NeedsReview(limit)", "next": "big" }], "otherwise": "small" },
+                    { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "NeedsReview(limit)", "next": "big" }], "otherwise": "small" },
                     { "name": "big", "type": "end" },
                     { "name": "small", "type": "end" }
                   ] }
@@ -239,7 +239,7 @@ public sealed class ReleaseCompilerBuildModelTests
                 { "id": "55555555-5555-4555-8555-555555555501", "kind": "page", "name": "TicketDetail", "formatVersion": 1,
                   "title": { "textKey": "page.title" },
                   "parameters": [ { "name": "zebra", "type": "text" }, { "name": "apple", "type": "text" } ],
-                  "widgets": [ { "type": "taskInbox" } ] }
+                  "widgets": [ { "name": "taskInbox", "type": "taskInbox" } ] }
                 """),
             new ResourceContent("processes/tell.json", """
                 { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Tell", "formatVersion": 1, "entity": "Ticket",

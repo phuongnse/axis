@@ -256,8 +256,18 @@ public static class SchemaPlanner
 
         private void PlanExistingTable(EntityModel entity, CatalogTable table, ChildOwner? childOwner)
         {
-            void Report(string message, string path) =>
-                _diagnostics.Add(new Diagnostic(DiagnosticCodes.IncompatibleFieldChange, message, entity.File, path, entity.Id));
+            // A diagnostic about a field the layer changed is reported in the layer file.
+            void Report(string message, string path)
+            {
+                if (entity.Layer is { } layer && layer.PathOf(path) is { } layerPath)
+                {
+                    _diagnostics.Add(new Diagnostic(DiagnosticCodes.IncompatibleFieldChange, message, layer.File, layerPath, layer.Id));
+                }
+                else
+                {
+                    _diagnostics.Add(new Diagnostic(DiagnosticCodes.IncompatibleFieldChange, message, entity.File, path, entity.Id));
+                }
+            }
 
             var columnsByName = table.Columns.ToDictionary(column => column.Name, StringComparer.Ordinal);
             var replaced = new HashSet<string>(StringComparer.Ordinal);
@@ -347,12 +357,20 @@ public static class SchemaPlanner
             {
                 if (!systemColumns.Contains(column.Name, StringComparer.Ordinal) && !fieldColumns.Contains(column.Name))
                 {
+                    // A column of a field that a layer removed is reported at that remove in the layer file.
+                    var removedPath = entity.Layer?.RemovedFieldPaths
+                        .Where(pair => EntityNaming.Column(pair.Key) == column.Name || EntityNaming.LookupColumn(pair.Key) == column.Name)
+                        .Select(pair => pair.Value)
+                        .FirstOrDefault();
+                    var (file, path, id) = entity.Layer is { } layer && removedPath is not null
+                        ? (layer.File, removedPath, layer.Id)
+                        : (entity.File, "/fields", entity.Id);
                     _diagnostics.Add(new Diagnostic(
                         DiagnosticCodes.RemovedField,
                         $"The column '{column.Name}' has no field. Drop it with a dropField change in a migration, or rename it with a renameField change.",
-                        entity.File,
-                        "/fields",
-                        entity.Id));
+                        file,
+                        path,
+                        id));
                 }
             }
 

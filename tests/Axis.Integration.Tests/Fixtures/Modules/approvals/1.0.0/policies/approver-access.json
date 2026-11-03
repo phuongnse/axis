@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["approver"],
   "grants": [
-    { "entity": "Approval", "actions": ["read", "create"] },
-    { "dataSource": "Approvals", "actions": ["read"] }
+    { "name": "approvalRead", "entity": "Approval", "actions": ["read", "create"] },
+    { "name": "approvalsRead", "dataSource": "Approvals", "actions": ["read"] }
   ]
 }

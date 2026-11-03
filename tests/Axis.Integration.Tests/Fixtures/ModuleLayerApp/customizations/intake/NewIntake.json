@@ -1,0 +1,21 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3f07",
+  "kind": "layer",
+  "formatVersion": 1,
+  "target": "intake/NewIntake",
+  "changes": {
+    "widgets": [
+      {
+        "name": "intakeTabs",
+        "tabs": [
+          {
+            "name": "review",
+            "after": "notes",
+            "label": { "textKey": "intake.pages.newIntake.review" },
+            "widgets": [{ "type": "kpi", "name": "reviewTotal", "dataSource": "IntakeTotals", "measure": "intakeCount", "label": { "textKey": "intake.pages.newIntake.review" } }]
+          }
+        ]
+      }
+    ]
+  }
+}

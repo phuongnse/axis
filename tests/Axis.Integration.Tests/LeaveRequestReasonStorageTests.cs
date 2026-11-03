@@ -143,10 +143,10 @@ public sealed class LeaveRequestReasonStorageTests(AdminBackupFixture fixture) :
         return id;
     }
 
-    // The id of the Operations department that the departments module seeds for the sample.
+    // The id of the Operations department that the sample seeds in the organization module.
     private static async Task<Guid> OperationsAsync(HttpClient client)
     {
-        using var request = Request("/api/apps/LeaveRequests/entities/departments/Department/records?pageSize=100", AdminBackupFixture.Host);
+        using var request = Request("/api/apps/LeaveRequests/entities/organization/Department/records?pageSize=100", AdminBackupFixture.Host);
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));

@@ -30,6 +30,7 @@ import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 import { setOwn } from '../platform/ownProperty'
@@ -166,13 +167,14 @@ function Picker({
 /**
  * The designer of an entity. It shows the entity's name, label and display field, then its fields as a table of
  * name, label, type, required, unique and a settings column that shows only the settings the field's type takes,
- * and its validations as rows of an expression, a message key and a field. A field can be added, removed and moved,
+ * and its validations as rows of a name, an expression, a message key and a field. A field can be added, removed and moved,
  * and a type change drops the settings the new type does not take. A computed field's `expression` and each
  * validation's expression use the expression editor, and so does a field's `default`, which has no field in scope.
  * A field's settings also include `min` and `max` in the type of the field, `minLength` and `searchable`, and they
  * hide `default`, `min`, `max` and `minLength` next to an `expression`, a `sequence` or `creator`. An Indexes list
- * under the fields adds, moves and removes the entity's `indexes`, each a list of the entity's fields and a Unique
- * choice. The designer edits the draft through `onChange`, so a key it
+ * under the fields adds, moves and removes the entity's `indexes`, each a name, a list of the entity's fields and a
+ * Unique choice. The name of an index or a validation is shown as plain text, and an added one gets `index1` or
+ * `validation1`, the first name its list does not use. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
  * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
  * at the row of a setting that the row does not show. Clearing an optional value removes its key. With `readOnly`,
@@ -861,7 +863,7 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
 }
 
 /**
- * The indexes of the entity as rows of a field picker and a Unique choice. The picker offers the fields that have a
+ * The indexes of the entity as rows of a name, a field picker and a Unique choice. The picker offers the fields that have a
  * column and writes the picked names in order. Every change writes the whole `indexes` array, and an empty list
  * removes the key.
  */
@@ -915,6 +917,9 @@ function Indexes({
           const content = isContent(index) ? index : {}
           return (
             <Flex key={position} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
+              <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+                {text(content.name)}
+              </Typography.Text>
               <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{t('shell.studio.entity.indexFields')}</div>
                 <Select
@@ -954,7 +959,9 @@ function Indexes({
         })}
         {readOnly ? null : (
           <div>
-            <Button onClick={() => write([...list, { fields: [] }])}>{t('shell.studio.entity.addIndex')}</Button>
+            <Button onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}>
+              {t('shell.studio.entity.addIndex')}
+            </Button>
           </div>
         )}
       </Flex>
@@ -962,7 +969,7 @@ function Indexes({
   )
 }
 
-/** The validations of the entity as rows of an expression, a message key and a field. */
+/** The validations of the entity as rows of a name, an expression, a message key and a field. */
 function Validations({
   validations,
   fieldNames,
@@ -995,6 +1002,9 @@ function Validations({
           const name = t('shell.studio.entity.validationExpression')
           return (
             <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
+              <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+                {text(content.name)}
+              </Typography.Text>
               <div data-testid={`studio-field-${pointer}/expression`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{name}</div>
                 <Expression
@@ -1034,7 +1044,10 @@ function Validations({
           <div>
             <Button
               onClick={() =>
-                onChange('/validations', [...list, { expression: '', message: { textKey: '' }, field: '' }])
+                onChange('/validations', [
+                  ...list,
+                  { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
+                ])
               }
             >
               {t('shell.studio.entity.addValidation')}

@@ -228,6 +228,31 @@ public sealed class EndpointCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void A_matched_reference_cannot_be_mapped()
+    {
+        using var folder = Folder()
+            .With("entities/note.json", Note.Replace(
+                """{ "name": "createdBy", "type": "text", "creator": true }""",
+                """{ "name": "createdBy", "type": "text", "creator": true }, { "name": "owner", "type": "reference", "target": "Person", "match": { "field": "user", "from": "code" } }""",
+                StringComparison.Ordinal))
+            .With("entities/person.json", Person.Replace(
+                """{ "name": "name", "type": "text", "required": true }""",
+                """{ "name": "name", "type": "text", "required": true }, { "name": "user", "type": "text", "unique": true }""",
+                StringComparison.Ordinal))
+            .With("endpoints/import-note.json", Endpoint(
+                "ImportNote", "Note", "NoteClose", """[{ "name": "who", "type": "reference", "target": "Person" }]""", """{ "owner": "who" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.ReadOnlyEndpointValueField, "/values/owner"), (diagnostic.Code, diagnostic.Path));
+        Assert.Equal(
+            "The field 'owner' is set by its match, so the server sets it. An endpoint maps only fields it can write.",
+            diagnostic.Message);
+        Assert.Null(result.Model);
+    }
+
     [Theory]
     [InlineData("""{ "name": "state", "type": "enum", "values": ["open", "archived"] }""", "status", "state", ExpressionDiagnosticCodes.ResultTypeMismatch)]
     [InlineData("""{ "name": "who", "type": "reference", "target": "Note" }""", "person", "who", ExpressionDiagnosticCodes.ResultTypeMismatch)]

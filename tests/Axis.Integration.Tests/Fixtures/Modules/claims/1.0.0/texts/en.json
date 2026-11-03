@@ -1,0 +1,11 @@
+{
+  "id": "4d2a6c81-3e5b-4f70-8a1c-9b0d2e4f6b04",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "claims.roles.filer": "Filer",
+    "claims.roles.viewer": "Viewer"
+  }
+}

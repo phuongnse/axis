@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "departments/Department", "actions": ["read", "create", "update", "delete"] },
-    { "dataSource": "departments/Departments", "actions": ["read"] },
-    { "entity": "budgets/Budget", "actions": ["read", "create"] },
-    { "entity": "Employee", "actions": ["read", "create", "update", "delete"] }
+    { "name": "departmentRead", "entity": "departments/Department", "actions": ["read", "create", "update", "delete"] },
+    { "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] },
+    { "name": "budgetRead", "entity": "budgets/Budget", "actions": ["read", "create"] },
+    { "name": "employeeRead", "entity": "Employee", "actions": ["read", "create", "update", "delete"] }
   ]
 }

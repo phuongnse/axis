@@ -8,6 +8,7 @@ using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
+using Axis.Processes.Records;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
@@ -211,7 +212,7 @@ internal static class InboundEndpoints
         }
 
         // The defaults, the computed fields and the validations run in the write transaction, so their
-        // now() is its start time. The defaults and the creator fields are set first, as in a record API
+        // now() is its start time. The defaults, the creator fields and the matched references are set first, as in a record API
         // create, so the computed fields and validations see the record as it will be stored.
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var defaults = RecordDefaults.Apply(entity, mapped.Values, now, application.TimeZone);
@@ -221,7 +222,7 @@ internal static class InboundEndpoints
             return new(Results.ValidationProblem(defaultErrors));
         }
 
-        var values = RecordCreator.WithCreator(entity, defaults.Values, caller.Id);
+        var values = await RecordMatcher.WithMatchesAsync(connection, application, entity, RecordCreator.WithCreator(entity, defaults.Values, caller.Id), null, cancellationToken);
         var computed = RecordComputer.ComputeCreate(application, entity, values, mapped.Rows);
         if (computed.Errors is { } computeErrors)
         {
@@ -235,11 +236,19 @@ internal static class InboundEndpoints
             return new(Results.ValidationProblem(failures));
         }
 
-        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, computed.Values, computed.Rows, id: recordId, cipher: cipher, cancellationToken: cancellationToken);
+        var write = new RecordWriteContext(caller.Id, null);
+        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, write, computed.Values, computed.Rows, id: recordId, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);
-            return new(RecordEndpoints.WriteFailure(result));
+            if (result.Outcome != RecordWriteOutcome.LifecycleRefused)
+            {
+                return new(RecordEndpoints.WriteFailure(result));
+            }
+
+            // A module contract's refusal answers as a validation failure does, keyed by the state field.
+            RecordLifecycleLog.Refused(loggerFactory, entity.Id, result.Point, null);
+            return new(Results.ValidationProblem(result.Errors!));
         }
 
         await AuditRecords.AppendAsync(
@@ -264,6 +273,7 @@ internal static class InboundEndpoints
             DataChangeKinds.Create,
             record,
             changedFields: null,
+            write,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
 
@@ -280,6 +290,7 @@ internal static class InboundEndpoints
                 record.Id,
                 subject: null,
                 instanceId!.Value,
+                caller.Id,
                 caller.Id,
                 details,
                 cancellationToken);
@@ -315,6 +326,7 @@ internal static class InboundEndpoints
                 record.Id,
                 EventRaiser.Payload(mappedEvent.Fields),
                 instanceId,
+                caller.Id,
                 (active.ReleaseId, application),
                 loggerFactory.CreateLogger(typeof(EventRaiser)),
                 cancellationToken);

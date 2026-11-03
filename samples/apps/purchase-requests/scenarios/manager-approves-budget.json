@@ -6,6 +6,7 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "manager": ["department-manager"],
+    "manager2": ["department-manager"],
     "requester": ["employee"]
   },
   "steps": [
@@ -35,6 +36,13 @@
         "status": "draft"
       }
     },
+    {
+      "type": "updateRecord",
+      "record": "budget",
+      "as": "manager",
+      "values": { "status": "approved" },
+      "expect": "conflict"
+    },
     { "type": "startProcess", "process": "department-budgets/BudgetApproval", "record": "budget", "as": "manager" },
     {
       "type": "completeTask",
@@ -44,13 +52,20 @@
       "as": "requester",
       "expect": "denied"
     },
-    { "type": "completeTask", "record": "budget", "step": "review", "outcome": "approve", "as": "manager" },
+    { "type": "completeTask", "record": "budget", "step": "review", "outcome": "approve", "as": "manager2" },
     {
       "type": "expectInstance",
       "process": "department-budgets/BudgetApproval",
       "record": "budget",
       "state": "completed"
     },
-    { "type": "expectRecord", "record": "budget", "values": { "status": "approved" } }
+    { "type": "expectRecord", "record": "budget", "values": { "status": "approved" } },
+    {
+      "type": "updateRecord",
+      "record": "budget",
+      "as": "manager2",
+      "values": { "amount": 60000 },
+      "expect": { "invalid": "amount" }
+    }
   ]
 }

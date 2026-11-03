@@ -5,5 +5,5 @@
   "formatVersion": 1,
   "title": { "textKey": "orderDetail.title" },
   "parameters": [{ "name": "order", "type": "reference", "required": true, "target": "Order" }],
-  "widgets": [{ "type": "detail", "form": "OrderSummary", "record": "order" }]
+  "widgets": [{ "type": "detail", "name": "detail", "form": "OrderSummary", "record": "order" }]
 }

@@ -37,16 +37,31 @@ export function totp(secret: string | Uint8Array, at = Date.now()) {
   return String(binary % 1_000_000).padStart(6, "0");
 }
 
+/** How long a code must still be valid when `liveTotp` returns it, for the browser to type and submit it. */
+const liveMargin = 5_000;
+
+/**
+ * The code for `secret` now, made when at least five seconds of its period remain. A code made just before a period ends
+ * is refused by Keycloak when the browser submits it in the next period, so this waits for the next period instead.
+ */
+export async function liveTotp(secret: string | Uint8Array) {
+  const remaining = period * 1000 - (Date.now() % (period * 1000));
+  if (remaining < liveMargin) await new Promise((resolve) => setTimeout(resolve, remaining + 500));
+  return totp(secret);
+}
+
 /**
  * A code for `secret` that differs from `used`, the code that the same person gave before. Keycloak refuses a code that
  * was used in its period, so this waits for the next period when the current code is `used`.
  */
 export async function nextTotp(secret: string | Uint8Array, used: string) {
-  while (totp(secret) === used) {
+  let code = await liveTotp(secret);
+  while (code === used) {
     const wait = period * 1000 - (Date.now() % (period * 1000)) + 500;
     await new Promise((resolve) => setTimeout(resolve, wait));
+    code = await liveTotp(secret);
   }
-  return totp(secret);
+  return code;
 }
 
 /** The Base32 secret of `user`'s `otp` credential in the development realm file, which is the only place that holds it. */

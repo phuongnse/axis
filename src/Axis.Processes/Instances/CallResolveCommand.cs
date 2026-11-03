@@ -296,6 +296,7 @@ public static class CallResolveCommand
     {
         var (pinned, subject) = (target.Pinned, target.Subject);
         Record? updated = null;
+        var write = new RecordWriteContext(userId, null);
 
         // An instance without a subject has no record to read or write. A step of such a process maps no
         // outputs, so there are no values either.
@@ -319,6 +320,7 @@ public static class CallResolveCommand
             ["resolved"] = true,
         };
         AuditEntry? recordAudit = null;
+        IReadOnlyList<EffectRecord> effects = [];
         if (values.Count > 0)
         {
             if (subject is null || record is null)
@@ -327,7 +329,7 @@ public static class CallResolveCommand
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, record, values, now, cipher: cipher, cancellationToken: cancellationToken);
+            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, write, record, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (written is not { Outcome: RecordWriteOutcome.Written, Record: { } stored })
             {
                 return new CallResolveResult(CallResolveOutcome.Invalid, Errors: Remap(written, target.Mappings));
@@ -335,6 +337,7 @@ public static class CallResolveCommand
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, pinned, subject, target.ReleaseId, cancellationToken);
             updated = stored;
+            effects = written.Effects;
             output["subjectVersion"] = stored.Version;
             recordAudit = new AuditEntry(
                 userId,
@@ -386,6 +389,20 @@ public static class CallResolveCommand
                 record,
                 updated,
                 [],
+                write,
+                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                cancellationToken);
+            await EffectRecordWrites.AppendAsync(
+                transaction,
+                tenantId,
+                active,
+                activeReleaseId,
+                target.ReleaseId,
+                instance.ApplicationId,
+                instance.Id,
+                userId,
+                effects,
+                write,
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
         }
@@ -569,7 +586,7 @@ public static class CallResolveCommand
 
         if (errors.Count == 0)
         {
-            errors[OutputPointer] = [result.Outcome.ToString()];
+            errors[OutputPointer] = [ProcessStepHandler.Describe(result)];
         }
 
         return errors;

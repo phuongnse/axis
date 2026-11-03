@@ -173,6 +173,6 @@ public sealed class ExactLookupFilterCompilerTests
             .With("roles/employee.json", Role)
             .With("policies/people.json", $$"""
                 { "id": "{{PolicyId}}", "kind": "policy", "name": "PersonAccess", "formatVersion": 1, "roles": ["employee"],
-                  "grants": [{ "entity": "Person", "actions": ["read"], "filter": "{{filter}}" }] }
+                  "grants": [{ "name": "personRead", "entity": "Person", "actions": ["read"], "filter": "{{filter}}" }] }
                 """);
 }

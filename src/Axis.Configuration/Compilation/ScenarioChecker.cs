@@ -22,7 +22,13 @@ namespace Axis.Configuration.Compilation;
 /// duration, as a task's <c>dueIn</c> is. Every problem of a scenario is reported in one pass. Names are matched ignoring letter case,
 /// except roles, users and aliases, which are matched exactly. A name whose file was not loaded
 /// because of its own errors is not reported again, and a step that depends on an unknown alias or
-/// entity is not checked further.
+/// entity is not checked further. A module's scenarios are checked with <c>roleSlots</c> set: each
+/// user role, assignee role and recipient role must be a role slot of the module, compared exactly, and
+/// any other name is <see cref="DiagnosticCodes.ModuleScenarioRoleNotSlot"/>. No role is looked up, and the
+/// application maps each slot to its role when it runs the scenario. A module scenario's
+/// <c>contract.covers</c> names <c>contractPoints</c>, the named points of the module's contracts, compared
+/// exactly, and any other point is <see cref="DiagnosticCodes.UnknownCoveredPoint"/>. An application's own
+/// scenario with <c>contract</c> is <see cref="DiagnosticCodes.ContractOnApplicationScenario"/>.
 /// </summary>
 internal static class ScenarioChecker
 {
@@ -41,7 +47,9 @@ internal static class ScenarioChecker
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
         ReferenceIndexBuilder references,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null,
+        IReadOnlySet<string>? contractPoints = null)
     {
         // Duplicate process names are reported by the loader, so names resolve to the first process.
         var processesByName = new Dictionary<string, ProcessResource>(StringComparer.OrdinalIgnoreCase);
@@ -55,12 +63,62 @@ internal static class ScenarioChecker
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, scenario.File, path, scenario.Id));
 
+            if (roleSlots is null && scenario.Contract is not null)
+            {
+                Report(
+                    DiagnosticCodes.ContractOnApplicationScenario,
+                    "Only a module's scenario can be a contract scenario. Remove 'contract', or move the scenario into the module.",
+                    "/contract");
+            }
+            else if (roleSlots is { } contractModule && scenario.Contract is { } contract)
+            {
+                var points = contractPoints ?? new HashSet<string>();
+                for (var index = 0; index < contract.Covers.Count; index++)
+                {
+                    if (!points.Contains(contract.Covers[index]))
+                    {
+                        Report(
+                            DiagnosticCodes.UnknownCoveredPoint,
+                            points.Count == 0
+                                ? $"The module '{contractModule.ModuleId}' has no contracts, so '{contract.Covers[index]}' names nothing."
+                                : $"'{contract.Covers[index]}' is not a named point of a contract of the module '{contractModule.ModuleId}'. A point is written <entity>/<part>/<name>, with the same letter case as the contract.",
+                            $"/contract/covers/{index}");
+                    }
+                }
+            }
+
             bool KnownRole(string role) => findRole(role) is not null || unloadedRoleNames.Contains(role);
+
+            // A module scenario names a slot. The application's role comes from the pin's mapping when it runs.
+            bool CheckSlot(string role, string path)
+            {
+                if (roleSlots is not { } module)
+                {
+                    return false;
+                }
+
+                if (!module.Slots.Contains(role))
+                {
+                    Report(
+                        DiagnosticCodes.ModuleScenarioRoleNotSlot,
+                        module.Slots.Count == 0
+                            ? $"The module '{module.ModuleId}' has no role slots, so '{role}' names nothing. A module scenario names role slots of its module."
+                            : $"'{role}' is not a role slot of the module '{module.ModuleId}'. A module scenario names role slots, not roles. The slots are {string.Join(", ", module.Slots.Order(StringComparer.Ordinal).Select(slot => $"'{slot}'"))}.",
+                        path);
+                }
+
+                return true;
+            }
 
             foreach (var (user, roles) in scenario.Users)
             {
                 for (var index = 0; index < roles.Count; index++)
                 {
+                    if (CheckSlot(roles[index], $"/users/{Escape(user)}/{index}"))
+                    {
+                        continue;
+                    }
+
                     if (findRole(roles[index]) is { } role)
                     {
                         references.Add(scenario, $"/users/{Escape(user)}/{index}", ReferenceRelations.ScenarioRole, ResourceNode.Of(role));
@@ -111,7 +169,11 @@ internal static class ScenarioChecker
                         $"{path}/assignee/user");
                 }
 
-                if (step.Assignee?.Role is { } assigneeRole && findRole(assigneeRole) is { } assigneeRoleResource)
+                if (step.Assignee?.Role is { } slotAssigneeRole && CheckSlot(slotAssigneeRole, $"{path}/assignee/role"))
+                {
+                    // A module scenario's slot was checked above.
+                }
+                else if (step.Assignee?.Role is { } assigneeRole && findRole(assigneeRole) is { } assigneeRoleResource)
                 {
                     references.Add(scenario, $"{path}/assignee/role", ReferenceRelations.ScenarioRole, ResourceNode.Of(assigneeRoleResource));
                 }
@@ -131,7 +193,11 @@ internal static class ScenarioChecker
                         $"{path}/recipient/user");
                 }
 
-                if (step.Recipient?.Role is { } recipientRole && findRole(recipientRole) is { } recipientRoleResource)
+                if (step.Recipient?.Role is { } slotRecipientRole && CheckSlot(slotRecipientRole, $"{path}/recipient/role"))
+                {
+                    // A module scenario's slot was checked above.
+                }
+                else if (step.Recipient?.Role is { } recipientRole && findRole(recipientRole) is { } recipientRoleResource)
                 {
                     references.Add(scenario, $"{path}/recipient/role", ReferenceRelations.ScenarioRole, ResourceNode.Of(recipientRoleResource));
                 }

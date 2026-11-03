@@ -187,7 +187,7 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
         Assert.True(compiled.Model!.TryGetDataSource("PeopleMatching", out var dataSource));
 
         var page = await DataSourceQueries.ListAsync(
-            connection, null, compiled.Model, dataSource, 1, 50, null, [new(dataSource.Parameters[0], Matching)], null, null, cipher, CancellationToken);
+            connection, null, compiled.Model, dataSource, 1, 50, null, [new(dataSource.Parameters[0], Matching)], null, null, cipher, null, CancellationToken);
 
         Assert.NotNull(page);
         var counts = page.Items.ToDictionary(row => row.Values["name"]!.GetValue<string>(), row => row.Values["matching"]!.GetValue<long>());
@@ -220,10 +220,10 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
         DataSourceParameterValue[] parameters = [new(dataSource.Parameters[0], Matching)];
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => DataSourceQueries.ListAsync(connection, null, compiled.Model, dataSource, 1, 50, null, parameters, null, null, null, CancellationToken));
+            () => DataSourceQueries.ListAsync(connection, null, compiled.Model, dataSource, 1, 50, null, parameters, null, null, null, null, CancellationToken));
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await foreach (var _ in DataSourceQueries.ReadAllAsync(connection, compiled.Model, dataSource, null, parameters, null, null, 50, null, CancellationToken))
+            await foreach (var _ in DataSourceQueries.ReadAllAsync(connection, compiled.Model, dataSource, null, parameters, null, null, 50, null, null, CancellationToken))
             {
             }
         });
@@ -234,7 +234,7 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
     {
         Assert.True(compiled.Model!.TryGetDataSource(name, out var dataSource));
         var page = await DataSourceQueries.ListAsync(
-            connection, null, compiled.Model, dataSource, 1, 50, null, [.. dataSource.Parameters.Select(declared => new DataSourceParameterValue(declared, parameter))], null, null, cipher, CancellationToken);
+            connection, null, compiled.Model, dataSource, 1, 50, null, [.. dataSource.Parameters.Select(declared => new DataSourceParameterValue(declared, parameter))], null, null, cipher, null, CancellationToken);
         Assert.NotNull(page);
         return [.. page.Items.Select(row => row.Id!.Value)];
     }
@@ -384,18 +384,18 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
                 "policies/clerk-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "ClerkAccess", "formatVersion": 1, "roles": ["clerk"], "grants": [
-                    { "entity": "Person", "actions": ["read", "create", "update"] }] }
+                    { "name": "personRead", "entity": "Person", "actions": ["read", "create", "update"] }] }
                 """)
             .With(
                 "policies/matcher-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "MatcherAccess", "formatVersion": 1, "roles": ["matcher"], "grants": [
-                    { "entity": "Person", "actions": ["read"], "filter": "nationalId == '{{Matching}}'" }] }
+                    { "name": "personRead2", "entity": "Person", "actions": ["read"], "filter": "nationalId == '{{Matching}}'" }] }
                 """)
             .With(
                 "policies/other-access.json",
                 $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "OtherAccess", "formatVersion": 1, "roles": ["other"], "grants": [
-                    { "entity": "Person", "actions": ["read"], "filter": "nationalId != '{{Matching}}'" }] }
+                    { "name": "personRead3", "entity": "Person", "actions": ["read"], "filter": "nationalId != '{{Matching}}'" }] }
                 """);
 }

@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// One tenant database, <c>a</c>, served by the real server on host <c>a.example.test</c>. The
-/// server migrates it and activates the fixture applications ModuleAppA and ModuleAppB through
+/// server migrates it and activates the fixture applications ModuleAppA, ModuleAppB, ModuleContractApp, ModuleCeilingApp and ModuleRelaxApp through
 /// <c>ActivateOnStartup</c>. Both use the <c>departments</c> test module installed under
 /// <c>Fixtures/Modules</c>, so the module's department table and seed rows exist once for each.
 /// ModuleAppA also declares the <c>budgets</c> module, which depends on <c>departments</c>, and has an
@@ -16,6 +16,21 @@ namespace Axis.Integration.Tests;
 /// authentication scheme signs in <c>requester</c>, an employee, <c>manager</c>, who holds no role, and
 /// <c>approver-a</c>, who holds <c>manager</c> in ModuleAppA only.
 /// ModuleAppA also holds the site <c>modulesa</c>, which lists the <c>departments</c> module's Departments page.
+/// ModuleContractApp declares only the <c>requests</c> module, whose <c>Request</c> entity has a contract with a
+/// lifecycle, and maps its <c>requester</c> slot to <c>employee</c>. The contract's <c>approved</c> state is protected. The
+/// application's layers add the <c>onHold</c> state, its enum value, and the <c>hold</c> and <c>resume</c> transitions between
+/// it and <c>submitted</c>.
+/// ModuleCeilingApp declares only the <c>claims</c> module, whose <c>Claim</c> entity has a contract with a grant
+/// ceiling. It maps the <c>filer</c> slot to <c>clerk</c> and the <c>viewer</c> slot to <c>auditor</c>. The test
+/// authentication scheme signs in <c>ceiling-clerk</c> and <c>ceiling-auditor</c>, who hold those roles there only.
+/// ModuleRelaxApp declares the <c>requests</c>, <c>stages</c>, <c>ledgers</c> and <c>claims</c> modules, each with
+/// one relax entry: the <c>Request</c> submit guard, the <c>Ticket</c> <c>amountFrozenAfterSubmit</c> validation, the
+/// <c>ledgers</c> <c>Claim</c> <c>entryRecorded</c> effect and the <c>claims</c> <c>viewer</c> ceiling slot. The test
+/// authentication scheme signs in <c>relax-clerk</c> and <c>relax-auditor</c>, who hold <c>clerk</c> and <c>auditor</c> there only.
+/// ModuleLayerApp declares only the <c>intake</c> module and maps its <c>clerk</c> slot to <c>clerk</c>. Its layer on the
+/// module's <c>IntakeForm</c> adds the <c>notes</c> field, its layer on the NewIntake page adds a <c>review</c> tab after the
+/// second tab, its layer on the IntakeArchive page removes that page, and its site <c>modulelayer</c> lists the module's
+/// NewIntake page. The test authentication scheme signs in <c>layer-clerk</c>, who holds <c>clerk</c> there only.
 /// </summary>
 public sealed class ModuleAppFixture : IAsyncLifetime
 {
@@ -28,6 +43,15 @@ public sealed class ModuleAppFixture : IAsyncLifetime
 
     /// <summary>The <c>id</c> of ModuleAppB.</summary>
     public static readonly Guid AppBId = Guid.Parse("7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3b01");
+
+    /// <summary>The <c>id</c> of ModuleCeilingApp.</summary>
+    public static readonly Guid CeilingAppId = Guid.Parse("7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3d01");
+
+    /// <summary>The <c>id</c> of ModuleRelaxApp.</summary>
+    public static readonly Guid RelaxAppId = Guid.Parse("7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3e01");
+
+    /// <summary>The <c>id</c> of ModuleLayerApp.</summary>
+    public static readonly Guid LayerAppId = Guid.Parse("7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3f01");
 
     /// <summary>The id of the Department entity in the module file, before it is derived for an application.</summary>
     public static readonly Guid DepartmentEntityId = Guid.Parse("3b7e5a10-4c2d-4f6a-9d18-7a1c0e5b2f01");
@@ -70,16 +94,40 @@ public sealed class ModuleAppFixture : IAsyncLifetime
             builder.UseSetting("Modules:Path", Path.Combine(_fixtures, "Modules"));
             builder.UseSetting("ActivateOnStartup:0", Path.Combine(_fixtures, "ModuleAppA"));
             builder.UseSetting("ActivateOnStartup:1", Path.Combine(_fixtures, "ModuleAppB"));
+            builder.UseSetting("ActivateOnStartup:2", Path.Combine(_fixtures, "ModuleContractApp"));
+            builder.UseSetting("ActivateOnStartup:3", Path.Combine(_fixtures, "ModuleCeilingApp"));
+            builder.UseSetting("ActivateOnStartup:4", Path.Combine(_fixtures, "ModuleRelaxApp"));
+            builder.UseSetting("ActivateOnStartup:5", Path.Combine(_fixtures, "ModuleLayerApp"));
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
                 new TestIdentity("manager", "Manager No Role"),
                 new TestIdentity("approver-a", "Approver In A")
                 {
                     ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [AppAId] = ["manager"] },
+                },
+                new TestIdentity("ceiling-clerk", "Ceiling Clerk")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [CeilingAppId] = ["clerk"] },
+                },
+                new TestIdentity("ceiling-auditor", "Ceiling Auditor")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [CeilingAppId] = ["auditor"] },
+                },
+                new TestIdentity("relax-clerk", "Relax Clerk")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [RelaxAppId] = ["clerk"] },
+                },
+                new TestIdentity("relax-auditor", "Relax Auditor")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [RelaxAppId] = ["auditor"] },
+                },
+                new TestIdentity("layer-clerk", "Layer Clerk")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [LayerAppId] = ["clerk"] },
                 });
         });
 
-        // Creating a client starts the server, which migrates the database, activates both applications and seeds them.
+        // Creating a client starts the server, which migrates the database, activates the applications and seeds them.
         _factory.CreateClient().Dispose();
     }
 

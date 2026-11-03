@@ -3,6 +3,8 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Data.Records;
+using Axis.Expressions.Evaluation;
+using Axis.Expressions.Typing;
 using Record = Axis.Data.Records.Record;
 
 namespace Axis.Data.Tests;
@@ -238,6 +240,52 @@ public sealed class RecordValidatorTests
         Assert.Equal(("/values/lines", "order.needsLine"), (Assert.Single(empty).Key, Assert.Single(Assert.Single(empty).Value)));
         Assert.NotNull(large);
         Assert.Equal(("/values/lines", "order.smallTotal"), (Assert.Single(large).Key, Assert.Single(Assert.Single(large).Value)));
+    }
+
+    [Fact]
+    public void Core_validation_reads_the_record_id_even_when_a_field_is_named_id()
+    {
+        var node = Models.Entity(
+            Guid.Parse("44444444-4444-4444-8444-444444444444"),
+            "Node",
+            "entities/node.json",
+            Models.Field("id", FieldType.Text),
+            Models.Field("parent", FieldType.Reference, target: Models.Entity(Guid.Parse("44444444-4444-4444-8444-444444444444"), "Node", "entities/node.json")));
+
+        // The scope holds the record's id first, so it hides the field named id, as ExpressionScopes does.
+        var scope = new ExpressionScope(
+        [
+            KeyValuePair.Create("id", ExpressionType.ReferenceParameter("Node")),
+            KeyValuePair.Create("parent", ExpressionType.Reference("Node")),
+        ]);
+        node = node with
+        {
+            Contract = new ContractModel
+            {
+                Name = "organization/NodeContract",
+                File = "contracts/node.json",
+                Validations =
+                [
+                    new CoreValidationModel(
+                        "notOwnParent",
+                        ExpressionModel.Compile("parent == null or parent != id", scope, ExpressionType.Boolean, contract: true),
+                        new TextReference("node.notOwnParent"),
+                        "parent"),
+                ],
+            },
+        };
+        var application = Models.Application(node);
+        var recordId = Guid.Parse("55555555-5555-4555-8555-555555555555");
+
+        var own = RecordValidator.ValidateCore(
+            application, node, null, recordId, Values(node, ("id", "abc"), ("parent", recordId)), [], DateTimeOffset.UtcNow, RecordSets.Empty, new ExpressionAccountability(null, null), out var point);
+        var other = RecordValidator.ValidateCore(
+            application, node, null, recordId, Values(node, ("id", "abc"), ("parent", Guid.NewGuid())), [], DateTimeOffset.UtcNow, RecordSets.Empty, new ExpressionAccountability(null, null), out _);
+
+        Assert.NotNull(own);
+        Assert.Equal(("/values/parent", "node.notOwnParent"), (Assert.Single(own).Key, Assert.Single(Assert.Single(own).Value)));
+        Assert.Equal("Node/validations/notOwnParent", point);
+        Assert.Null(other);
     }
 
     private static EntityModel Validated(EntityModel entity, params (string Expression, string TextKey, string Field)[] rules) =>

@@ -35,6 +35,7 @@ const expressionNodes: [kind: string, pointer: string][] = [
   ['page', '/$defs/rowAction/properties/visibleWhen'],
   ['page', '/$defs/rowAction/properties/record'],
   ['page', '/$defs/navigateAction/properties/record'],
+  ['page', '/$defs/toolbarAction/properties/record'],
 ]
 
 describe('the x-axis-expression keyword', () => {

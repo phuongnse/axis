@@ -7,13 +7,14 @@ namespace Axis.Expressions.Evaluation;
 /// <summary>
 /// Evaluates a checked expression against one record's field values, following the null rules and
 /// run-time errors in docs/reference/expressions.md. It covers literals, bare field names, every
-/// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections,
-/// calls to named rules and paths through reference fields. It does no I/O: it reads the records a
+/// operator, every function in <see cref="ExpressionFunctions"/>, aggregates over child collections
+/// and over a path that ends at one, calls to named rules and paths through reference fields. It does no I/O: it reads the records a
 /// path names through an <see cref="ExpressionRecordResolver"/> the caller gives. Arithmetic is exact, and an evaluation stops after
 /// <see cref="ExpressionLimits.MaxSteps"/> steps, counting the steps of the rules it calls and of
 /// an aggregate's item expression on every row. Each node evaluated is one step, and a
 /// <c>concat</c> also costs one step for each full <see cref="ExpressionLimits.CharactersPerStep"/>
-/// characters of its result. Values use the CLR types listed on
+/// characters of its result. Inside an aggregate's item expression, <c>outer.field</c> reads a field of the
+/// record the whole expression runs on, and it costs one step like a bare name. Values use the CLR types listed on
 /// <see cref="ExpressionValues"/>.
 /// </summary>
 public static class ExpressionInterpreter
@@ -33,6 +34,11 @@ public static class ExpressionInterpreter
     /// A <c>now()</c> evaluated without it is a bug in the caller too.
     /// <paramref name="timeZone"/> is the application's time zone, which <c>today()</c> and <c>toDate</c>
     /// use to take the calendar date of an instant. Either evaluated without it is a bug in the caller too.
+    /// <paramref name="previous"/> holds the stored values before the write, which <c>previous(field)</c>
+    /// reads. It is <c>null</c> when no record exists before the write, as on a create, and then
+    /// <c>previous</c> gives <c>null</c>.
+    /// <paramref name="accountability"/> is what <c>accountableUser()</c> and <c>decisionTask()</c> give: the
+    /// write's accountable user and deciding task. Either evaluated without it is a bug in the caller too.
     /// </summary>
     public static ExpressionEvaluationResult Evaluate(
         ExpressionNode expression,
@@ -40,8 +46,10 @@ public static class ExpressionInterpreter
         ExpressionValues values,
         ExpressionRecordResolver? records = null,
         DateTimeOffset? now = null,
-        TimeZoneInfo? timeZone = null) =>
-        EvaluateCountingSteps(expression, checkResult, values, records, now, timeZone).Result;
+        TimeZoneInfo? timeZone = null,
+        ExpressionValues? previous = null,
+        ExpressionAccountability? accountability = null) =>
+        EvaluateCountingSteps(expression, checkResult, values, records, now, timeZone, previous, accountability).Result;
 
     /// <summary>
     /// Evaluates like <see cref="Evaluate"/> and also gives the steps used, so a test can show that
@@ -53,7 +61,9 @@ public static class ExpressionInterpreter
         ExpressionValues values,
         ExpressionRecordResolver? records = null,
         DateTimeOffset? now = null,
-        TimeZoneInfo? timeZone = null)
+        TimeZoneInfo? timeZone = null,
+        ExpressionValues? previous = null,
+        ExpressionAccountability? accountability = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(checkResult);
@@ -66,7 +76,7 @@ public static class ExpressionInterpreter
         var budget = new Budget();
         try
         {
-            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now, timeZone).Eval(expression), null), budget.Steps);
+            return (new ExpressionEvaluationResult(new Evaluator(values, checkResult, budget, records, now, timeZone, previous, accountability).Eval(expression), null), budget.Steps);
         }
         catch (EvaluationFailure failure)
         {
@@ -86,7 +96,10 @@ public static class ExpressionInterpreter
         Budget budget,
         ExpressionRecordResolver? records,
         DateTimeOffset? now,
-        TimeZoneInfo? timeZone)
+        TimeZoneInfo? timeZone,
+        ExpressionValues? previous = null,
+        ExpressionAccountability? accountability = null,
+        ExpressionValues? outer = null)
     {
         public object? Eval(ExpressionNode node)
         {
@@ -126,11 +139,13 @@ public static class ExpressionInterpreter
             budget.Steps += (int)steps;
         }
 
-        private object? Name(NameNode name)
+        private object? Name(NameNode name) => Read(values, name.Name);
+
+        private static object? Read(ExpressionValues source, string name)
         {
-            if (!values.TryGetValue(name.Name, out var value))
+            if (!source.TryGetValue(name, out var value))
             {
-                throw new InvalidOperationException($"No value was given for field '{name.Name}'.");
+                throw new InvalidOperationException($"No value was given for field '{name}'.");
             }
 
             return value is null or string or long or decimal or bool or DateOnly or DateTimeOffset or Guid
@@ -144,6 +159,13 @@ public static class ExpressionInterpreter
         /// </summary>
         private object? Member(MemberNode member)
         {
+            if (checkResult.OuterReads.Contains(member))
+            {
+                return Read(
+                    outer ?? throw new InvalidOperationException($"'outer.{member.Name}' was evaluated outside an aggregate's item expression."),
+                    member.Name);
+            }
+
             switch (Eval(member.Target))
             {
                 case null:
@@ -202,6 +224,10 @@ public static class ExpressionInterpreter
             var arguments = call.Arguments;
             switch (signature.Name)
             {
+                case "previous":
+                    // The argument is never evaluated, because that would give the new value.
+                    return previous is null ? null : Read(previous, ((NameNode)arguments[0]).Name);
+
                 case "if":
                     // Only the picked branch is evaluated. A null condition picks the else branch.
                     return Widen(call, Eval(Boolean(Eval(arguments[0])) == true ? arguments[1] : arguments[2]));
@@ -237,6 +263,12 @@ public static class ExpressionInterpreter
 
                 case "now":
                     return now ?? throw new InvalidOperationException("now() was evaluated without the transaction's time.");
+
+                case "accountableUser":
+                    return (accountability ?? throw new InvalidOperationException("accountableUser() was evaluated without the write's accountability.")).AccountableUser;
+
+                case "decisionTask":
+                    return (accountability ?? throw new InvalidOperationException("decisionTask() was evaluated without the write's accountability.")).DecisionTask;
 
                 case "today":
                     return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(
@@ -288,10 +320,12 @@ public static class ExpressionInterpreter
 
         /// <summary>
         /// Evaluates the item expression on every row of the collection, in order, on the same
-        /// budget. The collection argument is read, not evaluated, so it costs no step. Every row
+        /// budget. The collection argument is read, not evaluated, so it costs no step, except that the
+        /// reference part of a path to a collection is evaluated, as the path of a scalar field is. Every row
         /// is evaluated, even after <c>any</c> or <c>all</c> knows its result. <c>sum</c>,
         /// <c>avg</c>, <c>min</c> and <c>max</c> skip <c>null</c> items, and a <c>null</c> condition
-        /// counts as false.
+        /// counts as false. <c>first</c> evaluates its condition on every row too, but its item only
+        /// on the first row whose condition is true, and gives <c>null</c> when there is none.
         /// </summary>
         private object? Aggregate(CallNode call, string name)
         {
@@ -301,11 +335,27 @@ public static class ExpressionInterpreter
                 return (long)rows.Count;
             }
 
+            if (name == "first")
+            {
+                Evaluator? picked = null;
+                foreach (var row in rows)
+                {
+                    var evaluator = new Evaluator(row, checkResult, budget, records, now, timeZone, accountability: accountability, outer: outer ?? values);
+                    var condition = evaluator.Eval(call.Arguments[1]);
+                    if (picked is null && Boolean(condition) == true)
+                    {
+                        picked = evaluator;
+                    }
+                }
+
+                return picked is null ? null : Widen(call, picked.Eval(call.Arguments[2]));
+            }
+
             var item = call.Arguments[1];
             var items = new object?[rows.Count];
             for (var i = 0; i < items.Length; i++)
             {
-                items[i] = new Evaluator(rows[i], checkResult, budget, records, now, timeZone).Eval(item);
+                items[i] = new Evaluator(rows[i], checkResult, budget, records, now, timeZone, accountability: accountability, outer: outer ?? values).Eval(item);
             }
 
             switch (name)
@@ -344,9 +394,42 @@ public static class ExpressionInterpreter
             }
         }
 
-        /// <summary>The rows of the collection an aggregate names.</summary>
+        /// <summary>
+        /// The rows of the collection an aggregate names: a field of the record, or the collection
+        /// of the record a path ends at. A <c>null</c> reference, or one that names no record, gives no rows.
+        /// </summary>
         private IReadOnlyList<ExpressionValues> Collection(ExpressionNode node)
         {
+            if (node is MemberNode path)
+            {
+                switch (Eval(path.Target))
+                {
+                    case null:
+                        return [];
+                    case Guid id:
+                        if (!checkResult.PathTargets.TryGetValue(path, out var entity))
+                        {
+                            throw new InvalidOperationException($"The type checker recorded no target entity for '.{path.Name}'.");
+                        }
+
+                        if (records is null)
+                        {
+                            throw new InvalidOperationException("A path was evaluated without a record resolver.");
+                        }
+
+                        if (records(entity, id) is not { } record)
+                        {
+                            return [];
+                        }
+
+                        return record.TryGetValue(path.Name, out var rows) && rows is IReadOnlyList<ExpressionValues> list
+                            ? list
+                            : throw new InvalidOperationException($"No rows were given for collection '{path.Name}' of '{entity}'.");
+                    case var other:
+                        throw Unexpected(other);
+                }
+            }
+
             if (node is not NameNode name || !values.TryGetValue(name.Name, out var value))
             {
                 throw new InvalidOperationException("No rows were given for the aggregate's collection.");

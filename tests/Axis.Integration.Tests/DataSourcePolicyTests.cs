@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using Axis.Configuration.Model;
 using Axis.Data.DataSources;
@@ -151,6 +152,38 @@ public sealed class DataSourcePolicyTests(RecordApiFixture fixture) : IClassFixt
             Assert.Equal([ferns], RowIds(rows));
             Assert.Equal(1, rows.RootElement.GetProperty("totalCount").GetInt64());
         }
+    }
+
+    [Fact]
+    public async Task A_data_source_filter_that_calls_current_user_gives_each_user_their_own_rows_in_the_list_and_the_export()
+    {
+        await fixture.ResetAsync();
+        var mine = await fixture.InsertAsync(TenantA, "Ticket", new Dictionary<string, string?> { ["title"] = "Printer", ["requester"] = "requester" });
+        var ferns = await fixture.InsertAsync(TenantA, "Ticket", new Dictionary<string, string?> { ["title"] = "Shelf", ["requester"] = "fern" });
+        using var fern = fixture.CreateClient().SignedInAs("fern");
+
+        // The requester has no read filter on tickets, so only the data source filter keeps the rows apart.
+        using (var rows = await ReadJsonAsync(await SendAsync(fixture.Client, Path("MyTickets"))))
+        {
+            Assert.Equal([mine], RowIds(rows));
+            Assert.Equal(1, rows.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        // Fern also has a read filter on the tickets that names the same user, so one value serves both.
+        using (var rows = await ReadJsonAsync(await SendAsync(fern, Path("MyTickets"))))
+        {
+            Assert.Equal([ferns], RowIds(rows));
+            Assert.Equal(1, rows.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        using var export = await SendAsync(fixture.Client, "/api/apps/RecordsApp/data-sources/MyTickets/export?format=csv");
+        Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+        var csv = CsvText.Parse(Encoding.UTF8.GetString((await export.Content.ReadAsByteArrayAsync(CancellationToken))[3..]));
+
+        // The header and the requester's one row.
+        Assert.Equal(2, csv.Count);
+        Assert.Contains("Printer", csv[1]);
+        Assert.DoesNotContain(csv.SelectMany(row => row), cell => cell == "Shelf" || cell == "fern");
     }
 
     [Fact]

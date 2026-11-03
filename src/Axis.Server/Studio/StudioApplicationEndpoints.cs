@@ -2,8 +2,12 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Templates;
+using Axis.Core.Tenancy;
+using Axis.Server.Tenancy;
+using Axis.Tenancy;
 using Microsoft.Net.Http.Headers;
 
 namespace Axis.Server.Studio;
@@ -11,7 +15,8 @@ namespace Axis.Server.Studio;
 /// <summary>
 /// <c>POST /api/studio/apps</c> creates an application folder in <c>Studio:ApplicationsPath</c> from <c>{ name, template? }</c>
 /// and answers 201 with <c>{ name, diagnostics }</c> and a <c>Location</c> header. The order of checks is the session (401),
-/// the author role (403), a set <c>Studio:ApplicationsPath</c> (403), the content type (415), the body (400), the template
+/// the author role (403), a set <c>Studio:ApplicationsPath</c> (403), in a cell the tenant's applications quota
+/// (403 <c>quota-exceeded</c>), the content type (415), the body (400), the template
 /// (404), the write lock (503), then a name or folder that exists (409). The CSRF header is checked by the middleware first.
 /// The problem titles never contain text from the request. The route never activates a release.
 /// </summary>
@@ -27,16 +32,32 @@ internal static class StudioApplicationEndpoints
         PackageCatalog packages,
         ModuleCatalog modules,
         IStudioWriteLock writeLock,
-        IStudioFileWriter writer)
+        IStudioFileWriter writer,
+        TenantQuotas quotas,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        ILoggerFactory loggers)
     {
         if (await StudioEndpoints.RefuseAsync(httpContext, options) is { } refusal)
         {
             return refusal;
         }
 
+        options = StudioEndpoints.ForRequest(httpContext, options);
         if (options.ApplicationsPath is null)
         {
             return StudioEndpoints.Problem(StatusCodes.Status403Forbidden, "Studio cannot create applications here.");
+        }
+
+        // Outside a cell, or for a tenant with no limit, Limit answers null and the tenant database is never read.
+        if (tenants.Current?.TenantId is { } tenantId && quotas.Limit(tenantId, QuotaKeys.Applications) is { } limit)
+        {
+            var used = await CountApplicationsAsync(database, options, httpContext.RequestAborted);
+            if (used >= limit)
+            {
+                QuotaRefusal.Log(loggers, tenantId, QuotaKeys.Applications);
+                return QuotaRefusal.Problem(QuotaKeys.Applications, limit, used);
+            }
         }
 
         var request = httpContext.Request;
@@ -108,6 +129,15 @@ internal static class StudioApplicationEndpoints
         return Results.Created(
             $"/api/studio/apps/{Uri.EscapeDataString(name)}/resources",
             new StudioCreateApplicationResponse(name, StudioDiagnostics.Compile(target, packages, modules)));
+    }
+
+    // The distinct names, ignoring letter case, of the folders in the tenant's Studio folder and of the active releases.
+    private static async Task<long> CountApplicationsAsync(TenantDatabase database, StudioOptions options, CancellationToken cancellationToken)
+    {
+        var names = new HashSet<string>(StudioFolder.Applications(options), StringComparer.OrdinalIgnoreCase);
+        var releases = await new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken)).ListAsync(cancellationToken);
+        names.UnionWith(releases.Select(release => release.Name));
+        return names.Count;
     }
 }
 

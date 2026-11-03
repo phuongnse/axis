@@ -13,7 +13,8 @@ namespace Axis.Processes.Records;
 /// other cell is left for the record parser to check as a record id. An empty cell and a cell that is a record id
 /// are left as they are. A value that matches no record, or more than one, is an error at
 /// <c>/values/{field}</c> that does not repeat the value. Each distinct value of a field is looked up once, and
-/// the answer is kept for the whole run.
+/// the answer is kept for the whole run. A column of a field with a match is not looked up: the record parser
+/// refuses its cell, as the server sets the field.
 /// </summary>
 internal sealed class RecordImportReferences
 {
@@ -42,7 +43,7 @@ internal sealed class RecordImportReferences
         var lookups = new List<(int, FieldModel, EntityModel)>();
         for (var index = 0; index < columns.Fields.Count; index++)
         {
-            if (columns.Fields[index] is { Type: FieldType.Reference } field
+            if (columns.Fields[index] is { Type: FieldType.Reference, Match: null } field
                 && RecordFieldAccess.CanReadLabel(application, held, field)
                 && application.FindEntity(field.Target!.Id) is { } target)
             {

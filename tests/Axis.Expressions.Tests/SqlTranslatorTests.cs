@@ -142,7 +142,7 @@ public sealed class SqlTranslatorTests
     {
         var parsed = ExpressionParser.Parse("t == currentUser() or t == 'x'");
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
-        var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, policyFilter: true);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, currentUser: true);
         Assert.True(check.Succeeded, check.Diagnostic?.Message);
 
         var result = SqlTranslator.Translate(parsed.Expression, Column, check);
@@ -178,6 +178,7 @@ public sealed class SqlTranslatorTests
     [InlineData("lower(t) == 'a'", 0, "Function 'lower'")]
     [InlineData("UPPER(t) == 'a'", 0, "Function 'upper'")]
     [InlineData("b and trim(t) == 'a'", 6, "Function 'trim'")]
+    [InlineData("previous(i) == i", 0, "Function 'previous'")]
     [InlineData("i / 2 > 1", 2, "Operator '/'")]
     [InlineData("i > 0 and lower(t).x", 18, "Paths")]
     [InlineData("dt == date('2026-13-45')", 6, "'2026-13-45' is not a valid date")]
@@ -188,6 +189,7 @@ public sealed class SqlTranslatorTests
     [InlineData("min(lines, qty) > 0", 0, "Function 'min'")]
     [InlineData("max(lines, qty) > 0", 0, "Function 'max'")]
     [InlineData("all(lines, ok)", 0, "Function 'all'")]
+    [InlineData("first(lines, ok, qty) > 0", 0, "Function 'first'")]
     [InlineData("any(lines, lower(name) == 'a')", 11, "Function 'lower'")]
     [InlineData("b and count(lines, trim(name) == 'a') > 0", 19, "Function 'trim'")]
     public void Construct_outside_the_subset_is_reported_at_it(string expression, int offset, string named)
@@ -331,6 +333,22 @@ public sealed class SqlTranslatorTests
         Assert.Equal(["i"], outer);
         Assert.Equal(["lines"], requested);
         Assert.Equal(["product|name", "qty"], inner);
+    }
+
+    [Theory]
+    [InlineData("any(lines, qty > outer.i)")]
+    [InlineData("count(lines, OUTER.i == qty) > 0")]
+    [InlineData("any(lines, outer.i.name == 'x')")]
+    public void Outer_inside_an_aggregate_is_outside_the_subset(string expression)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded);
+
+        var result = SqlTranslator.Translate(parsed.Expression, Column, collection: Lines);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionDiagnosticCodes.OutsideSqlSubset, result.Diagnostic.Code);
+        Assert.Contains("'outer' is not translated to SQL", result.Diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]

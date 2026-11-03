@@ -11,6 +11,7 @@ import {
   isNumberType,
   type ListPart,
   moveTo,
+  namedWidget,
   newColumn,
   newTab,
   newWidget,
@@ -30,6 +31,7 @@ import { expressionScope } from './expressionScope'
 import { LabelTextsContext } from './labelTextsContext'
 import { MappingRows } from './MappingRows'
 import { stepLabels, usePartLabel } from './pagePaletteSupport'
+import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -330,7 +332,7 @@ function WidgetList({ pointer, widgets, tree }: { pointer: string; widgets: unkn
           style={{ minWidth: 240 }}
           value={null}
           options={addableTypes.map((option) => ({ value: option, label: option }))}
-          onChange={(type: string) => tree.onChange(pointer, [...widgets, newWidget(type)])}
+          onChange={(type: string) => tree.onChange(pointer, [...widgets, namedWidget(tree.widgets, newWidget(type))])}
         />
       </div>
     </Flex>
@@ -1218,7 +1220,9 @@ function TabsPanel({ base, tabs, onChange }: { base: string; tabs: unknown; onCh
         </Card>
       ))}
       <div>
-        <Button onClick={() => onChange(`${base}/tabs`, [...tabs, newTab()])}>{t('shell.studio.page.addTab')}</Button>
+        <Button onClick={() => onChange(`${base}/tabs`, [...tabs, newTab(tabs)])}>
+          {t('shell.studio.page.addTab')}
+        </Button>
       </div>
     </Flex>
   )
@@ -1495,7 +1499,7 @@ function Actions({
   const list = Array.isArray(actions) ? actions : []
 
   function add(action: Content) {
-    onChange(pointer, [...list, action])
+    onChange(pointer, [...list, { type: action.type, name: uniqueStepName(list, action.type as string), ...action }])
     onSelect(`${pointer}/${list.length}`)
   }
 

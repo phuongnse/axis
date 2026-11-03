@@ -1,0 +1,13 @@
+{
+  "id": "3f9b6d02-7c41-4e85-a1d3-9b2e8c5f6a10",
+  "kind": "application",
+  "name": "ModuleCoreValidationApp",
+  "formatVersion": 1,
+  "modules": [
+    {
+      "id": "stages",
+      "version": "^1.0.0",
+      "roles": { "requester": "employee" }
+    }
+  ]
+}

@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "Report", "actions": ["read", "create", "update", "delete"] },
-    { "entity": "Restricted", "actions": ["read", "create", "update", "delete"] },
-    { "dataSource": "ReportStatuses", "actions": ["read"] },
-    { "process": "Escalate", "actions": ["start", "inspect"] }
+    { "name": "reportRead", "entity": "Report", "actions": ["read", "create", "update", "delete"] },
+    { "name": "restrictedRead", "entity": "Restricted", "actions": ["read", "create", "update", "delete"] },
+    { "name": "reportStatusesRead", "dataSource": "ReportStatuses", "actions": ["read"] },
+    { "name": "escalateStart", "process": "Escalate", "actions": ["start", "inspect"] }
   ]
 }

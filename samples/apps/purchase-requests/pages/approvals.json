@@ -4,5 +4,5 @@
   "name": "Approvals",
   "formatVersion": 1,
   "title": { "textKey": "pages.approvals.title" },
-  "widgets": [{ "type": "processInspector", "process": "PurchaseRequestApproval" }]
+  "widgets": [{ "type": "processInspector", "name": "approvalFlow", "process": "PurchaseRequestApproval" }]
 }

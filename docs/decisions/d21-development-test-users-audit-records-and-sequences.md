@@ -24,11 +24,11 @@ record history are built.
   - A database trigger rejects every `UPDATE` and `DELETE`.
 
   See [storage](../reference/storage.md#audit-records-and-sequence-counters)
-  and [the record API](../reference/record-api.md#audit-records-and-history).
+  and [the record API](../reference/record-audit.md#audit-records-and-history).
 
 - **Record history:** an endpoint returns the audit records of one record,
   newest first. The form page shows them. See
-  [the record API](../reference/record-api.md#audit-records-and-history).
+  [the record API](../reference/record-audit.md#audit-records-and-history).
 - **Sequences:** a `sequence` resource has a format, such as
   `PR-{yyyy}-{n:5}`. See
   [configuration](../reference/resource-files.md#sequences).

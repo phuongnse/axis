@@ -1,0 +1,12 @@
+{
+  "id": "4d2a6c81-3e5b-4f70-8a1c-9b0d2e4f6b01",
+  "kind": "entity",
+  "name": "Claim",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "code", "type": "text", "maxLength": 50, "unique": true },
+    { "name": "requester", "type": "text", "maxLength": 100 }
+  ]
+}

@@ -33,6 +33,7 @@ export function StudioNavigation({
   application,
   applications,
   resources,
+  moduleKinds = [],
   view,
   canCreate,
   onPickApplication,
@@ -42,6 +43,8 @@ export function StudioNavigation({
   application: string
   applications: readonly StudioApplication[]
   resources: readonly StudioResourceItem[]
+  /** Proposed: the kinds the application's modules have resources of, which have an entry as the application's own do. */
+  moduleKinds?: readonly string[]
   view: StudioView
   canCreate: boolean
   onPickApplication: (name: string) => void
@@ -59,6 +62,9 @@ export function StudioNavigation({
   const counts = new Map<string, number>()
   for (const item of resources) {
     counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1)
+  }
+  for (const kind of moduleKinds) {
+    counts.set(kind, counts.get(kind) ?? 0)
   }
 
   // Proposed: an entry is its text while the sidebar is open and its icon, centred, while it is collapsed, where the

@@ -7,9 +7,10 @@
   "widgets": [
     {
       "type": "table",
+      "name": "purchaseRequests",
       "dataSource": "PurchaseRequestList",
-      "rowActions": [{ "type": "navigate", "page": "PurchaseRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
-      "toolbarActions": [{ "type": "navigate", "page": "PurchaseRequestForm", "label": { "textKey": "actions.new" } }]
+      "rowActions": [{ "type": "navigate", "name": "open", "page": "PurchaseRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "PurchaseRequestForm", "label": { "textKey": "actions.new" } }]
     }
   ]
 }

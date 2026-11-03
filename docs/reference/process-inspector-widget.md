@@ -10,7 +10,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   opens one, through the [inspection API](process-inspection.md#process-inspection).
 
   ```json
-  { "type": "processInspector", "process": "PurchaseRequestApproval" }
+  { "type": "processInspector", "name": "inspector", "process": "PurchaseRequestApproval" }
   ```
 
   - **Compile.** The `process` must name a loaded process, otherwise it is

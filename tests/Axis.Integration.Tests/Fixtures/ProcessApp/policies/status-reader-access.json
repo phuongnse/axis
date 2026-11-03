@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["status-reader"],
   "grants": [
-    { "entity": "Request", "actions": ["read"], "fields": ["status"] },
-    { "process": "Submit", "actions": ["inspect"] }
+    { "name": "requestRead", "entity": "Request", "actions": ["read"], "fields": ["status"] },
+    { "name": "submitInspect", "process": "Submit", "actions": ["inspect"] }
   ]
 }

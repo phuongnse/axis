@@ -10,7 +10,7 @@ public sealed class TenantConnectionFactoryTests
     [Fact]
     public async Task Opening_a_connection_without_a_tenant_context_throws()
     {
-        await using var factory = new TenantConnectionFactory(_catalog, new TenantContextAccessor());
+        await using var factory = new TenantConnectionFactory(_catalog, new TenantContextAccessor(), TenantPoolSettings.Default);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await factory.OpenConnectionAsync(TestContext.Current.CancellationToken));
@@ -22,7 +22,7 @@ public sealed class TenantConnectionFactoryTests
     public async Task Opening_a_connection_for_an_unconfigured_tenant_throws()
     {
         var accessor = new TenantContextAccessor { Current = new TenantContext("other") };
-        await using var factory = new TenantConnectionFactory(_catalog, accessor);
+        await using var factory = new TenantConnectionFactory(_catalog, accessor, TenantPoolSettings.Default);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await factory.OpenConnectionAsync(TestContext.Current.CancellationToken));

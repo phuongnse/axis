@@ -49,7 +49,7 @@ internal sealed partial class RecordImportCheckHandler(
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(connection);
 
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -196,7 +196,7 @@ internal sealed partial class RecordImportCheckHandler(
                 continue;
             }
 
-            if (RecordCommand.PrepareCreate(application, entity, actor, parse.Input!, form: null, now).Errors is { } prepareErrors)
+            if ((await RecordCommand.PrepareCreateAsync(connection, application, entity, actor, parse.Input!, form: null, now, cancellationToken: cancellationToken)).Errors is { } prepareErrors)
             {
                 Add(errors, prefix, prepareErrors);
             }

@@ -1,0 +1,14 @@
+{
+  "id": "0544a5fa-308f-44cd-ae6f-b5e84d9ac2bf",
+  "kind": "site",
+  "name": "Organization",
+  "formatVersion": 1,
+  "path": "organization",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [
+    { "page": "organization/Departments", "label": { "textKey": "nav.departments" } },
+    { "page": "organization/Employees", "label": { "textKey": "nav.employees" } },
+    { "page": "organization/OutOfOffice", "label": { "textKey": "nav.outOfOffice" } }
+  ]
+}

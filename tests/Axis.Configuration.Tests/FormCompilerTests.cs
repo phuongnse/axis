@@ -33,7 +33,7 @@ public sealed class FormCompilerTests
     public void Form_widget_naming_a_form_compiles_to_the_form_and_its_entity_and_a_table_may_open_it()
     {
         using var folder = Folder(Form("order", TwoSections))
-            .With("pages/order-form.json", FormPage("""{ "type": "form", "form": "orderLAYOUT" }"""));
+            .With("pages/order-form.json", FormPage("""{ "name": "form", "type": "form", "form": "orderLAYOUT" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -158,7 +158,7 @@ public sealed class FormCompilerTests
     public void Form_that_breaks_its_schema_is_reported_and_a_widget_naming_it_is_not(string sections, string path)
     {
         using var folder = Folder(Form("Order", sections))
-            .With("pages/order-form.json", FormPage("""{ "type": "form", "form": "OrderLayout" }"""));
+            .With("pages/order-form.json", FormPage("""{ "name": "form", "type": "form", "form": "OrderLayout" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -174,7 +174,7 @@ public sealed class FormCompilerTests
     public void Form_field_width_that_is_not_a_whole_number_from_1_to_12_is_reported_and_a_widget_naming_it_is_not(string width)
     {
         using var folder = Folder(Form("Order", $$"""[ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "width": {{width}} } ] } ]"""))
-            .With("pages/order-form.json", FormPage("""{ "type": "form", "form": "OrderLayout" }"""));
+            .With("pages/order-form.json", FormPage("""{ "name": "form", "type": "form", "form": "OrderLayout" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -202,9 +202,9 @@ public sealed class FormCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "form", "form": "OrderLayout", "entity": "Order" }""", "/widgets/0")]
-    [InlineData("""{ "type": "form" }""", "/widgets/0")]
-    [InlineData("""{ "type": "table", "entity": "Order", "form": "OrderLayout" }""", "/widgets/0/form")]
+    [InlineData("""{ "name": "form", "type": "form", "form": "OrderLayout", "entity": "Order" }""", "/widgets/0")]
+    [InlineData("""{ "name": "form", "type": "form" }""", "/widgets/0")]
+    [InlineData("""{ "name": "table", "type": "table", "entity": "Order", "form": "OrderLayout" }""", "/widgets/0/form")]
     public void Widget_naming_both_or_neither_of_form_and_entity_or_a_table_naming_a_form_is_reported(string widget, string path)
     {
         using var folder = Folder(Form("Order", TwoSections))
@@ -223,7 +223,7 @@ public sealed class FormCompilerTests
     public void Widget_naming_no_loaded_form_is_reported_at_its_form()
     {
         using var folder = Folder(Form("Order", TwoSections))
-            .With("pages/order-form.json", FormPage("""{ "type": "form", "form": "Missing" }"""));
+            .With("pages/order-form.json", FormPage("""{ "name": "form", "type": "form", "form": "Missing" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -243,7 +243,7 @@ public sealed class FormCompilerTests
                 { "id": "88888888-8888-4888-8888-888888888882", "kind": "form", "name": "CustomerLayout", "formatVersion": 1, "entity": "Customer",
                   "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "name" } ] } ] }
                 """)
-            .With("pages/order-form.json", FormPage("""{ "type": "form", "form": "CustomerLayout" }"""));
+            .With("pages/order-form.json", FormPage("""{ "name": "form", "type": "form", "form": "CustomerLayout" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 

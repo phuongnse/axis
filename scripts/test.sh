@@ -5,9 +5,9 @@ cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
 source scripts/lib/tools.sh
 
-# The server tests start the server, which reads the sample modules and templates from artifacts/. NexKit
+# The server tests start the server, which reads the built-in modules, sample modules and templates from artifacts/. NexKit
 # runs this script in a job without scripts/build.sh, which installs them too.
-bash scripts/lib/install-sample-modules.sh
+bash scripts/lib/install-modules.sh
 bash scripts/lib/install-sample-templates.sh
 
 for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.Expressions.Tests Axis.Tenancy.Tests; do
@@ -22,7 +22,7 @@ run_suite web web npm test --prefix web -- \
 # The report, smoke test selection, link check, docs structure check, locator check, raw HTML check, prototype pollution check, bundle budget check,
 # font check, design-system bundle check, dependency scan, image scan, setup retries, image build retries, E2E shard
 # split, load script, load test workflow, load objectives, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, load test routes and TOTP module, Compose status
-# helper, dev script stop helper, development realm script and Helm chart scripts' own tests.
+# helper, module install script, dev script stop helper, development realm script and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
 node --test scripts/check-links.test.mjs || status=1
@@ -43,6 +43,8 @@ node --test scripts/load-objectives.test.mjs || status=1
 node --test scripts/load.test.mjs || status=1
 node --test scripts/load-workflow.test.mjs || status=1
 node --test scripts/smoke.test.mjs || status=1
+node --test scripts/install-modules.test.mjs || status=1
+node --test scripts/sample-modules.test.mjs || status=1
 node --test scripts/compose-status.test.mjs || status=1
 node --test scripts/dev-stop.test.mjs || status=1
 node --test scripts/development-realm.test.mjs || status=1

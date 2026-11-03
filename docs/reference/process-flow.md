@@ -234,7 +234,8 @@ A `createRecord` operation creates a record of another entity:
   to the subject entity.
 - The step creates the record through the record create command, as `system`,
   in the step's transaction. Sequences, computed fields, validations and field
-  defaults apply. A creator field gets `system`. A validation failure fails the
+  defaults apply. A creator field gets `system`, and a
+  [matched reference](resource-files.md#matched-references) is set after it. A validation failure fails the
   step and leaves no record. The step does not run the actor's grants, as
   `system` holds none. It shares the in-transaction part of the create path
   with the record command, so the two do not drift apart.

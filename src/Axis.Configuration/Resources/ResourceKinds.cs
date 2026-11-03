@@ -23,4 +23,6 @@ public static class ResourceKinds
     public const string Webhook = "webhook";
     public const string Migration = "migration";
     public const string Scenario = "scenario";
+    public const string Contract = "contract";
+    public const string Layer = "layer";
 }

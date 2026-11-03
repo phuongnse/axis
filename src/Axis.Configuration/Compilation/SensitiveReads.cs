@@ -10,7 +10,9 @@ namespace Axis.Configuration.Compilation;
 /// as <see cref="Model.MappingFields"/> does for a mapping: a bare name is a field of the current
 /// entity, a path step is a field of the entity the step's target resolves to, a rule call reads
 /// the fields its arguments read, because a rule body sees only its parameters, and the item
-/// expression of an aggregate reads the fields of the child entity. An entity that
+/// expression of an aggregate reads the fields of the child entity, also when the aggregate names the
+/// collection by a path, such as <c>type.steps</c>, where the path's reference part reads its own fields. A read
+/// through <c>outer</c> is a field of the entity the expression runs on, also inside an item expression. An entity that
 /// <c>findEntity</c> cannot find is skipped. A filter may test an exact lookup
 /// field of its entity with <c>==</c> or <c>!=</c> against a literal other than <c>null</c>, outside
 /// the arguments of a call and outside an item expression: that test runs against the stored
@@ -38,7 +40,7 @@ internal static class SensitiveReads
         Func<string, EntityResource?> findEntity,
         bool allowExactLookupEquality = false,
         Func<string, bool>? isParameter = null) =>
-        Walk(node, check, entity, scope, findEntity, inItem: false, inCall: false, allowExactLookupEquality, isParameter);
+        Walk(node, check, entity, entity, scope, findEntity, inItem: false, inCall: false, allowExactLookupEquality, isParameter);
 
     // inItem is true inside the item expression of an aggregate, where a bare name is a field of the child row.
     // inCall is true inside the arguments of a call, where an exact lookup test is not translated.
@@ -46,6 +48,7 @@ internal static class SensitiveReads
         ExpressionNode node,
         ExpressionCheckResult check,
         EntityResource entity,
+        EntityResource outer,
         ExpressionScope scope,
         Func<string, EntityResource?> findEntity,
         bool inItem,
@@ -59,6 +62,11 @@ internal static class SensitiveReads
                 return Sensitive(entity, name.Name);
 
             case MemberNode member:
+                if (check.OuterReads.Contains(member))
+                {
+                    return Sensitive(outer, member.Name);
+                }
+
                 if (check.PathTargets.TryGetValue(member, out var targetName)
                     && findEntity(targetName) is { } target
                     && Sensitive(target, member.Name) is { } read)
@@ -66,10 +74,10 @@ internal static class SensitiveReads
                     return read;
                 }
 
-                return Walk(member.Target, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
+                return Walk(member.Target, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case UnaryNode unary:
-                return Walk(unary.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
+                return Walk(unary.Operand, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case BinaryNode binary:
                 if (allowExactLookupEquality && !inItem && !inCall && IsExactLookupEquality(binary, entity, scope, isParameter))
@@ -77,18 +85,18 @@ internal static class SensitiveReads
                     return null;
                 }
 
-                return Walk(binary.Left, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter)
-                    ?? Walk(binary.Right, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
+                return Walk(binary.Left, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter)
+                    ?? Walk(binary.Right, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case IsNullNode isNull:
-                return Walk(isNull.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
+                return Walk(isNull.Operand, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case InNode inList:
-                return Walk(inList.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter)
-                    ?? FirstOf(inList.Items, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
+                return Walk(inList.Operand, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter)
+                    ?? FirstOf(inList.Items, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case CallNode call:
-                return WalkCall(call, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
+                return WalkCall(call, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             default:
                 return null;
@@ -99,6 +107,7 @@ internal static class SensitiveReads
         CallNode call,
         ExpressionCheckResult check,
         EntityResource entity,
+        EntityResource outer,
         ExpressionScope scope,
         Func<string, EntityResource?> findEntity,
         bool inItem,
@@ -113,16 +122,32 @@ internal static class SensitiveReads
             && scope.TryGetCollection(list.Name, out var collection)
             && findEntity(collection.Entity) is { } child)
         {
-            return FirstOf(call.Arguments.Skip(1), check, child, scope, findEntity, inItem: true, inCall: true, allowExactLookupEquality, isParameter);
+            return FirstOf(call.Arguments.Skip(1), check, child, outer, scope, findEntity, inItem: true, inCall: true, allowExactLookupEquality, isParameter);
         }
 
-        return FirstOf(call.Arguments, check, entity, scope, findEntity, inItem, inCall: true, allowExactLookupEquality, isParameter);
+        if (!check.RuleCalls.ContainsKey(call)
+            && !inItem
+            && _aggregateNames.Contains(call.Name)
+            && call.Arguments is [MemberNode path, ..]
+            && check.CollectionPaths.Contains(path)
+            && check.PathTargets.TryGetValue(path, out var ownerName)
+            && findEntity(ownerName) is { } owner
+            && owner.Fields.FirstOrDefault(field => string.Equals(field.Name, path.Name, StringComparison.OrdinalIgnoreCase)) is { Target: { } childName }
+            && findEntity(childName) is { } pathChild)
+        {
+            // The path's reference part is read from the current entity, and the item expression from the collection's rows.
+            return Walk(path.Target, check, entity, outer, scope, findEntity, inItem, inCall: true, allowExactLookupEquality, isParameter)
+                ?? FirstOf(call.Arguments.Skip(1), check, pathChild, outer, scope, findEntity, inItem: true, inCall: true, allowExactLookupEquality, isParameter);
+        }
+
+        return FirstOf(call.Arguments, check, entity, outer, scope, findEntity, inItem, inCall: true, allowExactLookupEquality, isParameter);
     }
 
     private static (string Entity, string Field)? FirstOf(
         IEnumerable<ExpressionNode> nodes,
         ExpressionCheckResult check,
         EntityResource entity,
+        EntityResource outer,
         ExpressionScope scope,
         Func<string, EntityResource?> findEntity,
         bool inItem,
@@ -132,7 +157,7 @@ internal static class SensitiveReads
     {
         foreach (var node in nodes)
         {
-            if (Walk(node, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter) is { } read)
+            if (Walk(node, check, entity, outer, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter) is { } read)
             {
                 return read;
             }

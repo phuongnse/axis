@@ -8,6 +8,7 @@
   "widgets": [
     {
       "type": "kpi",
+      "name": "kpi",
       "dataSource": "ItemTotalsInDepartment",
       "parameters": { "inDepartment": "department" },
       "measure": "items",

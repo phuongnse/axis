@@ -27,52 +27,42 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   library. Where the library leaves a state out, such as loading (`aria-busy`)
   or the current page (`aria-current`, as on the active navigation entry), the
   widget adds it.
-- **Design tokens and previews.** The token file
-  `web/src/platform/designTokens.ts` holds every colour, type, spacing and
-  radius value of the theme, in Axis names. The colours are primary, success,
-  warning, danger, info, primaryText, successText, warningText, dangerText,
-  infoText, canvas, surface, text, textMuted, border, borderSubtle, divider and
-  focusRing, each with a light and a dark value. The first five are seeds: they
-  colour fills, icons and tints. The `*Text` tokens colour text in that state
-  colour: state text, links, the selected tab, the active navigation entry and
-  form validation messages, the current page of a pagination, destructive menu
-  entries and the text of outlined and danger buttons, see **Buttons** below. `focusRing` colours the solid 2px keyboard focus of
-  every control. Every text colour reaches 4.5:1 and every border and focus
-  ring reaches 3:1 on surface and canvas, in both modes. The shadow group
-  holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast
-  it, and widgets, cards, sections and buttons cast none. Type has the body and
-  code fonts and the font size, spacing runs from xs to xl, and radius has the
-  base radius. The body font is IBM Plex Sans, a variable font for weights 100
-  to 700, and the code font is IBM Plex Mono at weight 400. The SPA ships the
-  Google Fonts files from the Fontsource npm packages unchanged. Only the
-  Latin, Latin Extended and Vietnamese subsets ship, each with a
-  `unicode-range` in `web/src/fonts.css`, so a browser downloads only the
-  subsets a page uses. The fonts are under the SIL Open Font License 1.1. Its
-  texts ship at `/fonts/OFL-IBM-Plex-Sans.txt` and
-  `/fonts/OFL-IBM-Plex-Mono.txt`, from `web/public/fonts`. The font files are
-  part of the build output and load from the SPA's own origin (`font-src
-  'self'`), so an install with no internet shows them too. The design-system
-  bundle carries no fonts. `web/src/platform/antTheme.ts` is the only file that maps them to Ant
-  Design tokens. A component that needs a theme value reads Axis tokens through
-  `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test
-  fails on a hard-coded colour, font family or radius in `web/src` outside those
-  two files. The shared chart component in `web/src/platform/Chart.tsx` maps the
-  Axis tokens to chart colours, font and grid, and loads the library in its own
-  chunk. Widget previews draw every widget, container and field input from
-  fixture metadata, in light and dark mode. `scripts/design-system.sh` builds
-  them into one classic script that sets `window.Axis` with a mount per preview.
-  A mounted widget follows `data-theme` on the page's root element. For the
-  current mode it also reads the custom properties `--primary` to `--focusRing`
-  for the colours (named as above, so `--primaryText` to `--infoText` and
-  `--focusRing` too), `--shadowOverlay`, `--spacing-xs` to `--spacing-xl`,
-  `--radius-base`, `--font-sans` and `--font-code` from that element, and
-  redraws when one changes. A property the page leaves out, or sets to a value
-  the theme cannot use, keeps its token file value. A shadow value is usable
-  when it is not empty and has no `;`, `{` or `}`. Only the design-system
-  bundle reads them. See [Development](../development.md#widget-previews),
+- **Design tokens and previews.** The token file `web/src/platform/designTokens.ts` holds every colour, type, spacing
+  and radius value of the theme, in Axis names. The colours are primary, success, warning, danger, info, primaryText,
+  successText, warningText, dangerText, infoText, canvas, surface, text, textMuted, border, borderSubtle, divider and
+  focusRing, each with a light and a dark value. The first five are seeds: they colour fills, icons and tints. The
+  `*Text` tokens colour text in that state colour: state text, links, the selected tab, the active navigation entry and
+  form validation messages, the current page of a pagination, destructive menu entries and the text of outlined and
+  danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid 2px keyboard focus of
+  every control. Every text colour reaches 4.5:1 and every border and focus ring reaches 3:1 on surface and canvas, in
+  both modes. The shadow group holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast it, and
+  widgets, cards, sections and buttons cast none. Type has the body and code fonts and the font size, spacing runs from
+  xs to xl, and radius has the base radius. _(planned for M31)_: the size group holds `bar`, 48 px, the height of the
+  shell's header, a page's band and Studio's application row, `smallControl`, 24 px, a small icon button and the line of
+  text beside it, and `tableRow`, 40 px, a table's row and header. No size, space, type, radius or colour is a number of
+  its own in a component; a layout technique, such as a column's 1 % width, takes its size from a token, see
+  [D129](../decisions/d129-rules-from-the-studio-editors-review.md). The body font is IBM Plex Sans, a variable font for
+  weights 100 to 700, and the code font is IBM Plex Mono at weight 400. The SPA ships the Google Fonts files from the
+  Fontsource npm packages unchanged. Only the Latin, Latin Extended and Vietnamese subsets ship, each with a
+  `unicode-range` in `web/src/fonts.css`, so a browser downloads only the subsets a page uses. The fonts are under the
+  SIL Open Font License 1.1. Its texts ship at `/fonts/OFL-IBM-Plex-Sans.txt` and `/fonts/OFL-IBM-Plex-Mono.txt`, from
+  `web/public/fonts`. The font files are part of the build output and load from the SPA's own origin (`font-src
+  'self'`), so an install with no internet shows them too. The design-system bundle carries no fonts.
+  `web/src/platform/antTheme.ts` is the only file that maps them to Ant Design tokens. A component that needs a theme
+  value reads Axis tokens through `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test fails on
+  a hard-coded colour, font family or radius in `web/src` outside those two files. The shared chart component in
+  `web/src/platform/Chart.tsx` maps the Axis tokens to chart colours, font and grid, and loads the library in its own
+  chunk. Widget previews draw every widget, container and field input from fixture metadata, in light and dark mode.
+  `scripts/design-system.sh` builds them into one classic script that sets `window.Axis` with a mount per preview. A
+  mounted widget follows `data-theme` on the page's root element. For the current mode it also reads the custom
+  properties `--primary` to `--focusRing` for the colours (named as above, so `--primaryText` to `--infoText` and
+  `--focusRing` too), `--shadowOverlay`, `--spacing-xs` to `--spacing-xl`, `--radius-base`, `--font-sans` and
+  `--font-code` from that element, and redraws when one changes. A property the page leaves out, or sets to a value the
+  theme cannot use, keeps its token file value. A shadow value is usable when it is not empty and has no `;`, `{` or
+  `}`. Only the design-system bundle reads them. See [Development](../development.md#widget-previews),
   [D67](../decisions/d67-live-widget-previews-in-the-design-system.md),
-  [D57](../decisions/d57-a-design-system-published-from-the-repository.md) and
-  [Design changes](../delivery.md#design-changes).
+  [D57](../decisions/d57-a-design-system-published-from-the-repository.md) and [Design
+  changes](../delivery.md#design-changes).
 - **Icons.** Every icon comes from `@ant-design/icons`, and nothing in the SPA
   draws one by hand. Only the outlined style is used, so icons look alike. An
   icon takes the text colour and size of its control, so its colour comes from
@@ -93,35 +83,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   end-to-end step clicks during an opening animation, and a spec that proves a
   wait asks for motion again
   ([D97](../decisions/d97-reliable-test-runs.md)).
-- **Buttons**. A button's level follows its role, so the same kind
-  of action always has the same style
-  ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
-  - *Finish*: solid primary. The one action that finishes a task, such as Save
-    or Next, one per screen.
-  - *Main*: outlined in `primaryText`. The main action of a region: a table's
-    first toolbar action that is shown, such as New request, Add row of a child
-    collection, and a `startProcess` action on a form or a detail.
-  - *Secondary*: the default grey outline, such as Cancel and Import.
-  - *Icon*: a text button with only an icon, for small actions such as
-    Refresh. Choose and Clear of a `reference` field are bordered and joined.
-  - *Destructive*: in `dangerText` at any level, such as Remove row and
-    Delete.
-  - Ant Design writes the text of text, outlined and danger buttons in the
-    fill colours `primary` and `danger`, which fail contrast on a dark
-    surface, so Axis writes them in `primaryText` and `dangerText`. One shared
-    Axis button, `AxisButton` in `web/src/platform/`, takes the role, and each
-    widget names a role, never an Ant Design button type. The table's toolbar,
-    its icon buttons and the reference, set and file field buttons use it.
-  - **Icon-only buttons.** Only for actions repeated on every row, or where
-    space is tight. Main toolbar actions keep their text. Every icon-only
-    button shows its name as a tooltip on hover and on keyboard focus, and has
-    the same text as its accessible name, from the text resources.
-    Configuration never names an icon, so the platform gives an icon only to
-    an action whose meaning it knows. At narrow width row actions fold into a
-    menu of text entries, so touch users lose nothing.
-- **Selected and current states**. The selected tab, the active
-  menu entry and the current page of a pagination use `primaryText`.
-  Destructive menu entries use `dangerText`.
+- **Buttons, menus and fields**. A button's level follows its role and its place, menus mark the current
+  entry, and every form places field errors the same way, see
+  [actions and controls](actions-and-controls.md).
 - **Shown values**. A value reads the same in every widget: in an
   input, a read-only field, a table cell, a detail and a KPI
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
@@ -365,7 +329,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `maxLength` and `minLength` for text, `min` and `max` for integer, decimal, date and
     date-time, `precision` and `scale` for decimal and money, `currency` (the fixed code) or `currencyField` (the field
     holding the code) for money, `values` for enum, `valueLabelKeys` for an enum with `valueLabels`, `maxSize`,
-    `accept`, `uploadPath` and `downloadPath` for file, `target` for reference and references, and `fields` for
+    `accept`, `uploadPath` and `downloadPath` for file, `usersPath` for a text field marked `userId`, `target` for reference and references, and `fields` for
     child collection. `min` and `max` are strings in the
     entity file's literal form, such as `"0.5"` or `"2026-01-01"`. A property the field's
     type does not have, or a label the file leaves out, is `null`; it is
@@ -509,6 +473,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | Address | Shows |
   | --- | --- |
   | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it starts sign-in at once and draws no screen first. Only two addresses show a card, and neither starts sign-in until the person clicks its button. `/?signIn=failed` is where the server sends the browser after a refused sign-in. It shows "Sign in" and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/?signedOut` is where the identity provider returns the browser after sign-out. It shows "You have signed out", a message and a "Sign in again" button. A signed-in person who opens either address sees the launcher. |
+  | `/licences` | the [open source licences](legal.md#open-source-licences) page, open without signing in _(planned for M31)_ |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
@@ -551,9 +516,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     [layout](shell.md#layout) of [Shell and home page](shell.md).
     The page header, app switcher and language and theme menu work as they do on the platform site, see
     [page header](shell.md#page-header) and [app switcher and preferences](shell.md#app-switcher-and-preferences).
-- **Table widget.** A page whose widget is a `table` lists the records of its
-  entity through the record API, or the rows of its data source, in the
-  shared Ant Design table.
+- **Table widget.** A page whose widget is a `table` lists the records of its entity through the record API, or the rows
+  of its data source, in the shared Ant Design table. _(planned for M31)_: it draws on the platform's one shared table,
+  which every table of the platform uses, see [tables](actions-and-controls.md#tables).
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
     child collection and a `references` field have no column.
@@ -561,11 +526,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       entity's `displayField` when the table shows it, and otherwise the first
       column. For a data source it is the first column. It comes first. With a
       `navigate` row action it is the link that opens the row, see **Links**.
-    - **Layout**. Text, enum and reference columns are at most
-      320 px wide, and their text wraps. Every cell and the actions column
-      line up at the top, so a row with wrapped text reads along its first
-      line. Number columns sit on the right in tabular figures, see **Shown
-      values**.
+    - **Layout**. Text, enum and reference columns are at most 320 px wide, and their text wraps. _(planned for M31)_: a
+      text, reference or file column is free text and the free text columns share the width left in equal parts; every
+      other column fits its content; rows are 40 px, see [tables](actions-and-controls.md#tables). Every cell and the
+      actions column line up at the top, so a row with wrapped text reads along its first line. Number columns sit on
+      the right in tabular figures, see **Shown values**.
   - **URL state.** Paging, sorting and search live in the URL as the record
     API's own `page`, `pageSize`, `sort` (`-` and the field name for
     descending) and `search`, so reload, sharing and the back button keep
@@ -761,21 +726,21 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       opens a menu of text entries, a delete entry in `dangerText`. The count
       is of the actions the widget configures besides the open link, not of
       those a row shows, so every row has the same layout even where
-      `visibleWhen` hides an action on some rows. A
-      `navigate` action may sit in either list. `startProcess` and `delete`
-      are row actions only. A row of a data source acts on its root record,
-      and a group row has no actions.
-    - **Navigate.** A button that opens another page and sets its
-      parameters. A My tickets row opens a TicketDetail page and sets its
-      `ticket` parameter:
+      `visibleWhen` hides an action on some rows. A `navigate` action may sit
+      in either list. `startProcess` and `delete` are row actions only. A row
+      of a data source acts on its root record, and a group row has no actions.
+    - **Navigate.** A button that opens another page and sets its parameters.
+      A My tickets row opens a TicketDetail page and sets its `ticket` parameter:
 
       ```json
       {
         "type": "table",
+        "name": "tickets",
         "entity": "Ticket",
         "rowActions": [
           {
             "type": "navigate",
+            "name": "open",
             "page": "TicketDetail",
             "label": { "textKey": "tickets.open" },
             "parameters": { "ticket": "id" }
@@ -787,12 +752,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       The target page declares
       `"parameters": [{ "name": "ticket", "type": "reference", "target": "Ticket", "required": true }]`.
       The click goes to `/{site}/ticketdetail?ticket=<id>`. See [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
-      With `record`, the button opens `/{site}/{page}/{id}`. Without it, an
-      action to a form page, one with `opensForm`, opens `/{site}/{page}/new`.
-      A toolbar action to a form page without `record` shows only when the
-      table's `access.actions` holds `create`. A
-      click passes the table's address, with its paging and sorting, to the
-      page in history state, so a form returns to it after save or cancel.
+      With `record`, the button opens `/{site}/{page}/{id}`. Without it, an action
+      to a form page, one with `opensForm`, opens `/{site}/{page}/new`. A toolbar
+      action to a form page without `record` shows only when the table's
+      `access.actions` holds `create`. A click passes the table's address, with its
+      paging and sorting, to the page in history state, so a form returns to it
+      after save or cancel.
     - **Values.** The SPA has no full expression engine. It works out a bare
       name (`id`, a column or a field, matched ignoring case) and a literal
       (text in single quotes, a number, `true`, `false` or `null`). A button
@@ -925,11 +890,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - With nobody signed in, it is a **Sign in** button, except on the home page `/`, which starts sign-in or shows a card.
     It sends the browser to `/api/auth/sign-in` with the current path and query string as `returnUrl`, so the person
     comes back there, but to `/` from the card addresses `/?signIn=failed` and `/?signedOut`.
-  - With someone signed in, it shows their display name. Its menu holds
-    **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
-    ends the session and then sends the browser to the identity provider's sign-out page.
+  - With someone signed in, it shows their display name, and _(planned for M31)_ their avatar before it and a caret
+    after it. Its menu holds **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
+    ends the session and then sends the browser to the identity provider's sign-out page. _(Planned for M31: the server
+    ends the identity provider's session itself and the browser goes to `/?signedOut`, see
+    [sign-in and the session](security.md#sign-in-and-the-session).)_
   - The **sessions screen** at `/account` and the **users page** at `/users` are platform routes beside `/studio`,
-    before the site route, so `account` and `users` are reserved site paths. See [platform pages](platform-pages.md).
+    before the site route, so `account` and `users` are reserved site paths, and so is `licences` _(planned for M31)_. See
+    [platform pages](platform-pages.md).
   - A `401` from any API call shows the **sign-in prompt**, a dialog titled "Your session has ended"
     with a short message and a **Sign in** button. It shows when a signed-out person
     opens an application page, and over the current page when a session ends

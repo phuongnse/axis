@@ -85,6 +85,9 @@ public sealed class SensitiveValueSourceTests
         // SeedApplier passes only plain fields, and AddValue throws on a plain value of a sensitive field.
         ["Axis.Data/Records/RecordCommands.cs:FindVersionAsync"] = Untouched.Ids,
 
+        // The lifecycle's state field is never sensitive: the contract compiler refuses it.
+        ["Axis.Data/Records/RecordLifecycle.cs:CheckDeleteAsync"] = Untouched.NeverSensitive,
+
         ["Axis.Data/Records/RecordFilters.cs:MatchAsync"] = Untouched.Ids,
         ["Axis.Data/Records/RecordFilters.cs:Column"] = Untouched.NeverSensitive,
         ["Axis.Data/Records/RecordFilters.cs:Collection"] = Untouched.Ids,

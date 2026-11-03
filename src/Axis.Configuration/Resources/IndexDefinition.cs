@@ -7,6 +7,9 @@ namespace Axis.Configuration.Resources;
 /// </summary>
 public sealed record IndexDefinition
 {
+    /// <summary>The name of the index, unique in the entity's indexes ignoring letter case.</summary>
+    public required string Name { get; init; }
+
     /// <summary>The names of the fields the index covers, in order.</summary>
     public required IReadOnlyList<string> Fields { get; init; }
 

@@ -1,0 +1,8 @@
+{
+  "id": "1ba6ffbd-817b-4335-bbe3-59d061b75bae",
+  "kind": "page",
+  "name": "AbsenceForm",
+  "formatVersion": 1,
+  "title": { "textKey": "organization.pages.absenceForm.title" },
+  "widgets": [{ "type": "form", "name": "absenceForm", "form": "Absence" }]
+}

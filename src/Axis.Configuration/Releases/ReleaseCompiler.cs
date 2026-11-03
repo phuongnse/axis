@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
@@ -67,7 +68,9 @@ public static class ReleaseCompiler
         ArgumentNullException.ThrowIfNull(installedPackages);
         ArgumentNullException.ThrowIfNull(installedModules);
 
-        return await StoreAsync(ApplicationCompiler.Compile(folderPath, installedPackages, installedModules, maxFileSize), context, cancellationToken);
+        var loaded = ApplicationLoader.Load(folderPath);
+        var previous = await ActiveModuleCopiesAsync(loaded, context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize), context, cancellationToken);
     }
 
     /// <summary>
@@ -102,7 +105,38 @@ public static class ReleaseCompiler
         ArgumentNullException.ThrowIfNull(installedPackages);
         ArgumentNullException.ThrowIfNull(installedModules);
 
-        return await StoreAsync(ApplicationCompiler.CompileFiles(files, installedPackages, installedModules, maxFileSize), context, cancellationToken);
+        var loaded = ApplicationLoader.Load(files);
+        var previous = await ActiveModuleCopiesAsync(loaded, context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize), context, cancellationToken);
+    }
+
+    /// <summary>
+    /// The copies of the modules in the active release of the loaded application, or none when it has no active release.
+    /// The compile checks a layer on a module whose pinned version changes against these copies.
+    /// </summary>
+    private static async Task<IReadOnlyCollection<InstalledModule>> ActiveModuleCopiesAsync(
+        ApplicationLoadResult loaded,
+        ConfigurationDbContext context,
+        CancellationToken cancellationToken)
+    {
+        if (loaded.Application?.Id is not { } applicationId)
+        {
+            return [];
+        }
+
+        var store = new ActiveReleaseStore(context);
+        var active = await store.FindByApplicationIdAsync(applicationId, cancellationToken);
+        var release = active is null ? null : await store.GetReleaseAsync(active.ReleaseId, cancellationToken);
+        if (release is null)
+        {
+            return [];
+        }
+
+        var copies = release.Resources
+            .Where(resource => resource.Path.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal))
+            .Select(resource => new ResourceContent(resource.Path, resource.Content))
+            .ToList();
+        return ApplicationCompiler.ReadModuleCopies(copies, []);
     }
 
     private static async Task<ReleaseCompilationResult> StoreAsync(

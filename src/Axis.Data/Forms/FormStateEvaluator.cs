@@ -97,6 +97,7 @@ public static class FormStateEvaluator
                     || field.IsComputed
                     || field.Sequence is not null
                     || field.Creator
+                    || field.Match is not null
                     || (entry.ReadOnlyWhen is not null && Holds(entry.ReadOnlyWhen, conditions, now, application.TimeZone));
                 if (required && field.HasColumn && record[field.Name].Value is null)
                 {

@@ -10,6 +10,7 @@ using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 
 namespace Axis.Worker;
 
@@ -22,15 +23,18 @@ public static class WorkerServiceCollectionExtensions
     /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
     /// <c>Tenancy:RefreshInterval</c>. The dry run of an import fails a file with more data rows than
     /// <c>Data:ImportMaxRows</c>, which defaults to 10000. Every statement of a work item runs under <c>Worker:StatementTimeout</c>,
-    /// which defaults to one minute. The worker deletes in-app notifications older than
+    /// which defaults to one minute. The tenant connection pools take their sizes from <c>Data:TenantPoolMaxSize</c>,
+    /// <c>Data:TenantPoolMinSize</c> and <c>Data:TenantPoolIdleLifetime</c>. The worker deletes in-app notifications older than
     /// <c>Notifications:RetentionDays</c>, which defaults to 90. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL. The worker sends the emails that
     /// <c>notify</c> steps staged over the SMTP server of the <c>Email</c> section, which a tenant's own <c>Email</c> block
     /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none, and only a worker that runs in Development sends email
     /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>.
+    /// With <c>Cell:Id</c> set the worker is part of a cell and needs <c>Tenancy:Source=directory</c>, <c>Cell:Region</c> and <c>Cell:TenantDomain</c>.
+    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs and the emails it sends for each tenant per UTC day, in the platform database over <c>ConnectionStrings:Platform</c>. An email past the tenant's <c>emailsPerDay</c> quota waits until 00:00 UTC.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -59,7 +63,18 @@ public static class WorkerServiceCollectionExtensions
             throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.DeliveryAttempts)}' must be at least 1.");
         }
 
+        if (options.Concurrency < 1)
+        {
+            throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.Concurrency)}' must be at least 1.");
+        }
+
+        if (options.Quantum < 1)
+        {
+            throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.Quantum)}' must be at least 1.");
+        }
+
         var statementTimeout = StatementTimeout.Read(configuration, "Worker:StatementTimeout", WorkItemSettings.DefaultStatementTimeout);
+        var pool = TenantPoolSettings.Load(configuration);
 
         var health = new HealthOptions();
         configuration.GetSection(HealthOptions.SectionName).Bind(health);
@@ -67,6 +82,14 @@ public static class WorkerServiceCollectionExtensions
         {
             throw new InvalidOperationException($"'{HealthOptions.SectionName}:{nameof(HealthOptions.Urls)}' must not be empty.");
         }
+
+        var cell = CellOptions.Load(configuration);
+        services.AddSingleton(cell);
+
+        // Read before any database work too, so a bad value stops the start.
+        var runtimeAddress = TenantRuntimeAddress.Load(configuration, cell);
+        services.AddSingleton(QuotaDefaults.Load(configuration, cell));
+        services.AddSingleton<TenantQuotas>();
 
         WorkerTenantCatalog catalog;
         ITenantKeySource keySource;
@@ -92,8 +115,19 @@ public static class WorkerServiceCollectionExtensions
                 platformConnectionString,
                 cipher,
                 refreshInterval,
-                configuration.GetSection(TenantOptions.SectionName).Exists());
+                configuration.GetSection(TenantOptions.SectionName).Exists(),
+                runtimeAddress);
             keySource = new DirectoryTenantKeySource(platformConnectionString, cipher);
+
+            // A cell always reads the directory, so its usage and its daily email count are written to the same platform database.
+            if (cell.IsCell)
+            {
+                var platform = NpgsqlDataSource.Create(platformConnectionString);
+                services.AddSingleton(new TenantUsageStore(platform));
+                services.AddSingleton(new TenantDailyCounterStore(platform));
+                services.AddSingleton<IEmailQuota, CellEmailQuota>();
+                services.AddSingleton<IWorkItemUsage, CellWorkItemUsage>();
+            }
         }
         else
         {
@@ -102,7 +136,7 @@ public static class WorkerServiceCollectionExtensions
         }
 
         services.AddWorkerTelemetry(configuration, environment);
-        services.AddTenancy(catalog);
+        services.AddTenancy(catalog, pool);
         services.AddTenantKeys(keySource);
         services.AddSingleton<SensitiveValues>();
         services.AddSingleton(catalog);

@@ -102,6 +102,36 @@ public sealed class FormStateEvaluatorTests
     }
 
     [Fact]
+    public void Matched_reference_is_read_only_whatever_the_form_says()
+    {
+        var holder = Models.Entity(
+            Guid.Parse("8a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c10"),
+            "Badge",
+            "entities/badge.json",
+            Models.Field("holder", FieldType.Text, maxLength: 100, unique: true));
+        var visit = Models.Entity(
+            Guid.Parse("8a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c11"),
+            "Visit",
+            "entities/visit.json",
+            Models.Field("title", FieldType.Text),
+            Models.Field("badge", FieldType.Reference, target: holder) with { Match = new FieldMatchModel("holder", "title") });
+        var form = new FormModel
+        {
+            Id = Guid.Parse("8a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c12"),
+            Name = "VisitForm",
+            File = "forms/visit-form.json",
+            Entity = new EntityReference(visit.Id, visit.Name),
+            Sections = [new FormSectionModel(new TextReference("main"), [new FormFieldModel("title", false), new FormFieldModel("badge", false)], Name: "main")],
+        };
+        var draft = new RecordDraftResult(new RecordInput { Values = [] }, new SortedDictionary<string, string[]>(StringComparer.Ordinal));
+
+        var state = FormStateEvaluator.Evaluate(Models.Application(visit, holder), form, visit, null, draft, new HashSet<string>(), null, "requester", _now);
+
+        Assert.True(state.Fields["badge"].ReadOnly);
+        Assert.False(state.Fields["title"].ReadOnly);
+    }
+
+    [Fact]
     public void Validation_message_is_answered_only_for_a_touched_field()
     {
         var draft = Draft(("name", "Desk"), ("quantity", -1L));

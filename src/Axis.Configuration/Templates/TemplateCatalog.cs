@@ -177,7 +177,8 @@ public sealed class TemplateCatalog
                 root.GetProperty("id").GetString()!,
                 root.GetProperty("version").GetString()!,
                 ReadText(root.GetProperty("title")),
-                ReadText(root.GetProperty("description")));
+                ReadText(root.GetProperty("description")),
+                root.TryGetProperty("builtIn", out var builtIn) && builtIn.GetBoolean());
         }
     }
 

@@ -3,13 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { expect, test } from "../test";
 import { startServer } from "../activate";
-import { e2eApp, leaveRequests } from "../server-settings";
+import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
 
-// The leave request sample uses the departments module. The second server's Studio edits a copy of the sample, so the
+// The purchase request sample uses the department-budgets module. The second server's Studio edits a copy of the sample, so the
 // main E2E server's Studio folder stays as the other Studio specs expect it.
 test.describe("Studio draws a module page read-only", () => {
   let copy: string;
@@ -17,7 +17,7 @@ test.describe("Studio draws a module page read-only", () => {
 
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), "axis-studio-module-page-"));
-    await cp(leaveRequests, copy, { recursive: true });
+    await cp(purchaseRequests, copy, { recursive: true });
     server = await startServer({
       ActivateOnStartup__0: e2eApp,
       Studio__Folders__0: copy,
@@ -31,15 +31,15 @@ test.describe("Studio draws a module page read-only", () => {
     }
   });
 
-  test("an author sees departments/Departments drawn on the canvas with no way to change it", async ({
+  test("an author sees department-budgets/Budgets drawn on the canvas with no way to change it", async ({
     page,
   }) => {
     await useSession(page, "author");
-    await page.goto(`${server.url}/studio?app=LeaveRequests`);
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`);
 
     await page
       .getByTestId("studio-group-module-pages")
-      .getByRole("button", { name: "departments/Departments", exact: true })
+      .getByRole("button", { name: "department-budgets/Budgets", exact: true })
       .click();
 
     await expect(page.getByTestId("studio-page-canvas")).toBeVisible();

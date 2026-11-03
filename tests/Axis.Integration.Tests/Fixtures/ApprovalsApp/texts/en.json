@@ -1,0 +1,15 @@
+{
+  "id": "c35fa677-2cdc-475f-ab5d-f9d2483476c0",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.admin": "Administrator",
+    "role.employee": "Employee",
+    "decide.main": "Request",
+    "decide.review": "Decide the request",
+    "decide.approve": "Approve",
+    "decide.advance": "Advance"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "7fa87793-d002-4b81-99b1-408df2a70d49",
+  "kind": "contract",
+  "name": "DepartmentContract",
+  "formatVersion": 1,
+  "entity": "Department",
+  "validations": [
+    {
+      "name": "notOwnParent",
+      "expression": "parent == null or parent != id",
+      "message": { "textKey": "organization.department.notOwnParent" },
+      "field": "parent"
+    }
+  ],
+  "ceiling": {
+    "slots": {
+      "admin": [{ "actions": ["read", "create", "update", "delete", "export", "import"] }],
+      "member": [{ "actions": ["read"] }]
+    },
+    "others": [{ "actions": ["read"] }]
+  }
+}

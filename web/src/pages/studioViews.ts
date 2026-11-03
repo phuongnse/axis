@@ -18,6 +18,8 @@ export const studioKindGroups: readonly { key: string; kinds: readonly { kind: s
     key: 'data',
     kinds: [
       { kind: 'entity', icon: 'folder' },
+      // Proposed: a module's contract, a lifecycle on its entity, sits beside the entities.
+      { kind: 'contract', icon: 'process' },
       { kind: 'seed', icon: 'document' },
       { kind: 'sequence', icon: 'tag' },
       { kind: 'dataSource', icon: 'chart' },

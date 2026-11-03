@@ -1,0 +1,23 @@
+{
+  "id": "71967868-84ab-4970-aa3d-e25c400d3bee",
+  "kind": "process",
+  "name": "AutoSubmit",
+  "formatVersion": 1,
+  "entity": "requests/Request",
+  "start": "submit",
+  "steps": [
+    {
+      "name": "submit",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "status": "'submitted'"
+      },
+      "next": "finished"
+    },
+    {
+      "name": "finished",
+      "type": "end"
+    }
+  ]
+}

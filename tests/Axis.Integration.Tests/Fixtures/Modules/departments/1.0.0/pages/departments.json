@@ -4,5 +4,5 @@
   "name": "Departments",
   "formatVersion": 1,
   "title": { "textKey": "departments.pages.departments.title" },
-  "widgets": [{ "type": "table", "dataSource": "Departments" }]
+  "widgets": [{ "type": "table", "name": "departments", "dataSource": "Departments" }]
 }

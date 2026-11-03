@@ -17,7 +17,7 @@
     }
   ],
   "steps": [
-    { "title": { "textKey": "noteWizard.steps.main" }, "sections": ["main"] },
-    { "title": { "textKey": "noteWizard.steps.details" }, "sections": ["details"] }
+    { "name": "step1", "title": { "textKey": "noteWizard.steps.main" }, "sections": ["main"] },
+    { "name": "step2", "title": { "textKey": "noteWizard.steps.details" }, "sections": ["details"] }
   ]
 }

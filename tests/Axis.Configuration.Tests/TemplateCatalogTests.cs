@@ -29,6 +29,32 @@ public sealed class TemplateCatalogTests
     }
 
     [Fact]
+    public void A_manifest_with_built_in_true_loads_marked_as_built_in()
+    {
+        using var root = new TemporaryFolder()
+            .With("tpl-a/1.0.0/template.json", """{ "kind": "applicationTemplate", "id": "tpl-a", "version": "1.0.0", "title": { "en": "T", "vi": "T" }, "description": { "en": "D", "vi": "D" }, "builtIn": true }""")
+            .With("tpl-a/1.0.0/sites/site.json", Site);
+
+        var catalog = TemplateCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Problems);
+        Assert.True(Assert.Single(catalog.Newest).Manifest.BuiltIn);
+    }
+
+    [Fact]
+    public void A_built_in_flag_that_is_not_a_boolean_leaves_the_template_out()
+    {
+        using var root = new TemporaryFolder()
+            .With("tpl-a/1.0.0/template.json", """{ "kind": "applicationTemplate", "id": "tpl-a", "version": "1.0.0", "title": { "en": "T", "vi": "T" }, "description": { "en": "D", "vi": "D" }, "builtIn": "yes" }""")
+            .With("tpl-a/1.0.0/sites/site.json", Site);
+
+        var catalog = TemplateCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Newest);
+        Assert.Equal("tpl-a/1.0.0", Assert.Single(catalog.Problems).Folder);
+    }
+
+    [Fact]
     public void The_newest_version_of_each_template_is_listed_by_id()
     {
         using var root = new TemporaryFolder();

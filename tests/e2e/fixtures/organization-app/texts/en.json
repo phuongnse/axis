@@ -1,0 +1,15 @@
+{
+  "id": "b726e893-8187-4b38-909f-fdf1116589e2",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Organization",
+    "nav.departments": "Departments",
+    "nav.employees": "Employees",
+    "nav.outOfOffice": "Out of office",
+    "role.departmentManager": "Department manager",
+    "role.employee": "Employee"
+  }
+}

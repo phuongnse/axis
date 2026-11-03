@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Configuration.Modules;
 using Axis.Data.Naming;
 using Axis.Server.Tests;
 using Npgsql;
@@ -11,8 +12,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// An operator with a <c>retry</c> grant sends a failed purchase request approval back to its
 /// failed step, through the HTTP API. The sample gives the grant to the finance reviewers, here
-/// <c>finance-reviewer</c>. <c>requester</c> starts the approvals and <c>manager-2</c> is the manager of Operations.
-/// A step fails when the request's department has no manager, and a retry works once the
+/// <c>finance-reviewer</c>. <c>requester</c> starts the approvals and <c>manager-2</c> is the head of Operations.
+/// A step fails when the request's department has no head, and a retry works once the
 /// department is Operations. Each test leaves no due work item behind, so the next one finds
 /// only its own.
 /// </summary>
@@ -20,7 +21,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
 {
     private const string App = "/api/apps/PurchaseRequests";
 
-    private const string Reason = """{ "reason": "The department has a manager now" }""";
+    private const string Reason = """{ "reason": "The department has a head now" }""";
 
     private const string AlreadyRunningTitle = "A running or waiting instance of this process already exists for this record.";
 
@@ -28,7 +29,9 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
 
     private static readonly string _requests = EntityNaming.QualifiedTable(EntityNaming.Table(Guid.Parse("d9ccbf89-5004-4d52-8885-2ee377b7caa5")));
 
-    private static readonly string _departments = EntityNaming.QualifiedTable(EntityNaming.Table(Guid.Parse("ebe6bc20-4772-4d6c-839b-65d426ebeeca")));
+    private static readonly string _departments = EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(
+        Guid.Parse("219102bc-864f-42ed-874a-c19eaee0d1ba"), // PurchaseRequests application id
+        Guid.Parse("25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95")))); // modules/organization/entities/department.json
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -67,7 +70,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
         var task = await OpenTaskAsync(instance);
         Assert.Contains(task, await InboxAsync(manager2));
 
-        // The step ran with the department as it is now, so its manager decides and the instance moves on.
+        // The step ran with the department as it is now, so its head decides and the instance moves on.
         using var approved = await CompleteAsync(manager2, task, """{ "outcome": "reject" }""");
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -224,7 +227,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
             "SELECT details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = 'process.retried'", ("id", instance)))!);
         Assert.Equal(["step", "reason"], details.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal("managerApproval", details.RootElement.GetProperty("step").GetString());
-        Assert.Equal("The department has a manager now", details.RootElement.GetProperty("reason").GetString());
+        Assert.Equal("The department has a head now", details.RootElement.GetProperty("reason").GetString());
 
         Assert.Equal(
             1L,
@@ -415,14 +418,14 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
                 order.TryGetProperty("supplierCode", out var code) ? code.GetString() : null))];
     }
 
-    // Starts an approval for a request whose department has no manager, and runs it until managerApproval fails.
+    // Starts an approval for a request whose department has no head, and runs it until managerApproval fails.
     private async Task<(Guid Subject, Guid Instance)> FailAsync(HttpClient requester)
     {
         var department = Guid.NewGuid();
         await fixture.ScalarAsync(
-            $"INSERT INTO {_departments} ({EntityNaming.Quote(EntityNaming.IdColumn)}, {EntityNaming.Quote(EntityNaming.Column("code"))}, {EntityNaming.Quote(EntityNaming.Column("name"))}) VALUES (@id, @code, 'No manager')",
+            $"INSERT INTO {_departments} ({EntityNaming.Quote(EntityNaming.IdColumn)}, {EntityNaming.Quote(EntityNaming.Column("code"))}, {EntityNaming.Quote(EntityNaming.Column("name"))}) VALUES (@id, @code, 'No head')",
             ("id", department),
-            ("code", "T" + department.ToString("N")[..10]));
+            ("code", "T" + department.ToString("N")[..10].ToUpperInvariant()));
         var subject = await CreateRequestAsync(requester, 500, department);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);

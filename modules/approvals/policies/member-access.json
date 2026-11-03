@@ -1,0 +1,32 @@
+{
+  "id": "2f6a9d41-8c3e-4b70-9d15-a4e7c1b30f62",
+  "kind": "policy",
+  "name": "MemberAccess",
+  "formatVersion": 1,
+  "roles": ["member"],
+  "grants": [
+    {
+      "name": "requestRead",
+      "entity": "Request",
+      "actions": ["read"],
+      "filter": "requester == currentUser() or approverUser == currentUser() or onBehalfOf == currentUser()"
+    },
+    {
+      "name": "requestWrite",
+      "entity": "Request",
+      "actions": ["create", "update", "delete"],
+      "fields": ["type", "title", "description", "amount", "status"],
+      "filter": "requester == currentUser()"
+    },
+    { "name": "requestTypeRead", "entity": "RequestType", "actions": ["read"] },
+    {
+      "name": "decisionRead",
+      "entity": "Decision",
+      "actions": ["read"],
+      "filter": "request.requester == currentUser() or decidedBy == currentUser()"
+    },
+    { "name": "myRequestsRead", "dataSource": "MyRequests", "actions": ["read"] },
+    { "name": "requestDecisionsRead", "dataSource": "RequestDecisions", "actions": ["read"] },
+    { "name": "requestApprovalStart", "process": "RequestApproval", "actions": ["start"] }
+  ]
+}

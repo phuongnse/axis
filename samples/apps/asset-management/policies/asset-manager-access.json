@@ -8,6 +8,7 @@
   ],
   "grants": [
     {
+      "name": "asset1",
       "entity": "Asset",
       "actions": [
         "read",
@@ -19,6 +20,7 @@
       ]
     },
     {
+      "name": "category1",
       "entity": "Category",
       "actions": [
         "read",
@@ -30,6 +32,7 @@
       ]
     },
     {
+      "name": "location1",
       "entity": "Location",
       "actions": [
         "read",
@@ -41,6 +44,7 @@
       ]
     },
     {
+      "name": "vendor1",
       "entity": "Vendor",
       "actions": [
         "read",
@@ -52,6 +56,7 @@
       ]
     },
     {
+      "name": "software1",
       "entity": "Software",
       "actions": [
         "read",
@@ -63,6 +68,7 @@
       ]
     },
     {
+      "name": "assetValueByLocation1",
       "dataSource": "AssetValueByLocation",
       "actions": [
         "read",
@@ -70,6 +76,7 @@
       ]
     },
     {
+      "name": "assetsByStatus1",
       "dataSource": "AssetsByStatus",
       "actions": [
         "read",
@@ -77,6 +84,7 @@
       ]
     },
     {
+      "name": "warrantiesEndingSoon1",
       "dataSource": "WarrantiesEndingSoon",
       "actions": [
         "read",

@@ -3,8 +3,16 @@
 Detailed reference for the quotas of a tenant in a [cell](cells.md) and the usage that Axis measures.
 It follows [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_. A self-hosted installation has no quotas: they are on
-only when `Cell:Id` is set. The conventions of [architecture.md](../architecture.md) apply.
+Everything in this file is _(planned for M31)_, except what the next paragraph says is in place. A
+self-hosted installation has no quotas: they are on only when `Cell:Id` is set.
+
+In place: the `platform.tenant_quotas` table, the cell's defaults and the reading of both with the
+directory. The server and the worker answer a tenant's effective quota from them, and answer no limit
+outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
+[usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
+`emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
+event and the `applications` refusal of Studio are in place. The other refusals and the leases are still planned, and
+so are the usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
 
 The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
 what one tenant uses in total or at once. A rate limit limits how fast one caller asks.
@@ -96,23 +104,56 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 
 ## Emails a day
 
-- The worker counts each email it sends in `platform.tenant_daily_counters`, keyed by tenant, day
-  (UTC) and counter, in the transaction that marks the email sent.
-- An email past the quota is held, not dropped. Held emails are sent in order after 00:00 UTC, still
-  under the next day's quota. In-app notifications are never held.
+- **Counting.** In a cell the worker takes one slot of the tenant's count for the day just before it
+  sends an email. `platform.tenant_daily_counters` holds the count, keyed by tenant, day (UTC) and
+  counter, and emails use the counter `emails`. One statement on the platform database checks the
+  quota and adds one, so workers that send at the same time cannot pass it. It is a short
+  transaction of its own, since the platform and the tenant databases cannot commit together.
+- **Failure.** A send that fails gives its slot back. A worker that crashes between the send and the
+  mark of the row sends the email again and counts it twice. A send cancelled at shutdown keeps its slot.
+- **Held emails.** An email past the quota is held, not dropped. Its row stays `pending` and its work
+  item is due at the next 00:00 UTC by the worker's clock. After midnight held emails are sent in the
+  order their items were queued, to the millisecond, and count against the new day's quota. A quota of
+  0 holds every email. A tenant with no limit is counted and never held.
+- **In-app notifications** are never held. A `notify` step stores its in-app notification when the
+  day's emails are used up.
+- **Platform database down.** When a slot cannot be taken, the email is not sent, its item is due again
+  after one lease, and the worker logs one warning for the tenant.
+- **Outside a cell** nothing is counted or held.
+- The platform reader role gets `INSERT` and `UPDATE` on the table, and no `DELETE`. Old rows are kept,
+  one small row for each tenant and day.
 - The tenant's administrators get one in-app notification the first time a day that emails are held.
+  _(planned for M31)_
 
 ## Usage
 
-- **Sampling.** A worker job samples each tenant's storage every hour: `pg_database_size` of its
-  database plus the bytes of its stored files. It keeps the newest sample in
-  `platform.tenant_usage_latest`, which the storage check reads.
+- **Sampling.** A worker job in a cell samples each tenant's storage every hour. It keeps the
+  newest sample in `platform.tenant_usage_latest`, which the storage check reads. A worker with no
+  `Cell:Id` measures nothing and writes no usage row.
+- **Database bytes and file bytes.** File bytes are the on-disk size of the stored file contents,
+  the table `axis.file_contents` with its indexes and TOAST data. Database bytes are
+  `pg_database_size` of the tenant database minus the file bytes. A stored file sits inside the tenant
+  database, so this split counts each byte once. A file kept outside the database would need its own
+  measurement. A size on disk does not shrink after a delete until PostgreSQL vacuums the
+  table.
 - **Daily rows.** `platform.tenant_usage` holds one row per tenant and day (UTC): the largest
   storage sample of the day, split into database and file bytes, the users and applications at the
-  end of the day, the emails sent, the connector and package calls, and the work items run. Rows are
-  kept for 13 months, then deleted. _(planned for M35)_ They also hold the authoring requests sent
+  end of the day, the emails sent, the connector and package calls, and the work items run. A sample
+  replaces the day's pair of sizes only when its total is larger. Rows are
+  kept for 13 months. The sampling job deletes the tenant's rows older than that.
+  The users, applications and emails-sent columns exist, but nothing fills them yet.
+  _(planned for M31)_ Each is filled by its own quota, see [Quotas](#quotas) and
+  [Emails a day](#emails-a-day). _(planned for M35)_ Rows also hold the authoring requests sent
   and the tokens of each model, with a tenant's own key counted apart, see
   [authoring requests](authoring-requests.md#audit).
+- **Counts.** Each work item the worker runs adds one to the day's work-item count, and a connector
+  call or a package call adds one to the day's call count too. A retry that the handler reschedules
+  counts, as every attempt is real work. The count is added in a short transaction on the platform database right
+  after the work item's transaction in the tenant database ended. The two databases cannot commit
+  together, so a worker that stops between them loses one count, and a failed write is logged and
+  never fails the work item. An item whose claim another worker took counts nowhere in this worker.
+- **Who writes.** The platform role of `ConnectionStrings:Platform` may insert, update and delete
+  rows of both usage tables, see [storage](storage.md#database-roles).
 - **Readers.** The [cell console](cell-console.md#views) shows the usage. M34's plans and prices
   read it, as D118 agrees. _(planned for M33)_ A tenant administrator sees the tenant's own quotas
   and its usage of the last 30 days on the users page's "Usage" section, and the

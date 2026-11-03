@@ -1,0 +1,48 @@
+{
+  "id": "00f41c46-bb37-4dc0-a5c8-29f42b7648e9",
+  "kind": "scenario",
+  "name": "MemberUpdatesOnlyTheirOwnAbsence",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["Employee/ceiling/member", "Department/ceiling/member"] },
+  "users": {
+    "admin": ["admin"],
+    "ann": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Employee",
+      "as": "admin",
+      "save": "annRecord",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com", "user": "ann" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Employee",
+      "as": "admin",
+      "save": "bob",
+      "values": { "fullName": "Bob Tran", "workEmail": "bob@example.com" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "annRecord",
+      "as": "ann",
+      "values": { "phone": "0901 000 111", "delegate": "bob", "delegateFrom": "2026-11-10", "delegateUntil": "2026-11-12" }
+    },
+    {
+      "type": "expectRecord",
+      "record": "annRecord",
+      "values": { "phone": "0901 000 111", "delegate": "bob", "delegateFrom": "2026-11-10", "delegateUntil": "2026-11-12" }
+    },
+    { "type": "updateRecord", "record": "annRecord", "as": "ann", "values": { "jobTitle": "Director" }, "expect": "denied" },
+    { "type": "updateRecord", "record": "bob", "as": "ann", "values": { "phone": "0901 000 222" }, "expect": "denied" },
+    {
+      "type": "createRecord",
+      "entity": "Department",
+      "as": "ann",
+      "values": { "code": "TEST-FIN", "name": "Finance" },
+      "expect": "denied"
+    }
+  ]
+}

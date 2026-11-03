@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["reviewer"],
   "grants": [
-    { "entity": "Checklist", "actions": ["read"] },
-    { "dataSource": "Checklists", "actions": ["read"] }
+    { "name": "checklistRead", "entity": "Checklist", "actions": ["read"] },
+    { "name": "checklistsRead", "dataSource": "Checklists", "actions": ["read"] }
   ]
 }

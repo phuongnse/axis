@@ -293,9 +293,9 @@ public static partial class RecordInputParser
                 continue;
             }
 
-            // The server computes the value on every write, or numbers it or sets its creator on
-            // create, so a body never sets it, not even to null.
-            if (field.IsComputed || field.Sequence is not null || field.Creator)
+            // The server computes the value on every write, numbers it, sets its creator on create or
+            // looks it up by its match, so a body never sets it, not even to null.
+            if (field.IsComputed || field.Sequence is not null || field.Creator || field.Match is not null)
             {
                 AddError(errors, propertyPointer, Messages.Computed);
                 continue;

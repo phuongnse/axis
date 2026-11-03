@@ -9,9 +9,18 @@ import { StudioNewApplication } from './StudioNewApplication'
 const template = {
   id: 'request-approval',
   version: '1.0.0',
+  builtIn: false,
   title: { en: 'Request approval', vi: 'Phê duyệt yêu cầu' },
   description: { en: 'A request form, a list and a two-step approval.', vi: 'Một biểu mẫu yêu cầu.' },
   diagnostics: [],
+}
+
+const builtInTemplate = {
+  ...template,
+  id: 'tracker-test',
+  builtIn: true,
+  title: { en: 'Tracker test', vi: 'Kiểm thử theo dõi' },
+  description: { en: 'A built-in test template.', vi: 'Một mẫu kiểm thử tích hợp sẵn.' },
 }
 
 const existsText = platformEnglish['shell.studio.newApplication.exists']
@@ -105,6 +114,19 @@ describe.each(['light', 'dark'])('StudioNewApplication in %s mode', (mode) => {
       .getAllByRole('radio')
       .map((radio) => radio.closest('label')?.textContent)
     expect(labels).toEqual(['Blank', 'Request approvalA request form, a list and a two-step approval.'])
+  })
+
+  it('lists a built-in template first, with Built in in its name, and no mark on the other', async () => {
+    stubFetch(undefined, () => json({ items: [builtInTemplate, template] }))
+    renderButton()
+    const dialog = await openDialog()
+
+    await within(dialog).findByRole('radio', { name: /^Tracker test/ })
+    const radios = within(dialog).getAllByRole('radio')
+    expect(radios.map((radio) => radio.getAttribute('value'))).toEqual(['', 'tracker-test', 'request-approval'])
+    expect(radios[1]).toHaveAccessibleName(/^Tracker test.*Built in/)
+    expect(radios[2]).toHaveAccessibleName(/^Request approval/)
+    expect(radios[2]).not.toHaveAccessibleName(/Built in/)
   })
 
   it('offers only Blank and a notice when the templates do not load', async () => {

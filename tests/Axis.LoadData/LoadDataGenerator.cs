@@ -126,6 +126,7 @@ public static class LoadDataGenerator
                 {
                     validations.Add(new
                     {
+                        name = $"check{j}",
                         expression = $"Rule{(ValidationsPerEntity * i) + j:D3}(quantity)",
                         message = Label($"entity{i:D2}.check{j}"),
                         field = "quantity",
@@ -259,21 +260,21 @@ public static class LoadDataGenerator
                 .ToList();
 
             var clerk = new List<object>();
-            clerk.AddRange(entities.Select(entity => new { entity, actions = _editActions }));
-            clerk.AddRange(dataSources.Select(dataSource => new { dataSource, actions = _readActions }));
-            clerk.AddRange(processes.Select(process => new { process, actions = _startActions }));
+            clerk.AddRange(entities.Select(entity => new { name = $"{entity}Edit", entity, actions = _editActions }));
+            clerk.AddRange(dataSources.Select(dataSource => new { name = $"{dataSource}Read", dataSource, actions = _readActions }));
+            clerk.AddRange(processes.Select(process => new { name = $"{process}Start", process, actions = _startActions }));
             WritePolicy("clerk-access", "ClerkAccess", "clerk", clerk);
 
             foreach (var role in new[] { "reviewer", "auditor" })
             {
                 var grants = new List<object>();
-                grants.AddRange(entities.Select(entity => new { entity, actions = _readActions }));
-                grants.AddRange(dataSources.Select(dataSource => new { dataSource, actions = _readActions }));
+                grants.AddRange(entities.Select(entity => new { name = $"{entity}Read", entity, actions = _readActions }));
+                grants.AddRange(dataSources.Select(dataSource => new { name = $"{dataSource}Read", dataSource, actions = _readActions }));
                 WritePolicy($"{role}-access", $"{char.ToUpperInvariant(role[0])}{role[1..]}Access", role, grants);
             }
 
             // The machine caller of the inbound endpoint. It holds no other grant.
-            WritePolicy("load-caller-access", "LoadCallerAccess", "load-caller", [new { endpoint = "CreateEntity00", actions = _invokeActions }]);
+            WritePolicy("load-caller-access", "LoadCallerAccess", "load-caller", [new { name = "createEntity00Invoke", endpoint = "CreateEntity00", actions = _invokeActions }]);
         }
 
         private void WritePolicy(string file, string name, string role, List<object> grants) =>
@@ -469,9 +470,10 @@ public static class LoadDataGenerator
                         new
                         {
                             type = "table",
+                            name = "table",
                             dataSource = $"DataSource{i:D3}",
-                            rowActions = new[] { new { type = "navigate", page = form, label = Label("actions.open"), record = "id" } },
-                            toolbarActions = new[] { new { type = "navigate", page = form, label = Label("actions.new"), record = (string?)null } },
+                            rowActions = new[] { new { type = "navigate", name = "open", page = form, label = Label("actions.open"), record = "id" } },
+                            toolbarActions = new[] { new { type = "navigate", name = "new", page = form, label = Label("actions.new"), record = (string?)null } },
                         },
                     },
                 });
@@ -483,7 +485,7 @@ public static class LoadDataGenerator
                     name = form,
                     formatVersion = 1,
                     title = Label($"entity{i:D2}.formTitle"),
-                    widgets = new[] { new { type = "form", form = $"Entity{i:D2}Review" } },
+                    widgets = new[] { new { type = "form", name = "form", form = $"Entity{i:D2}Review" } },
                 });
             }
         }

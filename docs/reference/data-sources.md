@@ -126,7 +126,10 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   [SQL subset](expressions.md#sql-subset). Values are always sent as SQL
   parameters and never spliced into the SQL text. A row is kept only when the
   filter is `true`, so a `null` result drops it. Without a `filter`, every
-  row passes.
+  row passes. The `filter` may call
+  [`currentUser()`](expressions.md#current-user), such as
+  `requester == currentUser()`, so a page lists only the signed-in user's own
+  records. A measure `filter` may not.
 - **`sort`.** The default order, in the syntax of the query `sort`: a name, or
   `-` and a name for descending order. Without it, rows are ordered by the
   tie-break below.
@@ -196,7 +199,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   `quantity`. Two opposite comparisons of a field that can be `null` may
   therefore not add up to the number of rows. A `sort` by the measure orders
   the groups by the filtered value. Like the data source `filter`, a measure
-  filter may compare a field that the user cannot read.
+  filter may compare a field that the user cannot read. Unlike the data source
+  `filter`, it cannot call `currentUser()` (`AXC0095`).
 - **`null` groups.** Rows whose group field is `null`, such as items with no
   department, form one group of their own.
 - **Row values.** A grouped row holds the group fields in `groupBy` order,
@@ -275,6 +279,10 @@ see the Data sources bullet of the Resolve step in
   is `AXC0047`. See [Types](expressions.md#types).
 - Each measure `filter` is checked like the `filter`, with the same codes, at
   `/aggregate/measures/{i}/filter`. For example `AXC0053` is a call to `lower`.
+- `currentUser()` is allowed in the `filter` and not in a measure `filter`,
+  where it is `AXC0095` at `/aggregate/measures/{i}/filter`. A schedule trigger
+  over a data source whose `filter` calls it is `AXC0363`, see
+  [integration resources](integration-resources.md).
 - No `filter` is checked while a parameter of the data source has a
   diagnostic, because that parameter may have no usable type.
 
@@ -324,7 +332,7 @@ active release, and `{dataSource}` a data source in that release. Both match
 ignoring letter case, as in the record API.
 
 A module data source's `{dataSource}` is written `{module id}/{data source name}`,
-for example `data-sources/departments/Departments/rows`. It matches ignoring
+for example `data-sources/organization/Departments/rows`. It matches ignoring
 letter case, is two path segments, and only that form reaches a module data
 source. A data source of the application has one segment. This is how the
 [record API routes](record-api.md#routes) name module entities. A module data
@@ -350,6 +358,11 @@ grants, the record filters, the fields and the joined targets are built.
   [pending field](migrations.md#recomputing-computed-fields) is a `409` and no
   rows come back. It is checked right after the grants, before the query, so
   a bad `sort` does not hide it. See [Errors](#errors).
+- **Current user.** `currentUser()` in the data source's own `filter` is the
+  session's user id, for the rows route and for the export. It is bound once,
+  also when a read filter of the root entity calls it. So two users who read
+  the same data source get only the rows that match themselves, even when
+  neither has a read filter.
 - **Fields.** Every projected field must be one the user may read, otherwise
   the whole data source is a `403`. This covers every entry of `fields`,
   also in a grouped data source, and so every field that a measure

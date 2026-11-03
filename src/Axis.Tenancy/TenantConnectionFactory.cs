@@ -5,9 +5,10 @@ using Npgsql;
 namespace Axis.Tenancy;
 
 /// <summary>
-/// Keeps one <see cref="NpgsqlDataSource"/> per tenant, created on first use and disposed with the factory.
+/// Keeps one <see cref="NpgsqlDataSource"/> per tenant, created on first use and disposed with the factory. The pool
+/// takes its size from <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> and <c>Data:TenantPoolIdleLifetime</c>.
 /// </summary>
-public sealed class TenantConnectionFactory(ITenantCatalog catalog, ITenantContextAccessor accessor)
+public sealed class TenantConnectionFactory(ITenantCatalog catalog, ITenantContextAccessor accessor, TenantPoolSettings pool)
     : ITenantConnectionFactory, IAsyncDisposable, IDisposable
 {
     private readonly ConcurrentDictionary<string, Lazy<NpgsqlDataSource>> _dataSources = new(StringComparer.Ordinal);
@@ -64,6 +65,6 @@ public sealed class TenantConnectionFactory(ITenantCatalog catalog, ITenantConte
 
     private Lazy<NpgsqlDataSource> CreateDataSource(string tenantId) =>
         new(() => catalog.Find(tenantId) is { } tenant
-            ? NpgsqlDataSource.Create(tenant.ConnectionString.Reveal())
+            ? NpgsqlDataSource.Create(pool.Apply(tenant.ConnectionString.Reveal()))
             : throw new InvalidOperationException($"Tenant '{tenantId}' is not configured."));
 }

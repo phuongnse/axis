@@ -1,0 +1,26 @@
+{
+  "id": "e4a82c96-1f07-4b3d-b5c8-6a9d3e1f7b04",
+  "kind": "contract",
+  "name": "TicketContract",
+  "formatVersion": 1,
+  "entity": "Ticket",
+  "lifecycle": {
+    "field": "status",
+    "states": [{ "name": "draft", "initial": true, "deletable": true }, { "name": "submitted" }],
+    "transitions": [{ "name": "submit", "from": ["draft"], "to": "submitted" }]
+  },
+  "validations": [
+    {
+      "name": "amountFrozenAfterSubmit",
+      "expression": "previous(status) == null or previous(status) == 'draft' or amount == previous(amount)",
+      "message": { "textKey": "stages.ticket.amountFrozen" },
+      "field": "amount"
+    },
+    {
+      "name": "stepMovesWithNewDecision",
+      "expression": "previous(status) == null or step == previous(step) or stepDecision != previous(stepDecision)",
+      "message": { "textKey": "stages.ticket.stepNeedsDecision" },
+      "field": "step"
+    }
+  ]
+}

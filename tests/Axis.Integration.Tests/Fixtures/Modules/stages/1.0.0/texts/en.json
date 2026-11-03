@@ -1,0 +1,13 @@
+{
+  "id": "0e8f4c31-6b2a-4d57-9f13-5a7c1d9e3b01",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "stages.roles.requester": "Requester",
+    "stages.ticket.amountNotNegative": "The amount cannot be negative.",
+    "stages.ticket.amountFrozen": "The amount cannot change after the ticket is submitted.",
+    "stages.ticket.stepNeedsDecision": "The step moves only with a new decision."
+  }
+}

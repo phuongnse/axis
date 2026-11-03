@@ -15,6 +15,7 @@
   ],
   "validations": [
     {
+      "name": "amountNegative",
       "expression": "amount is null or amount >= 0",
       "message": { "textKey": "request.amountNegative" },
       "field": "amount"

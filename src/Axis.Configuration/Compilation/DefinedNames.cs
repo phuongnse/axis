@@ -18,9 +18,10 @@ public sealed record DefinedNames(
     IReadOnlyList<DefinedResource> Forms,
     IReadOnlyList<DefinedPage> Pages,
     IReadOnlyList<DefinedPolicy> Policies,
+    IReadOnlyList<DefinedContract> Contracts,
     IReadOnlyList<DefinedText> Texts)
 {
-    public static DefinedNames Empty { get; } = new([], [], [], [], [], [], [], [], [], [], [], [], []);
+    public static DefinedNames Empty { get; } = new([], [], [], [], [], [], [], [], [], [], [], [], [], []);
 }
 
 /// <summary>An entity and its fields. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
@@ -89,6 +90,12 @@ public sealed record DefinedPage(Guid Id, string Name, string? Module, IReadOnly
 
 /// <summary>A policy. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
 public sealed record DefinedPolicy(Guid Id, string Name, string? Module);
+
+/// <summary>
+/// A module contract. Only modules have contracts, so <paramref name="Module"/> is always the module id, and
+/// <paramref name="Name"/> is <c>&lt;module id&gt;/&lt;name&gt;</c>.
+/// </summary>
+public sealed record DefinedContract(Guid Id, string Name, string Module);
 
 /// <summary>A page parameter: its name, its type and whether a link must give it.</summary>
 public sealed record DefinedPageParameter(string Name, string Type, bool Required);

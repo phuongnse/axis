@@ -124,10 +124,14 @@ export function studioApplicationDescription(app: StudioApplication, locale: str
   return descriptions[locale] ?? Object.values(descriptions)[0]
 }
 
-/** An application template in the list of `GET /api/studio/templates`. `title` and `description` hold `en` and `vi`. */
+/**
+ * An application template in the list of `GET /api/studio/templates`. `title` and `description` hold `en` and `vi`.
+ * `builtIn` is true for a built-in application, and the server lists those first.
+ */
 export interface StudioTemplate {
   id: string
   version: string
+  builtIn: boolean
   title: Record<string, string>
   description: Record<string, string>
 }
@@ -362,6 +366,7 @@ export interface StudioNames {
   forms: StudioNameResource[]
   pages: StudioNamePage[]
   policies: StudioNamePolicy[]
+  contracts: { id: string; name: string; module: string }[]
   texts: StudioNameText[]
 }
 
@@ -758,8 +763,8 @@ export async function putStudioTexts(
 export type StudioRequestStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 
 /**
- * One scenario of a `test` request. `step` is the 0-based index of the failing step and `path` is `/steps/{step}`, both
- * `null` when the scenario passed or failed before any step.
+ * One scenario of a `test` request, or a contract scenario of a `publish` or `validate`. `step` is the 0-based index of
+ * the failing step and `path` is `/steps/{step}`, both `null` when the scenario passed or failed before any step.
  */
 export interface StudioScenarioResult {
   name: string
@@ -773,8 +778,19 @@ export interface StudioScenarioResult {
 }
 
 /**
+ * A contract scenario that a relax entry skipped in a `publish` or `validate`. `point` is the relaxed point it covers.
+ */
+export interface StudioSkippedScenarioResult {
+  name: string
+  file: string
+  outcome: 'skipped'
+  point: string
+}
+
+/**
  * A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends.
- * `scenarios` is `null` unless the kind is `test`, and then it is empty until the request ends.
+ * `scenarios` holds the stored results of a `test`, `publish` or `validate`, and is `null` when none were stored. For a
+ * `test` it is empty until the request ends.
  */
 export interface StudioRequest {
   id: string
@@ -786,12 +802,20 @@ export interface StudioRequest {
   note: string | null
   releaseId: string | null
   diagnostics: StudioDiagnostic[]
-  scenarios: StudioScenarioResult[] | null
+  scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
+}
+
+/** One contract point that the application relaxed in a release, with the author's reason. */
+export interface StudioRelaxedPoint {
+  module: string
+  point: string
+  reason: string
 }
 
 /**
  * One activation in the release history. `actor` is a user id, `startup`, `operator` or `unknown`. `actorName` is the
- * name in the actor's user profile, else the one stored with the activation, else `null`.
+ * name in the actor's user profile, else the one stored with the activation, else `null`. `offStandard` is set when
+ * the release relaxed a contract point, and `relaxed` lists those points.
  */
 export interface StudioReleaseItem {
   releaseId: string
@@ -803,6 +827,8 @@ export interface StudioReleaseItem {
   label: string | null
   note: string | null
   requestId: string | null
+  offStandard: boolean
+  relaxed: StudioRelaxedPoint[]
 }
 
 /**
@@ -968,6 +994,7 @@ export interface StudioReleaseGroup {
   note: string | null
   published: StudioReleaseItem
   live: boolean
+  relaxed: StudioRelaxedPoint[]
 }
 
 /** Proposed: the release list as one row per release, the highest number first, so a release activated again shows once. */
@@ -986,6 +1013,7 @@ export function releaseGroups(history: StudioReleases): StudioReleaseGroup[] {
         note: oldestFirst.find((item) => item.note)?.note ?? null,
         published: oldestFirst[0],
         live: history.active?.releaseId === releaseId,
+        relaxed: oldestFirst[0].relaxed,
       }
     })
     .sort((left, right) => right.number - left.number)
@@ -1075,9 +1103,9 @@ export function groupByKind(items: StudioResourceItem[], locale = 'en'): Resourc
 }
 
 /** The kind of a module resource that Studio lists and opens read-only. */
-export type ModuleResourceKind = 'entity' | 'process' | 'policy' | 'page'
+export type ModuleResourceKind = 'entity' | 'process' | 'policy' | 'contract' | 'page'
 
-/** An entity, process, policy or page of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
+/** An entity, process, policy, contract or page of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
 export interface ModuleResourceItem {
   id: string
   kind: ModuleResourceKind
@@ -1092,7 +1120,7 @@ export interface ModuleResourceGroup {
 }
 
 /**
- * The module entities, processes, policies and pages in the names, in that order, with the application's own left out.
+ * The module entities, processes, policies, contracts and pages in the names, in that order, with the application's own left out.
  * An item stays when its name or id contains `search`, ignoring letter case and surrounding spaces. A kind with no
  * item has no group.
  */
@@ -1105,6 +1133,7 @@ export function moduleResources(names: StudioNames | null, search: string): Modu
     ['entity', names.entities],
     ['process', names.processes],
     ['policy', names.policies],
+    ['contract', names.contracts],
     ['page', names.pages],
   ]
   return sources

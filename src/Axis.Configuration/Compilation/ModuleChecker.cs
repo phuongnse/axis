@@ -40,13 +40,20 @@ namespace Axis.Configuration.Compilation;
 /// declared module, a <c>form</c> and a <c>process</c> never do. A trigger's <c>process</c> is rewritten like a
 /// sub-process, and its <c>event</c> and <c>entity</c> like a process's. A module may hold a trigger of any
 /// type. A <c>schedule</c> trigger has no <c>timeZone</c>, see <see cref="ResourceSchemas.ModuleTrigger"/>, and its
-/// <c>dataSource</c> is qualified with the module id like a policy grant's. A
+/// <c>dataSource</c> is qualified with the module id like a policy grant's. A module's contracts come back
+/// with a qualified name and the <c>entity</c> as written, for <see cref="ContractChecker"/>. A
 /// policy's grants name only the module's own resources, so each grant's <c>entity</c> and
 /// <c>dataSource</c> is qualified with the module id as written, and <see cref="PolicyChecker"/> reports
 /// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
 /// a role of the application, and the pin keeps that map. The <c>connectors</c> of an entry must map
 /// each connector slot of the pinned version to a connector of the application that fits it, see
-/// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too.
+/// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too. The <c>relax</c> entries of an entry
+/// must each name a point of the pinned version's contracts, once, with a reason, and the pin keeps the valid ones.
+/// A module may hold scenarios.
+/// A scenario's steps name the module's own entities and processes without <c>/</c>, rewritten to the
+/// qualified name. A step's <c>entity</c> may instead name an entity of a declared module, and anything
+/// else is reported as for a process. The scenario files are checked but are not
+/// returned with the files of the release, so they stay out of its content hash.
 /// </summary>
 internal static class ModuleChecker
 {
@@ -66,15 +73,23 @@ internal static class ModuleChecker
         ResourceKinds.Seed,
         ResourceKinds.Policy,
         ResourceKinds.Trigger,
+        ResourceKinds.Scenario,
+        ResourceKinds.Contract,
     };
 
     /// <summary>
     /// Checks <paramref name="application"/>'s modules and the modules they depend on, and returns
     /// the pins of the modules without problems, the application's entries as written and then each
     /// dependency in the order it is first reached, the canonical files of the pinned versions that
-    /// are valid and the resources read from those files.
+    /// are valid and the resources read from those files. The resources read are those of the module with the
+    /// <paramref name="layers"/> of the application applied, and the files are the module's own. The traces
+    /// are the layer and the merge of each module file a layer changed, by the file's path, for
+    /// <see cref="LayerDiagnostics.MapToLayers"/>. The removed are the module resources that a layer took out of
+    /// the model, for <see cref="LayerDiagnostics.MapRemovedReferences"/>. With the <paramref name="previous"/> copies of the modules in
+    /// the application's active release, a layer on a module whose pinned version differs from its copy is also
+    /// checked against that copy, for a key that the new version dropped.
     /// </summary>
-    public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources) Check(
+    public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources, IReadOnlyDictionary<string, LayerTrace> Traces, IReadOnlyList<RemovedResource> Removed) Check(
         ApplicationManifest application,
         IReadOnlyCollection<InstalledModule> installed,
         List<Diagnostic> diagnostics,
@@ -82,7 +97,9 @@ internal static class ModuleChecker
         IReadOnlyList<RoleResource> roles,
         IReadOnlySet<string> unloadedRoleNames,
         IReadOnlyList<ConnectorResource> connectors,
-        IReadOnlySet<string> unloadedConnectorNames)
+        IReadOnlySet<string> unloadedConnectorNames,
+        IReadOnlyList<LayerResource> layers,
+        IReadOnlyCollection<InstalledModule>? previous = null)
     {
         var versionsById = installed
             .GroupBy(candidate => candidate.Manifest.Id, StringComparer.Ordinal)
@@ -204,6 +221,8 @@ internal static class ModuleChecker
         var pins = new List<PinnedModuleModel>();
         var files = new List<ResourceContent>();
         var resources = new ModuleResourceCollector();
+        var traces = new Dictionary<string, LayerTrace>(StringComparer.Ordinal);
+        var removed = new List<RemovedResource>();
         var declaredByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         var slotsByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         var manifests = new Dictionary<string, ModuleManifest>(StringComparer.Ordinal);
@@ -218,12 +237,23 @@ internal static class ModuleChecker
             var pinnedModule = installed.First(candidate =>
                 string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
                 && string.Equals(candidate.Manifest.Version, picked, StringComparison.Ordinal));
+            var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
+            var moduleLayers = first.Asker is null
+                ? layers.Where(layer => LayerModuleId(layer) == id).ToList()
+                : [];
+            var previousModule = first.Asker is null && moduleLayers.Count > 0
+                ? previous?.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
+                    && !string.Equals(candidate.Manifest.Version, picked, StringComparison.Ordinal))
+                : null;
+            CheckFiles(pinnedModule, declared, moduleLayers, files, resources, traces, removed, diagnostics, previousModule);
             if (first.Asker is null)
             {
                 references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
                 var slotRoles = CheckRoleSlots(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, roles, unloadedRoleNames, diagnostics);
                 var slotConnectors = CheckConnectorSlots(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, connectors, unloadedConnectorNames, diagnostics);
-                pins.Add(new PinnedModuleModel(id, first.RangeText, picked) { Roles = slotRoles, Connectors = slotConnectors });
+                var relaxed = CheckRelax(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, ContractPoints.Of(resources.ContractsOf(id)), diagnostics);
+                pins.Add(new PinnedModuleModel(id, first.RangeText, picked) { Roles = slotRoles, Connectors = slotConnectors, Relaxed = relaxed });
             }
             else
             {
@@ -231,10 +261,8 @@ internal static class ModuleChecker
             }
 
             manifests[id] = pinnedModule.Manifest;
-            var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
             declaredByModule[id] = declared;
             slotsByModule[id] = pinnedModule.Manifest.Roles.Select(slot => slot.Name).ToHashSet(StringComparer.Ordinal);
-            CheckFiles(pinnedModule, declared, files, resources, diagnostics);
         }
 
         // The entries of a pinned module for a pinned module send the slots of the dependency to its own.
@@ -246,7 +274,7 @@ internal static class ModuleChecker
             .ToList();
         var chained = new ModuleSlotChains(manifests, dependencies, connectors, diagnostics).Apply(pins);
 
-        return (chained, files, resources.ToResources(declaredByModule, slotsByModule));
+        return (chained, files, resources.ToResources(declaredByModule, slotsByModule), traces, removed);
     }
 
     /// <summary>
@@ -557,6 +585,67 @@ internal static class ModuleChecker
         return mapped.Count == 0 ? ReadOnlyDictionary<string, string>.Empty : mapped;
     }
 
+    /// <summary>
+    /// Checks the <c>relax</c> entries of a module entry against the named points of its pinned
+    /// version's contracts. Points are matched exactly. Returns the entries that name a known point
+    /// for the first time and give a reason, in the order written, with the reason as written.
+    /// </summary>
+    private static IReadOnlyList<RelaxedPointModel> CheckRelax(
+        ApplicationManifest application,
+        int index,
+        ApplicationModuleDefinition entry,
+        ModuleManifest manifest,
+        IReadOnlySet<string> points,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, int entryIndex) =>
+            diagnostics.Add(new Diagnostic(code, message, application.File, $"/modules/{index}/relax/{entryIndex}", application.Id));
+
+        var kept = new List<RelaxedPointModel>();
+        var firstIndexByPoint = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var relaxIndex = 0; relaxIndex < entry.Relax.Count; relaxIndex++)
+        {
+            var point = entry.Relax[relaxIndex].Point;
+            var reason = entry.Relax[relaxIndex].Reason;
+            var blank = string.IsNullOrWhiteSpace(reason);
+            if (blank)
+            {
+                Report(
+                    DiagnosticCodes.MissingRelaxReason,
+                    $"The relax entry for '{point}' has no reason. Write why the application turns this point off, in 1 to 500 characters.",
+                    relaxIndex);
+            }
+
+            if (!points.Contains(point))
+            {
+                Report(
+                    DiagnosticCodes.UnknownRelaxPoint,
+                    points.Count == 0
+                        ? $"The module '{manifest.Id}' {manifest.Version} has no contracts, so '{point}' relaxes nothing."
+                        : $"The module '{manifest.Id}' {manifest.Version} has no point '{point}'. Points are matched exactly. Its points are {string.Join(", ", points.Order(StringComparer.Ordinal).Select(known => $"'{known}'"))}.",
+                    relaxIndex);
+                continue;
+            }
+
+            if (firstIndexByPoint.TryGetValue(point, out var firstIndex))
+            {
+                Report(
+                    DiagnosticCodes.DuplicateRelaxPoint,
+                    $"The point '{point}' is already relaxed by entry {firstIndex}. Name each point once.",
+                    relaxIndex);
+                continue;
+            }
+
+            firstIndexByPoint[point] = relaxIndex;
+            if (!blank)
+            {
+                kept.Add(new RelaxedPointModel(point, reason!));
+            }
+        }
+
+        return kept.Count == 0 ? ReadOnlyCollection<RelaxedPointModel>.Empty : kept;
+    }
+
     /// <summary>Escapes a key as an RFC 6901 JSON Pointer segment.</summary>
     internal static string Escape(string segment) =>
         segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
@@ -565,10 +654,22 @@ internal static class ModuleChecker
     private static void CheckFiles(
         InstalledModule module,
         IReadOnlySet<string> declared,
+        List<LayerResource> layers,
         List<ResourceContent> files,
         ModuleResourceCollector resources,
-        List<Diagnostic> diagnostics)
+        Dictionary<string, LayerTrace> traces,
+        List<RemovedResource> removed,
+        List<Diagnostic> diagnostics,
+        InstalledModule? previousModule = null)
     {
+        var kindsByName = layers.Count == 0 ? null : LayerChecker.KindsByName(module);
+        var contractEntities = layers.Count == 0 ? null : ContractEntitiesOf(module);
+        var pendingContracts = new List<PendingContract>();
+        var addedValuesByEntity = new Dictionary<string, (LayerResource Layer, Dictionary<string, HashSet<string>>? Values)>(StringComparer.OrdinalIgnoreCase);
+        var removedByEntity = new Dictionary<string, RemovedFields>(StringComparer.OrdinalIgnoreCase);
+        var contractReaders = new List<FieldReader>();
+        var dataSourceReaders = new List<FieldReader>();
+        var formReaders = new List<FieldReader>();
         foreach (var file in module.Files)
         {
             var path = $"modules/{module.Manifest.Id}/{file.Path}";
@@ -595,18 +696,421 @@ internal static class ModuleChecker
                 var resourceId = ReadResourceId(root);
                 if (file.Path != ModuleCatalog.ManifestFileName)
                 {
-                    if (!CheckKind(path, root, resourceId, diagnostics))
+                    // The model reads the resource with the layer applied. The release keeps the file as the
+                    // module wrote it, so that compiling the stored release applies the layer once.
+                    using var merged = ApplyLayer(root, layers, kindsByName, contractEntities, path, traces, diagnostics, module.Manifest, previousModule, out var layer, out var additions, out var isRemoved);
+                    if (isRemoved)
                     {
-                        resources.AddUnloaded(module.Manifest.Id, root);
+                        // The model leaves the resource out. The release keeps the file, so compiling it applies the layer again.
+                        removed.Add(new RemovedResource(
+                            module.Manifest.Id,
+                            root.GetProperty("name").GetString()!,
+                            root.GetProperty("kind").GetString()!,
+                            layer!));
+                        files.Add(new ResourceContent(path, JsonCanonicalizer.Canonicalize(root)));
                         continue;
                     }
 
-                    resources.Add(module.Manifest.Id, declared, path, root, diagnostics);
+                    var effective = merged?.RootElement ?? root;
+                    if (!CheckKind(path, effective, resourceId, diagnostics))
+                    {
+                        resources.AddUnloaded(module.Manifest.Id, effective);
+                        continue;
+                    }
+
+                    resources.Add(module.Manifest.Id, declared, path, effective, diagnostics);
+                    if (layers.Count > 0)
+                    {
+                        CollectFieldReads(root, effective, path, layer, traces, removedByEntity, contractReaders, dataSourceReaders, formReaders);
+                    }
+
+                    if (layer is not null && root.GetProperty("kind").GetString() == ResourceKinds.Entity)
+                    {
+                        addedValuesByEntity[root.GetProperty("name").GetString()!] = (layer, merged is null ? null : AddedValues(root, effective));
+                    }
+                    else if (layers.Count > 0
+                        && root.GetProperty("kind").GetString() == ResourceKinds.Contract
+                        && effective.TryGetProperty("lifecycle", out var lifecycle)
+                        && lifecycle.TryGetProperty("field", out var field)
+                        && field.ValueKind == JsonValueKind.String)
+                    {
+                        pendingContracts.Add(new PendingContract(
+                            root.GetProperty("name").GetString()!,
+                            effective.GetProperty("entity").GetString()!,
+                            field.GetString()!,
+                            layer,
+                            additions));
+                    }
+
+                    // A module scenario is a test. It is not part of the release or its content hash.
+                    if (root.GetProperty("kind").GetString() == ResourceKinds.Scenario)
+                    {
+                        continue;
+                    }
                 }
 
                 files.Add(new ResourceContent(path, JsonCanonicalizer.Canonicalize(root)));
             }
         }
+
+        foreach (var pending in pendingContracts)
+        {
+            CheckLifecycleAdditions(module.Manifest.Id, pending, addedValuesByEntity, resources, diagnostics);
+        }
+
+        RemovedFieldChecker.Check(removedByEntity, contractReaders, dataSourceReaders, formReaders, diagnostics);
+    }
+
+    /// <summary>
+    /// Keeps what <see cref="RemovedFieldChecker"/> needs from a file: the fields that an applied layer removes from
+    /// an entity, the contract, and the data sources and forms that have no layer of their own.
+    /// </summary>
+    private static void CollectFieldReads(
+        JsonElement root,
+        JsonElement effective,
+        string path,
+        LayerResource? layer,
+        Dictionary<string, LayerTrace> traces,
+        Dictionary<string, RemovedFields> removedByEntity,
+        List<FieldReader> contracts,
+        List<FieldReader> dataSources,
+        List<FieldReader> forms)
+    {
+        var kind = root.GetProperty("kind").GetString();
+        if (kind == ResourceKinds.Entity)
+        {
+            if (layer is not null
+                && traces.TryGetValue(path, out var trace)
+                && RemovedFieldChecker.FieldRemoves(trace.Merge) is { Count: > 0 } removes)
+            {
+                removedByEntity[root.GetProperty("name").GetString()!] = new RemovedFields(layer, removes);
+            }
+
+            return;
+        }
+
+        List<FieldReader>? readers = kind switch
+        {
+            ResourceKinds.Contract => contracts,
+            ResourceKinds.DataSource when layer is null => dataSources,
+            ResourceKinds.Form when layer is null => forms,
+            _ => null,
+        };
+        if (readers is not null
+            && effective.TryGetProperty("entity", out var entity)
+            && entity.ValueKind == JsonValueKind.String)
+        {
+            readers.Add(new FieldReader(path, entity.GetString()!, effective.Clone()));
+        }
+    }
+
+    /// <summary>
+    /// A contract with a lifecycle, once every file of the module is read. <see cref="Layer"/> is its layer, and
+    /// <see cref="Additions"/> is what that layer added, or null when there is no layer or it was not applied.
+    /// </summary>
+    private sealed record PendingContract(string Name, string Entity, string Field, LayerResource? Layer, ContractAdditions? Additions);
+
+    /// <summary>
+    /// The values that a layer added to each enum field of an entity: the values of the merged field that the
+    /// module's field does not have, by the declared name of the field.
+    /// </summary>
+    private static Dictionary<string, HashSet<string>> AddedValues(JsonElement module, JsonElement merged)
+    {
+        var added = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        if (!merged.TryGetProperty("fields", out var fields) || fields.ValueKind != JsonValueKind.Array)
+        {
+            return added;
+        }
+
+        foreach (var field in fields.EnumerateArray())
+        {
+            if (field.ValueKind != JsonValueKind.Object
+                || !field.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String
+                || !field.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            var before = new HashSet<string>(StringComparer.Ordinal);
+            if (module.TryGetProperty("fields", out var moduleFields) && moduleFields.ValueKind == JsonValueKind.Array)
+            {
+                var moduleField = moduleFields.EnumerateArray().FirstOrDefault(candidate =>
+                    candidate.ValueKind == JsonValueKind.Object
+                    && candidate.TryGetProperty("name", out var moduleName)
+                    && moduleName.ValueKind == JsonValueKind.String
+                    && string.Equals(moduleName.GetString(), name.GetString(), StringComparison.OrdinalIgnoreCase));
+                if (moduleField.ValueKind == JsonValueKind.Object && moduleField.TryGetProperty("values", out var moduleValues) && moduleValues.ValueKind == JsonValueKind.Array)
+                {
+                    before.UnionWith(moduleValues.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String).Select(value => value.GetString()!));
+                }
+            }
+
+            var extra = values.EnumerateArray()
+                .Where(value => value.ValueKind == JsonValueKind.String)
+                .Select(value => value.GetString()!)
+                .Where(value => !before.Contains(value))
+                .ToHashSet(StringComparer.Ordinal);
+            if (extra.Count > 0)
+            {
+                added[name.GetString()!] = extra;
+            }
+        }
+
+        return added;
+    }
+
+    /// <summary>
+    /// Reports a state that the contract's layer added without the same value in the state field, and a value that
+    /// the entity's layer added without the same state. Then keeps the added names on the contract, so the
+    /// contract check, the named points and the compiled lifecycle know them.
+    /// </summary>
+    private static void CheckLifecycleAdditions(
+        string moduleId,
+        PendingContract pending,
+        Dictionary<string, (LayerResource Layer, Dictionary<string, HashSet<string>>? Values)> addedValuesByEntity,
+        ModuleResourceCollector resources,
+        List<Diagnostic> diagnostics)
+    {
+        var addedStates = pending.Additions?.States ?? [];
+        var entity = addedValuesByEntity.TryGetValue(pending.Entity, out var found) ? found : default;
+        var addedValues = entity.Values?.GetValueOrDefault(pending.Field) ?? [];
+
+        // A layer that was not applied has its own diagnostics, so what it would have added is not compared.
+        var contractLayerRejected = pending.Layer is not null && pending.Additions is null;
+        var entityLayerRejected = entity.Layer is not null && entity.Values is null;
+        if (pending.Layer is not null && !contractLayerRejected && !entityLayerRejected)
+        {
+            foreach (var (name, index) in addedStates.Where(state => !addedValues.Contains(state.Name)))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.LifecycleAdditionMismatch,
+                    $"The state '{name}' is added without the value '{name}' in the field '{pending.Field}'. Add the same value to the field in the layer of the entity '{pending.Entity}'.",
+                    pending.Layer.File,
+                    $"/changes/lifecycle/states/{index.ToString(CultureInfo.InvariantCulture)}/name",
+                    pending.Layer.Id));
+            }
+        }
+
+        if (entity.Layer is { } entityLayer && !contractLayerRejected && !entityLayerRejected)
+        {
+            var path = FieldValuesPath(entityLayer, pending.Field);
+            foreach (var value in addedValues.Where(value => !addedStates.Any(state => state.Name == value)).Order(StringComparer.Ordinal))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.LifecycleAdditionMismatch,
+                    $"The value '{value}' is added to the field '{pending.Field}' without the state '{value}'. Add the same state to the lifecycle in the layer of the contract of '{pending.Entity}'.",
+                    entityLayer.File,
+                    path,
+                    entityLayer.Id));
+            }
+        }
+
+        resources.AddAdditions(
+            moduleId,
+            pending.Name,
+            addedStates.Select(state => state.Name).ToHashSet(StringComparer.Ordinal),
+            (pending.Additions?.Transitions ?? []).ToHashSet(StringComparer.Ordinal),
+            addedValues);
+    }
+
+    /// <summary>The path in an entity's layer of the <c>values</c> of a field, or of the <c>fields</c> when the layer does not list the field.</summary>
+    private static string FieldValuesPath(LayerResource layer, string field)
+    {
+        if (layer.Changes.ValueKind == JsonValueKind.Object
+            && layer.Changes.TryGetProperty("fields", out var fields)
+            && fields.ValueKind == JsonValueKind.Array)
+        {
+            var index = 0;
+            foreach (var element in fields.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.Object
+                    && element.TryGetProperty("name", out var name)
+                    && name.ValueKind == JsonValueKind.String
+                    && string.Equals(name.GetString(), field, StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"/changes/fields/{index.ToString(CultureInfo.InvariantCulture)}/values";
+                }
+
+                index++;
+            }
+        }
+
+        return "/changes/fields";
+    }
+
+    /// <summary>The module id of a layer's target, the text before the first <c>/</c>.</summary>
+    private static string LayerModuleId(LayerResource layer)
+    {
+        var slash = layer.Target.IndexOf('/', StringComparison.Ordinal);
+        return slash < 0 ? layer.Target : layer.Target[..slash];
+    }
+
+    /// <summary>
+    /// Merges the layer of a module file into it. The layer is the first one that names the file's resource,
+    /// ignoring letter case, and applies only when that name is one resource of a kind that a layer may change,
+    /// which is not a scenario. A layer on a contract is checked by <see cref="ContractLayerChecker"/> first.
+    /// A layer whose <c>changes</c> is exactly <c>{ "remove": true }</c> sets <paramref name="removed"/>, unless it
+    /// removes an entity that a contract covers, which is reported.
+    /// Returns null when there is no layer to apply, or when the layer has a problem of its own, so the
+    /// module's file is read as it is. <paramref name="found"/> is the layer that targets the file, applied or
+    /// not, and <paramref name="additions"/> is what an applied layer on a contract added.
+    /// </summary>
+    private static JsonDocument? ApplyLayer(
+        JsonElement root,
+        List<LayerResource> layers,
+        ILookup<string, string>? kindsByName,
+        HashSet<string>? contractEntities,
+        string path,
+        Dictionary<string, LayerTrace> traces,
+        List<Diagnostic> diagnostics,
+        ModuleManifest manifest,
+        InstalledModule? previousModule,
+        out LayerResource? found,
+        out ContractAdditions? additions,
+        out bool removed)
+    {
+        found = null;
+        additions = null;
+        removed = false;
+        if (kindsByName is null
+            || root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("kind", out var kindElement) || kindElement.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("name", out var nameElement) || nameElement.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var kind = kindElement.GetString()!;
+        var name = nameElement.GetString()!;
+        var layer = layers.FirstOrDefault(candidate =>
+            candidate.Target.Length > LayerModuleId(candidate).Length + 1
+            && string.Equals(candidate.Target[(LayerModuleId(candidate).Length + 1)..], name, StringComparison.OrdinalIgnoreCase));
+        if (layer is null
+            || kindsByName[name].Distinct(StringComparer.Ordinal).Count() != 1
+            || kind == ResourceKinds.Scenario
+            || !ResourceSchemas.TryGet(kind, out var kindSchema))
+        {
+            return null;
+        }
+
+        found = layer;
+        var countBefore = diagnostics.Count;
+        if (kind == ResourceKinds.Contract)
+        {
+            additions = ContractLayerChecker.CheckAdditions(root, layer, diagnostics);
+            if (additions is null)
+            {
+                return null;
+            }
+        }
+
+        if (kind != ResourceKinds.Contract
+            && layer.Changes.ValueKind == JsonValueKind.Object
+            && layer.Changes.TryGetProperty("remove", out var remove)
+            && remove.ValueKind == JsonValueKind.True)
+        {
+            if (layer.Changes.EnumerateObject().Any(property => property.Name != "remove"))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.InvalidLayerRemove,
+                    "A layer that removes a whole resource holds only \"remove\": true in 'changes'.",
+                    layer.File,
+                    "/changes",
+                    layer.Id));
+            }
+            else if (kind == ResourceKinds.Entity && contractEntities!.Contains(name))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.RemovedResourceCoveredByContract,
+                    $"The entity '{name}' is covered by a contract of the module, so a layer cannot remove it.",
+                    layer.File,
+                    "/changes/remove",
+                    layer.Id));
+            }
+            else
+            {
+                removed = true;
+            }
+
+            return null;
+        }
+
+        using var previousDocument = ReadPreviousFile(previousModule, kind, name);
+        var upgrade = previousDocument is null || previousModule is null
+            ? null
+            : new LayerUpgrade(manifest.Id, previousModule.Manifest.Version, manifest.Version, previousDocument.RootElement);
+        var result = LayerMerger.Merge(kind, root, layer, diagnostics, upgrade);
+        LayerMerger.CheckProperties(kind == ResourceKinds.Trigger ? ResourceSchemas.ModuleTrigger : kindSchema, result, layer, diagnostics);
+        if (diagnostics.Count != countBefore)
+        {
+            additions = null;
+            return null;
+        }
+
+        traces[path] = new LayerTrace(layer, result);
+        return JsonSerializer.SerializeToDocument(result.Merged);
+    }
+
+    /// <summary>The entities that the contracts of a module cover, by name and ignoring letter case.</summary>
+    private static HashSet<string> ContractEntitiesOf(InstalledModule module)
+    {
+        var entities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in module.Files)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(file.Content, _documentOptions);
+                var root = document.RootElement;
+                if (root.ValueKind == JsonValueKind.Object
+                    && root.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == ResourceKinds.Contract
+                    && root.TryGetProperty("entity", out var entity) && entity.ValueKind == JsonValueKind.String)
+                {
+                    entities.Add(entity.GetString()!);
+                }
+            }
+            catch (JsonException)
+            {
+                // The file is reported when it is checked.
+            }
+        }
+
+        return entities;
+    }
+
+    /// <summary>The file of an old module version with the same <paramref name="kind"/> and <paramref name="name"/>, ignoring letter case, or null.</summary>
+    private static JsonDocument? ReadPreviousFile(InstalledModule? previousModule, string kind, string name)
+    {
+        foreach (var file in previousModule?.Files ?? [])
+        {
+            if (file.Path == ModuleCatalog.ManifestFileName)
+            {
+                continue;
+            }
+
+            JsonDocument document;
+            try
+            {
+                document = JsonDocument.Parse(file.Content, _documentOptions);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("kind", out var kindElement) && kindElement.ValueKind == JsonValueKind.String
+                && root.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+                && string.Equals(kindElement.GetString(), kind, StringComparison.Ordinal)
+                && string.Equals(nameElement.GetString(), name, StringComparison.OrdinalIgnoreCase))
+            {
+                return document;
+            }
+
+            document.Dispose();
+        }
+
+        return null;
     }
 
     /// <summary>Checks that a module file has a kind a module may hold and is valid against the schema of that kind.</summary>
@@ -644,7 +1148,7 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies, triggers and texts of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies, triggers, contracts, texts and scenarios of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
@@ -658,7 +1162,9 @@ internal static class ModuleChecker
         private readonly List<ProcessResource> _processes = [];
         private readonly List<PolicyResource> _policies = [];
         private readonly List<TriggerResource> _triggers = [];
+        private readonly List<ModuleContract> _contracts = [];
         private readonly List<ModuleText> _texts = [];
+        private readonly List<ModuleScenario> _scenarios = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedSequenceNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedEventNames = new(StringComparer.OrdinalIgnoreCase);
@@ -667,6 +1173,29 @@ internal static class ModuleChecker
         private readonly HashSet<string> _unloadedPageNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedProcessNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _noModules = [];
+
+        /// <summary>Keeps on a collected contract the names that its module's layers added to the lifecycle.</summary>
+        public void AddAdditions(
+            string moduleId,
+            string contractName,
+            HashSet<string> states,
+            HashSet<string> transitions,
+            HashSet<string> values)
+        {
+            var qualified = $"{moduleId}/{contractName}";
+            var index = _contracts.FindIndex(entry => entry.ModuleId == moduleId && entry.Contract.Name == qualified);
+            if (index >= 0 && (states.Count > 0 || transitions.Count > 0 || values.Count > 0))
+            {
+                _contracts[index] = _contracts[index] with
+                {
+                    Contract = _contracts[index].Contract with { AddedStates = states, AddedTransitions = transitions, AddedValues = values },
+                };
+            }
+        }
+
+        /// <summary>The contracts collected so far for a module, with the entity and names as written.</summary>
+        public IEnumerable<ContractResource> ContractsOf(string moduleId) =>
+            _contracts.Where(contract => contract.ModuleId == moduleId).Select(contract => contract.Contract);
 
         public ModuleResources ToResources(
             IReadOnlyDictionary<string, IReadOnlySet<string>> declaredModules,
@@ -683,7 +1212,9 @@ internal static class ModuleChecker
                 _policies,
                 _processes,
                 _triggers,
+                _contracts,
                 _texts,
+                _scenarios,
                 _unloadedEntityNames,
                 _unloadedSequenceNames,
                 _unloadedEventNames,
@@ -733,7 +1264,7 @@ internal static class ModuleChecker
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy, a trigger or a text.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy, a trigger, a contract, a text or a scenario.</summary>
         public void Add(string moduleId, IReadOnlySet<string> declared, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -815,12 +1346,34 @@ internal static class ModuleChecker
                         {
                             Entity = grant.Entity is null ? null : $"{moduleId}/{grant.Entity}",
                             DataSource = grant.DataSource is null ? null : $"{moduleId}/{grant.DataSource}",
+                            Process = grant.Process is null ? null : $"{moduleId}/{grant.Process}",
                         })],
                     });
+                    break;
+                case ResourceKinds.Contract:
+                    // The entity stays as written, so the checker can see a name that is not plain. The
+                    // name is qualified with the module id like any module resource's.
+                    var contract = root.Deserialize<ContractResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+                    _contracts.Add(new ModuleContract(moduleId, contract with { Name = $"{moduleId}/{contract.Name}" }));
                     break;
                 case ResourceKinds.Text:
                     var text = root.Deserialize<TextResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _texts.Add(new ModuleText(moduleId, text));
+                    break;
+                case ResourceKinds.Scenario:
+                    var scenario = root.Deserialize<ScenarioResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+
+                    // A step names the module's own processes by plain name. Its entity is the module's own or a
+                    // declared module's. A user's roles stay slot names. ScenarioChecker reports a role that is
+                    // not a slot.
+                    _scenarios.Add(new ModuleScenario(moduleId, scenario with
+                    {
+                        Steps = [.. scenario.Steps.Select((step, index) => step with
+                        {
+                            Entity = Rewrite(moduleId, declared, step.Entity, scenario.File, scenario.Id, $"/steps/{index}/entity", _unloadedEntityNames, diagnostics),
+                            Process = Rewrite(moduleId, _noModules, step.Process, scenario.File, scenario.Id, $"/steps/{index}/process", _unloadedProcessNames, diagnostics),
+                        })],
+                    }));
                     break;
             }
         }
@@ -1008,8 +1561,8 @@ internal static class ModuleChecker
 }
 
 /// <summary>
-/// The entities, sequences, seeds, events, data sources, forms, pages, processes, policies, triggers and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
-/// carrying the ids written in the module files. The rules come by module, in pin order, each in path
+/// The entities, sequences, seeds, events, data sources, forms, pages, processes, policies, triggers, contracts and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// carrying the ids written in the module files. The scenarios keep their plain names. The rules come by module, in pin order, each in path
 /// order and under its plain name. <c>DeclaredModules</c> maps each pinned module to the ids in its
 /// manifest's <c>modules</c>, and <c>RoleSlots</c> to the names of the slots in its manifest's <c>roles</c>,
 /// matched exactly. A policy's <c>Roles</c> still name slots here, and a grant's <c>Entity</c> and
@@ -1029,7 +1582,9 @@ internal sealed record ModuleResources(
     IReadOnlyList<PolicyResource> Policies,
     IReadOnlyList<ProcessResource> Processes,
     IReadOnlyList<TriggerResource> Triggers,
+    IReadOnlyList<ModuleContract> Contracts,
     IReadOnlyList<ModuleText> Texts,
+    IReadOnlyList<ModuleScenario> Scenarios,
     IReadOnlySet<string> UnloadedEntityNames,
     IReadOnlySet<string> UnloadedSequenceNames,
     IReadOnlySet<string> UnloadedEventNames,
@@ -1040,5 +1595,21 @@ internal sealed record ModuleResources(
     IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredModules,
     IReadOnlyDictionary<string, IReadOnlySet<string>> RoleSlots);
 
+/// <summary>A layer that changed a module file, and the merge of its changes into that file.</summary>
+internal sealed record LayerTrace(LayerResource Layer, LayerMergeResult Merge);
+
+/// <summary>A module resource that a layer took out of the model: its module, plain name and kind, and the layer.</summary>
+internal sealed record RemovedResource(string ModuleId, string Name, string Kind, LayerResource Layer);
+
+/// <summary>A contract of a pinned module, with the id of that module. The contract's name is qualified and its entity is as written.</summary>
+internal sealed record ModuleContract(string ModuleId, ContractResource Contract);
+
 /// <summary>A text resource of a pinned module, with the id of that module.</summary>
 internal sealed record ModuleText(string ModuleId, TextResource Text);
+
+/// <summary>
+/// A scenario of a pinned module, with the id of that module. Its name is the plain name written in the file,
+/// its steps name the module's own entities and processes qualified with the module id, and its users, assignees
+/// and recipients still name role slots.
+/// </summary>
+internal sealed record ModuleScenario(string ModuleId, ScenarioResource Scenario);

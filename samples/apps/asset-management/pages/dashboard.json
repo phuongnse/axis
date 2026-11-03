@@ -9,12 +9,15 @@
   "widgets": [
     {
       "type": "columns",
+      "name": "summary",
       "columns": [
         {
           "width": 4,
+          "name": "figures",
           "widgets": [
             {
               "type": "kpi",
+              "name": "warrantiesEnding",
               "dataSource": "WarrantiesEndingSoon",
               "measure": "endingCount",
               "label": {
@@ -25,9 +28,11 @@
         },
         {
           "width": 8,
+          "name": "breakdown",
           "widgets": [
             {
               "type": "chart",
+              "name": "assetsByStatus",
               "kind": "bar",
               "dataSource": "AssetsByStatus",
               "category": "status",
@@ -49,6 +54,7 @@
     },
     {
       "type": "table",
+      "name": "assetValues",
       "dataSource": "AssetValueByLocation"
     }
   ]

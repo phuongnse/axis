@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
 
-bash scripts/lib/install-sample-modules.sh
+bash scripts/lib/install-modules.sh
 
 run_suite_if_affected dev-script . node --test --test-reporter=spec --test-reporter-destination=stdout \
   --test-reporter=junit --test-reporter-destination="$results_dir/dev-script.xml" scripts/dev.test.mjs

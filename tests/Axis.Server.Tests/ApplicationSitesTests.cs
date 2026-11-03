@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Tests;
 using Axis.Presentation.Sites;
 
@@ -281,6 +282,91 @@ public sealed class ApplicationSitesTests
         }
     }
 
+    [Fact]
+    public void User_id_fields_carry_the_path_of_their_user_search_route()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "app/application.json", """
+                { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1,
+                  "modules": [{ "id": "people", "version": "1.0.0" }] }
+                """);
+            Write(root, "app/entities/claim.json", """
+                { "id": "55555555-5555-4555-8555-555555555531", "kind": "entity", "name": "Claim", "formatVersion": 1,
+                  "fields": [
+                    { "name": "title", "type": "text" },
+                    { "name": "owner", "type": "text", "userId": true }
+                  ] }
+                """);
+            Write(root, "modules/people/1.0.0/module.json", """{ "kind": "module", "id": "people", "version": "1.0.0", "label": "People" }""");
+            Write(root, "modules/people/1.0.0/Member.json", """
+                { "id": "55555555-5555-4555-8555-555555555532", "kind": "entity", "name": "Member", "formatVersion": 1,
+                  "fields": [
+                    { "name": "nickname", "type": "text" },
+                    { "name": "user", "type": "text", "userId": true }
+                  ] }
+                """);
+
+            var result = ApplicationCompiler.Compile(Path.Combine(root, "app"), null, ModuleCatalog.Load(Path.Combine(root, "modules")).Modules);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var claim = ApplicationSites.DescribeEntity(result.Model, "Claim").Fields.ToDictionary(field => field.Name);
+            Assert.Equal("/api/apps/Sample/entities/Claim/fields/owner/users", claim["owner"].UsersPath);
+            Assert.Null(claim["title"].UsersPath);
+
+            var member = ApplicationSites.DescribeEntity(result.Model, "people/Member").Fields.ToDictionary(field => field.Name);
+            Assert.Equal("/api/apps/Sample/entities/people/Member/fields/user/users", member["user"].UsersPath);
+            Assert.Null(member["nickname"].UsersPath);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Form_marks_a_matched_reference_as_read_only()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "application.json", """{ "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }""");
+            Write(root, "entities/badge.json", """
+                { "id": "55555555-5555-4555-8555-555555555511", "kind": "entity", "name": "Badge", "formatVersion": 1, "displayField": "holder",
+                  "fields": [ { "name": "holder", "type": "text", "required": true, "unique": true } ] }
+                """);
+            Write(root, "entities/visit.json", """
+                { "id": "55555555-5555-4555-8555-555555555512", "kind": "entity", "name": "Visit", "formatVersion": 1,
+                  "fields": [
+                    { "name": "holder", "type": "text" },
+                    { "name": "badge", "type": "reference", "target": "Badge", "match": { "field": "holder", "from": "holder" } } ] }
+                """);
+            Write(root, "forms/visit-form.json", """
+                { "id": "88888888-8888-4888-8888-888888888811", "kind": "form", "name": "VisitForm", "formatVersion": 1, "entity": "Visit",
+                  "sections": [ { "name": "main", "title": { "textKey": "visit.main" }, "fields": [ { "field": "holder" }, { "field": "badge" } ] } ] }
+                """);
+            Write(root, "texts/en.json", """
+                { "id": "77777777-7777-4777-8777-777777777711", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "visit.main": "Visit" } }
+                """);
+
+            var result = ApplicationCompiler.Compile(root);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var fields = ApplicationSites.DescribeForm(result.Model, "VisitForm").Sections.SelectMany(section => section.Fields).ToDictionary(field => field.Name);
+
+            Assert.True(fields["badge"].ReadOnly);
+            Assert.False(fields["holder"].ReadOnly);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void Write(string root, string relativePath, string content)
     {
         var fullPath = Path.Combine(root, relativePath);
@@ -333,7 +419,7 @@ public sealed class ApplicationSitesTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
 
-        var entityTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "Departments")!.Widgets));
+        var entityTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "Suppliers")!.Widgets));
         var dataSourceTable = Assert.IsType<WidgetMetadata>(Assert.Single(ApplicationSites.FindPage(result.Model, "PurchaseRequests")!.Widgets));
 
         Assert.NotNull(entityTable.Entity);

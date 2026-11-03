@@ -60,7 +60,7 @@ public sealed partial class ExpressionFuzzTests
         {
             var parsed = ExpressionParser.Parse(text);
             Assert.True(parsed.Succeeded, $"{text}: {parsed.Diagnostic?.Message}");
-            var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, policyFilter: true);
+            var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, currentUser: true);
             if (check.Succeeded && SqlTranslator.Translate(parsed.Expression, Column, check, "f", _timeZone, Items).Succeeded)
             {
                 translated++;
@@ -96,7 +96,7 @@ public sealed partial class ExpressionFuzzTests
                 }
 
                 var result = ExpressionTypeChecker.Check(
-                    parsed.Expression, _scope, ExpressionType.Boolean, storedValue: input.StoredValue, policyFilter: true);
+                    parsed.Expression, _scope, ExpressionType.Boolean, storedValue: input.StoredValue, currentUser: true);
 
                 Assert.True(result.Type is null != result.Diagnostic is null);
             },
@@ -116,7 +116,7 @@ public sealed partial class ExpressionFuzzTests
                 }
 
                 TranslateAndCheckSql(parsed.Expression, null);
-                var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, policyFilter: true);
+                var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, currentUser: true);
                 if (check.Succeeded)
                 {
                     TranslateAndCheckSql(parsed.Expression, check);

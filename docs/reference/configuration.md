@@ -29,13 +29,8 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration` or `scenario`), see
-   [identity provider resource](identity-provider.md#identity-provider-resource). The manifest is the
-   single `application` resource, stored as `application.json` at the
-   folder root; an `application` resource in any other file is not used as
-   the manifest. Resource IDs are unique across the application, compared as
-   UUIDs. Names are unique per kind, ignoring letter case. The same checks
-   run on a release's stored resources when the server rebuilds its model.
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration`, `layer`, `scenario` or `contract`), see
+   [identity provider resource](identity-provider.md#identity-provider-resource). Only a module holds a `contract`, see [module contracts](module-contracts.md#the-contract-resource): one in an application folder is `AXC0320` and is not loaded. Only an application holds a `layer`, see [customization layers](customization-layers.md#the-layer-resource): a module file of that kind is refused as `AXC0202`. The manifest is the single `application` resource, stored as `application.json` at the folder root; an `application` resource in any other file is not used as the manifest. Resource IDs are unique across the application, compared as UUIDs. Names are unique per kind, ignoring letter case. The same checks run on a release's stored resources when the server rebuilds its model.
 2. **Resolve.** Every reference must resolve inside the application or its
    declared modules. The entity model is built here: each field's `type`
    becomes a typed field type, every type-specific property is checked against
@@ -85,7 +80,7 @@ flowchart LR
      [Entity logic](resource-files.md#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
-     reserved by the platform (`api`, `health`, `assets`, `studio`, `account`, `users`), or one that an
+     reserved by the platform (`api`, `health`, `assets`, `studio`, `account`, `users`, and `licences` _(planned for M31)_), or one that an
      earlier site of the application already uses in path order, is
      `AXC0024` at `/path`. A reserved path is not also checked for
      duplicates. The `default` and `fallback` locales must be in
@@ -261,12 +256,12 @@ flowchart LR
      [Form conditions and steps](form-conditions.md#form-conditions-and-steps):
      each condition is a boolean expression over the entity, and it reads only
      listed fields (`AXC0225`). `visibleWhen` is not allowed on a required
-     field (`AXC0226`). A section name is used once (`AXC0227`). A step names
+     field (`AXC0226`). A section name is used once (`AXC0227`) and a step name once (`AXC0360`). A step names
      a known section (`AXC0228`) that is in no other step (`AXC0229`), and
      when there are steps, every section has a name and is in one step
      (`AXC0230`).
-   - **Seeds.** A seed's `entity` must name a loaded entity, ignoring letter
-     case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
+   - **Seeds.** A seed's `entity` must name a loaded entity, `Entity` or `module/Entity`, ignoring
+     letter case, otherwise it is `AXC0032` at `/entity`. A name whose entity file
      was not loaded because of its own errors is not reported again. Seed
      record ids are unique across every seed file of the application,
      compared as UUIDs: a record whose id an earlier record already uses, in
@@ -442,7 +437,7 @@ flowchart LR
      `/steps/{i}/deadline/after`. A later outcome with a name already
      used in the step, ignoring letter case, is `AXC0085` at
      `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome
-     `label` join the `AXC0028` check. A decision with no branches, an
+     `label` join the `AXC0028` check. A branch or escalation name used twice in its list, ignoring letter case, is `AXC0359` at its `name`. A decision with no branches, an
      operation without `operation` or `next`, an `updateRecord` step without
      `set` or with `connector`, `input`, `output` or `retry`, a
      `callConnector` step without `connector` or `input` or with `set`, a
@@ -455,7 +450,7 @@ flowchart LR
      not letters and digits, an `event` or `fields` on any other step, `to`,
      `channels`, `message` or `open` on any other step, a retry `attempts` outside 1 to 10, a task without
      `label`, `assignee`, `form` or an outcome, and an `end` step with
-     `branches`, `otherwise` or any other property, are `AXC0004`. A
+     `branches`, `otherwise` or any other property, or a branch or escalation without `name`, are `AXC0004`. A
      sub-process step without `process` or `next`, or with a property of
      another step type, is `AXC0004` too, and so is `process`, `subject` or
      `parameters` on any other step. A sub-process step's `process` that names
@@ -578,27 +573,27 @@ flowchart LR
      is unknown. Data change triggers fire on every committed write through the
      record command, see [Starts from triggers](process-events.md#starts-from-triggers).
 
-     A schedule trigger's `schedule` must be a valid 5-field cron, otherwise
-     it is `AXC0160` at `/schedule`. Its `timeZone` must be an IANA id,
-     written with its exact letter case, otherwise it is `AXC0161` at
-     `/timeZone`. Its `dataSource` must name a loaded data source, ignoring
-     letter case, otherwise it is `AXC0162` at `/dataSource`. A grouped data
-     source is `AXC0163` and a data source over another entity than the
-     process's subject entity is `AXC0164`, both at `/dataSource`. The
-     second is not checked when either entity is unknown. Each `parameters`
-     key must name a parameter of the data source, ignoring letter case, and
-     no parameter may be named twice, otherwise the key is `AXC0165` at
-     `/parameters/{key}`. A value that is not a literal of the parameter's
-     type is `AXC0166` at `/parameters/{key}`. Each parameter that no key
-     gives is `AXC0167` at `/parameters`, once for each parameter, even when
-     `parameters` is left out. The parameters are not checked when the data
-     source is unknown. A schedule trigger without a `dataSource` is a
-     scheduled job. Its process must have no subject, otherwise it is
-     `AXC0249` at `/process`, and the parameter checks then read the process's
-     parameters. A `null` is `AXC0166` there. They are not checked when the
-     process is unknown or has a subject. A name whose data source file was not loaded because
-     of its own errors is not reported again. The
-     [schedule trigger](integration-resources.md#events-and-triggers) section lists the rules.
+     A schedule trigger's `schedule` must be a valid 5-field cron, otherwise it is
+     `AXC0160` at `/schedule`. Its `timeZone` must be an IANA id, written with its
+     exact letter case, otherwise it is `AXC0161` at `/timeZone`. Its `dataSource`
+     must name a loaded data source, ignoring letter case, otherwise it is
+     `AXC0162` at `/dataSource`. A grouped data source is `AXC0163`, a data source
+     over another entity than the process's subject entity is `AXC0164` and one
+     whose `filter` calls `currentUser()` is `AXC0363`, all at `/dataSource`. The
+     entity match is not checked when either entity is unknown. Each `parameters`
+     key must name a parameter of the data source, ignoring letter case, and no
+     parameter may be named twice, otherwise the key is `AXC0165` at
+     `/parameters/{key}`. A value that is not a literal of the parameter's type is
+     `AXC0166` at `/parameters/{key}`. Each parameter that no key gives is
+     `AXC0167` at `/parameters`, once for each parameter, even when `parameters`
+     is left out. The parameters are not checked when the data source is unknown.
+     A schedule trigger without a `dataSource` is a scheduled job. Its process
+     must have no subject, otherwise it is `AXC0249` at `/process`, and the
+     parameter checks then read the process's parameters. A `null` is `AXC0166`
+     there. They are not checked when the process is unknown or has a subject. A
+     name whose data source file did not load is not reported again. The
+     [schedule trigger](integration-resources.md#events-and-triggers) section
+     lists the rules.
 
      A `type` other than `event`, `dataChange` or `schedule`, a `mode` other
      than `async` or `sync`, a `when` or `mode` on a schedule trigger, a
@@ -667,8 +662,8 @@ flowchart LR
        duration in the form of a task's `dueIn` is `AXC0193` at
        `/steps/{i}/by`. An `advanceTime` step in a scenario without `now` is
        `AXC0194` at `/steps/{i}`.
-     - A scenario error is an error like any other, so a folder with one does
-       not compile or activate.
+     - A scenario error is an error like any other, so a folder with one does not compile or activate.
+       A pinned module's scenarios are checked in its file: a role that is not a role slot is `AXC0335`, an `entity` or `process` with `/` is `AXC0208`, and a `contract.covers` point the module lacks is `AXC0339`. An application's own scenario with `contract` is `AXC0340`. See [modules](modules-and-templates.md#processes-pages-policies-and-dependencies).
 
    The model holds the text resources, each entity's display field, each
    field's sequence with its id, name and format, the

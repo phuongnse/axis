@@ -21,7 +21,7 @@
       "name": "managerApproval",
       "type": "task",
       "label": { "textKey": "purchaseRequest.managerApproval" },
-      "assignee": { "user": "department.manager" },
+      "assignee": { "user": "department.head.user" },
       "form": "PurchaseRequestReview",
       "dueIn": "P3D",
       "outcomes": [
@@ -33,7 +33,7 @@
     {
       "name": "financeCheck",
       "type": "decision",
-      "branches": [{ "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
+      "branches": [{ "name": "branch1", "when": "totalAmount >= FinanceThreshold()", "next": "financeApproval" }],
       "otherwise": "markApproved"
     },
     {

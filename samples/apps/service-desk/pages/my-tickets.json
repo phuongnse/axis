@@ -9,10 +9,12 @@
   "widgets": [
     {
       "type": "table",
+      "name": "myTickets",
       "dataSource": "MyTicketList",
       "rowActions": [
         {
           "type": "navigate",
+          "name": "open",
           "page": "TicketForm",
           "label": {
             "textKey": "actions.open"
@@ -21,6 +23,7 @@
         },
         {
           "type": "navigate",
+          "name": "view",
           "page": "TicketDetail",
           "label": {
             "textKey": "actions.view"
@@ -33,6 +36,7 @@
       "toolbarActions": [
         {
           "type": "navigate",
+          "name": "new",
           "page": "TicketForm",
           "label": {
             "textKey": "actions.new"

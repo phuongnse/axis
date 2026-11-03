@@ -1,0 +1,42 @@
+{
+  "id": "cb66cef6-541f-4bb9-8e50-a9b95de08200",
+  "kind": "scenario",
+  "name": "EmployeeIsNotTheirOwnManagerOrDelegate",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["Employee/validations/notOwnManager", "Employee/validations/notOwnDelegate"] },
+  "users": {
+    "admin": ["admin"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Employee",
+      "as": "admin",
+      "save": "ann",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Employee",
+      "as": "admin",
+      "save": "bob",
+      "values": { "fullName": "Bob Tran", "workEmail": "bob@example.com", "manager": "ann" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "ann",
+      "as": "admin",
+      "values": { "manager": "ann" },
+      "expect": { "invalid": "manager" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "ann",
+      "as": "admin",
+      "values": { "delegate": "ann", "delegateFrom": "2026-11-10", "delegateUntil": "2026-11-12" },
+      "expect": { "invalid": "delegate" }
+    },
+    { "type": "expectRecord", "record": "ann", "values": { "manager": null, "delegate": null } }
+  ]
+}

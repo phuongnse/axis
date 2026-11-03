@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["importer"],
   "grants": [
-    { "entity": "Item", "actions": ["read", "create", "import"] },
-    { "entity": "Supplier", "actions": ["read"] }
+    { "name": "itemRead", "entity": "Item", "actions": ["read", "create", "import"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] }
   ]
 }

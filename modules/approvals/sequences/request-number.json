@@ -1,0 +1,7 @@
+{
+  "id": "79cd22c2-411e-41e5-9a7a-cc5a0a70ff95",
+  "kind": "sequence",
+  "name": "RequestNumber",
+  "formatVersion": 1,
+  "format": "RQ-{yyyy}-{n:5}"
+}

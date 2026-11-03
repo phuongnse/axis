@@ -83,7 +83,7 @@ internal static class StudioApplications
                 ["name"] = "Home",
                 ["formatVersion"] = 1,
                 ["title"] = new JsonObject { ["textKey"] = "pages.home.title" },
-                ["widgets"] = new JsonArray(new JsonObject { ["type"] = "taskInbox" }),
+                ["widgets"] = new JsonArray(new JsonObject { ["type"] = "taskInbox", ["name"] = "taskInbox1" }),
             })),
             ("texts/en.json", StudioWrites.Serialize(new JsonObject
             {

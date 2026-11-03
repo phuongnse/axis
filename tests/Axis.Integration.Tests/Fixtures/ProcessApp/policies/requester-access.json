@@ -5,8 +5,8 @@
   "formatVersion": 1,
   "roles": ["requester"],
   "grants": [
-    { "entity": "Request", "actions": ["read"], "filter": "startsWith(title, 'Request')" },
-    { "process": "Submit", "actions": ["start", "inspect"] },
-    { "process": "NightlyJob", "actions": ["start", "inspect"] }
+    { "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "startsWith(title, 'Request')" },
+    { "name": "submitStart", "process": "Submit", "actions": ["start", "inspect"] },
+    { "name": "nightlyJobStart", "process": "NightlyJob", "actions": ["start", "inspect"] }
   ]
 }

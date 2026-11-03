@@ -1,0 +1,12 @@
+{
+  "id": "05b19d48-fa6d-40e8-aba3-fe04fb2ef33d",
+  "kind": "contract",
+  "name": "EntryContract",
+  "formatVersion": 1,
+  "entity": "Entry",
+  "lifecycle": {
+    "field": "status",
+    "states": [{ "name": "open", "initial": true }, { "name": "closed" }],
+    "transitions": [{ "name": "close", "from": ["open"], "to": "closed" }]
+  }
+}

@@ -314,7 +314,7 @@ public sealed class RuleCompilerTests
     {
         var validations = validation is null
             ? ""
-            : $$""", "validations": [{ "expression": "{{validation}}", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }]""";
+            : $$""", "validations": [{ "name": "check1", "expression": "{{validation}}", "message": { "textKey": "order.quantityPositive" }, "field": "quantity" }]""";
         return new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
             .With("texts/en.json", Texts)

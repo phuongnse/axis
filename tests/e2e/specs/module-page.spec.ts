@@ -3,8 +3,8 @@ import type { Page } from '@playwright/test'
 import { useSession } from '../sessions'
 import { chooseTheme } from '../shell'
 
-// The leave request sample lists the Departments page of its departments module in the site navigation. An
-// employee opens it and sees the module's seeded departments.
+// The leave request sample lists its own Departments page in the site navigation, a table over the organization
+// module's department list. An employee opens it and sees the sample's seeded departments.
 const departments = ['Finance', 'Engineering', 'Operations']
 
 async function expectDepartments(page: Page) {
@@ -14,7 +14,7 @@ async function expectDepartments(page: Page) {
   }
 }
 
-test('an employee opens the module page from the navigation and sees the departments in light and dark mode', async ({
+test('an employee opens the Departments page from the navigation and sees the departments in light and dark mode', async ({
   page,
 }) => {
   await useSession(page, 'employee')
@@ -22,7 +22,7 @@ test('an employee opens the module page from the navigation and sees the departm
 
   await page.getByRole('menuitem', { name: 'Departments', exact: true }).click()
 
-  await expect(page).toHaveURL(/\/leave\/departments\/departments$/)
+  await expect(page).toHaveURL(/\/leave\/departments$/)
   await expect(page.locator('[data-theme-mode="light"]').first()).toBeVisible()
   await expectDepartments(page)
 

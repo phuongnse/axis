@@ -17,9 +17,9 @@ const recordsPath = `${appPath}/entities/PurchaseRequest/records`;
 const tasksPath = `${appPath}/tasks`;
 const listAddress = "/purchasing/purchaserequests?pageSize=100&sort=-title";
 
-/** A unique part for the titles of this run, so runs and parallel specs never share a title. */
+/** A unique part for the titles of this run, so runs and parallel workers never share a title. */
 function runId() {
-  return `${Date.now()}-${test.info().retry}`;
+  return `${Date.now()}-${test.info().parallelIndex}-${test.info().retry}`;
 }
 
 /** Runs `body` with an API context that holds `user`'s saved session, and disposes the context after. */
@@ -44,7 +44,7 @@ async function asUser<T>(
 /** The id of the seeded department named `name`, read from the record API. */
 async function departmentId(request: APIRequestContext, name: string) {
   const response = await request.get(
-    `${appPath}/entities/Department/records?pageSize=100`,
+    `${appPath}/entities/organization/Department/records?pageSize=100`,
   );
   expect(response.status()).toBe(200);
   const body = (await response.json()) as {
@@ -339,7 +339,7 @@ const signedOutPages: {
     name: "Departments",
     address: () => "/purchasing/departments",
     user: "requester",
-    api: () => `${appPath}/entities/Department/records?pageSize=100`,
+    api: () => `${appPath}/entities/organization/Department/records?pageSize=100`,
     expectation: (page) =>
       expect(page.getByRole("row", { name: /Engineering/ })).toBeVisible(),
   },

@@ -23,7 +23,8 @@ namespace Axis.Data.Seeding;
 /// and is inserted by <see cref="RecordCommands.CreateAsync"/>. Every record is parsed before any
 /// write, and every parse problem is reported. The writes run in one transaction in path order of
 /// the seed files and file order of the records, so a reference may name a record inserted earlier
-/// in the same run. The first storage problem rolls back every write.
+/// in the same run. The first storage problem rolls back every write. A write that the lifecycle of the
+/// entity's module contract refuses is reported at the state field, and its message names the point that refused it.
 /// </summary>
 public static class SeedApplier
 {
@@ -92,7 +93,7 @@ public static class SeedApplier
                 var sensitive = input.Values.Where(value => value.Field.Sensitive).ToList();
                 var found = await RecordCommands.FindVersionAsync(connection, entity, id, plain, cancellationToken);
                 Record? stored = null;
-                if (found is not null && (entity.HasComputedFields || sensitive.Count > 0))
+                if (found is not null && (entity.HasComputedFields || sensitive.Count > 0 || RecordMatcher.HasMatches(entity)))
                 {
                     stored = await RecordQueries.GetAsync(connection, model, entity, id, cipher, cancellationToken);
                 }
@@ -108,14 +109,15 @@ public static class SeedApplier
                 if (found is { } existing)
                 {
                     // The seed declares only some values, so the others come from the stored record.
-                    var computed = RecordComputer.ComputeUpdate(model, entity, entity.HasComputedFields ? stored : null, input.Values, input.Rows);
+                    var matched = await RecordMatcher.WithMatchesAsync(connection, model, entity, input.Values, stored, cancellationToken);
+                    var computed = RecordComputer.ComputeUpdate(model, entity, entity.HasComputedFields ? stored : null, matched, input.Rows);
                     if (computed.Errors is { } errors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.UpdateAsync(connection, model, entity, releaseId, id, existing.Version, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
+                    result = await RecordCommands.UpdateAsync(connection, model, entity, releaseId, RecordWriteContext.None, id, existing.Version, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
                 }
                 else
                 {
@@ -126,14 +128,15 @@ public static class SeedApplier
                         return NotComputed(seed, index, defaultErrors);
                     }
 
-                    var computed = RecordComputer.ComputeCreate(model, entity, defaults.Values, input.Rows);
+                    var matched = await RecordMatcher.WithMatchesAsync(connection, model, entity, defaults.Values, null, cancellationToken);
+                    var computed = RecordComputer.ComputeCreate(model, entity, matched, input.Rows);
                     if (computed.Errors is { } errors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cipher: cipher, cancellationToken: cancellationToken);
+                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, RecordWriteContext.None, computed.Values, computed.Rows, input.Links, id, cipher: cipher, cancellationToken: cancellationToken);
                 }
             }
             else
@@ -150,14 +153,15 @@ public static class SeedApplier
                     return NotComputed(seed, index, defaultErrors);
                 }
 
-                var computed = RecordComputer.ComputeCreate(model, entity, defaults.Values, input.Rows);
+                var matched = await RecordMatcher.WithMatchesAsync(connection, model, entity, defaults.Values, null, cancellationToken);
+                var computed = RecordComputer.ComputeCreate(model, entity, matched, input.Rows);
                 if (computed.Errors is { } errors)
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     return NotComputed(seed, index, errors);
                 }
 
-                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cipher: cipher, cancellationToken: cancellationToken);
+                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, RecordWriteContext.None, computed.Values, computed.Rows, input.Links, id, cipher: cipher, cancellationToken: cancellationToken);
             }
 
             if (result.Outcome != RecordWriteOutcome.Written)
@@ -184,9 +188,17 @@ public static class SeedApplier
     private static SeedResult Failed(SeedModel seed, int index, RecordWriteResult result)
     {
         var path = $"/records/{index}";
+        if (result.Outcome == RecordWriteOutcome.EffectRefused)
+        {
+            return new SeedResult([Invalid(seed, path, $"An effect of the transition could not be recorded. Refused at '{result.Point}'.")], 0, 0);
+        }
+
+        var refusal = result.Outcome == RecordWriteOutcome.LifecycleRefused
+            ? $" Refused at '{result.Point ?? "no transition"}'."
+            : "";
         return new SeedResult(
             result.Errors is { } errors
-                ? DiagnosticOrder.Sort(errors.Select(error => Invalid(seed, path + error.Key, error.Value[0])))
+                ? DiagnosticOrder.Sort(errors.Select(error => Invalid(seed, path + error.Key, error.Value[0] + refusal)))
                 : [Invalid(seed, path, SchemaConflictMessage)],
             0,
             0);

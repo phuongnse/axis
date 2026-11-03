@@ -494,9 +494,40 @@ public sealed class DataSourceCompilerTests
     }
 
     [Theory]
+    [InlineData("count(shipment.lines) > 0")]
+    [InlineData("any(shipment.lines, amount > 1)")]
+    public void Filter_over_a_path_to_a_collection_is_outside_the_sql_subset(string filter)
+    {
+        // The filter type-checks, but a path to a collection cannot become SQL.
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/line-item.json", LineItem)
+            .With("entities/shipment.json", """
+                { "id": "66666666-6666-4666-8666-666666666601", "kind": "entity", "name": "Shipment", "formatVersion": 1,
+                  "displayField": "code", "fields": [ { "name": "code", "type": "text", "required": true }, { "name": "lines", "type": "child-collection", "target": "LineItem" } ] }
+                """)
+            .With("entities/parcel.json", """
+                { "id": "66666666-6666-4666-8666-666666666602", "kind": "entity", "name": "Parcel", "formatVersion": 1,
+                  "fields": [ { "name": "code", "type": "text" }, { "name": "shipment", "type": "reference", "target": "Shipment" } ] }
+                """)
+            .With("data-sources/parcels.json", DataSource(
+                "Parcel",
+                """[{ "name": "code", "path": "code" }]""",
+                $$""", "filter": "{{filter}}" """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((ExpressionDiagnosticCodes.OutsideSqlSubset, "data-sources/parcels.json", "/filter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("A path to a collection is not translated to SQL", diagnostic.Message);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
     // A filter type-checks with the child collections, but only any and count are in the SQL subset.
     [InlineData("sum(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("avg(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("first(lines, amount > 0, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("number != 'x' and all(lines, amount > 0)", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("any(lines, lower(description) == 'a')", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("any(lines, number == 'x')", ExpressionDiagnosticCodes.UnknownName)]
@@ -504,6 +535,9 @@ public sealed class DataSourceCompilerTests
     [InlineData("lines is null", ExpressionDiagnosticCodes.TypeMismatch)]
     // A path goes only through reference fields, so it cannot go through a child collection.
     [InlineData("lines.amount > 0", ExpressionDiagnosticCodes.TypeMismatch)]
+    // The outer record is read in memory only, so SQL does not translate it.
+    [InlineData("any(lines, description == outer.number)", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("outer.number == 'x'", ExpressionDiagnosticCodes.OuterOutsideAggregateItem)]
     public void Filter_over_a_child_collection_is_reported_at_the_filter(string filter, string code)
     {
         using var folder = new TemporaryFolder()

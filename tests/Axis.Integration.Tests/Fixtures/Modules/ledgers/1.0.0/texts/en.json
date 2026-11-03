@@ -1,0 +1,11 @@
+{
+  "id": "1fa5ae9b-e9cc-452d-a1b2-7e4889ffaee5",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "ledgers.roles.clerk": "Clerk",
+    "ledgers.entry.amountNotNegative": "The amount cannot be negative."
+  }
+}

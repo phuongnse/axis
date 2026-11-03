@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["reader"],
   "grants": [
-    { "entity": "Item", "actions": ["read"] },
-    { "entity": "Bundle", "actions": ["read"], "fields": ["products"] }
+    { "name": "itemRead", "entity": "Item", "actions": ["read"] },
+    { "name": "bundleRead", "entity": "Bundle", "actions": ["read"], "fields": ["products"] }
   ]
 }

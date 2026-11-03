@@ -387,7 +387,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         var entityPath = Path.Combine(Folder, EntityFile);
         var entity = File.ReadAllText(entityPath);
-        const string target = "\"target\": \"Department\"";
+        const string target = "\"target\": \"Supplier\"";
         Assert.Contains(target, entity, StringComparison.Ordinal);
         File.WriteAllText(entityPath, entity.Replace(target, "\"target\": \"NoSuchEntity\"", StringComparison.Ordinal));
         const string scenarioFile = "scenarios/returned-request.json";
@@ -939,7 +939,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var body = $$$"""
             {"changes":[
               {"patch":{{{DisplayFieldPatch}}},"id":"{{{EntityId}}}","version":"{{{Sha256(Path.Combine(Folder, EntityFile))}}}"},
-              {"patch":[],"id":"{{{IdOf("entities/department.json")}}}","version":"{{{new string('0', 64)}}}"},
+              {"patch":[],"id":"{{{IdOf("entities/supplier.json")}}}","version":"{{{new string('0', 64)}}}"},
               {"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh"}}
             ]}
             """;
@@ -1200,21 +1200,21 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Department_lists_what_it_uses_and_every_entry_that_uses_it()
+    public async Task Supplier_lists_what_it_uses_and_every_entry_that_uses_it()
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient().SignedInAs("author");
-        var departmentId = IdOf("entities/department.json");
+        var supplierId = IdOf("entities/supplier.json");
         var purchaseRequestId = IdOf(EntityFile);
         var fields = JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, EntityFile)))!["fields"]!.AsArray();
-        var field = fields.IndexOf(fields.Single(item => item!["name"]!.GetValue<string>() == "department"));
+        var field = fields.IndexOf(fields.Single(item => item!["name"]!.GetValue<string>() == "supplier"));
 
-        using var body = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{departmentId}/references");
+        using var body = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{supplierId}/references");
 
         var uses = body.RootElement.GetProperty("uses").EnumerateArray().ToList();
-        Assert.Contains(uses, entry => Matches(entry, "label text", "entities/department.json", "/label/textKey")
+        Assert.Contains(uses, entry => Matches(entry, "label text", "entities/supplier.json", "/label/textKey")
             && entry.GetProperty("node").GetProperty("type").GetString() == "text"
-            && entry.GetProperty("node").GetProperty("key").GetString() == "department.label");
+            && entry.GetProperty("node").GetProperty("key").GetString() == "supplier.label");
         var usedBy = body.RootElement.GetProperty("usedBy").EnumerateArray().ToList();
         var entry = Assert.Single(usedBy, item => Matches(item, "field target", EntityFile, $"/fields/{field}/target"));
         var node = entry.GetProperty("node");
@@ -1229,13 +1229,13 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient().SignedInAs("author");
-        var departmentId = IdOf("entities/department.json");
+        var supplierId = IdOf("entities/supplier.json");
 
         using var list = await GetJson(client, "/api/studio/apps/PurchaseRequests/resources");
-        using var references = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{departmentId}/references");
+        using var references = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{supplierId}/references");
 
         var item = list.RootElement.GetProperty("items").EnumerateArray()
-            .Single(entry => entry.GetProperty("id").GetString() == departmentId);
+            .Single(entry => entry.GetProperty("id").GetString() == supplierId);
         var usedBy = item.GetProperty("usedBy").GetInt32();
         Assert.True(usedBy > 0);
         Assert.Equal(references.RootElement.GetProperty("usedBy").GetArrayLength(), usedBy);
@@ -1285,16 +1285,16 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var file = Path.Combine(Folder, EntityFile);
         var purchaseRequest = JsonNode.Parse(File.ReadAllBytes(file))!;
         purchaseRequest["fields"]!.AsArray()
-            .Single(field => field!["name"]!.GetValue<string>() == "department")!["target"] = "Missing";
+            .Single(field => field!["name"]!.GetValue<string>() == "supplier")!["target"] = "Missing";
         File.WriteAllText(file, purchaseRequest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         await using var factory = CreateFactory();
         using var client = factory.CreateClient().SignedInAs("author");
-        var departmentId = IdOf("entities/department.json");
+        var supplierId = IdOf("entities/supplier.json");
 
-        using var body = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{departmentId}/references");
+        using var body = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{supplierId}/references");
 
         var uses = body.RootElement.GetProperty("uses").EnumerateArray().ToList();
-        Assert.Contains(uses, entry => Matches(entry, "label text", "entities/department.json", "/label/textKey"));
+        Assert.Contains(uses, entry => Matches(entry, "label text", "entities/supplier.json", "/label/textKey"));
         var usedBy = body.RootElement.GetProperty("usedBy").EnumerateArray().ToList();
         Assert.DoesNotContain(usedBy, entry => entry.GetProperty("file").GetString() == EntityFile
             && entry.GetProperty("relation").GetString() == "field target");

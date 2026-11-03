@@ -2,7 +2,7 @@
 # Builds the SPA into the server web root, checks its size against web/bundle-budget.json and its font files
 # and license texts, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
 # files and fonts, then builds the .NET solution, which installs the sample extension package in
-# artifacts/extensions. Then installs the sample modules in artifacts/modules and the sample templates in
+# artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates in
 # artifacts/templates.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -21,8 +21,9 @@ test -f "$theme/login-config-totp.ftl"
 test -f "$theme/resources/assets/axis-sign-in.js"
 node scripts/check-fonts.mjs "$theme/resources"
 dotnet build Axis.slnx -c Release --no-restore
-bash scripts/lib/install-sample-modules.sh
-test -f artifacts/modules/departments/1.1.0/module.json
-test -f artifacts/modules/department-budgets/1.0.0/module.json
+bash scripts/lib/install-modules.sh
+test -f artifacts/modules/department-budgets/1.2.0/module.json
+test -f artifacts/modules/organization/1.0.0/module.json
+test -f artifacts/modules/approvals/1.0.0/module.json
 bash scripts/lib/install-sample-templates.sh
 test -d artifacts/templates

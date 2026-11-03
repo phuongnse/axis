@@ -7,8 +7,9 @@
   "widgets": [
     {
       "type": "form",
+      "name": "form",
       "entity": "Item",
-      "actions": [{ "type": "startProcess", "process": "ItemReview", "label": { "textKey": "item.review" } }]
+      "actions": [{ "type": "startProcess", "name": "startProcess", "process": "ItemReview", "label": { "textKey": "item.review" } }]
     }
   ]
 }

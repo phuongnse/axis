@@ -9,11 +9,9 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
-references, names, policy matrix, module resource, expression check and draft page metadata routes are built. It is
-agreed in
-[D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md).
-Its edit routes never activate a release. Under `scripts/dev.sh`, a saved file
-restarts the server, which activates the folder, as a hand edit does today.
+references, names, policy matrix, module resource, module resource save, expression check and draft page metadata routes are built. It is agreed in
+[D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md). Its edit routes never activate a release.
+Under `scripts/dev.sh`, a saved file restarts the server, which activates the folder, as a hand edit does today.
 A write takes a lock in the platform database, see [Versions](#versions). Reads
 and diagnostics touch no database. Going live from Studio is
 [Publishing](#publishing). `validate`, `publish`, `preview`, `rollback` and the release history are built. It asks for an activation: the
@@ -62,12 +60,13 @@ in the application. File names and names can change.
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
+| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. Each item also gives `titles` and `descriptions` by locale, from the manifest's `label` and `description` _(planned for M31)_, see [Studio workspace](studio-workspace.md#applications). A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
 | `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) |
-| `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, sorted by `id`. See [application templates](modules-and-templates.md#application-templates) |
+| `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, builtIn, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template. Built-in templates come first, then the others, each group sorted by `id`. See [application templates](modules-and-templates.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
-| `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched |
+| `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content, layer, marks, removed }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched. A change to it is saved by the route below. `version` is the hash of the module file. `content` has the application's [customization layer](customization-layers.md) applied, when the file `customizations/<module>/<name>.json` exists. `layer` is `{ id, file, version }`, with the SHA-256 of the layer file as `version`, or `null` when the resource has no layer. `marks` are `{ path, mark }`, a JSON Pointer into `content` with `added` or `changed`, the added ones first. `removed` are `{ list, key, content }`, a module element that the layer removed: the pointer of its list, its key and the module's element. Without a layer, `marks` and `removed` are empty. A module scenario is answered as the module wrote it, with `layer: null` |
+| `PUT /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when the save writes a layer. The body is the edited module resource whole, as `application/json`. It needs `If-Match` with the layer's version, or `If-None-Match: *` when the resource has no layer. `file` and `version` are null, and there is no `ETag`, when no layer is left. See [Module resource saves](module-resource-saves.md) |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `POST /api/studio/apps/{application}/changes` | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
@@ -131,7 +130,7 @@ checked in this order, and the first failure is the response. Checks 1 to 6
 and 8 to 10 are built for every route that is built, and so is check 5a. Check 7 is built for a patch and a delete.
 Check 6 is built for a request and for a release:
 
-1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PATCH` or `DELETE`, `403`.
+1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PUT`, `PATCH` or `DELETE`, `403`.
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs `Studio:AuthorRole` to be set and held in
    the session's roles, and `Studio:Folders` to be non-empty. This holds for
@@ -158,13 +157,13 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The names route, the module resource route, the text write and the expression check are built.
-The four routes use these checks. None of them has
-check 6 or a later numbered check, except where a line says so:
+The names route, the module resource route, the module resource save, the text write and the expression check are built.
+The five routes use these checks. None of them has check 6 or a later numbered check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Module resource.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body. Then `404` for a
   module that the application does not pin, and then `404` for a resource that the pinned module version has no file for.
+- **Module resource save.** Checks 1, 2, 3 and 5, then those of [Module resource saves](module-resource-saves.md#order-of-checks).
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
   `application/json`, then `400` for a bad body, then `503` when the
   [write lock](#versions) cannot be taken. Under the lock, it answers `400` when a
@@ -225,7 +224,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Module resource, Create, Patch, Delete, Changes, Diagnostics, Names,
+from the request. The rows for List applications, List resources, Read, Module resource, Module resource save, Create, Patch, Delete, Changes, Diagnostics, Names,
 Text write, Expression check, Draft page metadata, Module page metadata, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -234,6 +233,7 @@ Text write, Expression check, Draft page metadata, Module page metadata, Resourc
 | List resources | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Read | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Module resource | No session | No author role, or no `Studio:Folders` | Unknown application, module or resource | Not used |
+| Module resource save | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, module or resource | A stale `If-Match` version, or `If-None-Match` over an existing layer |
 | Create | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The `id` or the target file already exists |
 | Patch | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
@@ -320,7 +320,7 @@ agrees it. The answer is:
   events: [{ id, name, entity, fields: [{ name, type }] }],
   roles, sequences, forms: [{ id, name }],
   pages: [{ id, name, module, parameters: [{ name, type, required }] }],
-  policies: [{ id, name, module }],
+  policies: [{ id, name, module }], contracts: [{ id, name, module }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
 ```
 
@@ -329,7 +329,7 @@ agrees it. The answer is:
   is `<module id>:<name>`. `module` is the module id, or null for the application's own.
 - **Module names.** Events, sequences and forms of a module are listed under
   `<module id>/<name>` too. Only entities, data sources, rules, processes, pages
-  and policies carry `module`. A module resource's `id` is the id in its module file.
+  and policies carry `module`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
 - **Event `entity`.** It is the entity the event is about, written as a process
   writes its `entity`. A module event that names its own module's entity without
   a slash is listed with the entity qualified, as `<module id>/<name>`. Studio's
@@ -348,7 +348,7 @@ agrees it. The answer is:
   one total row, and null for a plain data source. A group field that names no
   field is still listed as a column, with a null type.
 - **Order.** Each list holds the module resources first, then the
-  application's own in file path order. Module policies come in pin order. A step
+  application's own in file path order. Module policies and module contracts come in pin order. A step
   that is not a task has `outcomes: []`. Text keys are sorted ordinally.
 - **Process `entity`.** The subject entity of the process, or null for a process without a subject.
 - **Process `parameters`.** The parameters of a process without a subject, in file order. It is `[]` for a process with a subject.
@@ -494,7 +494,7 @@ Studio's expression editor can show errors as the author types. The body is
   is exclusive.
 - **The range.** The compile reports one character position, so the range is
   the token at that position: a name, a literal or an operator. A qualified
-  call such as `departments:IsManager` is one range. A character that starts no
+  call such as `organization:IsDelegating` is one range. A character that starts no
   token covers that one character, and text that is never closed runs to the
   end. `AXC0036` and `AXC0048` cover the whole expression. A limit that the
   compile reports at the place but outside the expression check, such as a rule
@@ -511,7 +511,7 @@ Studio's expression editor can show errors as the author types. The body is
 
 ## Writes
 
-Writes are built for patches, creates, deletes, changes and text writes.
+Writes are built for patches, creates, deletes, changes, text writes and module resource saves.
 
 - **Atomic.** A write goes to a hidden temporary file in the same folder and
   is then renamed over the target. A reader never sees half a file. A delete removes
@@ -569,7 +569,7 @@ Writes are built for patches, creates, deletes, changes and text writes.
 ## Creating an application
 
 `POST /api/studio/apps` creates a new application folder in
-`Studio:ApplicationsPath`, blank or from an installed
+`Studio:ApplicationsPath` (in a cell, [the tenant's folder](host-settings.md#studio-settings)), blank or from an installed
 [application template](modules-and-templates.md#application-templates). It follows
 [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
 The body is `{ "name": "...", "template": "<template id>" }`, and `template` is
@@ -580,22 +580,20 @@ This route has its own order of checks. The first failure is the response:
 1. The CSRF header `X-Axis-Csrf: 1`, `403`.
 2. The session, `401`.
 3. The author role, `403`.
-4. `Studio:ApplicationsPath` not set, `403`, titled "Studio cannot create
-   applications here."
-5. A body that is not `application/json`, `415`.
-6. A bad body, `400`. That is:
+4. `Studio:ApplicationsPath` not set, `403`, titled "Studio cannot create applications here."
+5. In a cell, the tenant at its applications quota, `403` with `reason` `quota-exceeded`, see [refusals](tenant-quotas.md#refusals).
+6. A body that is not `application/json`, `415`.
+7. A bad body, `400`. That is:
    - a body that is not a JSON object, or has a key other than `name` and
      `template`;
    - a `name` that does not match `^[A-Za-z][A-Za-z0-9]*$` or is longer than 60
      characters;
    - a `name` whose [kebab-case](#writes) form is longer than 60 characters, or
-     is a reserved site path: `api`, `health`, `assets`, `studio`, `account` or `users`;
+     is a reserved site path: `api`, `health`, `assets`, `studio`, `account`, `users` or `licences` _(planned for M31)_;
    - a `template` that is not a string.
-7. An unknown template, `404`. It is an `id` that no installed template has.
-8. A write lock that cannot be taken, `503`. See [Versions](#versions).
-9. A name already used, ignoring letter case, by an application of
-   `Studio:Folders` or of `Studio:ApplicationsPath`, or a target folder that
-   already exists, `409`.
+8. An unknown template, `404`. It is an `id` that no installed template has.
+9. A write lock that cannot be taken, `503`. See [Versions](#versions).
+10. A name already used, ignoring letter case, by an application of `Studio:Folders` or of `Studio:ApplicationsPath`, or a target folder that already exists, `409`.
 
 - **Atomic.** The whole folder is written to a hidden temporary folder,
   `.<kebab>-<random>`, inside `Studio:ApplicationsPath`, and then renamed to
@@ -733,7 +731,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `finishedAt` | When it reached `succeeded` or `failed`, or null before |
 | `releaseId` | The release a `publish` activated or a `rollback` named, or null. A `validate` and a `test` have none |
 | `diagnostics` | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings |
-| `scenarios` | Null for every kind but `test`. For `test`, an array with one item for each scenario that ran, in file order, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends |
+| `scenarios` | For `test`, an array with one item for each scenario that ran, in file order, in the form `{ name, resourceId, file, outcome, durationMs, step, path, message }`. `outcome` is `passed` or `failed`. `durationMs` is the time the scenario took. `step` is the 0-based index of the failing step, or null. `path` is `/steps/<index>`, in the same form as the paths of [Diagnostics](#diagnostics), or null. `message` is the failure message, or null. `resourceId` and `file` name the scenario resource, so Studio can open it at `path`. Empty until the request ends. For `publish` and `validate`, the stored results of their [contract scenarios](module-contracts.md#contract-scenarios), in the same form for each one that ran. A contract scenario that a relax entry skipped is an item in the form `{ name, file, outcome: "skipped", point }`, where `point` is the relaxed point it covers. Null until the request ends, when no contract scenario ran, and for `rollback` |
 
 - **A snapshot.** `validate` and `publish` store the folder as it is when the
   request is made: every `*.json` file that Studio can reach, with its `version`, as for
@@ -745,17 +743,17 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
   still accepted with `202`. The request then ends `failed` with those
   diagnostics. There is one path for diagnostics, and the snapshot shows what
   the author sent.
-- **`validate`.** The publisher runs every activation check against the
-  tenant inside a transaction that it rolls back. It returns the codes of
-  [startup activation](host-settings.md#startup-activation), including the
-  checks that the in-memory diagnostics skip: bindings, name and site path
-  conflicts, and storage changes. It stores no release and changes nothing.
-  It ends `succeeded` when there is no error.
-- **`publish`.** The publisher compiles the snapshot against the tenant,
-  stores the release and activates it, then seeds, with the same steps as
-  [`axis-admin activate`](administration.md#activate). A `seed` failure
-  happens after activation has committed, so the request ends `failed` with
-  `releaseId` set, and the release stays active and stays in the history.
+- **`validate`.** The publisher first runs the [contract scenarios](module-contracts.md#contract-scenarios)
+  of the pinned modules. It then runs every activation check against the tenant inside a transaction that
+  it rolls back. It returns the codes of [startup activation](host-settings.md#startup-activation),
+  including the checks that the in-memory diagnostics skip: bindings, name and site path conflicts, and
+  storage changes. It stores no release and changes nothing. It ends `succeeded` when there is no error. Its contract scenario results, skipped ones included, are in `scenarios`.
+- **`publish`.** The publisher first runs the contract scenarios, as for `validate`. A failing one ends
+  the request `failed` with `AXC0342`, and nothing is stored or activated. Their outcomes are stored
+  with the request, and the status route returns them as `scenarios`. Then it compiles the snapshot against the tenant, stores
+  the release and activates it, then seeds, with the same steps as
+  [`axis-admin activate`](administration.md#activate). A `seed` failure happens after activation has
+  committed, so the request ends `failed` with `releaseId` set, and the release stays active.
 - **`test`.** The server stores the request with the snapshot, taken as for
   `validate`. The publisher runs the scenarios as the [publisher](administration.md#publisher)
   describes, and stores their outcomes in `scenarios`. The request ends
@@ -811,8 +809,8 @@ the outcome, see [Studio](studio.md).
 - **Who may.** The author role is enough. It needs no publisher role, because
   a test changes no tenant. It costs database time, so the limits below apply.
 - **The body.** The optional `scenarios` list names the scenarios to run, by
-  their `name`. With no body, no list or an empty list, every scenario runs.
-  An unknown name is accepted with `202`, and the request then ends `failed`
+  their `name`. With no body, no list or an empty list, every scenario runs,
+  a pinned module's after the application's own, as `<module id>/<name>`. An unknown name is accepted with `202`, and the request then ends `failed`
   with `AXC0218`, as for a folder with errors.
 - **Where it runs.** The publisher runs it with `Scenarios:ServerConnectionString`,
   in a new database for each scenario, see
@@ -825,7 +823,7 @@ the outcome, see [Studio](studio.md).
 - **The outcome.** `scenarios` holds one item for each scenario that ran. A
   scenario that fails has the failing `step`, its `path` and its `message`.
   Selecting it in Studio opens the scenario at that step, as a diagnostic opens
-  a resource.
+  a resource. A module's scenario opens nothing.
 - **Limits.** The scenarios of a request run one after another. A request stops
   after 10 minutes: the scenario that runs fails, its database is dropped and
   the request ends `failed` with `AXC0219`. A stop of the publisher does the same
@@ -861,8 +859,8 @@ stateDiagram-v2
 - A request that has been claimed three times, and whose lease runs out again,
   ends `failed` with `AXC0215` in place of a fourth claim. A request that
   crashes the publisher cannot block the queue for good.
-- A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and one that a
-  stop of the publisher ends fails with `AXC0220`, see [Test](#test).
+- A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and one that a stop ends fails with
+  `AXC0220`, see [Test](#test). Contract scenarios can end a `publish` or `validate` with `AXC0219` too.
 - `succeeded` and `failed` are final. Studio polls
   `GET .../requests/{id}` until the status is one of them.
 - A request that runs again does no harm. Activating the same content hash
@@ -873,38 +871,37 @@ stateDiagram-v2
 This route is built. The publisher writes the rows of a publish and a rollback.
 
 `GET .../releases` answers
-`{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId }] }`,
+`{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`,
 newest first.
 
-- `active` is the application's active release in this tenant, or null when
-  there is none.
-- `folderContentHash` is the content hash that the folder would compile to now,
-  so Studio can show that the live release and the folder differ. It is null
-  when the folder has errors.
-- Each item is one activation: a startup, an `axis-admin activate`, a publish or
-  a rollback. `actor` is a user id, `startup` or `operator`. A row that a
-  migration added for a release that was live before the history existed has
-  the actor `unknown`. `actorName` is the actor's name from their [user profile](notifications.md#user-profiles),
-  else the name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin activate`.
-- A release gets its `number` the first time it is activated in the tenant:
-  1, 2, 3… per application. Activating it again keeps the number, so the same
-  content can have different numbers in two tenants.
-- Activating the release that is already active adds no row and keeps the
-  number. Otherwise every restart under `scripts/dev.sh` would fill the history
-  with copies.
-- `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
-  both the author role and the publisher role and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
-- `GET /api/me` gains a boolean `studioTest`, true when
-  `studio` is true and `Studio:Tests` is true. Studio uses it to hide **Run
-  tests** and the **Run** action of a scenario.
-- `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and
-  `Studio:ApplicationsPath` is set. It is built. Studio uses it to show **New
-  application**.
-- `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant
-  whose `PreviewOf` is the session's tenant. It is `null` when the user may not
-  use Studio, or when the tenant has no served preview tenant. It is built. Studio
-  shows Preview only when it is set. It names a host and no port, so Studio takes
-  the port and the protocol from its own page.
+- `active` is the application's active release in this tenant, or null when there is none.
+- `folderContentHash` is the content hash that the folder would compile to now, so Studio can show that the live release
+  and the folder differ. It is null when the folder has errors.
+- `changes` _(planned for M31,_ [_D129_](../decisions/d129-rules-from-the-studio-editors-review.md)_)_: the
+  files that differ from the active release as canonical JSON, by path, `[{ path, change, kind, name, titles, locale }]`
+  with `change` `added`, `changed` or `removed`; a removed file's other fields come from the active release and its
+  texts, null for the rest. A folder with errors is read file by file, without the modules' copies on either side.
+- Each item is one activation: a startup, an `axis-admin activate`, a publish or a rollback. `actor` is a user id,
+  `startup` or `operator`. A row that a migration added for a release that was live before the history existed has the
+  actor `unknown`. `actorName` is the actor's name from their [user profile](notifications.md#user-profiles), else the
+  name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin
+  activate`. `relaxed` lists the relax entries of the release's application in manifest order, read from the
+  `application.json` stored with that release, and `offStandard` is true when it is not empty, see [off-standard
+  releases](module-contracts.md#off-standard-releases).
+- A release gets its `number` the first time it is activated in the tenant: 1, 2, 3… per application. Activating it
+  again keeps the number, so the same content can have different numbers in two tenants.
+- Activating the release that is already active adds no row and keeps the number. Otherwise every restart under
+  `scripts/dev.sh` would fill the history with copies.
+- `GET /api/me` gains a boolean `studioPublisher`, true when the user holds both the author role and the publisher role
+  and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
+- `GET /api/me` gains a boolean `studioTest`, true when `studio` is true and `Studio:Tests` is true. Studio uses it to
+  hide **Run tests** and the **Run** action of a scenario.
+- `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and `Studio:ApplicationsPath` is set. It is
+  built. Studio uses it to show **New application**.
+- `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant whose `PreviewOf` is the session's
+  tenant. It is `null` when the user may not use Studio, or when the tenant has no served preview tenant. It is built.
+  Studio shows Preview only when it is set. It names a host and no port, so Studio takes the port and the protocol from
+  its own page.
 
 ### Rollback
 

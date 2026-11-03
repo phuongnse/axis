@@ -21,7 +21,8 @@ public static partial class EventRaiser
     /// starts the <c>async</c> triggers later, and stages a delivery for each webhook of <paramref name="model"/>.
     /// A skipped trigger start is logged and lets the transaction commit. Any other error throws, so the
     /// caller rolls back with the event. <paramref name="processInstanceId"/> is the instance that raises the
-    /// event, or <see langword="null"/> for an inbound endpoint that starts no process. <paramref name="active"/> is the active release of the application,
+    /// event, or <see langword="null"/> for an inbound endpoint that starts no process.
+    /// <paramref name="accountableUser"/> answers for the occurrence, and each trigger starts its instance with it. <paramref name="active"/> is the active release of the application,
     /// or <see langword="null"/> when it has none, in which case no <c>sync</c> trigger starts.
     /// </summary>
     public static async Task RaiseAsync(
@@ -34,6 +35,7 @@ public static partial class EventRaiser
         Guid subjectId,
         JsonObject payload,
         Guid? processInstanceId,
+        string? accountableUser,
         (Guid ReleaseId, ApplicationModel Model)? active,
         ILogger logger,
         CancellationToken cancellationToken)
@@ -45,13 +47,13 @@ public static partial class EventRaiser
         ArgumentNullException.ThrowIfNull(logger);
         var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
         var applicationId = model.Manifest.Id;
-        var occurrence = new NewEvent(occurrenceId, applicationId, @event.Name, releaseId, @event.Entity.Id, subjectId, payload, processInstanceId);
+        var occurrence = new NewEvent(occurrenceId, applicationId, @event.Name, releaseId, @event.Entity.Id, subjectId, payload, processInstanceId, accountableUser);
         await ProcessEvents.InsertAsync(transaction, occurrence, cancellationToken);
 
         if (active is { } current
             && EventTriggerStarts.Find(current.ReleaseId, current.Model, @event.Name, TriggerMode.Sync) is { Event: { } declared, Triggers: { Count: > 0 } triggers })
         {
-            var stored = new StoredEvent(occurrenceId, applicationId, @event.Name, @event.Entity.Id, subjectId, payload);
+            var stored = new StoredEvent(occurrenceId, applicationId, @event.Name, @event.Entity.Id, subjectId, payload, accountableUser);
             foreach (var trigger in triggers)
             {
                 var (_, skipped) = await EventTriggerStarts.StartAsync(

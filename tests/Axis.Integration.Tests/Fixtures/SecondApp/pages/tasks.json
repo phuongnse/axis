@@ -4,5 +4,5 @@
   "name": "Tasks",
   "formatVersion": 1,
   "title": { "textKey": "tasks.title" },
-  "widgets": [{ "type": "table", "entity": "Task" }]
+  "widgets": [{ "type": "table", "name": "table", "entity": "Task" }]
 }

@@ -5,13 +5,13 @@
   "formatVersion": 1,
   "roles": ["inspector"],
   "grants": [
-    { "entity": "Request", "actions": ["read"], "filter": "department is null" },
-    { "process": "RoleApprove", "actions": ["inspect", "reassign"] },
-    { "process": "Decide", "actions": ["inspect"] },
-    { "process": "Break", "actions": ["inspect"] },
-    { "process": "Submit", "actions": ["inspect"] },
-    { "process": "Divide", "actions": ["inspect"] },
-    { "process": "DepartmentOrder", "actions": ["inspect"] },
-    { "process": "TimerWait", "actions": ["inspect"] }
+    { "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "department is null" },
+    { "name": "roleApproveInspect", "process": "RoleApprove", "actions": ["inspect", "reassign"] },
+    { "name": "decideInspect", "process": "Decide", "actions": ["inspect"] },
+    { "name": "breakInspect", "process": "Break", "actions": ["inspect"] },
+    { "name": "submitInspect", "process": "Submit", "actions": ["inspect"] },
+    { "name": "divideInspect", "process": "Divide", "actions": ["inspect"] },
+    { "name": "departmentOrderInspect", "process": "DepartmentOrder", "actions": ["inspect"] },
+    { "name": "timerWaitInspect", "process": "TimerWait", "actions": ["inspect"] }
   ]
 }

@@ -7,15 +7,17 @@
   "widgets": [
     {
       "type": "table",
+      "name": "table",
       "entity": "Item",
       "rowActions": [
         {
           "type": "navigate",
+          "name": "navigate",
           "page": "ItemsInDepartment",
           "label": { "textKey": "itemLinks.sameDepartment" },
           "parameters": { "departmentName": "department.name" }
         },
-        { "type": "navigate", "page": "ItemForm", "label": { "textKey": "itemLinks.open" }, "record": "id" }
+        { "type": "navigate", "name": "navigate2", "page": "ItemForm", "label": { "textKey": "itemLinks.open" }, "record": "id" }
       ]
     }
   ]

@@ -1,0 +1,12 @@
+{
+  "id": "f149b5fc-ea46-434a-9b08-940e5ef125d8",
+  "kind": "page",
+  "name": "RequestDetail",
+  "formatVersion": 1,
+  "title": { "textKey": "approvals.pages.requestDetail.title" },
+  "parameters": [{ "name": "request", "type": "reference", "target": "Request", "required": true }],
+  "widgets": [
+    { "type": "detail", "name": "requestDetail", "form": "RequestDetail", "record": "request" },
+    { "type": "table", "name": "decisions", "dataSource": "RequestDecisions", "parameters": { "forRequest": "request" } }
+  ]
+}

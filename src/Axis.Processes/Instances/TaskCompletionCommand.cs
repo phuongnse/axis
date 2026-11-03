@@ -57,7 +57,10 @@ public sealed record TaskCompletionResult(
 /// actor may read. One transaction then writes the values as a record update on the task's release,
 /// closes the task, resumes the instance on the outcome's next step and appends the audit record
 /// <c>task.completed</c>. A completion with values then starts the data change triggers of the
-/// update, from the active release, in the same transaction. A task shows its form and step as the
+/// update, from the active release, in the same transaction. When the update makes a transition with
+/// effects, the completion also audits each effect record as <c>record.created</c> for the actor and
+/// starts the create triggers on its entity. A failing effect refuses the completion as
+/// <see cref="TaskCompletionOutcome.WriteFailed"/> with <see cref="RecordWriteOutcome.EffectRefused"/>, and the task stays open. A task shows its form and step as the
 /// release its instance is pinned to declares them, and a completion uses that release too.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
 /// Only the claimer may complete a claimed role task.
@@ -142,6 +145,8 @@ public static class TaskCompletionCommand
         IReadOnlyList<string> fields = [];
         Record? previous = null;
         Record? updated = null;
+        IReadOnlyList<EffectRecord> effects = [];
+        var write = new RecordWriteContext(actor.Id, task.Id);
         if (body.Input is { } input)
         {
             // The values are written as a record update on the task's release. The lock makes the
@@ -153,7 +158,8 @@ public static class TaskCompletionCommand
                     TaskCompletionOutcome.WriteFailed, Write: new RecordWriteResult(RecordWriteOutcome.NotFound));
             }
 
-            var computed = RecordComputer.ComputeUpdate(release, entity, stored, input.Values, input.Rows);
+            var matched = await RecordMatcher.WithMatchesAsync(connection, release, entity, input.Values, stored, cancellationToken);
+            var computed = RecordComputer.ComputeUpdate(release, entity, stored, matched, input.Rows);
             if (computed.Errors is { } computeErrors)
             {
                 return new TaskCompletionResult(TaskCompletionOutcome.Invalid, computeErrors);
@@ -173,17 +179,26 @@ public static class TaskCompletionCommand
             }
 
             var result = await RecordCommands.UpdateAsync(
-                connection, release, entity, task.ReleaseId, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
+                connection, release, entity, task.ReleaseId, write, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
-                return result.Outcome == RecordWriteOutcome.StaleVersion
-                    ? new TaskCompletionResult(TaskCompletionOutcome.StaleVersion)
-                    : new TaskCompletionResult(TaskCompletionOutcome.WriteFailed, Write: result);
+                if (result.Outcome == RecordWriteOutcome.StaleVersion)
+                {
+                    return new TaskCompletionResult(TaskCompletionOutcome.StaleVersion);
+                }
+
+                if (result.Outcome is RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused)
+                {
+                    RecordLifecycleLog.Refused(loggerFactory, entity.Id, result.Point, task.SubjectId);
+                }
+
+                return new TaskCompletionResult(TaskCompletionOutcome.WriteFailed, Write: result);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, release, entity, task.ReleaseId, cancellationToken);
             previous = stored;
             updated = written;
+            effects = result.Effects;
             readVersion = stored.Version;
             writtenVersion = written.Version;
             fields = sent;
@@ -234,6 +249,20 @@ public static class TaskCompletionCommand
                 previous,
                 updated,
                 saved.Rows.Select(rows => rows.Collection.Name).Concat(saved.Links.Select(links => links.Field.Name)),
+                write,
+                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                cancellationToken);
+            await EffectRecordWrites.AppendAsync(
+                transaction,
+                tenantId,
+                active,
+                activeReleaseId,
+                task.ReleaseId,
+                task.ApplicationId,
+                task.ProcessInstanceId,
+                actor.Id,
+                effects,
+                write,
                 loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                 cancellationToken);
         }

@@ -213,7 +213,9 @@ A text value may hold named placeholders, such as
   After `Worker:DeliveryAttempts` failures, default 5, the item is deleted, the
   row stays `pending` and an `open` dead letter of kind `notification.email` is
   written. Nothing more is sent until an operator redelivers it, which queues
-  the same row again.
+  the same row again. In a cell the worker takes a slot of the tenant's
+  [emails a day](tenant-quotas.md#emails-a-day) just before the send. With no slot
+  left the row stays `pending` and the item is due at the next 00:00 UTC.
 - **At least once.** A crash after the send and before the mark sends again.
   The same `Message-ID` lets a receiver drop the repeat.
 - **Locale.** The recipient's profile locale when the release has texts for
@@ -252,8 +254,9 @@ sign-in and the last sign-in. A later sign-in updates it.
 - A failure to write the profile does not refuse the sign-in. The server logs a
   warning that does not include the email.
 - The profiles are not a directory. They serve email addresses, locales, the
-  user picker of a [reassign](task-deadlines.md#reassign) and the actor names
-  of the history views, and no other route lists them.
+  user picker of a [reassign](task-deadlines.md#reassign), the search route of a
+  [`userId` field](resource-files.md#entity-field-types-and-constraints) and the
+  actor names of the history views, and no other route lists them.
 
 ## Mail settings
 

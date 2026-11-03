@@ -68,12 +68,12 @@ public sealed class ModuleCompilerTests
     private const string DepartmentsPage = """
         { "id": "66666666-6666-4666-8666-666666666601", "kind": "page", "name": "Departments", "formatVersion": 1,
           "title": { "textKey": "pages.departments.title" },
-          "widgets": [ { "type": "table", "dataSource": "departments/Departments" } ] }
+          "widgets": [ { "name": "table", "type": "table", "dataSource": "departments/Departments" } ] }
         """;
 
     private const string DepartmentsPolicy = """
         { "id": "12121212-1212-4212-8212-121212121202", "kind": "policy", "name": "DepartmentsAccess", "formatVersion": 1,
-          "roles": ["employee"], "grants": [ { "dataSource": "departments/Departments", "actions": ["read"] } ] }
+          "roles": ["employee"], "grants": [ { "name": "departmentsRead", "dataSource": "departments/Departments", "actions": ["read"] } ] }
         """;
 
     private const string LabelledDepartment = $$"""
@@ -185,14 +185,50 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
-    public void A_migration_that_names_a_module_entity_is_reported_at_its_entity()
+    public void A_migration_that_names_an_entity_of_a_declared_module_compiles()
     {
         using var modules = Modules("1.0.0");
         using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
-            .With("migrations/0001.json", """
-                { "id": "2b4c6d8e-1f3a-4b5c-9d7e-0a1b2c3d4e5f", "kind": "migration", "name": "DropName", "formatVersion": 1,
-                  "entity": "departments/Department", "changes": [ { "type": "dropField", "field": "name" } ] }
-                """);
+            .With("migrations/0001.json", MigrationOn(DepartmentName, """{ "type": "dropField", "field": "name" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var migration = Assert.Single(result.Model!.Migrations);
+        Assert.Equal(DepartmentName, migration.Entity);
+    }
+
+    [Fact]
+    public void A_migration_that_drops_a_module_entity_is_reported_at_the_drop()
+    {
+        using var modules = Modules("1.0.0");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("migrations/0001.json", MigrationOn(DepartmentName, """{ "type": "dropEntity" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MigrationOfModuleEntity, "migrations/0001.json", "/changes/0/type"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_migration_that_names_an_entity_of_a_module_only_a_dependency_is_reported_at_its_entity()
+    {
+        using var modules = Modules("1.0.0");
+        modules.With("departments/1.0.0/module.json", """
+            { "kind": "module", "id": "departments", "version": "1.0.0", "label": "departments",
+              "modules": [{ "id": "people", "version": "1.0.0" }] }
+            """);
+        modules.With("people/1.0.0/module.json", ModuleCatalogTests.Manifest("people", "1.0.0"));
+        modules.With("people/1.0.0/Person.json", """
+            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c09", "kind": "entity", "name": "Person", "formatVersion": 1,
+              "fields": [ { "name": "name", "type": "text", "required": true } ] }
+            """);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("migrations/0001.json", MigrationOn("people/Person", """{ "type": "dropField", "field": "name" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
 
@@ -714,6 +750,7 @@ public sealed class ModuleCompilerTests
     [InlineData("""{ "kind": "role" }""")]
     [InlineData("""{ "kind": "identityProvider" }""")]
     [InlineData("""{ "kind": "webhook" }""")]
+    [InlineData("""{ "kind": "layer" }""")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "Nested" }""")]
     [InlineData("""{ "kind": "unknown" }""")]
     [InlineData("""{ "kind": 5 }""")]
@@ -1106,7 +1143,7 @@ public sealed class ModuleCompilerTests
     private static string ModulePage(string dataSource) => $$"""
         { "id": "{{ModulePageId}}", "kind": "page", "name": "Departments", "formatVersion": 1,
           "title": { "textKey": "{{ModulePageTitleKey}}" },
-          "widgets": [ { "type": "table", "dataSource": "{{dataSource}}" } ] }
+          "widgets": [ { "name": "table", "type": "table", "dataSource": "{{dataSource}}" } ] }
         """;
 
     private const string MainSite = """
@@ -1216,7 +1253,7 @@ public sealed class ModuleCompilerTests
             .With("departments/1.0.0/Department.json", $$"""
                 { "id": "{{DepartmentId}}", "kind": "entity", "name": "Department", "formatVersion": 1,
                   "fields": [ { "name": "value", "type": "integer" } ],
-                  "validations": [ { "expression": "{{expression}}", "message": { "textKey": "departments.department.invalid" }, "field": "value" } ] }
+                  "validations": [ { "name": "check1", "expression": "{{expression}}", "message": { "textKey": "departments.department.invalid" }, "field": "value" } ] }
                 """)
             .With("departments/1.0.0/TextsEn.json", Texts(ModuleTextsEnId, "en", """{ "departments.department.invalid": "Not valid." }"""));
         var folder = Folder(DepartmentsModule).With("texts/en.json", RequestTexts);
@@ -1335,7 +1372,7 @@ public sealed class ModuleCompilerTests
     private const string DepartmentsModule = """[{ "id": "departments", "version": "1.0.0" }]""";
 
     private static string RequestValidation(string expression) =>
-        $$"""[{ "expression": "{{expression}}", "message": { "textKey": "request.invalid" }, "field": "quantity" }]""";
+        $$"""[{ "name": "check2", "expression": "{{expression}}", "message": { "textKey": "request.invalid" }, "field": "quantity" }]""";
 
     private static object? EvaluateRequest(Model.ValidationModel validation, long quantity)
     {
@@ -1440,7 +1477,7 @@ public sealed class ModuleCompilerTests
             ("policies/requests.json", """
                 { "id": "12121212-1212-4212-8212-121212121202", "kind": "policy", "name": "RequestAccess", "formatVersion": 1,
                   "roles": ["employee"],
-                  "grants": [{ "entity": "Request", "actions": ["read"], "filter": "departments:A(quantity)" }] }
+                  "grants": [{ "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "departments:A(quantity)" }] }
                 """));
         using var _ = modules;
         using var __ = folder;
@@ -1586,7 +1623,7 @@ public sealed class ModuleCompilerTests
 
     private static string PolicyOver(string entity) => $$"""
         { "id": "12121212-1212-4212-8212-121212121201", "kind": "policy", "name": "DepartmentAccess", "formatVersion": 1,
-          "roles": ["employee"], "grants": [ { "entity": "{{entity}}", "actions": ["read"] } ] }
+          "roles": ["employee"], "grants": [ { "name": "grantRead", "entity": "{{entity}}", "actions": ["read"] } ] }
         """;
 
     /// <summary>An installation root with each version of the <c>departments</c> module, holding its manifest and one entity.</summary>
@@ -1601,6 +1638,11 @@ public sealed class ModuleCompilerTests
 
         return root;
     }
+
+    private static string MigrationOn(string entity, string change) => $$"""
+        { "id": "2b4c6d8e-1f3a-4b5c-9d7e-0a1b2c3d4e5f", "kind": "migration", "name": "Change", "formatVersion": 1,
+          "entity": "{{entity}}", "changes": [ {{change}} ] }
+        """;
 
     private static TemporaryFolder Folder(string modules) =>
         new TemporaryFolder().With("application.json", $$"""

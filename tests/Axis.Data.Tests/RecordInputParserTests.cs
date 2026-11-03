@@ -671,6 +671,37 @@ public sealed class RecordInputParserTests
         }
     }
 
+    [Theory]
+    [InlineData("\"7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e11\"")]
+    [InlineData("null")]
+    public void Matched_reference_set_by_the_body_is_an_error_at_its_pointer(string json)
+    {
+        var holder = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e10"),
+            "Badge",
+            "entities/badge.json",
+            Field("holder", FieldType.Text, maxLength: 100, unique: true));
+        var visit = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e12"),
+            "Visit",
+            "entities/visit.json",
+            Field("title", FieldType.Text),
+            Field("holder", FieldType.Text, maxLength: 100),
+            Field("badge", FieldType.Reference, target: holder) with { Match = new FieldMatchModel("holder", "holder") });
+        var application = Application(holder, visit);
+
+        foreach (var (operation, version) in new[] { (RecordOperation.Create, ""), (RecordOperation.Update, "\"version\": 1, ") })
+        {
+            var body = $$"""{ {{version}}"values": { "title": "Hi", "badge": {{json}} } }""";
+            var result = RecordInputParser.Parse(Encoding.UTF8.GetBytes(body), visit, application, operation);
+
+            Assert.Null(result.Input);
+            Assert.NotNull(result.Errors);
+            Assert.Equal(["/values/badge"], result.Errors.Keys);
+            Assert.Equal(["Cannot be set."], result.Errors["/values/badge"]);
+        }
+    }
+
     private static readonly EntityModel _ranged = Entity(
         Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e08"),
         "Reading",

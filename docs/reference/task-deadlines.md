@@ -33,6 +33,7 @@ A task step may add `escalations` and a `deadline`:
   "dueIn": "P1D",
   "escalations": [
     {
+      "name": "escalation1",
       "after": "P1D",
       "notify": {
         "to": [{ "role": "service-desk-lead" }],
@@ -40,7 +41,7 @@ A task step may add `escalations` and a `deadline`:
         "message": { "subject": { "textKey": "ticket.late.subject" }, "body": { "textKey": "ticket.late.body" } }
       }
     },
-    { "after": "P2D", "reassign": { "role": "service-desk-lead" } }
+    { "name": "escalation2", "after": "P2D", "reassign": { "role": "service-desk-lead" } }
   ],
   "deadline": { "after": "P5D", "next": "markExpired" },
   "outcomes": [{ "name": "resolved", "label": { "textKey": "task.resolved" }, "next": "confirm" }]
@@ -54,8 +55,10 @@ A task step may add `escalations` and a `deadline`:
   counts from and the task's `created_at`. In a [test scenario](test-scenarios.md)
   that time follows the scenario's `now`. There are no business hours or
   calendars.
-- **Escalation.** Each has `after` and at least one of `reassign` and
-  `notify`, otherwise `AXC0280` at `/steps/{i}/escalations/{j}`. `reassign` has
+- **Escalation.** Each has a `name`, `after` and at least one of `reassign` and
+  `notify`, otherwise `AXC0280` at `/steps/{i}/escalations/{j}`. A missing `name`
+  is `AXC0004`, and a later escalation with a name already used in the task,
+  ignoring letter case, is `AXC0359` at `/steps/{i}/escalations/{j}/name`. `reassign` has
   the shape and the checks of `assignee`, reported under `.../reassign`. `notify`
   has the shape and the checks of the
   [`notify` operation](notifications.md#notify-operation), without `next`,
@@ -203,11 +206,13 @@ Content-Type: application/json
   The deadline does not change, so the new assignee inherits `due_at` and the
   pending `task.deadline` work item.
 - **User picker.** `GET /api/apps/{app}/users?search=` lists up to 20 user
-  profiles whose display name contains the search text, ignoring case, sorted
-  by display name and then id. An empty or missing search lists the first 20. It
-  answers `{ "items": [{ "id", "displayName" }] }` and nothing else of a
-  profile, and it is the only route that lists profiles. It needs a `reassign`
-  grant on some process of the application, otherwise `403`. Only people who
+  profiles whose display name or email contains the search text, ignoring case,
+  sorted by display name and then id. An empty or missing search lists the first
+  20. It answers `{ "items": [{ "id", "displayName" }] }` and nothing else of a
+  profile, so the email is a match condition only. It needs a `reassign`
+  grant on some process of the application, otherwise `403`. A text field marked
+  [`userId`](resource-files.md#entity-field-types-and-constraints) has a
+  search route of its own for people who may write that field. Only people who
   have signed in have a profile, so a new colleague can receive a task after
   one sign-in.
 - **Audit.** `task.reassigned`, with the actor, the task id, the subject record

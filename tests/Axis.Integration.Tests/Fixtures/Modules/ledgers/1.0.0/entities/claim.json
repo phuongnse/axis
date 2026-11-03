@@ -1,0 +1,12 @@
+{
+  "id": "b9d8304a-328b-48b3-bffd-5b627c1e4ff8",
+  "kind": "entity",
+  "name": "Claim",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "amount", "type": "integer" },
+    { "name": "status", "type": "enum", "required": true, "values": ["draft", "submitted", "approved"] }
+  ]
+}

@@ -1,7 +1,9 @@
 using System.Data.Common;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Model;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Realms;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
@@ -292,7 +294,16 @@ public static class ReleaseActivator
                 && root.TryGetProperty("name", out var name) && name.GetString() is { } entityName
                 && root.TryGetProperty("id", out var id) && Guid.TryParse(id.GetString(), out var entityId))
             {
-                ids[entityName] = entityId;
+                // A module entity is read under its qualified name with the id the application's copy has.
+                if (resource.Path.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal))
+                {
+                    var moduleId = resource.Path.Split('/')[1];
+                    ids[$"{moduleId}/{entityName}"] = ModuleResourceIds.Derive(applicationId, entityId);
+                }
+                else
+                {
+                    ids[entityName] = entityId;
+                }
             }
         }
 

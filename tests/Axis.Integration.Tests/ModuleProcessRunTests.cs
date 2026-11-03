@@ -128,6 +128,41 @@ public sealed class ModuleProcessRunTests(ModuleProcessFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_person_who_holds_the_mapped_role_starts_the_module_process()
+    {
+        var review = await fixture.InsertReviewAsync();
+        using var client = fixture.CreateClient().SignedInAs("manager");
+
+        var instance = await StartAsync(client, "reviews/Close", review);
+        await fixture.Steps.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal("completed", (await fixture.Steps.InstanceAsync(instance)).State);
+        Assert.Equal("closed", await fixture.ReviewStateAsync(review));
+    }
+
+    [Theory]
+    [InlineData("clerk")]
+    [InlineData("elsewhere")]
+    [InlineData("outsider")]
+    public async Task A_person_without_the_mapped_role_cannot_start_the_module_process(string user)
+    {
+        var review = await fixture.InsertReviewAsync();
+        using var client = fixture.CreateClient().SignedInAs(user);
+
+        using var request = Request(
+            HttpMethod.Post,
+            "/api/apps/ModuleProcessApp/processes/reviews/Close/instances",
+            ModuleProcessFixture.Host,
+            $$"""{ "subjectId": "{{review:D}}" }""");
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(
+            0L,
+            await fixture.Steps.CountAsync("SELECT count(*) FROM axis.process_instances WHERE subject_id = @id", ("id", review)));
+    }
+
+    [Fact]
     public async Task A_module_task_assigned_to_a_slot_goes_to_the_people_who_hold_the_mapped_role_who_decide_it()
     {
         var review = await fixture.InsertReviewAsync();

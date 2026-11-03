@@ -15,6 +15,9 @@ public sealed record WidgetActionDefinition
     /// <summary>The kind of action: <c>startProcess</c>, <c>navigate</c> or <c>delete</c>.</summary>
     public required string Type { get; init; }
 
+    /// <summary>The name that a layer finds the action by. It is unique in its own list, ignoring letter case. The schema refuses it on a kpi's <c>navigate</c>.</summary>
+    public string? Name { get; init; }
+
     /// <summary>The process a <c>startProcess</c> action starts for the form's or row's record. The schema requires it there and refuses it on a <c>navigate</c> or <c>delete</c> action.</summary>
     public string? Process { get; init; }
 

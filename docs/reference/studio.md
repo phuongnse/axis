@@ -13,7 +13,7 @@ agrees. The route, the link, the application picker, New application, New resour
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, Run tests,
-Run and the Test results list, the read-only views of a module entity, a module process and a module policy, and the reconnect message are built.
+Run and the Test results list, the read-only views of a module entity, a module process and a module policy, and the reconnect message are built. Where each sits is in [Studio workspace](studio-workspace.md).
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   lists Studio in the app switcher only when `GET /api/me` answers `studio: true`. A person
@@ -24,17 +24,17 @@ Run and the Test results list, the read-only views of a module entity, a module 
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`. The id of a module entity, process or policy opens it too, as `&resource=<id>`,
   when the id is not one of the folder's own resources.
-- **New application.** A **New application** button shows beside the picker
+- **New application.** A **New application** button shows beside the picker (New application… on the list, _planned for M31_)
   when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
   lists no application. The dialog asks for a name and checks it with the API's
   rule before it sends anything. It offers Blank or a template from
   `GET /api/studio/templates`, with the title and description in the UI locale
-  and `en` as the fallback. A `409` or a `400` shows next to the name. A success
+  and `en` as the fallback. A built-in template is listed first, with a "Built in" mark. A `409` or a `400` shows next to the name. A success
   adds the application to the picker, picks it, and loads its resources and
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **New resource.** A **New resource** button above the search box opens a
+- **New resource.** A **New resource** button above the search box (New resource… in the band, starting with the list's kind, _planned for M31_) opens a
   dialog that asks for the kind and the name, or the locale for a `text`
   resource. The kind picker lists the 20 kinds the create route accepts: every
   kind except the manifest. The author can type to narrow it. A new
@@ -47,8 +47,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - The starters live in the SPA, in `web/src/platform/studioStarters.json`.
     Each lists the pointers of its empty references. A Vitest test checks each
     one against its bundled schema, so a schema file without a starter fails
-    (the manifest is exempt), and every error must be at a listed pointer. A server test reads the same
-    file, sends each starter through the create route, and checks that its
+    (the manifest, the contract and the layer are exempt), and every error must be at a listed
+    pointer. A server test reads the same file, sends each starter through the create route, and checks that its
     diagnostics are at the listed pointers only.
   - A new text resource copies every key and text of the default locale of the
     first site in file order, or `en` when there is no site, so every label still
@@ -61,14 +61,14 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. With only one application, it is picked at
-  once.
-- **Resource list.** The list groups the resources by kind. The kind shows as
+  once. The list becomes tiles by title, see [applications](studio-workspace.md#applications) _(planned for M31)_. An **Off-standard** tag shows beside it while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio).
+- **Resource list.** The list groups the resources by kind (in the sidebar, see [workspace](studio-workspace.md#workspace), _planned for M31_). The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
   its name, kind, `id` and file, and opens it in the editor below. **Module entities**, **Module processes**,
-  **Module policies** and **Module pages** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
+  **Module policies**, **Module contracts** and **Module pages** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
   the application's names, and the search box filters them too. A module process opens as its graph alone, with no palette, connect handle, step panel or delete,
-  a module policy as a read-only table of its grants, and a module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. Each view shows its read-only notice with the alert role.
+  a module policy as a read-only table of its grants, a module contract as its lifecycle in a state diagram (initial and deletable states marked, each arrow labelled with its transition's name and whether it has a guard) with tables of its states, transitions, core validations, effects and ceiling entries, each row with its [named point](module-contracts.md#named-points)., and a module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. Each view shows its read-only notice with the alert role. In a module contract, when `application.json` declares the module directly, each named point also has a **Relax** button, which opens a dialog for a reason of 1 to 500 characters, and a relaxed point shows its reason and an **Undo relax** button. Both write `application.json` with `If-Match`, see [in Studio](module-contracts.md#in-studio).
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
     bundles the schemas in `src/Axis.Configuration/Schemas`, the files the
@@ -142,7 +142,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   opens the resource at the diagnostic's `path`, as a Used by entry does. A
   diagnostic with an empty path opens the resource at its top. A diagnostic that
   names no resource cannot be selected. A diagnostic never blocks a save.
-- **Publishing.** Up to three buttons sit under the application picker. They use the
+- **Publishing.** Up to three buttons sit under the application picker (in the band, see [band](studio-workspace.md#band), _planned for M31_). They use the
   [publishing routes](authoring.md#publishing).
   - **Validate** sends a validate request. **Publish** opens a dialog with an
     optional label, up to 100 characters, and an optional note, up to 2000.
@@ -193,11 +193,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
     the outcome, and Studio checks `GET .../requests/{id}` every second until the
     status is `succeeded` or `failed`. A test shows **Tests passed** or
     **Tests failed**, and never a release number.
-  - The **Test results** list shows each scenario of the request's `scenarios`
-    field, with **passed** or **failed**, its time and, for a failure, the failing
-    step and its message. Steps count from 1, as the step cards of the editor do.
-    Selecting a failure opens the scenario resource at the item's `path`, as a
-    diagnostic does.
+  - The **Test results** list shows each scenario of the request's `scenarios` field, with **passed** or **failed**, its time and, for a failure, the failing step and its message. Steps count from 1, as the step cards of the editor do. Selecting a failure opens the scenario resource at the item's `path`, as a diagnostic does.
+  - A **publish**, **validate** or **preview** request shows its contract scenarios under the status line, in a **Contract scenarios** list, when it stored any. A failed row opens as a test failure does. A **skipped** row shows its relaxed point and opens nothing.
   - While the request is queued or running, the list shows a note instead of rows,
     so an empty list never reads as a pass. A failed run with no results says that
     no scenario ran, and points to the diagnostics. Compile errors, a missing
@@ -206,26 +203,26 @@ Run and the Test results list, the read-only views of a module entity, a module 
     diagnostics panel, as before.
   - The buttons are off while a request runs and while the reconnect message
     shows.
-- **Releases.** A list under the publishing buttons shows the open application's
-  release history from `GET .../releases`.
-  - Each row is one activation: its release number, label, note, who activated it
-    and when. Rows are sorted by time, newest first.
-  - Exactly one row is marked **Active**. A release that was activated more than
-    once has a row for each activation, and only its newest row is marked.
-  - **Roll back** shows only when `GET /api/me` answers `studioPublisher: true`. It
-    sits on every row of a release that is not the active one, and is off while a
-    request runs and while the reconnect message shows.
-  - **Roll back** opens a dialog that names the release number and label. Confirming
-    sends `POST .../releases/{id}/rollback`. The status line then shows **queued**,
-    **running** and the outcome, as for Publish. A failed rollback puts its
-    diagnostics in the diagnostics panel, and the list still marks the previous
-    release **Active**.
-  - A warning shows when the folder's content hash differs from the active release,
-    for example after a save or a rollback. It does not show without an active
-    release, or while the folder has errors, because the server then returns no
-    content hash for the folder.
-  - The list loads when the application is picked, and again after a request ends,
-    after a save, a text write or a delete, and after a reconnect.
+- **Releases.** A list under the publishing buttons (the Releases entry of the sidebar, _planned for M31_) shows the
+  open application's release history from `GET .../releases`. Below is what is built; one row per release with
+  Activate… replaces it _(planned for M31)_, see [releases](studio-workspace.md#releases).
+  - Each row is one activation: its release number, label, note, who activated it and when. Rows are sorted by time,
+    newest first.
+  - Exactly one row is marked **Active**. A release that was activated more than once has a row for each activation, and
+    only its newest row is marked.
+  - An [off-standard release](module-contracts.md#off-standard-releases) shows the **Off-standard**
+    tag with the module, point and reason of each relaxed entry. A standard one shows no tag.
+  - **Roll back** shows only when `GET /api/me` answers `studioPublisher: true`. It sits on every row of a release that
+    is not the active one, and is off while a request runs and while the reconnect message shows.
+  - **Roll back** opens a dialog that names the release number and label. Confirming sends `POST
+    .../releases/{id}/rollback`. The status line then shows **queued**, **running** and the outcome, as for Publish. A
+    failed rollback puts its diagnostics in the diagnostics panel, and the list still marks the previous release
+    **Active**.
+  - A warning shows when the folder's content hash differs from the active release, for example after a save or a
+    rollback. It does not show without an active release, or while the folder has errors, because the server then
+    returns no content hash for the folder.
+  - The list loads when the application is picked, and again after a request ends, after a save, a text write or a
+    delete, and after a reconnect.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
   Studio shows a reconnect message at the top of the page when a request gets
   no answer, or answers `502`, `503` or `504`. The Vite dev proxy answers `502`
@@ -319,9 +316,9 @@ Run and the Test results list, the read-only views of a module entity, a module 
       A process without a subject offers its `parameters` and no field.
     - The application's rules, with module rules as `<module>:<name>`, and the
       functions and aggregates of the [expression language](expressions.md#functions).
-    - `currentUser()` only in a policy grant's filter. Expressions in
-      migrations and endpoints, and in a trigger that has no entity, offer the
-      rules and the functions only.
+    - `currentUser()` only in a policy grant's or data source's filter, not a
+      measure filter. Expressions in migrations and endpoints, and in a trigger
+      that has no entity, offer the rules and the functions only.
     - A function or rule inserts with its brackets and puts the cursor inside
       them. `now()` and `currentUser()` put the cursor after them.
     - When the names do not load, the list offers the functions only. Typing and
@@ -364,7 +361,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     added in the same session asks nothing, except a `fill` question when it is
     required. Those questions come after the loaded fields, in row order. A new
     row with the name of a removed loaded field counts as that loaded field.
-  - A rename asks Keep data, Drop data or Cancel. Keep data adds
+  - A rename asks Keep data, Drop data or Cancel, the last two as text buttons beside the solid one _(planned for M31)_. Keep data adds
     `renameField`, and Drop data adds `dropField` for the old name. Cancel
     stops the whole save and keeps the draft. A removal asks Drop data or Keep
     field. Keep field puts the field back where it was, and the save goes on
@@ -410,7 +407,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     `retry`, `resolve` and `reassign`. An endpoint takes `invoke`. Studio reads each list
     from `policy.schema.json`. Filter and fields are only on entity grants.
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
-  - A Resources / Policy matrix switch sits under the application picker. The
+  - A Resources / Policy matrix switch sits under the application picker (the policy matrix entry of the sidebar, _planned for M31_). The
     matrix view is kept in the address as `&view=policies`, so a reload or a
     shared link reopens it. The diagnostics panel shows in both views.
   - Selecting a cell opens its grants under the table. A cell lists the
@@ -428,8 +425,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
     - An entity grant also edits its record filter in the expression editor
       and its fields in a field picker. An empty field list means all fields,
       so clearing the picker removes the `fields` key.
-    - Add grant adds a grant for the cell's target. Remove deletes a grant,
-      but not the policy's last one.
+    - Add grant adds a grant named after the cell's target, such as `purchaseRequest1`, with the first free number in the policy (case is ignored).
+      A grant shows its name read-only. Remove deletes a grant, but not the policy's last one.
     - Save is off while a grant has no ticked action, and while nothing
       changed.
   - A save writes one file. It sends one patch with the version the panel
@@ -483,16 +480,17 @@ Run and the Test results list, the read-only views of a module entity, a module 
     with a text box for each locale, and a list of its widgets, each with its
     type and a summary such as `table · PurchaseRequestList`. A panel per
     widget type, `table`, `form`, `taskInbox`, `processInspector`, `kpi`,
-    `chart`, `detail`, `columns`, `tabs` and `section`, shows the properties the widget has today. The `columns`, `tabs` and `section` panels edit the width of each column, the label of each tab, and the title and collapsed state of a section. A `table` panel has entity and data source
-    pickers, then a `rowActions` list of navigate or delete actions and a
+    `chart`, `detail`, `columns`, `tabs` and `section`, shows the properties
+    the widget has today. A `table` panel has entity and data source pickers,
+    then a `rowActions` list of navigate or delete actions and a
     `toolbarActions` list of navigate actions. A delete action has a label and
     an optional `visibleWhen` expression. A `form` panel has entity and form
     pickers and its `actions`, each a `startProcess` action with a process
-    picker and a label, or a navigate action. A
-    `taskInbox` panel has no properties. A `processInspector` panel has a
-    process picker. A `detail` panel has the entity and form pickers and the
-    actions of a form, and a record picker between them. The widget is described
-    in [detail, chart and KPI widgets](detail-chart-kpi-widgets.md), per
+    picker and a label, or a navigate action. A `taskInbox` panel has no
+    properties. A `processInspector` panel has a process picker. A `detail`
+    panel has the entity and form pickers and the actions of a form, and a
+    record picker between them. The widget is described in [detail, chart and
+    KPI widgets](detail-chart-kpi-widgets.md), per
     [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The record picker
     lists the page's parameters that are required and of type `reference`. When
     the widget names an entity, it lists only the parameters whose `target` is
@@ -502,12 +500,9 @@ Run and the Test results list, the read-only views of a module entity, a module 
     after the save. The JSON view stays as a second view of the same draft.
     - **Type change.** Choosing another type removes the known properties the
       new type does not take, because the compiler rejects them. A switch to
-      `processInspector` adds an empty `process`, which the schema requires. A
-      switch to `detail` adds an empty `record`, which the schema also requires.
-      A switch to `kpi` or `chart` adds the empty keys its type requires. A new
-      chart starts with the `bar` kind and one measure with an empty name and
-      label, because the schema accepts only `bar`, `line` or `pie` and needs
-      at least one measure.
+      `processInspector`, `detail`, `kpi` or `chart` adds the empty keys the
+      schema requires, such as `process` or `record`. A new chart starts with
+      the `bar` kind and one empty measure, which the schema requires.
     - **KPI and chart panels.** A `kpi` panel has a data source picker, a
       measure picker and a label with a text box for each locale. Add
       comparison adds a comparison with its own measure picker and label, and
@@ -544,9 +539,11 @@ Run and the Test results list, the read-only views of a module entity, a module 
       page picker, a label with a text box for each locale, an optional
       `record` expression and parameter expressions. The page picker lists
       every page, including the current one, because a page may open itself
-      with other parameters. A table offers only navigate actions. A form
-      offers Add action for `startProcess` and Add navigate action. An empty
-      Record box removes the `record` key.
+      with other parameters. A table offers only Add navigate action, and a
+      form also Add action for `startProcess`. An empty Record box removes the
+      `record` key. A new action is named `<action type><n>`, such as
+      `navigate1`, with the first free n in its list. A KPI's `navigate` has
+      no name, because the schema refuses one.
       - **Parameter expressions.** When the names list the target page, the
         action shows one expression box for each parameter the page declares,
         with the parameter's type and `required` beside it. An empty box
@@ -556,9 +553,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
         ignoring letter case. While the names have not loaded, or when the page
         is not in them, the action keeps rows where the author types the
         parameter name, and a wrong name shows as a diagnostic after the save.
-    - **Pickers.** The action's process picker lists every process. It does
-      not check what the choice holds, so a wrong choice shows as a diagnostic
-      after the save.
+    - **Pickers.** The action's process picker lists every process and does
+      not check the choice, so a wrong one shows as a diagnostic after the save.
     - **Page parameters.** A Parameters list sits between the title and the
       widgets. Each parameter has a name, a type picker over `text`,
       `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and
@@ -570,28 +566,29 @@ Run and the Test results list, the read-only views of a module entity, a module 
       each page's parameters, which is how a navigate action knows them
       ([D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md)).
       `parameters` that is not a list points to the JSON view.
-    - **Widget tree** _(built)_. The editor shows the page's widgets as
-      nested rows. A container shows its columns, tabs or section body as
-      nested lists, and a row opens that widget's panel at its own pointer,
-      such as `/widgets/0/columns/1/widgets/0`. Every list has an Add widget
-      picker with all ten types. A new `columns` starts with two columns of
-      width 6, a new `tabs` with one tab and a new `section` empty. Every row
-      has Move up, Move down and Remove, which replace only the list that holds
-      the widget, and a Move to picker. Move to lists every other widget list
-      as a path such as `Page › columns 1 › Column 2`, leaves out the widget's
-      own list and the lists inside it, and replaces the page's `widgets` in
-      one change. A container's type is fixed, and its panel edits the rest. The
-      editor does not check the depth limit or an empty list, so the
-      compiler reports them after the save. A widget keeps every key the editor
-      does not know when it moves.
-    - **Container panels** _(built)_. Each container type has a panel under
-      its fixed type. A `columns` panel shows one width box from 1 to 12 for
-      each column. The editor does not check that the widths add up to 12, so
-      the compiler reports it after the save. Add column adds a column that
-      takes what is left of 12, or 1 when nothing is left, and keeps the other
-      widths. Remove column drops a column with the widgets in it. A `tabs`
-      panel shows each tab's label as a key with one text box per locale, and
-      has Add tab and Remove tab. A `section` panel shows the title the same
+    - **Widget tree** _(built)_. The editor shows the page's widgets as nested
+      rows. A container shows its columns, tabs or section body as nested lists,
+      and a row opens that widget's panel at its own pointer, such as
+      `/widgets/0/columns/1/widgets/0`. Every list has an Add widget picker with
+      all ten types. A new widget is named `<type><n>`, such as `table1`, with
+      the first n free on the page at any depth, ignoring letter case. A type
+      change or a move keeps the name. A new `columns` starts with columns
+      `column1` and `column2` of width 6, a new `tabs` with `tab1` and a new
+      `section` empty. Every row has Move up, Move down and Remove, which
+      replace only the list that holds the widget, and a Move to picker. Move to
+      lists every other widget list as a path such as `Page › columns 1 › Column
+      2`, leaves out the widget's own list and the lists inside it, and replaces
+      the page's `widgets` in one change. A container's type is fixed. The
+      compiler reports the depth limit and an empty list after the save.
+    - **Container panels** _(built)_. Each container type has a panel under its
+      fixed type. A `columns` panel shows one width box from 1 to 12 for each
+      column, and the compiler reports widths that do not add up to 12 after the
+      save. Add column adds a column that takes what is left of 12, or 1 when
+      nothing is left, and keeps the other widths. Remove column drops a column
+      with its widgets. A `tabs` panel shows each tab's label as a key with one
+      text box per locale, and has Add tab and Remove tab. An added column or
+      tab is named with the first free `column<n>` or `tab<n>` among its
+      siblings, ignoring letter case. A `section` panel shows the title the same
       way, and a Collapsed switch. Switching Collapsed off removes the
       `collapsed` key, because a section starts expanded. Remove column and
       Remove tab are disabled when one is left, because the schema needs at
@@ -599,8 +596,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
       stays in the saved file. A container whose parts are malformed, such as
       `columns` that is not a list, points to the JSON view. See [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
     - **Unknown keys.** A key the editor does not show, on the page or on a
-      widget, is saved unchanged. A widget of a type with no panel shows its
-      type and points to the JSON view.
+      widget, is saved unchanged, also when the widget moves. A widget of a
+      type with no panel shows its type and points to the JSON view.
   - **Process step editor.** The Form tab opens the process with its name,
     subject and optional start condition, and its start step. The JSON view
     stays as a second view of the same draft.
@@ -619,7 +616,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
       including unknown keys, stay.
     - **Decision and end panels** _(built)_. A decision shows its branches,
       each with a `when` expression and a target, and its `otherwise`. A branch
-      can be added and removed. An end step shows only its name and type.
+      can be added and removed, and a new one is named `branch1`, `branch2`... An end step shows only its name and type.
     - **Transitions** _(built)_. The start step, `next`, a branch's `next`,
       `otherwise` and an outcome's `next` pick their target from the step names
       of the unsaved draft. A target that is not a step stays visible and is

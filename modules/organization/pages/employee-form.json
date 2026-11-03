@@ -1,0 +1,8 @@
+{
+  "id": "e6a61738-5889-4986-a47f-73777839d5f0",
+  "kind": "page",
+  "name": "EmployeeForm",
+  "formatVersion": 1,
+  "title": { "textKey": "organization.pages.employeeForm.title" },
+  "widgets": [{ "type": "form", "name": "employeeForm", "entity": "Employee" }]
+}

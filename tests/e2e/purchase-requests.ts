@@ -4,14 +4,14 @@ import { csrfHeaders } from './csrf'
 import { expectShown, fieldLabel, fieldValue, shownValue } from './fields'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
-// it creates. They use Operations, whose manager is manager-2, so that the per-department test keeps the
+// it creates. They use Operations, whose head is manager-2, so that the per-department test keeps the
 // Engineering total fixed.
 export const appPath = '/api/apps/PurchaseRequests'
 export const recordsPath = `${appPath}/entities/PurchaseRequest/records`
 
 /** The id of the seeded department named `name`, read from the record API. */
 export async function departmentId(page: Page, name: string) {
-  const response = await page.request.get(`${appPath}/entities/Department/records?pageSize=100`)
+  const response = await page.request.get(`${appPath}/entities/organization/Department/records?pageSize=100`)
   expect(response.status()).toBe(200)
   const body = (await response.json()) as { items: { id: string; values: { name: string } }[] }
   const department = body.items.find((item) => item.values.name === name)

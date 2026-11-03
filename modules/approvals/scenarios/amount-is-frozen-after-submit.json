@@ -1,0 +1,59 @@
+{
+  "id": "4866a58c-a71a-424a-be69-e651fe3e4b00",
+  "kind": "scenario",
+  "name": "AmountIsFrozenAfterSubmit",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["Request/validations/frozenAfterSubmit"] },
+  "users": {
+    "admin": ["admin"],
+    "ann": ["member"],
+    "mia": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "mia",
+      "values": { "fullName": "Mia Tran", "workEmail": "mia@example.com", "user": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "annEmployee",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com", "user": "ann", "manager": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "purchase",
+      "values": { "name": "Purchase", "code": "PURCHASE", "steps": [{ "sequence": 1, "approver": "lineManager" }] }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "travel",
+      "values": { "name": "Travel", "code": "TRAVEL", "steps": [{ "sequence": 1, "approver": "lineManager" }] }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "monitor",
+      "values": { "type": "purchase", "title": "Monitor", "amount": 400 }
+    },
+    { "type": "updateRecord", "record": "monitor", "as": "ann", "values": { "amount": 450 } },
+    { "type": "startProcess", "process": "RequestApproval", "record": "monitor", "as": "ann" },
+    { "type": "updateRecord", "record": "monitor", "as": "ann", "values": { "amount": 5000 }, "expect": { "invalid": "amount" } },
+    { "type": "updateRecord", "record": "monitor", "as": "ann", "values": { "type": "travel" }, "expect": { "invalid": "amount" } },
+    { "type": "expectRecord", "record": "monitor", "values": { "type": "purchase", "amount": 450 } },
+    { "type": "completeTask", "record": "monitor", "step": "decide", "outcome": "return", "as": "mia" },
+    { "type": "expectRecord", "record": "monitor", "values": { "status": "returned" } },
+    { "type": "updateRecord", "record": "monitor", "as": "ann", "values": { "amount": 300 } },
+    { "type": "expectRecord", "record": "monitor", "values": { "status": "returned", "amount": 300 } }
+  ]
+}

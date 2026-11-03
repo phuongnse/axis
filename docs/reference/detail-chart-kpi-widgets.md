@@ -10,7 +10,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   nothing. See [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
 
   ```json
-  { "type": "detail", "entity": "Ticket", "record": "ticket", "actions": [{ "type": "startProcess", "process": "TicketHandling", "label": { "textKey": "tickets.handle" } }] }
+  { "type": "detail", "name": "ticket", "entity": "Ticket", "record": "ticket", "actions": [{ "type": "startProcess", "name": "handle", "process": "TicketHandling", "label": { "textKey": "tickets.handle" } }] }
   ```
 
   - **Compile.** The widget names exactly one of `form` and `entity`, as a form
@@ -52,7 +52,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - **Actions.** A `startProcess` button follows the form widget's **Start
     process action**, without a save first. It is the region's main action,
-    outlined at the *main* level of [buttons](frontend.md). A `navigate` action sees the
+    outlined at the *main* level of [buttons](actions-and-controls.md#buttons). A `navigate` action sees the
     record's fields and `id`, as on a form
     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)).
 - **Chart widget**. A page whose widget is a `chart` draws
@@ -63,7 +63,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   [widget binding](data-sources.md#widget-binding).
 
   ```json
-  { "type": "chart", "kind": "bar", "dataSource": "OpenTicketsByCategory", "category": "category", "measures": [{ "name": "openCount", "label": { "textKey": "dashboard.byCategory.open" } }], "title": { "textKey": "dashboard.byCategory.title" } }
+  { "type": "chart", "name": "by-category", "kind": "bar", "dataSource": "OpenTicketsByCategory", "category": "category", "measures": [{ "name": "openCount", "label": { "textKey": "dashboard.byCategory.open" } }], "title": { "textKey": "dashboard.byCategory.title" } }
   ```
 
   - **Compile.** The binding checks are in
@@ -125,7 +125,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
 
   ```json
-  { "type": "kpi", "dataSource": "OpenTicketTotals", "measure": "openCount", "label": { "textKey": "dashboard.open.label" }, "comparison": { "measure": "openLastMonth", "label": { "textKey": "dashboard.open.lastMonth" } }, "navigate": { "type": "navigate", "page": "AllTickets", "label": { "textKey": "dashboard.open.show" } } }
+  { "type": "kpi", "name": "open", "dataSource": "OpenTicketTotals", "measure": "openCount", "label": { "textKey": "dashboard.open.label" }, "comparison": { "measure": "openLastMonth", "label": { "textKey": "dashboard.open.lastMonth" } }, "navigate": { "type": "navigate", "page": "AllTickets", "label": { "textKey": "dashboard.open.show" } } }
   ```
 
   - **Compile.** The binding checks are in

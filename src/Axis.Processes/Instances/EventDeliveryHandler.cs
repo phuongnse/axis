@@ -24,7 +24,7 @@ namespace Axis.Processes.Instances;
 /// release it finds under the lock. A trigger that this release no longer has is skipped with no
 /// receipt, and a trigger that only this release has is not delivered for the occurrence. The
 /// transaction then evaluates the trigger's <c>when</c> on the stored payload, locks and reads the occurrence's
-/// record, and starts the process for it as <c>system</c>, pinned to the active release. A start
+/// record, and starts the process for it as <c>system</c>, pinned to the active release, with the occurrence's accountable user. A start
 /// marks the receipt <c>started</c>. A skip leaves it <c>skipped</c> and is logged with its reason.
 /// A trigger whose transaction fails does not stop the others. After the failed transaction has
 /// rolled back, a transaction of its own counts the failure in <c>axis.delivery_failures</c> for the
@@ -75,7 +75,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
         StoredEvent? occurrence;
         EventTriggers? delivery = null;
         IReadOnlyList<WaitingInstance> waiting = [];
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             occurrence = item.EventId is { } eventId ? await ProcessEvents.LoadAsync(transaction, eventId, cancellationToken) : null;
             if (occurrence is null)
@@ -172,7 +172,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
             }
         }
 
-        await using var completion = await connection.BeginTransactionAsync(cancellationToken);
+        await using var completion = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var settled = backoff is { } due
             ? await WorkItemQueue.RescheduleAsync(connection, completion, item, due, cancellationToken)
             : await WorkItemQueue.CompleteAsync(connection, completion, item, cancellationToken);
@@ -206,7 +206,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
         var target = $"{trigger.Id:D}/{occurrence.Id:D}";
         int attempts;
         Guid? deadLetterId = null;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
             {
@@ -257,7 +257,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
         var target = $"{waiting.Id:D}/{occurrence.Id:D}";
         int attempts;
         Guid? deadLetterId = null;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
             {
@@ -423,7 +423,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
     {
         string? skipped;
         string? next;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
             {
@@ -552,7 +552,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
         CancellationToken cancellationToken)
     {
         string? skipped;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
             {

@@ -1,0 +1,10 @@
+{
+  "id": "4d7a1c92-6e35-4b08-9f2d-1a8c5e3b7d62",
+  "kind": "entity",
+  "name": "Visit",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "holder", "type": "text", "maxLength": 100 },
+    { "name": "badge", "type": "reference", "target": "Badge", "match": { "field": "holder", "from": "holder" } }
+  ]
+}

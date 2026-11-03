@@ -51,8 +51,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `{ "field": "quantity", "width": 4 }` takes a third of the row.
   - A field appears at most once in the form. A field the form does not list
     is not shown and never sent.
-  - Computed, sequence and creator fields are always read-only, whatever
-    `readOnly` says.
+  - Computed, sequence, creator and matched reference fields are always
+    read-only, whatever `readOnly` says.
   - On a page, `readOnly` only shapes the UI. The record API enforces the
     user's field write grants, so it still accepts a read-only field that an
     `update` grant covers. In a task, the server
@@ -100,7 +100,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       Only a form shows it, not a table or a detail.
     - **Validation messages.** A message is 14px at a 20px line height, 4px
       under its input, followed by a whole field gap (`spacing-lg`, 24px)
-      before the next field, so the layout grows when a message appears.
+      before the next field, so the layout grows when a message appears. Every form follows the same
+      rule, see [fields](actions-and-controls.md#fields) _(planned for M31)_.
     - **Read-only values.** A field the form makes read-only, by `readOnly` or
       `readOnlyWhen`, and a `computed`, `sequence` or `creator` field show
       plain text, not an input. A boolean shows Yes or No. The value starts
@@ -114,6 +115,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     | Field type | Input |
     | --- | --- |
     | `text` | a text input limited to `maxLength`. With `minLength` it also has the `minlength` attribute and shows the character count against the limits, such as `0 / 3–10`, or `0 / ≥3` with no `maxLength` |
+    | a `text` field marked `userId` | a searchable select of people by display name, from `usersPath`. Typing searches again. It sends the picked user id, and a field that is not required can be cleared, which sends null. A stored id shows the person's name, read through the route's `id` parameter, or the id itself when no profile has it. A failed search leaves the list empty |
     | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides. A number input that takes the locale's decimal comma is not decided yet |
     | `money` | the input of a decimal with the currency code beside the box. The code is `currency`, or the current value of `currencyField` in the form, or in the row of a child collection. Without a code of three letters nothing is shown beside the box. It sends the typed text as a plain JSON number |
     | `boolean` | a checkbox |
@@ -192,7 +194,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - Each row has a remove row button: a trash icon button in `dangerText`,
       with its name as a tooltip on hover and on focus. Add row sits above the
       table on the right, outlined at the *main* level of
-      [buttons](frontend.md). It appends a row with every child field `null`,
+      [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`,
       and focus moves to the row's first input. Rows cannot be reordered.
     - When rows were added, removed or edited, the form sends the whole row
       list, as [record-api.md](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
@@ -239,7 +241,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     value and never sends the form. Enter in a text input sends the form, as
     in any form.
   - **History**. The form page of a saved record shows the record's history
-    from the [history endpoint](record-api.md#audit-records-and-history) in a
+    from the [history endpoint](record-audit.md#audit-records-and-history) in a
     panel below the form, newest first. A new record has no history panel.
     - Each entry shows its action, who did it, its time and a short summary.
       The action is a platform text, such as "Updated" or "Task decided". An
@@ -281,8 +283,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     does not show appears above the form.
   - **Start process action**. A `form` widget can declare
     `startProcess` actions. On a saved record, each is shown as a button
-    next to Save and Cancel, with its label. It is outlined at the *main*
-    level of [buttons](frontend.md), and Save is the solid *finish* button. For a signed-in user, page
+    next to Save and Cancel, with its label. Save is the solid *finish* button, and beside it the action is a
+    text button, see [buttons](actions-and-controls.md#buttons) _(planned for M31)_. For a signed-in user, page
     metadata lists only the actions whose process the user holds a `start`
     grant on. A new record shows no action buttons, so a failed start never
     leaves a record behind on a form that still says new.
@@ -290,10 +292,12 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     ```json
     {
       "type": "form",
+      "name": "edit",
       "form": "PurchaseRequestEdit",
       "actions": [
         {
           "type": "startProcess",
+          "name": "submit",
           "process": "PurchaseRequestApproval",
           "label": { "textKey": "purchaseRequest.submit" }
         }

@@ -43,7 +43,8 @@ namespace Axis.Configuration.Compilation;
 /// over the event's payload fields, its <c>timeout.after</c> is a positive fixed duration and its
 /// <c>timeout.next</c> is a transition.
 /// A <c>notify</c> step is checked by <see cref="CheckNotify"/>. A task's <c>escalations</c> are checked by
-/// <see cref="CheckEscalations"/>.
+/// <see cref="CheckEscalations"/>. A decision's branch names and a task's escalation names are each unique in their
+/// list, ignoring letter case.
 /// Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
@@ -714,7 +715,7 @@ internal static class ProcessChecker
                     .Where(field => values.ContainsKey(field.Name))
                     .Select(field => new RecordAssignmentModel(
                         field.Name,
-                        ExpressionModel.Compile(values[field.Name], scope, ExpressionScopes.TypeOf(field)!))),
+                        ExpressionModel.Compile(values[field.Name], scope, ExpressionScopes.TypeOf(field)!, stepSet: true))),
             ];
         }
 
@@ -1010,7 +1011,8 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks the step names and the transitions, then walks the steps: breadth-first from
+    /// Checks the step names, the branch names of each decision step and the escalation names of each
+    /// task step, each unique in its list ignoring letter case, and the transitions, then walks the steps: breadth-first from
     /// <c>start</c> for reachability, to a fixed point for the path to an end, and depth-first in
     /// file order for cycles. A transition resolves to the first step with its name.
     /// </summary>
@@ -1033,6 +1035,25 @@ internal static class ProcessChecker
             }
         }
 
+        // Reports a name that an earlier element of the same list already uses, at the later element's name.
+        void CheckElementNames(string element, string listPath, IEnumerable<string> names)
+        {
+            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var position = 0;
+            foreach (var name in names)
+            {
+                if (!firstIndexByName.TryAdd(name, position))
+                {
+                    report(
+                        DiagnosticCodes.DuplicateProcessElementName,
+                        $"The {element} name '{name}' is already used by the {element} at '{listPath}/{firstIndexByName[name]}'.",
+                        $"{listPath}/{position}/name");
+                }
+
+                position++;
+            }
+        }
+
         // The index of the step a transition names, or null when it names none.
         int? Resolve(string name, string path)
         {
@@ -1051,6 +1072,8 @@ internal static class ProcessChecker
         {
             var step = steps[index];
             var path = $"/steps/{index}";
+            CheckElementNames("branch", $"{path}/branches", (step.Branches ?? []).Select(branch => branch.Name));
+            CheckElementNames("escalation", $"{path}/escalations", (step.Escalations ?? []).Select(escalation => escalation.Name));
             transitions[index] = [];
             for (var branch = 0; branch < (step.Branches?.Count ?? 0); branch++)
             {
@@ -1255,8 +1278,8 @@ internal static class ProcessChecker
     /// problem, or null. When it type-checks, the rules it calls are added to <paramref name="references"/> at <paramref name="path"/>.
     /// </summary>
     private static ExpressionDiagnostic? CheckExpression(
-        Resource process, string expression, ExpressionScope scope, ExpressionType expected, string path, ReferenceIndexBuilder references) =>
-        CheckExpression(process, expression, scope, expected, path, references, out _, out _);
+        Resource process, string expression, ExpressionScope scope, ExpressionType expected, string path, ReferenceIndexBuilder references, bool stepSet = false) =>
+        CheckExpression(process, expression, scope, expected, path, references, out _, out _, stepSet);
 
     /// <summary>
     /// Like the overload without outputs, and also gives the parsed expression and its check result
@@ -1270,7 +1293,8 @@ internal static class ProcessChecker
         string path,
         ReferenceIndexBuilder references,
         out ExpressionNode? node,
-        out ExpressionCheckResult? result)
+        out ExpressionCheckResult? result,
+        bool stepSet = false)
     {
         node = null;
         result = null;
@@ -1281,7 +1305,7 @@ internal static class ProcessChecker
             return parsed.Diagnostic;
         }
 
-        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, expected, stepSet: stepSet);
         if (check.Succeeded)
         {
             references.AddRuleCalls(process, path, check);
@@ -1505,7 +1529,7 @@ internal static class ProcessChecker
                 continue;
             }
 
-            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field)!, path, references);
+            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field)!, path, references, stepSet: true);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, path);
@@ -2174,9 +2198,10 @@ internal static class ProcessChecker
         package.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Why a process cannot write <paramref name="field"/>, or null when it can.</summary>
-    private static string? ReadOnlyReason(FieldDefinition field) =>
+    internal static string? ReadOnlyReason(FieldDefinition field) =>
         field.Expression is not null ? "is computed"
         : field.Sequence is not null ? "is numbered by a sequence"
+        : field.Match is not null ? "is set by its match"
         : FieldTypes.Parse(field.Type) == FieldType.ChildCollection ? "is a child collection"
         : FieldTypes.Parse(field.Type) == FieldType.References ? "is a references field"
         : null;

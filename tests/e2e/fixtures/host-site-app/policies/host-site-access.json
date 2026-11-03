@@ -4,5 +4,5 @@
   "name": "HostSiteAccess",
   "formatVersion": 1,
   "roles": ["employee"],
-  "grants": [{ "entity": "Topic", "actions": ["read", "create", "update", "delete"] }]
+  "grants": [{ "name": "topicRead", "entity": "Topic", "actions": ["read", "create", "update", "delete"] }]
 }

@@ -142,7 +142,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
             links = [new RecordLinks(set, software)];
         }
 
-        var result = await RecordCommands.CreateAsync(connection, model, entity, Guid.NewGuid(), [.. fields], [], links, cancellationToken: CancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, model, entity, Guid.NewGuid(), RecordWriteContext.None, [.. fields], [], links, cancellationToken: CancellationToken);
         Assert.Equal(RecordWriteOutcome.Written, result.Outcome);
         return result.Record!.Id;
     }
@@ -170,7 +170,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
             .With("roles/worker.json", $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "role", "name": "worker", "formatVersion": 1, "label": { "textKey": "role.worker" } }""")
             .With("policies/worker-access.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "policy", "name": "WorkerAccess", "formatVersion": 1, "roles": ["worker"],
-                  "grants": [ { "entity": "Workstation", "actions": ["read"], "fields": ["name", "note", "software"] } ] }
+                  "grants": [ { "name": "workstationRead", "entity": "Workstation", "actions": ["read"], "fields": ["name", "note", "software"] } ] }
                 """)
             .With("texts/en.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
@@ -194,7 +194,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
                   "start": "route",
                   "steps": [
                     { "name": "route", "type": "decision", "branches": [
-                        { "when": "{{HasOffice}}", "next": "office" }
+                        { "name": "branch1", "when": "{{HasOffice}}", "next": "office" }
                       ], "otherwise": "other" },
                     { "name": "office", "type": "end" },
                     { "name": "other", "type": "end" }

@@ -5,9 +5,9 @@
   "formatVersion": 1,
   "roles": ["reporting-system"],
   "grants": [
-    { "entity": "Report", "actions": ["read", "create", "update", "delete"], "filter": "status != 'hidden'" },
-    { "dataSource": "ReportTitles", "actions": ["read"] },
-    { "process": "Review", "actions": ["start", "inspect"] },
-    { "process": "Publish", "actions": ["start", "inspect", "retry", "cancel", "resolve"] }
+    { "name": "reportRead", "entity": "Report", "actions": ["read", "create", "update", "delete"], "filter": "status != 'hidden'" },
+    { "name": "reportTitlesRead", "dataSource": "ReportTitles", "actions": ["read"] },
+    { "name": "reviewStart", "process": "Review", "actions": ["start", "inspect"] },
+    { "name": "publishStart", "process": "Publish", "actions": ["start", "inspect", "retry", "cancel", "resolve"] }
   ]
 }

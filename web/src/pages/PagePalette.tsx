@@ -1,7 +1,14 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
 import { getAt } from '../platform/jsonPatch'
-import { addableTypes, insertionPlace, newWidget, paletteLimit, widgetPointerOf } from '../platform/pageWidgets'
+import {
+  addableTypes,
+  insertionPlace,
+  namedWidget,
+  newWidget,
+  paletteLimit,
+  widgetPointerOf,
+} from '../platform/pageWidgets'
 import { useText } from '../platform/texts'
 import { landedText, paletteReasons, usePartLabel, visuallyHidden } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
@@ -46,7 +53,11 @@ export function PagePalette({
       return
     }
     const items = getAt({ widgets }, place.list) as unknown[]
-    onChange(place.list, [...items.slice(0, place.index), newWidget(type), ...items.slice(place.index)])
+    onChange(place.list, [
+      ...items.slice(0, place.index),
+      namedWidget(widgets, newWidget(type)),
+      ...items.slice(place.index),
+    ])
     onSelect(`${place.list}/${place.index}`)
     onAnnounce(landedText(t, partLabel, widgets, place.list, place.index, type))
   }

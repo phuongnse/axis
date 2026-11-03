@@ -79,6 +79,13 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
             var instance = Assert.Single(await InstancesAsync(tenant, id));
             Assert.Equal((ProcessStarts.Waiting, tenant.FirstReleaseId), (instance.State, instance.ReleaseId));
             Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, id, occurrence));
+
+            // No user stands behind a schedule, so its instance has no accountable user and no deciding task.
+            Assert.Equal(
+                1L,
+                await tenant.CountAsync(
+                    "SELECT count(*) FROM axis.process_instances WHERE id = @id AND accountable_user IS NULL AND decision_task IS NULL",
+                    ("id", instance.Id)));
         }
 
         Assert.Empty(await InstancesAsync(tenant, small));

@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The sample's policies decide which purchase requests each role reaches. Employees reach their own
-/// requests, department managers those of the departments they manage, and finance reviewers the
+/// requests, department managers those of the departments they head, and finance reviewers the
 /// submitted requests and their outcomes. The test has the fixture's database to itself.
 /// </summary>
 public sealed class PurchaseRequestReachTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
@@ -53,7 +53,7 @@ public sealed class PurchaseRequestReachTests(SampleAppFixture fixture) : IClass
 
         foreach (var client in new[] { requester, employee, manager2, manager, financeReviewer })
         {
-            Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(client, $"{App}/entities/Department/records"));
+            Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(client, $"{App}/entities/organization/Department/records"));
             Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(client, $"{App}/entities/Supplier/records"));
         }
 

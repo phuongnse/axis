@@ -9,12 +9,15 @@
   "widgets": [
     {
       "type": "columns",
+      "name": "summary",
       "columns": [
         {
           "width": 4,
+          "name": "figures",
           "widgets": [
             {
               "type": "kpi",
+              "name": "openTickets",
               "dataSource": "OpenTicketTotals",
               "measure": "openCount",
               "label": {
@@ -30,6 +33,7 @@
             },
             {
               "type": "kpi",
+              "name": "urgentTickets",
               "dataSource": "UrgentTicketTotals",
               "measure": "urgentCount",
               "label": {
@@ -40,9 +44,11 @@
         },
         {
           "width": 8,
+          "name": "breakdown",
           "widgets": [
             {
               "type": "chart",
+              "name": "openByCategory",
               "kind": "bar",
               "dataSource": "OpenTicketsByCategory",
               "category": "category",
@@ -64,6 +70,7 @@
     },
     {
       "type": "table",
+      "name": "allTickets",
       "dataSource": "AllTicketList"
     }
   ]

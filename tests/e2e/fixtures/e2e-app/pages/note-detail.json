@@ -8,11 +8,12 @@
   "widgets": [
     {
       "type": "detail",
+      "name": "detail",
       "entity": "Note",
       "record": "note",
       "actions": [
-        { "type": "startProcess", "process": "NoteClose", "label": { "textKey": "noteClose.action" } },
-        { "type": "navigate", "page": "NoteActions", "label": { "textKey": "noteDetail.edit" }, "record": "id" }
+        { "type": "startProcess", "name": "startProcess", "process": "NoteClose", "label": { "textKey": "noteClose.action" } },
+        { "type": "navigate", "name": "navigate", "page": "NoteActions", "label": { "textKey": "noteDetail.edit" }, "record": "id" }
       ]
     }
   ]

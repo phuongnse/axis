@@ -1,0 +1,37 @@
+{
+  "id": "8533d3fd-c0e3-47cd-bf80-071d235fba9f",
+  "kind": "policy",
+  "name": "FlowAccess",
+  "formatVersion": 1,
+  "roles": [
+    "employee"
+  ],
+  "grants": [
+    {
+      "name": "requestCreate",
+      "entity": "requests/Request",
+      "actions": [
+        "create",
+        "import"
+      ]
+    },
+    {
+      "name": "submitRequestStart",
+      "process": "SubmitRequest",
+      "actions": [
+        "start",
+        "inspect",
+        "retry"
+      ]
+    },
+    {
+      "name": "autoSubmitStart",
+      "process": "AutoSubmit",
+      "actions": [
+        "start",
+        "inspect",
+        "retry"
+      ]
+    }
+  ]
+}

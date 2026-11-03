@@ -6,30 +6,37 @@
   "roles": ["service-desk-lead"],
   "grants": [
     {
+      "name": "ticket1",
       "entity": "Ticket",
       "actions": ["read"]
     },
     {
+      "name": "category1",
       "entity": "Category",
       "actions": ["read"]
     },
     {
+      "name": "allTicketList1",
       "dataSource": "AllTicketList",
       "actions": ["read"]
     },
     {
+      "name": "openTicketTotals1",
       "dataSource": "OpenTicketTotals",
       "actions": ["read"]
     },
     {
+      "name": "urgentTicketTotals1",
       "dataSource": "UrgentTicketTotals",
       "actions": ["read"]
     },
     {
+      "name": "openTicketsByCategory1",
       "dataSource": "OpenTicketsByCategory",
       "actions": ["read"]
     },
     {
+      "name": "ticketHandling1",
       "process": "TicketHandling",
       "actions": ["reassign"]
     }

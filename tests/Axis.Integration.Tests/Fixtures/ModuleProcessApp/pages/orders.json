@@ -7,8 +7,9 @@
   "widgets": [
     {
       "type": "form",
+      "name": "form",
       "entity": "Order",
-      "actions": [{ "type": "startProcess", "process": "CloseReview", "label": { "textKey": "order.closeReview" } }]
+      "actions": [{ "type": "startProcess", "name": "startProcess", "process": "CloseReview", "label": { "textKey": "order.closeReview" } }]
     }
   ]
 }

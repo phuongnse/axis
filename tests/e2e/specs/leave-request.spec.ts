@@ -11,15 +11,15 @@ import { sessionFile, useSession, type SampleUser } from "../sessions";
 //
 // Specs run in parallel against one database, so each test looks only for the requests it creates. Every
 // request gets its own title, which is its display field, so the title finds its task. The reason is
-// sensitive, so it cannot be the label. requester and employee are employees. manager-2 manages
-// Operations and manager manages Engineering.
+// sensitive, so it cannot be the label. requester and employee are employees. manager-2 heads
+// Operations and manager heads Engineering.
 const appPath = "/api/apps/LeaveRequests";
 const recordsPath = `${appPath}/entities/LeaveRequest/records`;
 const tasksPath = `${appPath}/tasks`;
 
 /** A unique part for the titles of this run, so runs and parallel specs never share a title. */
 function runId() {
-  return `${Date.now()}-${test.info().retry}`;
+  return `${Date.now()}-${test.info().parallelIndex}-${test.info().retry}`;
 }
 
 /** Runs `body` with an API context that holds `user`'s saved session, and disposes the context after. */
@@ -41,10 +41,10 @@ async function asUser<T>(
   }
 }
 
-/** The id of the seeded department named `name`, read from the record API of the departments module. */
+/** The id of the seeded department named `name`, read from the record API of the organization module. */
 async function departmentId(request: APIRequestContext, name: string) {
   const response = await request.get(
-    `${appPath}/entities/departments/Department/records?pageSize=100`,
+    `${appPath}/entities/organization/Department/records?pageSize=100`,
   );
   expect(response.status()).toBe(200);
   const body = (await response.json()) as {
@@ -181,7 +181,7 @@ test("requester submits a sick leave with a reason, manager-2 reads it on the re
   await row.getByRole("link", { name: "Manager approval", exact: true }).click();
   await expectShown(fieldValue(page, "reason"), reason);
 
-  // manager-2 manages Operations, so the task is manager-2's.
+  // manager-2 heads Operations, so the task is manager-2's.
   const task = await taskId(playwright.request, baseURL, "manager-2", id);
   await useSession(page, "employee");
 
@@ -231,7 +231,7 @@ test("a manager of another department gets no task for the request, and cannot c
     await start(requester, created);
     return created;
   });
-  // manager-2 manages Operations, so the task is manager-2's. It exists once the worker has created it.
+  // manager-2 heads Operations, so the task is manager-2's. It exists once the worker has created it.
   const manager2Task = await taskId(playwright.request, baseURL, "manager-2", id);
   await useSession(page, "manager");
 

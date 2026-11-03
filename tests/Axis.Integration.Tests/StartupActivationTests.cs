@@ -27,6 +27,10 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
 
     private const string TitleField = """{ "name": "title", "type": "text", "required": true, "maxLength": 200 }""";
     private const string SecretField = """{ "name": "secret", "type": "text", "sensitive": true }""";
+    private static readonly Guid _ticketEntityId = Guid.Parse("8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a61");
+    // The id of the Department entity in the built-in organization module, before it is derived for an application.
+    private static readonly Guid _organizationDepartmentEntityId = Guid.Parse("25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95");
+
     private const string DoneField = """{ "name": "done", "type": "boolean" }""";
 
     // Each test uses its own application, so active releases and tables never meet across tests.
@@ -475,7 +479,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         await ScalarAsync(a, $"INSERT INTO {EntityNaming.QualifiedTable(table)} (id, f_title) SELECT gen_random_uuid(), 'n' || n FROM generate_series(1, 25) n");
         folder.With("entities/note.json", $$"""
             { "id": "{{_noteId}}", "kind": "entity", "name": "Note", "formatVersion": 1,
-              "indexes": [{ "fields": ["title"] }], "fields": [{{TitleField}}] }
+              "indexes": [{ "name": "title", "fields": ["title"] }], "fields": [{{TitleField}}] }
             """);
         var logs = new LogCollector();
 
@@ -519,23 +523,20 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
     }
 
     [Fact]
-    public async Task Start_activates_an_application_that_declares_the_sample_departments_module()
+    public async Task Start_activates_an_application_that_declares_the_organization_module()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
         using var folder = ApplicationFolder(TitleField)
             .With("application.json", $$"""
                 { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
-                  "modules": [{ "id": "departments", "version": "^1.0.0", "roles": { "manager": "employee" } }] }
+                  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "employee", "member": "employee" } }] }
                 """)
             .With("texts/vi.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a16", "kind": "text", "name": "TextsVi", "formatVersion": 1, "locale": "vi", "texts": { "role.employee": "Nhân viên" } }""")
             .With(
-                "policies/manager-access.json",
-                """
-                { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a17", "kind": "policy", "name": "ManagerAccess", "formatVersion": 1, "roles": ["employee"],
-                  "grants": [
-                    { "entity": "departments/Department", "actions": ["read"], "filter": "departments:IsManager(manager, currentUser())" },
-                    { "dataSource": "departments/Departments", "actions": ["read"] }
-                  ] }
+                "seeds/departments.json",
+                $$"""
+                { "id": "{{_seedResourceId}}", "kind": "seed", "name": "Departments", "formatVersion": 1, "entity": "organization/Department",
+                  "records": [{ "id": "{{_firstSeedId}}", "values": { "code": "FIN", "name": "Finance" } }] }
                 """);
         var logs = new LogCollector();
 
@@ -549,8 +550,68 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
 
         Assert.NotNull(await ActiveAsync(a));
         Assert.DoesNotContain(logs.Entries, entry => entry.Contains("AXC", StringComparison.Ordinal));
-        var department = EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(_applicationId, SampleModules.DepartmentEntityId)));
-        Assert.Equal(3L, await ScalarAsync(a, $"SELECT count(*) FROM {department}"));
+        var department = EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(_applicationId, _organizationDepartmentEntityId)));
+        Assert.Equal(1L, await ScalarAsync(a, $"SELECT count(*) FROM {department}"));
+    }
+
+    [Fact]
+    public async Task Synced_module_seed_moves_a_record_back_to_its_initial_state_along_a_transition_without_a_guard()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var modules = TicketModules(reopenGuard: null);
+        using var folder = TicketApplication();
+        var settings = new Dictionary<string, string> { ["Modules:Path"] = modules.Path };
+        var table = TicketTable();
+        var status = EntityNaming.Quote(EntityNaming.Column("status"));
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), settings))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        Assert.Equal(("open", 1L), await TicketStateAsync(a));
+        await ScalarAsync(a, $"UPDATE {table} SET {status} = 'closed'");
+
+        var logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, settings))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        Assert.Equal(("open", 2L), await TicketStateAsync(a));
+        Assert.Contains(logs.Entries, entry => entry.Contains("updated 1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Synced_module_seed_whose_transition_guard_is_false_stops_the_start_and_the_log_names_the_point()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        // The guard stands in for accountableUser() != null, which seeds fail as they have no accountable user,
+        // until that function can be called in an expression.
+        using var modules = TicketModules(reopenGuard: "reopenedBy != null");
+        using var folder = TicketApplication();
+        var settings = new Dictionary<string, string> { ["Modules:Path"] = modules.Path };
+        var table = TicketTable();
+        var status = EntityNaming.Quote(EntityNaming.Column("status"));
+
+        await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), settings))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        await ScalarAsync(a, $"UPDATE {table} SET {status} = 'closed'");
+
+        var logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, settings))
+        {
+            Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        }
+
+        Assert.Contains(logs.Entries, entry =>
+            entry.Contains(DiagnosticCodes.InvalidSeedValue, StringComparison.Ordinal)
+            && entry.Contains("/records/0/values/status", StringComparison.Ordinal)
+            && entry.Contains("Ticket/transitions/reopen", StringComparison.Ordinal));
+        Assert.Equal(("closed", 1L), await TicketStateAsync(a));
     }
 
     [Fact]
@@ -861,7 +922,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
                 """)
             .With("pages/notes.json", """
                 { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a21", "kind": "page", "name": "Notes", "formatVersion": 1,
-                  "title": { "textKey": "notes.title" }, "widgets": [ { "type": "table", "entity": "Note" } ] }
+                  "title": { "textKey": "notes.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Note" } ] }
                 """)
             .With("identity-providers/accounts.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a22", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""");
         foreach (var path in paths)
@@ -983,6 +1044,69 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         Assert.True(exception.SqlState == sqlState, $"{sql} gave {exception.SqlState}, expected {sqlState}: {exception.Message}");
     }
 
+    private string TicketTable() =>
+        EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(_applicationId, _ticketEntityId)));
+
+    /// <summary>The stored state and version of the seeded ticket in tenant <paramref name="connectionString"/>.</summary>
+    private async Task<(string? State, long Version)> TicketStateAsync(string connectionString)
+    {
+        var status = EntityNaming.Quote(EntityNaming.Column("status"));
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await using var command = dataSource.CreateCommand($"SELECT {status}, {EntityNaming.VersionColumn} FROM {TicketTable()}");
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        return (reader.GetString(0), reader.GetInt64(1));
+    }
+
+    /// <summary>The application that declares the <c>tickets</c> module and maps its slot to <c>employee</c>.</summary>
+    private TemporaryFolder TicketApplication() =>
+        ApplicationFolder(TitleField)
+            .With("application.json", $$"""
+                { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
+                  "modules": [{ "id": "tickets", "version": "^1.0.0", "roles": { "agent": "employee" } }] }
+                """);
+
+    /// <summary>
+    /// A modules folder with <c>tickets</c>: a <c>Ticket</c> entity with a lifecycle of <c>open</c> (initial) and <c>closed</c>,
+    /// and a synced seed of one open ticket. <c>reopen</c> leads from <c>closed</c> to <c>open</c> with the given guard.
+    /// </summary>
+    private static TemporaryFolder TicketModules(string? reopenGuard)
+    {
+        var guard = reopenGuard is null ? "" : $$""", "guard": "{{reopenGuard}}" """;
+        return new TemporaryFolder()
+            .With("tickets/1.0.0/module.json", """
+                { "kind": "module", "id": "tickets", "version": "1.0.0", "label": "Tickets",
+                  "roles": [{ "name": "agent", "label": { "textKey": "tickets.roles.agent" } }] }
+                """)
+            .With("tickets/1.0.0/Ticket.json", $$"""
+                { "id": "{{_ticketEntityId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1,
+                  "fields": [
+                    { "name": "title", "type": "text" },
+                    { "name": "status", "type": "enum", "values": ["open", "closed"], "required": true },
+                    { "name": "reopenedBy", "type": "text" }
+                  ] }
+                """)
+            .With("tickets/1.0.0/TicketContract.json", $$"""
+                { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a62", "kind": "contract", "name": "TicketContract", "formatVersion": 1, "entity": "Ticket",
+                  "lifecycle": {
+                    "field": "status",
+                    "states": [{ "name": "open", "initial": true, "deletable": true }, { "name": "closed" }],
+                    "transitions": [
+                      { "name": "close", "from": ["open"], "to": "closed" },
+                      { "name": "reopen", "from": ["closed"], "to": "open"{{guard}} }
+                    ]
+                  } }
+                """)
+            .With("tickets/1.0.0/Tickets.json", $$"""
+                { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a63", "kind": "seed", "name": "Tickets", "formatVersion": 1, "entity": "Ticket", "sync": true,
+                  "records": [{ "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a64", "values": { "title": "First", "status": "open" } }] }
+                """)
+            .With("tickets/1.0.0/TextsEn.json", """
+                { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a65", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "tickets.roles.agent": "Agent" } }
+                """);
+    }
+
     private Task<string> CreateDatabaseAsync() => database.CreateDatabaseAsync("startup", CancellationToken);
 
     private TemporaryFolder ApplicationFolder(params string[] fields) =>
@@ -993,7 +1117,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
             .With("texts/en.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a14", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "role.employee": "Employee" } }""")
             .With(
                 "policies/employee-access.json",
-                """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a15", "kind": "policy", "name": "EmployeeAccess", "formatVersion": 1, "roles": ["employee"], "grants": [{ "entity": "Note", "actions": ["read", "create", "update", "delete"] }] }""");
+                """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a15", "kind": "policy", "name": "EmployeeAccess", "formatVersion": 1, "roles": ["employee"], "grants": [{ "name": "noteRead", "entity": "Note", "actions": ["read", "create", "update", "delete"] }] }""");
 
     /// <summary>
     /// A seed over <c>Note</c> with the fixed seed ids and the given values, synced when

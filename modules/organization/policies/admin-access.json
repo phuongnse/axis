@@ -1,0 +1,13 @@
+{
+  "id": "561e949c-4b60-4a87-9134-15b98f154043",
+  "kind": "policy",
+  "name": "AdminAccess",
+  "formatVersion": 1,
+  "roles": ["admin"],
+  "grants": [
+    { "name": "departmentAll", "entity": "Department", "actions": ["read", "create", "update", "delete", "export", "import"] },
+    { "name": "employeeAll", "entity": "Employee", "actions": ["read", "create", "update", "delete", "export", "import"] },
+    { "name": "departmentsAll", "dataSource": "Departments", "actions": ["read", "export"] },
+    { "name": "employeesAll", "dataSource": "Employees", "actions": ["read", "export"] }
+  ]
+}

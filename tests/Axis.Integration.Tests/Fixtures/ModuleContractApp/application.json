@@ -1,0 +1,7 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3c01",
+  "kind": "application",
+  "name": "ModuleContractApp",
+  "formatVersion": 1,
+  "modules": [{ "id": "requests", "version": "^1.0.0", "roles": { "requester": "employee" } }]
+}

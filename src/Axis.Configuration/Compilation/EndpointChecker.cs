@@ -444,6 +444,7 @@ internal static class EndpointChecker
             var readOnly = field.Expression is not null ? "is computed"
                 : field.Sequence is not null ? "takes its value from a sequence"
                 : field.Creator == true ? "is the record's creator"
+                : field.Match is not null ? "is set by its match"
                 : null;
             if (readOnly is not null)
             {

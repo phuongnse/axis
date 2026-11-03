@@ -71,6 +71,18 @@
         "connectors": {
           "type": "object",
           "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "relax": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["point"],
+            "properties": {
+              "point": { "type": "string" },
+              "reason": { "type": "string", "maxLength": 500 }
+            }
+          }
         }
       }
     }

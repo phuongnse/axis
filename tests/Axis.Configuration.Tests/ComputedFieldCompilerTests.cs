@@ -22,6 +22,9 @@ public sealed class ComputedFieldCompilerTests
         { """{ "name": "stamped", "type": "date-time", "expression": "now()" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time at character 1." },
         { """{ "name": "today", "type": "date", "expression": "today()" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'today' is not allowed in a computed field, because a stored value cannot depend on the current time at character 1." },
         { """{ "name": "day", "type": "date", "expression": "toDate(dateTime('2026-10-08T09:30:00Z'))" }""", ExpressionDiagnosticCodes.CurrentTimeInStoredValue, "/fields/4/expression", "Function 'toDate' is not allowed in a computed field, because a stored value cannot depend on the application's time zone at character 1." },
+        // A stored value is not the set of a step either.
+        { """{ "name": "decider", "type": "text", "expression": "accountableUser()" }""", ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "/fields/4/expression", "Function 'accountableUser' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step at character 1." },
+        { """{ "name": "task", "type": "text", "expression": "decisionTask()" }""", ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, "/fields/4/expression", "Function 'decisionTask' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step at character 1." },
     };
 
     [Theory]
@@ -57,7 +60,7 @@ public sealed class ComputedFieldCompilerTests
     public void Validation_reads_a_computed_field()
     {
         using var folder = Folder(["""{ "name": "total", "type": "decimal", "expression": "quantity * price" }"""],
-            validations: """[{ "expression": "total is null or total > 0", "message": { "textKey": "order.totalPositive" }, "field": "total" }]""")
+            validations: """[{ "name": "check1", "expression": "total is null or total > 0", "message": { "textKey": "order.totalPositive" }, "field": "total" }]""")
             .With("texts/en.json", """
                 { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
                   "texts": { "order.totalPositive": "The total must be greater than zero." } }

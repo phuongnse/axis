@@ -10,6 +10,7 @@ using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Expressions.Evaluation;
 using Axis.Expressions.Typing;
+using Axis.Processes.Records;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using Microsoft.Extensions.Logging;
@@ -158,6 +159,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             throw Failure($"The process '{process.Name}' has no step '{instance.Step}'.", instance, input);
         }
 
+        // The step's set can write the instance's stored accountable user and deciding task, so a retry
+        // writes what the first run would have, not the operator who retried it.
+        var accountability = new ExpressionAccountability(instance.AccountableUser, instance.DecisionTask?.ToString("D"));
+
         // With a subject, the step's expressions read the record. Without one, they read the stored
         // parameter values, and no record is locked, read or written.
         EntityModel? entity = null;
@@ -207,7 +212,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 ? await PendingComputedReads.ApplyAsync(context.Connection, context.Transaction, release.Model, subjectEntity, stored, cancellationToken, model)
                 : stored;
             var subject = record;
-            evaluate = expression => RecordExpressions.EvaluateAsync(context.Connection, model, subjectEntity, subject, expression, instance.Now, cancellationToken);
+            evaluate = expression => RecordExpressions.EvaluateAsync(context.Connection, model, subjectEntity, subject, expression, instance.Now, accountability, cancellationToken);
             rowSource = collection => ReadRowsAsync(context, model, subjectEntity, subject, collection, instance, step, input, cancellationToken);
         }
         else
@@ -234,7 +239,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             }
 
             var values = ProcessParameters.Values(process, instance.Parameters);
-            evaluate = expression => Task.FromResult(ProcessParameters.Evaluate(expression, values, instance.Now, model.TimeZone));
+            evaluate = expression => Task.FromResult(ProcessParameters.Evaluate(expression, values, instance.Now, model.TimeZone, accountability));
         }
 
         string state;
@@ -394,7 +399,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     raised.Entity.Id,
                     instance.SubjectId!.Value,
                     await PayloadAsync(evaluate, raiseStep, instance, input),
-                    instance.Id);
+                    instance.Id,
+                    instance.AccountableUser);
                 raisedEvent = raised;
                 state = ProcessStarts.Running;
                 nextStep = following.Name;
@@ -581,16 +587,20 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         // writes nothing. A rejected write throws, which rolls back the instance's move too.
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        IReadOnlyList<EffectRecord> effects = [];
+        var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (assignments is not null)
         {
-            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, stored!, assignments, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
+            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, write, stored!, assignments, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
+                LogRefusal(result, entity!.Id, instance.SubjectId);
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity!, instance.ReleaseId, cancellationToken);
             updated = written;
+            effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
                 AuditActors.System,
@@ -610,9 +620,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (creation is not null)
         {
             var result = await RecordCommands.CreateFromAsync(
-                context.Connection, model, created!, instance.ReleaseId, creation, AuditActors.System, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
+                context.Connection, model, created!, instance.ReleaseId, write, creation, AuditActors.System, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
+                LogRefusal(result, created!.Id, null);
                 throw Failure($"The record create was rejected: {Describe(result)}", instance, input);
             }
 
@@ -703,6 +714,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 occurrence.SubjectId,
                 occurrence.Payload,
                 instance.Id,
+                occurrence.AccountableUser,
                 activeRelease,
                 logger,
                 cancellationToken);
@@ -748,9 +760,24 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 stored!,
                 updated,
                 [],
+                write,
                 logger,
                 cancellationToken);
         }
+
+        await EffectRecordWrites.AppendAsync(
+            context.Transaction,
+            context.Item.TenantId,
+            active?.Model,
+            active?.ReleaseId ?? instance.ReleaseId,
+            instance.ReleaseId,
+            instance.ApplicationId,
+            instance.Id,
+            AuditActors.System,
+            effects,
+            write,
+            logger,
+            cancellationToken);
 
         if (createdRecord is not null && active is { } activeAfterCreate)
         {
@@ -762,6 +789,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 instance.ReleaseId,
                 created!,
                 createdRecord,
+                write,
                 logger,
                 cancellationToken);
         }
@@ -953,6 +981,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             child.Id,
             instance.Id,
             stepName,
+            instance.AccountableUser,
+            instance.DecisionTask,
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.AlreadyRunning)
         {
@@ -1297,11 +1327,27 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             ? json
             : throw Failure($"The {name} of the step '{step.Name}' gave a value of type '{value!.GetType().Name}'.", instance, input);
 
-    /// <summary>Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>, or the outcome when it has none.</summary>
-    internal static string Describe(RecordWriteResult result) =>
-        result.Errors is { Count: > 0 } errors
+    /// <summary>
+    /// Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>,
+    /// or the outcome when it has none. A write that a module contract refused ends with its named point, such as
+    /// <c>(named point Request/transitions/submit)</c>.
+    /// </summary>
+    internal static string Describe(RecordWriteResult result)
+    {
+        var text = result.Errors is { Count: > 0 } errors
             ? string.Join(", ", errors.Select(error => $"{error.Key}: {string.Join(" ", error.Value)}"))
             : result.Outcome.ToString();
+        return result.Point is { } point ? $"{text} (named point {point})" : text;
+    }
+
+    /// <summary>Logs the refusal of a module contract with its named point and record, as a record API refusal is.</summary>
+    private void LogRefusal(RecordWriteResult result, Guid entityId, Guid? recordId)
+    {
+        if (result.Outcome is RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused)
+        {
+            RecordLifecycleLog.Refused(logger, entityId, result.Point, recordId);
+        }
+    }
 
     private static ProcessStepException ExpressionFailure(string part, ProcessStepModel step, ExpressionRuntimeError error, LoadedInstance instance, JsonObject input) =>
         Failure($"The {part} of the step '{step.Name}' failed: {error.Kind}.", instance, input);

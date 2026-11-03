@@ -8,6 +8,7 @@
   ],
   "grants": [
     {
+      "name": "requestRead",
       "entity": "Request",
       "actions": [
         "read"
@@ -15,6 +16,7 @@
       "filter": "requester == currentUser()"
     },
     {
+      "name": "requestCreate",
       "entity": "Request",
       "actions": [
         "create",
@@ -28,12 +30,14 @@
       ]
     },
     {
+      "name": "requestListRead",
       "dataSource": "RequestList",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "requestApprovalStart",
       "process": "RequestApproval",
       "actions": [
         "start"

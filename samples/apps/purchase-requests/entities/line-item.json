@@ -19,11 +19,13 @@
   ],
   "validations": [
     {
+      "name": "quantityPositive",
       "expression": "quantity > 0",
       "message": { "textKey": "lineItem.quantityPositive" },
       "field": "quantity"
     },
     {
+      "name": "unitPriceNotNegative",
       "expression": "unitPrice >= 0",
       "message": { "textKey": "lineItem.unitPriceNotNegative" },
       "field": "unitPrice"

@@ -74,17 +74,25 @@ public enum RecordConflict
 
     /// <summary>A running or waiting process instance has the record as its subject.</summary>
     RunningProcess,
+
+    /// <summary>The entity's lifecycle refuses the write, and <see cref="RecordCommandResult.Errors"/> says why.</summary>
+    Lifecycle,
+
+    /// <summary>An effect of the transition could not be written, and <see cref="RecordCommandResult.Point"/> names it.</summary>
+    Effect,
 }
 
 /// <summary>
 /// The result of a record command. <see cref="Record"/> is the full stored record after a write,
 /// whatever the actor may read of it. <see cref="Errors"/> hold the problems by JSON Pointer.
+/// <see cref="Point"/> names the effect of a transition that could not be written, such as <c>Claim/effects/entryRecorded</c>.
 /// </summary>
 public sealed record RecordCommandResult(
     RecordCommandOutcome Outcome,
     Record? Record = null,
     IDictionary<string, string[]>? Errors = null,
-    RecordConflict? Conflict = null);
+    RecordConflict? Conflict = null,
+    string? Point = null);
 
 /// <summary>The parsed body of a create: the input, or the failure the create answers with. Never both.</summary>
 public sealed record RecordCreateParse(RecordInput? Input, RecordCommandResult? Failure);
@@ -121,6 +129,10 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// that fails leaves none.
 /// A create or update also starts the processes of the data change triggers that match it, in the
 /// same transaction, as <c>system</c>. A write that fails starts none.
+/// An update that makes a transition creates the records of its effects in the same transaction. Each gets a
+/// <c>record.created</c> audit record, with the actor and the details <c>version</c> and <c>effect</c>, and starts the
+/// processes of the create triggers on its entity, after the updated record's own audit record and starts.
+/// An effect that cannot be written is a conflict that names its point, and nothing is written.
 /// A delete starts the processes of the delete triggers on the entity, in the same transaction, after the
 /// audit record. Each starts a process without a subject, with parameters worked out from the record as it
 /// was before the delete. A delete that is refused starts none.
@@ -138,8 +150,8 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// A create or update may name a form of the entity. The form is checked after the grant and the
 /// record checks and before the content type: a name that is no form of the entity is invalid.
 /// A body is checked in order: content type, then body, then a field that no grant for the action
-/// covers, then, in the write transaction, the defaults of the fields a create leaves out and the computed
-/// fields of the record as it will be stored and of its rows, then the
+/// covers, then, in the write transaction, the defaults of the fields a create leaves out, the
+/// matched references (see <see cref="RecordMatcher"/>) and the computed fields of the record as it will be stored and of its rows, then the
 /// form's <c>requiredWhen</c> conditions and the entity's validations on that record, then storage.
 /// An update of an entity with computed fields or validations, or with a form that has
 /// <c>requiredWhen</c> conditions, reads the stored record first, so an unknown record is not found there.
@@ -283,16 +295,18 @@ public static class RecordCommand
         var sets = model.Validations.Count > 0 || form?.HasRequiredWhen == true
             ? await RecordSets.ReadAsync(connection, application, model, null, input.Links, cancellationToken, cipher)
             : RecordSets.Empty;
-        var prepared = PrepareCreate(application, model, actor, input, form, now, sets);
+        var prepared = await PrepareCreateAsync(connection, application, model, actor, input, form, now, sets, cancellationToken);
         if (prepared.Errors is { } prepareErrors)
         {
             return Invalid(prepareErrors);
         }
 
         var computed = prepared.Computed!;
-        var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
+        var write = new RecordWriteContext(actor.Id, null);
+        var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, write, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
+            LogRefusal(loggerFactory, model, result, recordId: null);
             return WriteResult(result);
         }
 
@@ -311,6 +325,7 @@ public static class RecordCommand
             DataChangeKinds.Create,
             written,
             changedFields: null,
+            write,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
         return WriteResult(result);
@@ -339,35 +354,39 @@ public static class RecordCommand
     }
 
     /// <summary>
-    /// Runs the checks of a create on a parsed input, without storage: the defaults, then the creator
-    /// fields, the computed fields, and the form's <c>requiredWhen</c> conditions and the entity's validations.
+    /// Runs the checks of a create on a parsed input, without writing: the defaults, then the creator
+    /// fields, the matched references (read as the system through <paramref name="connection"/>), the computed fields,
+    /// and the form's <c>requiredWhen</c> conditions and the entity's validations.
     /// <paramref name="now"/> is the start time of the transaction that does the work. <paramref name="sets"/> holds
     /// the target records an aggregate over a <c>references</c> field reads, none when it is null. The result holds the
     /// computed values and rows, or the errors by JSON Pointer.
     /// </summary>
-    public static RecordCreatePrepared PrepareCreate(
+    public static async Task<RecordCreatePrepared> PrepareCreateAsync(
+        NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel model,
         RecordActor actor,
         RecordInput input,
         FormModel? form,
         DateTimeOffset now,
-        RecordSets? sets = null)
+        RecordSets? sets = null,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(input);
 
-        // The defaults and the creator fields are set before the computed fields and validations, so they
-        // see the record as it will be stored.
+        // The defaults, the creator fields and the matched references are set before the computed fields and
+        // validations, so they see the record as it will be stored.
         var defaults = RecordDefaults.Apply(model, input.Values, now, application.TimeZone);
         if (defaults.Errors is { } defaultErrors)
         {
             return new RecordCreatePrepared(null, defaultErrors);
         }
 
-        var values = RecordCreator.WithCreator(model, defaults.Values, actor.Id);
+        var values = await RecordMatcher.WithMatchesAsync(connection, application, model, RecordCreator.WithCreator(model, defaults.Values, actor.Id), null, cancellationToken);
         var computed = RecordComputer.ComputeCreate(application, model, values, input.Rows);
         if (computed.Errors is { } computeErrors)
         {
@@ -432,7 +451,7 @@ public static class RecordCommand
         // earlier, so a write that passes the version check finds the record as computed here and
         // validated below.
         Record? stored = null;
-        if (model.Validations.Count > 0 || model.HasComputedFields || formModel?.HasRequiredWhen == true)
+        if (model.Validations.Count > 0 || model.HasComputedFields || formModel?.HasRequiredWhen == true || RecordMatcher.HasMatches(model))
         {
             stored = await RecordQueries.GetAsync(connection, application, model, recordId, cipher, cancellationToken);
             if (stored is null)
@@ -441,7 +460,8 @@ public static class RecordCommand
             }
         }
 
-        var computed = RecordComputer.ComputeUpdate(application, model, stored, input.Values, input.Rows);
+        var values = await RecordMatcher.WithMatchesAsync(connection, application, model, input.Values, stored, cancellationToken);
+        var computed = RecordComputer.ComputeUpdate(application, model, stored, values, input.Rows);
         if (computed.Errors is { } computeErrors)
         {
             return Invalid(computeErrors);
@@ -624,7 +644,7 @@ public static class RecordCommand
         }
 
         Record? stored = null;
-        if (model.Validations.Count > 0 || model.HasComputedFields)
+        if (model.Validations.Count > 0 || model.HasComputedFields || RecordMatcher.HasMatches(model))
         {
             stored = await RecordQueries.GetAsync(connection, application, model, recordId, cipher, cancellationToken);
             if (stored is null)
@@ -633,7 +653,8 @@ public static class RecordCommand
             }
         }
 
-        var computed = RecordComputer.ComputeUpdate(application, model, stored, input.Values, input.Rows);
+        var values = await RecordMatcher.WithMatchesAsync(connection, application, model, input.Values, stored, cancellationToken);
+        var computed = RecordComputer.ComputeUpdate(application, model, stored, values, input.Rows);
         if (computed.Errors is { } computeErrors)
         {
             return new UpdatePrepared(null, null, null, Invalid(computeErrors));
@@ -715,7 +736,8 @@ public static class RecordCommand
     }
 
     // The write steps of an update after the checks, in the transaction of the caller, which commits on a written
-    // result and rolls back otherwise.
+    // result and rolls back otherwise. The records that the effects of a transition created are audited and start
+    // the create triggers of their entities after the record itself, in declaration order.
     private static async Task<RecordCommandResult> WriteUpdateAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -741,9 +763,11 @@ public static class RecordCommand
             before = await RecordQueries.GetAsync(connection, application, model, recordId, cipher, cancellationToken);
         }
 
-        var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
+        var write = new RecordWriteContext(actor.Id, null);
+        var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, write, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
+            LogRefusal(loggerFactory, model, result, recordId);
             return WriteResult(result);
         }
 
@@ -764,8 +788,26 @@ public static class RecordCommand
             before is null
                 ? null
                 : DataChangeTriggerStarts.ChangedFields(model, before, written, input.Rows.Select(rows => rows.Collection.Name).Concat(input.Links.Select(links => links.Field.Name))),
+            write,
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
+        foreach (var effect in result.Effects)
+        {
+            await AuditRecords.AppendAsync(transaction, RecordAudit(actor, AuditActions.RecordCreated, application, effect.Entity, effect.Record.Id, effect.Record.Version, effect: effect.Point), cancellationToken);
+            await DataChangeTriggerStarts.StartAsync(
+                transaction,
+                tenantId,
+                application,
+                releaseId,
+                effect.Entity,
+                DataChangeKinds.Create,
+                effect.Record,
+                changedFields: null,
+                write,
+                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                cancellationToken);
+        }
+
         return WriteResult(result);
     }
 
@@ -857,7 +899,8 @@ public static class RecordCommand
 
             // The triggers see the record whole, so they are worked out before its row and child rows go.
             var prepared = await DataChangeTriggerStarts.PrepareDeleteAsync(transaction, application, model, recordId, cancellationToken);
-            result = await RecordCommands.DeleteAsync(connection, application, model, recordId, cancellationToken);
+            var write = new RecordWriteContext(actor.Id, null);
+            result = await RecordCommands.DeleteAsync(connection, application, model, write, recordId, cancellationToken);
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
@@ -870,9 +913,15 @@ public static class RecordCommand
                     releaseId,
                     recordId,
                     prepared,
+                    write,
                     loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                     cancellationToken),
                 cancellationToken);
+        }
+
+        if (result.Outcome == RecordDeleteOutcome.LifecycleRefused)
+        {
+            RecordLifecycleLog.Refused(loggerFactory, model.Id, result.Point, recordId);
         }
 
         return result.Outcome switch
@@ -880,6 +929,8 @@ public static class RecordCommand
             RecordDeleteOutcome.Deleted => new RecordCommandResult(RecordCommandOutcome.Deleted),
             RecordDeleteOutcome.NotFound => new RecordCommandResult(RecordCommandOutcome.NotFound),
             RecordDeleteOutcome.Referenced => new RecordCommandResult(RecordCommandOutcome.Conflict, Conflict: RecordConflict.Referenced),
+            RecordDeleteOutcome.LifecycleRefused => new RecordCommandResult(
+                RecordCommandOutcome.Conflict, Errors: result.Errors, Conflict: RecordConflict.Lifecycle),
             var outcome => throw new InvalidOperationException($"Unexpected delete outcome {outcome}."),
         };
     }
@@ -982,6 +1033,15 @@ public static class RecordCommand
     private static Dictionary<string, string[]> UnknownForm() =>
         new() { ["form"] = ["Must name a form of this entity."] };
 
+    // Logs a refusal by the lifecycle: the entity, the named point and the record, never a value.
+    private static void LogRefusal(ILoggerFactory loggerFactory, EntityModel model, RecordWriteResult result, Guid? recordId)
+    {
+        if (result.Outcome is RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused)
+        {
+            RecordLifecycleLog.Refused(loggerFactory, model.Id, result.Point, recordId);
+        }
+    }
+
     // Maps a storage result that is not a success. The conflicts name no column or constraint:
     // the storage names are not part of the outcome.
     private static RecordCommandResult WriteResult(RecordWriteResult result) =>
@@ -994,6 +1054,10 @@ public static class RecordCommand
             RecordWriteOutcome.UniqueViolation => new RecordCommandResult(
                 RecordCommandOutcome.Conflict, Errors: result.Errors, Conflict: RecordConflict.UniqueValue),
             RecordWriteOutcome.SchemaConflict => new RecordCommandResult(RecordCommandOutcome.Conflict, Conflict: RecordConflict.Schema),
+            RecordWriteOutcome.LifecycleRefused => new RecordCommandResult(
+                RecordCommandOutcome.Conflict, Errors: result.Errors, Conflict: RecordConflict.Lifecycle),
+            RecordWriteOutcome.EffectRefused => new RecordCommandResult(
+                RecordCommandOutcome.Conflict, Conflict: RecordConflict.Effect, Point: result.Point),
             _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unexpected write outcome."),
         };
 
@@ -1046,8 +1110,9 @@ public static class RecordCommand
 
     /// <summary>
     /// The audit record of a record write. Its details hold the record's version, and on update
-    /// the names of the fields the body sets. They never hold a field value. Its actor is
-    /// <paramref name="actor"/>, with their display name.
+    /// the names of the fields the body sets. For a record that an effect created they also hold the
+    /// effect's named point. They never hold a field value. Its actor is <paramref name="actor"/>, with
+    /// their display name.
     /// </summary>
     private static AuditEntry RecordAudit(
         RecordActor actor,
@@ -1056,9 +1121,15 @@ public static class RecordCommand
         EntityModel model,
         Guid recordId,
         long version,
-        IEnumerable<string>? fields = null)
+        IEnumerable<string>? fields = null,
+        string? effect = null)
     {
         var details = new JsonObject { ["version"] = version };
+        if (effect is not null)
+        {
+            details["effect"] = effect;
+        }
+
         if (fields is not null)
         {
             details["fields"] = new JsonArray([.. fields.Select(name => JsonValue.Create(name))]);

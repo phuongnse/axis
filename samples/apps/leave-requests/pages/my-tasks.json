@@ -4,5 +4,5 @@
   "name": "MyTasks",
   "formatVersion": 1,
   "title": { "textKey": "pages.myTasks.title" },
-  "widgets": [{ "type": "taskInbox" }]
+  "widgets": [{ "type": "taskInbox", "name": "myTasks" }]
 }

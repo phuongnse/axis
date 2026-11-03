@@ -17,8 +17,8 @@ public sealed class TaskEscalationCompilerTests
     {
         using var folder = Folder($$"""
             [
-              { "after": "PT4H", "notify": {{ValidNotify}} },
-              { "after": "P1D", "reassign": { "role": "lead" } }
+              { "name": "escalation1", "after": "PT4H", "notify": {{ValidNotify}} },
+              { "name": "escalation2", "after": "P1D", "reassign": { "role": "lead" } }
             ]
             """);
 
@@ -64,7 +64,7 @@ public sealed class TaskEscalationCompilerTests
     [Fact]
     public void An_escalation_with_neither_reassign_nor_notify_is_reported_at_the_escalation()
     {
-        using var folder = Folder("""[ { "after": "P1D" } ]""");
+        using var folder = Folder("""[ { "name": "escalation1", "after": "P1D" } ]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -75,6 +75,33 @@ public sealed class TaskEscalationCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void An_escalation_without_a_name_is_a_schema_violation_at_its_escalation()
+    {
+        using var folder = Folder("""[ { "name": "escalation1", "after": "P1D", "reassign": { "role": "lead" } }, { "after": "P2D", "reassign": { "role": "lead" } } ]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.File) == (DiagnosticCodes.SchemaViolation, "/steps/0/escalations/1", "processes/ticket-task.json"));
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Two_escalations_with_the_same_name_ignoring_letter_case_are_a_duplicate_on_the_later_escalation()
+    {
+        using var folder = Folder("""[ { "name": "remind", "after": "P1D", "reassign": { "role": "lead" } }, { "name": "REMIND", "after": "P2D", "reassign": { "role": "lead" } } ]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DuplicateProcessElementName, "processes/ticket-task.json", "/steps/0/escalations/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'/steps/0/escalations/0'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
     [Theory]
     [InlineData("P5D", 0)]
     [InlineData("P6D", 0)]
@@ -82,8 +109,8 @@ public sealed class TaskEscalationCompilerTests
     public void An_escalation_that_is_not_shorter_than_the_deadline_is_reported_at_its_after(string after, int index)
     {
         var escalations = index == 0
-            ? $$"""[ { "after": "{{after}}", "reassign": { "role": "lead" } } ]"""
-            : $$"""[ { "after": "P1D", "reassign": { "role": "lead" } }, { "after": "{{after}}", "reassign": { "role": "lead" } } ]""";
+            ? $$"""[ { "name": "escalation1", "after": "{{after}}", "reassign": { "role": "lead" } } ]"""
+            : $$"""[ { "name": "escalation1", "after": "P1D", "reassign": { "role": "lead" } }, { "name": "escalation2", "after": "{{after}}", "reassign": { "role": "lead" } } ]""";
         using var folder = Folder(escalations);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -98,7 +125,7 @@ public sealed class TaskEscalationCompilerTests
     [Fact]
     public void An_escalation_without_a_deadline_has_nothing_to_be_shorter_than()
     {
-        using var folder = Folder("""[ { "after": "P30D", "reassign": { "role": "lead" } } ]""", deadline: null);
+        using var folder = Folder("""[ { "name": "escalation1", "after": "P30D", "reassign": { "role": "lead" } } ]""", deadline: null);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -114,7 +141,7 @@ public sealed class TaskEscalationCompilerTests
     [InlineData("soon")]
     public void An_escalation_after_that_is_not_a_positive_fixed_duration_is_reported_at_its_after(string after)
     {
-        using var folder = Folder($$"""[ { "after": "{{after}}", "reassign": { "role": "lead" } } ]""");
+        using var folder = Folder($$"""[ { "name": "escalation1", "after": "{{after}}", "reassign": { "role": "lead" } } ]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -130,7 +157,7 @@ public sealed class TaskEscalationCompilerTests
     public void A_value_that_reads_a_sensitive_field_in_an_escalation_notify_is_reported_at_that_value()
     {
         var notify = ValidNotify.Replace("\"number\": \"number\"", "\"number\": \"requester\"", StringComparison.Ordinal);
-        using var folder = Folder($$"""[ { "after": "PT4H", "notify": {{notify}} } ]""")
+        using var folder = Folder($$"""[ { "name": "escalation1", "after": "PT4H", "notify": {{notify}} } ]""")
             .With("entities/ticket.json", $$"""
                 { "id": "{{TicketId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1,
                   "fields": [
@@ -153,7 +180,7 @@ public sealed class TaskEscalationCompilerTests
     public void A_placeholder_without_a_value_in_an_escalation_notify_is_reported_at_its_message()
     {
         var notify = ValidNotify.Replace(""", "values": { "number": "number" }""", "", StringComparison.Ordinal);
-        using var folder = Folder($$"""[ { "after": "PT4H", "notify": {{notify}} } ]""");
+        using var folder = Folder($$"""[ { "name": "escalation1", "after": "PT4H", "notify": {{notify}} } ]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -168,7 +195,7 @@ public sealed class TaskEscalationCompilerTests
     [Fact]
     public void A_reassign_role_that_no_role_declares_is_reported_at_its_role()
     {
-        using var folder = Folder("""[ { "after": "P1D", "reassign": { "role": "ghost" } } ]""");
+        using var folder = Folder("""[ { "name": "escalation1", "after": "P1D", "reassign": { "role": "ghost" } } ]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -182,7 +209,7 @@ public sealed class TaskEscalationCompilerTests
     [Fact]
     public void A_reassign_with_both_user_and_role_is_reported_at_the_reassign()
     {
-        using var folder = Folder("""[ { "after": "P1D", "reassign": { "role": "lead", "user": "requester" } } ]""");
+        using var folder = Folder("""[ { "name": "escalation1", "after": "P1D", "reassign": { "role": "lead", "user": "requester" } } ]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -196,7 +223,7 @@ public sealed class TaskEscalationCompilerTests
     [Fact]
     public void A_notify_that_needs_a_recipient_is_reported_at_its_to()
     {
-        using var folder = Folder("""[ { "after": "PT4H", "notify": { "to": [], "channels": ["inApp"], "message": { "subject": { "textKey": "notice.subject" }, "body": { "textKey": "notice.body" }, "values": { "number": "number" } } } } ]""");
+        using var folder = Folder("""[ { "name": "escalation1", "after": "PT4H", "notify": { "to": [], "channels": ["inApp"], "message": { "subject": { "textKey": "notice.subject" }, "body": { "textKey": "notice.body" }, "values": { "number": "number" } } } } ]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -210,7 +237,7 @@ public sealed class TaskEscalationCompilerTests
     [Fact]
     public void Escalations_may_come_in_any_order_of_after()
     {
-        using var folder = Folder("""[ { "after": "P2D", "reassign": { "role": "lead" } }, { "after": "P1D", "reassign": { "role": "lead" } }, { "after": "P1D", "reassign": { "role": "agent" } } ]""");
+        using var folder = Folder("""[ { "name": "escalation1", "after": "P2D", "reassign": { "role": "lead" } }, { "name": "escalation2", "after": "P1D", "reassign": { "role": "lead" } }, { "name": "escalation3", "after": "P1D", "reassign": { "role": "agent" } } ]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 

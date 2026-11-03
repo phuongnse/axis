@@ -452,6 +452,11 @@ function OwnGrants({
           <Flex key={index} vertical gap={4} data-testid="studio-matrix-own-grant">
             <Flex gap="small" align="center" wrap>
               <strong>{role.accessPolicy.name}</strong>
+              {typeof grant.name === 'string' && (
+                <Typography.Text code data-testid="studio-matrix-grant-name">
+                  {grant.name}
+                </Typography.Text>
+              )}
               <Checkbox.Group
                 data-testid="studio-matrix-actions"
                 options={accepted}
@@ -500,7 +505,7 @@ function OwnGrants({
         )
       })}
       <Flex gap="small" wrap>
-        <Button onClick={() => edit('/grants', [...grants, newGrant(target)])}>
+        <Button onClick={() => edit('/grants', [...grants, newGrant(target, grants)])}>
           {t('shell.studio.matrix.addGrant')}
         </Button>
         <Button type="primary" disabled={!changed || incomplete || saving || reconnecting} onClick={save}>

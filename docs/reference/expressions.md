@@ -7,8 +7,8 @@ diagnostics and the length, depth and node limits are built in
 bare field names, every operator, every [function](#functions) and the
 [aggregates](#aggregates), and the translation of the [SQL subset](#sql-subset).
 The one exception is [`currentUser()`](#current-user): the type checker and the
-SQL translation take it, and the record API binds its `@currentUser`
-parameter, but the interpreter does not evaluate it. Sections
+SQL translation take it, and the record API and the data source endpoint bind
+its `@currentUser` parameter, but the interpreter does not evaluate it. Sections
 marked *(planned for Mx)* are not built yet. Entity
 [validations](resource-files.md#entity-logic) and
 [computed fields](resource-files.md#entity-logic) are resource file uses: the
@@ -78,13 +78,13 @@ moduleId       = letter , { letter | digit | "-" } ;
 - **Names.** A name is ASCII letters and digits that start with a letter, like
   a field name.
 - **Qualified call.** A call to a rule of a [module](modules-and-templates.md#modules)
-  is written `departments:IsManager(x)`, with the module id, a `:` and the rule
+  is written `organization:IsDelegating(from, until)`, with the module id, a `:` and the rule
   name. No space is allowed around the `:`. The reader takes the letters,
   digits and `-` that run into the `:` as the module id, so `a-b:c(x)` calls
   the rule `c` of the module `a-b`. To subtract the result of a call, write
   spaces: `a - b:c(x)`. A `:` was never valid before, so no expression that
   parsed before changes meaning, and `total/ratio(x)` is still a division. A
-  qualified name must be called: `departments:IsManager` alone is `AXC0035`.
+  qualified name must be called: `organization:IsDelegating` alone is `AXC0035`.
 - **Keywords.** `and`, `or`, `not`, `is`, `in`, `null`, `true` and `false` are
   reserved in any letter case. Names ignore letter case, so a field named
   `Null` would otherwise be ambiguous.
@@ -324,7 +324,7 @@ Paths in validations and computed fields are not built. There a path is
   an aggregate's item expression. A filter's SQL inlines the rule's body, see
   [SQL subset](#sql-subset). Calls from computed fields come later.
 - **Qualified rule call.** A rule of a [module](modules-and-templates.md#modules) the
-  application declares is called as `departments:IsManager(x)`. It is allowed
+  application declares is called as `organization:IsDelegating(from, until)`. It is allowed
   wherever a rule call is: a rule body, a validation, a field default, a data
   source filter, a process condition and a policy filter. The module id must match exactly. The
   rule name ignores letter case. A bare name in an application expression never
@@ -382,6 +382,10 @@ Paths in validations and computed fields are not built. There a path is
   most once per evaluation. A reference that names no record gives `null`,
   as a `null` reference does. A stored decimal on any record read that .NET
   `decimal` cannot hold exactly stops the evaluation with a run-time error.
+  An aggregate may also name a collection of a referenced record by a path, such
+  as `count(type.steps)`, and the data module then reads that record's
+  collections and `references` sets once. See
+  [collections through a path](#collections-through-a-path-and-the-outer-record).
   An `updateRecord` value sees the same scope, and is type-checked against
   its field's type. A task's `assignee.user` sees the same scope too, and is
   type-checked as `text`. Validations and computed fields keep their scope.
@@ -427,10 +431,10 @@ argument is `null`.
 | `now()` | date-time | The start time of the current transaction. Not allowed in a computed field (`AXC0086`). | Yes |
 | `today()` | date | The calendar date of the transaction's time in the application's time zone. Not allowed in a computed field (`AXC0086`). | Yes |
 | `toDate(date-time)` | date | The calendar date of an instant in the application's time zone. `null` gives `null`. Not allowed in a computed field (`AXC0086`). | Yes |
-| `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
-| `previous(field)` | type of the field | _(planned for M24)_ The field's value before the write, `null` on a create. Allowed only in a module contract. See [previous values](module-contracts.md#previous-values). | No |
-| `accountableUser()` | text | _(planned for M24)_ The user who answers for the write, or `null`. Allowed only in a module contract and a step's `set`. See [the accountable user](module-contracts.md#the-accountable-user). | No |
-| `decisionTask()` | text | _(planned for M24)_ The task whose completion the write follows, or `null`. Allowed where `accountableUser()` is. See [the deciding task](module-contracts.md#the-deciding-task). | No |
+| `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter and in a data source `filter` (`AXC0095`). See [Current user](#current-user). | Yes |
+| `previous(field)` | type of the field | The field's value before the write, `null` on a create. Allowed only in a module contract (`AXC0336`), and its argument must be an own field (`AXC0337`). See [previous values](module-contracts.md#previous-values). | No |
+| `accountableUser()` | text | The user who answers for the write, or `null`. Allowed only in a module contract's guard, core validation and effect value and in the `set` of an `updateRecord` or `createRecord` step (`AXC0341`). See [the accountable user](module-contracts.md#the-accountable-user). | No |
+| `decisionTask()` | text | The id of the task whose completion the write follows, as a lowercase GUID with hyphens, or `null`. Allowed where `accountableUser()` is (`AXC0341`). See [the deciding task](module-contracts.md#the-deciding-task). | No |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
 day from an instant needs a time zone, so `toDate` does it.
@@ -472,21 +476,21 @@ because no conversion is implicit except integer to decimal.
 
 ### Current user
 
-It follows [D24](../decisions/d24-roles-and-policies.md). The type
-check, the SQL translation and binding the `@currentUser` parameter are built:
-the record API binds it when it runs a policy filter. The interpreter does not
-evaluate it, and no milestone plans that, because every policy filter runs as
-SQL.
+It follows [D24](../decisions/d24-roles-and-policies.md). The type check, the
+SQL translation and binding the `@currentUser` parameter are built: the record
+API and the data source endpoint bind it. The interpreter does not evaluate it,
+and no milestone plans that, because every filter that can call it runs as SQL.
 
 `currentUser()` gives the signed-in user's id as `text`, as the
 [session](security.md#sign-in-and-the-session) holds it. A policy
-filter uses it to compare a record with the user, such as
-`requester == currentUser()` or `department.manager == currentUser()`.
+filter or a data source `filter` uses it to compare a record with the user,
+such as `requester == currentUser()` or `department.manager == currentUser()`.
 
 - **Where.** It is allowed only in a
-  [policy filter](roles-and-policies.md), including as an
-  argument of a rule call there. Anywhere else, including inside a rule body,
-  it is `AXC0095` at the call.
+  [policy filter](roles-and-policies.md), including as an argument of a rule
+  call there, and in a [data source](data-sources.md#resource-shape) `filter`.
+  Anywhere else, including a measure `filter` and a rule body, it is `AXC0095`.
+  A schedule trigger over a data source that calls it is `AXC0363`.
 - **SQL.** It becomes the named parameter `@currentUser`, which the caller
   binds as `text`. The id is never spliced into the SQL text.
 - **One value.** Every call in one request gives the same id, so the
@@ -495,11 +499,15 @@ filter uses it to compare a record with the user, such as
 ### Aggregates
 
 An aggregate works on a child collection or a `references` field. The first
-argument names the field. The second argument is an item expression,
+argument names the field, or, in a process expression, is a path to the field
+of a referenced record, as in
+[collections through a path](#collections-through-a-path-and-the-outer-record). The second argument is an item expression,
 evaluated once per row. Inside it, names refer only to the child row's or the
-target record's fields, computed ones included. Computed fields can use
+target record's fields, computed ones included, and `outer.<field>` reads a field of the
+[outer record](#collections-through-a-path-and-the-outer-record). Computed fields can use
 aggregates over child collections. Validations and process conditions can use
-them over child collections and `references` fields.
+them over child collections and `references` fields. Only process expressions
+can use them over a path to a collection.
 
 | Function | Result | Empty list |
 | --- | --- | --- |
@@ -516,7 +524,7 @@ them over child collections and `references` fields.
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
 - **Item types.** `sum` takes integer or decimal items. `min` and `max` take
   integer, decimal, date and date-time items, because they order them. The
-  condition of `count`, `any` and `all` is boolean.
+  condition of `count`, `any`, `all` and `first` is boolean.
 - **Decimal results.** A `sum`, `min` or `max` over decimal items gives a
   decimal, so the 0 of an empty `sum` is a decimal 0.
 - **Null items.** `sum`, `min` and `max` skip `null` items. So a list of
@@ -532,35 +540,54 @@ them over child collections and `references` fields.
   `null` when none is left. Its result is a decimal rounded to 6 digits
   after the point.
 - **SQL.** Only `any` and `count` are in the SQL subset, so a data source or
-  policy filter can use them. The other aggregates are `AXC0053`, see
+  policy filter can use them. The other aggregates, `first` too, are `AXC0053`, see
   [SQL subset](#sql-subset).
-- **`first`** _(planned for M26)_. The `item` of the first row, in the list's
-  stored order, whose `condition` is true, or `null` when none is. The `item`
-  may be any scalar field, an enum or a reference of the row, so a step can
-  store the record a row names. Only the picked row's `item` is evaluated.
+- **`first`.** The `item` of the first row, in the list's stored order, whose
+  `condition` is true, or `null` when none is. The `item` may be a scalar
+  field, an enum or a reference of the row, which gives the record's id, so a
+  step can store the record a row names. The `condition` is evaluated on every
+  row, but only the picked row's `item` is, so an error in another is not raised.
 
 ### Collections through a path and the outer record
 
-_(planned for M26)_ Two additions let a process read the rows of another
-record, such as the approval steps of a request's type, as
-[D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees:
+Two additions let a process read the rows of another record, such as the
+approval steps of a request's type, as
+[D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees. The
+path to a collection and `outer` are built, and so is `first`.
 
 - **A path to a collection.** The first argument of an aggregate may be a path
   that ends at a child collection or a `references` field of a referenced
-  record, such as `count(type.steps)`, with at most 3 hops. It is allowed in
-  process expressions: conditions, `set`, assignees, inputs and `fields`. The
-  step reads the rows in its transaction. A `null` reference on the path gives
-  the aggregate's empty-list result.
+  record, such as `count(type.steps)` or `sum(type.steps, minAmount)`, with at
+  most 3 hops. A longer path is `AXC0058`, as for a path to a scalar field. It
+  is allowed in process expressions: conditions, decision branches, `set`,
+  assignees, inputs, notification values and `fields`, and in a data change
+  trigger's `when` and a start condition, which have the same scope. A
+  validation, a computed field and a field default refuse it as an unknown name
+  (`AXC0046`). The step reads the rows in its transaction. A `null` reference
+  on the path, or one that names no record, gives the aggregate's empty-list
+  result, such as 0 for `count`. A path to a collection cannot read a sensitive
+  field in a notification value. Rows are read without the record cipher, as the
+  rows of a `references` field are, so a sensitive value in a row read through a
+  path makes the read fail.
 - **`outer`.** Inside an item expression, `outer.<field>` reads a field of the
   record the whole expression runs on, and `outer.<path>` follows its
   references, such as
-  `count(type.steps, minAmount == null or outer.amount >= minAmount)`. Outside
-  an item expression it is a diagnostic. `outer` becomes a reserved name, so a
-  field named `outer` is a diagnostic.
-- **Not SQL.** A path to a collection, `outer` and `first` are evaluated in the
-  server and the worker, and a filter that uses them is `AXC0053`.
+  `count(type.steps, minAmount == null or outer.amount >= minAmount)`. It works
+  wherever aggregates run in memory. `outer` names the top-level record, also in
+  a nested aggregate, and the word `outer` is not a hop. A path after it
+  resolves only where a path does without `outer`. `outer.<collection>` and a
+  bare `outer` are type errors (`AXC0047`). Outside an item expression `outer`
+  is `AXC0354`. An entity field named `outer`, in any letter case, is
+  `AXC0355`, but a parameter named `outer` still works as a bare name. A
+  sensitive field or an unlisted form field is refused through `outer` too.
+- **Not SQL.** A path to a collection is evaluated in the server and the
+  worker, and a data source filter or a policy filter that uses it is
+  `AXC0053`. So is `outer` inside `any` or `count` in a filter. `first` is
+  evaluated in memory too, and a filter that uses it is `AXC0053`.
 - **Cost.** The rows count against the [cost bounds](#cost-bounds) as the rows
-  of a child collection of the record do.
+  of a child collection of the record do. Following the reference part of the
+  path costs its usual steps, but the collection itself costs none. So
+  `sum(r.lines, qty)` costs 1 step more than `sum(lines, qty)`.
 
 ## Cost bounds
 
@@ -611,9 +638,11 @@ Run-time limit:
 - **Step budget.** Each top-level evaluation has a budget of 10,000 steps.
   Each node evaluated is one step, and evaluation stops as soon as the budget
   runs out. An aggregate's item expression costs its steps once per row. The
-  aggregate call is one step, and its collection argument costs none. So
-  `sum(lines, qty)` costs 1 step plus 1 per row, and runs out of budget at
-  10,000 rows. The steps of a called rule count against the caller's
+  aggregate call is one step, and a collection argument that is a name costs
+  none. A path to a collection costs the steps of its reference part, such as
+  1 step for `r` in `r.lines`. So `sum(lines, qty)` costs 1 step plus 1 per
+  row, and runs out of budget at 10,000 rows. `sum(r.lines, qty)` costs 2
+  steps plus 1 per row, and runs out at 9,999 rows. The steps of a called rule count against the caller's
   budget. A `concat` also costs one step for every full 1,000 characters of
   its result, counted before the text is built. So one evaluation builds at
   most about 10 million characters.
@@ -783,7 +812,7 @@ There are three families:
 - **Syntax.** Tokens, the grammar and literal forms.
 - **Type.** Unknown names, type mismatches, unknown enum values, wrong
   argument counts, use of something outside the SQL subset in a filter,
-  `now()` in a computed field, and `currentUser()` outside a policy filter.
+  `now()` in a computed field, and `currentUser()` outside a policy filter and a data source `filter`.
 - **Cost.** The limits on length, depth, nodes, hops, rule call depth and
   rule call cycles.
 
@@ -842,10 +871,23 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
 - **`AXC0086`.** A computed field calls `now()`, `today()` or `toDate`,
   including inside an aggregate's item expression, at the call. A stored value
   cannot depend on the current time or the application's time zone.
-- **`AXC0095`.** An expression that is not a policy filter calls
-  `currentUser()`, at the call. This includes a validation, a computed field,
-  a data source filter, a process expression and a rule body. A rule
+- **`AXC0095`.** An expression that is not a policy filter or a data source
+  `filter` calls `currentUser()`, at the call. This includes a validation, a
+  computed field, a measure filter, a process expression and a rule body. A rule
   argument inside a policy filter may call it.
+- **`AXC0336`.** An expression that is not a module contract's expression calls
+  `previous`, at the call. This includes an entity validation, a computed
+  field, a policy filter, a process expression and a rule body.
+- **`AXC0337`.** The argument of `previous` is not the bare name of one of the
+  entity's own fields, at the call. A child collection, a `references` field,
+  an unknown name, any other expression, and a call inside an aggregate's item
+  expression are all this.
+- **`AXC0341`.** An expression that is not a module contract's guard, core validation or effect value, or the
+  `set` of an `updateRecord` or `createRecord` step, calls `accountableUser()` or `decisionTask()`, at the
+  call. This includes a decision condition, a computed field, a policy filter
+  and a rule body.
+- **`AXC0354`.** `outer` is used outside an aggregate's item expression, such
+  as in a rule body, at the name or the `.` after it.
 - **`AXC0055`.** Rules call each other in a cycle. It is reported on the
   rule file, not at a call, and names every rule in the cycle. See
   [the Check step](configuration.md#configuration-pipeline).

@@ -5,7 +5,7 @@ import { totp, totpSecret } from '../totp'
 
 // The purchasing system submits purchase requests through the sample's SubmitPurchaseRequest
 // endpoint with a bearer token. Specs run in parallel against one database, so each test looks only
-// for the request it creates. They use Operations, whose manager is manager-2, so that the per-department
+// for the request it creates. They use Operations, whose head is manager-2, so that the per-department
 // test keeps the Engineering total fixed.
 const appPath = '/api/apps/PurchaseRequests'
 const endpoint = `${appPath}/endpoints/SubmitPurchaseRequest`
@@ -40,7 +40,7 @@ function annaToken(request: APIRequestContext) {
 
 /** The id of the seeded department named `name`, read from the record API. */
 async function departmentId(page: Page, name: string) {
-  const response = await page.request.get(`${appPath}/entities/Department/records?pageSize=100`)
+  const response = await page.request.get(`${appPath}/entities/organization/Department/records?pageSize=100`)
   expect(response.status()).toBe(200)
   const body = (await response.json()) as { items: { id: string; values: { name: string } }[] }
   const department = body.items.find((item) => item.values.name === name)

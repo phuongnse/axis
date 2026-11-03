@@ -10,7 +10,7 @@
     { "name": "software", "type": "references", "target": "Product" }
   ],
   "validations": [
-    { "expression": "count(software) <= 2", "message": { "textKey": "workstation.tooMuchSoftware" }, "field": "software" },
-    { "expression": "seats == null or count(software) <= seats", "message": { "textKey": "workstation.tooFewSeats" }, "field": "seats" }
+    { "name": "tooMuchSoftware", "expression": "count(software) <= 2", "message": { "textKey": "workstation.tooMuchSoftware" }, "field": "software" },
+    { "name": "tooFewSeats", "expression": "seats == null or count(software) <= seats", "message": { "textKey": "workstation.tooFewSeats" }, "field": "seats" }
   ]
 }

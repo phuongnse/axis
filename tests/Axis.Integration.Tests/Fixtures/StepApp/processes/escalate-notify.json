@@ -19,6 +19,7 @@
       "deadline": { "after": "P5D", "next": "expired" },
       "escalations": [
         {
+          "name": "escalation1",
           "after": "P1D",
           "notify": {
             "to": [{ "role": "reviewer" }],
@@ -31,7 +32,7 @@
             "open": { "page": "Tasks" }
           }
         },
-        { "after": "P2D", "reassign": { "role": "finance" } }
+        { "name": "escalation2", "after": "P2D", "reassign": { "role": "finance" } }
       ]
     },
     { "name": "approved", "type": "end" },

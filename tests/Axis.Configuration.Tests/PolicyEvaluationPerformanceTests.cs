@@ -77,10 +77,10 @@ public sealed class PolicyEvaluationPerformanceTests
         { "id": "12121212-1212-4212-8212-1212121212{{index:00}}", "kind": "policy", "name": "Policy{{index:00}}", "formatVersion": 1,
           "roles": ["role{{index % RoleCount}}", "role{{(index + 1) % RoleCount}}"],
           "grants": [
-            { "entity": "Request", "actions": ["read"], "filter": "department.manager == currentUser() or amount > {{index}}",
+            { "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "department.manager == currentUser() or amount > {{index}}",
               "fields": ["title", "amount", "department"] },
-            { "entity": "Department", "actions": ["read"], "fields": ["name"] },
-            { "dataSource": "RequestList", "actions": ["read"] }
+            { "name": "departmentRead", "entity": "Department", "actions": ["read"], "fields": ["name"] },
+            { "name": "requestListRead", "dataSource": "RequestList", "actions": ["read"] }
           ] }
         """;
 

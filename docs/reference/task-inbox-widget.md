@@ -16,7 +16,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     "name": "MyTasks",
     "formatVersion": 1,
     "title": { "textKey": "pages.myTasks.title" },
-    "widgets": [{ "type": "taskInbox" }]
+    "widgets": [{ "type": "taskInbox", "name": "inbox" }]
   }
   ```
 

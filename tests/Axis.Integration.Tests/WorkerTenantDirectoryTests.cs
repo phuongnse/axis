@@ -6,6 +6,7 @@ using Axis.Core.Tenancy;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Axis.Worker;
 using Microsoft.AspNetCore.Builder;
@@ -270,6 +271,44 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
         Assert.Equal((HttpStatusCode.OK, "Healthy"), await GetAsync(client, "/health/ready"));
     }
 
+    [Fact]
+    public async Task In_a_cell_a_tenant_of_weight_two_runs_about_twice_the_items_of_a_tenant_of_weight_one_while_both_have_a_backlog()
+    {
+        var heavy = await PrepareTenantAsync("heavy");
+        var light = await PrepareTenantAsync("light");
+        await EnqueueManyAsync(heavy, 400);
+        await EnqueueManyAsync(light, 400);
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, heavy, light);
+        await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
+        {
+            context.TenantQuotas.Add(new TenantQuotaRow { TenantId = "heavy", Quota = QuotaKeys.WorkerWeight, Value = 2 });
+            await context.SaveChangesAsync(CancellationToken);
+        }
+
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(
+            platform,
+            logs,
+            ("Cell:Id", "vn-1"),
+            ("Cell:Region", "vn"),
+            ("Cell:TenantDomain", "vn.example.test"));
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await CountRunsAsync(heavy) + await CountRunsAsync(light) >= 300, "The tenants did not run enough items.");
+        await app.StopAsync(CancellationToken);
+
+        // The runs after the later tenant's first run, so both tenants had a backlog throughout.
+        var runs = (await RunTimesAsync(heavy, "heavy")).Concat(await RunTimesAsync(light, "light")).OrderBy(run => run.RanAt).ToList();
+        var start = Math.Max(runs.FindIndex(run => run.TenantId == "heavy"), runs.FindIndex(run => run.TenantId == "light"));
+        var window = runs.Skip(start).Take(180).ToList();
+        var heavyRuns = window.Count(run => run.TenantId == "heavy");
+        var lightRuns = window.Count(run => run.TenantId == "light");
+        Assert.Equal(180, window.Count);
+        Assert.InRange((double)heavyRuns / lightRuns, 1.5, 2.5);
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
     private static WebApplication BuildWorker(string platform, LogCollector logs, params (string Key, string Value)[] extraSettings)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -318,7 +357,7 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
             await connection.OpenAsync(CancellationToken);
             await RuntimeRoleGrants.ApplyAsync(connection, role.Name, CancellationToken);
             await using var command = new NpgsqlCommand(
-                $"CREATE TABLE test_runs (item_id uuid, tenant_id text, db text, role text); GRANT SELECT, INSERT ON test_runs TO {role.Name}",
+                $"CREATE TABLE test_runs (item_id uuid, tenant_id text, db text, role text, ran_at timestamptz DEFAULT clock_timestamp()); GRANT SELECT, INSERT ON test_runs TO {role.Name}",
                 connection);
             await command.ExecuteNonQueryAsync(CancellationToken);
         }
@@ -387,6 +426,33 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
         return await WorkItemQueue.EnqueueAsync(connection, null, tenant.Id, RecordKind, DateTimeOffset.UtcNow.AddMinutes(-1), CancellationToken);
     }
 
+    private static async Task EnqueueManyAsync(DirectoryTenant tenant, int count)
+    {
+        await using var connection = new NpgsqlConnection(tenant.SchemaConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        for (var i = 0; i < count; i++)
+        {
+            await WorkItemQueue.EnqueueAsync(connection, null, tenant.Id, RecordKind, DateTimeOffset.UtcNow.AddMinutes(-1), CancellationToken);
+        }
+    }
+
+    private static async Task<long> CountRunsAsync(DirectoryTenant tenant) => await AdminCountAsync(tenant.SchemaConnectionString, "test_runs");
+
+    private static async Task<List<RunTime>> RunTimesAsync(DirectoryTenant tenant, string tenantId)
+    {
+        await using var connection = new NpgsqlConnection(tenant.SchemaConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT ran_at FROM test_runs", connection);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var runs = new List<RunTime>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            runs.Add(new RunTime(tenantId, reader.GetDateTime(0)));
+        }
+
+        return runs;
+    }
+
     private static async Task<List<Run>> RunsAsync(DirectoryTenant tenant)
     {
         await using var connection = new NpgsqlConnection(tenant.SchemaConnectionString);
@@ -421,6 +487,8 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
     }
 
     private sealed record Run(Guid ItemId, string TenantId, string DatabaseName, string RoleName);
+
+    private sealed record RunTime(string TenantId, DateTime RanAt);
 
     /// <summary>Records each run in <c>test_runs</c> with the current tenant, database and role, in the work transaction.</summary>
     private sealed class RecordingHandler(ITenantContextAccessor accessor) : IWorkItemHandler

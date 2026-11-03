@@ -8,7 +8,7 @@ and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant sign-in set`, `tenant binding list|set|remove`,
-`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
+`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `cell operator invite`, `publisher` and `version`.
 `platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). `tenant suspend`, `tenant resume` and
 `tenant list` are in [tenant status commands](tenant-status-commands.md). The
 commands that change a tenant after it is created are in
@@ -39,13 +39,13 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant reads it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
-| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant reads it, and so does `tenant restore` when it is set. |
-| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant reads it, and so does `tenant restore` when `IdentityProvider:Url` is set. It is never stored and never printed. |
-| `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant and `cell operator invite` read it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
+| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when it is set. |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. It is never stored and never printed. |
+| `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher`, `cell operator invite` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` or `Scenarios:ServerConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
-| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
+| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests and the contract scenarios of `publish` and `validate` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request, or a `publish` or `validate` with contract scenarios to run, fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
@@ -218,7 +218,7 @@ with code 2.
   name is the tenant id too. The step signs in to the `master` realm with the admin client, creates the realm
   with sessions of at most 8 hours, `en` and `vi` and the three clients, and gives the activation client `manage-realm`
   among its rights, and its mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names
-  the step of the identity provider and its status code, never a response body or a secret.
+  the step of the identity provider and its status code, never a response body or a secret. After a server error (5xx) the step reads the realm again and repeats, up to three attempts, before it fails.
 - `roles` saves each generated password, encrypted, before it creates the role.
   It never alters a role that exists. A role that exists with no password
   stored for this tenant fails the step.
@@ -474,8 +474,10 @@ agrees. See [test](authoring.md#test) for the route.
 - `Activation:InlineRecomputeLimit`, as for `activate`.
 - `Data:ActivationTimeout`, as for `activate`.
 - `Scenarios:ServerConnectionString`, the role that creates
-  the scenario databases of `test` requests. It is optional. The publisher
-  starts without it, and a `test` request then fails with `AXC0217`, which
+  the scenario databases of `test` requests and of the contract scenarios of
+  `publish` and `validate` requests. It is optional. The publisher
+  starts without it, and a `test` request, or a `publish` or `validate` with
+  contract scenarios to run, then fails with `AXC0217`, which
   names the setting. An empty value counts as not set. A value that is not a
   connection string exits with code 2, and the message names the setting and
   never holds the value.
@@ -548,7 +550,26 @@ role unless it says otherwise.
    no line. A claim that fails writes `<tenant> claim failed: <message>`, and the
    publisher goes on with the next tenant.
 2. `version`: check that the tenant's schema version is the one of this build.
-3. For `publish`: `compile` the snapshot against the tenant database and store
+3. For `publish` and `validate`: `contracts`, the contract scenarios of every pinned
+   module, between `version` and the next step. It compiles the snapshot in memory to
+   find them. A snapshot that cannot be read or does not compile, and an application
+   whose modules have no contract scenario, run nothing and write no `contracts` line, so
+   the next step reports the problem as before. Otherwise the step fails with `AXC0217`
+   when the setting is empty and at least one contract scenario is left to run. A contract
+   scenario that covers a point its module has relaxed, see
+   [relax entries](module-contracts.md#relax-entries), is skipped. It writes
+   `<tenant> scenario <name> skipped: …` with the point, and its result is
+   `{ name, file, outcome: "skipped", point }`. When every scenario is skipped, the step needs no
+   scenario server. The others run, each in its own database, as
+   for a `test`, whatever the outcome of the ones before. Each failing scenario adds
+   one `AXC0342`, and the step writes `<tenant> contracts failed: AXC0342 …` for
+   each, then ends the request with nothing stored or activated. Each scenario that runs writes
+   a `<tenant> scenario <name> passed` or `failed` line, and its outcome goes
+   in the request's `scenario_results`. The scenarios may run for 10 minutes, counted from the
+   first one of each claim, and past that the request fails with `AXC0219`. A stop of
+   the publisher does not cut them short. `rollback` and `activate` run no
+   contract scenario.
+   For `publish`: `compile` the snapshot against the tenant database and store
    its release, `activate` the release, then `seed` and `indexes`. These are the
    steps of [activate](#activate) and report the same diagnostics. `seed` runs
    as the runtime role, and `indexes` as the schema role. The `activate` step also updates the tenant's realm after the
@@ -665,7 +686,7 @@ test may run for 10 minutes, which is longer than the stop grace period of both
 installs. The publisher stops it at once. The running scenario fails, its
 scenario database is dropped, and the request ends `failed` with `AXC0220`. The
 step writes `<tenant> test failed: AXC0220 …`. A `publish`, `validate` or
-`rollback` still finishes first. A stop that comes mid-request leaves a lease
+`rollback` still finishes first, and so do the contract scenarios of a `publish` or `validate`. A stop that comes mid-request leaves a lease
 that runs out. Another publisher then claims the request again. The platform's shutdown grace period must be longer than the longest
 `publish`, `validate` or `rollback`, or the request is claimed twice.
 
@@ -713,6 +734,34 @@ see [Not built yet](#not-built-yet).
 no other argument and writes one platform audit record with no tenant. It prints one line,
 `platform rekey ok: <n> tenant secrets, <m> data protection keys`. The steps, the exit codes and
 the locks are in [installation key](tenant-setting-commands.md#installation-key).
+
+## Cell operator invite
+
+`cell operator invite <email>` gives a new cell its first operator, see
+[cell console sign-in](cell-console.md#sign-in). It runs only in a cell, where `Cell:Id` is set, and
+changes nothing outside one.
+
+- **Realm.** It makes the realm `Cell:OperatorRealm`, or brings an existing one up to date. The realm has
+  the account rules of a tenant's realm: the password policy, the lockout, the Axis login theme and an
+  authenticator code at every sign-in. It has no brokered identity provider, so the command removes
+  any that it finds, and it has no client yet. It has the realm role `Cell:OperatorRole`.
+- **Account.** It finds the account with the email or creates it with the required actions to set a
+  password and an authenticator, and gives it the role.
+- **Invitation.** The realm emails the link through the host's `Email` settings. An account that has set a
+  password gets no new email. The link names no client, so the realm's built-in `account` client
+  handles it. Without `Email` settings the realm has no mail server, so the `invitation` step fails and
+  the run is repeated once mail is set up.
+- **Settings.** `ConnectionStrings:PlatformSchema`, the `IdentityProvider` settings and the `Email`
+  settings. It needs no `Platform:SecretKey`, no `Admin:ConnectionString` and no `Tenancy:Source` beyond
+  the cell's.
+- **Output.** Each line starts with the realm name, then the step `realm`, `account` or `invitation`, then
+  `ok` or `failed: <message>`. The `invitation` line says `skipped` when the account has a password. A
+  failed `audit` line also starts with the realm name. No line holds the email.
+- **Exit codes.** `0` when every step succeeded, `1` when a step failed, and `2` for a bad email, a missing
+  `Cell:Id` or a missing setting, with nothing changed.
+- **Audit.** Each run writes one platform audit record with no tenant, before any change. It lists
+  `realm: <name>` and `role: <name>` and never the email.
+- **Second factor.** The realm asks for an authenticator app. Passkeys are not set up yet.
 
 ## Version
 

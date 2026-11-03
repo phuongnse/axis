@@ -13,8 +13,8 @@ installation, declaring, pinning, dependencies between modules, the diagnostics 
 `AXC0295` and `AXC0296`, the
 role slots with their mapping, `AXC0292` to `AXC0294`, the connector slots with their
 mapping, `AXC0297` to `AXC0303`, the maps of a depending module, with `AXC0306`, the module
-policies that name role slots, `AXC0304` and `AXC0305`, and the task assignees that name role slots,
-`AXC0307`, are built. A pinned module's files are stored in the release and
+policies that name role slots, `AXC0304` and `AXC0305`, the task assignees that name role slots,
+`AXC0307`, and the scenarios that name role slots, `AXC0335`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources, forms and policies join the application
 model, each with an id derived from the application `id` and the name
@@ -42,7 +42,7 @@ the modules it uses in `application.json`, with a version range for each:
   "kind": "application",
   "name": "PurchaseRequests",
   "formatVersion": 1,
-  "modules": [{ "id": "departments", "version": "^1.0.0", "roles": { "manager": "department-manager" } }]
+  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "department-manager", "member": "employee" } }]
 }
 ```
 
@@ -51,26 +51,21 @@ The module's manifest is `module.json` at the root of its folder:
 ```json
 {
   "kind": "module",
-  "id": "departments",
-  "version": "1.1.0",
-  "label": "Departments",
-  "roles": [{ "name": "manager", "label": { "textKey": "departments.roles.manager" } }]
+  "id": "organization",
+  "version": "1.0.0",
+  "label": "Organization",
+  "roles": [
+    { "name": "admin", "label": { "textKey": "organization.roles.admin" } },
+    { "name": "member", "label": { "textKey": "organization.roles.member" } }
+  ]
 }
 ```
 
-`departments` is the sample module, `samples/modules/departments`. It holds a
-`Department` entity with a code, a name and a manager, a `Departments` data source,
-an `IsManager(manager, user)` rule and an `IsDepartmentCode(code)` rule, three seed
-departments and `en` and `vi` texts. The `Department` entity has a validation that
-calls `IsDepartmentCode`, so a department code must be in capital letters.
-It has a `manager` role slot, labelled in `en` and `vi`, and a `ManagerAccess` module
-policy for the slot. The policy lets the role read the departments whose `manager` is the
-current user, and read the `Departments` data source. The leave request sample maps the
-slot to its `department-manager` role, and so does the purchase request sample.
-`department-budgets` is the second sample module, see
+`organization` is a built-in module, see [built-in modules](built-in-modules.md), and
+`department-budgets` is the sample module, see
 [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 `scripts/build.sh`, `scripts/dev.sh` and the E2E run install them under
-`artifacts/modules/departments/1.1.0/` and `artifacts/modules/department-budgets/1.0.0/`, and the
+`artifacts/modules/organization/1.0.0/` and `artifacts/modules/department-budgets/1.2.0/`, and the
 Compose images hold them in `/modules`. The server and the worker read them through `Modules:Path`.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
@@ -82,9 +77,9 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
   [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
-  `form`, `page`, `process`, `event`, `text`, `seed`, `policy` and `trigger`
-  of type `event`, `dataChange` or `schedule`. Roles are not allowed.
-  _(planned for M24)_ `scenario` and `contract` are allowed too, see
+  `form`, `page`, `process`, `event`, `text`, `seed`, `policy`, `contract`,
+  `scenario` and `trigger` of type `event`, `dataChange` or `schedule`. Roles
+  are not allowed. See
   [module contracts](module-contracts.md). Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
@@ -104,9 +99,11 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   `modules/<id>/module.json`. There is no extra release table. A release keeps
   working when the version is later removed from the installation, because the
   release holds the files. A newer installed version in range gives a new
-  release at the next activation, as for packages.
+  release at the next activation, as for packages. A
+  [customization layer](customization-layers.md#versions-until-m29) that names a
+  key the newer version dropped fails that compile, and the release in use stays.
 - **References.** An application resource names a module resource as
-  `<module id>/<name>`, for example `departments/Department`. A module resource
+  `<module id>/<name>`, for example `organization/Department`. A module resource
   names resources of its own module without a `/`, and resources of a module its
   `module.json` declares in `modules` as `<module id>/<name>`. The compiler
   builds both rules for a field's `target` and `sequence` and for a data
@@ -138,7 +135,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   name a module entity. One that names an undeclared module keeps the policy's
   unknown-entity code, `AXC0092`. A module rule calls rules of its own
   module by plain name, such as `isActive(x)`, and rules of a module it declares
-  as `<module id>:<rule>(…)`, such as `departments:IsCode(x)`. The rule checks, `AXC0055`,
+  as `<module id>:<rule>(…)`, such as `organization:IsDelegating(from, until)`. The rule checks, `AXC0055`,
   `AXC0056`, `AXC0057` and `AXC0065`, and the type check of its expression
   apply to it and are reported in the module file. A call to an application
   rule, or a qualified call to a module it does not declare or to its own id, is
@@ -147,7 +144,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   dependency order, so a module in a dependency cycle, which is `AXC0296`, may
   also get `AXC0050` for a call back into the cycle. The compiler keeps each module rule as `<module id>/<name>`.
   An application expression calls it as `<module id>:<name>(…)`, such as
-  `departments:IsManager(x)`, with no spaces around the `:`. A rule, a
+  `organization:IsDelegating(from, until)`, with no spaces around the `:`. A rule, a
   validation, a data source filter, a process condition and a policy filter can
   call it. The interpreter runs its body, and a filter's SQL inlines it with the
   module rules it calls. The rule name ignores letter case and the module id
@@ -173,10 +170,10 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   order it is first reached. The record API
   writes a module entity's name as two path segments, `{module id}/{entity
   name}`, for example
-  `/api/apps/{app}/entities/departments/Department/records`. See the
+  `/api/apps/{app}/entities/organization/Department/records`. See the
   [record API routes](record-api.md#routes). The data source endpoint writes a
   module data source's name the same way, `{module id}/{data source name}`, for
-  example `/api/apps/{app}/data-sources/departments/Departments/rows`. See
+  example `/api/apps/{app}/data-sources/organization/Departments/rows`. See
   [the data source endpoint](data-sources.md#endpoint).
 - **A copy per application.** Entities, sequences, seeds, events, data sources and forms of a module belong
   to the application that uses it. The id of each module resource inside an
@@ -193,9 +190,12 @@ Compose images hold them in `/modules`. The server and the worker read them thro
   `type` are refused. Other field properties are not compared there. Removing a
   declared module from an application whose active release uses it counts as
   dropping each of its entities. Nothing is applied when activation is
-  refused. Modules ship no migrations, and a `migration` cannot name a
-  module entity: `AXC0214`. So an application cannot stop using a module once
-  its tables exist.
+  refused. Modules ship no migrations. An application `migration` may name an
+  entity of a module that `application.json` declares as `<module id>/<entity>`,
+  and then drops or converts a column of the application's copy. A migration
+  cannot drop a module entity, or name an entity of a module that is not
+  declared: `AXC0214`. So an application cannot stop using a module once its
+  tables exist.
 - **Texts.** A module's text keys start with `<module id>.`, or `AXC0209` is
   reported. A module ships one `text` resource per locale. Its texts join the
   application's texts of the same locale, ignoring letter case, so labels in
@@ -232,7 +232,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a module the application uses, declared or only depended on. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
-| `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
+| `AXC0214` | A `migration` names a module entity wrongly. Its `entity` contains `/` and names a module that `application.json` does not declare, reported at `/entity`. Or a `dropEntity` change names a module entity, reported at `/changes/{i}/type`. Reported at compile. |
 | `AXC0292` | A role slot of the pinned module version has no key in the entry's `roles`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/roles`, or at `/modules/{i}` when the entry has no `roles`. An entry of a `module.json` is checked the same way for the role slots of the module it names, and reported in `modules/<id>/module.json` of the module that holds it. |
 | `AXC0293` | A role slot is mapped to a name that is not a role the application declares. Reported at `/modules/{i}/roles/{slot}`, with `~` written `~0` and `/` written `~1`. A role whose file failed its own schema is not reported again. In an entry of a `module.json` the name must be a role slot of the module that holds the entry, matched exactly, and the report is in that `module.json`. |
 | `AXC0294` | A key in the entry's `roles` is not a role slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/roles/{key}`, escaped the same way. It is reported the same way in `modules/<id>/module.json` for an entry of a module. |
@@ -246,7 +246,7 @@ Compose images hold them in `/modules`. The server and the worker read them thro
 | `AXC0302` | An input of the connector's operation is required, and the slot operation has no input with that name. The message names the slot, the operation and the field. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` it is checked against the connector that the chain of slots reaches, and the report is in that `module.json`. |
 | `AXC0303` | An output of a slot operation is not an output of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` the slot of the depending module takes the place of the connector, and the report is in that `module.json`. |
 | `AXC0304` | A role in a module policy's `roles` is not a role slot of its module. The message lists the slots, or says there are none. Reported at `/roles/{i}` of the module file. |
-| `AXC0305` | A grant in a module policy is on something other than an entity or data source of its own module: a `process` or `endpoint` grant, a name with `/` such as `departments/Department`, or the plain name of an application entity or data source. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
+| `AXC0305` | A grant in a module policy is on something other than an entity, data source or process of its own module: an `endpoint` grant, a name with `/` such as `organization/Department`, or the plain name of an application entity, data source or process. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
 | `AXC0306` | Two mappings of the same slot of a module give it different roles or different connectors: the application's own entry and the chain through a depending module, or the chains through two depending modules. The message names the slot, the module and both mappings. The application's entry stays, and otherwise the first depending module in pin order. Reported at `/modules/{i}/roles/{slot}` or `/modules/{i}/connectors/{slot}` of the later entry, in `modules/<id>/module.json`. See [mapping slots](#processes-pages-policies-and-dependencies). |
 | `AXC0307` | A module task's `assignee.role`, or an escalation's `reassign.role`, is not a role slot of its module. A role of an application gives this too. The message lists the slots, or says there are none. Reported at `/steps/{i}/assignee/role` or `/steps/{i}/escalations/{j}/reassign/role` of the module file. |
 
@@ -257,38 +257,52 @@ permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies. Dependencies (the `modules` list with the slot maps), resolving the graph, one
-copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios and module policy grants on the module's processes are _(planned for M24)_.
+copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios are built. Module policy grants on the module's processes are _(planned for M24)_.
 
 ```json
 {
   "kind": "module",
   "id": "department-budgets",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "label": "Department budgets",
-  "roles": [{ "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } }],
-  "modules": [{ "id": "departments", "version": "^1.1.0", "roles": { "manager": "approver" } }]
+  "roles": [
+    { "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } },
+    { "name": "administrator", "label": { "textKey": "department-budgets.roles.administrator" } }
+  ],
+  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "administrator", "member": "approver" } }]
 }
 ```
 
 `department-budgets` is the sample module, `samples/modules/department-budgets`, that the
 purchase request sample declares, as
 [D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
-agrees. It holds a `Budget` entity with a name, a `departments/Department` reference, a year, an
-amount and a status, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetForm` page, a `BudgetApproval`
+agrees. It holds a `Budget` entity with a name, an `organization/Department` reference, a year, an
+amount, a `requester` creator field and a required `status` that defaults to `draft`, a `BudgetDecision` entity with the
+budget, the amount and `decidedBy`, a `BudgetContract` on `Budget`, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetForm` page, a `BudgetApproval`
 process whose `review` task goes to `approver`, an `ApproverAccess` policy and `en` and `vi` texts. The
 `Budgets` page has a `New` toolbar action that opens `BudgetForm` and a `Submit for approval` row action that
 starts `BudgetApproval` for the budget.
-An application that declares it maps the slot to one of its own roles:
+The [module contract](module-contracts.md) has a lifecycle where `draft` is initial and deletable and `approve` and
+`reject` go from `draft`. Both have the guard `accountableUser() != null and accountableUser() != requester`, so
+the creator of a budget cannot decide it, and a second manager must. It also has the core validation
+`amountFrozenOnceDecided`, which refuses an amount change once the budget is decided, the effect `decisionRecorded`,
+which creates a `BudgetDecision` when a budget is approved, and an `approver` ceiling of `read`, `create` and `update`.
+It holds the scenario `ApproverCreatesBudget` and the
+[contract scenarios](module-contracts.md#contract-scenarios) `RequesterCannotDecideOwnBudget`, `ApprovalRecordsDecision`
+and `DecidedAmountIsFrozen`. Every publish and validate of an application that declares it runs the contract scenarios.
+It has a second role slot, `administrator`, that grants nothing on budgets. It passes the `admin` slot of
+`organization` on to a role of the application, because the two `organization` slots must reach two different roles.
+An application that declares it maps both slots to roles of its own:
 
 ```json
 "modules": [
-  { "id": "departments", "version": "^1.1.0", "roles": { "manager": "department-manager" } },
-  { "id": "department-budgets", "version": "^1.0.0", "roles": { "approver": "department-manager" } }
+  { "id": "organization", "version": "^1.0.0", "roles": { "admin": "operator", "member": "department-manager" } },
+  { "id": "department-budgets", "version": "^1.2.0", "roles": { "approver": "department-manager", "administrator": "operator" } }
 ]
 ```
 
 - **Kinds.** A module may also hold `process` _(built)_, `trigger` of type `event`,
-  `dataChange` or `schedule` _(built)_ and _(planned for M24)_ `scenario`, as
+  `dataChange` or `schedule`, and `scenario`, as
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
   `connector`, `endpoint` or `webhook`.
 - **Role slots.** `roles` in `module.json` lists the module's role slots, each
@@ -317,15 +331,16 @@ An application that declares it maps the slot to one of its own roles:
   is `AXC0304`. Each slot becomes the role the application maps it to, so the
   compiled policy names that role and a person who holds the role in the
   application gets the grants there, and in no other application. A slot the
-  application does not map names nobody. A grant names an entity or data source of
+  application does not map names nobody. A grant names an entity, data source or process of
   its own module by its plain name. A name with `/`, including a module it
-  declares, a `process` or `endpoint` grant, and the plain name of an application
-  entity or data source are `AXC0305`. An unknown plain name keeps `AXC0092`. A grant's `filter` calls
+  declares, an `endpoint` grant, and the plain name of an application
+  entity, data source or process are `AXC0305`. An unknown plain name keeps `AXC0092`. A grant's `filter` calls
   only rules of the modules its module declares, by qualified call, as a module
   data source filter does. Default deny still holds: without the mapped role a
   person gets `403` on the module entity and data source. A module that the
   application reaches only as a dependency gets its slot map through the chain, so its policies
-  grant the role the chain reaches. _(planned for M24)_ A module policy grants on the processes of its own module.
+  grant the role the chain reaches. A `process` grant takes the process actions, and a person who holds the mapped role starts or
+  operates the module process, and without it gets `403`.
 - **Pages.** _(built)_ A module page is a `page` file in the module. In an application it is
   named `<module id>/<name>`, and its id is derived from the application `id` as for other module
   resources. Its widgets name resources of its own module by their plain names: the `entity`,
@@ -337,7 +352,7 @@ An application that declares it maps the slot to one of its own roles:
   application, gets the usual unknown-name diagnostic in the module file, and not in the
   application's files. Text keys in the page resolve against the merged texts, as in module forms.
   A module holds no site, so the application's site navigation lists a module page by that name,
-  such as `{ "page": "departments/Departments" }`, for a module that `application.json` declares.
+  such as `{ "page": "organization/Departments" }`, for a module that `application.json` declares.
   A module that the application does not declare is `AXC0207` at `/navigation/{i}/page`. An
   application page cannot navigate to a module page yet, because the `page` of its `navigate`
   action is a plain name. The page metadata API writes the name as two path segments, as the record
@@ -370,8 +385,8 @@ An application that declares it maps the slot to one of its own roles:
   starts it or an endpoint creates the module record and starts it, and a waiting instance finishes
   on the release it was started on, even after a newer module version is activated. The start endpoint takes it at
   `POST /api/apps/{app}/processes/{module}/{process}/instances`, and the E2E journey
-  `tests/e2e/specs/department-budgets-journey.spec.ts` starts one from the `Budgets` page row action and
-  decides its task. A module task assigned to a slot is listed in the task
+  `tests/e2e/specs/department-budgets-journey.spec.ts` starts one from the `Budgets` page row action, and a
+  second manager decides its task. A module task assigned to a slot is listed in the task
   inbox of the people who hold the mapped role, and only they can decide it.
 - **Triggers.** A module trigger starts a process of its own module. It
   reacts to an event or an entity of its own module, or of a module it
@@ -445,11 +460,23 @@ An application that declares it maps the slot to one of its own roles:
   header and lookup, and the worker runs it like an application step. Two
   applications that map one slot to different connectors call different
   systems. A module never names a binding.
-- **Scenarios** _(planned for M24)_. A module scenario gives its users role
-  slots instead of roles. When it runs for an application, each slot becomes
-  the role it maps to, and the scenario runs against the application as
-  customized. A module marks some as contract scenarios, which run on every
-  publish, see [contract scenarios](module-contracts.md#contract-scenarios).
+- **Scenarios** _(built)_. A module scenario gives its users, and its assignee
+  and recipient roles, role slots instead of roles. A role that is not a slot is
+  `AXC0335`, in the module file. Its steps name entities and processes of its own
+  module by plain name. A step's `entity` may also name an entity of a module the
+  module declares, written `<module id>/<name>`, so a scenario can create the
+  records another module holds, such as `organization/Employee`. A process
+  names only the module's own. Any other name with `/` is `AXC0208`, and an
+  unknown entity or process has its usual code. A connector
+  stub names a connector slot, and a package stub names a package the module
+  lists. When it runs for each application that pins the module, each slot
+  becomes the role the application maps it to, and the scenario runs against the
+  application as compiled. A module's scenarios run after the application's own,
+  in pin order and then by file path, in Studio and with `Axis.Scenarios`. A result
+  is named `<module id>/<scenario name>`. The scenario files stay out of the
+  release and its content hash. A module marks some as contract scenarios
+  _(planned for M24)_, which run on every publish, see
+  [contract scenarios](module-contracts.md#contract-scenarios).
 - **Dependencies.** _(built)_ `module.json` has an optional `modules`, with the `id` and
   `version` entries of an application's `modules`. A bad entry is `AXC0203`,
   `AXC0204` or `AXC0206`, reported in the `module.json` of the module that
@@ -536,9 +563,9 @@ The manifest is `template.json` at the root of the folder:
 - **Manifest.** `template.json` has `kind: applicationTemplate`, an `id`
   (lower-case letters, digits and `-`, starting with a letter), a SemVer
   `version`, a `title` and a `description`. The title and the description each
-  have an `en` and a `vi` text. _(planned for M26)_ `"builtIn": true` marks a
-  [built-in application](built-in-modules.md#where-they-live), which Studio lists
-  first.
+  have an `en` and a `vi` text. `builtIn` is an optional boolean. `"builtIn": true`
+  marks a [built-in application](built-in-modules.md#where-they-live), which Studio
+  lists first. Any other value leaves the template out.
 - **One site.** A template holds exactly one site. The site path of a copy
   follows the new name, and that rule is only clear for a single site.
 - **Installation.** Templates are installed per installation under
@@ -552,7 +579,8 @@ The manifest is `template.json` at the root of the folder:
   version's folder, as `request-approval/1.0.0`, and has no `AXC` code.
 - **Listing.** `GET /api/studio/templates` lists the newest version of each
   template, with the diagnostics of compiling it in memory. A template that does
-  not compile is still listed.
+  not compile is still listed. Built-in templates come first, then the others,
+  each group sorted by id.
 - **Copy**. A copy takes every `*.json` file of the template except
   `template.json`, in the same folders.
   - The top-level `id` of each resource becomes a new UUID. Seed record ids stay,
@@ -608,5 +636,5 @@ Every resource gets a new UUID `id`. The site JSON is:
 ```
 
 A `name` whose kebab-case form is longer than 60 characters, or is a reserved
-site path (`api`, `health`, `assets`, `studio`, `account`, `users`), is refused with `400`, so a
+site path (`api`, `health`, `assets`, `studio`, `account`, `users`, and `licences` _(planned for M31)_), is refused with `400`, so a
 blank application cannot fail with `AXC0024` or a schema error.

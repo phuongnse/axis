@@ -7,17 +7,21 @@
   "widgets": [
     {
       "type": "columns",
+      "name": "columns",
       "columns": [
-        { "width": 8, "widgets": [{ "type": "table", "entity": "Note" }] },
+        { "width": 8, "name": "column1", "widgets": [{ "type": "table", "name": "table", "entity": "Note" }] },
         {
           "width": 4,
+          "name": "column2",
           "widgets": [
             {
               "type": "section",
+              "name": "section",
               "title": { "textKey": "pages.noteOverview.totals" },
               "widgets": [
                 {
                   "type": "kpi",
+                  "name": "kpi",
                   "dataSource": "NoteTotals",
                   "measure": "notes",
                   "label": { "textKey": "kpi.notes" },

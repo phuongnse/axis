@@ -16,4 +16,10 @@ public sealed class WorkerOptions
 
     /// <summary>The failures of one delivery that make it a dead letter. It must be at least 1.</summary>
     public int DeliveryAttempts { get; set; } = 5;
+
+    /// <summary>How many loops share the active list of tenants with work due. It must be at least 1.</summary>
+    public int Concurrency { get; set; } = 4;
+
+    /// <summary>The work items a tenant of weight 1 runs in one turn, see <c>workerWeight</c>. It must be at least 1.</summary>
+    public int Quantum { get; set; } = 10;
 }

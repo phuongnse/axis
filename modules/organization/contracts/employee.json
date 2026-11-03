@@ -1,0 +1,46 @@
+{
+  "id": "9dbf22b1-376a-474d-9407-7bf069ab4610",
+  "kind": "contract",
+  "name": "EmployeeContract",
+  "formatVersion": 1,
+  "entity": "Employee",
+  "validations": [
+    {
+      "name": "notOwnManager",
+      "expression": "manager == null or manager != id",
+      "message": { "textKey": "organization.employee.notOwnManager" },
+      "field": "manager"
+    },
+    {
+      "name": "notOwnDelegate",
+      "expression": "delegate == null or delegate != id",
+      "message": { "textKey": "organization.employee.notOwnDelegate" },
+      "field": "delegate"
+    },
+    {
+      "name": "delegateHasDates",
+      "expression": "delegate == null or (delegateFrom != null and delegateUntil != null)",
+      "message": { "textKey": "organization.employee.delegateHasDates" },
+      "field": "delegateFrom"
+    },
+    {
+      "name": "delegateDatesInOrder",
+      "expression": "delegateFrom == null or delegateUntil == null or delegateUntil >= delegateFrom",
+      "message": { "textKey": "organization.employee.delegateDatesInOrder" },
+      "field": "delegateUntil"
+    }
+  ],
+  "ceiling": {
+    "slots": {
+      "admin": [{ "actions": ["read", "create", "update", "delete", "export", "import"] }],
+      "member": [
+        { "actions": ["read"] },
+        {
+          "actions": ["update"],
+          "fields": ["phone", "delegate", "delegateFrom", "delegateUntil"],
+          "filter": "user == currentUser()"
+        }
+      ]
+    }
+  }
+}

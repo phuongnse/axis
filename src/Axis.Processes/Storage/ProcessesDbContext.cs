@@ -79,6 +79,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.Step).HasColumnName("step");
             instance.Property(i => i.ParentInstanceId).HasColumnName("parent_instance_id");
             instance.Property(i => i.ParentStep).HasColumnName("parent_step");
+            instance.Property(i => i.AccountableUser).HasColumnName("accountable_user");
+            instance.Property(i => i.DecisionTask).HasColumnName("decision_task");
             instance.Property(i => i.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             instance.Property(i => i.EndedAt).HasColumnName("ended_at");
 
@@ -261,6 +263,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             @event.Property(e => e.SubjectId).HasColumnName("subject_id");
             @event.Property(e => e.Payload).HasColumnName("payload").HasColumnType("jsonb");
             @event.Property(e => e.ProcessInstanceId).HasColumnName("process_instance_id");
+            @event.Property(e => e.AccountableUser).HasColumnName("accountable_user");
             @event.Property(e => e.RaisedAt).HasColumnName("raised_at").HasDefaultValueSql("now()");
             @event.HasIndex(e => e.ProcessInstanceId).HasDatabaseName("ix_events_process_instance_id");
 

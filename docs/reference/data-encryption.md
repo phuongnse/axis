@@ -247,6 +247,9 @@ never a key. A refused `retire` writes none. Both need `Tenancy:Source=directory
   as `--backup-key-file <file>`, a file that holds the base64 key. The tool trims white space around it. The key
   never goes on the command line, in a setting or in a log. A lost backup key loses its archives. The tool cannot
   tell whether the backup key equals the installation key, so keeping the two apart is the operator's job.
+- **In a cell.** The cell has no key file for the operator to give. Each tenant has its own backup key in
+  `platform.tenant_backup_keys`, wrapped by the cell's backup key, and `tenant backup` and `tenant restore` use it and
+  refuse `--backup-key-file`. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
 - **The archive.** `tenant backup` writes the tar archive of [tenant backup](tenant-backup-and-restore.md#tenant-backup)
   encrypted:
   - The file starts with the 8 bytes `AXISBAK1` and a random 8-byte prefix.

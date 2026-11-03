@@ -1,0 +1,13 @@
+{
+  "id": "45d4447e-db09-47e8-9b84-c1a6ea4e813a",
+  "kind": "seed",
+  "name": "OrganizationDepartments",
+  "formatVersion": 1,
+  "entity": "organization/Department",
+  "sync": true,
+  "records": [
+    { "id": "5619ff72-c9b7-49d7-872e-72f15778485b", "values": { "code": "FIN", "name": "Finance", "head": "ce016969-dfdc-4f33-962e-dc322944b0fb" } },
+    { "id": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5", "values": { "code": "ENG", "name": "Engineering", "head": "7896d457-117d-4263-9133-fd6ba47dd25a" } },
+    { "id": "d1b09f14-34f5-4831-9708-158361c860df", "values": { "code": "OPS", "name": "Operations", "head": "38da2343-87f8-48b8-9a25-53c6e7ff5713" } }
+  ]
+}

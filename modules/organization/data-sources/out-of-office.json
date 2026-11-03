@@ -1,0 +1,14 @@
+{
+  "id": "cdcc2f3e-580b-4349-aad7-46e150475937",
+  "kind": "dataSource",
+  "name": "OutOfOffice",
+  "formatVersion": 1,
+  "entity": "Employee",
+  "fields": [
+    { "name": "fullName", "path": "fullName" },
+    { "name": "delegate", "path": "delegate" },
+    { "name": "delegateFrom", "path": "delegateFrom" },
+    { "name": "delegateUntil", "path": "delegateUntil" }
+  ],
+  "filter": "user == currentUser()"
+}

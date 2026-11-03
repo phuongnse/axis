@@ -283,11 +283,13 @@ owner.
   change is prototyped in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch
   and published to the artifact, so the owner sees the real widgets. The
-  branch stays local and is never merged. Before the review's issue its last
+  branch is pushed, so the review can go on from any machine, and is never
+  merged. CI leaves `design/` branches out, because a prototype changes the
+  widgets without their tests. Before the review's issue its last
   commit gets a `design-review/<yyyy-mm-dd>-<topic>` tag with the same date
-  and topic, and only the tag is pushed:
-  a tag starts no CI run, and it is never deleted, so the links to the
-  prototype never break.
+  and topic, and the tag is pushed: it starts no CI run, and it is never
+  deleted, so the links to the prototype never break. The branch is then
+  deleted, locally and on GitHub.
 - **The design runs ahead of the repository only by open issues and an open
   review.** While a design issue is open, the artifact holds its change and its
   last change note names the issue. While a review is open, the artifact may
@@ -416,8 +418,8 @@ issues, pull requests and sub-issues.
   such as `claude/<words>`: nobody names a branch like those by hand. A
   hand-made pull request comes from `docs/<topic>` for a docs change, or from
   `ops/<topic>` for a change in a path NexKit may not change, such as a NexKit
-  upgrade. A design review's prototype is a local
-  `design/<yyyy-mm-dd>-<topic>` branch, and its pushed tag is
+  upgrade. A design review's prototype is a
+  `design/<yyyy-mm-dd>-<topic>` branch, and its tag is
   `design-review/<yyyy-mm-dd>-<topic>`, with the same date and topic.
   `<topic>` is a few lower-case English words joined by hyphens, such as
   `widget-review`. Release tags, once Axis has them, start with `v`, so no
@@ -427,8 +429,9 @@ issues, pull requests and sub-issues.
   merges nor those of cloud sessions that push nothing. When the owner asks,
   the local session lists every `nexkit/` branch whose pull request is merged
   or that NexKit closed as `already_on_base`, because `main` already holds its
-  change, and every `claude/` branch with no pull request and no commit that
-  `main` lacks, and the owner deletes them. A branch with an open pull
+  change, every `claude/` branch with no pull request and no commit that
+  `main` lacks, and every `design/` branch whose `design-review/` tag exists,
+  and the owner deletes them. A branch with an open pull
   request, or any other closed one that was not merged, stays.
 
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md

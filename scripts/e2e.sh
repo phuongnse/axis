@@ -13,11 +13,11 @@
 # This script creates the PostgreSQL role axis_admin and gives Playwright AXIS_E2E_ADMIN_DATABASE and
 # AXIS_E2E_IDENTITY_ADMIN_SECRET. tests/e2e/admin-tool.ts runs Axis.Admin with them, and the realm emails go to
 # mailpit:1025.
-# The server starts with seven applications active: the generic E2E test application in
+# The server starts with nine applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests, the
 # leave request sample in samples/apps/leave-requests, the service desk sample in
 # samples/apps/service-desk, the asset management sample in samples/apps/asset-management and the
-# sub-process fixture in tests/e2e/fixtures/subprocess-app and the host site fixture in tests/e2e/fixtures/host-site-app.
+# sub-process fixture in tests/e2e/fixtures/subprocess-app, the host site fixture in tests/e2e/fixtures/host-site-app, the organization fixture in tests/e2e/fixtures/organization-app and the approvals fixture in tests/e2e/fixtures/approvals-app.
 # The host site's site has the host hostsite.localhost, one of the main tenant's hosts, which serves only that site.
 # A spec can activate another folder during the run: tests/e2e/activate.ts starts the built server
 # once more on a spare port with that folder in ActivateOnStartup, waits until it is ready and
@@ -56,7 +56,8 @@
 # startup activation migrates a tenant database. Playwright starts that server after the main one, which
 # shares the platform database. The worker and the publisher serve the journey tenant too, and the run fails if
 # either log never reports it ready. The setup step signs the author, the requester, the service desk lead,
-# the agent, the approver, the asset manager, the employee and the auditor in on its host.
+# the agent, the approver, the asset manager, the employee, the auditor, the department managers and the
+# platform operator in on its host.
 # The tenant create spec signs a person in on the host of the tenant it creates, over https and with no port. This script
 # makes a throwaway certificate with openssl for the run, in a temporary folder that it removes at the end, and gives
 # Playwright its paths as AXIS_E2E_TLS_CERT and AXIS_E2E_TLS_KEY. It also gives AXIS_E2E_TENANT_HTTPS_PORT (default

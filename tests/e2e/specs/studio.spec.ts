@@ -88,7 +88,9 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)
     await page.getByTestId(`studio-field-/fields/${index}/maxLength`).getByRole('spinbutton').fill(String(next))
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    // This is the first write on a fresh server. It compiles the sample with its modules, which can take longer than the
+    // default wait on a busy machine.
+    await expect(page.getByTestId('studio-saved')).toBeVisible({ timeout: 60_000 })
 
     const after: unknown = JSON.parse(await readFile(file, 'utf8'))
     before.fields[index].maxLength = next
@@ -144,18 +146,18 @@ test.describe('Studio on a copy of its own', () => {
     expect(await readFile(file, 'utf8')).toBe(before)
   })
 
-  test('an author follows a Used by entry from a department to the entity that uses it', async ({ page }) => {
+  test('an author follows a Used by entry from a supplier to the entity that uses it', async ({ page }) => {
     await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
-    const department = items.find((item) => item.file === 'entities/department.json')!
+    const supplier = items.find((item) => item.file === 'entities/supplier.json')!
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
 
-    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${department.id}`)
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${supplier.id}`)
     await page
       .getByTestId('studio-used-by')
       .getByTestId('studio-reference')
-      .filter({ hasText: 'entities/purchase-request.json · Path: /fields/3/target' })
+      .filter({ hasText: 'entities/purchase-request.json · Path: /fields/4/target' })
       .getByRole('button', { name: 'PurchaseRequest', exact: true })
       .click()
 
@@ -262,7 +264,7 @@ test.describe('Studio on a copy of its own', () => {
         name: 'MatrixTesterAccess',
         formatVersion: 1,
         roles: ['matrix-tester'],
-        grants: [{ entity: 'Supplier', actions: ['read'] }],
+        grants: [{ name: 'supplier1', entity: 'Supplier', actions: ['read'] }],
       })
       const diagnosticsAfter = await (
         await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/diagnostics`)
@@ -315,7 +317,7 @@ test.describe('Studio on a copy of its own', () => {
         name: 'MatrixExporterAccess',
         formatVersion: 1,
         roles: ['matrix-exporter'],
-        grants: [{ dataSource: 'PurchaseRequestList', actions: ['read', 'export'] }],
+        grants: [{ name: 'purchaseRequestList1', dataSource: 'PurchaseRequestList', actions: ['read', 'export'] }],
       })
       const diagnosticsAfter = await (
         await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/diagnostics`)
@@ -339,7 +341,7 @@ test.describe('Studio on a copy of its own', () => {
       const list = await page.request.get(`${restarted.url}/api/studio/apps/PurchaseRequests/resources`)
       const { items } = (await list.json()) as { items: { id: string; file: string }[] }
       const supplier = items.find((item) => item.file === 'entities/supplier.json')!
-      const department = items.find((item) => item.file === 'entities/department.json')!
+      const lineItem = items.find((item) => item.file === 'entities/line-item.json')!
       const file = path.join(copy, 'entities/supplier.json')
       const before = JSON.parse(await readFile(file, 'utf8')) as { fields: { maxLength: number }[] }
       const next = before.fields[1].maxLength + 1
@@ -351,7 +353,7 @@ test.describe('Studio on a copy of its own', () => {
 
       const { port } = restarted
       await restarted.stop()
-      await page.getByTestId(`studio-resource-${department.id}`).click()
+      await page.getByTestId(`studio-resource-${lineItem.id}`).click()
       await expect(page.getByTestId('studio-reconnecting')).toBeVisible()
 
       restarted = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy }, port)
@@ -397,12 +399,12 @@ test.describe('Studio on a copy of its own', () => {
     }
   })
 
-  test('an author adds a department in the seed grid and the file holds only that new record', async ({ page }) => {
+  test('an author adds a supplier in the seed grid and the file holds only that new record', async ({ page }) => {
     await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
-    const seed = items.find((item) => item.file === 'seeds/departments.json')!
-    const file = path.join(copy, 'seeds/departments.json')
+    const seed = items.find((item) => item.file === 'seeds/suppliers.json')!
+    const file = path.join(copy, 'seeds/suppliers.json')
     const original = await readFile(file, 'utf8')
     const before = JSON.parse(original) as { records: { id: string; values: Record<string, unknown> }[] }
     const diagnosticsBefore = await (
@@ -417,7 +419,7 @@ test.describe('Studio on a copy of its own', () => {
       await page.getByRole('button', { name: 'Add record', exact: true }).click()
       const row = page.getByTestId('studio-seed-row').nth(before.records.length)
       await row.getByRole('textbox', { name: 'code', exact: true }).fill(code)
-      await row.getByRole('textbox', { name: 'name', exact: true }).fill('Test department')
+      await row.getByRole('textbox', { name: 'name', exact: true }).fill('Test supplier')
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
@@ -430,7 +432,7 @@ test.describe('Studio on a copy of its own', () => {
       expect(after.records.slice(0, before.records.length)).toEqual(before.records)
       const added = after.records[before.records.length]
       expect(added.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
-      expect(added.values).toEqual({ code, name: 'Test department' })
+      expect(added.values).toEqual({ code, name: 'Test supplier' })
     } finally {
       await writeFile(file, original)
     }
@@ -555,7 +557,7 @@ test.describe('Studio on a copy of its own', () => {
     const id = randomUUID()
     await writeFile(
       pageFile,
-      JSON.stringify({ id, kind: 'page', name: 'LabelTextsE2e', formatVersion: 1, widgets: [{ type: 'taskInbox' }] }),
+      JSON.stringify({ id, kind: 'page', name: 'LabelTextsE2e', formatVersion: 1, widgets: [{ type: 'taskInbox', name: 'taskInbox' }] }),
     )
 
     try {

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioRequest, StudioScenarioResult } from '../platform/studio'
+import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioTestResults } from './StudioTestResults'
 
@@ -94,6 +94,31 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
 
     await userEvent.click(within(failed).getByRole('button'))
     expect(onSelect).toHaveBeenCalledWith('09d75317-fd9e-411e-8322-317778fc1b2b', '/steps/5')
+  })
+
+  it('shows a skipped contract scenario with its relaxed point, and opens nothing when clicked', async () => {
+    const skipped: StudioSkippedScenarioResult = {
+      name: 'department-budgets/ApprovalRecordsDecision',
+      file: 'scenarios/approval-records-decision.json',
+      outcome: 'skipped',
+      point: 'Budget/effects/decisionRecorded',
+    }
+    const { section, onSelect } = renderResults(
+      request({ kind: 'publish', status: 'succeeded', scenarios: [skipped, finance] }),
+    )
+
+    expect(section).toHaveAttribute('data-status', 'succeeded')
+    expect(screen.getByRole('heading', { name: 'Contract scenarios' })).toBeInTheDocument()
+    const rows = screen.getAllByTestId('studio-test-result')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveAttribute('data-outcome', 'skipped')
+    expect(rows[0]).toHaveTextContent('skipped')
+    expect(rows[0]).toHaveTextContent('department-budgets/ApprovalRecordsDecision')
+    expect(rows[0]).toHaveTextContent('Relaxed point Budget/effects/decisionRecorded')
+    expect(within(rows[0]).queryByRole('button')).not.toBeInTheDocument()
+
+    await userEvent.click(rows[0])
+    expect(onSelect).not.toHaveBeenCalled()
   })
 
   it('says no scenario ran when a failed run has no results', () => {

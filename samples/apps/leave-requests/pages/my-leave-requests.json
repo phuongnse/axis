@@ -7,9 +7,10 @@
   "widgets": [
     {
       "type": "table",
+      "name": "myLeaveRequests",
       "dataSource": "LeaveRequestList",
-      "rowActions": [{ "type": "navigate", "page": "LeaveRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
-      "toolbarActions": [{ "type": "navigate", "page": "LeaveRequestForm", "label": { "textKey": "actions.new" } }]
+      "rowActions": [{ "type": "navigate", "name": "open", "page": "LeaveRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "LeaveRequestForm", "label": { "textKey": "actions.new" } }]
     }
   ]
 }

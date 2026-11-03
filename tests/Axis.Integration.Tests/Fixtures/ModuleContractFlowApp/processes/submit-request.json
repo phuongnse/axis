@@ -1,0 +1,34 @@
+{
+  "id": "53b31e59-6ee7-406a-956c-d7891bcf1b04",
+  "kind": "process",
+  "name": "SubmitRequest",
+  "formatVersion": 1,
+  "entity": "requests/Request",
+  "start": "decide",
+  "steps": [
+    {
+      "name": "decide",
+      "type": "task",
+      "label": {
+        "textKey": "request.decide"
+      },
+      "assignee": {
+        "role": "employee"
+      },
+      "form": "RequestForm",
+      "outcomes": [
+        {
+          "name": "done",
+          "label": {
+            "textKey": "request.done"
+          },
+          "next": "finished"
+        }
+      ]
+    },
+    {
+      "name": "finished",
+      "type": "end"
+    }
+  ]
+}

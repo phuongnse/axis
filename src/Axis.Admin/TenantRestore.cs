@@ -509,6 +509,12 @@ internal sealed class TenantRestore : IAsyncDisposable
                 await TenantKeyRows.AddMissingAsync(_platform, _id, _settings.Cipher, _cancellationToken);
             }
 
+            // In a cell the restored tenant gets a backup key of its own. A rerun keeps the one it made.
+            if (_settings.CellBackupCipher is { } cell)
+            {
+                await TenantBackupKeys.AddMissingAsync(_platform, _id, cell, _cancellationToken);
+            }
+
             await _platform.SaveChangesAsync(_cancellationToken);
             await transaction.CommitAsync(_cancellationToken);
 

@@ -4,5 +4,5 @@
   "name": "Topics",
   "formatVersion": 1,
   "title": { "textKey": "pages.topics.title" },
-  "widgets": [{ "type": "table", "entity": "Topic" }]
+  "widgets": [{ "type": "table", "name": "table", "entity": "Topic" }]
 }

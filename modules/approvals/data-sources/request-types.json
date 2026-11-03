@@ -1,0 +1,13 @@
+{
+  "id": "de840a61-1807-4b9a-8627-850685823289",
+  "kind": "dataSource",
+  "name": "RequestTypes",
+  "formatVersion": 1,
+  "entity": "RequestType",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "code", "path": "code" },
+    { "name": "description", "path": "description" },
+    { "name": "active", "path": "active" }
+  ]
+}

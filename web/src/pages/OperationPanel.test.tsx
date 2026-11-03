@@ -82,6 +82,7 @@ const names: StudioNames = {
   forms: [],
   pages: [],
   policies: [],
+  contracts: [],
   texts: [],
 }
 

@@ -70,12 +70,13 @@ public static class DataSourceQueries
         RecordCondition? condition = null,
         string? search = null,
         CancellationToken cancellationToken = default) =>
-        ListAsync(connection, transaction, application, dataSource, page, pageSize, sort, parameters, condition, search, null, cancellationToken);
+        ListAsync(connection, transaction, application, dataSource, page, pageSize, sort, parameters, condition, search, null, null, cancellationToken);
 
     /// <summary>
     /// Lists a page as the list without a cipher does, and decrypts the value of each projected sensitive field with
     /// <paramref name="cipher"/>, also through a reference path. Without a cipher, a row that holds a stored sensitive
-    /// value throws.
+    /// value throws. <paramref name="userId"/> is the signed-in user's id, which a filter that calls <c>currentUser()</c>
+    /// compares with. The condition may already bind it, and then the data source adds nothing.
     /// </summary>
     public static async Task<DataSourceRowPage?> ListAsync(
         NpgsqlConnection connection,
@@ -89,6 +90,7 @@ public static class DataSourceQueries
         RecordCondition? condition,
         string? search,
         RecordCipher? cipher,
+        string? userId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -117,6 +119,7 @@ public static class DataSourceQueries
                 AddLookups(count, lookups);
                 AddTimeZone(count, statement);
                 condition?.AddTo(count);
+                AddCurrentUser(count, userId);
                 if (searching)
                 {
                     count.Parameters.Add(RecordQueries.SearchParameter(search!));
@@ -141,6 +144,7 @@ public static class DataSourceQueries
             AddLookups(command, lookups);
             AddTimeZone(command, statement);
             condition?.AddTo(command);
+            AddCurrentUser(command, userId);
             if (searching)
             {
                 command.Parameters.Add(RecordQueries.SearchParameter(search!));
@@ -182,11 +186,12 @@ public static class DataSourceQueries
         string? search,
         int limit,
         CancellationToken cancellationToken = default) =>
-        ReadAllAsync(connection, application, dataSource, sort, parameters, condition, search, limit, null, cancellationToken);
+        ReadAllAsync(connection, application, dataSource, sort, parameters, condition, search, limit, null, null, cancellationToken);
 
     /// <summary>
     /// Streams the rows as the stream without a cipher does, and decrypts the value of each projected sensitive field with
     /// <paramref name="cipher"/>. Without a cipher, a row that holds a stored sensitive value throws.
+    /// <paramref name="userId"/> is bound as <see cref="ListAsync(NpgsqlConnection, NpgsqlTransaction?, ApplicationModel, DataSourceModel, int, int, DataSourceSort?, IReadOnlyList{DataSourceParameterValue}, RecordCondition?, string?, RecordCipher?, string?, CancellationToken)"/> does.
     /// </summary>
     public static async IAsyncEnumerable<DataSourceRow> ReadAllAsync(
         NpgsqlConnection connection,
@@ -198,6 +203,7 @@ public static class DataSourceQueries
         string? search,
         int limit,
         RecordCipher? cipher,
+        string? userId,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -215,6 +221,7 @@ public static class DataSourceQueries
         AddLookups(command, lookups);
         AddTimeZone(command, statement);
         condition?.AddTo(command);
+        AddCurrentUser(command, userId);
         if (searching)
         {
             command.Parameters.Add(RecordQueries.SearchParameter(search!));
@@ -227,6 +234,18 @@ public static class DataSourceQueries
         while (await reader.ReadAsync(cancellationToken))
         {
             yield return dataSource.Aggregate is { } grouped ? ReadGroupedRow(reader, grouped) : await ReadRowAsync(reader, dataSource, cipher, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Binds <c>@currentUser</c> to <paramref name="userId"/> for a filter that calls <c>currentUser()</c>, unless the
+    /// condition has bound it already. Both are the session's user id, and a command cannot hold the name twice.
+    /// </summary>
+    private static void AddCurrentUser(NpgsqlCommand command, string? userId)
+    {
+        if (userId is not null && !command.Parameters.Contains(SqlTranslator.CurrentUserParameter))
+        {
+            command.Parameters.Add(new NpgsqlParameter(SqlTranslator.CurrentUserParameter, NpgsqlDbType.Text) { Value = userId });
         }
     }
 

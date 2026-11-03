@@ -1,0 +1,16 @@
+{
+  "id": "136a487c-97d9-4682-9f06-f18b9f05b3a9",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Approvals",
+    "nav.myRequests": "My requests",
+    "nav.toDecide": "To decide",
+    "nav.allRequests": "All requests",
+    "nav.requestTypes": "Request types",
+    "role.departmentManager": "Department manager",
+    "role.employee": "Employee"
+  }
+}

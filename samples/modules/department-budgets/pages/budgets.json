@@ -7,11 +7,12 @@
   "widgets": [
     {
       "type": "table",
+      "name": "budgets",
       "dataSource": "Budgets",
       "rowActions": [
-        { "type": "startProcess", "process": "BudgetApproval", "label": { "textKey": "department-budgets.actions.submit" } }
+        { "type": "startProcess", "name": "submit", "process": "BudgetApproval", "label": { "textKey": "department-budgets.actions.submit" } }
       ],
-      "toolbarActions": [{ "type": "navigate", "page": "BudgetForm", "label": { "textKey": "department-budgets.actions.new" } }]
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "BudgetForm", "label": { "textKey": "department-budgets.actions.new" } }]
     }
   ]
 }

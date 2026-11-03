@@ -13,6 +13,19 @@ namespace Axis.Data.Records;
 /// identifier comes from <see cref="EntityNaming"/> and is quoted, and every value is a typed
 /// parameter. Storage failures the request can cause become a <see cref="RecordWriteResult"/> or
 /// <see cref="RecordDeleteResult"/> that never names a table, column or constraint.
+/// Every create and update first runs the entity's core validations, when a module contract gives it
+/// some: each must be <c>true</c> on the record as it will be stored, or the write is
+/// <see cref="RecordWriteOutcome.Invalid"/>. They run after the entity's own validations, which the callers
+/// run first. Every write then follows the entity's lifecycle, when a module contract gives it one: a create only in
+/// an initial state, a state change only along a transition whose guard is <c>true</c>, and a delete
+/// only in a deletable state. The checks sit in <see cref="CreateAsync"/>, <see cref="UpdateAsync"/>
+/// and <see cref="DeleteAsync"/>, so <see cref="SetAsync"/> and <see cref="CreateFromAsync"/> reach it
+/// through them. A refusal is <see cref="RecordWriteOutcome.LifecycleRefused"/> or
+/// <see cref="RecordDeleteOutcome.LifecycleRefused"/> and writes nothing.
+/// An update that makes a transition ends with its effects: after the record is stored, each effect of the
+/// transition creates its record, in declaration order. Only an update runs effects, so effects never chain.
+/// An effect that cannot be written is <see cref="RecordWriteOutcome.EffectRefused"/>, and the caller's
+/// rollback leaves nothing of the write.
 /// </summary>
 public static class RecordCommands
 {
@@ -35,13 +48,17 @@ public static class RecordCommands
     /// A file value also needs the caller's transaction: the file is attached to the record after the
     /// reference check. It must be a pending file that <paramref name="uploader"/> uploaded for the same
     /// entity and field path. Without an <paramref name="uploader"/> nothing attaches, so any file id is
-    /// <see cref="RecordWriteOutcome.Invalid"/>.
+    /// <see cref="RecordWriteOutcome.Invalid"/>. A core validation of the entity's module contract that is
+    /// not <c>true</c> is <see cref="RecordWriteOutcome.Invalid"/> too, checked first. A create outside an
+    /// initial state of the entity's lifecycle is <see cref="RecordWriteOutcome.LifecycleRefused"/>, checked next.
     /// </summary>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     public static async Task<RecordWriteResult> CreateAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
         IReadOnlyList<RecordLinks>? links = null,
@@ -53,16 +70,27 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
+
+        var recordId = id ?? Guid.CreateVersion7();
+        if (await RecordCoreValidations.CheckCreateAsync(connection, application, entity, recordId, values, rows, links, context, cipher, cancellationToken) is { } coreFailure)
+        {
+            return coreFailure;
+        }
+
+        if (RecordLifecycle.CheckCreate(entity, values) is { } lifecycleRefusal)
+        {
+            return lifecycleRefusal;
+        }
 
         if (await FindMissingReferencesAsync(connection, values, rows, links, cancellationToken) is { } missing)
         {
             return missing;
         }
 
-        var recordId = id ?? Guid.CreateVersion7();
         if (await AttachFilesAsync(connection, application, entity, recordId, uploader, values, rows, cancellationToken) is { } refused)
         {
             return refused;
@@ -113,13 +141,25 @@ public static class RecordCommands
     /// Without an <paramref name="uploader"/> nothing new attaches, so any other file id is
     /// <see cref="RecordWriteOutcome.Invalid"/>. After a write, a file that the record no longer holds
     /// at a written file field, or at the file field of a written collection, becomes <c>deleted</c>
-    /// in the caller's transaction.
+    /// in the caller's transaction. An update of an entity with core validations reads the stored record
+    /// first, and is <see cref="RecordWriteOutcome.Invalid"/> when one of them is not <c>true</c> on the record
+    /// as it will be stored. An update that sends the lifecycle's state field and changes the state
+    /// reads the stored record, and is <see cref="RecordWriteOutcome.LifecycleRefused"/> unless a
+    /// transition from the stored state to the new one has a guard that is <c>true</c>, or has none.
+    /// After the record is stored, each effect of that transition creates its record, in declaration order,
+    /// as <see cref="CreateFromAsync"/> does, with the accountable user as its creator and no grant check.
+    /// The caller must hold a transaction when the entity's contract has effects, and roll it back unless the
+    /// record is <see cref="RecordWriteOutcome.Written"/>. An effect that cannot be written is
+    /// <see cref="RecordWriteOutcome.EffectRefused"/>, which names the effect in its point. A written result lists
+    /// the records the effects created in <see cref="RecordWriteResult.Effects"/>.
     /// </summary>
+    /// <param name="context">Who answers for the write and the task decision that led to it. A contract guard and an effect read it through <c>accountableUser()</c> and <c>decisionTask()</c>.</param>
     public static async Task<RecordWriteResult> UpdateAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         Guid id,
         long version,
         IReadOnlyList<RecordValue> values,
@@ -132,9 +172,21 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
         links ??= [];
+
+        if (await RecordCoreValidations.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, context, cipher, cancellationToken) is { } coreFailure)
+        {
+            return coreFailure;
+        }
+
+        var lifecycle = await RecordLifecycle.CheckUpdateAsync(connection, application, entity, id, version, values, rows, links, context, cipher, cancellationToken);
+        if (lifecycle.Refusal is { } lifecycleRefusal)
+        {
+            return lifecycleRefusal;
+        }
 
         if (await FindMissingReferencesAsync(connection, values, rows, links, cancellationToken) is { } missing)
         {
@@ -175,6 +227,11 @@ public static class RecordCommands
             if (written.Outcome == RecordWriteOutcome.Written)
             {
                 await MarkReplacedFilesAsync(connection, application, id, values, rows, cancellationToken);
+                if (lifecycle is { Transition: { } transition, Stored: { } before } && written.Record is { } after)
+                {
+                    var (refusal, created) = await RecordEffects.RunAsync(connection, application, entity, releaseId, context, transition, before, after, cipher, cancellationToken);
+                    return refusal ?? written with { Effects = created };
+                }
             }
 
             return written;
@@ -198,6 +255,7 @@ public static class RecordCommands
     /// transaction back unless the record is <see cref="RecordWriteOutcome.Written"/>.
     /// </summary>
     /// <param name="releaseId">The release the caller runs on, which the written record is stamped with.</param>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
     /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a validation.</param>
     public static async Task<RecordWriteResult> SetAsync(
@@ -205,6 +263,7 @@ public static class RecordCommands
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         Record stored,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
         DateTimeOffset now,
@@ -214,6 +273,7 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(stored);
         ArgumentNullException.ThrowIfNull(values);
 
@@ -240,7 +300,8 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors);
         }
 
-        var computed = RecordComputer.ComputeUpdate(application, entity, stored, converted, []);
+        var matched = await RecordMatcher.WithMatchesAsync(connection, application, entity, converted, stored, cancellationToken);
+        var computed = RecordComputer.ComputeUpdate(application, entity, stored, matched, []);
         if (computed.Errors is { } computeErrors)
         {
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: computeErrors);
@@ -254,7 +315,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await UpdateAsync(connection, application, entity, releaseId, stored.Id, stored.Version, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
+        return await UpdateAsync(connection, application, entity, releaseId, context, stored.Id, stored.Version, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -262,7 +323,8 @@ public static class RecordCommands
     /// caller's transaction and with no grant check. Each value must fit its field's column, and a
     /// <c>null</c> for a required field is refused. The fields the values leave out get their
     /// defaults, and a required field with no value, no default, no formula, no sequence and no
-    /// creator is refused. Each creator field is set to <paramref name="creatorId"/>. Then the
+    /// creator is refused. Each creator field is set to <paramref name="creatorId"/>, and stays <c>null</c> when
+    /// it is <see langword="null"/>. Then the
     /// computed fields are computed, the validations run and the record is inserted with its
     /// sequence numbers. A value that does not fit, a missing required field, a computed field that
     /// cannot be computed and a failed validation are <see cref="RecordWriteOutcome.Invalid"/>, keyed
@@ -270,16 +332,18 @@ public static class RecordCommands
     /// is <see cref="RecordWriteOutcome.Written"/>, which hands the sequence numbers back.
     /// </summary>
     /// <param name="releaseId">The release the caller runs on, which the written record is stamped with.</param>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     /// <param name="values">Each field to set with its value, as the expression interpreter gives it.</param>
-    /// <param name="creatorId">The id the creator fields are set to.</param>
+    /// <param name="creatorId">The id the creator fields are set to, or <see langword="null"/> to leave them <c>null</c>.</param>
     /// <param name="now">The start time of the caller's transaction, which <c>now()</c> gives in a default and a validation.</param>
     public static async Task<RecordWriteResult> CreateFromAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         Guid releaseId,
+        RecordWriteContext context,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
-        string creatorId,
+        string? creatorId,
         DateTimeOffset now,
         RecordCipher? cipher = null,
         CancellationToken cancellationToken = default)
@@ -287,8 +351,8 @@ public static class RecordCommands
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
-        ArgumentNullException.ThrowIfNull(creatorId);
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var converted = new List<RecordValue>();
@@ -335,7 +399,8 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: errors);
         }
 
-        var computed = RecordComputer.ComputeCreate(application, entity, RecordCreator.WithCreator(entity, defaults.Values, creatorId), []);
+        var matched = await RecordMatcher.WithMatchesAsync(connection, application, entity, RecordCreator.WithCreator(entity, defaults.Values, creatorId), null, cancellationToken);
+        var computed = RecordComputer.ComputeCreate(application, entity, matched, []);
         if (computed.Errors is { } computeErrors)
         {
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: computeErrors);
@@ -346,7 +411,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await CreateAsync(connection, application, entity, releaseId, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
+        return await CreateAsync(connection, application, entity, releaseId, context, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -370,18 +435,28 @@ public static class RecordCommands
     /// Deletes the record with <paramref name="id"/> and returns the version it had. Every file
     /// attached to it, also a file of a child row, becomes <c>deleted</c> in the same statement. A
     /// record that another record references is kept with its files and is
-    /// <see cref="RecordDeleteOutcome.Referenced"/>.
+    /// <see cref="RecordDeleteOutcome.Referenced"/>. When the entity has a lifecycle, the stored state is
+    /// read with <c>FOR UPDATE</c> first, and a state that is not deletable is
+    /// <see cref="RecordDeleteOutcome.LifecycleRefused"/>.
     /// </summary>
+    /// <param name="context">Who answers for the write and the task decision that led to it. The contract checks will read it.</param>
     public static async Task<RecordDeleteResult> DeleteAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
+        RecordWriteContext context,
         Guid id,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (await RecordLifecycle.CheckDeleteAsync(connection, entity, id, cancellationToken) is { } lifecycleRefusal)
+        {
+            return lifecycleRefusal;
+        }
 
         var versionColumn = EntityNaming.Quote(EntityNaming.VersionColumn);
         await using var command = new NpgsqlCommand(

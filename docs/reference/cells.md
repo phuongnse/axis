@@ -37,7 +37,9 @@ A host runs as a cell when `Cell:Id` is set, see [cell settings](host-settings.m
   region gets its tenants' records one by one, instead of the wildcard.
 - **Wildcard certificate.** The cell's ingress serves one certificate for `*.<tenant domain>`.
   cert-manager gets and renews it over ACME with the DNS-01 challenge, because a wildcard needs DNS
-  validation. The DNS provider's token is a Kubernetes Secret of the cell, never a setting.
+  validation. The DNS provider's token is a Kubernetes Secret of the cell, never a setting. The chart renders
+  the Issuer and the Certificate, see the `cell.certificate` values in
+  [installation](installation.md#settings-and-secrets).
 - **A host of the tenant's own.** A tenant administrator, or the operator through the
   [provisioning API](tenant-lifecycle.md#hosts), adds a host such as `approvals.acme.vn`.
   1. The cell answers with a verification token. The customer adds the DNS record
@@ -69,23 +71,32 @@ cell puts PgBouncer in front of it.
   - PgBouncer `default_pool_size` 3 for each database and role, `max_db_connections` 10,
     `max_client_conn` 10,000.
   - Npgsql `Maximum Pool Size` 5 and `Minimum Pool Size` 0 for each tenant, with
-    `Connection Idle Lifetime` 60 seconds, so an idle tenant holds no connection.
+    `Connection Idle Lifetime` 60 seconds, so an idle tenant holds no connection. These are the
+    defaults of the [`Data:TenantPool*` settings](host-settings.md#data-settings), which win over
+    the connection string's keywords. They also set `Max Auto Prepare` to 0.
   - PostgreSQL `max_connections` stays at the managed service's size, with 40 kept for direct
     connections.
 - **What transaction mode allows.** A transaction may take `pg_advisory_xact_lock` and use
   `SET LOCAL`, which end with it. Axis's run-time locks are of that kind. Nothing on a pooled
   connection may rely on state that outlives a transaction: a session advisory lock, a plain `SET`,
   a prepared statement kept by name, `LISTEN` or a temporary table. Npgsql's automatic preparation
-  is off on pooled connections.
+  is off on pooled connections. A guard test fails on such a statement in `src`, outside the listed
+  files that use direct connections.
 - **Direct connections.** These connect to PostgreSQL directly, not through PgBouncer:
   - `Axis.Admin` and the publisher, with the schema role, because activation and provisioning take
     session advisory locks and change tables;
   - the worker's one `LISTEN` connection on the platform database, see
     [waking a tenant](worker-scheduling.md#waking-a-tenant);
   - the platform database connections of the server and the worker, which are few.
-- **Settings.** The connection strings name PgBouncer's address for the runtime role and
-  PostgreSQL's for the rest. TLS with a full certificate check holds on both legs, as
-  [TLS](installation.md#tls) asks.
+- **Tested.** The integration tests run the record API and a worker process, a task step then an
+  operation step, through PgBouncer in transaction mode with the same pool sizes, for the runtime
+  role only. They also check that the schema role cannot connect through it.
+- **Settings.** The server and the worker send every tenant's runtime connection to
+  `Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, PgBouncer's address, see
+  [cell settings](host-settings.md#cell-settings). The tenant directory row and the platform
+  connection strings keep PostgreSQL's address for everything else. TLS with a full certificate
+  check holds on both legs, as [TLS](installation.md#tls) asks. The Helm chart's `cell.pgbouncer`
+  deploys PgBouncer and sets both settings, see [installation](installation.md#in-the-cloud).
 
 ## Cell size
 

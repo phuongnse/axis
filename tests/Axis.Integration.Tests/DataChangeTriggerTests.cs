@@ -107,6 +107,19 @@ public sealed class DataChangeTriggerTests(TriggerApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task The_instance_a_trigger_starts_keeps_the_writing_user_as_its_accountable_user()
+    {
+        var id = await CreateAsync("""{ "title": "Dock" }""");
+
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
+            SELECT count(*) FROM axis.process_instances
+            WHERE subject_id = @record AND process_id = @process AND accountable_user = 'cara' AND decision_task IS NULL
+            """,
+            ("record", id), ("process", fixture.ProcessId("Review"))));
+    }
+
+    [Fact]
     public async Task A_create_whose_start_condition_is_false_is_stored_and_the_skip_is_logged()
     {
         var id = await CreateAsync("""{ "title": "Retired", "status": "closed" }""");
@@ -207,6 +220,20 @@ public sealed class DataChangeTriggerTests(TriggerApiFixture fixture) : IClassFi
             """,
             ("record", id), ("process", fixture.ProcessId("Escalate"))))!;
         Assert.Equal(updated, started);
+    }
+
+    [Fact]
+    public async Task A_step_that_changes_a_field_another_trigger_watches_starts_that_process_with_the_accountable_user_of_the_step()
+    {
+        var id = await CreateAsync("""{ "title": "Relay" }""");
+        await UpdateAsync(id, """{ "version": 1, "values": { "stage": "open" } }""");
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(1L, await CountInstancesAsync(id, "Notify"));
+        const string accountable = "SELECT accountable_user FROM axis.process_instances WHERE subject_id = @record AND process_id = @process";
+        Assert.Equal("cara", await fixture.ScalarAsync(accountable, ("record", id), ("process", fixture.ProcessId("Escalate"))));
+        Assert.Equal("cara", await fixture.ScalarAsync(accountable, ("record", id), ("process", fixture.ProcessId("Notify"))));
     }
 
     [Fact]

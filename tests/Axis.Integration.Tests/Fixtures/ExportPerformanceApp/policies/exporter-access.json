@@ -8,6 +8,7 @@
   ],
   "grants": [
     {
+      "name": "requestRead",
       "entity": "Request",
       "actions": [
         "read",
@@ -15,6 +16,7 @@
       ]
     },
     {
+      "name": "departmentRead",
       "entity": "Department",
       "actions": [
         "read"

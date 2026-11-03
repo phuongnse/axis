@@ -28,7 +28,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Row_action_passing_the_row_id_to_a_reference_parameter_compiles_to_the_page_and_its_label()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -47,7 +47,7 @@ public sealed class NavigateActionCompilerTests
     public void Form_action_passing_the_record_id_compiles_to_the_page_and_its_label()
     {
         using var folder = Folder(
-            """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ] }""");
+            """{ "name": "form", "type": "form", "entity": "Order", "actions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -65,7 +65,7 @@ public sealed class NavigateActionCompilerTests
     public void Toolbar_action_to_a_page_without_parameters_compiles_to_the_page_and_its_label()
     {
         using var folder = Folder(
-            """{ "type": "table", "entity": "Order", "toolbarActions": [ { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } } ] }""");
+            """{ "name": "table", "type": "table", "entity": "Order", "toolbarActions": [ { "name": "navigate", "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -80,7 +80,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Parameters_of_a_compiled_action_are_keyed_by_the_name_the_target_declares()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "ORDER": "id" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "ORDER": "id" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -93,7 +93,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Row_action_passing_the_row_id_as_record_to_a_form_over_the_same_entity_compiles()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "id" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "id" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -107,7 +107,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Record_on_an_action_to_a_page_without_a_form_is_reported_at_the_record()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "record": "id" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "record": "id" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -121,7 +121,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Record_of_another_entity_than_the_form_is_reported_at_the_record()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" }, "record": "id" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" }, "record": "id" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -135,7 +135,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Record_expression_that_does_not_parse_is_reported_with_the_parse_error()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "number +" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "number +" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -148,7 +148,7 @@ public sealed class NavigateActionCompilerTests
     public void Form_page_that_declares_a_parameter_is_reported_at_its_parameters()
     {
         using var folder = Folder(Table("""[]"""))
-            .With("pages/order-form.json", Page("OrderForm", """{ "type": "form", "entity": "Order" }""", "55555555-5555-4555-8555-555555555552", "orderForm.title", CodeParameter));
+            .With("pages/order-form.json", Page("OrderForm", """{ "name": "form", "type": "form", "entity": "Order" }""", "55555555-5555-4555-8555-555555555552", "orderForm.title", CodeParameter));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -162,7 +162,7 @@ public sealed class NavigateActionCompilerTests
     public void Table_over_a_data_source_sees_its_projected_columns()
     {
         using var folder = Folder(
-                """{ "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "label" } } ] }""",
+                """{ "name": "table", "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "label" } } ] }""",
                 CodeParameter)
             .With("data-sources/order-numbers.json", OrderNumbers);
 
@@ -175,7 +175,7 @@ public sealed class NavigateActionCompilerTests
     public void Table_over_a_data_source_does_not_see_a_root_field_it_does_not_project()
     {
         using var folder = Folder(
-                """{ "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "quantity" } } ] }""",
+                """{ "name": "table", "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "quantity" } } ] }""",
                 CodeParameter)
             .With("data-sources/order-numbers.json", OrderNumbers);
 
@@ -190,7 +190,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Action_naming_no_loaded_page_is_reported_at_its_page()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Missing", "label": { "textKey": "order.open" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Missing", "label": { "textKey": "order.open" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -206,7 +206,7 @@ public sealed class NavigateActionCompilerTests
     public void Form_action_naming_no_loaded_page_is_reported_at_its_page()
     {
         using var folder = Folder(
-            """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Missing", "label": { "textKey": "order.open" } } ] }""");
+            """{ "name": "form", "type": "form", "entity": "Order", "actions": [ { "name": "navigate", "type": "navigate", "page": "Missing", "label": { "textKey": "order.open" } } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -219,7 +219,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Action_naming_a_page_that_failed_to_load_is_not_reported_again()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" } } ]"""))
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" } } ]"""))
             .With("pages/detail.json", $$"""{ "id": "{{DetailId}}", "kind": "page", "name": "Detail", "formatVersion": 1 }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -231,7 +231,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Parameter_the_target_page_does_not_declare_is_reported_at_its_key()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id", "extra": "id" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id", "extra": "id" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -245,7 +245,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Parameter_given_twice_ignoring_letter_case_is_reported_at_the_second_key()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id", "ORDER": "id" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id", "ORDER": "id" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -258,7 +258,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Missing_required_parameter_is_reported_at_the_action()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -273,7 +273,7 @@ public sealed class NavigateActionCompilerTests
     public void Text_field_passed_to_a_reference_parameter_is_reported_at_the_parameter()
     {
         using var folder = Folder(
-            """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "number" } } ] }""");
+            """{ "name": "form", "type": "form", "entity": "Order", "actions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "number" } } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -286,7 +286,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Parameter_expression_that_does_not_parse_is_reported_at_the_parameter()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id +" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id +" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -300,7 +300,7 @@ public sealed class NavigateActionCompilerTests
     public void Toolbar_expression_sees_no_names_not_even_the_id()
     {
         using var folder = Folder(
-            """{ "type": "table", "entity": "Order", "toolbarActions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ] }""");
+            """{ "name": "table", "type": "table", "entity": "Order", "toolbarActions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -313,7 +313,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Row_action_with_a_boolean_visibleWhen_compiles_and_keeps_its_text()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "number == 'A-1' and quantity is not null" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "number == 'A-1' and quantity is not null" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -326,7 +326,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Row_action_without_visibleWhen_keeps_none()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -338,7 +338,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Non_boolean_visibleWhen_is_reported_at_the_visibleWhen_and_gives_no_model()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "number" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "number" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -352,7 +352,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void VisibleWhen_naming_an_unknown_name_is_reported_at_the_visibleWhen()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "missing == 1" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "missing == 1" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -366,7 +366,7 @@ public sealed class NavigateActionCompilerTests
     public void VisibleWhen_on_a_toolbar_action_is_a_schema_violation()
     {
         using var folder = Folder(
-            """{ "type": "table", "entity": "Order", "toolbarActions": [ { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" }, "visibleWhen": "true" } ] }""");
+            """{ "name": "table", "type": "table", "entity": "Order", "toolbarActions": [ { "name": "navigate", "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" }, "visibleWhen": "true" } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -379,7 +379,7 @@ public sealed class NavigateActionCompilerTests
     public void VisibleWhen_on_a_form_action_is_a_schema_violation()
     {
         using var folder = Folder(
-            """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "true" } ] }""");
+            """{ "name": "form", "type": "form", "entity": "Order", "actions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "true" } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -391,7 +391,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Navigate_label_with_a_text_key_no_locale_has_is_reported_at_its_label()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.missing" }, "parameters": { "order": "id" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.missing" }, "parameters": { "order": "id" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -405,7 +405,7 @@ public sealed class NavigateActionCompilerTests
     public void Row_actions_on_a_table_over_a_grouped_data_source_are_reported_at_rowActions()
     {
         using var folder = Folder(
-                """{ "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" } } ] }""",
+                """{ "name": "table", "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" } } ] }""",
                 CodeParameter)
             .With("data-sources/order-numbers.json", OrderNumbers.Replace(
                 "\"fields\"",
@@ -422,13 +422,13 @@ public sealed class NavigateActionCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "form", "entity": "Order", "rowActions": [ ACTION ] }""", "/widgets/0/rowActions")]
-    [InlineData("""{ "type": "form", "entity": "Order", "toolbarActions": [ ACTION ] }""", "/widgets/0/toolbarActions")]
-    [InlineData("""{ "type": "taskInbox", "rowActions": [ ACTION ] }""", "/widgets/0/rowActions")]
-    [InlineData("""{ "type": "processInspector", "process": "OrderReview", "toolbarActions": [ ACTION ] }""", "/widgets/0/toolbarActions")]
+    [InlineData("""{ "name": "form", "type": "form", "entity": "Order", "rowActions": [ ACTION ] }""", "/widgets/0/rowActions")]
+    [InlineData("""{ "name": "form", "type": "form", "entity": "Order", "toolbarActions": [ ACTION ] }""", "/widgets/0/toolbarActions")]
+    [InlineData("""{ "name": "taskInbox", "type": "taskInbox", "rowActions": [ ACTION ] }""", "/widgets/0/rowActions")]
+    [InlineData("""{ "name": "processInspector", "type": "processInspector", "process": "OrderReview", "toolbarActions": [ ACTION ] }""", "/widgets/0/toolbarActions")]
     public void Row_and_toolbar_actions_on_a_widget_other_than_a_table_are_reported_at_their_property(string widget, string path)
     {
-        const string Action = """{ "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } }""";
+        const string Action = """{ "name": "navigate", "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } }""";
         using var folder = Folder(widget.Replace("ACTION", Action, StringComparison.Ordinal))
             .With("processes/order-review.json", """
                 { "id": "99999999-9999-4999-8999-999999999991", "kind": "process", "name": "OrderReview", "formatVersion": 1,
@@ -447,7 +447,7 @@ public sealed class NavigateActionCompilerTests
     public void Row_actions_on_a_container_widget_are_a_schema_error()
     {
         using var folder = Folder(
-            """{ "type": "section", "title": { "textKey": "orders.title" }, "rowActions": [ { "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } } ], "widgets": [ { "type": "table", "entity": "Order" } ] }""");
+            """{ "name": "section", "type": "section", "title": { "textKey": "orders.title" }, "rowActions": [ { "name": "navigate", "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } } ], "widgets": [ { "name": "table", "type": "table", "entity": "Order" } ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -456,13 +456,13 @@ public sealed class NavigateActionCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "navigate", "label": { "textKey": "order.open" } }""")]
-    [InlineData("""{ "type": "navigate", "page": "Detail", "process": "OrderReview", "label": { "textKey": "order.open" } }""")]
-    [InlineData("""{ "type": "startProcess", "process": "OrderReview", "page": "Detail", "label": { "textKey": "order.open" } }""")]
-    [InlineData("""{ "type": "startProcess", "process": "OrderReview", "parameters": { "order": "id" }, "label": { "textKey": "order.open" } }""")]
+    [InlineData("""{ "name": "navigate", "type": "navigate", "label": { "textKey": "order.open" } }""")]
+    [InlineData("""{ "name": "navigate", "type": "navigate", "page": "Detail", "process": "OrderReview", "label": { "textKey": "order.open" } }""")]
+    [InlineData("""{ "name": "startProcess", "type": "startProcess", "process": "OrderReview", "page": "Detail", "label": { "textKey": "order.open" } }""")]
+    [InlineData("""{ "name": "startProcess", "type": "startProcess", "process": "OrderReview", "parameters": { "order": "id" }, "label": { "textKey": "order.open" } }""")]
     public void Action_with_a_property_of_the_other_kind_is_a_schema_error(string action)
     {
-        using var folder = Folder($$"""{ "type": "form", "entity": "Order", "actions": [ {{action}} ] }""");
+        using var folder = Folder($$"""{ "name": "form", "type": "form", "entity": "Order", "actions": [ {{action}} ] }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -473,7 +473,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Row_action_passing_a_path_to_a_text_parameter_compiles_and_keeps_the_path()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ]"""), CodeParameter);
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ]"""), CodeParameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -487,7 +487,7 @@ public sealed class NavigateActionCompilerTests
     public void Form_action_passing_a_path_to_a_text_parameter_compiles_and_keeps_the_path()
     {
         using var folder = Folder(
-            """{ "type": "form", "entity": "Order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ] }""",
+            """{ "name": "form", "type": "form", "entity": "Order", "actions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ] }""",
             CodeParameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -500,7 +500,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Detail_action_passing_a_path_compiles_and_keeps_the_path()
     {
-        const string Widget = """{ "type": "detail", "entity": "Order", "record": "order", "actions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.parent.name" } } ] }""";
+        const string Widget = """{ "name": "detail", "type": "detail", "entity": "Order", "record": "order", "actions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.parent.name" } } ] }""";
         using var folder = Folder(Widget, CodeParameter)
             .With(OrdersFile, Page("Orders", Widget, "55555555-5555-4555-8555-555555555551", "orders.title", OrderParameter));
 
@@ -514,7 +514,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Path_passed_to_an_integer_parameter_is_reported_at_the_parameter()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ]"""), IntegerParameter);
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.name" } } ]"""), IntegerParameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -527,7 +527,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Path_to_an_unknown_field_is_reported_at_the_parameter()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.missing" } } ]"""), CodeParameter);
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.missing" } } ]"""), CodeParameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -540,7 +540,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Path_of_four_hops_is_reported_at_the_parameter()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.parent.parent.parent.name" } } ]"""), CodeParameter);
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "customer.parent.parent.parent.name" } } ]"""), CodeParameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -553,7 +553,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Path_in_a_record_expression_is_checked_against_the_form_entity()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "customer.missing" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "OrderForm", "label": { "textKey": "order.open" }, "record": "customer.missing" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -566,7 +566,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Path_cannot_start_at_the_id()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "id.number" } } ]"""), CodeParameter);
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "id.number" } } ]"""), CodeParameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -579,7 +579,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Path_in_a_visibleWhen_is_reported_at_the_visibleWhen()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "customer.name == 'a'" } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" }, "visibleWhen": "customer.name == 'a'" } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -593,7 +593,7 @@ public sealed class NavigateActionCompilerTests
     public void Path_on_a_table_over_a_data_source_is_reported_at_the_parameter()
     {
         using var folder = Folder(
-                """{ "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "label.name" } } ] }""",
+                """{ "name": "table", "type": "table", "dataSource": "OrderNumbers", "rowActions": [ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "label.name" } } ] }""",
                 CodeParameter)
             .With("data-sources/order-numbers.json", OrderNumbers);
 
@@ -609,9 +609,9 @@ public sealed class NavigateActionCompilerTests
     public void Paths_of_a_compiled_action_keep_the_declared_case_and_have_no_duplicates()
     {
         using var folder = Folder(
-            Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "CUSTOMER.Name", "other": "customer.name" } } ]"""),
+            Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "code": "CUSTOMER.Name", "other": "customer.name" } } ]"""),
             CodeParameter)
-            .With("pages/detail.json", Page("Detail", """{ "type": "table", "entity": "Order" }""", DetailId, "detail.title", CodeParameter + """, { "name": "other", "type": "text" }"""));
+            .With("pages/detail.json", Page("Detail", """{ "name": "table", "type": "table", "entity": "Order" }""", DetailId, "detail.title", CodeParameter + """, { "name": "other", "type": "text" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -623,7 +623,7 @@ public sealed class NavigateActionCompilerTests
     [Fact]
     public void Action_without_a_path_has_no_paths()
     {
-        using var folder = Folder(Table("""[ { "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
+        using var folder = Folder(Table("""[ { "name": "navigate", "type": "navigate", "page": "Detail", "label": { "textKey": "order.open" }, "parameters": { "order": "id" } } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -648,7 +648,7 @@ public sealed class NavigateActionCompilerTests
           "fields": [ { "name": "label", "path": "number" } ] }
         """;
 
-    private static string Table(string rowActions) => $$"""{ "type": "table", "entity": "Order", "rowActions": {{rowActions}} }""";
+    private static string Table(string rowActions) => $$"""{ "name": "table", "type": "table", "entity": "Order", "rowActions": {{rowActions}} }""";
 
     /// <summary>
     /// The presentation folder with the page <c>Orders</c> holding <paramref name="widget"/>, and the
@@ -660,5 +660,5 @@ public sealed class NavigateActionCompilerTests
             .With("entities/order.json", OrderEntity)
             .With("entities/customer.json", CustomerEntity)
             .With(OrdersFile, Page("Orders", widget))
-            .With("pages/detail.json", Page("Detail", """{ "type": "table", "entity": "Order" }""", DetailId, "detail.title", parameter));
+            .With("pages/detail.json", Page("Detail", """{ "name": "table", "type": "table", "entity": "Order" }""", DetailId, "detail.title", parameter));
 }

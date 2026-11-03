@@ -4,5 +4,5 @@
   "name": "Suppliers",
   "formatVersion": 1,
   "title": { "textKey": "pages.suppliers.title" },
-  "widgets": [{ "type": "table", "entity": "Supplier" }]
+  "widgets": [{ "type": "table", "name": "suppliers", "entity": "Supplier" }]
 }

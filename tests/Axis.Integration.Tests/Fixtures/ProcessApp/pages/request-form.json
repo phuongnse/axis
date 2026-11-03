@@ -7,10 +7,11 @@
   "widgets": [
     {
       "type": "form",
+      "name": "form",
       "entity": "Request",
       "actions": [
-        { "type": "startProcess", "process": "Submit", "label": { "textKey": "request.submit" } },
-        { "type": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }
+        { "type": "startProcess", "name": "startProcess", "process": "Submit", "label": { "textKey": "request.submit" } },
+        { "type": "navigate", "name": "navigate", "page": "Submissions", "label": { "textKey": "request.showSubmissions" } }
       ]
     }
   ]

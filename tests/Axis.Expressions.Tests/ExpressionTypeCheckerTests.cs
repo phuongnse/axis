@@ -273,7 +273,7 @@ public sealed class ExpressionTypeCheckerTests
         var parsed = ExpressionParser.Parse(text);
         Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
 
-        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), policyFilter: true);
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), currentUser: true);
 
         Assert.True(result.Succeeded, result.Diagnostic?.Message);
         Assert.Equal(Expected(type), result.Type);
@@ -293,7 +293,175 @@ public sealed class ExpressionTypeCheckerTests
 
         Assert.NotNull(diagnostic);
         Assert.Equal((ExpressionDiagnosticCodes.CurrentUserOutsidePolicyFilter, offset), (diagnostic.Code, diagnostic.Offset));
-        Assert.Equal($"Function 'currentUser' is allowed only in a policy filter at character {offset + 1}.", diagnostic.Message);
+        Assert.Equal($"Function 'currentUser' is allowed only in a policy filter or a data source filter at character {offset + 1}.", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("accountableUser()", "text")]
+    [InlineData("decisionTask()", "text")]
+    [InlineData("t == accountableUser()", "boolean")]
+    [InlineData("decisionTask() is null", "boolean")]
+    [InlineData("ACCOUNTABLEUSER() != null", "boolean")]
+    public void Accountability_in_a_step_set_is_text(string text, string type)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), stepSet: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(Expected(type), result.Type);
+    }
+
+    [Fact]
+    public void Accountability_in_the_item_of_an_aggregate_of_a_step_set_is_text()
+    {
+        var parsed = ExpressionParser.Parse("any(lineItems, name == accountableUser())");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.Boolean, stepSet: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Theory]
+    [InlineData("accountableUser()")]
+    [InlineData("decisionTask()")]
+    public void Accountability_in_a_contract_is_text(string text)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected("text"), contract: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(Expected("text"), result.Type);
+    }
+
+    [Theory]
+    [InlineData("accountableUser()", "text", "accountableUser", 0)]
+    [InlineData("decisionTask()", "text", "decisionTask", 0)]
+    [InlineData("t == accountableUser()", "boolean", "accountableUser", 5)]
+    [InlineData("concat(t, decisionTask())", "text", "decisionTask", 10)]
+    public void Accountability_outside_a_step_set_is_reported_at_the_call(string text, string type, string function, int offset)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        // The default, a stored value and a policy filter are all outside a step's set and a contract.
+        var results = new[]
+        {
+            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type)),
+            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), storedValue: true),
+            ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), currentUser: true),
+        };
+
+        foreach (var diagnostic in results.Select(result => result.Diagnostic))
+        {
+            Assert.NotNull(diagnostic);
+            Assert.Equal((ExpressionDiagnosticCodes.AccountabilityOutsideStepSet, offset), (diagnostic.Code, diagnostic.Offset));
+            Assert.Equal(
+                $"Function '{function}' is allowed only in a module contract's expression or the set of an updateRecord or createRecord step at character {offset + 1}.",
+                diagnostic.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData("text", "t")]
+    [InlineData("integer", "i")]
+    [InlineData("decimal", "d")]
+    [InlineData("boolean", "b")]
+    [InlineData("date", "dt")]
+    [InlineData("date-time", "ts")]
+    [InlineData("enum", "e")]
+    [InlineData("reference", "r")]
+    public void Previous_in_a_contract_has_the_type_of_its_field(string type, string field)
+    {
+        var parsed = ExpressionParser.Parse($"previous({field})");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null, contract: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(Expected(type), result.Type);
+    }
+
+    [Theory]
+    [InlineData("previous(i) == i", "boolean")]
+    [InlineData("PREVIOUS(i) + 1 > 0", "boolean")]
+    [InlineData("previous(t) is null", "boolean")]
+    [InlineData("previous(f) is null", "boolean")]
+    [InlineData("previous(f) is not null", "boolean")]
+    public void Previous_in_a_contract_composes_like_the_field(string text, string type)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), contract: true);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Fact]
+    public void Previous_of_a_file_allows_only_a_null_check()
+    {
+        var parsed = ExpressionParser.Parse("previous(f) == null");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean, contract: true).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal(ExpressionDiagnosticCodes.TypeMismatch, diagnostic.Code);
+    }
+
+    [Theory]
+    [InlineData("previous(lineItems) == null", 0, "'lineItems' is a child collection, previous reads only the entity's own fields at character 1.")]
+    [InlineData("title == previous(missing)", 9, "Unknown field 'missing' at character 10.")]
+    [InlineData("previous(1) == 1", 0, "Function 'previous' needs the name of one of the entity's own fields, outside an aggregate's item expression at character 1.")]
+    [InlineData("previous(title + 'a') == 'a'", 0, "Function 'previous' needs the name of one of the entity's own fields, outside an aggregate's item expression at character 1.")]
+    [InlineData("any(lineItems, previous(ok))", 15, "Function 'previous' needs the name of one of the entity's own fields, outside an aggregate's item expression at character 16.")]
+    public void A_bad_previous_argument_is_reported_at_the_call(string text, int offset, string message)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, CollectionScope(), ExpressionType.Null, contract: true).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.InvalidPreviousArgument, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal(message, diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("previous(t)", "text", false, 0)]
+    [InlineData("i == previous(i)", "boolean", false, 5)]
+    // A stored value is not a contract expression either.
+    [InlineData("concat(t, previous(t))", "text", true, 10)]
+    public void Previous_outside_a_contract_is_reported_at_the_call(string text, string type, bool storedValue, int offset)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, _scope, Expected(type), storedValue).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.PreviousOutsideContract, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal(
+            $"Function 'previous' is allowed only in a module contract's guards, core validations and effect values at character {offset + 1}.",
+            diagnostic.Message);
+    }
+
+    [Fact]
+    public void Previous_in_a_rule_body_is_reported_because_a_body_is_checked_on_its_own()
+    {
+        var parsed = ExpressionParser.Parse("previous(value) > 0");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var scope = new ExpressionScope(new Dictionary<string, ExpressionType> { ["value"] = ExpressionType.Integer });
+
+        var diagnostic = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean).Diagnostic;
+
+        Assert.NotNull(diagnostic);
+        Assert.Equal((ExpressionDiagnosticCodes.PreviousOutsideContract, 0), (diagnostic.Code, diagnostic.Offset));
     }
 
     [Theory]
@@ -352,6 +520,72 @@ public sealed class ExpressionTypeCheckerTests
 
         Assert.Equal((code, offset), (diagnostic.Code, diagnostic.Offset));
         Assert.Equal($"{message} at character {offset + 1}.", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("count(r.manager.parts)")]
+    [InlineData("count(r.manager.parts, amount > 1)")]
+    [InlineData("sum(r.manager.parts, amount) > 1")]
+    [InlineData("any(r.manager.parts, amount > 1)")]
+    [InlineData("count(r.items)")]
+    [InlineData("count(r.manager.department.items) == 0")]
+    public void A_scope_that_resolves_collection_paths_accepts_a_path_to_a_collection(string text)
+    {
+        var result = Check(text, ExpressionType.Null, CollectionPathScope());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_is_recorded_with_the_entity_that_holds_it()
+    {
+        var parsed = ExpressionParser.Parse("count(r.manager.parts)");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, CollectionPathScope(), ExpressionType.Null);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        var path = Assert.Single(result.CollectionPaths);
+        Assert.Equal("employee", result.PathTargets[path]);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_of_four_hops_is_too_long()
+    {
+        var diagnostic = CheckFails("count(r.manager.department.manager.parts)", ExpressionType.Null, CollectionPathScope());
+
+        Assert.Equal(("AXC0058", 34), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal("The path takes 4 hops, at most 3 are allowed at character 35.", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("count(r.manager.missing)", "AXC0046", 15, "Unknown collection 'missing' of 'employee'")]
+    [InlineData("count(r.missing.parts)", "AXC0046", 7, "Unknown field 'missing' of 'department'")]
+    [InlineData("count(r.parts)", "AXC0046", 7, "Unknown collection 'parts' of 'department'")]
+    [InlineData("count(t.parts)", "AXC0047", 7, "Operator '.' needs a reference, found text")]
+    [InlineData("count(pr.parts)", "AXC0047", 8, "Operator '.' cannot follow the parameter 'pr'. A path starts at a field")]
+    public void An_invalid_path_to_a_collection_is_reported_at_the_dot(string text, string code, int offset, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, CollectionPathScope());
+
+        Assert.Equal((code, offset), (diagnostic.Code, diagnostic.Offset));
+        Assert.Equal($"{message} at character {offset + 1}.", diagnostic.Message);
+    }
+
+    [Fact]
+    public void A_scope_without_collection_paths_refuses_a_path_to_a_collection()
+    {
+        var diagnostic = CheckFails("count(r.manager.parts)", ExpressionType.Null, PathScope());
+
+        Assert.Equal("AXC0046", diagnostic.Code);
+    }
+
+    [Fact]
+    public void A_path_to_a_collection_is_not_a_value()
+    {
+        var diagnostic = CheckFails("r.manager.parts is null", ExpressionType.Boolean, CollectionPathScope());
+
+        Assert.Equal("AXC0046", diagnostic.Code);
     }
 
     [Fact]
@@ -704,9 +938,203 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Fact]
+    public void First_has_the_type_of_its_item()
+    {
+        var reference = Check("first(lines, quantity > 1, dept)", ExpressionType.Null, OuterScope());
+        var number = Check("first(lines, quantity > outer.minimum, quantity)", ExpressionType.Null, OuterScope());
+
+        Assert.True(reference.Succeeded, reference.Diagnostic?.Message);
+        Assert.Equal(ExpressionType.Reference("department"), reference.Type);
+        Assert.True(number.Succeeded, number.Diagnostic?.Message);
+        Assert.Equal(ExpressionType.Integer, number.Type);
+    }
+
+    [Theory]
+    [InlineData("first(lines, quantity, quantity)")]
+    [InlineData("first(lines, outer.title, quantity)")]
+    public void First_needs_a_boolean_condition(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, OuterScope());
+
+        Assert.Equal(ExpressionDiagnosticCodes.TypeMismatch, diagnostic.Code);
+    }
+
+    [Theory]
+    [InlineData("first(lines, quantity > 1)")]
+    [InlineData("first(lines, quantity > 1, quantity, quantity)")]
+    public void First_takes_three_arguments(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, OuterScope());
+
+        Assert.Equal(ExpressionDiagnosticCodes.WrongArgumentCount, diagnostic.Code);
+    }
+
+    [Fact]
     public void An_aggregate_is_unknown_outside_a_scope_with_collections()
     {
         Assert.Equal(ExpressionDiagnosticCodes.UnknownName, CheckFails("count(lineItems) > 0", ExpressionType.Boolean).Code);
+    }
+
+    [Theory]
+    [InlineData("count(lines, quantity > outer.minimum)", "integer")]
+    [InlineData("count(lines, OUTER.Minimum > quantity)", "integer")]
+    [InlineData("any(lines, quantity > outer.minimum and outer.title == 'x')", "boolean")]
+    [InlineData("count(lines, outer.dept == dept)", "integer")]
+    [InlineData("count(lines, outer.dept.name == 'x')", "integer")]
+    [InlineData("sum(lines, quantity * outer.minimum)", "integer")]
+    [InlineData("count(lines, count(parts, outer.minimum > weight) > 0)", "integer")]
+    public void An_item_expression_reads_the_outer_record(string text, string expected)
+    {
+        var result = Check(text, ExpressionType.Null, OuterScope());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(expected, result.Type.ToString());
+    }
+
+    [Fact]
+    public void The_outer_reads_are_recorded_by_reference()
+    {
+        var parsed = ExpressionParser.Parse("count(lines, quantity > outer.minimum and outer.dept.name == 'x')");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = ExpressionTypeChecker.Check(parsed.Expression, OuterScope(), ExpressionType.Null);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(["dept", "minimum"], result.OuterReads.Select(read => read.Name).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void An_outer_path_follows_the_references_of_the_outer_record()
+    {
+        var result = Check("any(lines, outer.dept.manager.name == 'x')", ExpressionType.Boolean, OuterScope());
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(
+            ["department", "employee"],
+            result.PathTargets.OrderBy(pair => pair.Key.Name, StringComparer.Ordinal).Select(pair => pair.Value));
+    }
+
+    [Fact]
+    public void The_word_outer_is_not_a_hop()
+    {
+        Assert.True(Check("any(lines, outer.dept.manager.department.name == 'x')", ExpressionType.Boolean, OuterScope()).Succeeded);
+
+        var diagnostic = CheckFails("any(lines, outer.dept.manager.department.manager.name == 'x')", ExpressionType.Boolean, OuterScope());
+
+        Assert.Equal(ExpressionDiagnosticCodes.TooManyHops, diagnostic.Code);
+    }
+
+    [Theory]
+    [InlineData("outer.minimum > 1")]
+    [InlineData("OUTER.minimum > 1")]
+    [InlineData("outer.dept.name == 'x'")]
+    [InlineData("outer == null")]
+    [InlineData("lower(outer.title) == 'x'")]
+    [InlineData("any(lines, quantity > 1) and outer.minimum > 1")]
+    public void Outer_outside_an_item_expression_is_reported(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Boolean, OuterScope());
+
+        Assert.Equal("AXC0354", diagnostic.Code);
+        Assert.Contains("'outer' is allowed only inside an aggregate's item expression", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Outer_in_a_scope_that_does_not_resolve_paths_is_reported_outside_an_item_expression()
+    {
+        var diagnostic = CheckFails("outer.amount > 1", ExpressionType.Boolean, CollectionScope());
+
+        Assert.Equal("AXC0354", diagnostic.Code);
+    }
+
+    [Fact]
+    public void A_bare_outer_inside_an_item_expression_needs_a_field()
+    {
+        var diagnostic = CheckFails("count(lines, outer == null)", ExpressionType.Null, OuterScope());
+
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.TypeMismatch, "'outer' needs a field, such as outer.amount at character 14."),
+            (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Theory]
+    [InlineData("count(lines, outer.parts == null)", "AXC0047", "Collection 'parts' of the outer record is list<Part>, which an item expression cannot read at character 19.")]
+    [InlineData("count(lines, outer.missing > 1)", "AXC0046", "Unknown field 'missing' of the outer record at character 19.")]
+    [InlineData("count(lines, outer.quantity > 1)", "AXC0046", "Unknown field 'quantity' of the outer record at character 19.")]
+    [InlineData("count(outer.dept.items)", "AXC0047", "An aggregate cannot name a collection through 'outer' at character 17.")]
+    public void A_wrong_outer_read_is_reported_at_the_dot(string text, string code, string message)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, OuterScope());
+
+        Assert.Equal((code, message), (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Fact]
+    public void An_outer_path_is_an_unknown_name_in_an_outer_scope_that_does_not_resolve_paths()
+    {
+        var diagnostic = CheckFails("count(lines, outer.dept.name == 'x')", ExpressionType.Null, OuterScope(resolvesPaths: false));
+
+        Assert.Equal("AXC0046", diagnostic.Code);
+    }
+
+    [Theory]
+    [InlineData("count(lines, outer.pdept.name == 'x')")]
+    [InlineData("any(lines, outer.pdept.manager.name == 'x')")]
+    public void A_path_after_a_parameter_read_through_outer_is_reported_and_names_the_parameter(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Null, OuterScope());
+
+        Assert.Equal("AXC0047", diagnostic.Code);
+        Assert.Contains("cannot follow the parameter 'pdept'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_field_named_outer_in_the_scope_still_reads_as_a_bare_name()
+    {
+        var scope = new ExpressionScope(new Dictionary<string, ExpressionType> { ["outer"] = ExpressionType.Integer });
+
+        Assert.True(Check("outer > 1", ExpressionType.Boolean, scope).Succeeded);
+    }
+
+    /// <summary>
+    /// A field <c>minimum</c>, a text <c>title</c>, a reference <c>dept</c> to a department with a name, a
+    /// manager and a collection <c>items</c>, and the collections <c>lines</c> of rows with a quantity and
+    /// <c>parts</c>. A line holds the collection <c>parts</c> too, with a weight.
+    /// </summary>
+    private static ExpressionScope OuterScope(bool resolvesPaths = true)
+    {
+        var parts = new ExpressionCollection("parts", "Part", new ExpressionScope(new Dictionary<string, ExpressionType> { ["weight"] = ExpressionType.Integer }));
+        return new ExpressionScope(
+            new Dictionary<string, ExpressionType>
+            {
+                ["minimum"] = ExpressionType.Integer,
+                ["title"] = ExpressionType.Text,
+                ["dept"] = ExpressionType.Reference("department"),
+                ["pdept"] = ExpressionType.ReferenceParameter("department"),
+            },
+            [],
+            [
+                new ExpressionCollection("lines", "Line", new ExpressionScope(
+                    new Dictionary<string, ExpressionType> { ["quantity"] = ExpressionType.Integer, ["dept"] = ExpressionType.Reference("department") },
+                    [],
+                    [parts])),
+                parts,
+            ],
+            referenceFields: resolvesPaths
+                ? (entity, field) => (entity.ToLowerInvariant(), field.ToLowerInvariant()) switch
+                {
+                    ("department", "name") => ExpressionType.Text,
+                    ("department", "manager") => ExpressionType.Reference("employee"),
+                    ("employee", "name") => ExpressionType.Text,
+                    ("employee", "department") => ExpressionType.Reference("department"),
+                    _ => null,
+                }
+                : null,
+            referenceCollections: resolvesPaths
+                ? (entity, name) => (entity.ToLowerInvariant(), name.ToLowerInvariant()) is ("department", "items")
+                    ? new ExpressionCollection(name, "Part", new ExpressionScope(new Dictionary<string, ExpressionType> { ["weight"] = ExpressionType.Integer }))
+                    : null
+                : null);
     }
 
     /// <summary>
@@ -747,6 +1175,27 @@ public sealed class ExpressionTypeCheckerTests
             ("employee", "department") => ExpressionType.Reference("department"),
             _ => null,
         });
+
+    /// <summary>The scope of <see cref="PathScope"/>, where an employee holds the collection <c>parts</c> and a department <c>items</c>.</summary>
+    private static ExpressionScope CollectionPathScope() => new(
+        new Dictionary<string, ExpressionType>
+        {
+            ["t"] = ExpressionType.Text,
+            ["r"] = ExpressionType.Reference("department"),
+            ["pr"] = ExpressionType.ReferenceParameter("department"),
+        },
+        referenceFields: (entity, field) => (entity.ToLowerInvariant(), field.ToLowerInvariant()) switch
+        {
+            ("department", "name") => ExpressionType.Text,
+            ("department", "manager") => ExpressionType.Reference("employee"),
+            ("employee", "name") => ExpressionType.Text,
+            ("employee", "department") => ExpressionType.Reference("department"),
+            _ => null,
+        },
+        referenceCollections: (entity, name) =>
+            (entity.ToLowerInvariant(), name.ToLowerInvariant()) is ("employee", "parts") or ("department", "items")
+                ? new ExpressionCollection(name, "Part", new ExpressionScope(new Dictionary<string, ExpressionType> { ["amount"] = ExpressionType.Decimal }))
+                : null);
 
     /// <summary>The fields of <see cref="_scope"/>, with two rules known by their signatures.</summary>
     private static ExpressionScope ModuleScope(bool undeclaredModuleIsUnknown = false) => new(

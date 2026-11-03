@@ -154,7 +154,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     /// <summary>
     /// Reads the tenants, their hosts and the bindings of the active tenants over <paramref name="platformConnectionString"/>. The
     /// catalog has no schema connection, because under the <c>directory</c> source the server holds only the runtime
-    /// database role.
+    /// database role. With <paramref name="address"/>, each tenant's runtime connection goes to that host and port, and
+    /// takes small pool values, instead of the row's host and port.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The directory cannot be read. The message names <c>ConnectionStrings:Platform</c> and holds no connection value.
@@ -166,10 +167,11 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     public static Task<DirectoryTenantCatalog> LoadAsync(
         string platformConnectionString,
         TenantSecretCipher cipher,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TenantRuntimeAddress? address = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
-        return LoadAsync(platformConnectionString, TenantDatabaseTls.From(platformConnectionString), cipher, cancellationToken);
+        return LoadAsync(platformConnectionString, TenantDatabaseTls.From(platformConnectionString), cipher, cancellationToken, address);
     }
 
     // The tenant connections carry the TLS settings of the platform connection string, which the test PostgreSQL
@@ -178,7 +180,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         string platformConnectionString,
         TenantDatabaseTls tls,
         TenantSecretCipher cipher,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TenantRuntimeAddress? address = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
         ArgumentNullException.ThrowIfNull(tls);
@@ -188,6 +191,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         List<TenantHostRow> hosts;
         List<TenantBindingRow> bindings;
         List<TenantPlatformProviderRow> platformProviders;
+        List<TenantQuotaRow> quotas;
         try
         {
             var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnectionString).Options;
@@ -201,6 +205,9 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 .Where(binding => ids.Contains(binding.TenantId))
                 .ToListAsync(cancellationToken);
             platformProviders = await context.TenantPlatformProviders.AsNoTracking().ToListAsync(cancellationToken);
+            quotas = await context.TenantQuotas.AsNoTracking()
+                .Where(quota => ids.Contains(quota.TenantId))
+                .ToListAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
         {
@@ -236,8 +243,10 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 platformProviders.Where(provider => provider.TenantId == (row.PreviewOf ?? row.Id)),
                 cipher,
                 tls,
+                address,
                 row.PreviewOf is null ? null : byId[row.PreviewOf],
-                row.PreviewOf is null ? PlatformSignInProviders.From(platformProviders.Where(provider => provider.TenantId == row.Id)) : null)),
+                row.PreviewOf is null ? PlatformSignInProviders.From(platformProviders.Where(provider => provider.TenantId == row.Id)) : null,
+                quotas.Where(quota => quota.TenantId == row.Id))),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
             active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal),
@@ -337,25 +346,16 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         IEnumerable<TenantPlatformProviderRow> platformProviders,
         TenantSecretCipher cipher,
         TenantDatabaseTls tls,
+        TenantRuntimeAddress? address,
         TenantRow? main,
-        IReadOnlyList<IdentityProviderModel>? realmProviders)
+        IReadOnlyList<IdentityProviderModel>? realmProviders,
+        IEnumerable<TenantQuotaRow> quotaRows)
     {
         var id = row.Id;
         var bindings = Bindings(id, bindingRows, cipher);
 
         var connectionString = SecretValue.Deferred(() =>
-        {
-            var builder = new NpgsqlConnectionStringBuilder
-            {
-                Host = row.DatabaseHost,
-                Port = row.DatabasePort,
-                Database = row.DatabaseName,
-                Username = row.RuntimeUser,
-                Password = cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(),
-            };
-            tls.ApplyTo(builder);
-            return builder.ConnectionString;
-        });
+            RuntimeConnectionString(row, cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(), tls, address));
 
         var signIn = main ?? row;
         var oidc = new TenantOidc(
@@ -393,7 +393,25 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             RealmUsers(row, cipher),
             PlatformSignInOf(signIn, platformProviders),
             realmProviders,
-            hostSites);
+            hostSites,
+            Quotas(quotaRows));
+    }
+
+    // The runtime connection of a tenant: the row's database, user and password, the TLS settings of the platform
+    // connection, and the row's host and port unless a runtime address replaces them.
+    internal static string RuntimeConnectionString(TenantRow row, string password, TenantDatabaseTls tls, TenantRuntimeAddress? address)
+    {
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = row.DatabaseHost,
+            Port = row.DatabasePort,
+            Database = row.DatabaseName,
+            Username = row.RuntimeUser,
+            Password = password,
+        };
+        tls.ApplyTo(builder);
+        address?.ApplyTo(builder);
+        return builder.ConnectionString;
     }
 
     /// <summary>
@@ -491,6 +509,12 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             stored is { Length: > 0 } ? SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.SmtpPassword, stored).Reveal()) : null,
             Blank(row.EmailFrom));
     }
+
+    // A tenant's own quota rows. A key the code does not know is ignored, so the control plane can write a new quota before
+    // a host knows it. Quotas stay out of DatabaseKey and OidcKey, so a changed quota neither retires a pool nor rebuilds the sign-in.
+    private static Dictionary<string, long?> Quotas(IEnumerable<TenantQuotaRow> rows) =>
+        rows.Where(row => QuotaKeys.All.Contains(row.Quota, StringComparer.Ordinal))
+            .ToDictionary(row => row.Quota, row => row.Value, StringComparer.Ordinal);
 
     // The current key comes first, then the previous one. Each is decrypted only at the moment of use.
     private static List<TenantClientKey> ClientKeys(TenantRow signIn, TenantSecretCipher cipher)

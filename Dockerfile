@@ -2,7 +2,8 @@
 # the last stage, so it is the default target. The worker stage runs the worker host with its health
 # endpoints, the publisher stage runs `axis-admin publisher`, and the purchasing stage runs the purchasing
 # system stub from tests/Axis.PurchasingStub.
-# The images hold the sample modules departments and department-budgets in /modules.
+# The development images hold the built-in modules under modules and the sample modules under samples/modules
+# in /modules, each at the id and version of its module.json.
 # For local use: the Development environment and the sample credentials are not for production.
 #
 # The targets axis-server, axis-worker and axis-admin are the production images. They run the
@@ -27,6 +28,15 @@ COPY samples/apps/purchase-requests/processes/purchase-request-approval.json /sr
 COPY tests/e2e/fixtures/studio-connector-oauth2.json /src/tests/e2e/fixtures/
 RUN npm run build
 
+# The built-in and sample modules, installed in /src/artifacts/modules/<id>/<version> by the script that
+# scripts/build.sh runs. The id and the version come from each module.json.
+FROM node:24-slim AS modules
+WORKDIR /src
+COPY scripts/lib/install-modules.sh scripts/lib/
+COPY samples/modules/ samples/modules/
+COPY modules/ modules/
+RUN bash scripts/lib/install-modules.sh
+
 # The server, published with the SPA in its web root, the worker, the admin tool and the sample extension package.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -47,8 +57,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS worker
 WORKDIR /app
 COPY --from=build /worker .
 COPY --from=build /src/artifacts/extensions /extensions
-COPY samples/modules/departments/ /modules/departments/1.1.0/
-COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
+COPY --from=modules /src/artifacts/modules /modules
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
 
@@ -58,8 +67,7 @@ FROM mcr.microsoft.com/dotnet/runtime:10.0 AS publisher
 WORKDIR /app
 COPY --from=build /admin .
 COPY --from=build /src/artifacts/extensions /extensions
-COPY samples/modules/departments/ /modules/departments/1.1.0/
-COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
+COPY --from=modules /src/artifacts/modules /modules
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
@@ -140,8 +148,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
-COPY samples/modules/departments/ /modules/departments/1.1.0/
-COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
+COPY --from=modules /src/artifacts/modules /modules
 COPY samples/ /samples/
 COPY samples/templates/request-approval/ /templates/request-approval/1.0.0/
 USER $APP_UID

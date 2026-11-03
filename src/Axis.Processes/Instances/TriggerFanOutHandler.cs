@@ -66,7 +66,7 @@ internal sealed partial class TriggerFanOutHandler(
         TriggerModel trigger;
         try
         {
-            await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+            await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
             {
                 if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
                 {
@@ -194,7 +194,7 @@ internal sealed partial class TriggerFanOutHandler(
         // Only the type and SQLSTATE are kept: the message of the exception can quote a record value.
         var error = DeliveryFailures.ErrorText(exception);
         var target = $"{triggerId:D}/{occurrence}";
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -313,6 +313,7 @@ internal sealed partial class TriggerFanOutHandler(
             record,
             instanceId,
             AuditActors.System,
+            accountableUser: null,
             new JsonObject { ["trigger"] = trigger.Name, ["occurrenceAt"] = occurrence },
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)
@@ -371,6 +372,7 @@ internal sealed partial class TriggerFanOutHandler(
             parameters,
             instanceId,
             AuditActors.System,
+            accountableUser: null,
             new JsonObject { ["trigger"] = trigger.Name, ["occurrenceAt"] = occurrence },
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)

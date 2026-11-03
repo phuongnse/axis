@@ -217,11 +217,11 @@ public sealed class ReferenceIndexTests
             .With("data-sources/large-orders.json", DataSource("LargeOrders", "IsLarge(quantity)"))
             .With("pages/order-list.json", PresentationCompilerTests.Page(
                 "OrderList",
-                """{ "type": "table", "dataSource": "LargeOrders" }""",
+                """{ "name": "table", "type": "table", "dataSource": "LargeOrders" }""",
                 "55555555-5555-4555-8555-555555555553"))
             .With("pages/order-form.json", PresentationCompilerTests.Page(
                 "OrderForm",
-                """{ "type": "form", "form": "Missing" }""",
+                """{ "name": "form", "type": "form", "form": "Missing" }""",
                 "55555555-5555-4555-8555-555555555552",
                 "orderForm.title"));
 
@@ -327,7 +327,7 @@ public sealed class ReferenceIndexTests
     public void A_policy_with_an_unknown_role_keeps_its_grant_edge_and_adds_no_role_edge()
     {
         using var folder = SalesFolder("IsLarge(quantity)")
-            .With("policies/order-access.json", Policy("""["nobody"]""", """[{ "entity": "Order", "actions": ["read"] }]"""));
+            .With("policies/order-access.json", Policy("""["nobody"]""", """[{ "name": "orderRead", "entity": "Order", "actions": ["read"] }]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -459,7 +459,7 @@ public sealed class ReferenceIndexTests
                     { "name": "quantity", "type": "integer" },
                     { "name": "customer", "type": "reference", "target": "Customer" },
                     { "name": "lines", "type": "child-collection", "target": "OrderLine" } ],
-                  "validations": [ { "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
+                  "validations": [ { "name": "check1", "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
                 """)
             .With("entities/order-line.json", """
                 { "id": "11111111-1111-4111-8111-111111111112", "kind": "entity", "name": "OrderLine", "formatVersion": 1,
@@ -487,7 +487,7 @@ public sealed class ReferenceIndexTests
         const string Parameter = """{ "name": "client", "type": "reference", "target": "Client" }""";
         using (var folder = PresentationCompilerTests.Folder()
             .With("entities/client.json", PresentationCompilerTests.Client)
-            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order" }""", parameters: Parameter)))
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "name": "table", "type": "table", "entity": "Order" }""", parameters: Parameter)))
         {
             var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -502,7 +502,7 @@ public sealed class ReferenceIndexTests
         }
 
         using (var folder = PresentationCompilerTests.Folder()
-            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "type": "table", "entity": "Order" }""", parameters: Parameter.Replace("Client", "Missing", StringComparison.Ordinal))))
+            .With("pages/orders.json", PresentationCompilerTests.Page("Orders", """{ "name": "table", "type": "table", "entity": "Order" }""", parameters: Parameter.Replace("Client", "Missing", StringComparison.Ordinal))))
         {
             var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -514,10 +514,10 @@ public sealed class ReferenceIndexTests
     [Fact]
     public void A_navigate_action_gives_a_navigate_page_edge_to_its_target_and_an_unknown_target_none()
     {
-        const string Detail = """{ "type": "table", "entity": "Order" }""";
+        const string Detail = """{ "name": "table", "type": "table", "entity": "Order" }""";
         const string Parameter = """{ "name": "client", "type": "reference", "target": "Client", "required": true }""";
-        const string Action = """{ "type": "navigate", "page": "TARGET", "label": { "textKey": "orders.title" }, "parameters": { "client": "id" } }""";
-        const string Orders = """{ "type": "table", "entity": "Client", "rowActions": [ ACTION ] }""";
+        const string Action = """{ "name": "navigate", "type": "navigate", "page": "TARGET", "label": { "textKey": "orders.title" }, "parameters": { "client": "id" } }""";
+        const string Orders = """{ "name": "table", "type": "table", "entity": "Client", "rowActions": [ ACTION ] }""";
 
         using (var folder = PresentationCompilerTests.Folder()
             .With("entities/client.json", PresentationCompilerTests.Client)
@@ -548,28 +548,27 @@ public sealed class ReferenceIndexTests
     }
 
     [Fact]
-    public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_department_entity()
+    public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_supplier_entity()
     {
         var result = ApplicationCompiler.Compile(
             Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         var edges = result.References.Edges
-            .Where(edge => edge.To is ResourceNode { Kind: ResourceKinds.Entity, Name: "Department" })
+            .Where(edge => edge.To is ResourceNode { Kind: ResourceKinds.Entity, Name: "Supplier" })
             .Select(edge => (edge.From.File, edge.Path, edge.Relation));
         Assert.Equivalent(
             new (string, string, string)[]
             {
-                ("entities/purchase-request.json", "/fields/3/target", ReferenceRelations.FieldTarget),
-                ("data-sources/purchase-request-list.json", "/fields/2/path", ReferenceRelations.FieldPath),
-                ("data-sources/requests-by-department.json", "/fields/0/path", ReferenceRelations.FieldPath),
-                ("seeds/departments.json", "/entity", ReferenceRelations.SeedEntity),
-                ("pages/departments.json", "/widgets/0/entity", ReferenceRelations.WidgetEntity),
-                ("endpoints/submit-purchase-request.json", "/input/1/target", ReferenceRelations.FieldTarget),
-                ("policies/department-manager-access.json", "/grants/1/entity", ReferenceRelations.Grant),
-                ("policies/finance-reviewer-access.json", "/grants/1/entity", ReferenceRelations.Grant),
-                ("policies/operator-access.json", "/grants/1/entity", ReferenceRelations.Grant),
-                ("policies/employee-access.json", "/grants/2/entity", ReferenceRelations.Grant),
+                ("entities/purchase-request.json", "/fields/4/target", ReferenceRelations.FieldTarget),
+                ("data-sources/purchase-request-list.json", "/fields/3/path", ReferenceRelations.FieldPath),
+                ("seeds/suppliers.json", "/entity", ReferenceRelations.SeedEntity),
+                ("pages/suppliers.json", "/widgets/0/entity", ReferenceRelations.WidgetEntity),
+                ("endpoints/submit-purchase-request.json", "/input/2/target", ReferenceRelations.FieldTarget),
+                ("policies/department-manager-access.json", "/grants/3/entity", ReferenceRelations.Grant),
+                ("policies/finance-reviewer-access.json", "/grants/3/entity", ReferenceRelations.Grant),
+                ("policies/operator-access.json", "/grants/2/entity", ReferenceRelations.Grant),
+                ("policies/employee-access.json", "/grants/4/entity", ReferenceRelations.Grant),
             },
             edges);
     }
@@ -640,19 +639,19 @@ public sealed class ReferenceIndexTests
             """)
         .With("pages/orders.json", PresentationCompilerTests.Page(
             "Orders",
-            """{ "type": "table", "entity": "Order" }""",
+            """{ "name": "table", "type": "table", "entity": "Order" }""",
             "55555555-5555-4555-8555-555555555551"))
         .With("pages/order-list.json", PresentationCompilerTests.Page(
             "OrderList",
-            """{ "type": "table", "dataSource": "LargeOrders" }""",
+            """{ "name": "table", "type": "table", "dataSource": "LargeOrders" }""",
             "55555555-5555-4555-8555-555555555553"))
         .With("pages/order-review.json", PresentationCompilerTests.Page(
             "OrderReviewPage",
-            """{ "type": "processInspector", "process": "OrderReview" }""",
+            """{ "name": "processInspector", "type": "processInspector", "process": "OrderReview" }""",
             "55555555-5555-4555-8555-555555555554"))
         .With("pages/order-form.json", PresentationCompilerTests.Page(
             "OrderForm",
-            """{ "type": "form", "form": "OrderEntry", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } }, { "type": "navigate", "page": "Orders", "label": { "textKey": "order.submit" } } ] }""",
+            """{ "name": "form", "type": "form", "form": "OrderEntry", "actions": [ { "name": "startProcess", "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } }, { "name": "navigate", "type": "navigate", "page": "Orders", "label": { "textKey": "order.submit" } } ] }""",
             "55555555-5555-4555-8555-555555555552",
             "orderForm.title"))
         .With("identity-providers/accounts.json", PresentationCompilerTests.AccountsProvider)
@@ -682,7 +681,7 @@ public sealed class ReferenceIndexTests
                     { "name": "number", "type": "text", "sequence": "OrderNumber" },
                     { "name": "quantity", "type": "integer" },
                     { "name": "customer", "type": "reference", "target": "Customer" } ],
-                  "validations": [ { "expression": "{{validation}}", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
+                  "validations": [ { "name": "check2", "expression": "{{validation}}", "message": { "textKey": "order.quantityLarge" }, "field": "quantity" } ] }
                 """)
             .With("entities/customer.json", Customer)
             .With("entities/region.json", Region)
@@ -763,7 +762,7 @@ public sealed class ReferenceIndexTests
                   "entity": "Order", "start": "check",
                   "startCondition": { "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" } },
                   "steps": [
-                    { "name": "check", "type": "decision", "branches": [ { "when": "IsLarge(quantity)", "next": "update" } ], "otherwise": "update" },
+                    { "name": "check", "type": "decision", "branches": [ { "name": "branch1", "when": "IsLarge(quantity)", "next": "update" } ], "otherwise": "update" },
                     { "name": "update", "type": "operation", "operation": "updateRecord", "set": { "quantity": "Doubled(quantity)" }, "next": "connect" },
                     { "name": "connect", "type": "operation", "operation": "callConnector",
                       "connector": { "name": "PurchasingSystem", "operation": "count" }, "input": { "count": "Doubled(quantity)" }, "next": "add" },
@@ -786,10 +785,10 @@ public sealed class ReferenceIndexTests
                 """["approver"]""",
                 """
                 [
-                  { "entity": "Order", "actions": ["read"], "filter": "IsLarge(quantity)" },
-                  { "dataSource": "LargeOrders", "actions": ["read"] },
-                  { "process": "OrderReview", "actions": ["start"] },
-                  { "endpoint": "ImportOrder", "actions": ["invoke"] }
+                  { "name": "orderRead2", "entity": "Order", "actions": ["read"], "filter": "IsLarge(quantity)" },
+                  { "name": "largeOrdersRead", "dataSource": "LargeOrders", "actions": ["read"] },
+                  { "name": "orderReviewStart", "process": "OrderReview", "actions": ["start"] },
+                  { "name": "importOrderInvoke", "endpoint": "ImportOrder", "actions": ["invoke"] }
                 ]
                 """));
 

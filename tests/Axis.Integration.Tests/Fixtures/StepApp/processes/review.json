@@ -9,7 +9,7 @@
     {
       "name": "check",
       "type": "decision",
-      "branches": [{ "when": "NeedsReview(amount)", "next": "reviewed" }],
+      "branches": [{ "name": "branch1", "when": "NeedsReview(amount)", "next": "reviewed" }],
       "otherwise": "skipped"
     },
     { "name": "reviewed", "type": "end" },

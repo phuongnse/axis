@@ -1,5 +1,6 @@
 import { Button, Card, Flex, Input, Select, Typography } from 'antd'
 import { useContext, useState } from 'react'
+import { unusedStepName } from '../platform/formLayout'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
@@ -75,7 +76,7 @@ export function FormSteps({
   }
 
   function add() {
-    const step = { title: { textKey: '' }, sections: [] }
+    const step = { name: unusedStepName(list), title: { textKey: '' }, sections: [] }
     onChange('/steps', [...list, step])
   }
 

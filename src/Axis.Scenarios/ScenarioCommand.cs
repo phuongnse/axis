@@ -10,7 +10,8 @@ namespace Axis.Scenarios;
 
 /// <summary>
 /// The scenario runner as a command: it runs every scenario of an application folder, one at a
-/// time, each in its own temporary tenant database, and writes the results as JUnit. The exit code
+/// time, each in its own temporary tenant database, and writes the results as JUnit. The scenarios of the
+/// modules the application pins run after its own, named <c>&lt;module id&gt;/&lt;name&gt;</c>. The exit code
 /// is 0 when every scenario passed, 1 when one failed and 2 when the arguments are wrong or the
 /// folder does not compile, which is a setup error and not a failing scenario, and 130 when it is cancelled.
 /// With <c>--extensions</c> the application is compiled against the extension packages installed in that
@@ -71,7 +72,7 @@ public static class ScenarioCommand
         }
 
         var application = compiled.Model.Manifest.Name;
-        var scenarios = ApplicationLoader.Load(folder).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).ToList();
+        var scenarios = ApplicationLoader.Load(folder).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).Concat(compiled.ModuleScenarios).ToList();
         var outcomes = new List<ScenarioResult>();
         try
         {

@@ -1,0 +1,43 @@
+{
+  "id": "8a2e6b14-9c03-4d7f-b5a8-3e1f7c9d2b40",
+  "kind": "process",
+  "name": "DecideRequest",
+  "formatVersion": 1,
+  "entity": "approvals/Request",
+  "start": "decide",
+  "steps": [
+    {
+      "name": "decide",
+      "type": "task",
+      "label": { "textKey": "decide.review" },
+      "assignee": { "role": "employee" },
+      "form": "RequestDecisionForm",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "decide.approve" }, "next": "markApproved" },
+        { "name": "advance", "label": { "textKey": "decide.advance" }, "next": "first" }
+      ]
+    },
+    {
+      "name": "markApproved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'approved'" },
+      "next": "finished"
+    },
+    {
+      "name": "first",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "step": "coalesce(step, 0) + 1", "stepDecision": "decisionTask()" },
+      "next": "second"
+    },
+    {
+      "name": "second",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "step": "coalesce(step, 0) + 1", "stepDecision": "decisionTask()" },
+      "next": "finished"
+    },
+    { "name": "finished", "type": "end" }
+  ]
+}

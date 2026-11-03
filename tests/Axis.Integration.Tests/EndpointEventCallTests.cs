@@ -55,6 +55,35 @@ public sealed class EndpointEventCallTests(EndpointOutputFixture fixture) : ICla
     }
 
     [Fact]
+    public async Task The_occurrence_and_the_instances_its_triggers_start_carry_the_calling_service_account()
+    {
+        using var response = await CallAsync("""{ "input": { "title": "Logged by a service account", "quantity": 3 } }""");
+
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, body);
+        using var json = JsonDocument.Parse(body);
+        var recordId = json.RootElement.GetProperty("recordId").GetGuid();
+        var instanceId = json.RootElement.GetProperty("instanceId").GetGuid();
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        var caller = await fixture.ScalarAsync<string?>("SELECT accountable_user FROM axis.process_instances WHERE id = @id", ("id", instanceId));
+        Assert.NotNull(caller);
+        Assert.Equal(
+            caller,
+            await fixture.ScalarAsync<string?>("SELECT accountable_user FROM axis.events WHERE subject_id = @subject AND event = 'NoteLogged'", ("subject", recordId)));
+        foreach (var process in new[] { "AckNote", "FollowNote" })
+        {
+            Assert.True(fixture.Model.TryGetProcess(process, out var model));
+            Assert.Equal(
+                caller,
+                await fixture.ScalarAsync<string?>(
+                    "SELECT accountable_user FROM axis.process_instances WHERE process_id = @process AND subject_id = @subject",
+                    ("process", model.Id),
+                    ("subject", recordId)));
+        }
+    }
+
+    [Fact]
     public async Task A_repeated_call_with_the_same_idempotency_key_raises_no_second_occurrence()
     {
         const string title = "Logged once";

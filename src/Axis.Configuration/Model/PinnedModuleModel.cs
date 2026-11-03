@@ -14,4 +14,10 @@ public sealed record PinnedModuleModel(string Id, string Range, string Version)
 
     /// <summary>The connector slots of the pinned version, each mapped to the declared name of an application connector.</summary>
     public IReadOnlyDictionary<string, string> Connectors { get; init; } = ReadOnlyDictionary<string, string>.Empty;
+
+    /// <summary>
+    /// The valid relax entries of the application's module entry, in the order written. See
+    /// docs/reference/module-contracts.md#relax-entries.
+    /// </summary>
+    public IReadOnlyList<RelaxedPointModel> Relaxed { get; init; } = ReadOnlyCollection<RelaxedPointModel>.Empty;
 }

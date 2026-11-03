@@ -1,0 +1,9 @@
+{
+  "id": "86f46ede-e4b3-484e-aa67-f3143d3cff15",
+  "kind": "role",
+  "name": "approver",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.approver"
+  }
+}

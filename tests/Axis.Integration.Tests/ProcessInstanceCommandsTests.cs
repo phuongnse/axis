@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Configuration.Modules;
 using Axis.Data.Naming;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.SampleAppFixture;
@@ -10,14 +11,16 @@ namespace Axis.Integration.Tests;
 /// The process instance detail lists the operator commands the signed-in user may take, and marks a call
 /// resolvable, from the user's grants and the states. The sample gives <c>inspect</c> to the <c>operator</c>
 /// role, here the <c>operator</c> user, and <c>cancel</c>, <c>retry</c> and <c>resolve</c> to the finance reviewers.
-/// <c>khanh</c> holds both roles. <c>requester</c> starts the approvals and <c>manager-2</c> is the manager of
+/// <c>khanh</c> holds both roles. <c>requester</c> starts the approvals and <c>manager-2</c> is the head of
 /// Operations. Each test leaves no due work item behind, so the next one finds only its own.
 /// </summary>
 public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
 {
     private const string App = "/api/apps/PurchaseRequests";
 
-    private static readonly string _departments = EntityNaming.QualifiedTable(EntityNaming.Table(Guid.Parse("ebe6bc20-4772-4d6c-839b-65d426ebeeca")));
+    private static readonly string _departments = EntityNaming.QualifiedTable(EntityNaming.Table(ModuleResourceIds.Derive(
+        Guid.Parse("219102bc-864f-42ed-874a-c19eaee0d1ba"), // PurchaseRequests application id
+        Guid.Parse("25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95")))); // modules/organization/entities/department.json
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -96,14 +99,14 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }
 
-    // Starts an approval for a request whose department has no manager, and runs it until managerApproval fails.
+    // Starts an approval for a request whose department has no head, and runs it until managerApproval fails.
     private async Task<Guid> FailAsync(HttpClient requester)
     {
         var department = Guid.NewGuid();
         await fixture.ScalarAsync(
-            $"INSERT INTO {_departments} ({EntityNaming.Quote(EntityNaming.IdColumn)}, {EntityNaming.Quote(EntityNaming.Column("code"))}, {EntityNaming.Quote(EntityNaming.Column("name"))}) VALUES (@id, @code, 'No manager')",
+            $"INSERT INTO {_departments} ({EntityNaming.Quote(EntityNaming.IdColumn)}, {EntityNaming.Quote(EntityNaming.Column("code"))}, {EntityNaming.Quote(EntityNaming.Column("name"))}) VALUES (@id, @code, 'No head')",
             ("id", department),
-            ("code", "T" + department.ToString("N")[..10]));
+            ("code", "T" + department.ToString("N")[..10].ToUpperInvariant()));
         var subject = await CreateRequestAsync(requester, 500, department);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);

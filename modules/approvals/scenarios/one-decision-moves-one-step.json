@@ -1,0 +1,70 @@
+{
+  "id": "59ccc16f-16ea-43ef-afad-4f6954cb8b63",
+  "kind": "scenario",
+  "name": "OneDecisionMovesOneStep",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["Request/validations/oneDecisionPerStep"] },
+  "users": {
+    "admin": ["admin"],
+    "ann": ["member"],
+    "mia": ["member"],
+    "fin": ["member"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "mia",
+      "values": { "fullName": "Mia Tran", "workEmail": "mia@example.com", "user": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "fin",
+      "values": { "fullName": "Fin Le", "workEmail": "fin@example.com", "user": "fin" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "organization/Employee",
+      "as": "admin",
+      "save": "annEmployee",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com", "user": "ann", "manager": "mia" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "RequestType",
+      "as": "admin",
+      "save": "purchase",
+      "values": {
+        "name": "Purchase",
+        "code": "PURCHASE",
+        "steps": [
+          { "sequence": 1, "approver": "lineManager" },
+          { "sequence": 2, "approver": "employee", "employee": "fin" }
+        ]
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Request",
+      "as": "ann",
+      "save": "monitor",
+      "values": { "type": "purchase", "title": "Monitor", "amount": 400 }
+    },
+    { "type": "startProcess", "process": "RequestApproval", "record": "monitor", "as": "ann" },
+    { "type": "expectRecord", "record": "monitor", "values": { "status": "submitted", "step": 0, "stepsRequired": 2 } },
+    { "type": "completeTask", "record": "monitor", "step": "decide", "outcome": "approve", "as": "mia" },
+    { "type": "expectRecord", "record": "monitor", "values": { "status": "submitted", "step": 1 } },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "monitor", "state": "waiting", "step": "decide" },
+    { "type": "expectTask", "record": "monitor", "step": "decide", "assignee": { "user": "fin" } },
+    { "type": "completeTask", "record": "monitor", "step": "decide", "outcome": "approve", "as": "mia", "expect": "denied" },
+    { "type": "updateRecord", "record": "monitor", "as": "ann", "values": { "step": 2 }, "expect": "denied" },
+    { "type": "expectRecord", "record": "monitor", "values": { "status": "submitted", "step": 1 } },
+    { "type": "completeTask", "record": "monitor", "step": "decide", "outcome": "approve", "as": "fin" },
+    { "type": "expectInstance", "process": "RequestApproval", "record": "monitor", "state": "completed" },
+    { "type": "expectRecord", "record": "monitor", "values": { "status": "approved", "step": 2 } }
+  ]
+}

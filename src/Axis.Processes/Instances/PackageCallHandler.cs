@@ -74,7 +74,7 @@ internal sealed partial class PackageCallHandler(
         string? error = null;
         var errorClass = ErrorClass.Failed;
         var counted = true;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             var call = item.PackageCallId is { } callId ? await PackageCalls.LoadAsync(transaction, callId, cancellationToken) : null;
             var instance = call is null ? null : await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
@@ -445,7 +445,7 @@ internal sealed partial class PackageCallHandler(
     {
         var call = attempt.Call;
         string? failure;
-        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
             {
@@ -535,10 +535,12 @@ internal sealed partial class PackageCallHandler(
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Succeeded, ["next"] = target.Step.Next };
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        IReadOnlyList<EffectRecord> effects = [];
+        var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
+            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, write, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
@@ -546,6 +548,7 @@ internal sealed partial class PackageCallHandler(
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity!, call.ReleaseId, cancellationToken);
             updated = written;
+            effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
                 AuditActors.System,
@@ -572,19 +575,37 @@ internal sealed partial class PackageCallHandler(
             await AuditRecords.AppendAsync(transaction, recordAudit, cancellationToken);
         }
 
-        if (updated is not null
-            && await models.FindActiveAsync(new WorkItemContext(item, connection, transaction), instance.ApplicationId, cancellationToken) is { } active)
+        if (updated is not null)
         {
-            await DataChangeTriggerStarts.StartAfterUpdateAsync(
+            var active = await models.FindActiveAsync(new WorkItemContext(item, connection, transaction), instance.ApplicationId, cancellationToken);
+            if (active is { } activeNow)
+            {
+                await DataChangeTriggerStarts.StartAfterUpdateAsync(
+                    transaction,
+                    item.TenantId,
+                    activeNow.Model,
+                    activeNow.ReleaseId,
+                    call.ReleaseId,
+                    entity!,
+                    record!,
+                    updated,
+                    [],
+                    write,
+                    logger,
+                    cancellationToken);
+            }
+
+            await EffectRecordWrites.AppendAsync(
                 transaction,
                 item.TenantId,
-                active.Model,
-                active.ReleaseId,
+                active?.Model,
+                active?.ReleaseId ?? call.ReleaseId,
                 call.ReleaseId,
-                entity!,
-                record!,
-                updated,
-                [],
+                instance.ApplicationId,
+                instance.Id,
+                AuditActors.System,
+                effects,
+                write,
                 logger,
                 cancellationToken);
         }
@@ -657,7 +678,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
         if (!IsWaitingAt(instance, call, attempt))
         {
@@ -702,7 +723,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
         var waiting = IsWaitingAt(instance, call, attempt);
         if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
@@ -752,7 +773,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
         if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);

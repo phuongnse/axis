@@ -74,7 +74,7 @@ The load test sends these routes, and a test fails when this list and `tests/loa
 ## Reference environment
 
 - Two server replicas behind the TLS proxy, as in
-  [several server replicas](installation.md#several-server-replicas).
+  [several server replicas](several-server-replicas.md).
 - One worker.
 - One PostgreSQL server that holds the platform database and the tenant databases.
 - Each replica, the worker and PostgreSQL run on a machine of 4 vCPU and 8 GB of memory.
@@ -86,7 +86,7 @@ to find its own numbers.
 
 - **Script.** _(Built.)_ `scripts/load.sh` builds the production images and starts the Docker Compose
   stack with two server replicas, one worker and PostgreSQL over TLS, as in
-  [several server replicas](installation.md#several-server-replicas). It starts `server` and
+  [several server replicas](several-server-replicas.md). It starts `server` and
   then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the k6
   scenario `tests/load/objectives.js` in a container through the proxy: 50 users, each in a loop over the routes of the
   [objectives](#objectives), with a pause of about 1 s an iteration. Every request goes through one helper that tags it with

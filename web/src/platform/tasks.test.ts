@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
-import { fetchTask, fetchTasks, reassignTask, searchUsers, usersPath } from './tasks'
+import { fetchTask, fetchTasks, findUser, reassignTask, searchUsers, usersPath } from './tasks'
 
 vi.mock('./navigation')
 
@@ -45,6 +45,28 @@ describe('reassign and the user picker', () => {
       vi.fn(async () => new Response('', { status: 403 })),
     )
     await expect(searchUsers('/api/users', '')).rejects.toThrow('status 403')
+  })
+
+  it('reads one user by id, or null when no profile has it, and throws on a failure', async () => {
+    const fetchMock = vi.fn(
+      async (_url: string) =>
+        new Response(JSON.stringify({ items: [{ id: 'u1', displayName: 'Ann' }] }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(findUser('/api/users', 'u 1&')).resolves.toEqual({ id: 'u1', displayName: 'Ann' })
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/users?id=u%201%26')
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
+    )
+    await expect(findUser('/api/users', 'gone')).resolves.toBeNull()
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 403 })),
+    )
+    await expect(findUser('/api/users', 'u1')).rejects.toThrow('status 403')
   })
 
   it('returns the problem of a 400, the status of a 403 or 409, and throws otherwise', async () => {

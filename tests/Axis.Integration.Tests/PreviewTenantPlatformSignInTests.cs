@@ -349,11 +349,11 @@ public sealed class PreviewTenantPlatformSignInTests(KeycloakFixture keycloak, P
             """)
         .With("policies/buyer-access.json", """
             { "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c15", "kind": "policy", "name": "BuyerAccess", "formatVersion": 1,
-              "roles": ["buyer"], "grants": [ { "entity": "Note", "actions": ["read"], "fields": ["title"] } ] }
+              "roles": ["buyer"], "grants": [ { "name": "noteRead", "entity": "Note", "actions": ["read"], "fields": ["title"] } ] }
             """)
         .With("pages/home.json", """
             { "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c31", "kind": "page", "name": "Home", "formatVersion": 1,
-              "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox" } ] }
+              "title": { "textKey": "pages.home.title" }, "widgets": [ { "type": "taskInbox", "name": "taskInbox" } ] }
             """)
         .With("identity-providers/accounts.json", """{ "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c32", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""")
         .With("identity-providers/partner.json", """

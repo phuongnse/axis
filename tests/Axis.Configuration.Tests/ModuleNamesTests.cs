@@ -6,7 +6,7 @@ namespace Axis.Configuration.Tests;
 public sealed class ModuleNamesTests
 {
     [Fact]
-    public void Module_processes_pages_and_policies_carry_their_module_and_the_applications_own_carry_none()
+    public void Module_processes_pages_policies_and_contracts_carry_their_module_and_the_applications_own_carry_none()
     {
         var modules = ModuleCatalog.Load(Path.Combine(AppContext.BaseDirectory, "FixtureModules")).Modules;
 
@@ -22,5 +22,8 @@ public sealed class ModuleNamesTests
         Assert.Equal(
             [("checklists/ChecklistAccess", "checklists"), ("ItemAccess", null)],
             result.Names.Policies.Select(policy => (policy.Name, policy.Module)));
+        Assert.Equal(
+            [("checklists/ChecklistContract", "checklists")],
+            result.Names.Contracts.Select(contract => (contract.Name, contract.Module)));
     }
 }

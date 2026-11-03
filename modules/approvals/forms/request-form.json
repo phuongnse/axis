@@ -1,0 +1,13 @@
+{
+  "id": "fa71aab4-4c06-4db0-b020-171ac815f693",
+  "kind": "form",
+  "name": "RequestForm",
+  "formatVersion": 1,
+  "entity": "Request",
+  "sections": [
+    {
+      "title": { "textKey": "approvals.requestForm.request" },
+      "fields": [{ "field": "type" }, { "field": "title" }, { "field": "description" }, { "field": "amount" }, { "field": "status", "readOnly": true }]
+    }
+  ]
+}

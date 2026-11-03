@@ -1,0 +1,14 @@
+{
+  "id": "d25b93f9-6098-40ab-b907-24fb5dedda00",
+  "kind": "dataSource",
+  "name": "Departments",
+  "formatVersion": 1,
+  "entity": "Department",
+  "fields": [
+    { "name": "code", "path": "code" },
+    { "name": "name", "path": "name" },
+    { "name": "parent", "path": "parent" },
+    { "name": "head", "path": "head" },
+    { "name": "active", "path": "active" }
+  ]
+}

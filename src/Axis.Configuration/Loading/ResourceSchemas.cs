@@ -31,6 +31,8 @@ internal static class ResourceSchemas
         [ResourceKinds.Webhook] = Load("webhook.schema.json"),
         [ResourceKinds.Migration] = Load("migration.schema.json"),
         [ResourceKinds.Scenario] = Load("scenario.schema.json"),
+        [ResourceKinds.Contract] = Load("contract.schema.json"),
+        [ResourceKinds.Layer] = Load("layer.schema.json"),
     };
 
     /// <summary>

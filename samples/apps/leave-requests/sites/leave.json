@@ -10,6 +10,6 @@
   "navigation": [
     { "page": "MyLeaveRequests", "label": { "textKey": "nav.myLeaveRequests" }, "icon": "calendar" },
     { "page": "MyTasks", "label": { "textKey": "nav.myTasks" }, "icon": "tasks" },
-    { "page": "departments/Departments", "label": { "textKey": "nav.departments" }, "icon": "people" }
+    { "page": "Departments", "label": { "textKey": "nav.departments" }, "icon": "people" }
   ]
 }

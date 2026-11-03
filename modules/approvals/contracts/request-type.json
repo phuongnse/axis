@@ -1,0 +1,15 @@
+{
+  "id": "b5785788-a349-46e2-8cab-500bd2d0caa4",
+  "kind": "contract",
+  "name": "RequestTypeContract",
+  "formatVersion": 1,
+  "entity": "RequestType",
+  "validations": [
+    {
+      "name": "hasStepForEveryAmount",
+      "expression": "count(steps, minAmount == null) >= 1",
+      "message": { "textKey": "approvals.requestType.hasStepForEveryAmount" },
+      "field": "steps"
+    }
+  ]
+}

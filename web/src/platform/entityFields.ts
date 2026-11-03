@@ -104,6 +104,8 @@ export const fieldKeysEditedElsewhere: Record<string, string> = {
   type: 'the type column',
   label: 'the label column',
   help: 'the settings column',
+  match: 'the JSON tab',
+  userId: 'the JSON tab',
 }
 
 /** The settings a field type takes. An unknown type takes none. */

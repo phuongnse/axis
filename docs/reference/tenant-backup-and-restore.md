@@ -10,13 +10,14 @@ Detailed reference for `tenant backup` and `tenant restore` of `Axis.Admin`. The
 ## Tenant backup
 
 `tenant backup <id> --out <file> --backup-key-file <file>` writes one
-encrypted archive of one tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md).
+encrypted archive of one tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md). In a [cell](cells.md) the command
+takes no key file: it uses the tenant's own backup key, see [backups in a cell](#backups-in-a-cell).
 
 | Option | Meaning |
 | --- | --- |
 | `<id>` | The tenant id. |
 | `--out <file>` | The archive to write. The file must not exist, and its folder must exist. Only its owner can read it, because it holds all of the tenant's business data. |
-| `--backup-key-file <file>` | The backup key: a file that holds 32 bytes in base64, such as the output of `openssl rand -base64 32`. Surrounding white space is ignored. The key is read from the file only, never from the command line or a setting. The operator keeps it outside the installation. |
+| `--backup-key-file <file>` | The backup key: a file that holds 32 bytes in base64, such as the output of `openssl rand -base64 32`. Surrounding white space is ignored. The key is read from the file only, never from the command line or a setting. The operator keeps it outside the installation. Required outside a cell, and refused in a cell. |
 
 The archive holds a tar with two entries, `manifest.json` and `tenant.dump`, and the whole file is encrypted with the backup key.
 It starts with `AXISBAK1` and 8 random bytes. The tar follows in chunks of 1 MiB, each encrypted with AES-256-GCM, so the file
@@ -95,20 +96,23 @@ with `required` set to `false`.
 **Exit codes.** `0` when the archive is written. `1` when the dump or the write
 failed. `2` for an unknown tenant, a `provisioning` tenant, an `--out` file that
 exists, a missing option, a missing or malformed `--backup-key-file`, a missing tool or a missing setting.
+In a cell, `2` also covers a `--backup-key-file` (it is refused), a missing or unreadable `Cell:BackupKeyFile` and a tenant that has no backup key.
 A key file problem goes to standard error.
 
 ## Tenant restore
 
 `tenant restore <file> --tenant <id> --host <host>... --backup-key-file <file>`
 restores an archive into a new tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md). It needs the backup key that
-`tenant backup` used, and refuses an archive that is not encrypted, see [encrypted backups](data-encryption.md#encrypted-backups).
+`tenant backup` used. In a cell the command is `tenant restore <file> --tenant <id> --host <host>... --from <tenant id>`, see
+[backups in a cell](#backups-in-a-cell). It refuses an archive that is not encrypted, see [encrypted backups](data-encryption.md#encrypted-backups).
 
 | Option | Meaning |
 | --- | --- |
 | `<file>` | The archive that `tenant backup` wrote. |
 | `--tenant <id>` | The id of the new tenant. It follows the rule of `tenant create`. |
 | `--host <host>` | A host of the new tenant. Repeat it for more hosts. At least one is needed. |
-| `--backup-key-file <file>` | The backup key of the archive, in the same form as for `tenant backup`. |
+| `--backup-key-file <file>` | The backup key of the archive, in the same form as for `tenant backup`. Required outside a cell, and refused in a cell. |
+| `--from <tenant id>` | In a cell only: the tenant the archive came from. Its backup key opens the archive. The archive does not show its tenant id, so the command must be told. Refused outside a cell. |
 
 The authority and client id come from the manifest. The restored tenant either keeps the archive's sign-in or gets a new realm:
 
@@ -151,7 +155,8 @@ and whether it is newer than this build's or unknown to it, or the package id
 and version. When the archive is unreadable, is not encrypted, is not opened by the key, or its format is unknown, the schema
 version and package checks are skipped, because the manifest cannot be trusted.
 The tenant id and host checks still run. A missing or invalid
-setting, a missing `pg_restore`, a missing or malformed `--backup-key-file` and a usage error go to standard error. Both exit
+setting, a missing `pg_restore`, a missing or malformed `--backup-key-file`, in a cell a `--backup-key-file`, a missing `--from`, a missing or unreadable
+`Cell:BackupKeyFile` or a `--from` tenant with no backup key, and a usage error go to standard error. Both exit
 `2`, and nothing has changed.
 
 A module version that is not installed under `Modules:Path` is listed in the
@@ -258,18 +263,25 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_. The archive format and the steps above stay, with
-the changes below.
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, which is built. The archive
+format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
   in a second data centre of the region. It recovers the cell after a lost server. The daily archives
   recover one tenant, and keep 30 days.
-- **A backup key for each tenant.** `tenant create` makes a 32-byte backup key for the tenant and
+- **A backup key for each tenant** _(built)_. `tenant create` makes a 32-byte backup key for the tenant and
   stores it in `platform.tenant_backup_keys`, encrypted by the cell's backup key, which
-  `Cell:BackupKeyFile` names. The cell's key is a Kubernetes Secret that comes from the cloud
+  `Cell:BackupKeyFile` names, and bound to the tenant id so that a row copied to another tenant does not
+  unwrap. A rerun keeps the key it made. The cell's key is a Kubernetes Secret that comes from the cloud
   provider's key service, and it is never in the platform database or in an archive. In a cell,
   `tenant backup` and `tenant restore` take the tenant's key from the platform instead of
-  `--backup-key-file`.
+  `--backup-key-file`, and refuse that option with exit code `2`.
+  `tenant restore` takes `--from <tenant id>`, the tenant the archive came from, and opens the archive with that
+  tenant's key. An archive does not open with another tenant's key, and the restore stops with the usual
+  `the backup key does not open the archive` refusal. The restored tenant gets a new backup key of its own.
+  `tenant create`, `tenant backup` and `tenant restore` stop with exit code `2` when `Cell:BackupKeyFile`
+  is missing or cannot be read. A tenant made in a cell before this key existed has no key, and `tenant backup` refuses it.
+  `platform rekey` leaves `platform.tenant_backup_keys` alone, because the installation key does not wrap it.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
   key. Its archives stay in object storage until their lock ends, and nothing can read them. One
   leaked tenant key opens only that tenant's archives.

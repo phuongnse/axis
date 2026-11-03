@@ -133,7 +133,7 @@ the SPA.
 - **Dry run.** _(built)_ The worker runs one `records.importCheck` work
   item per import. It parses every row and runs each through the record
   command's checks as the user who uploaded the file, without storing
-  anything: parsing, field grants, defaults, computed fields and validations.
+  anything: parsing, field grants, defaults, matched references, computed fields and validations.
   With a `key`, it also reads the record that each row's key cell matches, and
   checks a matching row as a record API update: the `update` grant, its record
   filters and its field lists, then parsing, computed fields and validations.
@@ -171,6 +171,9 @@ the SPA.
   application's start lock shared, or none, and the import becomes `committed`
   or `failed`. A row that fails at write time, for example on a unique value
   that is taken or a reference to a record that does not exist, writes nothing.
+  A row that the [module contract](module-contracts.md#when-a-write-is-refused)
+  refuses fails the same way, at `/rows/{n}/values/<state field>` with the
+  contract's message. The dry run does not check the lifecycle.
   The import is `failed` with that row's errors, keyed `/rows/{n}/...` as the
   dry run's errors are. The file is deleted when the commit ends. A commit
   queued before the file was deleted ends `failed` with one error at the empty
@@ -180,7 +183,7 @@ the SPA.
 - **Each row.** It goes through the record command as the
   user who uploaded the file, with the roles stored at upload. Field grants,
   record filters, validations, defaults, sequences, the creator field,
-  computed fields and audit records all apply. With a `key`, a row whose key
+  matched references, computed fields and audit records all apply. With a `key`, a row whose key
   cell matches a record the uploader may read updates it, and other rows create
   records. A row with an empty key cell, with no match, or whose match the
   uploader cannot read, creates a record, so a hidden record is never revealed.

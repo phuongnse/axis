@@ -133,8 +133,16 @@ test.describe("Studio edits form conditions and steps", () => {
     };
     expect(saved.sections[1].fields[0].requiredWhen).toBe("totalAmount > 1000");
     expect(saved.steps).toEqual([
-      { title: { textKey: expect.any(String) }, sections: ["decision"] },
-      { title: { textKey: expect.any(String) }, sections: ["request"] },
+      {
+        name: "step2",
+        title: { textKey: expect.any(String) },
+        sections: ["decision"],
+      },
+      {
+        name: "step1",
+        title: { textKey: expect.any(String) },
+        sections: ["request"],
+      },
     ]);
   });
 });

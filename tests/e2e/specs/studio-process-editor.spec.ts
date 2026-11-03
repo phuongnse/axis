@@ -131,7 +131,7 @@ test.describe("Studio edits a process in the process editor", () => {
     expect(saved.steps[11]).toEqual({
       name: "checkTotal",
       type: "decision",
-      branches: [{ when: "totalAmount > 0", next: "managerApproval" }],
+      branches: [{ name: "branch1", when: "totalAmount > 0", next: "managerApproval" }],
       otherwise: "markRejected",
     });
   });
@@ -210,11 +210,22 @@ test.describe("Studio edits a process in the process editor", () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`);
     await openFormTab(page);
     const card = page.getByTestId("studio-step-4");
-    await expect(card).toContainText("markApproved");
-    await card
-      .getByRole("button", { name: "Remove step", exact: true })
-      .click();
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    const name = card.getByRole("textbox", { name: "Step name", exact: true });
+    await expect(name).toHaveValue("markApproved");
+    // The release history loads above the editor and moves it down, so a click during that shift can miss. The journey
+    // waits for the history, and clicks again only while the step is still there, so a second step is never removed.
+    await expect(page.getByTestId("studio-releases")).toBeVisible();
+    const save = page.getByRole("button", { name: "Save", exact: true });
+    await expect(async () => {
+      if ((await name.inputValue()) === "markApproved") {
+        await card
+          .getByRole("button", { name: "Remove step", exact: true })
+          .click({ timeout: 2_000 });
+      }
+      await expect(name).not.toHaveValue("markApproved", { timeout: 2_000 });
+      await expect(save).toBeEnabled({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+    await save.click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();
 
     const diagnostic = page

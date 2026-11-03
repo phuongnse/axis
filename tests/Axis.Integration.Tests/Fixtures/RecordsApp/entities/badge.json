@@ -1,0 +1,10 @@
+{
+  "id": "9b3e5d71-2c84-4a6f-8d10-7e4a2f9c6b51",
+  "kind": "entity",
+  "name": "Badge",
+  "formatVersion": 1,
+  "displayField": "holder",
+  "fields": [
+    { "name": "holder", "type": "text", "required": true, "maxLength": 100, "unique": true }
+  ]
+}

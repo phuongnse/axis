@@ -34,6 +34,9 @@ public static class ExpressionFunctions
         new("today", 0, 0),
         new("toDate", 1, 1),
         new("currentUser", 0, 0),
+        new("previous", 1, 1),
+        new("accountableUser", 0, 0),
+        new("decisionTask", 0, 0),
     ];
 
     private static readonly FunctionSignature[] _aggregates =
@@ -45,6 +48,7 @@ public static class ExpressionFunctions
         new("max", 2, 2) { IsAggregate = true },
         new("any", 2, 2) { IsAggregate = true },
         new("all", 2, 2) { IsAggregate = true },
+        new("first", 3, 3) { IsAggregate = true },
     ];
 
     private static readonly Dictionary<string, FunctionSignature> _byName =
@@ -72,7 +76,7 @@ internal sealed record FunctionSignature(string Name, int MinArguments, int MaxA
 {
     /// <summary>
     /// Whether the function aggregates over a child collection. Its first argument names the
-    /// collection, and its second, when there is one, is evaluated once per row.
+    /// collection, and the arguments after it, when there are any, are evaluated once per row.
     /// </summary>
     public bool IsAggregate { get; init; }
 }

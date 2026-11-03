@@ -9,10 +9,12 @@
   "widgets": [
     {
       "type": "table",
+      "name": "assets",
       "entity": "Asset",
       "rowActions": [
         {
           "type": "navigate",
+          "name": "open",
           "page": "AssetForm",
           "label": {
             "textKey": "actions.open"
@@ -21,6 +23,7 @@
         },
         {
           "type": "navigate",
+          "name": "view",
           "page": "AssetDetail",
           "label": {
             "textKey": "actions.view"
@@ -33,6 +36,7 @@
       "toolbarActions": [
         {
           "type": "navigate",
+          "name": "new",
           "page": "AssetForm",
           "label": {
             "textKey": "actions.new"

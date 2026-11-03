@@ -103,7 +103,7 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   activation needs no binding. Activating a release whose `fileStorage`
   binding is missing, or has another kind, fails with `AXC0100`. Other storage
   comes later. Under `Tenancy:Source=directory`, the `fileStorage` binding is a
-  `storage` binding of the tenant directory, and its value is `database`. See [the application manifest](resource-files.md#file-storage),
+  `storage` binding of the tenant directory, and its value is `database`. See [the application manifest](file-fields.md#the-filestorage-manifest-property),
   [file fields](file-fields.md#storage-and-clean-up) and
   [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
@@ -600,6 +600,7 @@ triggers compile and are part of the release. They fire on every
 committed write through the record command. The schedule trigger checks are built too: an invalid `schedule` is
 `AXC0160`, an unknown `timeZone` is `AXC0161`, an unknown `dataSource` is
 `AXC0162`, a grouped one is `AXC0163`, one over another entity is `AXC0164`,
+one whose `filter` calls `currentUser()` is `AXC0363`,
 an unknown or repeated `parameters` key is `AXC0165`, a wrongly typed value
 is `AXC0166` and a missing parameter is `AXC0167`. Without a `dataSource`, the
 same three codes check the keys and values against the process's parameters,

@@ -53,12 +53,14 @@
   ],
   "steps": [
     {
+      "name": "step1",
       "title": {
         "textKey": "ticket.steps.problem"
       },
       "sections": ["problem"]
     },
     {
+      "name": "step2",
       "title": {
         "textKey": "ticket.steps.details"
       },

@@ -1,0 +1,24 @@
+{
+  "id": "de640772-ab6e-4889-b4ab-7e3217ed5d2f",
+  "kind": "policy",
+  "name": "MemberAccess",
+  "formatVersion": 1,
+  "roles": ["member"],
+  "grants": [
+    { "name": "departmentRead", "entity": "Department", "actions": ["read"] },
+    {
+      "name": "employeeRead",
+      "entity": "Employee",
+      "actions": ["read"],
+      "fields": ["fullName", "workEmail", "jobTitle", "department", "manager", "user", "active", "delegate", "delegateFrom", "delegateUntil"]
+    },
+    {
+      "name": "employeeOwnAbsence",
+      "entity": "Employee",
+      "actions": ["update"],
+      "fields": ["phone", "delegate", "delegateFrom", "delegateUntil"],
+      "filter": "user == currentUser()"
+    },
+    { "name": "outOfOfficeRead", "dataSource": "OutOfOffice", "actions": ["read"] }
+  ]
+}

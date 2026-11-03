@@ -1,0 +1,59 @@
+{
+  "id": "827632b6-e3c7-4c56-965c-2b1bb1815d19",
+  "kind": "scenario",
+  "name": "DelegateNeedsDatesInOrder",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["Employee/validations/delegateHasDates", "Employee/validations/delegateDatesInOrder"] },
+  "users": {
+    "admin": ["admin"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Employee",
+      "as": "admin",
+      "save": "ann",
+      "values": { "fullName": "Ann Nguyen", "workEmail": "ann@example.com" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Employee",
+      "as": "admin",
+      "save": "bob",
+      "values": { "fullName": "Bob Tran", "workEmail": "bob@example.com" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "ann",
+      "as": "admin",
+      "values": { "delegate": "bob" },
+      "expect": { "invalid": "delegateFrom" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "ann",
+      "as": "admin",
+      "values": { "delegate": "bob", "delegateFrom": "2026-11-10" },
+      "expect": { "invalid": "delegateFrom" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "ann",
+      "as": "admin",
+      "values": { "delegate": "bob", "delegateFrom": "2026-11-12", "delegateUntil": "2026-11-10" },
+      "expect": { "invalid": "delegateUntil" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "ann",
+      "as": "admin",
+      "values": { "delegate": "bob", "delegateFrom": "2026-11-10", "delegateUntil": "2026-11-12" }
+    },
+    {
+      "type": "expectRecord",
+      "record": "ann",
+      "values": { "delegate": "bob", "delegateFrom": "2026-11-10", "delegateUntil": "2026-11-12" }
+    }
+  ]
+}

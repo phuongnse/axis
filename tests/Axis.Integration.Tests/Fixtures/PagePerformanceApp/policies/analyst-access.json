@@ -8,42 +8,49 @@
   ],
   "grants": [
     {
+      "name": "requestRead",
       "entity": "Request",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "departmentRead",
       "entity": "Department",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "requestListRead",
       "dataSource": "RequestList",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "requestsByStatusRead",
       "dataSource": "RequestsByStatus",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "openRequestTotalsRead",
       "dataSource": "OpenRequestTotals",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "amountTotalsRead",
       "dataSource": "AmountTotals",
       "actions": [
         "read"
       ]
     },
     {
+      "name": "largestRequestTotalsRead",
       "dataSource": "LargestRequestTotals",
       "actions": [
         "read"

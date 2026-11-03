@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "roles": ["employee", "department-manager"],
   "grants": [
-    { "entity": "Ticket", "actions": ["read", "create", "update"] },
-    { "process": "TicketReview", "actions": ["start"] }
+    { "name": "ticketRead", "entity": "Ticket", "actions": ["read", "create", "update"] },
+    { "name": "ticketReviewStart", "process": "TicketReview", "actions": ["start"] }
   ]
 }

@@ -1,3 +1,5 @@
+import { uniqueStepName } from './processPalette'
+
 export type ConnectChoice =
   | { kind: 'next' }
   | { kind: 'otherwise' }
@@ -79,11 +81,13 @@ export function connectEdit(
       return { pointer: `${prefix}/branches/${choice.index}/next`, value: next }
     case 'outcome':
       return { pointer: `${prefix}/outcomes/${choice.index}/next`, value: next }
-    case 'newBranch':
+    case 'newBranch': {
+      const branches = listOf(sourceStep.branches)
       return {
         pointer: `${prefix}/branches`,
-        value: [...listOf(sourceStep.branches), { when: '', next }],
+        value: [...branches, { name: uniqueStepName(branches, 'branch'), when: '', next }],
       }
+    }
     case 'newOutcome': {
       const outcomes = listOf(sourceStep.outcomes)
       return {

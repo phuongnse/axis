@@ -670,8 +670,8 @@ const processContent = {
         ...step,
         'x-note': 'keep',
         branches: [
-          { when: 'totalAmount >= FinanceThreshold()', next: 'financeApproval', 'x-note': 'keep' },
-          { when: 'totalAmount > 0', next: 'markApproved' },
+          { name: 'branch1', when: 'totalAmount >= FinanceThreshold()', next: 'financeApproval', 'x-note': 'keep' },
+          { name: 'branch2', when: 'totalAmount > 0', next: 'markApproved' },
         ],
       }
     }
@@ -729,7 +729,7 @@ describe('StudioEditor for a process', () => {
       {
         op: 'replace',
         path: '/steps/2/branches',
-        value: [...processContent.steps[2].branches!, { when: '', next: '' }],
+        value: [...processContent.steps[2].branches!, { name: 'branch3', when: '', next: '' }],
       },
     ])
   })
@@ -1707,8 +1707,8 @@ describe('StudioEditor for a form', () => {
       { name: 'details', title: { textKey: 'ticket.sections.details' }, fields: [{ field: 'resolution' }] },
     ],
     steps: [
-      { title: { textKey: 'ticket.steps.problem' }, sections: ['problem'] },
-      { title: { textKey: 'ticket.steps.details' }, sections: ['details'] },
+      { name: 'step1', title: { textKey: 'ticket.steps.problem' }, sections: ['problem'] },
+      { name: 'step2', title: { textKey: 'ticket.steps.details' }, sections: ['details'] },
     ],
   }
 

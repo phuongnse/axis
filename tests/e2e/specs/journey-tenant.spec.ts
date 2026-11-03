@@ -82,3 +82,19 @@ test('a requester has a journey session and cannot create an application there',
   })
   expect(response.status()).toBe(403)
 })
+
+test('the platform operator opens the operator console on the journey host and an author is denied it', async ({
+  page,
+}) => {
+  await useJourneySession(page, 'platform-operator')
+  await page.goto(`${journeyURL}/console`)
+
+  await expect(page.locator('[data-theme-mode="light"]').first()).toBeVisible()
+  const tenant = page.getByTestId('console-tenant')
+  await expect(tenant).toBeVisible()
+  await expect(tenant.getByRole('cell', { name: 'JourneyBase', exact: true })).toBeVisible()
+
+  await useJourneySession(page, 'author')
+  await page.goto(`${journeyURL}/console`)
+  await expect(page.getByTestId('console-forbidden')).toBeVisible()
+})

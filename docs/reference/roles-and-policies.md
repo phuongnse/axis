@@ -72,7 +72,7 @@ fields rules below: the data source endpoint adds the root entity's read
 filters to its query and refuses a data source that shows a field the user
 may not read. The purchase request sample uses the four policies below.
 Employees reach their own requests, department managers the requests of
-their department, and finance reviewers the submitted requests and their
+the departments they head, and finance reviewers the submitted requests and their
 outcomes. Operators inspect the approvals and change nothing:
 
 ```json
@@ -83,17 +83,19 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "requester == currentUser()" },
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "requester == currentUser()" },
     {
+      "name": "purchaseRequestCreate",
       "entity": "PurchaseRequest",
       "actions": ["create", "update"],
       "filter": "requester == currentUser() and status in ('draft', 'returned')",
       "fields": ["title", "department", "supplier", "currency", "lineItems", "status"]
     },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["start"] }
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "name": "purchaseRequestApprovalStart", "process": "PurchaseRequestApproval", "actions": ["start"] }
   ]
 }
 ```
@@ -106,11 +108,12 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["department-manager"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.manager == currentUser()" },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "dataSource": "RequestsByDepartment", "actions": ["read"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "department.head.user == currentUser()" },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] }
   ]
 }
 ```
@@ -123,12 +126,13 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["finance-reviewer"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "dataSource": "PurchaseRequestList", "actions": ["read"] },
-    { "dataSource": "RequestsByDepartment", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["inspect", "cancel", "retry", "resolve"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"], "filter": "status in ('submitted', 'approved', 'returned', 'rejected')" },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "departmentsRead", "dataSource": "organization/Departments", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestListRead", "dataSource": "PurchaseRequestList", "actions": ["read"] },
+    { "name": "requestsByDepartmentRead", "dataSource": "RequestsByDepartment", "actions": ["read"] },
+    { "name": "purchaseRequestApprovalInspect", "process": "PurchaseRequestApproval", "actions": ["inspect", "cancel", "retry", "resolve"] }
   ]
 }
 ```
@@ -141,10 +145,10 @@ outcomes. Operators inspect the approvals and change nothing:
   "formatVersion": 1,
   "roles": ["operator"],
   "grants": [
-    { "entity": "PurchaseRequest", "actions": ["read"] },
-    { "entity": "Department", "actions": ["read"] },
-    { "entity": "Supplier", "actions": ["read"] },
-    { "process": "PurchaseRequestApproval", "actions": ["inspect"] }
+    { "name": "purchaseRequestRead", "entity": "PurchaseRequest", "actions": ["read"] },
+    { "name": "departmentRead", "entity": "organization/Department", "actions": ["read"] },
+    { "name": "supplierRead", "entity": "Supplier", "actions": ["read"] },
+    { "name": "purchaseRequestApprovalInspect", "process": "PurchaseRequestApproval", "actions": ["inspect"] }
   ]
 }
 ```
@@ -192,12 +196,17 @@ outcomes. Operators inspect the approvals and change nothing:
 - **Combining.** The grants of all the user's policies combine with OR. A
   filter that is `false`, `null` or fails gives nothing through its grant.
   See [Combining grants](security.md#combining-grants).
-- **Name** _(planned for M25)_. Each grant has a `name`, unique in its policy,
-  so a [customization layer](customization-layers.md#list-keys) can change it.
-- **Ceiling** _(planned for M24)_. A grant on a module entity that has a
-  contract stays within the role's ceiling: an action or field past it is a
-  diagnostic, and the ceiling's filter joins the grant's with `and`. See
-  [grant ceiling](module-contracts.md#grant-ceiling).
+- **Name.** Each grant has a `name`, which follows the name pattern and is
+  unique in its policy, ignoring letter case. A grant without one is `AXC0004`.
+  A repeated name is `AXC0353`. A
+  [customization layer](customization-layers.md#list-keys) finds a grant by its
+  name.
+- **Ceiling.** A grant on a module entity that has a contract stays within
+  the role's ceiling: an action or field past it is a diagnostic (`AXC0334`).
+  At run time the filters of the role's ceiling entries that list the action
+  join the grant's filter with `and`, so a grant never reaches a record past
+  the ceiling.
+  See [grant ceiling](module-contracts.md#grant-ceiling).
 
 The `cancel` action of a `process` grant lets a user cancel that process's
 instances, see [Cancel](process-inspection.md#cancel). The `retry` action lets a user
@@ -210,7 +219,7 @@ reviewer policy above lets its reviewers inspect, cancel, retry and resolve an a
 that holds all three has:
 
 ```json
-{ "process": "PurchaseRequestApproval", "actions": ["retry", "cancel", "resolve"] }
+{ "name": "purchaseRequestApprovalOperate", "process": "PurchaseRequestApproval", "actions": ["retry", "cancel", "resolve"] }
 ```
 
 A policy also grants inbound [endpoints](integration-resources.md#endpoint-resource). The target is
@@ -228,7 +237,7 @@ caller. The purchase request sample gives the purchasing system this policy, in
   "name": "PurchasingSystemAccess",
   "formatVersion": 1,
   "roles": ["purchasing-system"],
-  "grants": [{ "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
+  "grants": [{ "name": "submitPurchaseRequestInvoke", "endpoint": "SubmitPurchaseRequest", "actions": ["invoke"] }]
 }
 ```
 
@@ -277,7 +286,7 @@ Compile checks, each a compile error:
   outside the [SQL subset](expressions.md#sql-subset), such as an aggregate
   other than `any` and `count`, or `lower`, is `AXC0053`. It gets the other
   [expression diagnostics](expressions.md#diagnostics) too.
-- `currentUser()` anywhere but a policy filter is `AXC0095`.
+- `currentUser()` anywhere but a policy filter and a data source `filter` is `AXC0095`.
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,

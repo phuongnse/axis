@@ -9,7 +9,8 @@ namespace Axis.Server.Tenancy;
 
 /// <param name="PlatformConnectionString">The reader role's connection string for the platform database.</param>
 /// <param name="Interval">How often the directory is read again.</param>
-internal sealed record TenantDirectoryRefreshOptions(string PlatformConnectionString, TimeSpan Interval);
+/// <param name="RuntimeAddress">Where tenant runtime connections go, or <c>null</c> for each row's own host and port.</param>
+internal sealed record TenantDirectoryRefreshOptions(string PlatformConnectionString, TimeSpan Interval, TenantRuntimeAddress? RuntimeAddress = null);
 
 /// <summary>
 /// Under <c>Tenancy:Source=directory</c>, reads the tenant directory again every <c>Tenancy:RefreshInterval</c>. A tenant
@@ -61,7 +62,7 @@ internal sealed partial class TenantDirectoryRefresh(
             DirectoryTenantCatalog loaded;
             try
             {
-                loaded = await DirectoryTenantCatalog.LoadAsync(options.PlatformConnectionString, cipher, cancellationToken);
+                loaded = await DirectoryTenantCatalog.LoadAsync(options.PlatformConnectionString, cipher, cancellationToken, options.RuntimeAddress);
             }
             catch (InvalidOperationException exception)
             {

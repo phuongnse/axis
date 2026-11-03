@@ -4,6 +4,7 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Parsing;
+using Axis.Expressions.Syntax;
 using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Compilation;
@@ -21,7 +22,7 @@ namespace Axis.Configuration.Compilation;
 /// not load is not reported again, the entity match is not checked when either entity is unknown,
 /// and <c>when</c> is not checked without the event or the entity. A schedule trigger has a valid cron
 /// and a known IANA time zone, and names a loaded data source that is not grouped and is over the
-/// process's subject entity. Its parameters give a literal value of its type to every parameter of the
+/// process's subject entity, and whose filter does not call <c>currentUser()</c>, because a schedule runs with no signed-in user. Its parameters give a literal value of its type to every parameter of the
 /// data source and name no other. A schedule trigger without a data source is a scheduled job. It names
 /// a process without a subject, and its parameters give a literal value of its type to every parameter
 /// of the process and name no other. A module trigger is checked inside its module, see
@@ -426,6 +427,17 @@ internal static class TriggerChecker
                 "/dataSource");
         }
 
+        // A filter that does not parse has a diagnostic of its own on the data source.
+        if (dataSource.Filter is { } dataSourceFilter
+            && ExpressionParser.Parse(dataSourceFilter) is { Succeeded: true } parsedFilter
+            && CallsCurrentUser(parsedFilter.Expression))
+        {
+            report(
+                DiagnosticCodes.CurrentUserInScheduleDataSource,
+                $"The filter of the data source '{dataSource.Name}' calls currentUser(). A schedule starts the process with no signed-in user, so its data source cannot depend on one.",
+                "/dataSource");
+        }
+
         // An unknown entity has a diagnostic of its own on the data source or the process.
         if (process is not null
             && findEntity(dataSource.Entity) is { } rowEntity
@@ -755,4 +767,20 @@ internal static class TriggerChecker
             ParameterExpressions = parameterExpressions,
         };
     }
+
+    /// <summary>
+    /// Whether <paramref name="node"/> calls <c>currentUser()</c>. A rule body is checked on its own and cannot call it,
+    /// so the filter's own tree is enough.
+    /// </summary>
+    private static bool CallsCurrentUser(ExpressionNode node) => node switch
+    {
+        CallNode call => (call.Module is null && string.Equals(call.Name, "currentUser", StringComparison.OrdinalIgnoreCase))
+            || call.Arguments.Any(CallsCurrentUser),
+        BinaryNode binary => CallsCurrentUser(binary.Left) || CallsCurrentUser(binary.Right),
+        UnaryNode unary => CallsCurrentUser(unary.Operand),
+        IsNullNode isNull => CallsCurrentUser(isNull.Operand),
+        InNode inList => CallsCurrentUser(inList.Operand) || inList.Items.Any(CallsCurrentUser),
+        MemberNode member => CallsCurrentUser(member.Target),
+        _ => false,
+    };
 }

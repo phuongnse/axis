@@ -4,5 +4,5 @@
   "name": "Categories",
   "formatVersion": 1,
   "title": { "textKey": "pages.categories.title" },
-  "widgets": [{ "type": "table", "entity": "Category" }]
+  "widgets": [{ "type": "table", "name": "table", "entity": "Category" }]
 }

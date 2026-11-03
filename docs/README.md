@@ -43,7 +43,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
 | [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |
 | [Data sources](reference/data-sources.md)                              | The `dataSource` resource and its endpoint                                            |
-| [Record API](reference/record-api.md)                                  | Record routes, values, paging, errors, child rows, audit history                      |
+| [Record API](reference/record-api.md)                                  | Record routes, values, paging, errors, child rows                                     |
+| [Record audit](reference/record-audit.md)                              | The audit records every record write leaves, and the history endpoint                 |
 | [File fields](reference/file-fields.md)                                | The `file` field type: values, upload, download, storage and clean-up                |
 | [Import and export](reference/import-export.md)                        | Exporting records to CSV and spreadsheets, and importing them under policies          |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency          |
@@ -81,14 +82,18 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Log inventory](reference/log-inventory.md)                            | Every log Axis writes: events, format, destination, readers, retention and the security events |
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
 | [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
+| [Actions and controls](reference/actions-and-controls.md)              | Button levels and places, menus, and how every form draws field errors and choices    |
 | [Shell and home page](reference/shell.md)                             | The shell around every page, navigation icons, the page header, the platform home page and the sign-in cards      |
-| [Platform pages](reference/platform-pages.md)                        | The sessions screen at `/account` and the users page at `/users`                      |
+| [Platform pages](reference/platform-pages.md)                        | The sessions screen and account page at `/account` and the users page at `/users`     |
+| [Legal links and terms](reference/legal.md)                            | Privacy and terms links per tenant and site, the legal line, `/licences` and accepting the terms |
 | [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
+| [Studio workspace](reference/studio-workspace.md)                      | Studio's list of applications, an open application's sidebar, band and Overview       |
 | [Entity designer](reference/entity-designer.md)                        | The Form tab of the entity editor: fields, settings, indexes, validations                 |
 | [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |
 | [Process designer](reference/process-designer.md)                      | The Design tab of the process editor: palette, transitions, removes, keyboard         |
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
 | [Draft page metadata](reference/draft-page-metadata.md)               | The routes that answer the page metadata of a draft page or form and of a module page  |
+| [Module resource saves](reference/module-resource-saves.md)           | The route that saves an edited module resource as a customization layer with only the difference |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |
 | [Administration](reference/administration.md)                          | The `Axis.Admin` commands: create a tenant, migrate, activate, publisher |
 | [Tenant backup and restore](reference/tenant-backup-and-restore.md)    | `tenant backup` and `tenant restore`: the encrypted archive, the backup key, the manifest, the checks and the steps, and daily backups in a cell |
@@ -108,6 +113,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [E-invoices](reference/e-invoices.md) | Vietnamese e-invoices issued on payment through a provider adapter |
 | [Billing portal](reference/billing-portal.md) | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
+| [Several server replicas](reference/several-server-replicas.md)        | Running the server as several replicas behind a TLS proxy: key ring, forwarded headers, Studio volume |
 | [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
 
 ## Working on Axis

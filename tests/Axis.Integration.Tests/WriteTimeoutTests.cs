@@ -126,9 +126,10 @@ public sealed class WriteTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         fixture.Factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Data:WriteTimeout", "00:00:00.200");
+            builder.UseSetting("Data:TenantPoolMaxSize", "1");
             builder.UseSetting(
                 "Tenants:a:ConnectionString",
-                PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString(TenantA)) + ";Maximum Pool Size=1;No Reset On Close=true");
+                PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString(TenantA)) + ";No Reset On Close=true");
         });
 
     // A request that no timeout stops fails here instead of hanging the test.

@@ -39,9 +39,9 @@ public sealed class PresentationCompilerTests
 
     // The buttons reuse text keys that every fixture of these tests has.
     private const string OrdersWidget = """
-        { "type": "table", "entity": "Order",
-          "rowActions": [ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "orders.title" }, "record": "id" } ],
-          "toolbarActions": [ { "type": "navigate", "page": "OrderForm", "label": { "textKey": "orderForm.title" } } ] }
+        { "type": "table", "name": "table", "entity": "Order",
+          "rowActions": [ { "type": "navigate", "name": "navigate", "page": "OrderForm", "label": { "textKey": "orders.title" }, "record": "id" } ],
+          "toolbarActions": [ { "type": "navigate", "name": "navigate2", "page": "OrderForm", "label": { "textKey": "orderForm.title" } } ] }
         """;
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class PresentationCompilerTests
     [Fact]
     public void Widget_over_an_unknown_entity_is_reported_at_its_entity()
     {
-        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "table", "entity": "Invoice" }"""));
+        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "table", "name": "table", "entity": "Invoice" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -87,7 +87,7 @@ public sealed class PresentationCompilerTests
     {
         // The property name is built at run time so that no file under tests spells it out.
         var removed = "form" + "Page";
-        using var folder = Folder().With("pages/orders.json", Page("Orders", $$"""{ "type": "table", "entity": "Order", "{{removed}}": "OrderForm" }"""));
+        using var folder = Folder().With("pages/orders.json", Page("Orders", $$"""{ "type": "table", "name": "table", "entity": "Order", "{{removed}}": "OrderForm" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -103,7 +103,7 @@ public sealed class PresentationCompilerTests
     {
         using var folder = Folder()
             .With("data-sources/order-list.json", OrderList())
-            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "orderList" }"""));
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "name": "table", "dataSource": "orderList" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -121,7 +121,7 @@ public sealed class PresentationCompilerTests
     [Fact]
     public void Widget_over_an_unknown_data_source_is_reported_at_its_data_source()
     {
-        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "Missing" }"""));
+        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "table", "name": "table", "dataSource": "Missing" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -138,7 +138,7 @@ public sealed class PresentationCompilerTests
     {
         using var folder = Folder()
             .With("data-sources/order-list.json", $$"""{ "id": "{{OrderListId}}", "kind": "dataSource", "name": "OrderList", "formatVersion": 1, "entity": "Order" }""")
-            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList" }"""));
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "name": "table", "dataSource": "OrderList" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -148,9 +148,9 @@ public sealed class PresentationCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "table", "entity": "Order", "dataSource": "OrderList" }""", "/widgets/0")]
-    [InlineData("""{ "type": "table" }""", "/widgets/0")]
-    [InlineData("""{ "type": "form", "dataSource": "OrderList" }""", "/widgets/0/dataSource")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "dataSource": "OrderList" }""", "/widgets/0")]
+    [InlineData("""{ "type": "table", "name": "table" }""", "/widgets/0")]
+    [InlineData("""{ "type": "form", "name": "form", "dataSource": "OrderList" }""", "/widgets/0/dataSource")]
     public void Widget_naming_both_or_neither_of_entity_and_data_source_or_a_form_over_a_data_source_is_reported(string widget, string path)
     {
         using var folder = Folder()
@@ -169,7 +169,7 @@ public sealed class PresentationCompilerTests
     [Fact]
     public void Task_inbox_with_no_binding_compiles_to_a_widget_with_no_references()
     {
-        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "taskInbox" }"""));
+        using var folder = Folder().With("pages/orders.json", Page("Orders", """{ "type": "taskInbox", "name": "taskInbox" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -187,7 +187,7 @@ public sealed class PresentationCompilerTests
     {
         using var folder = Folder()
             .With("data-sources/order-list.json", OrderList())
-            .With("pages/orders.json", Page("Orders", $$"""{ "type": "taskInbox", "{{property}}": {{value}} }"""));
+            .With("pages/orders.json", Page("Orders", $$"""{ "type": "taskInbox", "name": "taskInbox", "{{property}}": {{value}} }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -203,7 +203,7 @@ public sealed class PresentationCompilerTests
         using var folder = Folder()
             .With("data-sources/order-list.json", OrderList(
                 """, "parameters": [{ "name": "numberFilter", "type": "text", "required": true }, { "name": "optional", "type": "text" }] """))
-            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList" }"""));
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "name": "table", "dataSource": "OrderList" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -215,7 +215,7 @@ public sealed class PresentationCompilerTests
         Assert.Null(result.Model);
     }
 
-    private const string BoundTable = """{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "number" } }""";
+    private const string BoundTable = """{ "type": "table", "name": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "number" } }""";
 
     private static TemporaryFolder BoundFolder(string dataSourceParameters, string pageParameters, string widget = BoundTable) =>
         Folder()
@@ -229,7 +229,7 @@ public sealed class PresentationCompilerTests
         using var folder = BoundFolder(
             """{ "name": "numberFilter", "type": "text", "required": true }""",
             """{ "name": "Number", "type": "text", "required": true }""",
-            """{ "type": "table", "dataSource": "OrderList", "parameters": { "NUMBERFILTER": "number" } }""");
+            """{ "type": "table", "name": "table", "dataSource": "OrderList", "parameters": { "NUMBERFILTER": "number" } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -320,8 +320,8 @@ public sealed class PresentationCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "table", "dataSource": "OrderList", "parameters": { "missing": "number" } }""", "/widgets/0/parameters/missing")]
-    [InlineData("""{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "missing" } }""", "/widgets/0/parameters/numberFilter")]
+    [InlineData("""{ "type": "table", "name": "table", "dataSource": "OrderList", "parameters": { "missing": "number" } }""", "/widgets/0/parameters/missing")]
+    [InlineData("""{ "type": "table", "name": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "missing" } }""", "/widgets/0/parameters/numberFilter")]
     public void Table_binding_an_unknown_name_is_reported_at_the_binding(string widget, string path)
     {
         using var folder = BoundFolder(
@@ -341,7 +341,7 @@ public sealed class PresentationCompilerTests
         using var folder = BoundFolder(
             """{ "name": "numberFilter", "type": "text" }, { "name": "other", "type": "text" }""",
             """{ "name": "number", "type": "text" }, { "name": "OTHER", "type": "text" }""",
-            """{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "number" } }""");
+            """{ "type": "table", "name": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "number" } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -358,7 +358,7 @@ public sealed class PresentationCompilerTests
         using var folder = BoundFolder(
             """{ "name": "numberFilter", "type": "text" }""",
             """{ "name": "numberFilter", "type": "text" }""",
-            """{ "type": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "numberFilter" } }""");
+            """{ "type": "table", "name": "table", "dataSource": "OrderList", "parameters": { "numberFilter": "numberFilter" } }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -370,7 +370,7 @@ public sealed class PresentationCompilerTests
     {
         using var folder = Folder().With(
             "pages/orders.json",
-            Page("Orders", """{ "type": "table", "entity": "Order", "parameters": { "a": "b" } }"""));
+            Page("Orders", """{ "type": "table", "name": "table", "entity": "Order", "parameters": { "a": "b" } }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -386,7 +386,7 @@ public sealed class PresentationCompilerTests
         using var folder = Folder()
             .With("data-sources/order-list.json", OrderList(
                 """, "aggregate": { "groupBy": ["number"], "measures": [{ "name": "orders", "function": "count" }] } """))
-            .With("pages/orders.json", Page("Orders", """{ "type": "table", "dataSource": "OrderList" }"""));
+            .With("pages/orders.json", Page("Orders", """{ "type": "table", "name": "table", "dataSource": "OrderList" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -666,8 +666,8 @@ public sealed class PresentationCompilerTests
             .With("sites/sales.json", Site())
             .With("identity-providers/accounts.json", AccountsProvider)
             .With("pages/orders.json", Page("Orders", OrdersWidget))
-            .With("pages/order-form.json", Page("OrderForm", """{ "type": "form", "entity": "Order" }""", "55555555-5555-4555-8555-555555555552", "orderForm.title"))
-            .With("pages/customer-form.json", Page("CustomerForm", """{ "type": "form", "entity": "Customer" }""", "55555555-5555-4555-8555-555555555553", "customerForm.title"));
+            .With("pages/order-form.json", Page("OrderForm", """{ "type": "form", "name": "form", "entity": "Order" }""", "55555555-5555-4555-8555-555555555552", "orderForm.title"))
+            .With("pages/customer-form.json", Page("CustomerForm", """{ "type": "form", "name": "form", "entity": "Customer" }""", "55555555-5555-4555-8555-555555555553", "customerForm.title"));
 
     private static string Site(
         string name = "Sales",

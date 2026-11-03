@@ -1,0 +1,15 @@
+{
+  "id": "69b9773b-13c7-4c5e-8fc5-16d540121705",
+  "kind": "application",
+  "name": "ModuleContractFlowApp",
+  "formatVersion": 1,
+  "modules": [
+    {
+      "id": "requests",
+      "version": "^1.0.0",
+      "roles": {
+        "requester": "employee"
+      }
+    }
+  ]
+}

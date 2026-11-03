@@ -118,8 +118,8 @@ public sealed class WidgetActionCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "table", "entity": "Order", "actions": [ ACTION ] }""")]
-    [InlineData("""{ "type": "taskInbox", "actions": [ ACTION ] }""")]
+    [InlineData("""{ "name": "table", "type": "table", "entity": "Order", "actions": [ ACTION ] }""")]
+    [InlineData("""{ "name": "taskInbox", "type": "taskInbox", "actions": [ ACTION ] }""")]
     public void Actions_on_a_widget_other_than_a_form_are_reported_at_its_actions(string widget)
     {
         using var folder = Folder("Order")
@@ -187,7 +187,7 @@ public sealed class WidgetActionCompilerTests
     public void Start_process_action_in_toolbar_actions_is_a_schema_violation()
     {
         using var folder = Folder("Order")
-            .With(OrdersFile, Page("Orders", $$"""{ "type": "table", "entity": "Order", "toolbarActions": [ {{ActionJson("OrderReview")}} ] }"""));
+            .With(OrdersFile, Page("Orders", $$"""{ "name": "table", "type": "table", "entity": "Order", "toolbarActions": [ {{ActionJson("OrderReview")}} ] }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -217,7 +217,7 @@ public sealed class WidgetActionCompilerTests
     public void Delete_action_in_toolbar_actions_is_a_schema_violation()
     {
         using var folder = Folder("Order")
-            .With(OrdersFile, Page("Orders", $$"""{ "type": "table", "entity": "Order", "toolbarActions": [ {{DeleteJson()}} ] }"""));
+            .With(OrdersFile, Page("Orders", $$"""{ "name": "table", "type": "table", "entity": "Order", "toolbarActions": [ {{DeleteJson()}} ] }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -229,7 +229,7 @@ public sealed class WidgetActionCompilerTests
     public void Delete_action_in_a_form_widgets_actions_is_a_schema_violation()
     {
         using var folder = Folder("Order")
-            .With(PageFile, FormPage($$"""{ "type": "form", "entity": "Order", "actions": [ {{DeleteJson()}} ] }"""));
+            .With(PageFile, FormPage($$"""{ "name": "form", "type": "form", "entity": "Order", "actions": [ {{DeleteJson()}} ] }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -241,7 +241,7 @@ public sealed class WidgetActionCompilerTests
     public void Delete_action_naming_a_process_is_a_schema_violation()
     {
         using var folder = Folder("Order")
-            .With(OrdersFile, OrdersPage("""{ "type": "delete", "process": "OrderReview", "label": { "textKey": "order.submit" } }"""));
+            .With(OrdersFile, OrdersPage("""{ "name": "delete", "type": "delete", "process": "OrderReview", "label": { "textKey": "order.submit" } }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -274,19 +274,19 @@ public sealed class WidgetActionCompilerTests
                 """);
 
     private static string ActionJson(string process, string labelKey = "order.submit") =>
-        $$"""{ "type": "startProcess", "process": "{{process}}", "label": { "textKey": "{{labelKey}}" } }""";
+        $$"""{ "name": "startProcess", "type": "startProcess", "process": "{{process}}", "label": { "textKey": "{{labelKey}}" } }""";
 
     private static string DeleteJson(string labelKey = "order.submit", string? visibleWhen = null)
     {
         var condition = visibleWhen is null ? "" : $", \"visibleWhen\": \"{visibleWhen}\"";
-        return $$"""{ "type": "delete", "label": { "textKey": "{{labelKey}}" }{{condition}} }""";
+        return $$"""{ "name": "delete", "type": "delete", "label": { "textKey": "{{labelKey}}" }{{condition}} }""";
     }
 
     private static string Action(string process, string labelKey = "order.submit") =>
-        $$"""{ "type": "form", "entity": "Order", "actions": [ {{ActionJson(process, labelKey)}} ] }""";
+        $$"""{ "name": "form", "type": "form", "entity": "Order", "actions": [ {{ActionJson(process, labelKey)}} ] }""";
 
     private static string OrdersPage(string rowAction) =>
-        Page("Orders", $$"""{ "type": "table", "entity": "Order", "rowActions": [ {{rowAction}} ] }""");
+        Page("Orders", $$"""{ "name": "table", "type": "table", "entity": "Order", "rowActions": [ {{rowAction}} ] }""");
 
     private static string FormPage(string widget) =>
         Page("OrderForm", widget, "55555555-5555-4555-8555-555555555552", "orderForm.title");

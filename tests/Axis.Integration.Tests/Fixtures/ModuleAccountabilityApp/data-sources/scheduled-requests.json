@@ -1,0 +1,9 @@
+{
+  "id": "707ab652-2ee5-41c3-bc13-904fc549f624",
+  "kind": "dataSource",
+  "name": "ScheduledRequests",
+  "formatVersion": 1,
+  "entity": "signoffs/Request",
+  "filter": "startsWith(title, 'Scheduled ')",
+  "fields": [{ "name": "title", "path": "title" }]
+}

@@ -163,7 +163,7 @@ internal static class PresentationChecker
     }
 
     /// <summary>
-    /// Checks the steps: each title is a known text key, each step section names a section of the
+    /// Checks the steps: each name is unique, ignoring letter case, each title is a known text key, each step section names a section of the
     /// form, no section is in two steps, and, when there are steps, each section has a name and is in
     /// one. A section name matches ignoring letter case.
     /// </summary>
@@ -181,9 +181,18 @@ internal static class PresentationChecker
         var sectionNames = new HashSet<string>(
             form.Sections.Select(section => section.Name).OfType<string>(), StringComparer.OrdinalIgnoreCase);
         var firstPathByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var firstIndexByStepName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var stepIndex = 0; stepIndex < form.Steps.Count; stepIndex++)
         {
             var step = form.Steps[stepIndex];
+            if (!firstIndexByStepName.TryAdd(step.Name, stepIndex))
+            {
+                report(
+                    DiagnosticCodes.DuplicateFormStepName,
+                    $"The step name '{step.Name}' is already used by the step at '/steps/{firstIndexByStepName[step.Name]}'.",
+                    $"/steps/{stepIndex}/name");
+            }
+
             ApplicationCompiler.CheckTextKey(step.Title, form, $"/steps/{stepIndex}/title", references, diagnostics);
 
             for (var sectionIndex = 0; sectionIndex < step.Sections.Count; sectionIndex++)
@@ -335,37 +344,44 @@ internal static class PresentationChecker
     /// <summary>
     /// The first field of the entity that <paramref name="node"/> reads and <paramref name="listed"/>
     /// lacks, or null. A path reads its first field. An aggregate reads its collection field, and
-    /// its item expression reads the child row, so it is skipped. A rule body sees only its
-    /// arguments, so a rule call reads what its arguments read.
+    /// its item expression reads the child row, so only its <c>outer.field</c> reads, which read a field of
+    /// the entity, count. A rule body sees only its arguments, so a rule call reads what its arguments read.
+    /// <paramref name="inItem"/> is true inside an aggregate's item expression, where a bare name is a field of the child row.
     /// </summary>
-    private static string? FirstUnlistedField(ExpressionNode node, ExpressionCheckResult check, IReadOnlySet<string> listed)
+    private static string? FirstUnlistedField(ExpressionNode node, ExpressionCheckResult check, IReadOnlySet<string> listed, bool inItem = false)
     {
         switch (node)
         {
             case NameNode name:
-                return listed.Contains(name.Name) ? null : name.Name;
+                return inItem || listed.Contains(name.Name) ? null : name.Name;
 
             case MemberNode member:
-                return FirstUnlistedField(member.Target, check, listed);
+                if (check.OuterReads.Contains(member))
+                {
+                    return listed.Contains(member.Name) ? null : member.Name;
+                }
+
+                return FirstUnlistedField(member.Target, check, listed, inItem);
 
             case UnaryNode unary:
-                return FirstUnlistedField(unary.Operand, check, listed);
+                return FirstUnlistedField(unary.Operand, check, listed, inItem);
 
             case BinaryNode binary:
-                return FirstUnlistedField(binary.Left, check, listed) ?? FirstUnlistedField(binary.Right, check, listed);
+                return FirstUnlistedField(binary.Left, check, listed, inItem) ?? FirstUnlistedField(binary.Right, check, listed, inItem);
 
             case IsNullNode isNull:
-                return FirstUnlistedField(isNull.Operand, check, listed);
+                return FirstUnlistedField(isNull.Operand, check, listed, inItem);
 
             case InNode inList:
-                return FirstUnlistedField(inList.Operand, check, listed)
-                    ?? inList.Items.Select(item => FirstUnlistedField(item, check, listed)).FirstOrDefault(name => name is not null);
+                return FirstUnlistedField(inList.Operand, check, listed, inItem)
+                    ?? inList.Items.Select(item => FirstUnlistedField(item, check, listed, inItem)).FirstOrDefault(name => name is not null);
 
             case CallNode call:
                 var isAggregate = !check.RuleCalls.ContainsKey(call)
                     && ExpressionFunctions.AggregateNames.Contains(call.Name, StringComparer.OrdinalIgnoreCase);
-                var arguments = isAggregate ? call.Arguments.Take(1) : call.Arguments;
-                return arguments.Select(argument => FirstUnlistedField(argument, check, listed)).FirstOrDefault(name => name is not null);
+                return call.Arguments
+                    .Select((argument, index) => FirstUnlistedField(argument, check, listed, inItem || (isAggregate && index > 0)))
+                    .FirstOrDefault(name => name is not null);
 
             default:
                 return null;
@@ -417,6 +433,7 @@ internal static class PresentationChecker
 
         var leaves = new List<(WidgetDefinition Widget, string Path)>();
         CheckWidgets(page.Widgets, "/widgets", 1, leaves, page, references, diagnostics);
+        CheckNames(page, Report);
 
         // A form page opens a record, which a navigate action names with 'record'.
         if (page.Parameters.Count > 0 && leaves.Any(leaf => leaf.Widget.Type == "form"))
@@ -521,6 +538,76 @@ internal static class PresentationChecker
             {
                 ApplicationCompiler.CheckTextKey(widget.Title!, page, $"{path}/title", references, diagnostics);
                 CheckWidgets(children, $"{path}/widgets", level + 1, leaves, page, references, diagnostics);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks that a widget name is unique on the page, ignoring letter case, at any depth, and that the names of the actions,
+    /// columns and tabs of each list are unique in that list. A repeat is reported at its name.
+    /// </summary>
+    private static void CheckNames(PageResource page, Action<string, string, string> report)
+    {
+        var firstPathByWidgetName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        CheckWidgetNames(page.Widgets, "/widgets", firstPathByWidgetName, report);
+    }
+
+    private static void CheckWidgetNames(
+        IReadOnlyList<WidgetDefinition> widgets,
+        string listPath,
+        Dictionary<string, string> firstPathByWidgetName,
+        Action<string, string, string> report)
+    {
+        for (var index = 0; index < widgets.Count; index++)
+        {
+            var widget = widgets[index];
+            var path = $"{listPath}/{index}";
+            if (widget.Name is { } name && !firstPathByWidgetName.TryAdd(name, $"{path}/name"))
+            {
+                report(
+                    DiagnosticCodes.DuplicatePageElementName,
+                    $"The widget name '{name}' is already used at '{firstPathByWidgetName[name]}'. A page names each widget once, ignoring letter case.",
+                    $"{path}/name");
+            }
+
+            CheckElementNames(widget.Actions?.Select(action => action.Name) ?? [], $"{path}/actions", report);
+            CheckElementNames(widget.RowActions?.Select(action => action.Name) ?? [], $"{path}/rowActions", report);
+            CheckElementNames(widget.ToolbarActions?.Select(action => action.Name) ?? [], $"{path}/toolbarActions", report);
+            CheckElementNames(widget.Columns?.Select(column => column.Name) ?? [], $"{path}/columns", report);
+            CheckElementNames(widget.Tabs?.Select(tab => tab.Name) ?? [], $"{path}/tabs", report);
+
+            var columns = widget.Columns ?? [];
+            for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
+            {
+                CheckWidgetNames(columns[columnIndex].Widgets, $"{path}/columns/{columnIndex}/widgets", firstPathByWidgetName, report);
+            }
+
+            var tabs = widget.Tabs ?? [];
+            for (var tabIndex = 0; tabIndex < tabs.Count; tabIndex++)
+            {
+                CheckWidgetNames(tabs[tabIndex].Widgets, $"{path}/tabs/{tabIndex}/widgets", firstPathByWidgetName, report);
+            }
+
+            if (widget.Widgets is { } children)
+            {
+                CheckWidgetNames(children, $"{path}/widgets", firstPathByWidgetName, report);
+            }
+        }
+    }
+
+    /// <summary>Checks that the names of one list's elements are unique, ignoring letter case, and reports a repeat at its name.</summary>
+    private static void CheckElementNames(IEnumerable<string?> names, string listPath, Action<string, string, string> report)
+    {
+        var firstPathByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, index) in names.Select((name, index) => (name, index)))
+        {
+            var path = $"{listPath}/{index}/name";
+            if (name is not null && !firstPathByName.TryAdd(name, path))
+            {
+                report(
+                    DiagnosticCodes.DuplicatePageElementName,
+                    $"The name '{name}' is already used at '{firstPathByName[name]}'. Each element of a list has its own name, ignoring letter case.",
+                    path);
             }
         }
     }

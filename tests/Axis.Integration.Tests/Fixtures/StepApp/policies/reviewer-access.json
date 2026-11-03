@@ -4,5 +4,5 @@
   "name": "ReviewerAccess",
   "formatVersion": 1,
   "roles": ["reviewer"],
-  "grants": [{ "entity": "Request", "actions": ["read"], "fields": ["title", "department"] }]
+  "grants": [{ "name": "requestRead", "entity": "Request", "actions": ["read"], "fields": ["title", "department"] }]
 }

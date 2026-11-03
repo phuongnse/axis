@@ -21,6 +21,9 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     setting a type does not take cannot be edited. The settings
     column also has a field's [`help`](resource-files.md#resource-file-shape)
     on every type, a picker of the existing text keys like the label.
+    A `reference` field's [`match`](resource-files.md#matched-references) and a
+    `text` field's [`userId`](resource-files.md#entity-field-types-and-constraints)
+    are edited in the JSON tab.
   - The type picker also offers `money`, `file` and `references`, and a child
     entity's fields may be `reference`. A `references` field has the same
     target picker as a `reference` field. The settings column adds, for a
@@ -51,8 +54,10 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     combination (`AXC0013`). A key that is already in the file stays, and its
     diagnostic opens at the field's row.
   - An Indexes list under the fields adds, moves and removes the entity's
-    `indexes`. Each index picks the entity's fields in order and has a Unique
-    checkbox. The picker offers only fields that have a column, so it leaves
+    `indexes`. Each index shows its name as read-only text, picks the entity's
+    fields in order and has a Unique checkbox. Add index writes the name
+    `index1`, `index2` and so on, the first one that no index of the entity has,
+    ignoring letter case. The picker offers only fields that have a column, so it leaves
     out `child-collection`, `references` and `file` fields (`AXC0276`). Each
     change writes the whole `indexes` array, and removing the last index
     removes the key.
@@ -68,14 +73,16 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     the key, they do not write `false`.
   - A computed field's `expression` and each validation's expression use the
     [expression editor](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md).
-    A validation also has a message key picker and a field picker, and can be
-    added and removed.
+    A validation also shows its name as read-only text, has a message key picker
+    and a field picker, and can be added and removed. Add validation writes the
+    name `validation1`, `validation2` and so on, the first one that no validation
+    of the entity has, ignoring letter case.
   - Fields can be added, removed and moved up or down. Each of these replaces
     the `fields` array.
   - Every input keeps its `studio-field-<pointer>` id, and each row has the id
     of its field, so a diagnostic opens at its input, or at the row when the
     row does not show the setting.
-  - A module entity, such as `departments/Department`, opens in the designer
+  - A module entity, such as `organization/Department`, opens in the designer
     read-only, from the [module resource route](authoring.md#routes). Every input is
     off, and it has no Add field, Remove, Move, Add validation, Save or Delete
     button, no JSON tab and no Uses or Used by lists. A label shows its text key. The read-only notice has the alert role.

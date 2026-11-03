@@ -8,10 +8,11 @@ namespace Axis.Server.Users;
 
 /// <summary>
 /// <c>GET /api/apps/{app}/users?search=</c>, the user picker. It lists up to 20 user profiles whose display name
-/// contains the search text, ignoring letter case, sorted by display name and then id. A missing or empty search lists the
-/// first 20. Each item has only the user's <c>id</c> and <c>displayName</c>. It is the only route that lists user
-/// profiles, and it is for choosing who receives a task, so it needs <c>reassign</c> on some process of the active
-/// release. A request is checked in order: signed-in user (401), application (404), the grant (403).
+/// or email contains the search text, ignoring letter case, sorted by display name and then id. A missing or empty search
+/// lists the first 20. Each item has only the user's <c>id</c> and <c>displayName</c>, never the email. It is for choosing
+/// who receives a task, so it needs <c>reassign</c> on some process of the active release. The route of a user id field
+/// (<see cref="UserIdFieldEndpoints"/>) lists profiles the same way for people who may write that field. A request is checked in order: signed-in user (401),
+/// application (404), the grant (403).
 /// </summary>
 internal static class UserPickerEndpoints
 {

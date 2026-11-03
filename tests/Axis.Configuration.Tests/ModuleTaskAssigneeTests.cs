@@ -109,7 +109,7 @@ public sealed class ModuleTaskAssigneeTests
     private static TemporaryFolder Modules(string assignee, string? reassign = null, bool slots = true)
     {
         var slotList = slots ? """, "roles": [ { "name": "approver", "label": { "textKey": "approvals.approver" } } ]""" : "";
-        var escalations = reassign is null ? "" : $$""", "escalations": [ { "after": "PT1H", "reassign": {{reassign}} } ]""";
+        var escalations = reassign is null ? "" : $$""", "escalations": [ { "name": "escalation1", "after": "PT1H", "reassign": {{reassign}} } ]""";
         return new TemporaryFolder()
             .With("approvals/1.0.0/module.json", $$"""
                 { "kind": "module", "id": "approvals", "version": "1.0.0", "label": "Approvals"{{slotList}} }

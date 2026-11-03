@@ -1,0 +1,16 @@
+{
+  "id": "249dbb40-8bc2-4b9b-b5f8-b76192a9ffe8",
+  "kind": "dataSource",
+  "name": "Employees",
+  "formatVersion": 1,
+  "entity": "Employee",
+  "fields": [
+    { "name": "fullName", "path": "fullName" },
+    { "name": "workEmail", "path": "workEmail" },
+    { "name": "jobTitle", "path": "jobTitle" },
+    { "name": "department", "path": "department" },
+    { "name": "manager", "path": "manager" },
+    { "name": "user", "path": "user" },
+    { "name": "active", "path": "active" }
+  ]
+}

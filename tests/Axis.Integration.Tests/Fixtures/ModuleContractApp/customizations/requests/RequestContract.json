@@ -1,0 +1,15 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3c11",
+  "kind": "layer",
+  "formatVersion": 1,
+  "target": "requests/RequestContract",
+  "changes": {
+    "lifecycle": {
+      "states": [{ "name": "onHold" }],
+      "transitions": [
+        { "name": "hold", "from": ["submitted"], "to": "onHold", "guard": "amount < 1000" },
+        { "name": "resume", "from": ["onHold"], "to": "submitted", "guard": "amount > 0" }
+      ]
+    }
+  }
+}

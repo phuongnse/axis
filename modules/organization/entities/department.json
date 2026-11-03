@@ -1,0 +1,18 @@
+{
+  "id": "25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95",
+  "kind": "entity",
+  "name": "Department",
+  "formatVersion": 1,
+  "label": { "textKey": "organization.department.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "code", "type": "text", "required": true, "unique": true, "maxLength": 20, "label": { "textKey": "organization.department.code" } },
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "organization.department.name" } },
+    { "name": "parent", "type": "reference", "target": "Department", "label": { "textKey": "organization.department.parent" } },
+    { "name": "head", "type": "reference", "target": "Employee", "label": { "textKey": "organization.department.head" } },
+    { "name": "active", "type": "boolean", "default": "true", "label": { "textKey": "organization.department.active" } }
+  ],
+  "validations": [
+    { "name": "codeUpperCase", "expression": "code == upper(code)", "message": { "textKey": "organization.department.codeUpperCase" }, "field": "code" }
+  ]
+}

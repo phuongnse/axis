@@ -3,6 +3,7 @@ import { Flex, Modal, Tag, Typography } from 'antd'
 import { useContext, useState, type HTMLAttributes } from 'react'
 import { AxisTable } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
+import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import { releaseActorName, releaseGroups, type StudioReleaseGroup, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -14,7 +15,8 @@ import { PlatformContext } from './context'
  * label or note its publish did not give shows as no value. When
  * `canActivate`, every release that is not live has an icon button, Activate…, off while `busy`: activating goes
  * either way, back to an older release or forward to a newer one, so one verb names it. The button opens a dialog that
- * says which release replaces the live one, and its confirmation calls `onActivate`.
+ * says which release replaces the live one, and its confirmation calls `onActivate`. An off-standard release shows the
+ * Off-standard tag with each relaxed module, point and reason.
  */
 export function StudioReleasesList({
   history,
@@ -55,6 +57,7 @@ export function StudioReleasesList({
             'data-testid': 'studio-release-row',
             'data-number': release.number,
             'data-active': release.live ? 'true' : undefined,
+            'data-off-standard': release.relaxed.length > 0 ? 'true' : undefined,
           }) as HTMLAttributes<HTMLElement>
         }
         columns={[
@@ -96,6 +99,12 @@ export function StudioReleasesList({
             title: t('shell.studio.releases.note'),
             kind: 'text',
             render: (release) => release.note ?? <EmptyDash />,
+          },
+          {
+            key: 'relaxed',
+            title: t('shell.studio.releases.relaxed'),
+            kind: 'text',
+            render: (release) => <ReleaseOffStandard relaxed={release.relaxed} />,
           },
         ]}
         rowActions={

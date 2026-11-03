@@ -14,7 +14,7 @@ public sealed class ExpressionProbeTests
             { "name": "total", "type": "decimal", "expression": "quantity * unitPrice" }
           ],
           "validations": [
-            { "field": "quantity", "message": { "textKey": "order.quantity" }, "expression": "quantity > 0" }
+            { "name": "quantityPositive", "field": "quantity", "message": { "textKey": "order.quantity" }, "expression": "quantity > 0" }
           ] }
         """;
 

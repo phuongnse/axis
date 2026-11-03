@@ -53,6 +53,32 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     }
 
     [Fact]
+    public async Task Migrate_in_a_cell_keeps_the_schema_role_on_the_database_host_whatever_the_runtime_database_address()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        await scenario.SetSchemaVersionAsync(id, OldVersion);
+
+        var result = await scenario.RunAsync(
+            ["migrate"],
+            extra: new Dictionary<string, string?>
+            {
+                ["Tenancy:Source"] = "directory",
+                ["Cell:Id"] = "vn-1",
+                ["Cell:Region"] = "vn",
+                ["Cell:TenantDomain"] = "vn.example.test",
+                ["Cell:RuntimeDatabaseHost"] = "pgbouncer.invalid",
+                ["Cell:RuntimeDatabasePort"] = "6432",
+            });
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(_steps.Select(step => $"{id} {step} ok"), result.Output.Where(line => line.StartsWith($"{id} ", StringComparison.Ordinal)));
+        Assert.Equal(TenantSchemaVersion.Current, (await scenario.RowAsync(id)).SchemaVersion);
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
     public async Task Migrate_gives_keys_to_a_tenant_without_any_and_a_second_run_changes_nothing()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);

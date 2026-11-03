@@ -4,5 +4,5 @@
   "name": "Requests",
   "formatVersion": 1,
   "title": { "textKey": "pages.requests.title" },
-  "widgets": [{ "type": "table", "entity": "Request" }]
+  "widgets": [{ "type": "table", "name": "table", "entity": "Request" }]
 }

@@ -52,7 +52,7 @@ request ends `approved`:
       "save": "request",
       "values": {
         "title": "Laptops",
-        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
         "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
         "currency": "USD",
         "status": "draft",
@@ -89,10 +89,18 @@ request ends `approved`:
 - `users` maps a user id to its role names. Each role must be a declared
   [`role`](roles-and-policies.md). No identity provider takes part. The runner
   gives each step the user's id and roles, as a session would.
-  _(planned for M24)_ A scenario in a module names role slots of the module
-  instead, and each becomes the role the application maps it to, see
+  A scenario in a module names role slots of the module instead, and each
+  becomes the role the application maps it to, see
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md)
-  and [contract scenarios](module-contracts.md#contract-scenarios).
+  and [module scenarios](modules-and-templates.md#processes-pages-policies-and-dependencies).
+  A step of a module scenario names an entity of its own module by plain name, or an entity of
+  a module that the module declares, as `<module id>/<name>`. A process is always the module's own.
+  An assignee role and a recipient role are slots too. A name that is not a slot
+  is `AXC0335`.
+- `contract` is for a module's scenario only. Its `covers` lists the named points of the module's
+  contracts that the scenario tests, which makes it a contract scenario, see
+  [contract scenarios](module-contracts.md#contract-scenarios). A point the module lacks is
+  `AXC0339`. An application's own scenario with `contract` is `AXC0340`.
 - `now` is a date-time with an offset. It fixes the time that expressions,
   filters, sequence numbers and task due dates read, for the whole scenario.
   Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.
@@ -141,7 +149,9 @@ Every step has a `type`. These are the step kinds:
   command, as the record API does. `startProcess` and `completeTask` apply the
   checks of the process start and task endpoints without the HTTP layer.
 - `entity` and `process` name a resource of the application, or of a module it
-  declares, written `<module id>/<name>` such as `department-budgets/Budget`.
+  declares, written `<module id>/<name>` such as `department-budgets/Budget`. In a
+  module's scenario, `entity` names an entity of the module or of a module it declares, and
+  `process` names a process of the module only.
 - Only actions may declare `expect`. With no `expect`, an action must succeed.
   An unmet expectation fails the scenario:
   - `"denied"` means 403. A grant, a field grant or a record filter refused
@@ -289,7 +299,7 @@ advances three hours, the schedule has fired and the manager has a task:
       "save": "request",
       "values": {
         "title": "Laptops",
-        "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
         "supplier": "06e1abca-17bb-4a84-a05d-508f7428a7e5",
         "currency": "USD",
         "status": "draft",
@@ -393,6 +403,11 @@ What runs now:
 A failure names the step and what differed, for example
 `Step 3 (expectRecord): field 'quantity' expected 3 but was 4`. The runner stops
 a scenario at its first failing step.
+
+Each module the application pins may hold scenarios, see
+[module scenarios](modules-and-templates.md#processes-pages-policies-and-dependencies).
+They run after the application's own, for each module in pin order and then by file path. A result
+is named `<module id>/<scenario name>`, in the output, the JUnit file and the Studio test results.
 
 It writes `scenarios-<application name>.xml`, a JUnit file with one test case per
 scenario, to `artifacts/test-results/`, or to the folder of `--results`. The exit

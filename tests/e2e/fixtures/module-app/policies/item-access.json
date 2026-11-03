@@ -4,5 +4,5 @@
   "name": "ItemAccess",
   "formatVersion": 1,
   "roles": ["employee"],
-  "grants": [{ "entity": "Item", "actions": ["read"] }]
+  "grants": [{ "name": "itemRead", "entity": "Item", "actions": ["read"] }]
 }

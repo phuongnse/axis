@@ -54,6 +54,13 @@ builder.Services.AddSingleton<RateLimitRefusals>();
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, RateLimitRefusals>(RateLimits.Configure);
 
+// Read before any database work too, so a bad value stops the start.
+var cell = CellOptions.Load(builder.Configuration);
+var runtimeAddress = TenantRuntimeAddress.Load(builder.Configuration, cell);
+builder.Services.AddSingleton(cell);
+builder.Services.AddSingleton(QuotaDefaults.Load(builder.Configuration, cell));
+builder.Services.AddSingleton<TenantQuotas>();
+
 // Both sources need the schema connection, a reader role and the key, so a missing setting stops the start
 // before any database work.
 var platformSchemaConnectionString = builder.Configuration.GetConnectionString("PlatformSchema");
@@ -101,7 +108,7 @@ if (directorySource)
     }
 
     await PlatformMigration.ApplyAsync(platformMigration, CancellationToken.None);
-    var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None);
+    var loaded = await DirectoryTenantCatalog.LoadAsync(platformConnectionString, cipher, CancellationToken.None, runtimeAddress);
 
     // The server serves a tenant only on its own schema version. Axis.Admin migrate brings a tenant there.
     var otherSchema = loaded.OnOtherSchemaVersion(TenantSchemaVersion.Current);
@@ -113,7 +120,7 @@ if (directorySource)
     // Registered first, so it logs before the release check runs.
     builder.Services.AddSingleton(directory);
     builder.Services.AddSingleton<TenantDirectoryRefreshStatus>();
-    builder.Services.AddSingleton(new TenantDirectoryRefreshOptions(platformConnectionString, refreshInterval));
+    builder.Services.AddSingleton(new TenantDirectoryRefreshOptions(platformConnectionString, refreshInterval, runtimeAddress));
     builder.Services.AddSingleton<TenantDirectoryRefresh>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<TenantDirectoryRefresh>());
     builder.Services.AddSingleton(new TenantDirectoryStart(
@@ -170,7 +177,7 @@ builder.Services.AddExceptionHandler<TenantDataKeyMissingHandler>();
 builder.Services.AddServerTelemetry(builder.Configuration, builder.Environment);
 // The clients that startup activation uses to bring a tenant's realm in step.
 builder.Services.AddHttpClient();
-builder.Services.AddTenancy(tenants);
+builder.Services.AddTenancy(tenants, TenantPoolSettings.Load(builder.Configuration));
 builder.Services.AddTenantKeys(directorySource
     ? new DirectoryTenantKeySource(platformConnectionString, cipher)
     : new ConfigurationTenantKeySource(builder.Configuration));
@@ -217,7 +224,7 @@ builder.Services.AddSingleton(QueryTimeoutSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(ExportSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(FileSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(RecordImportSettings.Load(builder.Configuration));
-builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
+builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath, cell));
 builder.Services.AddSingleton(ConsoleSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(UsersSettings.Load(builder.Configuration));
 
@@ -308,7 +315,13 @@ sessions.MapConsoleEndpoints();
 sessions.MapAboutEndpoints();
 sessions.MapSessionEndpoints();
 sessions.MapUserPickerEndpoints();
+sessions.MapUserIdFieldEndpoints();
 sessions.MapStudioEndpoints();
+
+// An /api path that matches no route answers a 404 problem, never the SPA's page. GET and HEAD only, as the SPA fallback,
+// so a wrong method on a real route still answers 405.
+sessions.MapFallback("/api/{**path}", () => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No API route matches this path."))
+    .WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
 
 app.MapGroup(string.Empty).WithBearerRateLimit().MapInboundEndpoints();
 

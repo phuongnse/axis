@@ -1,0 +1,24 @@
+{
+  "id": "6adf408a-ed60-49f6-a685-6e5d07d46bad",
+  "kind": "contract",
+  "name": "RequestContract",
+  "formatVersion": 1,
+  "entity": "Request",
+  "lifecycle": {
+    "field": "status",
+    "states": [
+      { "name": "draft", "initial": true, "deletable": true },
+      { "name": "submitted" },
+      { "name": "approved" }
+    ],
+    "transitions": [
+      { "name": "submit", "from": ["draft"], "to": "submitted" },
+      {
+        "name": "approve",
+        "from": ["submitted"],
+        "to": "approved",
+        "guard": "accountableUser() != null and accountableUser() != requester"
+      }
+    ]
+  }
+}

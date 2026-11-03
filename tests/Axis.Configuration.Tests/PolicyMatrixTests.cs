@@ -97,8 +97,8 @@ public sealed class PolicyMatrixTests
     public void A_grant_from_a_policy_naming_two_roles_is_shared_and_one_from_the_roles_own_access_policy_is_not()
     {
         using var folder = Folder(
-            ("policies/shared.json", Policy("11", "RequestAccess", """["employee", "manager"]""", """[{ "entity": "Request", "actions": ["read"] }]""")),
-            ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """[{ "entity": "Request", "actions": ["create"], "filter": "owner == 'x'", "fields": ["owner"] }]""")));
+            ("policies/shared.json", Policy("11", "RequestAccess", """["employee", "manager"]""", """[{ "name": "requestRead", "entity": "Request", "actions": ["read"] }]""")),
+            ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """[{ "name": "requestCreate", "entity": "Request", "actions": ["create"], "filter": "owner == 'x'", "fields": ["owner"] }]""")));
 
         var matrix = ApplicationCompiler.Compile(folder.Path).PolicyMatrix;
 
@@ -125,7 +125,7 @@ public sealed class PolicyMatrixTests
     public void An_access_policy_that_names_another_role_makes_the_row_read_only_and_a_missing_one_leaves_it_editable()
     {
         using var folder = Folder(
-            ("policies/employee.json", Policy("12", "EmployeeAccess", """["manager"]""", """[{ "entity": "Request", "actions": ["read"] }]""")));
+            ("policies/employee.json", Policy("12", "EmployeeAccess", """["manager"]""", """[{ "name": "requestRead2", "entity": "Request", "actions": ["read"] }]""")));
 
         var matrix = ApplicationCompiler.Compile(folder.Path).PolicyMatrix;
 
@@ -146,9 +146,9 @@ public sealed class PolicyMatrixTests
     public void A_data_source_read_without_read_on_its_root_entity_gives_no_read_and_names_the_entity()
     {
         using var folder = Folder(
-            ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """[{ "dataSource": "RequestList", "actions": ["read"] }]""")),
+            ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """[{ "name": "requestListRead", "dataSource": "RequestList", "actions": ["read"] }]""")),
             ("policies/manager.json", Policy("13", "ManagerAccess", """["manager"]""", """
-                [{ "dataSource": "RequestList", "actions": ["read"] }, { "entity": "Request", "actions": ["read"] }]
+                [{ "name": "requestListRead2", "dataSource": "RequestList", "actions": ["read"] }, { "name": "requestRead3", "entity": "Request", "actions": ["read"] }]
                 """)));
 
         var matrix = ApplicationCompiler.Compile(folder.Path).PolicyMatrix;
@@ -170,14 +170,14 @@ public sealed class PolicyMatrixTests
         using var folder = Folder(
             ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """
                 [
-                  { "dataSource": "RequestList", "actions": ["read", "export"] },
-                  { "entity": "Request", "actions": ["export", "import"] }
+                  { "name": "requestListRead3", "dataSource": "RequestList", "actions": ["read", "export"] },
+                  { "name": "requestExport", "entity": "Request", "actions": ["export", "import"] }
                 ]
                 """)),
             ("policies/manager.json", Policy("13", "ManagerAccess", """["manager"]""", """
                 [
-                  { "dataSource": "RequestList", "actions": ["read", "export"] },
-                  { "entity": "Request", "actions": ["read", "export", "import"] }
+                  { "name": "requestListRead4", "dataSource": "RequestList", "actions": ["read", "export"] },
+                  { "name": "requestRead4", "entity": "Request", "actions": ["read", "export", "import"] }
                 ]
                 """)));
 
@@ -214,7 +214,7 @@ public sealed class PolicyMatrixTests
     {
         using var folder = Folder(
             ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """
-                [{ "entity": "RequestLine", "actions": ["read"] }, { "process": "requestreview", "actions": ["start", "read"] }]
+                [{ "name": "requestLineRead", "entity": "RequestLine", "actions": ["read"] }, { "name": "requestreviewStart", "process": "requestreview", "actions": ["start", "read"] }]
                 """)));
 
         var matrix = ApplicationCompiler.Compile(folder.Path).PolicyMatrix;
@@ -236,7 +236,7 @@ public sealed class PolicyMatrixTests
     public void A_folder_with_a_compile_error_still_gets_its_roles_and_grants()
     {
         using var folder = Folder(
-            ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """[{ "entity": "Request", "actions": ["read"] }]""")))
+            ("policies/employee.json", Policy("12", "EmployeeAccess", """["employee"]""", """[{ "name": "requestRead5", "entity": "Request", "actions": ["read"] }]""")))
             .With("endpoints/broken.json", $$"""
                 { "id": "bc241668-fe85-45a4-b7cf-d36da8d56b72", "kind": "endpoint", "name": "Broken", "formatVersion": 1, "entity": "Request",
                   "process": "NoSuchProcess", "input": [], "values": {} }

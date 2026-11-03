@@ -4,5 +4,5 @@
   "name": "ImporterAccess",
   "formatVersion": 1,
   "roles": ["importer"],
-  "grants": [{ "endpoint": "ImportTicket", "actions": ["invoke"] }]
+  "grants": [{ "name": "importTicketInvoke", "endpoint": "ImportTicket", "actions": ["invoke"] }]
 }

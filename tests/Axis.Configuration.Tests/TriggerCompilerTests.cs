@@ -577,6 +577,24 @@ public sealed class TriggerCompilerTests
     }
 
     [Fact]
+    public void A_schedule_trigger_over_a_data_source_whose_filter_calls_current_user_is_a_diagnostic_at_data_source()
+    {
+        using var folder = ScheduleFolder()
+            .With("data-sources/my-notes.json", """
+                { "id": "99999999-9999-4999-8999-999999999905", "kind": "dataSource", "name": "MyNotes", "formatVersion": 1, "entity": "Note",
+                  "fields": [{ "name": "title", "path": "title" }],
+                  "filter": "title == currentUser()" }
+                """)
+            .With("triggers/nightly.json", ScheduleTrigger(dataSource: "MyNotes"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.CurrentUserInScheduleDataSource, "triggers/nightly.json", "/dataSource"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'MyNotes'", diagnostic.Message);
+    }
+
+    [Fact]
     public void A_schedule_trigger_with_an_unknown_or_repeated_parameter_key_is_a_diagnostic_at_the_key()
     {
         using var folder = ScheduleFolder().With("triggers/nightly.json", ScheduleTrigger(

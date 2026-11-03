@@ -12,6 +12,12 @@ internal sealed record StudioWriteOutcome(StudioWriteRefusal? Refusal, string? V
     public static StudioWriteOutcome Refused(StudioWriteRefusal refusal) => new(refusal, null);
 }
 
+/// <summary>What a layer write did: the layer's file and new version, both null when no layer is left, or the reason it was refused.</summary>
+internal sealed record StudioLayerOutcome(StudioWriteRefusal? Refusal, string? File, string? Version)
+{
+    public static StudioLayerOutcome Refused(StudioWriteRefusal refusal) => new(refusal, null, null);
+}
+
 /// <summary>What a batch of changes did: the new version of each file in request order, or the reason it was refused.</summary>
 internal sealed record StudioChangesOutcome(StudioWriteRefusal? Refusal, IReadOnlyList<string>? Versions)
 {
@@ -110,6 +116,109 @@ internal static class StudioWrites
 
         await ReplaceAsync(check.Target!, check.Bytes!, cancellationToken);
         return new StudioWriteOutcome(null, Version(check.Bytes!));
+    }
+
+    /// <summary>
+    /// Writes the customization layer of a module resource: the layer for <paramref name="moduleId"/> and
+    /// <paramref name="name"/> holds <paramref name="changes"/>, or is deleted when <paramref name="changes"/> is null.
+    /// The existing layer is the first file in path order of kind <c>layer</c> whose <c>target</c> has this module id
+    /// exactly and this name ignoring letter case. It keeps its <c>id</c>, its file and its <c>target</c>. A new layer
+    /// gets a new <c>id</c> and the file <c>customizations/&lt;module&gt;/&lt;name&gt;.json</c>. The version check
+    /// refuses as stale when <paramref name="ifMatch"/> is not the existing layer's version, or when there is no
+    /// layer, and when <paramref name="ifNoneMatch"/> is set and a layer exists. Nothing is written when it refuses.
+    /// </summary>
+    public static async Task<StudioLayerOutcome> WriteLayerAsync(
+        IStudioWriteLock writeLock,
+        string folder,
+        string moduleId,
+        string name,
+        JsonObject? changes,
+        string? ifMatch,
+        bool ifNoneMatch,
+        CancellationToken cancellationToken)
+    {
+        if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
+        {
+            return StudioLayerOutcome.Refused(StudioWriteRefusal.Unavailable);
+        }
+
+        await using var _ = held;
+
+        var existing = FindLayer(StudioFolder.List(folder), moduleId, name);
+        if (ifMatch is not null
+            && (existing is null || !string.Equals(Unquote(ifMatch), existing.File.Version, StringComparison.Ordinal)))
+        {
+            return StudioLayerOutcome.Refused(StudioWriteRefusal.Stale);
+        }
+
+        if (ifNoneMatch && existing is not null)
+        {
+            return StudioLayerOutcome.Refused(StudioWriteRefusal.Stale);
+        }
+
+        var file = existing?.File.File ?? $"customizations/{moduleId}/{name}.json";
+        if (Target(folder, file) is not { } target)
+        {
+            return StudioLayerOutcome.Refused(StudioWriteRefusal.UnsafePath);
+        }
+
+        if (changes is null)
+        {
+            if (existing is not null)
+            {
+                File.Delete(target);
+            }
+
+            return new StudioLayerOutcome(null, null, null);
+        }
+
+        var bytes = Serialize(new JsonObject
+        {
+            ["id"] = (existing?.File.Id ?? Guid.NewGuid()).ToString("D"),
+            ["kind"] = "layer",
+            ["formatVersion"] = 1,
+            ["target"] = existing?.Target ?? $"{moduleId}/{name}",
+            ["changes"] = changes.DeepClone(),
+        });
+        if (existing is not null)
+        {
+            await ReplaceAsync(target, bytes, cancellationToken);
+        }
+        else if (await WriteNewAsync(target, bytes, cancellationToken) is { } refused)
+        {
+            return StudioLayerOutcome.Refused(refused);
+        }
+
+        return new StudioLayerOutcome(null, file, Version(bytes));
+    }
+
+    // A layer file with its target as written.
+    private sealed record ExistingLayer(StudioFile File, string Target);
+
+    // The first layer in path order whose target names this module exactly and this resource ignoring letter case.
+    private static ExistingLayer? FindLayer(IReadOnlyList<StudioFile> files, string moduleId, string name)
+    {
+        foreach (var file in files.Where(file => file.Kind == "layer"))
+        {
+            try
+            {
+                if (JsonNode.Parse(file.Bytes) is JsonObject { } root
+                    && root["target"] is JsonValue value
+                    && value.TryGetValue<string>(out var target)
+                    && target.IndexOf('/', StringComparison.Ordinal) is var slash and > 0
+                    && string.Equals(target[..slash], moduleId, StringComparison.Ordinal)
+                    && string.Equals(target[(slash + 1)..], name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new ExistingLayer(file, target);
+                }
+            }
+            catch (JsonException)
+            {
+                // A file that is not JSON names no target. The list has left such a file out already.
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

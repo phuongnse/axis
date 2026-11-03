@@ -11,6 +11,7 @@ namespace Axis.Integration.Tests;
 /// The rollback route of the authoring API stores a <c>rollback</c> request for a release of the history, and the publisher
 /// activates that release again. The server and the publisher run together here.
 /// </summary>
+[Collection("Test scenario runs")]
 public sealed class StudioRollbackTests : IAsyncLifetime
 {
     private const string ApplicationUrl = "/api/studio/apps/PurchaseRequests";
@@ -184,10 +185,10 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         Assert.Equal(label, texts.RootElement.GetProperty("texts").GetProperty("nav.departments").GetString());
     }
 
-    // Adds an optional text field to the Department entity of the sample.
+    // Adds an optional text field to the Supplier entity of the sample.
     private static async Task AddFieldAsync(string folder)
     {
-        var path = Path.Combine(folder, "entities", "department.json");
+        var path = Path.Combine(folder, "entities", "supplier.json");
         var text = await File.ReadAllTextAsync(path, CancellationToken);
         var index = text.IndexOf("\"fields\": [", StringComparison.Ordinal);
         Assert.True(index >= 0);

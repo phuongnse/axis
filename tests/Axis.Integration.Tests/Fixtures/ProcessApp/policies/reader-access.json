@@ -4,5 +4,5 @@
   "name": "ReaderAccess",
   "formatVersion": 1,
   "roles": ["reader"],
-  "grants": [{ "entity": "Request", "actions": ["read", "delete"] }]
+  "grants": [{ "name": "requestRead", "entity": "Request", "actions": ["read", "delete"] }]
 }

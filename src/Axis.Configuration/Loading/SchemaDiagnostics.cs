@@ -104,15 +104,49 @@ internal static class SchemaDiagnostics
         // A property rejected by "additionalProperties": false, or by a false schema under
         // "properties", fails against the false schema, whose own message does not say which
         // property is the problem. Only a false schema fails without a keyword.
-        var evaluationPath = node.EvaluationPath.ToString();
-        if (evaluationPath.EndsWith("/additionalProperties", StringComparison.Ordinal)
-            || (string.IsNullOrEmpty(keyword) && ParentSegment(evaluationPath) == "properties"))
+        if (IsRejectedProperty(node.EvaluationPath.ToString(), keyword))
         {
             var property = path[(path.LastIndexOf('/') + 1)..].Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal);
             return $"Property '{property}' is not allowed here.";
         }
 
         return string.IsNullOrEmpty(keyword) ? error : $"{error} ({keyword})";
+    }
+
+    /// <summary>Whether an error is a property that the schema does not allow, which fails against a false schema.</summary>
+    private static bool IsRejectedProperty(string evaluationPath, string? keyword) =>
+        evaluationPath.EndsWith("/additionalProperties", StringComparison.Ordinal)
+        || (string.IsNullOrEmpty(keyword) && ParentSegment(evaluationPath) == "properties");
+
+    /// <summary>
+    /// The JSON Pointers of the properties in <paramref name="root"/> that <paramref name="schema"/> does not
+    /// allow, the ones <see cref="Validate"/> reports as "Property ... is not allowed here".
+    /// </summary>
+    public static IReadOnlyList<string> RejectedProperties(JsonSchema schema, JsonElement root)
+    {
+        var results = schema.Evaluate(root, _schemaOptions);
+        var rejected = new List<string>();
+        if (results.IsValid)
+        {
+            return rejected;
+        }
+
+        foreach (var node in results.Details ?? [])
+        {
+            if (node.IsValid || node.Errors is null || IsUnderIf(node.EvaluationPath.ToString()))
+            {
+                continue;
+            }
+
+            var evaluationPath = node.EvaluationPath.ToString();
+            var path = node.InstanceLocation.ToString();
+            if (node.Errors.Keys.Any(keyword => IsRejectedProperty(evaluationPath, keyword)) && !rejected.Contains(path))
+            {
+                rejected.Add(path);
+            }
+        }
+
+        return rejected;
     }
 
     /// <summary>Whether a schema evaluation path goes through an <c>if</c> keyword, and not a property named <c>if</c>.</summary>

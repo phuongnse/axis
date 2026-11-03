@@ -31,6 +31,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- include "axis.hostEnv" . | nindent 12 }}
+            {{- with include "axis.pgbouncerEnv" . }}
+            {{- . | nindent 12 }}
+            {{- end }}
             # The image keeps the health address on loopback. The kubelet probes the pod address.
             - name: Health__Urls
               value: http://0.0.0.0:5208

@@ -17,6 +17,7 @@
   "widgets": [
     {
       "type": "detail",
+      "name": "ticketDetail",
       "entity": "Ticket",
       "record": "ticket"
     }

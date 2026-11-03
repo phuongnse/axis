@@ -90,9 +90,10 @@ providers it allows, see
   "widgets": [
     {
       "type": "table",
+      "name": "requests",
       "entity": "PurchaseRequest",
-      "rowActions": [{ "type": "navigate", "page": "PurchaseRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
-      "toolbarActions": [{ "type": "navigate", "page": "PurchaseRequestForm", "label": { "textKey": "actions.new" } }]
+      "rowActions": [{ "type": "navigate", "name": "open", "page": "PurchaseRequestForm", "label": { "textKey": "actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "PurchaseRequestForm", "label": { "textKey": "actions.new" } }]
     }
   ]
 }
@@ -116,7 +117,7 @@ providers it allows, see
 - A `table` widget opens and creates records through `navigate` actions, see
   below. It has no link to a form page of its own.
 - A `form` or `detail` widget may list `actions`. Each is
-  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
+  `{ "type": "startProcess", "name": "submit", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record. See
   [frontend.md](frontend.md).
 - A `table` widget may list `rowActions` and `toolbarActions`. For now each
@@ -125,8 +126,8 @@ providers it allows, see
   `navigate` row action is the link of the identifying column instead
   _(planned)_, see [frontend](frontend.md). A `delete`
   asks for confirmation, then deletes the row's record. An entry has a `type`, such as
-  `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }` or
-  `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }`.
+  `{ "type": "startProcess", "name": "submit", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }` or
+  `{ "type": "delete", "name": "delete", "label": { "textKey": "purchaseRequest.delete" } }`.
   `navigate` may sit in either list. `startProcess` and `delete` sit in
   `rowActions` only, and the row is their subject. A `navigate`,
   `startProcess` or `delete` entry in `rowActions` may have `visibleWhen`, a boolean
@@ -136,7 +137,7 @@ providers it allows, see
   `record`, and a `delete` in `toolbarActions` or a form's `actions`. See [frontend.md](frontend.md) and
   [D59](../decisions/d59-table-row-and-toolbar-actions.md).
 - A `table` widget may name a `dataSource` instead of an `entity`, such as
-  `{ "type": "table", "dataSource": "PurchaseRequestList" }`.
+  `{ "type": "table", "name": "requests", "dataSource": "PurchaseRequestList" }`.
   Its columns are the data source's projected fields. See
   [widget binding](data-sources.md#widget-binding).
 - A page may declare typed `parameters`. Each has a `name`, a `type` (text,
@@ -168,7 +169,7 @@ providers it allows, see
   the SPA shows its button. It sits in a
   table's `rowActions` or `toolbarActions` ([D59](../decisions/d59-table-row-and-toolbar-actions.md)),
   or in a form's `actions`:
-  `{ "type": "navigate", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
+  `{ "type": "navigate", "name": "open", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
   Each value is an expression, see
   [expressions](expressions.md#names-and-references). In `toolbarActions` the
   expressions see no names, because a toolbar has no row. The checks are in
@@ -193,27 +194,33 @@ widgets `columns`, `tabs` and `section` hold other widgets, see
   "widgets": [
     {
       "type": "columns",
+      "name": "layout",
       "columns": [
         {
+          "name": "main",
           "width": 8,
           "widgets": [
-            { "type": "table", "entity": "PurchaseRequest" }
+            { "type": "table", "name": "requests", "entity": "PurchaseRequest" }
           ]
         },
         {
+          "name": "side",
           "width": 4,
           "widgets": [
             {
               "type": "tabs",
+              "name": "side-tabs",
               "tabs": [
                 {
+                  "name": "tasks",
                   "label": { "textKey": "pages.overview.tasks" },
                   "widgets": [
                     {
                       "type": "section",
+                      "name": "tasks-section",
                       "title": { "textKey": "pages.overview.tasksTitle" },
                       "collapsed": true,
-                      "widgets": [{ "type": "taskInbox" }]
+                      "widgets": [{ "type": "taskInbox", "name": "inbox" }]
                     }
                   ]
                 }
@@ -233,14 +240,22 @@ widgets `columns`, `tabs` and `section` hold other widgets, see
 - A `section` widget has a `title`, its `widgets` and an optional `collapsed`,
   which defaults to `false`.
 - A label and a title are `{ "textKey": ... }`, like a page title.
-- Containers nest to at most 4 levels. The page's own `widgets` list is
-  level 1.
+- Containers nest to at most 4 levels. The page's own `widgets` list is level 1.
 - A page holds at most one `table` of any kind, and at most one `form`,
   `taskInbox` or `processInspector`, so the URL state stays unambiguous.
   Every `widgets`, `columns` and `tabs` list has at least one entry.
 - The compiler checks every widget at any depth. A problem is reported at the
   widget's own JSON pointer, such as `/widgets/0/columns/1/widgets/0/entity`.
-- `formatVersion` stays 1. Today's pages stay valid.
+- A widget, an action, a row action, a toolbar action, a column and a tab require a `name`.
+  A missing one is `AXC0004` at the element, such as `/widgets/0/tabs/1`.
+- A widget's `name` is unique on the whole page, at any depth, ignoring letter case.
+  A repeat is `AXC0361`, reported at the later widget's `name`.
+- An action, column or tab `name` is unique in its own list, ignoring letter case.
+  A repeat is `AXC0361`, reported at the later element's `name`. The actions of a
+  `form` or `detail` widget, a table's `rowActions` and `toolbarActions`, a
+  `columns` widget's columns and a `tabs` widget's tabs each have their own list,
+  so a row action and a toolbar action may share a name.
+- A kpi's `navigate` action has no `name`. The schema refuses one there. `formatVersion` stays 1.
 
 A `seed` holds records with fixed ids for one entity:
 
@@ -258,6 +273,9 @@ A `seed` holds records with fixed ids for one entity:
 }
 ```
 
+- `entity` is the name of an entity of the application, or a module entity written as
+  `module/Entity`, such as `organization/Employee`. Seeds apply in path order, so a seed
+  that names a record of another seed, such as a department's `head`, sorts after it.
 - Each record's `id` is the record id, fixed so that the startup step
   inserts the record once. It is unique across every seed file of the
   application (`AXC0034`).
@@ -268,6 +286,9 @@ A `seed` holds records with fixed ids for one entity:
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
   A seed cannot set a `file` field, in a record or in a child row (`AXC0259`).
+  A record of an entity whose [module contract](module-contracts.md#where-the-contract-is-checked)
+  has a lifecycle must give an initial state when it gives a state as text (`AXC0338`). A synced
+  seed that changes a stored state must follow a transition.
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -338,8 +359,10 @@ The entity file in the same release renames `decisionComments` to
 ```
 
 - `id` is permanent. `kind` is `migration`, `name` names the migration and
-  `formatVersion` is `1`. `entity` names the entity it changes. It cannot name a
-  module entity such as `departments/Department`, which is `AXC0214`.
+  `formatVersion` is `1`. `entity` names the entity it changes. It may name an
+  entity of a module that `application.json` declares as `<module id>/<entity>`,
+  such as `organization/Department`, but no migration may drop it. An entity of a
+  module that is not declared is `AXC0214`, and so is a `dropEntity` of a module entity.
 - `changes` is ordered. Each change has a `type` and the properties below.
 
   | Type | Properties | Effect |
@@ -510,6 +533,13 @@ is `AXC0013`.
   `required: true`, `expression` or `sequence`, and a child entity's field
   cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
   [Record creator](roles-and-policies.md#record-creator).
+- `userId` marks a `text` field that holds a user id, and the server does not check a written value. It is
+  allowed only on `text`, even as `false`, not with `creator`, `expression` or `sequence`, and not on a child
+  entity's field. Each is `AXC0013` at `/fields/{i}/userId`. The field gets `usersPath` in page metadata, the path
+  `GET /api/apps/{app}/entities/{entity}/fields/{field}/users?search=&id=` (`{module}/{entity}` for a module's entity).
+  It is checked in order: signed in (401, never a service account), entity and field (404), a `create` or `update`
+  grant covering the field (403). It lists 20 profiles at most whose display name or email contains `search`, or
+  with `id` only that one, as `{ "items": [{ "id", "displayName" }] }`.
 - `sensitive` is allowed on `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `money`, and defaults to
   `false`. `true` on a `reference`, `references` or `file` field is `AXC0308` at `/fields/{i}/sensitive`, on the `displayField`
   at `/displayField`, on `child-collection` `AXC0013`. `exactLookup` needs `sensitive` and a name of at most 54 characters,
@@ -578,9 +608,10 @@ new check is a new compile diagnostic.
 
 ### Matched references
 
-_(planned for M26)_ A `reference` field may have `match`, which finds its record by a unique field
-instead of being written, as
-[D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees:
+A `reference` field may have `match`, which finds its record by a unique field instead of being
+written, as [D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees. The compile
+checks of `match`, its compile into the field's model, the write of its value and the rule that
+nothing else writes the field are built:
 
 ```json
 {
@@ -591,26 +622,41 @@ instead of being written, as
 }
 ```
 
-- **Shape.** `match.field` names a `unique` field of the target entity. `match.from` names a field
-  of this entity with the same type. Neither may be `sensitive`, unless the target field has
-  `exactLookup`. A bad name or type is a diagnostic at `/fields/{i}/match`.
+- **Shape.** `match` has exactly the keys `field` and `from`, or it breaks the JSON Schema
+  (`AXC0004`). `match.field` names a `unique` field of the target entity. A unique field cannot be
+  `sensitive`. `match.from` names a field of this entity with the same field type, and for two
+  `reference` fields the same target entity. It may not be `sensitive`, the field itself, another
+  field with `match`, or a computed field, because the match runs before computed fields and a
+  chain of matched fields has no order. A problem is `AXC0362` at `/fields/{i}/match`.
 - **Value.** On every create and update, after defaults and creator fields and before computed
   fields and validations, the write sets the field to the target record whose `field` equals the
-  value of `from`, or to `null` when `from` is empty or no record matches. The lookup reads as the
-  system, so it needs no grant. A later change to the target does not change the stored reference
-  until this record is written again.
-- **Not writable.** Clients, process `set`, imports and seeds cannot write it. A value for it is a
-  `400` at its pointer with "Cannot be set.", as for a creator field.
-- **Allowed fields.** `match` cannot be combined with `required`, `expression`, `default` or
-  `sequence`, and a child entity's field cannot have it.
+  value of `from`, or to `null` when `from` is empty or no record matches. On an update, `from` is the
+  value in the body, or else the stored value. The lookup reads as the system, so it needs no grant and
+  no record filter hides the target. Every write path runs it: the record API, the import check,
+  process steps and transition effects, task completion, inbound endpoints and seeds. A later change
+  to the target does not change the stored reference until this record is written again.
+- **Not writable.** Nothing but the match writes it. A record API body, an import column or a seed
+  record that sets it, even to `null`, is refused at its pointer with "Cannot be set.", as for a
+  creator field. An import does not look up a matched column by display value. A process `set`
+  (`AXC0080`), a connector step `output` (`AXC0108`), a contract effect's `create.values`
+  (`AXC0346`) and an inbound endpoint's `values` (`AXC0121`) that name it fail to compile. A form
+  shows the field as read-only.
+- **Allowed fields.** Only a `reference` field may have `match`. It cannot be combined with
+  `required`, `expression`, `default` or `sequence`, and a child entity's field cannot have it.
+  Each is `AXC0013` at `/fields/{i}/match`, and only the first problem found is reported.
 
 ### Indexes
 
 `indexes` is built. On the entity, it is a list of
-`{ "fields": [ ... ] }` with an optional `"unique": true`. See
+`{ "name": ..., "fields": [ ... ] }` with an optional `"unique": true`. See
 [D77](../decisions/d77-indexes-defaults-and-ranges.md) and
 [schema planning](storage.md#schema-planning).
 
+- **`name`.** Required, so a [customization layer](customization-layers.md#list-keys)
+  can find the index. It is a name like a field's, and it is unique in the
+  entity's indexes, ignoring letter case. A missing `name` breaks the JSON
+  Schema (`AXC0004`). It is not the PostgreSQL index name, which the platform
+  builds from the table and the columns.
 - **`fields`.** One to 32 distinct field names of the entity, matched
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
@@ -618,6 +664,8 @@ instead of being written, as
   `child-collection`, `references` or `file` field is `AXC0276`. A `references`
   field has no column, because a junction table holds its links.
 - **Compile diagnostics.** Each is reported in the entity file:
+  - `AXC0343`: an index has the name of an earlier one, ignoring letter case,
+    at `/indexes/{j}/name`.
   - `AXC0274`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.
   - `AXC0275`: a name in `fields` is no field of the entity, at
@@ -659,6 +707,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
   ],
   "validations": [
     {
+      "name": "needsLineItem",
       "expression": "count(lineItems) >= 1",
       "message": { "textKey": "purchaseRequest.needsLineItem" },
       "field": "lineItems"
@@ -688,6 +737,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
   ],
   "validations": [
     {
+      "name": "quantityPositive",
       "expression": "IsPositive(quantity)",
       "message": { "textKey": "lineItem.quantityPositive" },
       "field": "quantity"
@@ -697,6 +747,11 @@ validation calls the rules of its own module, see [modules](modules-and-template
 ```
 
 - **Validations.** `validations` is a list on the entity. Each entry has:
+  - `name`, which is required, so a
+    [customization layer](customization-layers.md#list-keys) can find the
+    validation. It is a name like a field's, and it is unique in the entity's
+    validations, ignoring letter case (`AXC0343`, at `/validations/{i}/name`).
+    A missing `name` breaks the JSON Schema (`AXC0004`).
   - `expression`, which must be boolean.
   - `message`, a label that is checked like other labels (`AXC0028`). Its text
     key is the message of a failure.
@@ -843,26 +898,3 @@ The `application` manifest may name the application's time zone, see [D75](../de
 - **What does not.** `now()` stays an instant. A schedule trigger keeps its own
   `timeZone`. The SPA shows a `date-time` in the browser's time zone, as
   before. Calendar durations such as `P1M` stay `AXC0084`.
-
-## File storage
-
-The `application` manifest may name the deployment binding that says where the bytes of its files go, see
-[D76](../decisions/d76-file-money-and-enum-label-field-types.md):
-
-```json
-{
-  "id": "6ec71db1-5b21-43d9-95d2-dcc45055eb0e",
-  "kind": "application",
-  "name": "ServiceDesk",
-  "formatVersion": 1,
-  "fileStorage": { "binding": "Files" }
-}
-```
-
-- `fileStorage` is optional. It is an object with one `binding`, a binding name. Any other shape is a schema error.
-  Without it, the bytes go to the tenant database and activation needs no binding.
-- The binding must be a `storage` binding of the tenant. Activation reports a missing binding, or one of another
-  kind, as `AXC0100` at `/fileStorage/binding` of `application.json`. On a preview tenant a missing binding is a
-  warning.
-- In M15 the binding's only value is `database`, so the bytes stay in `axis.file_contents`. See
-  [deployment bindings](integration-resources.md#deployment-bindings).

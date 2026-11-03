@@ -1,0 +1,21 @@
+{
+  "id": "c2ad798a-c10d-49f3-957f-86c491e68706",
+  "kind": "entity",
+  "name": "Employee",
+  "formatVersion": 1,
+  "label": { "textKey": "organization.employee.label" },
+  "displayField": "fullName",
+  "fields": [
+    { "name": "fullName", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "organization.employee.fullName" } },
+    { "name": "workEmail", "type": "text", "required": true, "unique": true, "maxLength": 254, "label": { "textKey": "organization.employee.workEmail" } },
+    { "name": "phone", "type": "text", "sensitive": true, "maxLength": 30, "label": { "textKey": "organization.employee.phone" } },
+    { "name": "jobTitle", "type": "text", "maxLength": 100, "label": { "textKey": "organization.employee.jobTitle" } },
+    { "name": "department", "type": "reference", "target": "Department", "label": { "textKey": "organization.employee.department" } },
+    { "name": "manager", "type": "reference", "target": "Employee", "label": { "textKey": "organization.employee.manager" } },
+    { "name": "user", "type": "text", "unique": true, "maxLength": 100, "userId": true, "label": { "textKey": "organization.employee.user" } },
+    { "name": "active", "type": "boolean", "default": "true", "label": { "textKey": "organization.employee.active" } },
+    { "name": "delegate", "type": "reference", "target": "Employee", "label": { "textKey": "organization.employee.delegate" } },
+    { "name": "delegateFrom", "type": "date", "label": { "textKey": "organization.employee.delegateFrom" } },
+    { "name": "delegateUntil", "type": "date", "label": { "textKey": "organization.employee.delegateUntil" } }
+  ]
+}

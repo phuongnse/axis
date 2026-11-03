@@ -5,6 +5,6 @@
   "formatVersion": 1,
   "roles": ["filtered"],
   "grants": [
-    { "entity": "Claim", "actions": ["read"], "filter": "title == 'Shared'" }
+    { "name": "claimRead", "entity": "Claim", "actions": ["read"], "filter": "title == 'Shared'" }
   ]
 }

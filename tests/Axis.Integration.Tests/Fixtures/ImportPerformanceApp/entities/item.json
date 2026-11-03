@@ -10,6 +10,6 @@
     { "name": "supplier", "type": "reference", "target": "Supplier" }
   ],
   "validations": [
-    { "expression": "quantity is null or quantity > 0", "message": { "textKey": "item.quantityPositive" }, "field": "quantity" }
+    { "name": "quantityPositive", "expression": "quantity is null or quantity > 0", "message": { "textKey": "item.quantityPositive" }, "field": "quantity" }
   ]
 }

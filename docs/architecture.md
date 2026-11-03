@@ -243,7 +243,7 @@ changed OIDC setting applies at the next refresh, and a tenant that is no
 longer served loses both. A failed refresh keeps the last good directory and
 makes readiness Degraded. The worker claims no new work item of a tenant that
 is no longer `active`, and a work item already claimed finishes. The worker runs
-the refresh in its polling loop, between work items.
+the refresh in its poll. It pauses its loops and waits for the work items already running.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so
@@ -620,13 +620,13 @@ metadata, theme tokens or the custom widget API, see
 
 ## Testing
 
-| Level         | Tooling                                        | Scope                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit          | xUnit                                          | Compiler, expression engine, policy evaluation, pure logic                                                                                                                                                                                                                                                                                                                  |
-| Integration   | xUnit + Testcontainers PostgreSQL and Keycloak | Storage, transactions, concurrency, tenancy isolation, engine recovery, the development realm                                                                                                                                                                                                                                                                               |
-| Frontend unit | Vitest + Testing Library                       | Shared components and metadata rendering                                                                                                                                                                                                                                                                                                                                    |
-| End to end    | Playwright                                     | Real server + real database + SPA, user journeys and denied access                                                                                                                                                                                                                                                                                                          |
-| Scenario      | Axis.Scenarios + Testcontainers PostgreSQL     | Configuration-level tests of an application. Record actions, process starts, task completions and the `expect` steps run, with `now` fixing the time. Stubs answer the calls to connectors and packages. Event deliveries run, so `async` event triggers start their processes. Schedule triggers run through `advanceTime`, which moves `now` and runs every due work item |
+| Level         | Tooling                                                   | Scope                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit          | xUnit                                                     | Compiler, expression engine, policy evaluation, pure logic                                                                                                                                                                                                                                                                                                                  |
+| Integration   | xUnit + Testcontainers PostgreSQL, PgBouncer and Keycloak | Storage, transactions, concurrency, tenancy isolation, engine recovery, the development realm                                                                                                                                                                                                                                                                               |
+| Frontend unit | Vitest + Testing Library                                  | Shared components and metadata rendering                                                                                                                                                                                                                                                                                                                                    |
+| End to end    | Playwright                                                | Real server + real database + SPA, user journeys and denied access                                                                                                                                                                                                                                                                                                          |
+| Scenario      | Axis.Scenarios + Testcontainers PostgreSQL                | Configuration-level tests of an application. Record actions, process starts, task completions and the `expect` steps run, with `now` fixing the time. Stubs answer the calls to connectors and packages. Event deliveries run, so `async` event triggers start their processes. Schedule triggers run through `advanceTime`, which moves `now` and runs every due work item |
 
 Every acceptance criterion maps to at least one of these. The exact commands
 are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
@@ -676,7 +676,7 @@ kinds in the [configuration pipeline](reference/configuration.md#configuration-p
 `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by
 heading or table header, so the sections may move within `docs/`.
 
-The E2E server starts with seven applications listed in `ActivateOnStartup` (see
+The E2E server starts with eight applications listed in `ActivateOnStartup` (see
 [Startup activation](reference/host-settings.md#startup-activation)), so Playwright journeys run against
 real metadata and records:
 
@@ -686,13 +686,13 @@ real metadata and records:
   purchase request skeleton journeys;
 - the leave request sample in `samples/apps/leave-requests`, for the leave
   request journeys;
-- the service desk sample in `samples/apps/service-desk`, for the service
-  desk journeys;
-- the asset management sample in `samples/apps/asset-management`, which no
-  journey uses yet;
+- the service desk sample in `samples/apps/service-desk`, for the service desk journeys;
+- the asset management sample in `samples/apps/asset-management`, which no journey uses yet;
 - the sub-process fixture in `tests/e2e/fixtures/subprocess-app`, a parent process that starts a child on a 24-hour
   timer, both without a subject, for the process inspector's sub-process journey;
-- the host site fixture in `tests/e2e/fixtures/host-site-app`, for the journey that opens a site at its own host's root.
+- the host site fixture in `tests/e2e/fixtures/host-site-app`, for the journey that opens a site at its own host's root;
+- the organization fixture in `tests/e2e/fixtures/organization-app`, which declares `organization`, for its pages' journey;
+- the approvals fixture in `tests/e2e/fixtures/approvals-app`, which declares `organization` and `approvals`, for the approvals pages' journey.
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on
@@ -766,7 +766,7 @@ It sets `Studio:ApplicationsPath` to a temporary folder and has no preview tenan
 activation migrates a tenant database, so it activates one application at start,
 `tests/e2e/fixtures/journey-base`, which holds only a manifest. It clashes with no sample. A journey therefore builds a whole application in Studio and publishes it, with no clash with
 the committed samples on the main tenant. The setup step signs the author, the requester, the service desk lead,
-the agent, the approver, the asset manager, the employee and the auditor in on the journey host and saves those sessions apart from the sessions of the main host. The
+the agent, the approver, the asset manager, the employee, the auditor, the department managers and the platform operator in on the journey host and saves those sessions apart from the sessions of the main host. The journey server sets `Console:OperatorRole` to `platform-operator`, so the operator console answers there. The
 worker and the publisher serve the journey tenant too, and the run fails when the worker log lacks
 `Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
 `artifacts/logs/e2e-journey-server.log`.

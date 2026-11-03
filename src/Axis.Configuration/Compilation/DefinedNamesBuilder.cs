@@ -16,6 +16,7 @@ internal static class DefinedNamesBuilder
         IReadOnlyList<SequenceResource> sequences,
         IReadOnlyList<EventResource> events,
         IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> moduleRules,
+        IReadOnlyList<ModuleContract> contracts,
         IReadOnlyList<TextResource> texts,
         Func<string, EntityResource?> findEntity,
         ReferenceIndex index)
@@ -61,6 +62,7 @@ internal static class DefinedNamesBuilder
                 [.. page.Parameters.Select(parameter => new DefinedPageParameter(
                     parameter.Name, parameter.Type, parameter.Required ?? false))]))],
             [.. loaded.Policies.Select(policy => new DefinedPolicy(policy.Id, policy.Name, ModuleOf(policy)))],
+            [.. contracts.Select(entry => new DefinedContract(entry.Contract.Id, entry.Contract.Name, entry.ModuleId))],
             Texts(texts, index));
     }
 

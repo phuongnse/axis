@@ -383,7 +383,7 @@ public sealed record DataSourceColumnMetadata(
 /// decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and money, <see cref="Currency"/> and
 /// <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum, <see cref="Target"/> for reference and references, and
 /// <see cref="Fields"/> for child collection, and <see cref="MaxSize"/>, <see cref="Accept"/>, <see cref="UploadPath"/> and
-/// <see cref="DownloadPath"/> for file.
+/// <see cref="DownloadPath"/> for file, and <see cref="UsersPath"/> for text.
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
 /// <param name="Computed">Whether the server computes the value. A client shows it and never sends it.</param>
@@ -400,6 +400,7 @@ public sealed record DataSourceColumnMetadata(
 /// <param name="Accept">The media types a file field accepts, or null when it accepts any.</param>
 /// <param name="UploadPath">The path of the field's upload route, or null when the field has none, as for a field of a module's entity.</param>
 /// <param name="DownloadPath">The path of the application's file download route, to which a client appends a file id.</param>
+/// <param name="UsersPath">The path of the user search route of a text field marked <c>userId</c>, or null for any other field.</param>
 public sealed record FieldMetadata(
     string Name,
     string Type,
@@ -424,6 +425,7 @@ public sealed record FieldMetadata(
     IReadOnlyList<string>? Accept,
     string? UploadPath,
     string? DownloadPath,
+    string? UsersPath,
     ReferenceTarget? Target,
     IReadOnlyList<FieldMetadata>? Fields);
 

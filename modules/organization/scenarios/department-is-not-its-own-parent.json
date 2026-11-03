@@ -1,0 +1,35 @@
+{
+  "id": "14482a83-fb0f-4e4e-b30d-11f6d500b5f1",
+  "kind": "scenario",
+  "name": "DepartmentIsNotItsOwnParent",
+  "formatVersion": 1,
+  "now": "2026-11-02T09:00:00Z",
+  "contract": { "covers": ["Department/validations/notOwnParent"] },
+  "users": {
+    "admin": ["admin"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Department",
+      "as": "admin",
+      "save": "finance",
+      "values": { "code": "TEST-FIN", "name": "Finance" }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Department",
+      "as": "admin",
+      "save": "accounting",
+      "values": { "code": "TEST-ACC", "name": "Accounting", "parent": "finance" }
+    },
+    {
+      "type": "updateRecord",
+      "record": "finance",
+      "as": "admin",
+      "values": { "parent": "finance" },
+      "expect": { "invalid": "parent" }
+    },
+    { "type": "expectRecord", "record": "finance", "values": { "parent": null } }
+  ]
+}

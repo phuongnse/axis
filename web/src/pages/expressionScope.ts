@@ -34,7 +34,7 @@ const functionNames = [
   'toDate',
 ]
 
-const aggregateNames = ['count', 'sum', 'avg', 'min', 'max', 'any', 'all']
+const aggregateNames = ['count', 'sum', 'avg', 'min', 'max', 'any', 'all', 'first']
 
 const zeroArgumentFunctions = ['now', 'today', 'currentUser']
 
@@ -202,7 +202,7 @@ function functionOptions(kind: string, pointer: string): ScopeOption[] {
   // A default sees no child collections, so an aggregate can never be valid in it.
   const names =
     kind === 'entity' && fieldDefault.test(pointer) ? [...functionNames] : [...functionNames, ...aggregateNames]
-  if (kind === 'policy' && grantFilter.test(pointer)) {
+  if ((kind === 'policy' && grantFilter.test(pointer)) || (kind === 'dataSource' && pointer === '/filter')) {
     names.push('currentUser')
   }
   return names.map((name) => option(`${name}()`, 'function', !zeroArgumentFunctions.includes(name)))

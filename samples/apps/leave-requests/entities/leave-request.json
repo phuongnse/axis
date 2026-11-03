@@ -19,7 +19,7 @@
     {
       "name": "department",
       "type": "reference",
-      "target": "departments/Department",
+      "target": "organization/Department",
       "required": true,
       "label": { "textKey": "leaveRequest.department" }
     },

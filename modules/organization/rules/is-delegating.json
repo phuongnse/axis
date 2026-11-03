@@ -1,0 +1,12 @@
+{
+  "id": "67ac475c-d365-4fa5-80e1-1f9f74afe70f",
+  "kind": "rule",
+  "name": "IsDelegating",
+  "formatVersion": 1,
+  "parameters": [
+    { "name": "from", "type": "date" },
+    { "name": "until", "type": "date" }
+  ],
+  "resultType": "boolean",
+  "expression": "from is not null and until is not null and from <= today() and today() <= until"
+}

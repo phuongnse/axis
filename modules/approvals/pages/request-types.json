@@ -1,0 +1,16 @@
+{
+  "id": "570e1fa5-59ff-44bc-bb6d-bdc495d61a0d",
+  "kind": "page",
+  "name": "RequestTypes",
+  "formatVersion": 1,
+  "title": { "textKey": "approvals.pages.requestTypes.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "name": "requestTypes",
+      "dataSource": "RequestTypes",
+      "rowActions": [{ "type": "navigate", "name": "open", "page": "RequestTypeForm", "label": { "textKey": "approvals.actions.open" }, "record": "id" }],
+      "toolbarActions": [{ "type": "navigate", "name": "new", "page": "RequestTypeForm", "label": { "textKey": "approvals.actions.new" } }]
+    }
+  ]
+}

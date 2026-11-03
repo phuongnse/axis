@@ -11,8 +11,12 @@ KUBECONFORM_VERSION=v0.8.0
 KUBERNETES_VERSION=1.33.0
 # A commit of github.com/yannh/kubernetes-json-schema. A commit keeps the schemas fixed.
 KUBERNETES_SCHEMAS_COMMIT=93153a1458e24e93f386c50f9980d584fcba574b
-# The kinds the chart renders. A new kind needs its schema file here.
-KUBERNETES_SCHEMA_FILES=(deployment-apps-v1 job-batch-v1 service-v1)
+# The Kubernetes kinds the chart renders. A new kind needs its schema file here.
+KUBERNETES_SCHEMA_FILES=(configmap-v1 deployment-apps-v1 job-batch-v1 service-v1)
+# A commit of github.com/datreeio/CRDs-catalog, which holds the schemas of cert-manager's kinds.
+CRDS_CATALOG_COMMIT=27233a506de0085e71c7f9702597806a7f95eb24
+# The cert-manager kinds the chart renders, as group/kind_version. A new kind needs its schema file here.
+CRD_SCHEMA_FILES=(cert-manager.io/certificate_v1 cert-manager.io/issuer_v1)
 # Trivy scans the images. Aqua withdrew the releases of its March 2026 supply chain incident, so the
 # pin is a later release, and its archives' checksums are pinned here rather than read from the
 # release itself.
@@ -24,6 +28,7 @@ tools_dir="$HOME/.cache/axis-tools"
 helm="$tools_dir/helm-$HELM_VERSION/helm"
 kubeconform="$tools_dir/kubeconform-$KUBECONFORM_VERSION/kubeconform"
 kubernetes_schemas="$tools_dir/kubernetes-schemas-$KUBERNETES_VERSION"
+crd_schemas="$tools_dir/crd-schemas-$CRDS_CATALOG_COMMIT"
 trivy="$tools_dir/trivy-$TRIVY_VERSION/trivy"
 
 # Checks FILE against the SHA-256 checksum EXPECTED.
@@ -40,8 +45,9 @@ verify_sha256() {
   fi
 }
 
-# Downloads each missing tool and skips the ones present. Each one is built in a temporary
-# folder and moved into place, so a failed download leaves nothing behind.
+# Downloads each missing tool and skips the ones present. The schema files are fetched one by one,
+# so a cache that lacks a newly listed file gets it. Each download goes to a temporary folder and
+# is moved into place, so a failed download leaves nothing behind.
 install_tools() {
   local os arch work
   case "$(uname -s)" in
@@ -80,15 +86,26 @@ install_tools() {
     mv "$work/kubeconform" "$tools_dir/kubeconform-$KUBECONFORM_VERSION"
   fi
 
-  if [ ! -d "$kubernetes_schemas" ]; then
-    local file
-    mkdir "$work/schemas"
-    for file in "${KUBERNETES_SCHEMA_FILES[@]}"; do
-      retry 4 curl -fsSL --retry 3 -o "$work/schemas/$file.json" \
+  local file
+  mkdir -p "$kubernetes_schemas"
+  for file in "${KUBERNETES_SCHEMA_FILES[@]}"; do
+    if [ ! -f "$kubernetes_schemas/$file.json" ]; then
+      retry 4 curl -fsSL --retry 3 -o "$work/$file.json" \
         "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/$KUBERNETES_SCHEMAS_COMMIT/v$KUBERNETES_VERSION-standalone-strict/$file.json"
-    done
-    mv "$work/schemas" "$kubernetes_schemas"
-  fi
+      mv "$work/$file.json" "$kubernetes_schemas/$file.json"
+    fi
+  done
+
+  local crd
+  mkdir -p "$crd_schemas"
+  for crd in "${CRD_SCHEMA_FILES[@]}"; do
+    if [ ! -f "$crd_schemas/$crd.json" ]; then
+      retry 4 curl -fsSL --retry 3 -o "$work/crd.json" \
+        "https://raw.githubusercontent.com/datreeio/CRDs-catalog/$CRDS_CATALOG_COMMIT/$crd.json"
+      mkdir -p "$crd_schemas/$(dirname "$crd")"
+      mv "$work/crd.json" "$crd_schemas/$crd.json"
+    fi
+  done
 
   rm -rf "$work"
 }

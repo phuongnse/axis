@@ -1,0 +1,7 @@
+{
+  "id": "4027bfc0-3d82-497d-83e6-8278f158d6f1",
+  "kind": "identityProvider",
+  "name": "accounts",
+  "formatVersion": 1,
+  "type": "accounts"
+}

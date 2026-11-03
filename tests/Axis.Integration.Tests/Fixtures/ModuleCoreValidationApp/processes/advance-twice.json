@@ -1,0 +1,33 @@
+{
+  "id": "4c8e0a26-7f19-4b53-a2d4-6e1b3f5a7c16",
+  "kind": "process",
+  "name": "AdvanceTwice",
+  "formatVersion": 1,
+  "entity": "stages/Ticket",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "ticket.review" },
+      "assignee": { "role": "employee" },
+      "form": "TicketForm",
+      "outcomes": [{ "name": "go", "label": { "textKey": "ticket.go" }, "next": "first" }]
+    },
+    {
+      "name": "first",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "step": "coalesce(step, 0) + 1", "stepDecision": "decisionTask()" },
+      "next": "second"
+    },
+    {
+      "name": "second",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "step": "coalesce(step, 0) + 1", "stepDecision": "decisionTask()" },
+      "next": "finished"
+    },
+    { "name": "finished", "type": "end" }
+  ]
+}

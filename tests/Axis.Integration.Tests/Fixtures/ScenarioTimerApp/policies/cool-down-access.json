@@ -6,6 +6,7 @@
   "roles": ["employee"],
   "grants": [
     {
+      "name": "coolDownStart",
       "process": "CoolDown",
       "actions": ["start"]
     }

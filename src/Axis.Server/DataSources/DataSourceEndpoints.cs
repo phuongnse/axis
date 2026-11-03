@@ -152,7 +152,7 @@ internal static class DataSourceEndpoints
             ? await RecordFilters.ConditionAsync(application, root, [.. filters.Select(filter => filter.Expression)], user.Id, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         var result = await DataSourceQueries.ListAsync(
-            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken);
+            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, RecordEndpoints.Cipher(sensitive, tenants), user.Id, cancellationToken);
         if (result is null)
         {
             // PostgreSQL cannot say which part of the WHERE clause failed, so every read filter is named.
@@ -267,7 +267,7 @@ internal static class DataSourceEndpoints
                 exportFormat,
                 model.Name,
                 columns,
-                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, search, export.MaxRows + 1, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken),
+                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, search, export.MaxRows + 1, RecordEndpoints.Cipher(sensitive, tenants), user.Id, cancellationToken),
                 Cells,
                 export.MaxRows,
                 (rows, truncated) => new AuditEntry(

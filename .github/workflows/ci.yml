@@ -2,13 +2,15 @@ name: CI
 
 # A push to any branch runs CI, so hand-made pull requests show its result. NexKit's
 # branches are left out: NexKit runs the same scripts as its own checks, and its pushes and
-# pull requests use the Actions token, which starts no workflow or waits for approval.
+# pull requests use the Actions token, which starts no workflow or waits for approval. A design
+# review's prototype branches are left out too: a prototype changes the widgets without their tests
+# and is never merged, so CI could only fail on it.
 # A merge by NexKit starts no push workflow, so NexKit starts CI on main once every 5 of its merges
 # (D112). It also runs on a person's push and on demand. Once a week the schedule runs the image scan
 # alone, so a new advisory in a base image fails CI on main even when nothing merged (D107).
 on:
   push:
-    branches-ignore: ['nexkit/**']
+    branches-ignore: ['nexkit/**', 'design/**']
   workflow_dispatch:
   schedule:
     - cron: '17 5 * * 1'

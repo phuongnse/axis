@@ -21,8 +21,8 @@
     { "name": "lineCount", "type": "integer", "expression": "count(lines)" }
   ],
   "validations": [
-    { "expression": "count(lines) <= 5", "message": { "textKey": "specimen.lineLimit" }, "field": "lines" },
-    { "expression": "count(tags) <= 3", "message": { "textKey": "specimen.tagLimit" }, "field": "tags" },
-    { "expression": "status != 'closed' or active != true", "message": { "textKey": "specimen.closedInactive" }, "field": "status" }
+    { "name": "lineLimit", "expression": "count(lines) <= 5", "message": { "textKey": "specimen.lineLimit" }, "field": "lines" },
+    { "name": "tagLimit", "expression": "count(tags) <= 3", "message": { "textKey": "specimen.tagLimit" }, "field": "tags" },
+    { "name": "closedInactive", "expression": "status != 'closed' or active != true", "message": { "textKey": "specimen.closedInactive" }, "field": "status" }
   ]
 }

@@ -559,31 +559,40 @@ describe('EntityDesigner', () => {
 
     expect(screen.getByTestId('studio-field-/indexes')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Add index' }))
-    expect(indexes()).toEqual([{ fields: [] }])
+    expect(indexes()).toEqual([{ name: 'index1', fields: [] }])
 
     await userEvent.click(row(0).getByRole('combobox', { name: 'Index fields' }))
     expect(optionTexts(await openDropdown())).toEqual(['stage', 'count'])
     await chooseOption('count')
     await chooseOption('stage')
-    expect(indexes()).toEqual([{ fields: ['count', 'stage'] }])
+    expect(indexes()).toEqual([{ name: 'index1', fields: ['count', 'stage'] }])
     await userEvent.keyboard('{Escape}')
 
     await userEvent.click(row(0).getByRole('checkbox', { name: 'Unique index' }))
-    expect(indexes()).toEqual([{ fields: ['count', 'stage'], unique: true }])
+    expect(indexes()).toEqual([{ name: 'index1', fields: ['count', 'stage'], unique: true }])
 
     await userEvent.click(screen.getByRole('button', { name: 'Add index' }))
-    expect(indexes()).toEqual([{ fields: ['count', 'stage'], unique: true }, { fields: [] }])
+    expect(indexes()).toEqual([
+      { name: 'index1', fields: ['count', 'stage'], unique: true },
+      { name: 'index2', fields: [] },
+    ])
     expect(row(0).getByRole('button', { name: 'Move up' })).toBeDisabled()
     expect(row(1).getByRole('button', { name: 'Move down' })).toBeDisabled()
     await userEvent.click(row(1).getByRole('button', { name: 'Move up' }))
-    expect(indexes()).toEqual([{ fields: [] }, { fields: ['count', 'stage'], unique: true }])
+    expect(indexes()).toEqual([
+      { name: 'index2', fields: [] },
+      { name: 'index1', fields: ['count', 'stage'], unique: true },
+    ])
 
     await userEvent.click(row(1).getByRole('checkbox', { name: 'Unique index' }))
-    expect(indexes()).toEqual([{ fields: [] }, { fields: ['count', 'stage'] }])
+    expect(indexes()).toEqual([
+      { name: 'index2', fields: [] },
+      { name: 'index1', fields: ['count', 'stage'] },
+    ])
     expect(Object.hasOwn((indexes() as object[])[1], 'unique')).toBe(false)
 
     await userEvent.click(row(0).getByRole('button', { name: 'Remove index' }))
-    expect(indexes()).toEqual([{ fields: ['count', 'stage'] }])
+    expect(indexes()).toEqual([{ name: 'index1', fields: ['count', 'stage'] }])
     await userEvent.click(row(0).getByRole('button', { name: 'Remove index' }))
     expect(Object.hasOwn(content(), 'indexes')).toBe(false)
   })
@@ -594,7 +603,7 @@ describe('EntityDesigner', () => {
   })
 
   it('offers no index button and turns the index inputs off when it is read-only', () => {
-    renderDesigner(entity({ indexes: [{ fields: ['code'], unique: true }] }), vi.fn(), names, true)
+    renderDesigner(entity({ indexes: [{ name: 'code', fields: ['code'], unique: true }] }), vi.fn(), names, true)
 
     for (const name of ['Add index', 'Remove index']) {
       expect(screen.queryByRole('button', { name })).toBeNull()
@@ -678,7 +687,12 @@ describe('EntityDesigner', () => {
   })
 
   it('adds and removes a validation, with a message key and a field of the draft', async () => {
-    const validation = { expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' }
+    const validation = {
+      name: 'totalPositive',
+      expression: 'total > 0',
+      message: { textKey: 'validation.total' },
+      field: 'total',
+    }
     const value = entity({ validations: [validation] })
     const onChange = renderDesigner(value)
 
@@ -695,8 +709,23 @@ describe('EntityDesigner', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add validation' }))
     expect(onChange).toHaveBeenLastCalledWith('/validations', [
       validation,
-      { expression: '', message: { textKey: '' }, field: '' },
+      { name: 'validation1', expression: '', message: { textKey: '' }, field: '' },
     ])
+  })
+
+  it('names each added validation and index with the first name its list does not use', async () => {
+    const content = renderContent(entity({ indexes: [{ name: 'Index1', fields: ['code'] }] }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add validation' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add validation' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add index' }))
+
+    expect((content().validations as { name: string }[]).map((validation) => validation.name)).toEqual([
+      'validation1',
+      'validation2',
+    ])
+    expect((content().indexes as { name: string }[]).map((index) => index.name)).toEqual(['Index1', 'index2'])
+    expect(screen.getByTestId('studio-field-/validations/1/name')).toHaveTextContent('validation2')
   })
 
   it('points to the JSON view for fields or validations that are not arrays', () => {
@@ -728,7 +757,9 @@ describe('EntityDesigner', () => {
           { name: 'price', type: 'money', currency: 'VND' },
           { name: 'receipt', type: 'file', maxSize: 1024, accept: ['image/*'] },
         ],
-        validations: [{ expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' }],
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
       }),
       vi.fn(),
       names,
@@ -767,7 +798,9 @@ describe('EntityDesigner', () => {
 
   it('shows plain boxes until the names have loaded', () => {
     renderDesigner(
-      entity({ validations: [{ expression: 'total > 0', message: { textKey: 'v' }, field: 'total' }] }),
+      entity({
+        validations: [{ name: 'totalPositive', expression: 'total > 0', message: { textKey: 'v' }, field: 'total' }],
+      }),
       vi.fn(),
       null,
     )

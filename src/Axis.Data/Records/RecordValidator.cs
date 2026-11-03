@@ -65,6 +65,127 @@ public static class RecordValidator
         return Validate(application, entity, stored, values, rows, now, sets);
     }
 
+    /// <summary>
+    /// Whether a lifecycle guard is <c>true</c> on the <paramref name="stored"/> record with
+    /// <paramref name="values"/> and <paramref name="rows"/> on top. <c>previous(field)</c> reads the
+    /// <paramref name="stored"/> record as it was before the write. <c>accountableUser()</c> and
+    /// <c>decisionTask()</c> read <paramref name="accountability"/>, the values of the write. A <c>false</c>, a <c>null</c>, a
+    /// run-time error and a value that cannot be held exactly, in the new record or the stored one,
+    /// are all <see langword="false"/>.
+    /// </summary>
+    internal static bool GuardHolds(
+        ApplicationModel application,
+        EntityModel entity,
+        Record stored,
+        IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
+        ExpressionModel guard,
+        DateTimeOffset now,
+        RecordSets sets,
+        ExpressionAccountability accountability)
+    {
+        var record = BuildRecord(entity, stored, values);
+        var before = BuildRecord(entity, stored, []);
+        if (!RecordCollections.TryAdd(application, entity, stored, rows, record, new SortedDictionary<string, string[]>(StringComparer.Ordinal), sets)
+            || record.Values.Any(pair => !pair.Exact)
+            || before.Values.Any(pair => !pair.Exact))
+        {
+            return false;
+        }
+
+        var result = ExpressionInterpreter.Evaluate(
+            guard.Syntax,
+            guard.Check,
+            new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
+            records: null,
+            now: now,
+            timeZone: application.TimeZone,
+            previous: new ExpressionValues(before.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
+            accountability: accountability);
+        return result.Succeeded && result.Value is true;
+    }
+
+    /// <summary>
+    /// Runs the core validations of the entity's module contract on the record as it will be stored: the
+    /// <paramref name="stored"/> record, or none on a create, with <paramref name="values"/> and
+    /// <paramref name="rows"/> on top. <c>id</c> is <paramref name="recordId"/>, the record's own id, which on a
+    /// create is the id the record will get. <c>previous(field)</c> reads the stored record as it was before the
+    /// write, and is <c>null</c> for every field on a create. <c>accountableUser()</c> and
+    /// <c>decisionTask()</c> read <paramref name="accountability"/>. A validation fails when its expression is
+    /// <c>false</c>, <c>null</c> or stops with a run-time error. A failure is keyed <c>/values/&lt;field&gt;</c>
+    /// and the first in declaration order wins a key. Returns the failures in ordinal key order, or
+    /// <see langword="null"/> when every validation passes. <paramref name="point"/> is the named point of the
+    /// first failed validation, or <see langword="null"/> when a value could not be evaluated.
+    /// </summary>
+    internal static SortedDictionary<string, string[]>? ValidateCore(
+        ApplicationModel application,
+        EntityModel entity,
+        Record? stored,
+        Guid recordId,
+        IReadOnlyList<RecordValue> values,
+        IReadOnlyList<RecordRows> rows,
+        DateTimeOffset now,
+        RecordSets sets,
+        ExpressionAccountability accountability,
+        out string? point)
+    {
+        point = null;
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        if (entity.Contract is not { Validations.Count: > 0 } contract)
+        {
+            return null;
+        }
+
+        var record = BuildRecord(entity, stored, values);
+        var before = BuildRecord(entity, stored, []);
+        if (!RecordCollections.TryAdd(application, entity, stored, rows, record, errors, sets))
+        {
+            return errors;
+        }
+
+        var inexact = record.Where(pair => !pair.Value.Exact).Select(pair => pair.Key).ToList();
+        if (inexact.Count > 0)
+        {
+            foreach (var name in inexact)
+            {
+                entity.TryGetField(name, out var field);
+                errors.TryAdd($"/values/{field!.Name}", [RecordInputMessages.NotEvaluable]);
+            }
+
+            return errors;
+        }
+
+        // A stored value that cannot be held exactly leaves previous() without a record to read, so every validation fails.
+        var storedExact = before.Values.All(pair => pair.Exact);
+        // The record's own id comes last, so it wins over a field named id, as in the checker's scope.
+        var currentValues = record.ToDictionary(pair => pair.Key, pair => pair.Value.Value, StringComparer.OrdinalIgnoreCase);
+        currentValues["id"] = recordId;
+        var current = new ExpressionValues(currentValues);
+        var previous = new ExpressionValues(before.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)));
+        string? firstPoint = null;
+        foreach (var validation in contract.Validations)
+        {
+            var holds = storedExact
+                && ExpressionInterpreter.Evaluate(
+                    validation.Expression.Syntax,
+                    validation.Expression.Check,
+                    current,
+                    records: null,
+                    now: now,
+                    timeZone: application.TimeZone,
+                    previous: previous,
+                    accountability: accountability) is { Succeeded: true, Value: true };
+            if (!holds)
+            {
+                errors.TryAdd($"/values/{validation.Field}", [validation.Message.TextKey]);
+                firstPoint ??= $"{entity.Name[(entity.Name.LastIndexOf('/') + 1)..]}/validations/{validation.Name}";
+            }
+        }
+
+        point = firstPoint;
+        return errors.Count == 0 ? null : errors;
+    }
+
     private static SortedDictionary<string, string[]>? Validate(
         ApplicationModel application,
         EntityModel entity,

@@ -10,6 +10,7 @@ namespace Axis.Integration.Tests;
 /// it on the tenant's preview tenant. It needs the author role only, and it never changes the main tenant. The server
 /// and the publisher run together here.
 /// </summary>
+[Collection("Test scenario runs")]
 public sealed class StudioPreviewTests : IAsyncLifetime
 {
     private const string HostA = StudioPublishTests.HostA;

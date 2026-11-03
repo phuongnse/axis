@@ -56,14 +56,14 @@
   "page": {
     "content": {
       "title": { "textKey": "" },
-      "widgets": [{ "type": "taskInbox" }]
+      "widgets": [{ "type": "taskInbox", "name": "taskInbox1" }]
     },
     "emptyReferences": ["/title/textKey"]
   },
   "policy": {
     "content": {
       "roles": [""],
-      "grants": [{ "entity": "", "actions": ["read"] }]
+      "grants": [{ "name": "grant", "entity": "", "actions": ["read"] }]
     },
     "emptyReferences": ["/roles/0", "/grants/0/entity"]
   },

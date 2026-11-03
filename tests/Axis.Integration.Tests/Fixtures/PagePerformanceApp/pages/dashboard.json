@@ -9,26 +9,32 @@
   "widgets": [
     {
       "type": "tabs",
+      "name": "tabs",
       "tabs": [
         {
+          "name": "tab1",
           "label": {
             "textKey": "dashboard.overview"
           },
           "widgets": [
             {
               "type": "section",
+              "name": "section",
               "title": {
                 "textKey": "dashboard.requests"
               },
               "widgets": [
                 {
                   "type": "columns",
+                  "name": "columns",
                   "columns": [
                     {
                       "width": 4,
+                      "name": "column1",
                       "widgets": [
                         {
                           "type": "kpi",
+                          "name": "kpi",
                           "dataSource": "OpenRequestTotals",
                           "measure": "openCount",
                           "label": {
@@ -37,6 +43,7 @@
                         },
                         {
                           "type": "kpi",
+                          "name": "kpi2",
                           "dataSource": "AmountTotals",
                           "measure": "amountSum",
                           "label": {
@@ -45,6 +52,7 @@
                         },
                         {
                           "type": "kpi",
+                          "name": "kpi3",
                           "dataSource": "LargestRequestTotals",
                           "measure": "amountMax",
                           "label": {
@@ -55,9 +63,11 @@
                     },
                     {
                       "width": 8,
+                      "name": "column2",
                       "widgets": [
                         {
                           "type": "chart",
+                          "name": "chart",
                           "kind": "bar",
                           "dataSource": "RequestsByStatus",
                           "category": "status",
@@ -79,6 +89,7 @@
                 },
                 {
                   "type": "table",
+                  "name": "table",
                   "dataSource": "RequestList"
                 }
               ]

@@ -286,7 +286,7 @@ describe('PageEditor form panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add action' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/actions', [
       ...form.actions,
-      { type: 'startProcess', process: '', label: { textKey: '' } },
+      { type: 'startProcess', name: 'startProcess1', process: '', label: { textKey: '' } },
     ])
 
     await userEvent.click(within(screen.getByTestId('studio-action-0')).getByRole('button', { name: 'Remove action' }))
@@ -298,7 +298,7 @@ describe('PageEditor form panel', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add action' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/actions', [
-      { type: 'startProcess', process: '', label: { textKey: '' } },
+      { type: 'startProcess', name: 'startProcess1', process: '', label: { textKey: '' } },
     ])
   })
 
@@ -352,7 +352,7 @@ describe('PageEditor delete actions', () => {
     await userEvent.click(within(screen.getByTestId(rows)).getByRole('button', { name: 'Add delete action' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions', [
       existing,
-      { type: 'delete', label: { textKey: '' } },
+      { type: 'delete', name: 'delete1', label: { textKey: '' } },
     ])
   })
 
@@ -421,7 +421,7 @@ describe('PageEditor navigate actions', () => {
 
     expect((saved().widgets as unknown[])[0]).toEqual({
       ...table,
-      rowActions: [{ type: 'navigate', page: 'ReviewForm', label: { textKey: '' }, record: 'id' }],
+      rowActions: [{ type: 'navigate', name: 'navigate1', page: 'ReviewForm', label: { textKey: '' }, record: 'id' }],
     })
   })
 
@@ -430,7 +430,7 @@ describe('PageEditor navigate actions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add navigate action' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/actions', [
       ...form.actions,
-      { type: 'navigate', page: '', label: { textKey: '' } },
+      { type: 'navigate', name: 'navigate1', page: '', label: { textKey: '' } },
     ])
   })
 
@@ -443,7 +443,7 @@ describe('PageEditor navigate actions', () => {
       }),
     )
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/toolbarActions', [
-      { type: 'navigate', page: '', label: { textKey: '' } },
+      { type: 'navigate', name: 'navigate1', page: '', label: { textKey: '' } },
     ])
   })
 
@@ -759,7 +759,7 @@ describe('PageEditor detail panel', () => {
     const onChange = renderEditor(page(table))
 
     await chooseOption('detail', selectRoot(screen.getByRole('combobox', { name: 'Add widget' })))
-    expect(onChange).toHaveBeenLastCalledWith('/widgets', [table, { type: 'detail', record: '' }])
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [table, { type: 'detail', name: 'detail1', record: '' }])
   })
 
   it('adds an empty record when a taskInbox becomes a detail', async () => {
@@ -935,24 +935,28 @@ describe('PageEditor widget tree', () => {
       inbox,
       {
         type: 'columns',
+        name: 'columns1',
         columns: [
-          { width: 6, widgets: [] },
-          { width: 6, widgets: [] },
+          { name: 'column1', width: 6, widgets: [] },
+          { name: 'column2', width: 6, widgets: [] },
         ],
       },
     ])
     await chooseOption('tabs', adder())
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [
       inbox,
-      { type: 'tabs', tabs: [{ label: { textKey: '' }, widgets: [] }] },
+      { type: 'tabs', name: 'tabs1', tabs: [{ name: 'tab1', label: { textKey: '' }, widgets: [] }] },
     ])
     await chooseOption('section', adder())
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [
       inbox,
-      { type: 'section', title: { textKey: '' }, widgets: [] },
+      { type: 'section', name: 'section1', title: { textKey: '' }, widgets: [] },
     ])
     await chooseOption('processInspector', adder())
-    expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, { type: 'processInspector', process: '' }])
+    expect(onChange).toHaveBeenLastCalledWith('/widgets', [
+      inbox,
+      { type: 'processInspector', name: 'processInspector1', process: '' },
+    ])
   })
 
   it('adds a widget to the list inside a container', async () => {
@@ -961,7 +965,10 @@ describe('PageEditor widget tree', () => {
     const adder = within(list.parentElement!).getByRole('combobox', { name: 'Add widget' })
 
     await chooseOption('table', selectRoot(adder))
-    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns/0/widgets', [table, { type: 'table' }])
+    expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns/0/widgets', [
+      table,
+      { type: 'table', name: 'table1' },
+    ])
   })
 
   it('moves a top-level widget into a column with the keyboard alone', async () => {
@@ -1243,7 +1250,7 @@ describe('PageEditor container panels', () => {
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [
       { width: 4, widgets: [inbox] },
       { width: 4, widgets: [inbox], 'x-note': 'keep' },
-      { width: 4, widgets: [] },
+      { name: 'column1', width: 4, widgets: [] },
     ])
 
     await userEvent.click(within(screen.getByTestId('studio-column-0')).getByRole('button', { name: 'Remove column' }))
@@ -1255,7 +1262,35 @@ describe('PageEditor container panels', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add column' }))
 
-    expect(onChange.mock.lastCall![1]).toEqual([columns.columns[0], columns.columns[1], { width: 1, widgets: [] }])
+    expect(onChange.mock.lastCall![1]).toEqual([
+      columns.columns[0],
+      columns.columns[1],
+      { name: 'column1', width: 1, widgets: [] },
+    ])
+  })
+
+  it('names an added column, tab and navigate action with the first free name, ignoring letter case', async () => {
+    const named = {
+      type: 'columns',
+      columns: [{ name: 'COLUMN1', width: 6, widgets: [] }],
+    }
+    let onChange = await open(named)
+    await userEvent.click(screen.getByRole('button', { name: 'Add column' }))
+    expect((onChange.mock.lastCall![1] as { name: string }[])[1].name).toBe('column2')
+    cleanup()
+
+    onChange = await open({ type: 'tabs', tabs: [{ name: 'Tab1', label: { textKey: '' }, widgets: [] }] })
+    await userEvent.click(screen.getByRole('button', { name: 'Add tab' }))
+    expect((onChange.mock.lastCall![1] as { name: string }[])[1].name).toBe('tab2')
+    cleanup()
+
+    onChange = renderEditor(page({ ...table, rowActions: [{ type: 'navigate', name: 'NAVIGATE1', page: '' }] }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/widgets/0/rowActions')).getByRole('button', {
+        name: 'Add navigate action',
+      }),
+    )
+    expect((onChange.mock.lastCall![1] as { name: string }[])[1].name).toBe('navigate2')
   })
 
   it('disables Remove column on the last column', async () => {
@@ -1303,7 +1338,7 @@ describe('PageEditor container panels', () => {
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/tabs', [
       tabs.tabs[0],
       tabs.tabs[1],
-      { label: { textKey: '' }, widgets: [] },
+      { name: 'tab1', label: { textKey: '' }, widgets: [] },
     ])
 
     await userEvent.click(within(screen.getByTestId('studio-tab-0')).getByRole('button', { name: 'Remove tab' }))

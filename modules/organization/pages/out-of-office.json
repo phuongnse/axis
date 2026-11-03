@@ -1,0 +1,15 @@
+{
+  "id": "6a20c73a-fe47-4a7e-b96f-ac1778764fd7",
+  "kind": "page",
+  "name": "OutOfOffice",
+  "formatVersion": 1,
+  "title": { "textKey": "organization.pages.outOfOffice.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "name": "outOfOffice",
+      "dataSource": "OutOfOffice",
+      "rowActions": [{ "type": "navigate", "name": "open", "page": "AbsenceForm", "label": { "textKey": "organization.actions.open" }, "record": "id" }]
+    }
+  ]
+}

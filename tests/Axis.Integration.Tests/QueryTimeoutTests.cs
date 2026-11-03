@@ -184,6 +184,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
     {
         "app" => "RecordsApp",
         "entity" => "Item",
+        "field" => "name",
         "module" => "m",
         "id" => id.ToString("D"),
         "dataSource" => "ItemNames",
@@ -203,9 +204,10 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         {
             builder.UseSetting("Data:QueryTimeout", "00:00:00.200");
             builder.UseSetting("Data:ExportQueryTimeout", "00:00:00.200");
+            builder.UseSetting("Data:TenantPoolMaxSize", "1");
             builder.UseSetting(
                 "Tenants:a:ConnectionString",
-                PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString(TenantA)) + ";Maximum Pool Size=1;No Reset On Close=true");
+                PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString(TenantA)) + ";No Reset On Close=true");
         });
 
     // A request that no timeout stops fails here instead of hanging the test.

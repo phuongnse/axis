@@ -1,0 +1,10 @@
+{
+  "kind": "module",
+  "id": "organization",
+  "version": "1.0.0",
+  "label": "Organization",
+  "roles": [
+    { "name": "admin", "label": { "textKey": "organization.roles.admin" } },
+    { "name": "member", "label": { "textKey": "organization.roles.member" } }
+  ]
+}

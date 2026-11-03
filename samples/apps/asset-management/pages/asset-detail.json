@@ -17,6 +17,7 @@
   "widgets": [
     {
       "type": "detail",
+      "name": "assetDetail",
       "entity": "Asset",
       "record": "asset"
     }

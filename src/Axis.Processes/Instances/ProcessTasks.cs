@@ -247,7 +247,7 @@ public static class ProcessTasks
         ArgumentNullException.ThrowIfNull(completion);
         ArgumentNullException.ThrowIfNull(tenantId);
 
-        var revision = await ProcessSteps.TryResumeAsync(transaction, task.ProcessInstanceId, task.Step, completion.Next, cancellationToken)
+        var revision = await ProcessSteps.TryResumeAsync(transaction, task.ProcessInstanceId, task.Step, completion.Next, (completion.UserId, task.Id), cancellationToken)
             ?? throw new InvalidOperationException($"The instance of task '{task.Id}' is not waiting on the task's step.");
 
         var connection = Connection(transaction);

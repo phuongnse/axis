@@ -1,0 +1,16 @@
+{
+  "id": "1aee06b0-c10c-4ecd-b084-233acb8bc1b9",
+  "kind": "dataSource",
+  "name": "Decisions",
+  "formatVersion": 1,
+  "entity": "Decision",
+  "fields": [
+    { "name": "request", "path": "request" },
+    { "name": "stepSequence", "path": "stepSequence" },
+    { "name": "outcome", "path": "outcome" },
+    { "name": "decidedBy", "path": "decidedBy" },
+    { "name": "onBehalfOf", "path": "onBehalfOf" },
+    { "name": "comment", "path": "comment" },
+    { "name": "decidedAt", "path": "decidedAt" }
+  ]
+}

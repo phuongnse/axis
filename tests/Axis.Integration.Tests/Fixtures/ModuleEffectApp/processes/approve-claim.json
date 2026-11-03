@@ -1,0 +1,18 @@
+{
+  "id": "0aa56761-e1b6-453d-9d9c-ef6a83f680e3",
+  "kind": "process",
+  "name": "ApproveClaim",
+  "formatVersion": 1,
+  "entity": "ledgers/Claim",
+  "start": "approve",
+  "steps": [
+    {
+      "name": "approve",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'approved'" },
+      "next": "finished"
+    },
+    { "name": "finished", "type": "end" }
+  ]
+}

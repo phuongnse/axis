@@ -5,16 +5,16 @@
   "formatVersion": 1,
   "roles": ["employee", "department-manager"],
   "grants": [
-    { "entity": "Note", "actions": ["read", "create", "update", "delete"] },
-    { "entity": "Category", "actions": ["read", "create", "update", "delete"] },
-    { "entity": "Software", "actions": ["read", "create", "update", "delete"] },
-    { "entity": "Asset", "actions": ["read", "create", "update", "delete"] },
-    { "dataSource": "NoteRows", "actions": ["read"] },
-    { "dataSource": "CategoryNotes", "actions": ["read"] },
-    { "dataSource": "NoteTotals", "actions": ["read"] },
-    { "dataSource": "NotesByCategory", "actions": ["read"] },
-    { "process": "NoteReview", "actions": ["start"] },
-    { "process": "NoteClose", "actions": ["start"] },
-    { "process": "NoteNotify", "actions": ["start"] }
+    { "name": "noteRead", "entity": "Note", "actions": ["read", "create", "update", "delete"] },
+    { "name": "categoryRead", "entity": "Category", "actions": ["read", "create", "update", "delete"] },
+    { "name": "softwareRead", "entity": "Software", "actions": ["read", "create", "update", "delete"] },
+    { "name": "assetRead", "entity": "Asset", "actions": ["read", "create", "update", "delete"] },
+    { "name": "noteRowsRead", "dataSource": "NoteRows", "actions": ["read"] },
+    { "name": "categoryNotesRead", "dataSource": "CategoryNotes", "actions": ["read"] },
+    { "name": "noteTotalsRead", "dataSource": "NoteTotals", "actions": ["read"] },
+    { "name": "notesByCategoryRead", "dataSource": "NotesByCategory", "actions": ["read"] },
+    { "name": "noteReviewStart", "process": "NoteReview", "actions": ["start"] },
+    { "name": "noteCloseStart", "process": "NoteClose", "actions": ["start"] },
+    { "name": "noteNotifyStart", "process": "NoteNotify", "actions": ["start"] }
   ]
 }

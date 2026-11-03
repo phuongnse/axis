@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
@@ -171,7 +172,7 @@ public static partial class ApplicationCompiler
     /// id, each read from its own <c>module.json</c>. A copy without a valid manifest, or whose
     /// manifest id differs from its folder, is reported and left out.
     /// </summary>
-    private static List<InstalledModule> ReadModuleCopies(IEnumerable<ResourceContent> copies, List<Diagnostic> diagnostics)
+    internal static List<InstalledModule> ReadModuleCopies(IEnumerable<ResourceContent> copies, List<Diagnostic> diagnostics)
     {
         var modules = new List<InstalledModule>();
         foreach (var group in copies.GroupBy(copy => copy.Path.Split('/')[1], StringComparer.Ordinal).OrderBy(group => group.Key, StringComparer.Ordinal))
@@ -218,11 +219,86 @@ public static partial class ApplicationCompiler
         return modules;
     }
 
+    private static JsonNode? ParseContent(string? content)
+    {
+        try
+        {
+            return content is null ? null : JsonNode.Parse(content);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// For each module that the application declares and whose pinned version differs from its copy in the active release,
+    /// adds one <see cref="DiagnosticCodes.ModuleUpgradeBreaksLayers"/> at the module's entry in <c>application.json</c> that names the
+    /// module, both versions and the layer files with errors.
+    /// </summary>
+    private static void ReportUpgradesBreakingLayers(
+        ApplicationManifest manifest,
+        IReadOnlyList<PinnedModuleModel> pins,
+        IReadOnlyCollection<InstalledModule>? previousModules,
+        List<Diagnostic> diagnostics)
+    {
+        if (previousModules is null || previousModules.Count == 0)
+        {
+            return;
+        }
+
+        var summaries = new List<Diagnostic>();
+        for (var index = 0; index < manifest.Modules.Count; index++)
+        {
+            var id = manifest.Modules[index].Id;
+            var pin = pins.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
+            var previous = previousModules.FirstOrDefault(candidate => string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal));
+            if (pin is null || previous is null || string.Equals(pin.Version, previous.Manifest.Version, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var prefix = $"customizations/{id}/";
+            var files = diagnostics
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.File.StartsWith(prefix, StringComparison.Ordinal))
+                .Select(diagnostic => diagnostic.File)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToList();
+            if (files.Count == 0)
+            {
+                continue;
+            }
+
+            summaries.Add(new Diagnostic(
+                DiagnosticCodes.ModuleUpgradeBreaksLayers,
+                $"The module '{id}' moves from version {previous.Manifest.Version} in the active release to version {pin.Version}, and the layers in {string.Join(", ", files.Select(file => $"'{file}'"))} no longer apply to it.",
+                manifest.File,
+                $"/modules/{index}",
+                manifest.Id));
+        }
+
+        diagnostics.AddRange(summaries);
+    }
+
     internal static bool IsModuleResource(Resource resource) =>
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
     /// <summary>The module id of a qualified resource name, the text before the first <c>/</c>.</summary>
     internal static string ModuleIdOf(string qualifiedName) => qualifiedName[..qualifiedName.IndexOf('/', StringComparison.Ordinal)];
+
+    /// <summary>
+    /// Compiles an application that is already loaded, as the folder overload does. <paramref name="previousModules"/> are the
+    /// copies of the modules in the application's active release: a layer on a module whose pinned version differs from its
+    /// copy is also checked for the keys the new version dropped.
+    /// </summary>
+    internal static CompilationResult Compile(
+        ApplicationLoadResult loaded,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules,
+        IReadOnlyCollection<InstalledModule> previousModules,
+        long maxFileSize) =>
+        Compile(loaded, installedPackages, installedModules, collectReferences: true, maxFileSize, previousModules: previousModules);
 
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
@@ -230,7 +306,8 @@ public static partial class ApplicationCompiler
         IReadOnlyCollection<InstalledModule> installedModules,
         bool collectReferences,
         long maxFileSize,
-        ExpressionProbe? probe = null)
+        ExpressionProbe? probe = null,
+        IReadOnlyCollection<InstalledModule>? previousModules = null)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
@@ -250,13 +327,17 @@ public static partial class ApplicationCompiler
         var moduleManifests = new Dictionary<string, ModuleManifest>(StringComparer.Ordinal);
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
+        IReadOnlyDictionary<string, LayerTrace> layerTraces = new Dictionary<string, LayerTrace>();
+        IReadOnlyList<RemovedResource> removedResources = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
-            (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames);
+            (modules, moduleFiles, moduleResources, layerTraces, removedResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames, loaded.Layers, previousModules);
+            LayerChecker.Check(loaded.Layers, manifest, modules, installedModules, diagnostics);
+            ReportUpgradesBreakingLayers(manifest, modules, previousModules, diagnostics);
             var pinnedManifests = modules
                 .Select(pin => (pin.Id, installedModules.First(candidate => candidate.Manifest.Id == pin.Id && candidate.Manifest.Version == pin.Version).Manifest))
                 .ToList();
@@ -523,6 +604,28 @@ public static partial class ApplicationCompiler
                 diagnostics);
         }
 
+        var contracts = ContractChecker.Check(
+            moduleResources.Contracts,
+            FindEntity,
+            name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+            loaded.UnloadedEntityNames,
+            RulesFor,
+            DeclaredModulesOf,
+            moduleResources.RoleSlots,
+            FilterRulesFor,
+            diagnostics);
+
+        // From here on a contract is the copy without the points its module's entry relaxes. Seed checks, grant
+        // ceilings and the compiled model see that copy. The named points and the relax checks keep the originals.
+        foreach (var pin in modules.Where(pin => pin.Relaxed.Count > 0))
+        {
+            var points = pin.Relaxed.Select(entry => entry.Point).ToHashSet(StringComparer.Ordinal);
+            foreach (var name in contracts.Keys.Where(name => ModuleIdOf(name) == pin.Id).ToList())
+            {
+                contracts[name] = ContractRelaxations.Apply(contracts[name], points);
+            }
+        }
+
         PresentationChecker.Check(
             loaded,
             FindEntity,
@@ -536,7 +639,7 @@ public static partial class ApplicationCompiler
             rules,
             declaredModules,
             diagnostics);
-        CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
+        CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, contracts, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, FilterRulesFor, DeclaredModulesOf, diagnostics);
         // An application process names a module form or process only under a module the application declares.
         // A module process names only its own module and the modules it declares, sees no application
@@ -640,6 +743,7 @@ public static partial class ApplicationCompiler
             moduleReferences,
             DeclaredModulesOf,
             diagnostics);
+        GrantCeilings.Check(loaded.Policies, contracts, modules, FindEntity, FindRole, diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
         ConnectorChecker.CheckBindingKinds(loaded.Connectors, loaded.Application, loaded.IdentityProviders, diagnostics);
         IdentityProviderChecker.Check(
@@ -721,7 +825,7 @@ public static partial class ApplicationCompiler
                 diagnostics);
         }
         WebhookChecker.Check(loaded.Webhooks, FindEvent, loaded.UnloadedEventNames, moduleReferences, references, diagnostics);
-        MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, references, diagnostics);
+        MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, declaredModules, references, diagnostics);
         ScenarioChecker.Check(
             loaded.Scenarios,
             FindRole,
@@ -738,6 +842,51 @@ public static partial class ApplicationCompiler
             references,
             diagnostics);
 
+        // A module scenario names the module's own entities and processes and its role slots. It adds no
+        // reference, because a module file is not an editable resource. A connector stub names a connector slot,
+        // and a package stub a package the module itself lists.
+        foreach (var moduleScenarios in moduleResources.Scenarios.GroupBy(entry => entry.ModuleId, StringComparer.Ordinal))
+        {
+            var moduleId = moduleScenarios.Key;
+            var pin = modules.First(candidate => candidate.Id == moduleId);
+            var modulePins = modulePackages.GetValueOrDefault(moduleId)?.ToDictionary(package => package.Id, OperationsOf, StringComparer.Ordinal);
+            ScenarioChecker.Check(
+                [.. moduleScenarios.Select(entry => entry.Scenario)],
+                _ => null,
+                new HashSet<string>(),
+                FindEntity,
+                name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+                loaded.UnloadedEntityNames,
+                [.. loaded.Processes.Where(process => IsModuleResource(process) && ModuleIdOf(process.Name) == moduleId)],
+                loaded.UnloadedProcessNames,
+                name => pin.Connectors.TryGetValue(name, out var mapped) ? FindConnector(mapped) : null,
+                new HashSet<string>(),
+                id => modulePins?.GetValueOrDefault(id),
+                new HashSet<string>(moduleManifests[moduleId].Packages.Select(package => package.Id), StringComparer.Ordinal),
+                new ReferenceIndexBuilder(textKeys, loaded.Rules, false),
+                diagnostics,
+                (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()),
+                ContractPoints.Of(moduleResources.Contracts.Where(entry => entry.ModuleId == moduleId).Select(entry => entry.Contract)));
+        }
+
+        LayerDiagnostics.MapToLayers(diagnostics, layerTraces);
+        if (removedResources.Count > 0)
+        {
+            var parsed = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
+            LayerDiagnostics.MapRemovedReferences(diagnostics, removedResources, file =>
+            {
+                if (!parsed.TryGetValue(file, out var node))
+                {
+                    node = layerTraces.TryGetValue(file, out var trace)
+                        ? trace.Merge.Merged
+                        : ParseContent(loaded.Resources.Concat(moduleFiles).FirstOrDefault(resource => resource.Path == file)?.Content);
+                    parsed[file] = node;
+                }
+
+                return node;
+            });
+        }
+
         if (probe is not null)
         {
             return new CompilationResult(null, DiagnosticOrder.Sort(diagnostics));
@@ -747,7 +896,7 @@ public static partial class ApplicationCompiler
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics))
         {
             References = index,
-            Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, texts, FindEntity, index),
+            Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, moduleResources.Contracts, texts, FindEntity, index),
             ModulePins = modules,
             PolicyMatrix = PolicyMatrixBuilder.Build(
                 loaded.Roles,
@@ -762,6 +911,16 @@ public static partial class ApplicationCompiler
         {
             return result;
         }
+
+        // Each slot becomes the role the application maps it to, so the scenario's user acts with that role's grants.
+        // The scenarios come in pin order and then by path, after the application's own.
+        result = result with
+        {
+            ModuleScenarios = [.. modules.SelectMany(pin => moduleResources.Scenarios
+                .Where(entry => entry.ModuleId == pin.Id)
+                .OrderBy(entry => entry.Scenario.File, StringComparer.Ordinal)
+                .Select(entry => MapScenarioSlots(pin, entry.Scenario)))],
+        };
 
         // The derived ids apply only now, so a diagnostic in a module file keeps the id written in that file.
         var applicationId = loaded.Application.Id;
@@ -801,7 +960,16 @@ public static partial class ApplicationCompiler
         }
 
         var entities = allEntities
-            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), DeclaredModulesOf(entity)))
+            .Select(entity => BuildEntity(
+                entitiesByName[entity.Name],
+                entitiesByName,
+                sequencesByName,
+                RulesFor(entity),
+                DeclaredModulesOf(entity),
+                contracts.GetValueOrDefault(entity.Name),
+                IsModuleResource(entity) ? FilterRulesFor(entity) : [],
+                IsModuleResource(entity) ? modules.FirstOrDefault(pin => pin.Id == ModuleIdOf(entity.Name))?.Roles : null))
+            .Select(entity => layerTraces.TryGetValue(entity.File, out var trace) ? entity with { Layer = BuildEntityLayer(trace) } : entity)
             .ToList();
         var model = new ApplicationModel
         {
@@ -853,6 +1021,30 @@ public static partial class ApplicationCompiler
             Model = model,
             ContentHash = ContentHash.Compute(resources, allPackages),
             Resources = resources,
+        };
+    }
+
+    /// <summary>
+    /// Names a module's scenario <c>&lt;module id&gt;/&lt;name&gt;</c> and maps each role slot of its users, assignees and
+    /// recipients to the application role of the pin, and each connector stub's slot to the application connector.
+    /// A name the pin does not map is left as written, and the pin check has reported it already.
+    /// </summary>
+    private static ScenarioResource MapScenarioSlots(PinnedModuleModel pin, ScenarioResource scenario)
+    {
+        string Role(string slot) => pin.Roles.GetValueOrDefault(slot, slot);
+
+        return scenario with
+        {
+            Name = $"{pin.Id}/{scenario.Name}",
+            Users = scenario.Users.ToDictionary(user => user.Key, user => (IReadOnlyList<string>)[.. user.Value.Select(Role)]),
+            Stubs = [.. scenario.Stubs.Select(stub => stub.Connector is { } connector
+                ? stub with { Connector = connector with { Name = pin.Connectors.GetValueOrDefault(connector.Name, connector.Name) } }
+                : stub)],
+            Steps = [.. scenario.Steps.Select(step => step with
+            {
+                Assignee = step.Assignee?.Role is { } assignee ? step.Assignee with { Role = Role(assignee) } : step.Assignee,
+                Recipient = step.Recipient?.Role is { } recipient ? step.Recipient with { Role = Role(recipient) } : step.Recipient,
+            })],
         };
     }
 
@@ -1064,6 +1256,14 @@ public static partial class ApplicationCompiler
                     $"{path}/name");
             }
 
+            if (string.Equals(field.Name, ExpressionTypeChecker.OuterName, StringComparison.OrdinalIgnoreCase))
+            {
+                Report(
+                    DiagnosticCodes.ReservedFieldName,
+                    $"The field name '{field.Name}' is reserved, because an item expression reads the outer record with outer.<field>.",
+                    $"{path}/name");
+            }
+
             CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
             CheckTextKey(field.Help, entity, $"{path}/help", references, diagnostics);
             CheckValueLabels(field, entity, path, references, diagnostics);
@@ -1071,8 +1271,10 @@ public static partial class ApplicationCompiler
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
+            CheckUserId(field, path, childOwner, Report);
             CheckSearchable(field, path, Report);
             CheckSensitiveFlags(entity, field, path, Report);
+            CheckMatch(entity, field, path, childOwner, findEntity, moduleReferences, Report);
             CheckMoney(entity, field, path, Report);
             CheckDefault(entity, field, path, defaultScope, references, Report);
 
@@ -1128,10 +1330,19 @@ public static partial class ApplicationCompiler
     private static void CheckIndexes(EntityResource entity, Action<string, string, string> report)
     {
         var firstIndexByFields = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Indexes.Count; index++)
         {
             var declared = entity.Indexes[index];
             var path = $"/indexes/{index}";
+
+            if (!firstIndexByName.TryAdd(declared.Name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateEntityElementName,
+                    $"The index name '{declared.Name}' is already used by the index at '/indexes/{firstIndexByName[declared.Name]}'.",
+                    $"{path}/name");
+            }
 
             for (var position = 0; position < declared.Fields.Count; position++)
             {
@@ -1257,10 +1468,19 @@ public static partial class ApplicationCompiler
 
         var scope = ExpressionScopes.ForEntity(
             entity.Fields, rules: rules, findEntity: findEntity, modules: modules, undeclaredModuleIsUnknown: IsModuleResource(entity));
+        var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Validations.Count; index++)
         {
             var validation = entity.Validations[index];
             var path = $"/validations/{index}";
+
+            if (!firstIndexByName.TryAdd(validation.Name, index))
+            {
+                report(
+                    DiagnosticCodes.DuplicateEntityElementName,
+                    $"The validation name '{validation.Name}' is already used by the validation at '/validations/{firstIndexByName[validation.Name]}'.",
+                    $"{path}/name");
+            }
 
             CheckTextKey(validation.Message, entity, $"{path}/message", references, diagnostics);
 
@@ -1375,6 +1595,32 @@ public static partial class ApplicationCompiler
         }
     }
 
+    /// <summary>
+    /// Checks a field's <c>userId</c> property: it applies only to text fields, and a user id field
+    /// is neither computed, numbered nor a creator field, and not on a child entity. Only the first
+    /// problem is reported.
+    /// </summary>
+    private static void CheckUserId(
+        FieldDefinition field, string path, ChildOwner? childOwner, Action<string, string, string> report)
+    {
+        if (field.UserId is not { } userId)
+        {
+            return;
+        }
+
+        var problem = FieldTypes.Parse(field.Type) != FieldType.Text ? $"'userId' applies only to text fields, not to {field.Type} fields."
+            : !userId ? null
+            : field.Creator == true ? "A 'userId' field cannot be a 'creator' field: the server sets a creator field to the user who created the record."
+            : field.Expression is not null ? "A 'userId' field cannot have an 'expression': clients write the user id."
+            : field.Sequence is not null ? "A 'userId' field cannot have a 'sequence': clients write the user id."
+            : childOwner is not null ? $"A 'userId' field cannot belong to a child entity, but this entity is owned by '{childOwner}'."
+            : null;
+        if (problem is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/userId");
+        }
+    }
+
     /// <summary>Checks a field's <c>searchable</c> property: it applies only to text fields, whatever its value.</summary>
     /// <summary>
     /// A sensitive field is stored encrypted, so it cannot be <c>unique</c>, which needs a unique
@@ -1421,6 +1667,103 @@ public static partial class ApplicationCompiler
         if (field.Searchable == true)
         {
             report(DiagnosticCodes.SensitiveFieldUse, SensitiveUseMessage(entity.Name, field.Name, "'searchable'"), $"{path}/searchable");
+        }
+    }
+
+    /// <summary>
+    /// Checks a field's <c>match</c>. It applies only to reference fields that are optional, neither
+    /// computed, defaulted nor numbered, and not on a child entity: only the first of those problems
+    /// is reported, as <c>AXC0013</c>. Then <c>match.from</c> must be a stored, non-sensitive field of
+    /// this entity other than the field itself or another matched field, <c>match.field</c> a unique
+    /// field of the target, and the two of the same type, each reported as <c>AXC0362</c>.
+    /// </summary>
+    private static void CheckMatch(
+        EntityResource entity,
+        FieldDefinition field,
+        string path,
+        ChildOwner? childOwner,
+        Func<string, EntityResource?> findEntity,
+        ModuleReferences moduleReferences,
+        Action<string, string, string> report)
+    {
+        if (field.Match is not { } match)
+        {
+            return;
+        }
+
+        var matchPath = $"{path}/match";
+        var problem = FieldTypes.Parse(field.Type) != FieldType.Reference ? $"'match' applies only to reference fields, not to {field.Type} fields."
+            : field.Required == true ? "A field with a 'match' cannot be required: the server sets it to null when no record matches."
+            : field.Expression is not null ? "A field with a 'match' cannot have an 'expression': the server sets it from the matched record."
+            : field.Default is not null ? "A field with a 'match' cannot have a 'default': the server sets it from the matched record."
+            : field.Sequence is not null ? "A field with a 'match' cannot have a 'sequence': the server sets it from the matched record."
+            : childOwner is not null ? $"A field with a 'match' cannot belong to a child entity, but this entity is owned by '{childOwner}'."
+            : null;
+        if (problem is not null)
+        {
+            report(DiagnosticCodes.InvalidConstraint, problem, matchPath);
+            if (FieldTypes.Parse(field.Type) != FieldType.Reference)
+            {
+                return;
+            }
+        }
+
+        var from = FindField(entity, match.From);
+        var fromProblem = from is null ? $"The match 'from' field '{match.From}' is not a field of '{entity.Name}'."
+            : ReferenceEquals(from, field) ? $"The match 'from' field '{match.From}' is the field itself."
+            : from.Match is not null ? $"The match 'from' field '{from.Name}' has a 'match' of its own, so there is no order to match them in."
+            : from.Expression is not null ? $"The match 'from' field '{from.Name}' is computed, and the match runs before computed fields."
+            : from.Sensitive == true ? $"The match 'from' field '{from.Name}' is sensitive, so its value cannot be looked up."
+            : null;
+        if (fromProblem is not null)
+        {
+            report(DiagnosticCodes.InvalidMatch, fromProblem, matchPath);
+        }
+
+        // An unknown target is already reported.
+        var targetEntity = field.Target is { } targetName ? moduleReferences.Find(targetName, findEntity) : null;
+        if (targetEntity is null)
+        {
+            return;
+        }
+
+        var targetField = FindField(targetEntity, match.Field);
+        if (targetField is null)
+        {
+            report(
+                DiagnosticCodes.InvalidMatch,
+                $"The match field '{match.Field}' is not a field of '{targetEntity.Name}'.",
+                matchPath);
+        }
+        else if (targetField.Unique != true)
+        {
+            report(
+                DiagnosticCodes.InvalidMatch,
+                $"The match field '{targetField.Name}' of '{targetEntity.Name}' is not unique. A matched field must be unique.",
+                matchPath);
+        }
+
+        if (from is null || targetField is null)
+        {
+            return;
+        }
+
+        var fromType = FieldTypes.Parse(from.Type);
+        if (fromType != FieldTypes.Parse(targetField.Type))
+        {
+            report(
+                DiagnosticCodes.InvalidMatch,
+                $"The match 'from' field '{from.Name}' is {from.Type}, but the match field '{targetField.Name}' is {targetField.Type}. They must have the same type.",
+                matchPath);
+        }
+        else if (fromType == FieldType.Reference
+            && from.Target is { } fromTarget && targetField.Target is { } matchTarget
+            && !ReferenceEquals(moduleReferences.Find(fromTarget, findEntity), moduleReferences.Find(matchTarget, findEntity)))
+        {
+            report(
+                DiagnosticCodes.InvalidMatch,
+                $"The match 'from' field '{from.Name}' refers to '{fromTarget}', but the match field '{targetField.Name}' refers to '{matchTarget}'. They must refer to the same entity.",
+                matchPath);
         }
     }
 
@@ -1927,13 +2270,15 @@ public static partial class ApplicationCompiler
     /// <summary>
     /// Checks the seeds, which come in path order: each names a loaded entity, and every seed record
     /// id is used once across all seeds, compared as a UUID. A record cannot set a file field, in its
-    /// own values or in a child row's. The other values are not checked here; the startup step
-    /// checks them with the record API's rules before it inserts any record.
+    /// own values or in a child row's. A record of an entity whose checked contract has a lifecycle
+    /// gives a state that is an initial state, when it gives its state as text. The other values are
+    /// not checked here; the startup step checks them with the record API's rules before it inserts any record.
     /// </summary>
     private static void CheckSeeds(
         IReadOnlyList<SeedResource> seeds,
         IReadOnlySet<string> unloadedEntityNames,
         Func<string, EntityResource?> findEntity,
+        Dictionary<string, ContractResource> contracts,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -1961,6 +2306,10 @@ public static partial class ApplicationCompiler
                 if (entity is not null)
                 {
                     CheckSeedFiles(seed, entity, seed.Records[index].Values, $"/records/{index}/values", findEntity, diagnostics);
+                    if (contracts.TryGetValue(entity.Name, out var contract) && contract.Lifecycle is { } lifecycle)
+                    {
+                        CheckSeedState(seed, entity, lifecycle, seed.Records[index].Values, $"/records/{index}/values", diagnostics);
+                    }
                 }
 
                 var id = seed.Records[index].Id;
@@ -1973,6 +2322,45 @@ public static partial class ApplicationCompiler
                         $"/records/{index}/id",
                         seed.Id));
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a seed record's state that is text and not an initial state of <paramref name="lifecycle"/>, at the state's
+    /// value. A missing state and a value that is not text are left to the startup step.
+    /// </summary>
+    private static void CheckSeedState(
+        SeedResource seed,
+        EntityResource entity,
+        ContractLifecycleDefinition lifecycle,
+        JsonElement values,
+        string path,
+        List<Diagnostic> diagnostics)
+    {
+        if (values.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in values.EnumerateObject())
+        {
+            if (!string.Equals(property.Name, lifecycle.Field, StringComparison.OrdinalIgnoreCase)
+                || property.Value.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            var state = property.Value.GetString();
+            var initial = lifecycle.States.Where(candidate => candidate.Initial == true).Select(candidate => candidate.Name).ToList();
+            if (state is null || !initial.Contains(state))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.SeedStateNotInitial,
+                    $"The state '{state}' is not an initial state of the lifecycle of '{entity.Name}'. A seed record must be in one of: {string.Join(", ", initial)}.",
+                    seed.File,
+                    $"{path}/{property.Name}",
+                    seed.Id));
             }
         }
     }
@@ -2340,10 +2728,10 @@ public static partial class ApplicationCompiler
                     modulesFor(dataSource),
                     undeclaredModuleIsUnknown: IsModuleResource(dataSource));
 
-                void CheckDataSourceFilter(string filter, string path)
+                void CheckDataSourceFilter(string filter, string path, bool currentUser)
                 {
                     var problem = CheckFilter(
-                        filter, filterScope, policyFilter: false, entity, findEntity, out var check, parameterNames: dataSource.Parameters.Select(p => p.Name).ToList());
+                        filter, filterScope, currentUser, entity, findEntity, out var check, parameterNames: dataSource.Parameters.Select(p => p.Name).ToList());
                     if (check is not null)
                     {
                         references.AddRuleCalls(dataSource, path, check);
@@ -2358,7 +2746,7 @@ public static partial class ApplicationCompiler
 
                 if (dataSource.Filter is { } filter)
                 {
-                    CheckDataSourceFilter(filter, "/filter");
+                    CheckDataSourceFilter(filter, "/filter", currentUser: true);
                 }
 
                 var measures = dataSource.Aggregate?.Measures ?? [];
@@ -2366,7 +2754,7 @@ public static partial class ApplicationCompiler
                 {
                     if (measures[index].Filter is { } measureFilter)
                     {
-                        CheckDataSourceFilter(measureFilter, $"/aggregate/measures/{index}/filter");
+                        CheckDataSourceFilter(measureFilter, $"/aggregate/measures/{index}/filter", currentUser: false);
                     }
                 }
             }
@@ -2503,7 +2891,7 @@ public static partial class ApplicationCompiler
     /// The first problem of a data source or policy filter: in parsing, in type checking over the
     /// entity's fields, its child collections, a data source's parameters, paths through reference
     /// fields and the named rules, or outside the SQL subset with each rule call inlined. Only a
-    /// policy filter can call <c>currentUser()</c>. A filter that calls a rule without a checked
+    /// policy filter and a data source's own filter, with <paramref name="currentUser"/>, can call <c>currentUser()</c>. A filter that calls a rule without a checked
     /// expression, directly or through the rules it calls, is not translated: that rule already has
     /// its own diagnostic, as for a validation. A filter that reads a sensitive field of
     /// <paramref name="entity"/>, or of an entity it reaches, is refused: the stored value is
@@ -2514,7 +2902,7 @@ public static partial class ApplicationCompiler
     internal static ExpressionDiagnostic? CheckFilter(
         string filter,
         ExpressionScope scope,
-        bool policyFilter,
+        bool currentUser,
         EntityResource entity,
         Func<string, EntityResource?> findEntity,
         out ExpressionCheckResult? check,
@@ -2527,7 +2915,7 @@ public static partial class ApplicationCompiler
             return parsed.Diagnostic;
         }
 
-        var typeCheck = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, policyFilter: policyFilter);
+        var typeCheck = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, currentUser: currentUser);
         if (!typeCheck.Succeeded)
         {
             return typeCheck.Diagnostic;
@@ -2645,12 +3033,32 @@ public static partial class ApplicationCompiler
         return null;
     }
 
+    /// <summary>Where a layered module entity came from in its layer, with the remove of each field the layer removed.</summary>
+    private static EntityLayerModel BuildEntityLayer(LayerTrace trace)
+    {
+        var removedFields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var remove in trace.Merge.Removes.Where(remove => remove.LayerPath.StartsWith("/changes/fields/", StringComparison.Ordinal)))
+        {
+            removedFields.TryAdd(remove.Key, remove.LayerPath);
+        }
+
+        return new EntityLayerModel(
+            trace.Layer.File,
+            trace.Layer.Id,
+            trace.Merge.LayerPathByMergedPath,
+            trace.Merge.ChangedPathByMergedPath,
+            removedFields);
+    }
+
     private static EntityModel BuildEntity(
         EntityResource entity,
         Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, SequenceResource> sequencesByName,
         IEnumerable<ExpressionRule> rules,
-        IReadOnlySet<string>? modules)
+        IReadOnlySet<string>? modules,
+        ContractResource? contract,
+        IReadOnlyList<ExpressionRule> filterRules,
+        IReadOnlyDictionary<string, string>? slotRoles)
     {
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
@@ -2676,6 +3084,101 @@ public static partial class ApplicationCompiler
                     [.. declared.Fields.Select(name => FindField(entity, name)!.Name)],
                     declared.Unique ?? false))
                 .ToList(),
+            Contract = contract is null ? null : BuildContract(contract, entity, scope, rules, filterRules, modules, slotRoles, entitiesByName),
+        };
+    }
+
+    /// <summary>
+    /// Builds the contract the checker accepted. A guard sees the entity's validation <paramref name="scope"/>.
+    /// A ceiling filter sees <paramref name="filterRules"/> as a module policy filter does.
+    /// <paramref name="slotRoles"/> maps the module's role slots to application roles.
+    /// </summary>
+    private static ContractModel BuildContract(
+        ContractResource contract,
+        EntityResource entity,
+        ExpressionScope scope,
+        IEnumerable<ExpressionRule> rules,
+        IReadOnlyList<ExpressionRule> filterRules,
+        IReadOnlySet<string>? modules,
+        IReadOnlyDictionary<string, string>? slotRoles,
+        Dictionary<string, EntityResource> entitiesByName)
+    {
+        CeilingModel? BuildCeiling(ContractCeilingDefinition ceiling)
+        {
+            EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
+            var filterScope = ExpressionScopes.ForDataSource(entity.Fields, [], FindEntity, filterRules, modules, undeclaredModuleIsUnknown: true);
+            CeilingEntryModel BuildEntry(CeilingEntryDefinition entry) => new(
+                [.. entry.Actions.Select(PolicyChecker.ParseAction)],
+                // A checked entry names only fields of the entity.
+                entry.Fields is null ? null : [.. entry.Fields.Select(name => FindField(entity, name)!.Name)],
+                entry.Filter is null ? null : ExpressionModel.Compile(entry.Filter, filterScope, ExpressionType.Boolean, currentUser: true));
+
+            var roles = (slotRoles ?? new Dictionary<string, string>()).Values.Distinct(StringComparer.Ordinal).ToList();
+            return new CeilingModel
+            {
+                Roles = roles.ToDictionary(
+                    role => role,
+                    role => (IReadOnlyList<CeilingEntryModel>)[.. GrantCeilings.EntriesFor(ceiling, slotRoles!, role).Select(BuildEntry)],
+                    StringComparer.Ordinal),
+                Others = ceiling.Others is null ? null : [.. ceiling.Others.Select(BuildEntry)],
+            };
+        }
+
+        // A checked effect names a root entity of the contract's module, and each value key names a writable field once.
+        ContractEffectModel BuildEffect(ContractEffectDefinition effect)
+        {
+            var moduleId = entity.Name[..entity.Name.IndexOf('/', StringComparison.Ordinal)];
+            var target = entitiesByName[$"{moduleId}/{effect.Create.Entity}"];
+            var effectScope = ExpressionScopes.ForContractEffect(entity.Name, entity.Fields, rules, entitiesByName.GetValueOrDefault, modules);
+            var values = new Dictionary<string, string>(effect.Create.Values, StringComparer.OrdinalIgnoreCase);
+            return new ContractEffectModel(
+                effect.Name,
+                effect.On,
+                new EntityReference(target.Id, target.Name),
+                [
+                    .. target.Fields
+                        .Where(field => values.ContainsKey(field.Name))
+                        .Select(field => new RecordAssignmentModel(
+                            field.Name,
+                            ExpressionModel.Compile(values[field.Name], effectScope, ExpressionScopes.TypeOf(field)!, contract: true))),
+                ]);
+        }
+
+        // A core validation also reads id, the record's own id, which a lifecycle guard does not.
+        var validationScope = ExpressionScopes.ForEntity(
+            entity.Fields,
+            rules: rules,
+            findEntity: entitiesByName.GetValueOrDefault,
+            modules: modules,
+            undeclaredModuleIsUnknown: true,
+            idEntity: entity.Name);
+        return new()
+        {
+            Name = contract.Name,
+            File = contract.File,
+            Lifecycle = contract.Lifecycle is not { } lifecycle
+                ? null
+                : new LifecycleModel
+                {
+                    Field = FindField(entity, lifecycle.Field)!.Name,
+                    States = [.. lifecycle.States.Select(state => new LifecycleStateModel(state.Name, state.Initial == true, state.Deletable == true, state.Protected == true))],
+                    Transitions = [.. lifecycle.Transitions.Select(transition => new LifecycleTransitionModel
+                    {
+                        Name = transition.Name,
+                        From = transition.From,
+                        To = transition.To,
+                        Guard = transition.Guard is null ? null : ExpressionModel.Compile(transition.Guard, scope, ExpressionType.Boolean, contract: true),
+                        Message = transition.Message,
+                        Added = contract.AddedTransitions.Contains(transition.Name),
+                    })],
+                },
+            Validations = [.. (contract.Validations ?? []).Select(validation => new CoreValidationModel(
+                validation.Name,
+                ExpressionModel.Compile(validation.Expression, validationScope, ExpressionType.Boolean, contract: true),
+                validation.Message,
+                FindField(entity, validation.Field)!.Name))],
+            Effects = [.. (contract.Effects ?? []).Select(BuildEffect)],
+            Ceiling = contract.Ceiling is { } ceiling ? BuildCeiling(ceiling) : null,
         };
     }
 
@@ -2717,12 +3220,16 @@ public static partial class ApplicationCompiler
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
             Creator = field.Creator == true,
+            UserId = field.UserId == true,
             Searchable = field.Searchable == true,
             Default = field.Default is null
                 ? null
                 : ExpressionModel.Compile(field.Default, defaultScope, ExpressionScopes.TypeOf(field)!),
             Sensitive = field.Sensitive == true,
             ExactLookup = field.ExactLookup == true,
+            Match = field.Match is { } match
+                ? new FieldMatchModel(FindField(target!, match.Field)!.Name, FindField(entity, match.From)!.Name)
+                : null,
         };
     }
 
@@ -3063,7 +3570,7 @@ public static partial class ApplicationCompiler
             Entity = new EntityReference(entity.Id, entity.Name),
             Fields = fields,
             Parameters = parameters,
-            Filter = dataSource.Filter is { } filter ? ExpressionModel.Compile(filter, filterScope, ExpressionType.Boolean) : null,
+            Filter = dataSource.Filter is { } filter ? ExpressionModel.Compile(filter, filterScope, ExpressionType.Boolean, currentUser: true) : null,
             Aggregate = dataSource.Aggregate is { } aggregate
                 ? new DataSourceAggregateModel(
                     aggregate.GroupBy

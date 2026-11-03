@@ -154,7 +154,7 @@ internal sealed class ScenarioSteps(
         }
 
         var started = await ProcessStarter.StartAsync(
-            connection, transaction, ScenarioRunner.TenantId, model, releaseId, process, entity, id, record, Guid.CreateVersion7(), user, null, cancellationToken);
+            connection, transaction, ScenarioRunner.TenantId, model, releaseId, process, entity, id, record, Guid.CreateVersion7(), user, user, null, cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -386,7 +386,7 @@ internal sealed class ScenarioSteps(
             TaskCompletionOutcome.WriteFailed => write switch
             {
                 RecordWriteOutcome.NotFound => "notFound",
-                RecordWriteOutcome.UniqueViolation or RecordWriteOutcome.SchemaConflict => "conflict",
+                RecordWriteOutcome.UniqueViolation or RecordWriteOutcome.SchemaConflict or RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused => "conflict",
                 RecordWriteOutcome.MissingReference or RecordWriteOutcome.Invalid => "invalid",
                 _ => null,
             },

@@ -19,7 +19,7 @@ public sealed class ProcessSubjectIdTests(ProcessStepFixture fixture) : IClassFi
           "entity": "Request",
           "start": "check",
           "steps": [
-            { "name": "check", "type": "decision", "branches": [{ "when": "id == previous", "next": "same" }], "otherwise": "other" },
+            { "name": "check", "type": "decision", "branches": [{ "name": "branch1", "when": "id == previous", "next": "same" }], "otherwise": "other" },
             { "name": "same", "type": "end" },
             { "name": "other", "type": "end" }
           ]

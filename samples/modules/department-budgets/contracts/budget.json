@@ -1,0 +1,46 @@
+{
+  "id": "c413e87c-c2c2-43cb-8a39-84c3fc16cdbf",
+  "kind": "contract",
+  "name": "BudgetContract",
+  "formatVersion": 1,
+  "entity": "Budget",
+  "lifecycle": {
+    "field": "status",
+    "states": [{ "name": "draft", "initial": true, "deletable": true }, { "name": "approved" }, { "name": "rejected" }],
+    "transitions": [
+      {
+        "name": "approve",
+        "from": ["draft"],
+        "to": "approved",
+        "guard": "accountableUser() != null and accountableUser() != requester",
+        "message": { "textKey": "department-budgets.budget.noSelfDecision" }
+      },
+      {
+        "name": "reject",
+        "from": ["draft"],
+        "to": "rejected",
+        "guard": "accountableUser() != null and accountableUser() != requester",
+        "message": { "textKey": "department-budgets.budget.noSelfDecision" }
+      }
+    ]
+  },
+  "validations": [
+    {
+      "name": "amountFrozenOnceDecided",
+      "expression": "previous(status) == null or previous(status) == 'draft' or amount == previous(amount)",
+      "message": { "textKey": "department-budgets.budget.amountFrozen" },
+      "field": "amount"
+    }
+  ],
+  "effects": [
+    {
+      "name": "decisionRecorded",
+      "on": "approve",
+      "create": {
+        "entity": "BudgetDecision",
+        "values": { "budget": "id", "amount": "amount", "decidedBy": "accountableUser()" }
+      }
+    }
+  ],
+  "ceiling": { "slots": { "approver": [{ "actions": ["read", "create", "update"] }] } }
+}

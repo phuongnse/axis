@@ -1,5 +1,6 @@
 import { apiFetch } from './api'
 import { fetchDeadLetters, forbidden, type DeadLetterItem, type DeadLetterPage } from './inspection'
+import type { StudioRelaxedPoint } from './studio'
 
 /** The path of `GET /api/console/instances/{id}`, which answers an instance in the shape of the process inspector's. */
 export const consoleInstancesPath = '/api/console/instances'
@@ -185,6 +186,10 @@ export interface ConsoleReleaseItem {
   label: string | null
   note: string | null
   requestId: string | null
+  /** Whether the release relaxed a contract point. */
+  offStandard: boolean
+  /** The relaxed points with their reasons. Empty for a standard release. */
+  relaxed: StudioRelaxedPoint[]
 }
 
 /** One publish request of an application. It never holds the file snapshot, the diagnostics or the test results. */

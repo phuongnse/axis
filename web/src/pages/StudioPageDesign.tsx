@@ -19,6 +19,7 @@ import {
   keyboardMove,
   movePlace,
   moveTo,
+  namedWidget,
   newWidget,
   targetPlace,
   widgetPointerOf,
@@ -229,7 +230,11 @@ export default function StudioPageDesign({
       return
     }
     const items = getAt({ widgets }, place.list) as unknown[]
-    onChange(place.list, [...items.slice(0, place.index), newWidget(type as string), ...items.slice(place.index)])
+    onChange(place.list, [
+      ...items.slice(0, place.index),
+      namedWidget(widgets, newWidget(type as string)),
+      ...items.slice(place.index),
+    ])
     onSelect(`${place.list}/${place.index}`)
     setAnnouncement(landedText(t, partLabel, widgets, place.list, place.index, type as string))
   }
@@ -260,7 +265,7 @@ export default function StudioPageDesign({
     }
     onChange(place.list, [
       ...items.slice(0, place.index),
-      boundWidget(names, draft, binding, type),
+      namedWidget(widgets, boundWidget(names, draft, binding, type)),
       ...items.slice(place.index),
     ])
     onSelect(`${place.list}/${place.index}`)

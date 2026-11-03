@@ -7,12 +7,13 @@
   "widgets": [
     {
       "type": "table",
+      "name": "table",
       "entity": "Item",
       "rowActions": [
-        { "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.open" }, "record": "id" },
-        { "type": "delete", "label": { "textKey": "items.delete" } }
+        { "type": "navigate", "name": "navigate", "page": "ItemForm", "label": { "textKey": "items.open" }, "record": "id" },
+        { "type": "delete", "name": "delete", "label": { "textKey": "items.delete" } }
       ],
-      "toolbarActions": [{ "type": "navigate", "page": "ItemForm", "label": { "textKey": "items.new" } }]
+      "toolbarActions": [{ "type": "navigate", "name": "navigate", "page": "ItemForm", "label": { "textKey": "items.new" } }]
     }
   ]
 }

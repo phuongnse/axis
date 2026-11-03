@@ -1,0 +1,7 @@
+{
+  "kind": "module",
+  "id": "requests",
+  "version": "1.0.0",
+  "label": "Requests",
+  "roles": [{ "name": "requester", "label": { "textKey": "requests.roles.requester" } }]
+}

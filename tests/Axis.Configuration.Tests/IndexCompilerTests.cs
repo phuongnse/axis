@@ -9,16 +9,18 @@ public sealed class IndexCompilerTests
 
     public static TheoryData<string, string, string, string> InvalidIndexes => new()
     {
-        { """[{ "fields": ["quantity", "status"] }, { "fields": ["quantity", "status"] }]""", DiagnosticCodes.DuplicateIndex, "/indexes/1/fields", "'/indexes/0'" },
+        { """[{ "name": "index1", "fields": ["quantity", "status"] }, { "name": "index2", "fields": ["quantity", "status"] }]""", DiagnosticCodes.DuplicateIndex, "/indexes/1/fields", "'/indexes/0'" },
         // Field names match ignoring letter case, and the order of the fields matters only for being a duplicate.
-        { """[{ "fields": ["quantity", "status"], "unique": true }, { "fields": ["QUANTITY", "Status"] }]""", DiagnosticCodes.DuplicateIndex, "/indexes/1/fields", "'/indexes/0'" },
-        { """[{ "fields": ["quantity", "nope"] }]""", DiagnosticCodes.UnknownIndexField, "/indexes/0/fields/1", "'nope'" },
-        { """[{ "fields": ["quantity"] }, { "fields": ["lines"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/1/fields/0", "'child-collection'" },
-        { """[{ "fields": ["quantity", "receipt"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/0/fields/1", "'file'" },
-        { """[{ "fields": ["quantity", "tags"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/0/fields/1", "'references'" },
-        { """[{ "fields": [] }]""", DiagnosticCodes.SchemaViolation, "/indexes/0/fields", "" },
-        { """[{ "fields": ["quantity", "quantity"] }]""", DiagnosticCodes.SchemaViolation, "/indexes/0/fields", "" },
+        { """[{ "name": "index1", "fields": ["quantity", "status"], "unique": true }, { "name": "index2", "fields": ["QUANTITY", "Status"] }]""", DiagnosticCodes.DuplicateIndex, "/indexes/1/fields", "'/indexes/0'" },
+        { """[{ "name": "index1", "fields": ["quantity", "nope"] }]""", DiagnosticCodes.UnknownIndexField, "/indexes/0/fields/1", "'nope'" },
+        { """[{ "name": "index1", "fields": ["quantity"] }, { "name": "index2", "fields": ["lines"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/1/fields/0", "'child-collection'" },
+        { """[{ "name": "index1", "fields": ["quantity", "receipt"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/0/fields/1", "'file'" },
+        { """[{ "name": "index1", "fields": ["quantity", "tags"] }]""", DiagnosticCodes.InvalidIndexField, "/indexes/0/fields/1", "'references'" },
+        { """[{ "name": "index1", "fields": [] }]""", DiagnosticCodes.SchemaViolation, "/indexes/0/fields", "" },
+        { """[{ "name": "index1", "fields": ["quantity", "quantity"] }]""", DiagnosticCodes.SchemaViolation, "/indexes/0/fields", "" },
         { """[{ "unique": true }]""", DiagnosticCodes.SchemaViolation, "/indexes/0", "" },
+        { """[{ "fields": ["quantity"] }]""", DiagnosticCodes.SchemaViolation, "/indexes/0", "" },
+        { """[{ "name": "a", "fields": ["quantity"] }, { "name": "A", "fields": ["status"] }]""", DiagnosticCodes.DuplicateEntityElementName, "/indexes/1/name", "'/indexes/0'" },
     };
 
     [Theory]
@@ -39,7 +41,7 @@ public sealed class IndexCompilerTests
     public void More_than_32_fields_in_an_index_is_a_schema_violation()
     {
         var names = string.Join(", ", Enumerable.Range(0, 33).Select(position => $"\"f{position}\""));
-        using var folder = Folder($$"""[{ "fields": [{{names}}] }]""");
+        using var folder = Folder($$"""[{ "name": "index1", "fields": [{{names}}] }]""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -53,9 +55,9 @@ public sealed class IndexCompilerTests
     {
         using var folder = Folder("""
             [
-              { "fields": ["quantity"] },
-              { "fields": ["missing", "lines"] },
-              { "fields": ["quantity"] }
+              { "name": "index1", "fields": ["quantity"] },
+              { "name": "index2", "fields": ["missing", "lines"] },
+              { "name": "index3", "fields": ["quantity"] }
             ]
             """);
 
@@ -77,9 +79,9 @@ public sealed class IndexCompilerTests
         // The same fields in another order are another index, and a reference is a field an index can hold.
         using var withIndexes = Folder("""
             [
-              { "fields": ["Quantity", "status"], "unique": true },
-              { "fields": ["status", "quantity"] },
-              { "fields": ["customer"], "unique": false }
+              { "name": "index1", "fields": ["Quantity", "status"], "unique": true },
+              { "name": "index2", "fields": ["status", "quantity"] },
+              { "name": "index3", "fields": ["customer"], "unique": false }
             ]
             """);
 

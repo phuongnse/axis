@@ -1,0 +1,24 @@
+{
+  "id": "fbd89488-b97a-42a5-a5a9-60e8635edca5",
+  "kind": "dataSource",
+  "name": "Requests",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    { "name": "number", "path": "number" },
+    { "name": "type", "path": "type" },
+    { "name": "title", "path": "title" },
+    { "name": "description", "path": "description" },
+    { "name": "amount", "path": "amount" },
+    { "name": "requester", "path": "requester" },
+    { "name": "requesterEmployee", "path": "requesterEmployee" },
+    { "name": "status", "path": "status" },
+    { "name": "stepsRequired", "path": "stepsRequired" },
+    { "name": "step", "path": "step" },
+    { "name": "stepSequence", "path": "stepSequence" },
+    { "name": "approver", "path": "approver" },
+    { "name": "approverUser", "path": "approverUser" },
+    { "name": "onBehalfOf", "path": "onBehalfOf" },
+    { "name": "decisionComment", "path": "decisionComment" }
+  ]
+}

@@ -26,7 +26,10 @@ namespace Axis.Configuration.Compilation;
 /// <c>modules</c>, the application's or, with <c>undeclaredModuleIsUnknown</c>, those of a module. A
 /// navigate action's parameter sees <c>id</c>, as a reference parameter to the root entity, so a
 /// path cannot start at it, and the names of the row or record. It has no rules and no collections. A field default sees no fields, no collections and no
-/// paths, and has the rules it is given.
+/// paths, and has the rules it is given. A module contract's effect value sees <c>id</c> as a reference
+/// parameter to the contract's entity, then the entity's fields and child collections and the module's
+/// rules, and resolves no paths. A module contract's core validation sees the same <c>id</c> first, then the entity's fields,
+/// computed ones included, and the module's rules.
 /// </summary>
 public static class ExpressionScopes
 {
@@ -66,13 +69,15 @@ public static class ExpressionScopes
         Func<string, EntityResource?>? findEntity = null,
         IEnumerable<string>? modules = null,
         bool references = true,
-        bool undeclaredModuleIsUnknown = false)
+        bool undeclaredModuleIsUnknown = false,
+        string? idEntity = null)
     {
         var all = fields.ToList();
         return Build(
             all
                 .Where(field => includeComputed || field.Expression is null)
-                .Select(field => (field.Name, TypeOf(field))),
+                .Select(field => (field.Name, TypeOf(field)))
+                .Prepend(("id", idEntity is null ? null : (ExpressionType?)ExpressionType.ReferenceParameter(idEntity))),
             rules,
             findEntity is null ? null : CollectionsOf(all, findEntity, references),
             referenceFields: null,
@@ -159,7 +164,8 @@ public static class ExpressionScopes
             CollectionsOf(all, findEntity, paths: true),
             ReferenceFieldsOf(findEntity),
             modules,
-            undeclaredModuleIsUnknown);
+            undeclaredModuleIsUnknown,
+            ReferenceCollectionsOf(findEntity));
     }
 
     /// <summary>
@@ -185,7 +191,34 @@ public static class ExpressionScopes
             rules,
             CollectionsOf(all, findEntity),
             ReferenceFieldsOf(findEntity),
-            modules);
+            modules,
+            referenceCollections: ReferenceCollectionsOf(findEntity));
+    }
+
+    /// <summary>
+    /// The scope of a module contract's effect value: <c>id</c> as a reference parameter to the contract's
+    /// entity, then every field of the entity, computed ones included, its child collections, which only
+    /// aggregates accept, and the named <paramref name="rules"/>. It resolves no paths. A rule call
+    /// qualified with a module id is allowed only for the ids in <paramref name="modules"/>.
+    /// </summary>
+    internal static ExpressionScope ForContractEffect(
+        string entityName,
+        IEnumerable<FieldDefinition> fields,
+        IEnumerable<ExpressionRule> rules,
+        Func<string, EntityResource?> findEntity,
+        IEnumerable<string>? modules)
+    {
+        var all = fields.ToList();
+        return Build(
+            [
+                ("id", (ExpressionType?)ExpressionType.ReferenceParameter(entityName)),
+                .. all.Select(field => (field.Name, TypeOf(field))),
+            ],
+            rules,
+            CollectionsOf(all, findEntity),
+            referenceFields: null,
+            modules,
+            undeclaredModuleIsUnknown: true);
     }
 
     /// <summary>
@@ -310,13 +343,31 @@ public static class ExpressionScopes
             ? TypeOf(field)
             : null;
 
+    /// <summary>
+    /// Finds a child collection or a references field of the entity <paramref name="findEntity"/>
+    /// returns for a reference's target, ignoring letter case. Its item scope is the one
+    /// <see cref="CollectionsOf"/> gives, with no paths.
+    /// </summary>
+    private static ReferenceCollectionResolver ReferenceCollectionsOf(Func<string, EntityResource?> findEntity) =>
+        (target, name) =>
+        {
+            var field = findEntity(target)?.Fields.FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+            return field?.Target is { } childName
+                && FieldTypes.Parse(field.Type) is FieldType.ChildCollection or FieldType.References
+                && findEntity(childName) is { } child
+                    ? new ExpressionCollection(field.Name, child.Name, ForEntity(child.Fields))
+                    : null;
+        };
+
     private static ExpressionScope Build(
         IEnumerable<(string Name, ExpressionType? Type)> fields,
         IEnumerable<ExpressionRule>? rules,
         IEnumerable<ExpressionCollection>? collections,
         ReferenceFieldResolver? referenceFields,
         IEnumerable<string>? modules = null,
-        bool undeclaredModuleIsUnknown = false)
+        bool undeclaredModuleIsUnknown = false,
+        ReferenceCollectionResolver? referenceCollections = null)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -327,7 +378,7 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown);
+        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown, referenceCollections);
     }
 
     /// <summary>

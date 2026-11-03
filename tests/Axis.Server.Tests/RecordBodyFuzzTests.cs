@@ -8,6 +8,7 @@ using Axis.Server.Records;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Npgsql;
 using Xunit.Sdk;
 
 namespace Axis.Server.Tests;
@@ -19,6 +20,9 @@ namespace Axis.Server.Tests;
 /// </summary>
 public sealed class RecordBodyFuzzTests
 {
+    // The checks read nothing from storage: Specimen has no matched reference, so the connection is never opened.
+    private static readonly NpgsqlConnection _unopened = new();
+
     private static readonly RecordActor _requester = new("requester", ["employee"]);
 
     private static readonly Lazy<(ApplicationModel Application, EntityModel Specimen)> _fixture = new(() =>
@@ -30,7 +34,7 @@ public sealed class RecordBodyFuzzTests
     });
 
     [Fact]
-    public void The_unmutated_bodies_parse_and_pass_the_create_checks()
+    public async Task The_unmutated_bodies_parse_and_pass_the_create_checks()
     {
         var (application, specimen) = _fixture.Value;
         var random = new Random(Fuzz.DefaultSeed);
@@ -41,7 +45,7 @@ public sealed class RecordBodyFuzzTests
 
             var parse = RecordCommand.ParseCreate(application, specimen, _requester, body);
             Assert.True(parse.Failure is null, $"Body {RecordBodyFuzz.Show(body)} was refused: {Describe(parse.Failure)}");
-            var prepared = RecordCommand.PrepareCreate(application, specimen, _requester, parse.Input!, form: null, DateTimeOffset.UtcNow);
+            var prepared = await RecordCommand.PrepareCreateAsync(_unopened, application, specimen, _requester, parse.Input!, form: null, DateTimeOffset.UtcNow, cancellationToken: TestContext.Current.CancellationToken);
             Assert.True(prepared.Errors is null, $"Body {RecordBodyFuzz.Show(body)} failed a check: {string.Join("; ", prepared.Errors?.Keys ?? [])}");
         }
     }
@@ -71,13 +75,13 @@ public sealed class RecordBodyFuzzTests
     }
 
     [Fact]
-    public void Create_body_is_accepted_or_refused_with_a_400_problem()
+    public async Task Create_body_is_accepted_or_refused_with_a_400_problem()
     {
         var (application, specimen) = _fixture.Value;
 
-        Fuzz.Run(
+        await Fuzz.RunAsync(
             random => RecordBodyFuzz.Create(random, RecordBodyIds.None),
-            body =>
+            async body =>
             {
                 var parse = RecordCommand.ParseCreate(application, specimen, _requester, body);
                 if (parse.Failure is { } failure)
@@ -86,7 +90,7 @@ public sealed class RecordBodyFuzzTests
                     return;
                 }
 
-                var prepared = RecordCommand.PrepareCreate(application, specimen, _requester, parse.Input!, form: null, DateTimeOffset.UtcNow);
+                var prepared = await RecordCommand.PrepareCreateAsync(_unopened, application, specimen, _requester, parse.Input!, form: null, DateTimeOffset.UtcNow, cancellationToken: TestContext.Current.CancellationToken);
                 if (prepared.Errors is { } errors)
                 {
                     AssertBadRequest(RecordEndpoints.WriteFailure(new RecordCommandResult(RecordCommandOutcome.Invalid, Errors: errors)));

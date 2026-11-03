@@ -70,8 +70,8 @@ public sealed class ProcessInspectorCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "processInspector" }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "process": "OrderReview" }""")]
+    [InlineData("""{ "type": "processInspector", "name": "processInspector" }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "process": "OrderReview" }""")]
     public void Process_missing_on_an_inspector_or_set_on_another_widget_violates_the_page_schema(string widget)
     {
         using var folder = Folder(widget);
@@ -97,5 +97,5 @@ public sealed class ProcessInspectorCompilerTests
             .With(PageFile, Page("Orders", widget));
 
     private static string Inspector(string process, string extra = "") =>
-        $$"""{ "type": "processInspector", "process": "{{process}}"{{extra}} }""";
+        $$"""{ "type": "processInspector", "name": "processInspector", "process": "{{process}}"{{extra}} }""";
 }

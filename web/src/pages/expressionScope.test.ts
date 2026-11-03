@@ -64,7 +64,7 @@ describe('expressionScope', () => {
     expect(labels).not.toContain('currentUser()')
   })
 
-  it('offers a data source filter its parameters and its entity fields', () => {
+  it('offers a data source filter its parameters, its entity fields and currentUser()', () => {
     const draft = {
       entity: 'purchaserequest',
       parameters: [{ name: 'statusFilter', type: 'enum' }],
@@ -76,6 +76,14 @@ describe('expressionScope', () => {
     expect(labels).toContain('requester')
     expect(labels).toContain('title')
     expect(labels).not.toContain('code')
+    expect(labels).toContain('currentUser()')
+  })
+
+  it('does not offer currentUser() in the filter of a measure', () => {
+    const draft = { entity: 'purchaserequest', aggregate: { measures: [{ name: 'total', function: 'count' }] } }
+    const labels = labelsOf(expressionScope('dataSource', draft, '/aggregate/measures/0/filter', names))
+
+    expect(labels).toContain('requester')
     expect(labels).not.toContain('currentUser()')
   })
 

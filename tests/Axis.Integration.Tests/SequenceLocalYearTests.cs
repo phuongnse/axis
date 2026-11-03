@@ -79,7 +79,7 @@ public sealed class SequenceLocalYearTests(RecordApiFixture fixture) : IClassFix
     {
         Assert.True(ticket.TryGetField("title", out var title));
         var result = await RecordCommands.CreateAsync(
-            connection, model, ticket, Guid.NewGuid(), [new RecordValue(title, "Ticket")], [], cancellationToken: CancellationToken);
+            connection, model, ticket, Guid.NewGuid(), RecordWriteContext.None, [new RecordValue(title, "Ticket")], [], cancellationToken: CancellationToken);
         Assert.Equal(RecordWriteOutcome.Written, result.Outcome);
         return result.Record!.Values["number"]!.GetValue<string>();
     }

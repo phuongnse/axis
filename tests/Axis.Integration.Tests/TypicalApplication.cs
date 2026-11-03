@@ -90,7 +90,7 @@ internal static class TypicalApplication
 
                 var textKey = $"entity{i:D2}.check{j}";
                 textKeys.Add(textKey);
-                validations.Add(new { expression, message = new { textKey }, field = "quantity" });
+                validations.Add(new { name = $"check{j}", expression, message = new { textKey }, field = "quantity" });
             }
 
             folder.With(path, Json(new

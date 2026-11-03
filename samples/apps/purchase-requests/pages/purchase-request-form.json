@@ -7,9 +7,10 @@
   "widgets": [
     {
       "type": "form",
+      "name": "purchaseRequestForm",
       "entity": "PurchaseRequest",
       "actions": [
-        { "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }
+        { "type": "startProcess", "name": "submit", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }
       ]
     }
   ]

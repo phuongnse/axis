@@ -33,6 +33,7 @@
       },
       "escalations": [
         {
+          "name": "escalation1",
           "after": "PT6H",
           "reassign": {
             "role": "department-manager"
@@ -68,6 +69,7 @@
       "type": "decision",
       "branches": [
         {
+          "name": "branch1",
           "when": "amount >= FinanceThreshold()",
           "next": "financeApproval"
         }

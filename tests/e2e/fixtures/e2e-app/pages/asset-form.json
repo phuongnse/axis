@@ -4,5 +4,5 @@
   "name": "AssetForm",
   "formatVersion": 1,
   "title": { "textKey": "pages.assetForm.title" },
-  "widgets": [{ "type": "form", "entity": "Asset" }]
+  "widgets": [{ "type": "form", "name": "form", "entity": "Asset" }]
 }

@@ -61,7 +61,27 @@ describe('newPolicy and newGrant', () => {
     })
   })
 
-  it('makes a grant of the target with no action', () => {
-    expect(newGrant({ kind: 'dataSource', name: 'OpenRequests' })).toEqual({ dataSource: 'OpenRequests', actions: [] })
+  it('makes a grant of the target with no action and a name', () => {
+    expect(newGrant({ kind: 'dataSource', name: 'OpenRequests' }, [])).toEqual({
+      name: 'openRequests1',
+      dataSource: 'OpenRequests',
+      actions: [],
+    })
+  })
+
+  it('names the grant with the first number no other grant uses, ignoring case', () => {
+    expect(newGrant({ kind: 'dataSource', name: 'OpenRequests' }, [{ name: 'OpenRequests1' }]).name).toBe(
+      'openRequests2',
+    )
+    expect(
+      newGrant({ kind: 'entity', name: 'Ticket' }, [{ name: 'ticket1' }, { name: 'TICKET2' }, 'x', null, { name: 3 }])
+        .name,
+    ).toBe('ticket3')
+  })
+
+  it('drops a module prefix, cuts the base to 56 characters and falls back to grant', () => {
+    expect(newGrant({ kind: 'process', name: 'department-budgets/BudgetApproval' }, []).name).toBe('budgetApproval1')
+    expect(newGrant({ kind: 'entity', name: `A${'b'.repeat(69)}` }, []).name).toBe(`a${'b'.repeat(55)}1`)
+    expect(newGrant({ kind: 'entity', name: 'module/' }, []).name).toBe('grant1')
   })
 })

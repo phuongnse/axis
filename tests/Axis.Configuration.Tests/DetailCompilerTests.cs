@@ -25,7 +25,7 @@ public sealed class DetailCompilerTests
     [Fact]
     public void Detail_over_an_entity_compiles_to_the_page_parameter_as_declared()
     {
-        using var folder = Folder("""{ "type": "detail", "entity": "Order", "record": "ORDER" }""", Parameter);
+        using var folder = Folder("""{ "type": "detail", "name": "detail", "entity": "Order", "record": "ORDER" }""", Parameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -43,7 +43,7 @@ public sealed class DetailCompilerTests
     [Fact]
     public void Detail_over_a_form_compiles_to_the_form_and_its_entity()
     {
-        using var folder = Folder("""{ "type": "detail", "form": "OrderSections", "record": "order" }""", Parameter);
+        using var folder = Folder("""{ "type": "detail", "name": "detail", "form": "OrderSections", "record": "order" }""", Parameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -59,9 +59,9 @@ public sealed class DetailCompilerTests
     {
         using var folder = Folder(
             """
-            { "type": "detail", "entity": "Order", "record": "order", "actions": [
-                { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } },
-                { "type": "navigate", "page": "OrderForm", "label": { "textKey": "orderForm.title" }, "record": "id" } ] }
+            { "type": "detail", "name": "detail", "entity": "Order", "record": "order", "actions": [
+                { "type": "startProcess", "name": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } },
+                { "type": "navigate", "name": "navigate", "page": "OrderForm", "label": { "textKey": "orderForm.title" }, "record": "id" } ] }
             """,
             Parameter);
 
@@ -78,7 +78,7 @@ public sealed class DetailCompilerTests
     [Fact]
     public void Other_widgets_have_no_detail()
     {
-        using var folder = Folder("""{ "type": "detail", "entity": "Order", "record": "order" }""", Parameter);
+        using var folder = Folder("""{ "type": "detail", "name": "detail", "entity": "Order", "record": "order" }""", Parameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -95,7 +95,7 @@ public sealed class DetailCompilerTests
     [InlineData("""{ "name": "order", "type": "reference", "target": "Customer", "required": true }""", "'Customer'")]
     public void Record_that_is_no_required_reference_to_the_widgets_entity_is_reported_at_its_record(string parameter, string expected)
     {
-        using var folder = Folder("""{ "type": "detail", "entity": "Order", "record": "order" }""", parameter);
+        using var folder = Folder("""{ "type": "detail", "name": "detail", "entity": "Order", "record": "order" }""", parameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -111,7 +111,7 @@ public sealed class DetailCompilerTests
     public void Record_aimed_at_another_entity_than_the_form_is_reported_at_its_record()
     {
         using var folder = Folder(
-            """{ "type": "detail", "form": "OrderSections", "record": "customer" }""",
+            """{ "type": "detail", "name": "detail", "form": "OrderSections", "record": "customer" }""",
             """{ "name": "customer", "type": "reference", "target": "Customer", "required": true }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -124,9 +124,9 @@ public sealed class DetailCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "detail", "entity": "Order", "form": "OrderSections", "record": "order" }""")]
-    [InlineData("""{ "type": "detail", "record": "order" }""")]
-    [InlineData("""{ "type": "detail", "entity": "Order", "record": "order", "dataSource": "OrderList" }""")]
+    [InlineData("""{ "type": "detail", "name": "detail", "entity": "Order", "form": "OrderSections", "record": "order" }""")]
+    [InlineData("""{ "type": "detail", "name": "detail", "record": "order" }""")]
+    [InlineData("""{ "type": "detail", "name": "detail", "entity": "Order", "record": "order", "dataSource": "OrderList" }""")]
     public void Detail_that_does_not_name_exactly_one_of_form_and_entity_or_names_a_data_source_is_reported_as_an_invalid_binding(string widget)
     {
         using var folder = Folder(widget, Parameter);
@@ -140,10 +140,10 @@ public sealed class DetailCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "detail", "entity": "Order" }""")]
-    [InlineData("""{ "type": "detail", "entity": "Order", "record": "order", "parameters": {} }""")]
-    [InlineData("""{ "type": "table", "entity": "Order", "record": "order" }""")]
-    [InlineData("""{ "type": "form", "entity": "Order", "record": "order" }""")]
+    [InlineData("""{ "type": "detail", "name": "detail", "entity": "Order" }""")]
+    [InlineData("""{ "type": "detail", "name": "detail", "entity": "Order", "record": "order", "parameters": {} }""")]
+    [InlineData("""{ "type": "table", "name": "table", "entity": "Order", "record": "order" }""")]
+    [InlineData("""{ "type": "form", "name": "form", "entity": "Order", "record": "order" }""")]
     public void Detail_without_a_record_or_another_widget_with_one_violates_the_page_schema(string widget)
     {
         using var folder = Folder(widget, Parameter);
@@ -159,7 +159,7 @@ public sealed class DetailCompilerTests
     public void Action_naming_a_process_over_another_entity_is_reported_at_its_process()
     {
         using var folder = Folder(
-            """{ "type": "detail", "entity": "Customer", "record": "customer", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } } ] }""",
+            """{ "type": "detail", "name": "detail", "entity": "Customer", "record": "customer", "actions": [ { "type": "startProcess", "name": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } } ] }""",
             """{ "name": "customer", "type": "reference", "target": "Customer", "required": true }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -175,7 +175,7 @@ public sealed class DetailCompilerTests
     public void Navigate_to_an_unknown_page_is_reported_at_its_page()
     {
         using var folder = Folder(
-            """{ "type": "detail", "entity": "Order", "record": "order", "actions": [ { "type": "navigate", "page": "Missing", "label": { "textKey": "order.submit" } } ] }""",
+            """{ "type": "detail", "name": "detail", "entity": "Order", "record": "order", "actions": [ { "type": "navigate", "name": "navigate", "page": "Missing", "label": { "textKey": "order.submit" } } ] }""",
             Parameter);
 
         var result = ApplicationCompiler.Compile(folder.Path);

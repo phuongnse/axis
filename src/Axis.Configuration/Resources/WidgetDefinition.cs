@@ -11,6 +11,9 @@ public sealed record WidgetDefinition
 {
     public required string Type { get; init; }
 
+    /// <summary>The name that a layer finds the widget by. A page names each widget once, ignoring letter case.</summary>
+    public string? Name { get; init; }
+
     /// <summary>The entity whose records the widget shows: shorthand for all records of that entity.</summary>
     public string? Entity { get; init; }
 
@@ -97,6 +100,9 @@ public sealed record KpiComparisonDefinition
 /// <summary>One column of a <c>columns</c> widget: a width out of 12 and the widgets it holds.</summary>
 public sealed record WidgetColumnDefinition
 {
+    /// <summary>The name that a layer finds the column by. It is unique in its own list, ignoring letter case.</summary>
+    public string? Name { get; init; }
+
     public required int Width { get; init; }
 
     public required IReadOnlyList<WidgetDefinition> Widgets { get; init; }
@@ -105,6 +111,9 @@ public sealed record WidgetColumnDefinition
 /// <summary>One tab of a <c>tabs</c> widget: a label and the widgets it holds.</summary>
 public sealed record WidgetTabDefinition
 {
+    /// <summary>The name that a layer finds the tab by. It is unique in its own list, ignoring letter case.</summary>
+    public string? Name { get; init; }
+
     public required TextReference Label { get; init; }
 
     public required IReadOnlyList<WidgetDefinition> Widgets { get; init; }

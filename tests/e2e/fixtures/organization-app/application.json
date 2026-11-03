@@ -1,0 +1,7 @@
+{
+  "id": "f4acf704-d83c-4194-9f93-849b79cf6a7c",
+  "kind": "application",
+  "name": "OrganizationApp",
+  "formatVersion": 1,
+  "modules": [{ "id": "organization", "version": "^1.0.0", "roles": { "admin": "department-manager", "member": "employee" } }]
+}

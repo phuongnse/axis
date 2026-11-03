@@ -169,6 +169,29 @@ service account may download, as they may read records.
   and a call input can never map a file, because only `is null` and
   `is not null` accept one, so a file's name and id never reach either.
 
+## The `fileStorage` manifest property
+
+The `application` manifest may name the deployment binding that says where the bytes of its files go, see
+[D76](../decisions/d76-file-money-and-enum-label-field-types.md):
+
+```json
+{
+  "id": "6ec71db1-5b21-43d9-95d2-dcc45055eb0e",
+  "kind": "application",
+  "name": "ServiceDesk",
+  "formatVersion": 1,
+  "fileStorage": { "binding": "Files" }
+}
+```
+
+- `fileStorage` is optional. It is an object with one `binding`, a binding name. Any other shape is a schema error.
+  Without it, the bytes go to the tenant database and activation needs no binding.
+- The binding must be a `storage` binding of the tenant. Activation reports a missing binding, or one of another
+  kind, as `AXC0100` at `/fileStorage/binding` of `application.json`. On a preview tenant a missing binding is a
+  warning.
+- In M15 the binding's only value is `database`, so the bytes stay in `axis.file_contents`. See
+  [deployment bindings](integration-resources.md#deployment-bindings).
+
 ## In the SPA
 
 This is _(built)_.

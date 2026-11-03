@@ -24,6 +24,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     private const string Items = "/api/apps/RecordsApp/entities/Item";
     private const string Tickets = "/api/apps/RecordsApp/entities/Ticket";
     private const string Products = "/api/apps/RecordsApp/entities/Product/records";
+    private const string Visits = "/api/apps/RecordsApp/entities/Visit";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -443,6 +444,22 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         Assert.Equal(chair, await ProductOfAsync("c1"));
         Assert.Equal(desk, await ProductOfAsync("d1"));
         Assert.Null(await ProductOfAsync("e1"));
+    }
+
+    [Fact]
+    public async Task A_column_for_a_matched_reference_fails_the_dry_run_as_it_cannot_be_set_and_writes_nothing()
+    {
+        await ResetAsync();
+
+        var upload = await UploadAsync(fixture.Client, Visits, "holder,badge\nAnna,B-1\n");
+        await RunChecksAsync();
+
+        using var failed = await GetAsync(fixture.Client, Visits, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var error = Assert.Single(failed.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal("/rows/1/values/badge", error.Name);
+        Assert.Equal(["Cannot be set."], error.Value.EnumerateArray().Select(message => message.GetString()));
+        Assert.Equal(0, (await fixture.TableShapeAsync(TenantA, "Visit")).RowCount);
     }
 
     [Fact]

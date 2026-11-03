@@ -5,12 +5,12 @@
   "formatVersion": 1,
   "roles": ["importer"],
   "grants": [
-    { "endpoint": "ImportNote", "actions": ["invoke"] },
-    { "endpoint": "ImportClosedNote", "actions": ["invoke"] },
-    { "endpoint": "ImportReviewedNote", "actions": ["invoke"] },
-    { "endpoint": "ImportRepeatedNote", "actions": ["invoke"] },
-    { "endpoint": "ImportFailingNote", "actions": ["invoke"] },
-    { "endpoint": "ImportLoggedNote", "actions": ["invoke"] },
-    { "endpoint": "AnnounceNote", "actions": ["invoke"] }
+    { "name": "importNoteInvoke", "endpoint": "ImportNote", "actions": ["invoke"] },
+    { "name": "importClosedNoteInvoke", "endpoint": "ImportClosedNote", "actions": ["invoke"] },
+    { "name": "importReviewedNoteInvoke", "endpoint": "ImportReviewedNote", "actions": ["invoke"] },
+    { "name": "importRepeatedNoteInvoke", "endpoint": "ImportRepeatedNote", "actions": ["invoke"] },
+    { "name": "importFailingNoteInvoke", "endpoint": "ImportFailingNote", "actions": ["invoke"] },
+    { "name": "importLoggedNoteInvoke", "endpoint": "ImportLoggedNote", "actions": ["invoke"] },
+    { "name": "announceNoteInvoke", "endpoint": "AnnounceNote", "actions": ["invoke"] }
   ]
 }
