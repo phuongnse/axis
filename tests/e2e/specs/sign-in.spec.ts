@@ -63,10 +63,12 @@ test('after signing out from the header menu, no identity provider page shows, t
 
   await page.getByRole('main').getByRole('button', { name: 'Sign in again', exact: true }).click()
   // Keycloak keeps the language of the person who signed out in a cookie, and may show its page in Vietnamese.
-  const english = page.getByRole('link', { name: 'Tiếng Anh (English)', exact: true })
-  await expect(signInUsername(page).or(english)).toBeVisible()
-  if (await english.isVisible()) {
-    await english.click()
+  const gear = page.getByRole('button', { name: 'Ngôn ngữ và giao diện', exact: true })
+  await expect(signInUsername(page).or(gear)).toBeVisible()
+  if (await gear.isVisible()) {
+    await gear.click()
+    await page.getByRole('menuitemradio', { name: 'Tiếng Anh (English)', exact: true }).click()
+    await expect(signInUsername(page)).toBeVisible()
   }
   await logInAtKeycloak(page, 'requester')
 

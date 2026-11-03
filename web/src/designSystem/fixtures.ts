@@ -21,6 +21,7 @@ import type { TaskPage } from '../platform/tasks'
 import type {
   AddAuthenticatorContext,
   AddAuthenticatorTexts,
+  FrameTexts,
   ResetPasswordContext,
   ResetPasswordTexts,
   SignInContext,
@@ -814,6 +815,16 @@ export const identitySignInTexts: SignInTexts = {
   signIn: 'Sign in',
 }
 
+/** The texts of the identity provider's "Language and theme" gear, in English. */
+export const identityFrameTexts: FrameTexts = {
+  languageAndTheme: 'Language and theme',
+  language: 'Language',
+  theme: 'Theme',
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
+}
+
 /** What the identity provider's sign-in page draws in the design system. */
 export const identitySignInContext: SignInContext = {
   page: 'signIn',
@@ -825,10 +836,12 @@ export const identitySignInContext: SignInContext = {
   loginAction: '#sign-in',
   rememberMe: true,
   forgotPasswordUrl: '#forgot-password',
+  locale: 'en',
   locales: [
-    { label: 'English', url: '#en' },
-    { label: 'Tiếng Việt', url: '#vi' },
+    { tag: 'en', label: 'English', url: '#en' },
+    { tag: 'vi', label: 'Tiếng Việt', url: '#vi' },
   ],
+  frameTexts: identityFrameTexts,
   texts: identitySignInTexts,
 }
 
@@ -853,7 +866,9 @@ export const identityTwoStepContext: TwoStepContext = {
   loginAction: '#verify',
   restartUrl: '#sign-in',
   tryAnotherWay: true,
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
   texts: identityTwoStepTexts,
 }
 
@@ -875,7 +890,9 @@ export const identityResetPasswordContext: ResetPasswordContext = {
   username: identitySignInContext.username,
   loginAction: '#reset',
   loginUrl: '#sign-in',
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
   texts: identityResetPasswordTexts,
 }
 
@@ -896,7 +913,9 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   title: identityUpdatePasswordTexts.title,
   realmName: identitySignInContext.realmName,
   loginAction: '#set-password',
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
   texts: identityUpdatePasswordTexts,
 }
 
@@ -927,7 +946,9 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   manualKey: 'JBSW Y3DP EHPK 3PXP',
   secret: 'fixture-secret',
   deviceNameRequired: false,
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
   texts: identityAddAuthenticatorTexts,
 }
 

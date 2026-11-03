@@ -1,6 +1,6 @@
 import { ConfigProvider } from 'antd'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { antConfigFor } from './antTheme'
+import { antConfigFor, fieldRules } from './antTheme'
 import { designTokensFor } from './designTokens'
 import { ThemeModeContext, type ThemeChoice, type ThemeMode } from './themeMode'
 import { useReducedMotion } from './useReducedMotion'
@@ -52,7 +52,10 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider {...config}>{children}</ConfigProvider>
+      <ConfigProvider {...config}>
+        <style>{fieldRules(mode)}</style>
+        {children}
+      </ConfigProvider>
     </ThemeModeContext.Provider>
   )
 }

@@ -104,8 +104,9 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   test("an author drags a section after the detail, then a table into the section, and saves the tree", async ({
     page,
   }) => {
-    // A tall window keeps the palette and the drop areas in view together, away from the edges where a drag scrolls.
-    await page.setViewportSize({ width: 1280, height: 1000 });
+    // A tall window keeps the palette and the drop areas in view together. The drop area of the new section sits in
+    // the bottom fifth of a shorter window, where the drag library scrolls the page under the pointer.
+    await page.setViewportSize({ width: 1280, height: 1200 });
     await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,

@@ -6,8 +6,32 @@ export interface SignInProvider {
 }
 
 export interface SignInLocale {
+  /** The language tag, such as `en`. */
+  tag: string
+  /** The language's name in its own language, such as "Tiếng Việt". */
   label: string
+  /** Where the page opens in this language. */
   url: string
+}
+
+/** The texts of the frame's "Language and theme" gear. */
+export interface FrameTexts {
+  languageAndTheme: string
+  language: string
+  theme: string
+  system: string
+  light: string
+  dark: string
+}
+
+/** What every page of the identity provider shares: the organization's name and the "Language and theme" gear's languages and texts. */
+export interface IdentityFrameContext {
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
+  /** The tag of the page's language. */
+  locale: string
+  locales: SignInLocale[]
+  frameTexts: FrameTexts
 }
 
 /** The page's texts. `continueWith` and `providerOnly` hold a `{provider}` placeholder for the provider's label. */
@@ -79,11 +103,9 @@ export interface SignInSite {
 }
 
 /** What the identity provider's sign-in page draws. The design system feeds it fixtures, the theme feeds it Keycloak's. */
-export interface SignInContext {
+export interface SignInContext extends IdentityFrameContext {
   page: 'signIn'
   title: string
-  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
-  realmName?: string
   providers: SignInProvider[]
   /** Whether people may sign in with an account of the realm, next to or instead of the providers. */
   accounts: boolean
@@ -92,20 +114,19 @@ export interface SignInContext {
   username?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
+  /** Keycloak's message that is not an error, such as the notice after "Send link". It shows above the form. */
+  notice?: string
   loginAction: string
   /** Whether the "Keep me signed in" checkbox shows. */
   rememberMe: boolean
   forgotPasswordUrl?: string
-  locales: SignInLocale[]
   texts: SignInTexts
 }
 
 /** What the two-step verification page draws: the 6-digit code that follows the password. */
-export interface TwoStepContext {
+export interface TwoStepContext extends IdentityFrameContext {
   page: 'twoStep'
   title: string
-  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
-  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the code form posts `otp` and `login`, and where "Try another way" posts `tryAnotherWay=on`. */
@@ -114,16 +135,13 @@ export interface TwoStepContext {
   restartUrl: string
   /** Whether Keycloak offers another way to sign in, which shows "Try another way". */
   tryAnotherWay: boolean
-  locales: SignInLocale[]
   texts: TwoStepTexts
 }
 
 /** What the page that adds an authenticator draws: the QR code, the key to type by hand, the code and the device name. */
-export interface AddAuthenticatorContext {
+export interface AddAuthenticatorContext extends IdentityFrameContext {
   page: 'addAuthenticator'
   title: string
-  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
-  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the form posts `totp`, `totpSecret`, `userLabel` and `mode`. */
@@ -138,16 +156,13 @@ export interface AddAuthenticatorContext {
   mode?: string
   /** Whether the person already has an authenticator, so that the device name is required. */
   deviceNameRequired: boolean
-  locales: SignInLocale[]
   texts: AddAuthenticatorTexts
 }
 
 /** What the "Forgot password?" page draws: the email or username that Keycloak sends a link to. */
-export interface ResetPasswordContext {
+export interface ResetPasswordContext extends IdentityFrameContext {
   page: 'resetPassword'
   title: string
-  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
-  realmName?: string
   /** The username that the person typed on the sign-in page, if any. */
   username?: string
   /** The message to show above the form. No error means no alert. */
@@ -156,21 +171,17 @@ export interface ResetPasswordContext {
   loginAction: string
   /** Where "Back to sign in" goes. */
   loginUrl: string
-  locales: SignInLocale[]
   texts: ResetPasswordTexts
 }
 
 /** What the page that sets a password draws. An invitation and a reset link both open it. */
-export interface UpdatePasswordContext {
+export interface UpdatePasswordContext extends IdentityFrameContext {
   page: 'updatePassword'
   title: string
-  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
-  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the form posts `password-new`, `password-confirm` and `logout-sessions`. */
   loginAction: string
-  locales: SignInLocale[]
   texts: UpdatePasswordTexts
 }
 
