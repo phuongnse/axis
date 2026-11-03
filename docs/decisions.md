@@ -139,3 +139,5 @@ files agree, title and status included.
 | [D126](decisions/d126-sign-up-trials-and-the-control-plane.md) | Sign-up, trials and the control plane | **Agreed** |
 | [D127](decisions/d127-plans-payments-and-invoices.md) | Plans, payments and invoices | **Agreed** |
 | [D128](decisions/d128-rules-from-the-studio-review.md) | Rules from the Studio review | **Agreed** |
+| [D129](decisions/d129-rules-from-the-studio-editors-review.md) | Rules from the Studio editors review | **Agreed** |
+| [D130](decisions/d130-activate-a-release-replaces-roll-back.md) | "Activate a release" replaces "roll back" | **Proposed** |

@@ -874,35 +874,34 @@ This route is built. The publisher writes the rows of a publish and a rollback.
 `{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`,
 newest first.
 
-- `active` is the application's active release in this tenant, or null when
-  there is none.
-- `folderContentHash` is the content hash that the folder would compile to now,
-  so Studio can show that the live release and the folder differ. It is null
-  when the folder has errors.
-- Each item is one activation: a startup, an `axis-admin activate`, a publish or
-  a rollback. `actor` is a user id, `startup` or `operator`. A row that a
-  migration added for a release that was live before the history existed has
-  the actor `unknown`. `actorName` is the actor's name from their [user profile](notifications.md#user-profiles),
-  else the name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin activate`. `relaxed` lists the relax entries of the release's application in manifest order, read from the `application.json` stored with that release, and `offStandard` is true when it is not empty, see [off-standard releases](module-contracts.md#off-standard-releases).
-- A release gets its `number` the first time it is activated in the tenant:
-  1, 2, 3… per application. Activating it again keeps the number, so the same
-  content can have different numbers in two tenants.
-- Activating the release that is already active adds no row and keeps the
-  number. Otherwise every restart under `scripts/dev.sh` would fill the history
-  with copies.
-- `GET /api/me` gains a boolean `studioPublisher`, true when the user holds
-  both the author role and the publisher role and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
-- `GET /api/me` gains a boolean `studioTest`, true when
-  `studio` is true and `Studio:Tests` is true. Studio uses it to hide **Run
-  tests** and the **Run** action of a scenario.
-- `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and
-  `Studio:ApplicationsPath` is set. It is built. Studio uses it to show **New
-  application**.
-- `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant
-  whose `PreviewOf` is the session's tenant. It is `null` when the user may not
-  use Studio, or when the tenant has no served preview tenant. It is built. Studio
-  shows Preview only when it is set. It names a host and no port, so Studio takes
-  the port and the protocol from its own page.
+- `active` is the application's active release in this tenant, or null when there is none.
+- `folderContentHash` is the content hash that the folder would compile to now, so Studio can show that the live release
+  and the folder differ. It is null when the folder has errors.
+- `changes` _(Proposed, planned for M31,_ [_D129_](../decisions/d129-rules-from-the-studio-editors-review.md)_)_: the
+  files that differ from the active release as canonical JSON, by path, `[{ path, change, kind, name, titles, locale }]`
+  with `change` `added`, `changed` or `removed`; a removed file's other fields come from the active release and its
+  texts, null for the rest. A folder with errors is read file by file, without the modules' copies on either side.
+- Each item is one activation: a startup, an `axis-admin activate`, a publish or a rollback. `actor` is a user id,
+  `startup` or `operator`. A row that a migration added for a release that was live before the history existed has the
+  actor `unknown`. `actorName` is the actor's name from their [user profile](notifications.md#user-profiles), else the
+  name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin
+  activate`. `relaxed` lists the relax entries of the release's application in manifest order, read from the
+  `application.json` stored with that release, and `offStandard` is true when it is not empty, see [off-standard
+  releases](module-contracts.md#off-standard-releases).
+- A release gets its `number` the first time it is activated in the tenant: 1, 2, 3… per application. Activating it
+  again keeps the number, so the same content can have different numbers in two tenants.
+- Activating the release that is already active adds no row and keeps the number. Otherwise every restart under
+  `scripts/dev.sh` would fill the history with copies.
+- `GET /api/me` gains a boolean `studioPublisher`, true when the user holds both the author role and the publisher role
+  and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
+- `GET /api/me` gains a boolean `studioTest`, true when `studio` is true and `Studio:Tests` is true. Studio uses it to
+  hide **Run tests** and the **Run** action of a scenario.
+- `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and `Studio:ApplicationsPath` is set. It is
+  built. Studio uses it to show **New application**.
+- `GET /api/me` also gains `studioPreviewHost`, the first host of the served tenant whose `PreviewOf` is the session's
+  tenant. It is `null` when the user may not use Studio, or when the tenant has no served preview tenant. It is built.
+  Studio shows Preview only when it is set. It names a host and no port, so Studio takes the port and the protocol from
+  its own page.
 
 ### Rollback
 
