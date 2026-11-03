@@ -2,7 +2,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Axis.Worker;
 
-/// <summary>Unhealthy when the loop has not polled within twice the lease. Never Degraded.</summary>
+/// <summary>Unhealthy when the poll has not run, or one loop has been on one work item, for longer than twice the lease. Never Degraded.</summary>
 internal sealed partial class WorkerLoopHealthCheck(WorkerHealth health, WorkerOptions options, ILogger<WorkerLoopHealthCheck> logger) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
@@ -16,7 +16,7 @@ internal sealed partial class WorkerLoopHealthCheck(WorkerHealth health, WorkerO
         return Task.FromResult(HealthCheckResult.Unhealthy());
     }
 
-    [LoggerMessage(LogLevel.Warning, "The worker loop has not polled within {StallTime}.")]
+    [LoggerMessage(LogLevel.Warning, "The worker has not polled, or one loop has been on one work item, for longer than {StallTime}.")]
     private partial void LogLoopStalled(TimeSpan stallTime);
 }
 

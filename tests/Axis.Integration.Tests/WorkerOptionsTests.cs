@@ -88,6 +88,30 @@ public sealed class WorkerOptionsTests
     }
 
     [Theory]
+    [InlineData("Worker:Concurrency", "0")]
+    [InlineData("Worker:Concurrency", "-5")]
+    [InlineData("Worker:Concurrency", "many")]
+    [InlineData("Worker:Quantum", "0")]
+    [InlineData("Worker:Quantum", "-5")]
+    [InlineData("Worker:Quantum", "many")]
+    public void A_concurrency_or_quantum_setting_that_is_not_an_integer_of_at_least_one_stops_the_worker_at_startup_naming_the_setting(string setting, string value)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [setting] = value,
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("0")]
     [InlineData("-5")]
     [InlineData("many")]

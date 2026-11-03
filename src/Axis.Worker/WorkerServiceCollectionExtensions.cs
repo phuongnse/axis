@@ -33,7 +33,7 @@ public static class WorkerServiceCollectionExtensions
     /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs, in the platform database over <c>ConnectionStrings:Platform</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -60,6 +60,16 @@ public static class WorkerServiceCollectionExtensions
         if (options.DeliveryAttempts < 1)
         {
             throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.DeliveryAttempts)}' must be at least 1.");
+        }
+
+        if (options.Concurrency < 1)
+        {
+            throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.Concurrency)}' must be at least 1.");
+        }
+
+        if (options.Quantum < 1)
+        {
+            throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.Quantum)}' must be at least 1.");
         }
 
         var statementTimeout = StatementTimeout.Read(configuration, "Worker:StatementTimeout", WorkItemSettings.DefaultStatementTimeout);

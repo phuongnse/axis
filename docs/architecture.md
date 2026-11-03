@@ -243,7 +243,7 @@ changed OIDC setting applies at the next refresh, and a tenant that is no
 longer served loses both. A failed refresh keeps the last good directory and
 makes readiness Degraded. The worker claims no new work item of a tenant that
 is no longer `active`, and a work item already claimed finishes. The worker runs
-the refresh in its polling loop, between work items.
+the refresh in its poll. It pauses its loops and waits for the work items already running.
 
 - **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
   default, or `directory`. Both answer through one tenant catalog contract, so
