@@ -160,3 +160,7 @@ Shopify's settings pages:
   same resource used the same way shows once; with none, one line says so. Entries no longer expand a level: the link
   opens the resource, whose page has its own lists.
 
+- **A time zone is chosen, not typed.** The owner asked why the time zone was a text box. Agreed, as calendars do: a
+  searchable select of the time zones the server knows (the catalog's `timeZones`, so every choice passes AXC0277),
+  each "(UTC+07:00) Asia/Ho Chi Minh", by offset then id; cleared, the application's dates are UTC. A schedule
+  trigger's time zone is the same control. Selects take the field's full width, as every field does.

@@ -1268,6 +1268,8 @@ export interface StudioCatalog {
     connectors: StudioCatalogSlot[]
   }[]
   packages: { id: string; label: string | null; versions: string[] }[]
+  /** Proposed: the time zones the server knows, by IANA id, with their offset from UTC in minutes now. */
+  timeZones?: { id: string; offset: number }[]
 }
 
 /** Proposed: loads the modules and packages Studio offers. */

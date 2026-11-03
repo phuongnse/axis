@@ -5,7 +5,8 @@ using Axis.Configuration.Packages;
 namespace Axis.Server.Studio;
 
 /// <summary>
-/// Proposed: <c>GET /api/studio/catalog</c> answers the modules and the extension packages installed for Studio, so the
+/// Proposed: <c>GET /api/studio/catalog</c> answers the modules and the extension packages installed for Studio, and the
+/// time zones the server knows, so the
 /// application's Settings names them by their labels and Add… offers them to choose from rather than to type. Each
 /// module lists its versions, newest first, and its role and connector slots with their labels in each locale, read
 /// from the module's own texts. Each package lists its label and versions. It answers to an author, as every Studio
@@ -49,7 +50,16 @@ internal static class StudioCatalogEndpoints
             })
             .OrderBy(package => package.Label ?? package.Id, StringComparer.CurrentCulture)
             .ToList();
-        return Results.Ok(new StudioCatalog(moduleItems, packageItems));
+        // Proposed: the time zones the server knows by their IANA ids, which an application or a schedule may name, so
+        // Studio offers them to choose from rather than to type: each with its offset from UTC now, by offset then id.
+        var now = DateTimeOffset.UtcNow;
+        var zones = TimeZoneInfo.GetSystemTimeZones()
+            .Where(zone => zone.HasIanaId && (zone.Id.Contains('/', StringComparison.Ordinal) || zone.Id == "UTC"))
+            .Select(zone => new StudioCatalogTimeZone(zone.Id, (int)zone.GetUtcOffset(now).TotalMinutes))
+            .OrderBy(zone => zone.Offset)
+            .ThenBy(zone => zone.Id, StringComparer.Ordinal)
+            .ToList();
+        return Results.Ok(new StudioCatalog(moduleItems, packageItems, zones));
     }
 
     private static System.Version Version(string text) =>
@@ -92,7 +102,11 @@ internal static class StudioCatalogEndpoints
 }
 
 /// <summary>Proposed: the modules and packages Studio offers.</summary>
-internal sealed record StudioCatalog(IReadOnlyList<StudioCatalogModule> Modules, IReadOnlyList<StudioCatalogPackage> Packages);
+internal sealed record StudioCatalog(
+    IReadOnlyList<StudioCatalogModule> Modules, IReadOnlyList<StudioCatalogPackage> Packages, IReadOnlyList<StudioCatalogTimeZone> TimeZones);
+
+/// <summary>Proposed: a time zone by its IANA id, with its offset from UTC in minutes now.</summary>
+internal sealed record StudioCatalogTimeZone(string Id, int Offset);
 
 /// <summary>Proposed: an installed module: its id, label, versions newest first, and its role and connector slots.</summary>
 internal sealed record StudioCatalogModule(

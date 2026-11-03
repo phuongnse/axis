@@ -217,6 +217,14 @@ function FieldHeading({ label, help, helpId }: { label: string; help: string | n
   )
 }
 
+/** Proposed: a time zone as a person reads it: its offset from UTC, then its place, such as "(UTC+07:00) Asia/Ho Chi Minh". */
+function timeZoneLabel(zone: { id: string; offset: number }): string {
+  const sign = zone.offset < 0 ? '-' : '+'
+  const minutes = Math.abs(zone.offset)
+  const offset = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+  return `(UTC${sign}${offset}) ${zone.id.replace(/_/g, ' ')}`
+}
+
 /** Proposed: whether a node is drawn inside a list's dialog, where a nested list is rows of inputs, never a dialog. */
 const InListDialogContext = createContext(false)
 
@@ -650,10 +658,26 @@ function SchemaNode({
         aria-label={title}
         showSearch
         optionFilterProp="label"
-        style={{ minWidth: 240 }}
+        style={{ width: '100%' }}
         value={typeof value === 'string' ? value : undefined}
         options={entries?.map((entry) => ({ value: entry.id, label: entry.label ?? entry.id }))}
         onChange={(next) => onChange(pointer, next)}
+      />
+    )
+  } else if (control === 'timeZone') {
+    // Proposed: a time zone is chosen from those the server knows, searched by any part of its name, each shown with
+    // its offset from UTC now and listed by offset, as calendars list them. Cleared, the application's dates are UTC.
+    input = (
+      <Select
+        aria-label={title}
+        showSearch
+        allowClear={!required}
+        placeholder={t('shell.studio.timeZone.none')}
+        optionFilterProp="label"
+        style={{ width: '100%' }}
+        value={typeof value === 'string' ? value : undefined}
+        options={catalog?.timeZones?.map((zone) => ({ value: zone.id, label: timeZoneLabel(zone) }))}
+        onChange={(next) => onChange(pointer, next ?? undefined)}
       />
     )
   } else if (control === 'relaxedPoints') {

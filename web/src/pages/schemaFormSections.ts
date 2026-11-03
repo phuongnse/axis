@@ -44,11 +44,13 @@ export const StudioCatalogContext = createContext<import('../platform/studio').S
  */
 export const fieldControls: Record<
   string,
-  'module' | 'package' | 'moduleRoles' | 'moduleConnectors' | 'relaxedPoints'
+  'module' | 'package' | 'moduleRoles' | 'moduleConnectors' | 'relaxedPoints' | 'timeZone'
 > = {
   'application.modules.id': 'module',
   'application.packages.id': 'package',
   'application.modules.roles': 'moduleRoles',
   'application.modules.connectors': 'moduleConnectors',
   'application.modules.relax': 'relaxedPoints',
+  'application.timeZone': 'timeZone',
+  'trigger.timeZone': 'timeZone',
 }
