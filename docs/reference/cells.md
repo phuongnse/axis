@@ -69,7 +69,9 @@ cell puts PgBouncer in front of it.
   - PgBouncer `default_pool_size` 3 for each database and role, `max_db_connections` 10,
     `max_client_conn` 10,000.
   - Npgsql `Maximum Pool Size` 5 and `Minimum Pool Size` 0 for each tenant, with
-    `Connection Idle Lifetime` 60 seconds, so an idle tenant holds no connection.
+    `Connection Idle Lifetime` 60 seconds, so an idle tenant holds no connection. These are the
+    defaults of the [`Data:TenantPool*` settings](host-settings.md#data-settings), which win over
+    the connection string's keywords. They also set `Max Auto Prepare` to 0.
   - PostgreSQL `max_connections` stays at the managed service's size, with 40 kept for direct
     connections.
 - **What transaction mode allows.** A transaction may take `pg_advisory_xact_lock` and use

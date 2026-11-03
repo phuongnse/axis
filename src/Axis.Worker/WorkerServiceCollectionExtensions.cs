@@ -23,7 +23,8 @@ public static class WorkerServiceCollectionExtensions
     /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
     /// <c>Tenancy:RefreshInterval</c>. The dry run of an import fails a file with more data rows than
     /// <c>Data:ImportMaxRows</c>, which defaults to 10000. Every statement of a work item runs under <c>Worker:StatementTimeout</c>,
-    /// which defaults to one minute. The worker deletes in-app notifications older than
+    /// which defaults to one minute. The tenant connection pools take their sizes from <c>Data:TenantPoolMaxSize</c>,
+    /// <c>Data:TenantPoolMinSize</c> and <c>Data:TenantPoolIdleLifetime</c>. The worker deletes in-app notifications older than
     /// <c>Notifications:RetentionDays</c>, which defaults to 90. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL. The worker sends the emails that
     /// <c>notify</c> steps staged over the SMTP server of the <c>Email</c> section, which a tenant's own <c>Email</c> block
@@ -33,7 +34,7 @@ public static class WorkerServiceCollectionExtensions
     /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs, in the platform database over <c>ConnectionStrings:Platform</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -73,6 +74,7 @@ public static class WorkerServiceCollectionExtensions
         }
 
         var statementTimeout = StatementTimeout.Read(configuration, "Worker:StatementTimeout", WorkItemSettings.DefaultStatementTimeout);
+        var pool = TenantPoolSettings.Load(configuration);
 
         var health = new HealthOptions();
         configuration.GetSection(HealthOptions.SectionName).Bind(health);
@@ -127,7 +129,7 @@ public static class WorkerServiceCollectionExtensions
         }
 
         services.AddWorkerTelemetry(configuration, environment);
-        services.AddTenancy(catalog);
+        services.AddTenancy(catalog, pool);
         services.AddTenantKeys(keySource);
         services.AddSingleton<SensitiveValues>();
         services.AddSingleton(catalog);

@@ -14,21 +14,23 @@ public static class TenancyServiceCollectionExtensions
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant configuration is invalid, or outside Development a secret binding takes its value from a
-    /// configuration file.
+    /// configuration file, or a <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or
+    /// <c>Data:TenantPoolIdleLifetime</c> value is invalid.
     /// </exception>
     public static IServiceCollection AddTenancy(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment) =>
-        services.AddTenancy(ConfigurationTenantCatalog.Load(configuration, environment));
+        services.AddTenancy(ConfigurationTenantCatalog.Load(configuration, environment), TenantPoolSettings.Load(configuration));
 
     /// <summary>
     /// Registers tenant resolution, the tenant connection factory and the deployment binding resolver over
-    /// <paramref name="catalog"/>.
+    /// <paramref name="catalog"/>. Tenant pools take the sizes of <paramref name="pool"/>, or the defaults when it is null.
     /// </summary>
-    public static IServiceCollection AddTenancy(this IServiceCollection services, ITenantCatalog catalog)
+    public static IServiceCollection AddTenancy(this IServiceCollection services, ITenantCatalog catalog, TenantPoolSettings? pool = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(catalog);
 
         services.AddSingleton(catalog);
+        services.AddSingleton(pool ?? TenantPoolSettings.Default);
         services.AddSingleton(new TenantResolver(catalog));
         services.AddSingleton<ITenantContextAccessor, TenantContextAccessor>();
         services.AddSingleton<TenantConnectionFactory>();

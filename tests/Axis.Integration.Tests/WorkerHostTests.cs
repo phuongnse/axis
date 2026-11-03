@@ -321,7 +321,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         var handler = new LimitReadingExternalHandler(throws);
 
         // The pool holds one connection, which No Reset On Close would hand on with a plain SET still in force.
-        await using var connections = CreateConnections(tenantA, ";Maximum Pool Size=1;No Reset On Close=true");
+        await using var connections = CreateConnections(tenantA, new TenantPoolSettings(1, 0, TimeSpan.FromSeconds(60)), ";No Reset On Close=true");
         var runner = new WorkItemRunner(
             connections.Factory,
             connections.Accessor,
@@ -439,12 +439,12 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         return new HandBuiltWorker(runner, handler, connections);
     }
 
-    private static Connections CreateConnections(string connectionString, string poolSettings = "")
+    private static Connections CreateConnections(string connectionString, TenantPoolSettings? pool = null, string connectionStringSuffix = "")
     {
         var options = new TenantOptions();
-        options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) + poolSettings };
+        options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) + connectionStringSuffix };
         var accessor = new TenantContextAccessor();
-        return new Connections(new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor), accessor);
+        return new Connections(new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor, pool ?? TenantPoolSettings.Default), accessor);
     }
 
     private async Task<string> CreateTenantDatabaseAsync(string prefix, bool migrate = true)
