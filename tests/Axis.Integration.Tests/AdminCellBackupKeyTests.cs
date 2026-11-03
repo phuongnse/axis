@@ -72,6 +72,89 @@ public sealed class AdminCellBackupKeyTests(PostgreSqlFixture database) : IClass
     }
 
     [Fact]
+    public async Task In_a_cell_the_Studio_folder_of_a_tenant_is_backed_up_and_restored_under_the_new_tenant()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var tools = await PostgresClientTools.CreateAsync();
+        WriteCellKey();
+        using var studio = new TemporaryFolder();
+        var cell = new Dictionary<string, string?>(CellSettings()) { ["Studio:ApplicationsPath"] = studio.Path };
+        var source = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.RunAsync(AdminScenario.CreateArgs(source, $"{source}.example.test"), extra: cell)).Exit);
+        var files = new Dictionary<string, byte[]>
+        {
+            ["app-a/application.json"] = "{\"name\":\"a\"}"u8.ToArray(),
+            ["app-a/pages/home.json"] = RandomNumberGenerator.GetBytes(300_000),
+        };
+        foreach (var (relative, content) in files)
+        {
+            var path = Path.Combine(studio.Path, source, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllBytesAsync(path, content, CancellationToken);
+        }
+
+        // A link is not followed.
+        var outside = Path.Combine(studio.Path, "outside.txt");
+        await File.WriteAllTextAsync(outside, "outside", CancellationToken);
+        File.CreateSymbolicLink(Path.Combine(studio.Path, source, "link.txt"), outside);
+
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        var backup = await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: tools.PathSetting, extra: cell);
+        Assert.Equal(0, backup.Exit);
+
+        var restored = scenario.NewTenantId();
+        var restore = await scenario.RunAsync(
+            ["tenant", "restore", file, "--tenant", restored, "--host", $"{restored}.example.test", "--from", source],
+            path: tools.PathSetting,
+            extra: cell);
+
+        Assert.Equal(0, restore.Exit);
+        Assert.Empty(restore.Error);
+        string[] steps = ["check", "entry", "roles", "database", "restore", "grants", "grants", "work", "sessions", "role-check", "studio", "version"];
+        Assert.Equal(steps.Select(step => $"{restored} {step} ok"), restore.Output);
+        var target = Path.Combine(studio.Path, restored);
+        var written = Directory.EnumerateFiles(target, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(target, path).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal);
+        Assert.Equal(files.Keys.Order(StringComparer.Ordinal), written);
+        foreach (var (relative, content) in files)
+        {
+            Assert.Equal(content, await File.ReadAllBytesAsync(Path.Combine(target, relative), CancellationToken));
+        }
+
+        // The source folder is as it was.
+        Assert.Equal(files["app-a/application.json"], await File.ReadAllBytesAsync(Path.Combine(studio.Path, source, "app-a/application.json"), CancellationToken));
+    }
+
+    [Fact]
+    public async Task In_a_cell_a_tenant_without_a_Studio_folder_backs_up_and_restores_with_no_studio_step()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var tools = await PostgresClientTools.CreateAsync();
+        WriteCellKey();
+        using var studio = new TemporaryFolder();
+        var cell = new Dictionary<string, string?>(CellSettings()) { ["Studio:ApplicationsPath"] = studio.Path };
+        var source = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.RunAsync(AdminScenario.CreateArgs(source, $"{source}.example.test"), extra: cell)).Exit);
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: tools.PathSetting, extra: cell)).Exit);
+        var restored = scenario.NewTenantId();
+
+        var restore = await scenario.RunAsync(
+            ["tenant", "restore", file, "--tenant", restored, "--host", $"{restored}.example.test", "--from", source],
+            path: tools.PathSetting,
+            extra: cell);
+
+        Assert.Equal(0, restore.Exit);
+        Assert.Empty(restore.Error);
+        string[] steps = ["check", "entry", "roles", "database", "restore", "grants", "grants", "work", "sessions", "role-check", "version"];
+        Assert.Equal(steps.Select(step => $"{restored} {step} ok"), restore.Output);
+        Assert.False(Directory.Exists(Path.Combine(studio.Path, restored)));
+    }
+
+    [Fact]
     public async Task An_archive_of_one_tenant_does_not_open_with_the_key_of_another_and_the_restore_creates_nothing()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);

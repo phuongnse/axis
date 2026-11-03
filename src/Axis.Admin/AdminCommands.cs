@@ -56,6 +56,8 @@ internal static partial class AdminCommands
 
     public const string PathSetting = "PATH";
 
+    public const string StudioApplicationsPathSetting = "Studio:ApplicationsPath";
+
     internal const string Usage =
         """
         Usage: tenant create <id> --host <host>... [--administrator <email>]
@@ -710,6 +712,7 @@ internal static partial class AdminCommands
         byte[]? backupKey;
         if (cell.IsCell)
         {
+            settings = settings with { StudioApplicationsPath = ResolveFolder(configuration[StudioApplicationsPathSetting]) };
             if (request.BackupKeyFile is not null)
             {
                 error.WriteLine("In a cell, tenant backup takes the tenant's backup key from the platform, so --backup-key-file is refused.");
@@ -854,7 +857,12 @@ internal static partial class AdminCommands
             }
 
             // The restored tenant gets a backup key of its own, wrapped by the same cell key.
-            settings = settings with { Create = settings.Create with { CellBackupCipher = cellCipher } };
+            settings = settings with
+            {
+                Create = settings.Create with { CellBackupCipher = cellCipher },
+                InCell = true,
+                StudioApplicationsPath = ResolveFolder(configuration[StudioApplicationsPathSetting]),
+            };
             backupKey = await ReadCellBackupKeyAsync(
                 settings.Create.PlatformConnectionString,
                 request.From!,
@@ -2076,8 +2084,8 @@ internal sealed class AdminEnvironment(string environmentName) : IHostEnvironmen
     public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
-/// <summary>The settings of <c>tenant backup</c>.</summary>
-internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
+/// <summary>The settings of <c>tenant backup</c>. <paramref name="StudioApplicationsPath"/> is set only in a cell and is the full path of <c>Studio:ApplicationsPath</c>, which may be unset.</summary>
+internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath, string? StudioApplicationsPath = null);
 
 /// <summary>
 /// The settings of <c>tenant create</c>, which also needs the admin role. <paramref name="OidcClientSecret"/> is for <c>tenant restore</c>.
@@ -2093,5 +2101,8 @@ internal sealed record CreateSettings(
     RealmMail? Mail = null,
     TenantSecretCipher? CellBackupCipher = null);
 
-/// <summary>The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.</summary>
-internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath);
+/// <summary>
+/// The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.
+/// <paramref name="InCell"/> and <paramref name="StudioApplicationsPath"/>, the full path of <c>Studio:ApplicationsPath</c>, are set only in a cell.
+/// </summary>
+internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath, bool InCell = false, string? StudioApplicationsPath = null);
