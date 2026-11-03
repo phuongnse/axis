@@ -9,24 +9,26 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 A button's level follows its role, so the same kind of action always has the same style
 ([D96](../decisions/d96-rules-from-the-design-system-review.md)). Its place decides the rest
-([D128](../decisions/d128-rules-from-the-studio-review.md)) _(planned for M31)_.
+([D128](../decisions/d128-rules-from-the-studio-review.md)).
 
 - _Finish_: solid primary. The one action that finishes a task, such as Save or Next, one per screen.
-- _Main_: outlined in `primaryText`. The main action of a region: a table's first toolbar action that is shown, such
+- _Main_: outlined in `primaryText`, and a text button in an action row. The main action of a region: a table's first toolbar action that is shown, such
   as New request, Add row of a child collection, and a `startProcess` action on a form or a detail.
-- _Secondary_: the default grey outline, such as Cancel and Import.
+- _Secondary_: the default grey outline, and a text button in an action row, such as Cancel and Import.
 - _Icon_: a text button with only an icon, for small actions such as Refresh. Choose and Clear of a `reference` field
   are bordered and joined.
 - _Plain_: a borderless text button in the text colour, for header controls such as the account button.
-- _Destructive_: in `dangerText` at any level, such as Remove row and Delete.
+- _Destructive_: in `dangerText` at any level, outlined or a text button in an action row, such as Remove row and Delete.
 - Ant Design writes the text of text, outlined and danger buttons in the fill colours `primary` and `danger`, which
   fail contrast on a dark surface, so Axis writes them in `primaryText` and `dangerText`. One shared Axis button,
   `AxisButton` in `web/src/platform/`, takes the role, and each widget names a role, never an Ant Design button type.
-  The table's toolbar, its icon buttons and the reference, set and file field buttons use it.
-- **Beside a solid button every other action is a text button** _(planned for M31)_. In a dialog, a form's footer
+  The table's toolbar, its icon buttons, the reference, set and file field buttons, the form widget's footer, the import
+  dialog and Studio's publishing row, editor row and field questions use it.
+- **Beside a solid button every other action is a text button**. In a dialog, a form's footer
   and a band, Cancel and every secondary, main or destructive action next to the finish button is a text button in its
   own colour, so the finish button is the one filled shape. Every Ant Design dialog draws Cancel this way through the
-  theme, and `AxisButton`'s action row does it for the form widget's footer. A main action with no solid button beside
+  theme, and `AxisButton`'s action row, `AxisActionRow`, does it for the form widget's footer when it draws Save or Next, the import
+  dialog, Studio's publishing and editor rows and its field questions. A main action with no solid button beside
   it, such as a table's first toolbar action, stays outlined.
 - **Text or an icon, never both**. An action shows its text or its icon. An icon goes with text
   only where it does what text cannot: navigation that collapses to icons, a status or a severity, and the mark that

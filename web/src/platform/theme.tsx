@@ -1,6 +1,6 @@
 import { ConfigProvider } from 'antd'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { antThemeFor } from './antTheme'
+import { antConfigFor } from './antTheme'
 import { designTokensFor } from './designTokens'
 import { ThemeModeContext, type ThemeChoice, type ThemeMode } from './themeMode'
 import { useReducedMotion } from './useReducedMotion'
@@ -42,7 +42,7 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   const value = useMemo(() => ({ mode, choice, choose }), [mode, choice, choose])
   const reducedMotion = useReducedMotion()
-  const config = useMemo(() => antThemeFor(mode, undefined, reducedMotion), [mode, reducedMotion])
+  const config = useMemo(() => antConfigFor(mode, undefined, reducedMotion), [mode, reducedMotion])
 
   useEffect(() => {
     document.body.style.backgroundColor = designTokensFor(mode).colour.canvas
@@ -52,7 +52,7 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider theme={config}>{children}</ConfigProvider>
+      <ConfigProvider {...config}>{children}</ConfigProvider>
     </ThemeModeContext.Provider>
   )
 }

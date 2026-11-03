@@ -42,6 +42,8 @@ internal static partial class AdminCommands
 
     public const string IdentityProviderAdminClientSecretSetting = "IdentityProvider:AdminClientSecret";
 
+    public const string IdentityProviderDatabaseSetting = "IdentityProvider:DatabaseConnectionString";
+
     private const string Provisioning = "provisioning";
 
     private const string ActiveStatus = "active";
@@ -140,7 +142,7 @@ internal static partial class AdminCommands
         var environment = new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production);
         if (DatabaseTlsRequirement.Applies(environment))
         {
-            foreach (var setting in new[] { AdminSetting, PlatformSetting, ScenarioServerSetting })
+            foreach (var setting in new[] { AdminSetting, PlatformSetting, ScenarioServerSetting, IdentityProviderDatabaseSetting })
             {
                 var problem = DatabaseTlsRequirement.Problem(setting, configuration[setting]);
                 if (problem is not null)
@@ -173,7 +175,7 @@ internal static partial class AdminCommands
     internal static IReadOnlyList<AdminCommand> Commands { get; } =
     [
         new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
-        new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.CancellationToken)),
+        new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
@@ -695,6 +697,7 @@ internal static partial class AdminCommands
         CellOptions cell,
         TextWriter output,
         TextWriter error,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         var request = ParseTenantBackup(args);
@@ -765,7 +768,7 @@ internal static partial class AdminCommands
 
         return plan is null
             ? 2
-            : await new TenantBackup(settings, plan, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
+            : await new TenantBackup(settings, plan, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken, identityProviderHandler).RunAsync();
     }
 
     /// <summary>
@@ -1613,7 +1616,10 @@ internal static partial class AdminCommands
         return new MigrateRequest(tenant, parallel ?? 1);
     }
 
-    /// <summary><c>tenant backup</c> needs the platform database and the installation key, and <c>PATH</c> to find <c>pg_dump</c>. It needs no admin role and no client secret.</summary>
+    /// <summary>
+    /// <c>tenant backup</c> needs the platform database and the installation key, and <c>PATH</c> to find <c>pg_dump</c>. It needs no admin role and no client secret.
+    /// It reads <see cref="IdentityProviderDatabaseSetting"/> when it is set, and a value that is given must be a connection string.
+    /// </summary>
     internal static BackupSettings? ReadBackupSettings(IConfiguration configuration, out string problem)
     {
         var platform = ReadPlatformSettings(configuration, out problem);
@@ -1629,7 +1635,24 @@ internal static partial class AdminCommands
             return null;
         }
 
-        return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path);
+        string? identityProviderDatabase = null;
+        var database = configuration[IdentityProviderDatabaseSetting];
+        if (!string.IsNullOrWhiteSpace(database))
+        {
+            try
+            {
+                _ = new NpgsqlConnectionStringBuilder(database);
+            }
+            catch (Exception exception) when (exception is ArgumentException or FormatException)
+            {
+                problem = $"The setting {IdentityProviderDatabaseSetting} is not a valid connection string.";
+                return null;
+            }
+
+            identityProviderDatabase = database;
+        }
+
+        return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path, IdentityProviderDatabase: identityProviderDatabase);
     }
 
     /// <summary>
@@ -2086,8 +2109,16 @@ internal sealed class AdminEnvironment(string environmentName) : IHostEnvironmen
     public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
-/// <summary>The settings of <c>tenant backup</c>. <paramref name="StudioApplicationsPath"/> is set only in a cell and is the full path of <c>Studio:ApplicationsPath</c>, which may be unset.</summary>
-internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath, string? StudioApplicationsPath = null);
+/// <summary>
+/// The settings of <c>tenant backup</c>. <paramref name="StudioApplicationsPath"/> is set only in a cell and is the full path of <c>Studio:ApplicationsPath</c>, which may be unset.
+/// <paramref name="IdentityProviderDatabase"/> is <c>IdentityProvider:DatabaseConnectionString</c>, which may be unset: without it the backup writes no <c>realm.json</c>.
+/// </summary>
+internal sealed record BackupSettings(
+    string PlatformConnectionString,
+    TenantSecretCipher Cipher,
+    string SearchPath,
+    string? StudioApplicationsPath = null,
+    string? IdentityProviderDatabase = null);
 
 /// <summary>
 /// The settings of <c>tenant create</c>, which also needs the admin role. <paramref name="OidcClientSecret"/> is for <c>tenant restore</c>.

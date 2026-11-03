@@ -1,4 +1,4 @@
-import { theme, type ThemeConfig } from 'antd'
+import { theme, type ConfigProviderProps, type ThemeConfig } from 'antd'
 import { colourTokens, designTokensFor, type ColourName, type PageTokenValues } from './designTokens'
 import type { ThemeMode } from './themeMode'
 
@@ -104,6 +104,17 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       },
       Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
     },
+  }
+}
+
+/**
+ * The props every Axis `ConfigProvider` gets: the theme, and a Cancel of text type for every dialog, so it is a text
+ * button beside the solid OK (D128).
+ */
+export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ConfigProviderProps {
+  return {
+    theme: antThemeFor(mode, page, reducedMotion),
+    modal: { cancelButtonProps: { type: 'text' } },
   }
 }
 
