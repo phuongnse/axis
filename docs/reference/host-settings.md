@@ -636,7 +636,7 @@ does not read `Quotas:Defaults` yet.
 | `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
-| `Cell:OperatorRole` | Server | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
+| `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
 | `IdentityProvider:Url` | Server | In a cell with `Cell:ConsoleHost` or `Cell:InternalUrl` set, the server reads the identity provider's address, described in the [admin settings](#admin-settings), and finds the operator realm at `realms/<Cell:OperatorRealm>` under it. A missing or wrong value stops the start, and the message names the setting. |
 | `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup` and `tenant restore` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
 | `Cell:RuntimeDatabaseHost` | Server, worker | The address of every tenant's runtime database connection, such as PgBouncer, see [connections](cells.md#connections). Those connections also take `Maximum Pool Size=5`, `Minimum Pool Size=0`, `Connection Idle Lifetime=60` and `Max Auto Prepare=0`. Without it each connection uses the host of the tenant's directory row. The schema role, the publisher, the worker's `LISTEN` connection and the platform connections never use it. |

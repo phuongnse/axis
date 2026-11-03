@@ -1,0 +1,41 @@
+{{- if .Values.cell.pgbouncer.enabled }}
+{{- if not .Values.cell.id }}
+{{- fail "cell.id is required when cell.pgbouncer is on: the hosts read Cell__RuntimeDatabaseHost only in a cell" }}
+{{- end }}
+# PgBouncer's settings. They match the ones that the integration tests run, plus TLS on both legs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-pgbouncer
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgbouncer
+data:
+  pgbouncer.ini: |
+    [databases]
+    * = host={{ required "cell.pgbouncer.databaseHost is required: the host of PostgreSQL" .Values.cell.pgbouncer.databaseHost }} port={{ .Values.cell.pgbouncer.databasePort }}
+
+    [pgbouncer]
+    listen_addr = 0.0.0.0
+    listen_port = 6432
+    unix_socket_dir =
+    auth_type = scram-sha-256
+    auth_file = /etc/pgbouncer/userlist.txt
+    auth_user = {{ required "cell.pgbouncer.authUser is required: the PostgreSQL role that PgBouncer looks passwords up with" .Values.cell.pgbouncer.authUser }}
+    auth_dbname = {{ .Values.cell.pgbouncer.authDatabase }}
+    # The lookup function returns a password for the tenant runtime roles only.
+    auth_query = SELECT uname, phash FROM pgbouncer.user_lookup($1)
+    pool_mode = transaction
+    default_pool_size = {{ .Values.cell.pgbouncer.defaultPoolSize }}
+    max_db_connections = {{ .Values.cell.pgbouncer.maxDbConnections }}
+    max_client_conn = {{ .Values.cell.pgbouncer.maxClientConn }}
+    max_prepared_statements = 0
+    ignore_startup_parameters = extra_float_digits
+    client_tls_sslmode = require
+    client_tls_cert_file = /pgbouncer-tls/tls.crt
+    client_tls_key_file = /pgbouncer-tls/tls.key
+    server_tls_sslmode = verify-full
+    {{- if .Values.cell.pgbouncer.databaseAuthority.volume }}
+    server_tls_ca_file = /db-ca/root.crt
+    {{- end }}
+{{- end }}

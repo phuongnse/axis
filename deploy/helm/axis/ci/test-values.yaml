@@ -1,6 +1,6 @@
 # Values for the lint, the schema check and the render tests. They name every
-# Secret, the server and identity certificates, the identity host and every volume, run two server replicas, turn Studio and its test controls on, name the
-# scenario connection Secret, name one proxy and one network and set every cell value, turn the wildcard certificate on, so the checks cover every branch of the templates.
+# Secret, the server, identity and PgBouncer certificates, the identity host and every volume, run two server replicas, turn Studio and its test controls on, name the
+# scenario connection Secret, name one proxy and one network and set every cell value, turn the wildcard certificate and PgBouncer on, so the checks cover every branch of the templates.
 server:
   replicas: 2
 studio:
@@ -52,6 +52,10 @@ secrets:
     name: axis-identity
   identityCertificate:
     name: axis-identity-tls
+  pgbouncerAuth:
+    name: axis-pgbouncer-auth
+  pgbouncerCertificate:
+    name: axis-pgbouncer-tls
 cell:
   id: vn-1
   region: vn
@@ -73,6 +77,14 @@ cell:
       dns01:
         tokenSecret:
           name: axis-dns
+  pgbouncer:
+    enabled: true
+    databaseHost: db.internal.example.com
+    authUser: axis_pgbouncer
+    databaseAuthority:
+      volume:
+        configMap:
+          name: axis-db-ca
 extensions:
   volume:
     persistentVolumeClaim:

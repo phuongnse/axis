@@ -113,6 +113,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [E-invoices](reference/e-invoices.md) | Vietnamese e-invoices issued on payment through a provider adapter |
 | [Billing portal](reference/billing-portal.md) | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
+| [Several server replicas](reference/several-server-replicas.md)        | Running the server as several replicas behind a TLS proxy: key ring, forwarded headers, Studio volume |
 | [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
 
 ## Working on Axis

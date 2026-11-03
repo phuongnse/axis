@@ -1,0 +1,18 @@
+{{- if .Values.cell.pgbouncer.enabled }}
+# The address of the runtime connections of the server and the worker.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-pgbouncer
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgbouncer
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "axis.selectorLabels" (dict "root" . "component" "pgbouncer") | nindent 4 }}
+  ports:
+    - name: pgbouncer
+      port: 6432
+      targetPort: pgbouncer
+{{- end }}

@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { totp, totpSecret } from "./totp";
+import { liveTotp, totpSecret } from "./totp";
 
 /** The field for the username on the Axis sign-in page of the development realm. */
 export function signInUsername(page: Page): Locator {
@@ -30,7 +30,7 @@ export async function submitCode(page: Page, code: string) {
 export async function addAuthenticator(page: Page): Promise<string> {
   const key = await page.locator("#root code").first().innerText();
   const secret = key.replace(/\s+/g, "");
-  await page.locator("#root form input").first().pressSequentially(totp(secret));
+  await page.locator("#root form input").first().pressSequentially(await liveTotp(secret));
   await page.getByLabel("Device name", { exact: true }).fill("Test");
   await page.locator('#root form button[type="submit"]').first().click();
   return secret;
@@ -42,5 +42,5 @@ export async function addAuthenticator(page: Page): Promise<string> {
  */
 export async function logInAtKeycloak(page: Page, user: string) {
   await submitPassword(page, user, "axis");
-  await submitCode(page, totp(totpSecret(user)));
+  await submitCode(page, await liveTotp(totpSecret(user)));
 }

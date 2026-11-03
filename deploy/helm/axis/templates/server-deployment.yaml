@@ -34,6 +34,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- include "axis.hostEnv" . | nindent 12 }}
+            {{- with include "axis.pgbouncerEnv" . }}
+            {{- . | nindent 12 }}
+            {{- end }}
             # HTTPS only: a Kestrel endpoint list replaces the plain HTTP port of the image.
             - name: Kestrel__Endpoints__Https__Url
               value: https://+:8443

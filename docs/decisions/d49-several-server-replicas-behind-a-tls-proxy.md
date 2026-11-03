@@ -7,7 +7,7 @@ That is what a shared Studio server needs. The forwarded headers, the shared
 key ring, the platform tables under both tenant sources, the Studio write
 lock, the Helm chart's `studio.persistence` and the Compose example with two
 replicas behind a TLS proxy and a shared Studio folder, with its smoke test,
-are built. See the [installation guide](../reference/installation.md#several-server-replicas),
+are built. See the [several server replicas guide](../reference/several-server-replicas.md),
 the [forwarded headers settings](../reference/host-settings.md#forwarded-headers),
 the [platform database](../reference/storage.md#platform-database) and the
 [authoring API](../reference/authoring.md#versions).
