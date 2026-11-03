@@ -45,6 +45,12 @@ public sealed class EndpointCallFixture : IAsyncLifetime
     /// <summary>The qualified table of the <c>NoteLine</c> child entity.</summary>
     public string NoteLineTable => Table("NoteLine");
 
+    /// <summary>The factory of the test host, for a test that needs a host with other services.</summary>
+    internal WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
+
+    /// <summary>The connection string of the tenant database, as its owner.</summary>
+    public string ConnectionString => _connectionString ?? throw new InvalidOperationException("The fixture is not initialized.");
+
     private NpgsqlDataSource DataSource => _dataSource ?? throw new InvalidOperationException("The fixture is not initialized.");
 
     /// <summary>A new client of the server with no caller. The caller disposes it.</summary>

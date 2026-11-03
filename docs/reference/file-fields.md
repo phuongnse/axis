@@ -56,7 +56,8 @@ a module has no upload route yet. A service account may upload, as it may
 write records.
 
 - **Order of checks.** The route checks in the order of the record routes:
-  sign-in (`401`), then the path (`404`), then the grant (`403`), then the
+  sign-in (`401`), then in a cell the tenant's
+  [storage quota](tenant-quotas.md#refusals) (`403`, `quota-exceeded`), then the path (`404`), then the grant (`403`), then the
   request content type (`415`), then the body. A user without a grant learns
   nothing from the body checks. An unknown entity or field, and a field that is
   not a `file` field, are `404`.

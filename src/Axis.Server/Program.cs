@@ -153,6 +153,7 @@ builder.Services.AddOptions<KeyManagementOptions>().Configure<PlatformKeyRing>((
 builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
+builder.Services.AddSingleton<TenantUsageStore>();
 builder.Services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>();
 builder.Services.AddSingleton<IStudioFileWriter, StudioFileWriter>();
 builder.Services.AddSingleton<TenantDatabaseGauge>();

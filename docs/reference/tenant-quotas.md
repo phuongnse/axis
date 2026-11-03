@@ -11,8 +11,9 @@ directory. The server and the worker answer a tenant's effective quota from them
 outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
 [usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
 `emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
-event and the `applications` refusal of Studio are in place. The other refusals and the leases are still planned, and
-so are the usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
+event and the `applications` refusal of Studio are in place. So are the `storage` refusals of record creates and
+updates, imports, file uploads and inbound endpoint calls. The `storage` refusals of Studio saves and publishes, the
+`users` refusals and the leases are still planned, and so are the usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
 
 The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
 what one tenant uses in total or at once. A rate limit limits how fast one caller asks.
@@ -61,6 +62,8 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
 - The title names the quota in words, and `quota` names its key. Neither names the tenant.
   `reason` tells a quota refusal apart from a `403` of a policy, which has no `reason`.
 - `used` is the last sample for a sampled quota and the exact count otherwise.
+- The check is an endpoint filter that runs after the sign-in check (`401`) and before the path (`404`) and the
+  grant (`403`), so a signed-in caller without a grant also sees the tenant's limit and usage.
 - The check comes before body validation, validations, the
   [module contract](module-contracts.md#where-the-contract-is-checked)
   check and any write, so a refused request evaluates nothing and writes nothing, not even an audit
@@ -73,7 +76,9 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
   or update through the record API, an import, an inbound endpoint call that writes, a file upload,
   a save in Studio and a publish. A delete is never refused. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
-  tenant writes in one sampling interval.
+  tenant writes in one sampling interval. A tenant with no sample yet is not refused, and neither is a
+  write when the platform database cannot be read: the server logs a warning and the write goes on, because a quota
+  is a billing limit and not a security boundary. The server reads the last sample on each such write.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider
   for the first time, and would pass the quota, is refused at the identity provider with a page
