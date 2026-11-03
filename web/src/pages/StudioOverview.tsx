@@ -119,16 +119,13 @@ function More({
           <Typography.Text strong>{t(`shell.studio.nav.${group.key}`)}</Typography.Text>
           <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.sm }}>
             {group.kinds.map((kind) => (
-              <li key={kind} style={{ display: 'flex', flexDirection: 'column' }}>
-                <span>
-                  <Link to={addressOf({ name: 'kind', kind })} style={{ color: colour.primaryText }}>
-                    {t(`shell.studio.kind.${kind}`)}
-                  </Link>
-                  <Typography.Text>
-                    {' · '}
-                    {t(`shell.studio.overview.kind.${kind}`)}
-                  </Typography.Text>
-                </span>
+              // Proposed: each kind on lines of its own, as a site tile reads: the kind as the link, what it is for under
+              // it, and when one is needed in textMuted. No separator joins them on one line.
+              <li key={kind} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <Link to={addressOf({ name: 'kind', kind })} style={{ color: colour.primaryText }}>
+                  {t(`shell.studio.kind.${kind}`)}
+                </Link>
+                <Typography.Text>{t(`shell.studio.overview.kind.${kind}`)}</Typography.Text>
                 <Typography.Text style={{ color: colour.textMuted }}>
                   {t(`shell.studio.overview.when.${kind}`)}
                 </Typography.Text>
@@ -224,9 +221,21 @@ function Release({
       body = (
         <>
           {folderDiffers(releases) ? (
+            // Proposed: the changes in three aligned columns, as the table rules have them: the resource, which is free
+            // text and wraps at 320 px, then its kind and what changed, each as wide as its content, with no separator
+            // between them. Each row is a list item whose cells sit in the list's grid.
             <ul
               data-testid="studio-overview-changes"
-              style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.xs }}
+              style={{
+                margin: 0,
+                padding: 0,
+                listStyle: 'none',
+                display: 'grid',
+                gridTemplateColumns: 'fit-content(320px) max-content max-content',
+                columnGap: spacing.lg,
+                rowGap: spacing.xs,
+                alignItems: 'baseline',
+              }}
             >
               {changes.map((change) => {
                 const item = resources.find((resource) => resource.file === change.path)
@@ -245,7 +254,7 @@ function Release({
                     )
                 const kind = item?.kind ?? change.kind
                 return (
-                  <li key={change.path} style={{ display: 'flex', gap: spacing.xs, alignItems: 'baseline' }}>
+                  <li key={change.path} style={{ display: 'contents' }}>
                     {item ? (
                       <Link to={addressOf({ resource: item.id })} style={{ color: colour.primaryText }}>
                         {title}
@@ -253,8 +262,10 @@ function Release({
                     ) : (
                       <Typography.Text>{title}</Typography.Text>
                     )}
-                    <Typography.Text style={{ color: colour.textMuted }}>
-                      {kind ? `${kindName(kind, t)} · ` : ''}
+                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
+                      {kind ? kindName(kind, t) : ''}
+                    </Typography.Text>
+                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
                       {t(`shell.studio.overview.change.${change.change}`)}
                     </Typography.Text>
                   </li>

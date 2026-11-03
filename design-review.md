@@ -12,7 +12,7 @@ the review.
   the application's state and actions alone. Amends D128's "The band names the kind and the title".
 - **Not published yet.** The owner agreed to show it when the application has no live release.
 - **A quiet band.** The owner asked whether an empty band is fine when nothing needs attention. Recommended and chosen:
-  "Live · Release N" in textMuted, because an empty band cannot tell "all live" from "still loading" or "failed to
+  "Release N is live" in textMuted, because an empty band cannot tell "all live" from "still loading" or "failed to
   load"; "Releases did not load" when the history fails.
 - **Status words and the problems panel.** The owner asked whether the statuses are links and why each has an icon
   when its words already say it, then noted that a popover is for extra information while a list of problems is work
@@ -116,3 +116,12 @@ the review.
   find it right and dropped it: the Overview stays one column, the Live block first, then Changes since the live
   release, then More you can add. Its routes, `GET .../tests/latest` and `GET .../dependencies`, and its `aside` and
   `tile` size tokens went with it.
+- **No middle dot as a separator.** The owner asked whether the "·" Studio uses everywhere is a convention, and what
+  else there is. It is a common way to run short metadata into one line, not a rule, and it glues facts of different
+  kinds together with no order, and a screen reader may read it out. Agreed: peers join as words do, with a comma,
+  such as "2 errors, 1 warning"; a state is a sentence, "Release 7 is live"; facts of different kinds take a column or
+  a line of their own. Built on the band, on Changes since the live release, whose rows are three aligned columns,
+  the resource, free text that wraps at 320 px, then its kind and what changed, each as wide as its content with
+  spacing-lg between, and on More you can add, where each kind is the link on its own line, what it is for under it
+  and when one is needed in textMuted. For the issue: the other dots in Studio, in the form, page and process
+  designers, the policy matrix, the references, the problems panel and the Releases list, follow the same rule.

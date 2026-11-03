@@ -5,7 +5,7 @@ import { useDesignTokens } from '../platform/themeMode'
 
 /**
  * Proposed: the open application's state in Studio's band, beside Validate and Publish…, in words alone. Its errors,
- * which stop Publish, and its warnings are one text button that opens the problems panel beside the page. The rest is
+ * which stop Publish, and its warnings are one text button, joined by a comma as peers are, never by a separator, that opens the problems panel beside the page. The rest is
  * text in textMuted, as Publish… beside it is what to do: changes the live release lacks, no live release yet, the live
  * release when nothing needs attention, or a release history that did not load. While the history loads, only the
  * problems show.
@@ -59,13 +59,16 @@ export function StudioStatus({
           onClick={onProblems}
           style={{ paddingInline: spacing.xs }}
         >
-          {errors > 0 && (
-            <span style={{ color: colour.dangerText }}>{count('shell.studio.status.errors', errors)}</span>
-          )}
-          {errors > 0 && warnings > 0 && <span style={{ color: colour.textMuted }}> · </span>}
-          {warnings > 0 && (
-            <span style={{ color: colour.warningText }}>{count('shell.studio.status.warnings', warnings)}</span>
-          )}
+          {/* One span, as the button sets a gap between its children, which would put a space before the comma. */}
+          <span>
+            {errors > 0 && (
+              <span style={{ color: colour.dangerText }}>{count('shell.studio.status.errors', errors)}</span>
+            )}
+            {errors > 0 && warnings > 0 && <span style={{ color: colour.textMuted }}>, </span>}
+            {warnings > 0 && (
+              <span style={{ color: colour.warningText }}>{count('shell.studio.status.warnings', warnings)}</span>
+            )}
+          </span>
         </Button>
       )}
       {state !== undefined && (
