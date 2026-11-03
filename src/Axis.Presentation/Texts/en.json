@@ -781,6 +781,8 @@
   "shell.studio.release.loadFailed": "The release's changes, modules and packages could not be loaded.",
   "shell.studio.release.changes.title": "Changes",
   "shell.studio.release.changes.from": "Changes from release {previous}",
+  "shell.studio.release.changes.fromLive": "If you activate it, compared with live release {previous}",
+  "shell.studio.release.changes.noneLive": "Activating it changes nothing: it holds the same as live release {previous}.",
   "shell.studio.release.changes.first": "The application's first release, so there is nothing to compare it with.",
   "shell.studio.release.changes.none": "No changes from release {previous}.",
   "shell.studio.release.parts": "Modules and packages",

@@ -781,6 +781,8 @@
   "shell.studio.release.loadFailed": "Không thể tải các thay đổi, mô-đun và gói của phiên bản.",
   "shell.studio.release.changes.title": "Thay đổi",
   "shell.studio.release.changes.from": "Thay đổi so với phiên bản {previous}",
+  "shell.studio.release.changes.fromLive": "Nếu kích hoạt, so với phiên bản đang chạy {previous}",
+  "shell.studio.release.changes.noneLive": "Kích hoạt không thay đổi gì: nó giống hệt phiên bản đang chạy {previous}.",
   "shell.studio.release.changes.first": "Đây là phiên bản đầu tiên của ứng dụng nên không có gì để so sánh.",
   "shell.studio.release.changes.none": "Không có thay đổi so với phiên bản {previous}.",
   "shell.studio.release.parts": "Mô-đun và gói",

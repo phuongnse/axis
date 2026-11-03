@@ -88,6 +88,13 @@ industry practice (GitHub's issue sidebar, Salesforce and Jira record pages, Fio
   live release and by a release's changes from the one before it. Its rows are the changed resources and the modules
   and packages that differ ("Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0", "Removed, was 1.0.0"); with none, one
   line says so. Modules and packages lists Name, Type and Version only.
+- **Changes compare with the live release.** The owner pointed out that a release is opened to decide whether to
+  switch to it, so its changes should be against the live release, not the one before it. Agreed, as Argo CD shows the
+  diff from live before a sync: a release that is not live lists what activating it would change, titled "If you
+  activate it, compared with live release 4" (Added is what activating adds, Removed what it takes away, a module
+  "Removed, was 1.0.0"); the live release lists what it brought, titled "Changes from release 3"; the first live
+  release says there is nothing to compare with. The title always names the release it compares with. Choosing any
+  release to compare with goes with the later comparison page.
 - **Later: a change opens a comparison.** On a release page a changed resource is text, not a link, as the folder may
   have moved on. Opening a comparison of the two releases' versions (as GitHub shows a commit's file) is left for later,
   while the editors are still being built on main.

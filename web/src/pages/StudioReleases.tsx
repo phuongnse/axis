@@ -405,6 +405,8 @@ function StudioReleaseDetail({
     </div>
   )
   const previous = shown && shown !== 'failed' ? shown.previous : null
+  // Proposed: a release that is not live is compared with the live one: what activating it would change.
+  const previousIsLive = shown && shown !== 'failed' ? (shown.previousIsLive ?? false) : false
   const parts: StudioReleasePartRow[] =
     shown && shown !== 'failed'
       ? [
@@ -500,14 +502,18 @@ function StudioReleaseDetail({
             title={
               previous === null
                 ? t('shell.studio.release.changes.title')
-                : t('shell.studio.release.changes.from').replace('{previous}', String(previous))
+                : t(
+                    previousIsLive ? 'shell.studio.release.changes.fromLive' : 'shell.studio.release.changes.from',
+                  ).replace('{previous}', String(previous))
             }
             // Proposed: the changes are the Overview's change list; with none, one line says so, as the Overview's does.
             intro={
               previous === null
                 ? t('shell.studio.release.changes.first')
                 : changeRows(shown, locale, t).length === 0
-                  ? t('shell.studio.release.changes.none').replace('{previous}', String(previous))
+                  ? t(
+                      previousIsLive ? 'shell.studio.release.changes.noneLive' : 'shell.studio.release.changes.none',
+                    ).replace('{previous}', String(previous))
                   : undefined
             }
             testId="studio-release-changes"

@@ -741,19 +741,23 @@ internal static class StudioEndpoints
         var store = new ActiveReleaseStore(context);
         var live = await store.FindByApplicationIdAsync(applicationId, cancellationToken);
         var liveRow = live is null || live.ReleaseId == release.ReleaseId ? null : activations.FirstOrDefault(row => row.ReleaseId == live.ReleaseId);
-        var ids = new[] { release.ReleaseId, previous?.ReleaseId, liveRow?.ReleaseId }.OfType<Guid>().Distinct().ToArray();
+        // Proposed: what the page compares the release with: the live release, as a release that is not live is opened to
+        // decide whether to activate it, so its changes are what activating it would change; or, for the live release,
+        // the release numbered just below it, so its changes are what it brought. The first live release has neither.
+        var baseRow = liveRow ?? previous;
+        var ids = new[] { release.ReleaseId, baseRow?.ReleaseId }.OfType<Guid>().Distinct().ToArray();
         var files = await context.ReleaseResources
             .AsNoTracking()
             .Where(resource => ids.Contains(resource.ReleaseId))
             .Select(resource => new { resource.ReleaseId, resource.Path, resource.Content })
             .ToListAsync(cancellationToken);
         var current = files.Where(file => file.ReleaseId == release.ReleaseId).ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
-        var before = previous is null
+        var before = baseRow is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : files.Where(file => file.ReleaseId == previous.ReleaseId).ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+            : files.Where(file => file.ReleaseId == baseRow.ReleaseId).ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
 
         var changes = new List<StudioReleaseChange>();
-        if (previous is not null)
+        if (baseRow is not null)
         {
             var currentTexts = ReleaseTexts(current.Values);
             var beforeTexts = ReleaseTexts(before.Values);
@@ -775,7 +779,7 @@ internal static class StudioEndpoints
 
         var beforeModules = Modules(before).ToDictionary(module => module.Id, module => module.Version, StringComparer.Ordinal);
         var modules = Modules(current)
-            .Select(module => module with { PreviousVersion = previous is null ? null : beforeModules.GetValueOrDefault(module.Id) ?? "" })
+            .Select(module => module with { PreviousVersion = baseRow is null ? null : beforeModules.GetValueOrDefault(module.Id) ?? "" })
             .ToList();
         // Proposed: a package is named by the label of its installed manifest, as a module is by its own.
         var packageLabels = packageCatalog.Packages
@@ -786,27 +790,27 @@ internal static class StudioEndpoints
             .Where(package => ids.Contains(package.ReleaseId))
             .Select(package => new { package.ReleaseId, package.PackageId, package.Version })
             .ToListAsync(cancellationToken);
-        var beforePackages = pinned.Where(package => package.ReleaseId != release.ReleaseId).ToDictionary(package => package.PackageId, package => package.Version, StringComparer.Ordinal);
+        var beforePackages = pinned.Where(package => package.ReleaseId == baseRow?.ReleaseId).ToDictionary(package => package.PackageId, package => package.Version, StringComparer.Ordinal);
         var packages = pinned
             .Where(package => package.ReleaseId == release.ReleaseId)
             .OrderBy(package => package.PackageId, StringComparer.Ordinal)
             .Select(package => new StudioReleasePackage(
                 package.PackageId,
                 package.Version,
-                previous is null ? null : beforePackages.GetValueOrDefault(package.PackageId) ?? "",
+                baseRow is null ? null : beforePackages.GetValueOrDefault(package.PackageId) ?? "",
                 packageLabels.GetValueOrDefault(package.PackageId)))
             .ToList();
         // Proposed: how the modules and packages differ from the previous release, which the changes list shows beside
         // the files: one added, removed, upgraded or downgraded, by its version.
         var partChanges = new List<StudioReleasePartChange>();
-        if (previous is not null)
+        if (baseRow is not null)
         {
             var beforeModuleRows = Modules(before).ToList();
             partChanges.AddRange(PartChanges("module", modules.Select(module => (module.Id, module.Label, module.Version)), beforeModuleRows.Select(module => (module.Id, module.Label, module.Version))));
             partChanges.AddRange(PartChanges(
                 "package",
                 packages.Select(package => (package.Id, package.Label, package.Version)),
-                pinned.Where(package => package.ReleaseId != release.ReleaseId).Select(package => (package.PackageId, packageLabels.GetValueOrDefault(package.PackageId), package.Version))));
+                pinned.Where(package => package.ReleaseId == baseRow.ReleaseId).Select(package => (package.PackageId, packageLabels.GetValueOrDefault(package.PackageId), package.Version))));
         }
 
         // Proposed: whether the release can replace the live one, told before Activate… is sent. A module's tables hold
@@ -838,13 +842,14 @@ internal static class StudioEndpoints
 
         return Results.Ok(new StudioReleaseDetail(
             number,
-            previous?.Number,
+            baseRow?.Number,
             [.. changes.OrderBy(change => change.Path, StringComparer.Ordinal)],
             modules,
             packages,
             liveRow?.Number,
             blockers,
-            partChanges));
+            partChanges,
+            liveRow is not null));
 
         static IEnumerable<StudioReleasePartChange> PartChanges(
             string type, IEnumerable<(string Id, string? Label, string Version)> now, IEnumerable<(string Id, string? Label, string Version)> then)
@@ -1488,8 +1493,9 @@ internal sealed record StudioReleaseChange(
     string? Locale = null);
 
 /// <summary>
-/// Proposed: one release's page: its number, the number of the release just below it or null for the first, the files
-/// that differ from that release, the modules and the packages it pins.
+/// Proposed: one release's page: its number; the release it is compared with in <c>Previous</c>, the live one when it is
+/// not live (<c>PreviousIsLive</c>), else the one just below it, or null for the first; the files that differ from that
+/// release, the modules and the packages it pins.
 /// </summary>
 internal sealed record StudioReleaseDetail(
     int Number,
@@ -1499,7 +1505,8 @@ internal sealed record StudioReleaseDetail(
     IReadOnlyList<StudioReleasePackage> Packages,
     int? Live = null,
     IReadOnlyList<StudioReleaseBlocker>? Blockers = null,
-    IReadOnlyList<StudioReleasePartChange>? PartChanges = null);
+    IReadOnlyList<StudioReleasePartChange>? PartChanges = null,
+    bool PreviousIsLive = false);
 
 /// <summary>
 /// Proposed: a module or package that differs from the previous release: <c>added</c>, <c>removed</c>,

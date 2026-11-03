@@ -1010,7 +1010,9 @@ export interface StudioReleasePart {
 /** Proposed: one release's page, from `GET /api/studio/apps/{application}/releases/{number}`. */
 export interface StudioReleaseDetail {
   number: number
+  /** Proposed: the release it is compared with: the live one when this release is not live, else the one below it. */
   previous: number | null
+  previousIsLive?: boolean
   changes: StudioFileChange[]
   modules: StudioReleasePart[]
   packages: StudioReleasePart[]
