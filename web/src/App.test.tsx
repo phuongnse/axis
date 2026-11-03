@@ -35,10 +35,6 @@ const texts: Record<string, Record<string, string>> = {
   en: {
     'shell.title': 'Axis',
     'shell.nav.home': 'Home',
-    'shell.serverStatus.title': 'Server status:',
-    'shell.serverStatus.checking': 'Checking',
-    'shell.serverStatus.ready': 'Ready',
-    'shell.serverStatus.unavailable': 'Unavailable',
     'shell.breadcrumb.label': 'Breadcrumb',
     'shell.appSwitcher.label': 'Switch to',
     'shell.appSwitcher.studio': 'Studio',
@@ -78,7 +74,6 @@ const texts: Record<string, Record<string, string>> = {
   vi: {
     'shell.nav.home': 'Trang chủ',
     'shell.home.applications.title': 'Ứng dụng',
-    'shell.serverStatus.title': 'Trạng thái máy chủ:',
     'shell.preferences.label': 'Ngôn ngữ và giao diện',
     'shell.locale.label': 'Ngôn ngữ',
     'shell.locale.en': 'English',
@@ -372,7 +367,6 @@ function json(body: unknown, status = 200) {
 
 /** Stubs `fetch` with the server's routes. */
 function stubServer({
-  ready = true,
   siteStatus = 200,
   sitesStatus = 200,
   failingLocale = '',
@@ -383,9 +377,6 @@ function stubServer({
   me = signedInUser as CurrentUser | null,
 } = {}) {
   const fetchMock = vi.fn(async (input: string) => {
-    if (input === '/health/ready') {
-      return json({}, ready ? 200 : 503)
-    }
     if (input === '/api/me') {
       return me === null ? json({ title: 'Sign in to continue.', status: 401 }, 401) : json(me)
     }
@@ -470,25 +461,6 @@ async function findShellRoot(mode: 'light' | 'dark') {
 describe('App', () => {
   afterEach(() => setHostSite(null))
 
-  it('shows the server as ready when the readiness check succeeds', async () => {
-    stubServer()
-
-    renderApp()
-
-    expect(await within(await screen.findByTestId('footer-server-status')).findByText('Ready')).toBeInTheDocument()
-    expect(fetch).toHaveBeenCalledWith('/health/ready', expect.anything())
-  })
-
-  it('shows the server as unavailable when the readiness check fails', async () => {
-    stubServer({ ready: false })
-
-    renderApp()
-
-    expect(
-      await within(await screen.findByTestId('footer-server-status')).findByText('Unavailable'),
-    ).toBeInTheDocument()
-  })
-
   it('switches between light and dark mode and remembers the choice', async () => {
     stubServer()
     renderApp()
@@ -524,7 +496,6 @@ describe('App', () => {
     await choosePreference('Language and theme', 'Tiếng Việt')
 
     expect(await screen.findByRole('heading', { name: 'Ứng dụng' })).toBeInTheDocument()
-    expect(within(screen.getByRole('contentinfo')).getByText('Trạng thái máy chủ:')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ngôn ngữ và giao diện' })).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBe('vi')
   })
@@ -678,7 +649,7 @@ describe('App', () => {
         const grids = screen.getAllByTestId('home-grid')
         expect(grids).toHaveLength(tools === 0 ? 2 : 3)
         for (const grid of grids) {
-          expect(grid).toHaveStyle({ gridTemplateColumns: homeGridColumns(16), gap: '16px' })
+          expect(grid).toHaveStyle({ gridTemplateColumns: homeGridColumns(16), gridAutoRows: '1fr', gap: '16px' })
         }
         unmount()
       }
@@ -704,6 +675,17 @@ describe('App', () => {
     } finally {
       vi.stubGlobal('matchMedia', original)
     }
+  })
+
+  it('stops a tool description at two lines, with the full text in a tooltip', async () => {
+    stubServer({ me: { ...signedInUser, studio: true } })
+
+    renderApp()
+
+    await screen.findByRole('heading', { name: 'Tools' })
+    const description = screen.getByText('Build and publish applications.')
+    expect(description.closest('.ant-typography')).toHaveClass('ant-typography-ellipsis-multiple-line')
+    expect(description.closest('.ant-typography')).toHaveStyle({ '-webkit-line-clamp': '2' })
   })
 
   it('draws the focus ring of a home tile with a 2 px outline offset by 2 px', async () => {

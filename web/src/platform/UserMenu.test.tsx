@@ -90,6 +90,32 @@ describe('UserMenu', () => {
     },
   )
 
+  it('shows the avatar, the name and a caret', async () => {
+    stubServer(requester)
+    renderMenu()
+
+    const button = await screen.findByRole('button', { name: 'Requester User' })
+
+    const avatar = within(button).getByText('RU')
+    expect(avatar.closest('.ant-avatar')).toHaveAttribute('aria-hidden', 'true')
+    expect(button.querySelector('.anticon-down')).toHaveAttribute('aria-hidden', 'true')
+    expect(button).toHaveTextContent('RURequester User')
+  })
+
+  it.each([
+    ['Requester User', 'RU'],
+    ['Cher', 'C'],
+    ['ada king lovelace', 'AL'],
+    ['  Đỗ  Văn  An ', 'ĐA'],
+  ])('shows the initials of %s as %s', async (displayName, expected) => {
+    stubServer({ ...requester, displayName })
+    renderMenu()
+
+    const button = await screen.findByRole('button', { name: displayName.trim().replace(/\s+/g, ' ') })
+
+    expect(within(button).getByText(expected)).toBeInTheDocument()
+  })
+
   it.each(locales)('shows the name with a sign-out menu from the platform $name texts', async ({ texts }) => {
     stubServer(requester)
     renderMenu(texts)
