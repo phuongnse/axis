@@ -1,0 +1,82 @@
+{{- if and .Values.cell.id .Values.backup.bucket }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-cell-backup
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cell-backup
+spec:
+  # Every day at 01:00 in the time zone of the region.
+  schedule: "0 1 * * *"
+  timeZone: {{ required "backup.timeZone is required when backup.bucket is set in a cell: the IANA time zone of the region" .Values.backup.timeZone | quote }}
+  # Never two backups at once.
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # A failed backup is not retried. The operator looks, and the next day's run goes on.
+      backoffLimit: 0
+      # The backup ends within 6 hours or fails. The deadline is 6 hours 15 minutes, a little longer.
+      activeDeadlineSeconds: 22500
+      template:
+        metadata:
+          labels:
+            {{- include "axis.labels" . | nindent 12 }}
+            app.kubernetes.io/component: cell-backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- range . }}
+            - name: {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          securityContext:
+            {{- include "axis.podSecurityContext" . | nindent 12 }}
+          containers:
+            - name: cell-backup
+              image: {{ include "axis.image" (dict "root" . "repository" .Values.migrate.repository) | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - cell
+                - backup
+              securityContext:
+                {{- include "axis.containerSecurityContext" . | nindent 16 }}
+              {{- with .Values.backup.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              env:
+                {{- /* The job reads the cell's backup key from its own mount, not from cell.backupKeyFile. */}}
+                {{- $values := mergeOverwrite (deepCopy .Values) (dict "cell" (dict "backupKeyFile" "/cell-backup-key/key")) }}
+                {{- include "axis.hostEnv" (dict "Values" $values) | nindent 16 }}
+                - name: Cell__BackupStorage__Bucket
+                  value: {{ .Values.backup.bucket | quote }}
+                {{- with .Values.backup.serviceUrl }}
+                - name: Cell__BackupStorage__ServiceUrl
+                  value: {{ . | quote }}
+                {{- end }}
+                {{- with .Values.backup.region }}
+                - name: Cell__BackupStorage__Region
+                  value: {{ . | quote }}
+                {{- end }}
+              volumeMounts:
+                - {{ include "axis.secretsVolumeMount" . | nindent 18 | trim }}
+                - name: cell-backup-key
+                  mountPath: /cell-backup-key
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - {{ include "axis.secretsVolume" (dict "root" . "entries" (list "platformSchemaConnection" "platformSecretKey" "backupStorageAccessKeyId" "backupStorageSecretAccessKey")) | nindent 14 | trim }}
+            - name: cell-backup-key
+              secret:
+                secretName: {{ required "secrets.cellBackupKey.name is required: the Kubernetes Secret that holds the cell's backup key" .Values.secrets.cellBackupKey.name | quote }}
+                defaultMode: 292
+                items:
+                  - key: {{ .Values.secrets.cellBackupKey.key | default "cell-backup-key" | quote }}
+                    path: key
+            - name: tmp
+              emptyDir: {}
+{{- end }}

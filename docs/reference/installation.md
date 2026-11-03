@@ -123,45 +123,6 @@ Read the rules of each setting in
 - **The worker needs no schema connection** of any kind and gets no
   `ConnectionStrings:PlatformSchema`.
 
-## Outbound connections
-
-Every connection that the server and the worker open, with the setting that
-names its address. The TLS rule of each is under [TLS](#tls).
-
-| Host | Destination | Named by | TLS |
-| --- | --- | --- | --- |
-| server, worker | The platform database | `ConnectionStrings:Platform`. The server also uses `ConnectionStrings:PlatformSchema`, only at start | [PostgreSQL](#tls) |
-| server, worker | Each tenant's database | The [tenant directory](../architecture.md#tenant-directory), with the platform connection's TLS settings | [PostgreSQL](#tls) |
-| server | Each tenant's identity provider: discovery, signing keys and the token endpoint, with DPoP and pushed authorization requests under `fapi2` | The tenant's OIDC `Authority` in the tenant directory | [Identity provider](#tls) |
-| server, worker | The telemetry collector | `OTEL_EXPORTER_OTLP_*`, see [telemetry export](host-settings.md#telemetry-export) | [Telemetry export](#tls) |
-| worker | A connector's service | The `url` binding that the connector names as its `baseUrl`, see [deployment bindings](integration-resources.md#deployment-bindings) | [URL bindings](#tls) |
-| worker | A connector's OAuth2 token endpoint | The `url` binding that an `oauth2` auth names as its `tokenUrl`, see [OAuth2 auth](integration-resources.md#oauth2-auth) | [URL bindings](#tls) |
-| worker | A webhook's receiver | The `url` binding that the webhook names as its `url`, see [outbound webhooks](outbound-webhooks.md#webhook-resource) | [URL bindings](#tls) |
-| worker | A package operation's service | A `url` binding that the operation declares in its `capabilities` | [URL bindings](#tls) |
-| worker | The mail server | `Email:Smtp:Host`, or the tenant's email settings, see [notifications](notifications.md) | [Mail](#tls) |
-
-The publisher connects to PostgreSQL only, with `ConnectionStrings:PlatformSchema` and
-`Scenarios:ServerConnectionString`. It calls no HTTP address. The admin host connects to PostgreSQL with
-`Admin:ConnectionString` and `ConnectionStrings:PlatformSchema`. Only `tenant create` of a main tenant also calls an
-HTTP address: the identity provider's admin API, at `IdentityProvider:Url`, over HTTPS outside `Development` and
-`Testing`. The address is an operator setting, so it is on the allowlist below.
-
-- **The allowlist.** Every address comes from an operator setting or from a
-  deployment binding. The operator sets both, and a release holds only binding
-  names, never an address. So the settings and the bindings are the allowlist
-  of the server and the worker.
-- **No user names an address.** No user, author or API caller can give an
-  address in a request, a form, a release or a record. A connector or a package
-  operation can reach only the host of the binding it names.
-- **No redirects.** A connector call never follows one. A `3xx` fails the call,
-  see [call outcomes](process-execution.md#call-outcomes).
-- **No network rule in the examples.** The Compose example and the Helm chart
-  set no egress rule. An operator may add one that allows only the destinations
-  of this table.
-- **Extension packages are trusted code.** A package runs in the worker's
-  process, so installing one means trusting its code. The `url` binding limits
-  the client that Axis hands to it, not the package's own code.
-
 ## On premises
 
 This installs Axis on one machine with Docker Compose. PostgreSQL runs
@@ -671,7 +632,9 @@ set. Neither has an `Admin:ConnectionString`. The identity provider gets the fou
 The server also mounts the `serverCertificate` Secret read-only at `/server-tls`, and no
 other pod does. The identity provider mounts the `identityCertificate` Secret
 read-only at `/identity-tls` in the same way. Only the PgBouncer pod mounts the
-`pgbouncerAuth` and `pgbouncerCertificate` Secrets.
+`pgbouncerAuth` and `pgbouncerCertificate` Secrets. The cell backup CronJob alone gets
+`backupStorageAccessKeyId` and `backupStorageSecretAccessKey` as files in `/run/secrets`, and mounts the
+`cellBackupKey` Secret read-only at `/cell-backup-key/key`, outside `/run/secrets`.
 Rendering fails with a message that names the value when a `name` is missing.
 The values schema rejects any field in a reference other than `name` and `key`.
 
@@ -708,6 +671,14 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
 | `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain`, `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. The `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort` pair comes from `cell.pgbouncer` and goes to the server and the worker only. |
+| `backup.bucket` | empty | In a cell, setting it renders the cell backup CronJob, see the cell backup CronJob below. It is `Cell__BackupStorage__Bucket`. Empty, or outside a cell, renders no CronJob. |
+| `backup.serviceUrl` | empty | `Cell__BackupStorage__ServiceUrl`, the endpoint of the object storage. Left out when empty. |
+| `backup.region` | empty | `Cell__BackupStorage__Region`. Left out when empty. |
+| `backup.timeZone` | empty | The IANA time zone of the region, such as `Asia/Ho_Chi_Minh`, in which the CronJob runs at 01:00. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
+| `backup.resources` | none | Kubernetes resource requests and limits of the CronJob's container. |
+| `secrets.backupStorageAccessKeyId` | key `Cell__BackupStorage__AccessKeyId` | Secret `name` and `key` of the access key id of the backup storage. The cell backup CronJob alone mounts it. Required with `backup.bucket`. |
+| `secrets.backupStorageSecretAccessKey` | key `Cell__BackupStorage__SecretAccessKey` | Secret `name` and `key` of the secret access key of the backup storage. The cell backup CronJob alone mounts it. Required with `backup.bucket`. |
+| `secrets.cellBackupKey` | key `cell-backup-key` | Secret `name` and `key` of the cell's backup key. The cell backup CronJob alone mounts it, at `/cell-backup-key/key`, and sets `Cell__BackupKeyFile` to that path. Required with `backup.bucket`. |
 | `cell.pgbouncer.enabled` | `false` | `true` renders PgBouncer, see [PgBouncer](#in-the-cloud). Rendering then fails with a message that names the value when `cell.id`, `cell.pgbouncer.databaseHost`, `cell.pgbouncer.authUser`, `secrets.pgbouncerAuth.name` or `secrets.pgbouncerCertificate.name` is empty. The schema rejects any field under `cell.pgbouncer` that this table does not list. |
 | `cell.pgbouncer.image` | `edoburu/pgbouncer:v1.24.1-p1` | The whole image reference of PgBouncer. `image.registry` and `image.tag` do not apply to it. The pod runs as user 70 of that image, with a read-only root file system, and one replica. |
 | `cell.pgbouncer.databaseHost`, `cell.pgbouncer.databasePort` | none, required, and 5432 | The address of PostgreSQL, the target of the wildcard `* = host=... port=...` database line. |
@@ -735,6 +706,17 @@ the first install, because a first install has no tenants, see
 installation with many tenants needs a longer wait, such as
 `helm upgrade --install --timeout 30m`.
 
+**The cell backup CronJob.** In a cell with `backup.bucket` set, the chart renders a CronJob
+named `<release>-cell-backup` that runs `axis-admin cell backup` with the admin image every day at
+01:00 in `backup.timeZone`, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+It never runs two backups at once and never retries, and Kubernetes stops the Job after 6 hours
+15 minutes. It gets the platform schema connection, the installation key, the storage credentials
+and the cell backup key from Secret references, and the storage settings from `backup.*`. The
+operator sets the bucket's object lock in compliance mode for 30 days and its lifecycle rule that
+deletes an archive after 30 days. The chart does not create or change the bucket. The `cell backup`
+command is _(planned for M31)_, so until then the job fails with a usage error. The job has no
+Studio volume, so its archives hold no Studio files.
+
 **Tenants and releases.** Run `tenant create` and `activate` from a Job or a pod
 that uses the admin image, with the settings of the
 [settings table](#settings-and-secrets) and the application folder mounted.
@@ -743,7 +725,7 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas and the pinned cert-manager schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks that the identity secret files and certificate are mounted in the identity pod only and in no env entry, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume or the password-list volume. It checks the cert-manager `Certificate` and `Issuer` of the tenant subdomains: the wildcard name, the Secret name, the DNS-01 solver with a Secret reference for its token, that an inline token is rejected and never rendered, that nothing renders with the certificate off, and that rendering fails, naming the value, without the tenant domain, the Secret name, the ACME server or the token Secret name. It checks the PgBouncer objects: that only the server and the worker get the runtime database settings, the transaction pool mode, the pool sizes, the wildcard database line and the TLS modes in the ConfigMap, the non-root pod with a read-only root file system, the Service port 6432, that nothing renders with PgBouncer off, that rendering fails, naming the value, without `cell.id`, the database host, the auth user or either Secret name, and that a `value` in either Secret reference is rejected. No test runs PgBouncer from the chart on a live cluster. `scripts/setup.sh` installs the pinned Helm,
+Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks that the identity secret files and certificate are mounted in the identity pod only and in no env entry, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume or the password-list volume. It checks the cert-manager `Certificate` and `Issuer` of the tenant subdomains: the wildcard name, the Secret name, the DNS-01 solver with a Secret reference for its token, that an inline token is rejected and never rendered, that nothing renders with the certificate off, and that rendering fails, naming the value, without the tenant domain, the Secret name, the ACME server or the token Secret name. It checks the PgBouncer objects: that only the server and the worker get the runtime database settings, the transaction pool mode, the pool sizes, the wildcard database line and the TLS modes in the ConfigMap, the non-root pod with a read-only root file system, the Service port 6432, that nothing renders with PgBouncer off, that rendering fails, naming the value, without `cell.id`, the database host, the auth user or either Secret name, and that a `value` in either Secret reference is rejected. No test runs PgBouncer from the chart on a live cluster. It checks the cell backup CronJob: the schedule, the time zone, `Forbid`, no retry, the deadline, the storage values, that both storage credentials and the cell backup key come from Secret references and only the CronJob gets them, that a `value` in either storage reference or an unknown field under `backup` is rejected and never rendered, that nothing renders outside a cell or without a bucket, and that rendering fails, naming the value, without `backup.timeZone` or any of the three Secret names. `scripts/setup.sh` installs the pinned Helm,
 kubeconform, Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`, and downloads any schema file that a cached folder lacks. Axis has no test
 against a live cluster.
 
