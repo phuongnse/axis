@@ -100,7 +100,8 @@ the SPA.
   parameter. The import stores the format. An optional `?key=` names a unique
   field of the entity, and the dry run and the commit match each row's key cell
   with a record, see Each row. Only a signed-in user uploads, never
-  a service account. The checks come in order: session `401`, the path `404`,
+  a service account. The checks come in order: session `401`, in a cell the tenant's
+  [storage quota](tenant-quotas.md#refusals) `403`, the path `404`,
   `import` and `create` `403`, `update` `403` when there is a `key`, a `key`
   that is no unique field `400` at `key`, another content type `415`, and a
   file over the limit `413`. The answer is `202` with the import, `pending`.
@@ -160,7 +161,8 @@ the SPA.
   get `404`. The import is stored in `axis.record_imports`, see
   [storage](storage.md).
 - **Commit.** Only the uploader of a `checked` import
-  commits it. The checks come in order: session `401`, the path `404`, the
+  commits it. The checks come in order: session `401`, in a cell the tenant's
+  [storage quota](tenant-quotas.md#refusals) `403`, the path `404`, the
   user's current `import` and `create` grants `403`, then the import and its
   state. Another user's import and an unknown id are `404`. Any state other
   than `checked` is `409`, and so is a second commit while one is queued, and so

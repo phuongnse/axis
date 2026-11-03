@@ -46,6 +46,9 @@ public sealed class ProcessStartFixture : IAsyncLifetime
     /// <summary>The release of ProcessApp that the fixture activated first.</summary>
     public Guid FirstReleaseId { get; private set; }
 
+    /// <summary>The connection string of the tenant database, as its owner.</summary>
+    public string ConnectionString => _connectionString ?? throw new InvalidOperationException("The fixture is not initialized.");
+
     private NpgsqlDataSource DataSource => _dataSource ?? throw new InvalidOperationException("The fixture is not initialized.");
 
     /// <summary>A new client of the server with its own cookies. The caller disposes it.</summary>
