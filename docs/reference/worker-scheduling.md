@@ -3,8 +3,8 @@
 Detailed reference for how the worker shares its time between the tenants of a [cell](cells.md). It
 follows [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-[Fair share](#fair-share) and the concurrency quotas are built. Waking a tenant and the metrics are
-_(planned for M31)_. All of it applies to every installation, not only to a cell, so the worker has
+[Fair share](#fair-share), the concurrency quotas and the wake signal are built. Back-off, the next due
+time and the metrics are _(planned for M31)_. All of it applies to every installation, not only to a cell, so the worker has
 one way to run. How the worker runs one work item is in
 [process execution](process-execution.md), and it does not change. The conventions of
 [architecture.md](../architecture.md) apply.
@@ -13,15 +13,16 @@ one way to run. How the worker runs one work item is in
 and the loops run the tenants in the list. A tenant leaves the list when a claim finds nothing due and
 none of its other items runs, or when a run fails, and the next poll adds it again. So a tenant with a large backlog no longer holds back the
 others, but an idle cell still polls every database each round. Back-off is planned, see
-[waking a tenant](#waking-a-tenant). The server and the publisher already send the wake signal, but no
-worker listens to it yet.
+[waking a tenant](#waking-a-tenant). Under `Tenancy:Source=directory` the worker also listens for the
+wake signal that the server and the publisher send. A signal for a known tenant checks that tenant and adds
+it to the list at once, so new work does not wait for the next poll.
 
 ## Fair share
 
 The worker runs weighted deficit round-robin over the tenants that have work due.
 
 - **Active list.** The worker keeps the tenants that have work due in a list, in round order. A
-  tenant joins at the end when a poll finds work due, or _(planned for M31)_ when it is woken. It
+  tenant joins at the end when a poll finds work due or when it is woken. It
   leaves when a claim finds nothing due and none of its other items runs, because a running item may
   queue the next one. While other items of the tenant run, an empty claim only pauses the tenant until
   one of them ends. A poll adds every ready tenant in one step, in id order, so
@@ -65,14 +66,16 @@ An idle tenant is polled less and less often, and a wake signal brings it back a
   sending side is built: the server sends once for each tenant a request touched, when the request
   ends, and the publisher sends for the tenant it published or rolled back to, when the activation
   left a schedule trigger past due. Each send is cut off after about 2 seconds, and a failed send is
-  logged and never fails the request or the publish. _(planned for M31)_ The
-  worker holds one direct connection that runs `LISTEN axis_work`, see
-  [connections](cells.md#connections). A signal puts the tenant at the end of the active list and
-  resets its back-off. An installation under `Tenancy:Source=configuration` with no platform database
+  logged and never fails the request or the publish. The receiving side is built: the
+  worker holds one direct connection, named `axis-worker-listen`, that runs `LISTEN axis_work`, see
+  [connections](cells.md#connections). A signal for a known tenant checks that tenant and puts it at the end of the active
+  list at once. It runs no housekeeping and does not move the next poll of every tenant. A signal that names an
+  unknown tenant is ignored. _(planned for M31)_ A signal also resets the tenant's back-off. An installation under `Tenancy:Source=configuration` with no platform database
   sends no signal, and its worker finds work by polling alone.
 - **A lost signal.** A signal is a hint, never the only way work is found. A lost one delays work by
-  at most `Worker:IdlePollCeiling`. When the `LISTEN` connection drops, the worker connects again and
-  then polls every tenant once, as if each were woken.
+  at most `Worker:PollInterval`, and _(planned for M31)_ at most `Worker:IdlePollCeiling` once back-off exists. When
+  the `LISTEN` connection drops, the worker connects again at once, retries every `Worker:PollInterval` while
+  that fails, and then polls every tenant once, as if each were woken. It does the same after the first connection.
 - **What wakes whom.** A signal names only a tenant id. It holds no record, process or user.
 
 ## Metrics
