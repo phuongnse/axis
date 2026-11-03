@@ -1,5 +1,5 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { Button, Checkbox, Flex, Input, InputNumber, Modal, Select, Tag, Typography } from 'antd'
+import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Modal, Select, Tag, Typography } from 'antd'
 import { createContext, lazy, Suspense, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
@@ -453,6 +453,8 @@ function ListTable({
   inHeading = false,
 }: NodeProps & { kind: string; inHeading?: boolean }) {
   const t = useText()
+  // Proposed: a read-only form, such as while the JSON has an error, turns its lists' actions off too.
+  const readOnly = ConfigProvider.useConfig().componentDisabled ?? false
   const { colour } = useDesignTokens()
   const slot = useContext(SectionActionSlot)
   const notifyRemoved = useContext(RemovedNoticeContext)
@@ -536,7 +538,7 @@ function ListTable({
     tableRows.sort((a, b) => collator.compare(rowName(a.item), rowName(b.item)))
   }
   const addButton = (
-    <AxisButton role="main" onClick={add} data-testid={`studio-list-add-${pointer}`}>
+    <AxisButton role="main" disabled={readOnly} onClick={add} data-testid={`studio-list-add-${pointer}`}>
       {textOr(t, `${listKey}.add`, 'shell.studio.list.add')}
     </AxisButton>
   )
@@ -573,6 +575,7 @@ function ListTable({
               <Button
                 type="link"
                 data-testid="studio-list-open"
+                disabled={readOnly}
                 style={{ padding: 0, height: 'auto', color: colour.primaryText }}
                 onClick={() => setOpen({ index: row.index, isNew: false, item: items[row.index] })}
               >
@@ -592,6 +595,7 @@ function ListTable({
               nameSuffix: `${itemTitle} ${row.index + 1}`,
               icon: <DeleteOutlined />,
               destructive: true,
+              disabled: readOnly,
               onClick: () => {
                 onChange(`${pointer}/${row.index}`, undefined)
                 notifyRemoved?.(rowName(row.item) || itemTitle)

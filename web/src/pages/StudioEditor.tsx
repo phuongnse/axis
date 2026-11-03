@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Input, Modal, Tabs, Typography, message } from 'antd'
+import { Alert, Button, ConfigProvider, Flex, Modal, Tabs, Typography, message } from 'antd'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAnswers,
@@ -48,6 +48,7 @@ import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
+import { JsonEditor } from './JsonEditor'
 import { SchemaForm } from './SchemaForm'
 import { RemovedNoticeContext, StudioCatalogContext } from './schemaFormSections'
 import { SaveBar } from '../platform/SaveBar'
@@ -201,7 +202,7 @@ export function StudioEditor({
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const { type, colour, radius, spacing } = useDesignTokens()
+  const { colour, radius, spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -930,92 +931,115 @@ export function StudioEditor({
                   {
                     key: 'form',
                     label: t('shell.studio.form'),
+                    // Proposed: while the JSON has an error the form shows the last valid version read-only, under a
+                    // warning that says so, as VS Code's settings do, so no edit in the form overwrites the JSON.
                     children: (
-                      <Drawn onDrawn={setFormDrawn}>
-                        {seedSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={seedSchema} value={draft} onChange={change} />
-                            <SeedGrid
-                              fields={seedFields!}
-                              records={draft.records}
-                              problems={problems}
-                              onChange={update}
-                            />
-                          </Flex>
-                        ) : item.kind === 'scenario' ? (
-                          <ScenarioEditor value={draft} onChange={update} />
-                        ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
-                          <TextTable
-                            columns={resources
-                              .filter((resource) => resource.kind === 'text')
-                              .map((resource) =>
-                                resource.id === item.id
-                                  ? {
-                                      id: item.id,
-                                      locale: String(loaded.content.locale),
-                                      texts: draft.texts as Record<string, unknown>,
-                                      editable: true,
-                                    }
-                                  : otherTexts.find((column) => column.id === resource.id),
-                              )
-                              .filter((column): column is TextColumn => column !== undefined)}
-                            onChange={update}
-                            onAdd={addTextKey}
+                      <Flex vertical gap={spacing.md}>
+                        {jsonInvalid && (
+                          <Alert
+                            type="warning"
+                            data-testid="studio-form-json-error"
+                            title={t('shell.studio.form.jsonInvalid')}
+                            action={
+                              <Button size="small" onClick={() => setTab('json')}>
+                                {t('shell.studio.form.goToJson')}
+                              </Button>
+                            }
                           />
-                        ) : item.kind === 'entity' && schema ? (
-                          <EntityDesigner
-                            value={draft}
-                            onChange={change}
-                            origins={origins}
-                            warnings={fieldWarnings(loaded.content, draft, origins)}
-                            onOriginsChange={(next, removed) => {
-                              setOrigins(next)
-                              if (removed) {
-                                touch(removed)
-                              }
-                            }}
-                          />
-                        ) : item.kind === 'connector' && schema ? (
-                          <ConnectorEditor value={draft} onChange={change} />
-                        ) : item.kind === 'identityProvider' && schema ? (
-                          <IdentityProviderEditor value={draft} onChange={change} />
-                        ) : processSchema ? (
-                          <ProcessEditor schema={processSchema} value={draft} onChange={change} />
-                        ) : item.kind === 'page' && schema ? (
-                          <PageEditor value={draft} onChange={change} selected={widgetPath} onSelect={setWidgetPath} />
-                        ) : endpointSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
-                            <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
-                            <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
-                          </Flex>
-                        ) : siteSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={siteSchema} value={draft} onChange={change} />
-                            <SiteSignIn
-                              providers={resources
-                                .filter((resource) => resource.kind === 'identityProvider' && resource.name)
-                                .map((resource) => resource.name!)}
-                              value={draft.signIn}
-                              onChange={change}
-                            />
-                          </Flex>
-                        ) : formSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={formSchema} value={draft} onChange={change} />
-                            <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
-                          </Flex>
-                        ) : schema ? (
-                          <SchemaForm
-                            schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
-                            value={draft}
-                            onChange={change}
-                            kind={item.kind}
-                          />
-                        ) : (
-                          <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
                         )}
-                      </Drawn>
+                        <ConfigProvider componentDisabled={jsonInvalid}>
+                          <Drawn onDrawn={setFormDrawn}>
+                            {seedSchema ? (
+                              <Flex vertical gap="middle">
+                                <SchemaForm schema={seedSchema} value={draft} onChange={change} />
+                                <SeedGrid
+                                  fields={seedFields!}
+                                  records={draft.records}
+                                  problems={problems}
+                                  onChange={update}
+                                />
+                              </Flex>
+                            ) : item.kind === 'scenario' ? (
+                              <ScenarioEditor value={draft} onChange={update} />
+                            ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
+                              <TextTable
+                                columns={resources
+                                  .filter((resource) => resource.kind === 'text')
+                                  .map((resource) =>
+                                    resource.id === item.id
+                                      ? {
+                                          id: item.id,
+                                          locale: String(loaded.content.locale),
+                                          texts: draft.texts as Record<string, unknown>,
+                                          editable: true,
+                                        }
+                                      : otherTexts.find((column) => column.id === resource.id),
+                                  )
+                                  .filter((column): column is TextColumn => column !== undefined)}
+                                onChange={update}
+                                onAdd={addTextKey}
+                              />
+                            ) : item.kind === 'entity' && schema ? (
+                              <EntityDesigner
+                                value={draft}
+                                onChange={change}
+                                origins={origins}
+                                warnings={fieldWarnings(loaded.content, draft, origins)}
+                                onOriginsChange={(next, removed) => {
+                                  setOrigins(next)
+                                  if (removed) {
+                                    touch(removed)
+                                  }
+                                }}
+                              />
+                            ) : item.kind === 'connector' && schema ? (
+                              <ConnectorEditor value={draft} onChange={change} />
+                            ) : item.kind === 'identityProvider' && schema ? (
+                              <IdentityProviderEditor value={draft} onChange={change} />
+                            ) : processSchema ? (
+                              <ProcessEditor schema={processSchema} value={draft} onChange={change} />
+                            ) : item.kind === 'page' && schema ? (
+                              <PageEditor
+                                value={draft}
+                                onChange={change}
+                                selected={widgetPath}
+                                onSelect={setWidgetPath}
+                              />
+                            ) : endpointSchema ? (
+                              <Flex vertical gap="middle">
+                                <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
+                                <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                                <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
+                              </Flex>
+                            ) : siteSchema ? (
+                              <Flex vertical gap="middle">
+                                <SchemaForm schema={siteSchema} value={draft} onChange={change} />
+                                <SiteSignIn
+                                  providers={resources
+                                    .filter((resource) => resource.kind === 'identityProvider' && resource.name)
+                                    .map((resource) => resource.name!)}
+                                  value={draft.signIn}
+                                  onChange={change}
+                                />
+                              </Flex>
+                            ) : formSchema ? (
+                              <Flex vertical gap="middle">
+                                <SchemaForm schema={formSchema} value={draft} onChange={change} />
+                                <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
+                              </Flex>
+                            ) : schema ? (
+                              <SchemaForm
+                                schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
+                                value={draft}
+                                onChange={change}
+                                kind={item.kind}
+                              />
+                            ) : (
+                              <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+                            )}
+                          </Drawn>
+                        </ConfigProvider>
+                      </Flex>
                     ),
                   },
                   {
@@ -1023,13 +1047,11 @@ export function StudioEditor({
                     label: t('shell.studio.json'),
                     children: (
                       <Flex vertical gap="small">
-                        <Input.TextArea
-                          aria-label={t('shell.studio.json')}
-                          autoSize={{ minRows: 10, maxRows: 40 }}
-                          spellCheck={false}
-                          style={{ fontFamily: type.codeFontFamily }}
+                        <JsonEditor
+                          label={t('shell.studio.json')}
+                          schema={schema ?? null}
                           value={jsonText ?? JSON.stringify(draft, null, 2)}
-                          onChange={(event) => changeJson(event.target.value)}
+                          onChange={changeJson}
                         />
                         {jsonInvalid && (
                           <Alert data-testid="studio-json-error" type="error" title={t('shell.studio.invalidJson')} />

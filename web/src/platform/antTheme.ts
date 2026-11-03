@@ -88,6 +88,9 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       // D114: every dropdown menu keeps spacing-xs round its items.
       Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
       Tabs: {
+        // Proposed: a tab's label starts at the top of its bar, so the bar sits spacing-md under what precedes it, as
+        // every block does, rather than spacing-md plus Ant Design's 12 px; the underline keeps its 12 px under the label.
+        horizontalItemPadding: `0 0 ${spacing.sm}px`,
         itemSelectedColor: colour.primaryText,
         itemHoverColor: colour.primaryText,
         itemActiveColor: colour.primaryText,

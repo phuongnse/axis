@@ -255,3 +255,22 @@ Group and Material advise, and as mail and documents do:
   labels' texts; the application its modules and packages), which Uses leaves out, and a kind nothing can refer to
   (the application) has no Used by, as it never applies; a panel with nothing left is left out. Settings therefore
   ends at File storage; every other kind keeps both panels.
+
+## Form and JSON
+
+The owner asked whether both tabs stay and whether they stay in step. They do: both edit one draft, so a change in
+either shows in the other at once, and Undo, Redo, Discard and Save act on both. Agreed to keep both, as VS Code keeps
+its settings UI beside `settings.json` and Azure a JSON view beside its forms, and to close two gaps:
+
+- **While the JSON has an error, the form is read-only.** It shows the last valid version under a warning, "The JSON
+  has an error, so the form shows the last valid version and cannot be edited. Fix the JSON, or Undo.", with Go to
+  JSON; its inputs and its lists' actions are off, so no edit in the form overwrites the JSON being typed, as VS Code's
+  settings UI refuses edits while `settings.json` is broken. Save is off.
+- **The JSON view is a code editor.** CodeMirror, which Studio already has, with `@codemirror/lang-json`: JSON
+  highlighting, line numbers, and two checks as one types, each marked in the gutter and underlined where it is: a
+  syntax error ("This is not valid JSON here.") and every place the content breaks the kind's schema, in words ("Add
+  version.", "colour is not a field of this resource."), checked with Ajv, which moves from the dev dependencies to
+  the dependencies.
+- **A tab bar sits spacing-md under what precedes it.** The owner found the gap between a page's heading and its tabs
+  too wide: Ant Design pads a tab's label 12 px above it. The theme starts a tab's label at the top of its bar, the
+  underline keeping its 12 px under it, for every tab bar.
