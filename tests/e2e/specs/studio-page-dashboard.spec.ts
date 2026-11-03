@@ -97,7 +97,7 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await page.getByRole('button', { name: 'New application', exact: true }).click()
+    await page.getByRole('button', { name: 'New application…', exact: true }).click()
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     await dialog.getByRole('radio', { name: /^Request approval/ }).click()

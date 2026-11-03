@@ -310,7 +310,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio`)
 
-    await page.getByRole('button', { name: 'New application', exact: true }).click()
+    await page.getByRole('button', { name: 'New application…', exact: true }).click()
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('AssetManagement')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()

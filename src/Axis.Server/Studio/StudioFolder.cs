@@ -42,10 +42,25 @@ internal static class StudioFolder
     /// The manifest <c>name</c> of each listed folder, in list order. A folder without a readable manifest
     /// name is left out. Of names equal ignoring letter case, the first is kept, as <see cref="Find"/> takes it.
     /// </summary>
-    public static IReadOnlyList<string> Applications(StudioOptions options)
+    public static IReadOnlyList<string> Applications(StudioOptions options) =>
+        [.. ApplicationFolders(options).Select(application => application.Name)];
+
+    /// <summary>
+    /// The manifest <c>name</c> and the folder of each application, as <see cref="Applications"/> lists them.
+    /// </summary>
+    public static IReadOnlyList<(string Name, string Folder)> ApplicationFolders(StudioOptions options)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        return [.. Candidates(options).Select(ReadName).OfType<string>().Where(seen.Add)];
+        var applications = new List<(string, string)>();
+        foreach (var folder in Candidates(options))
+        {
+            if (ReadName(folder) is { } name && seen.Add(name))
+            {
+                applications.Add((name, folder));
+            }
+        }
+
+        return applications;
     }
 
     // The listed folders, then the direct subfolders of Studio:ApplicationsPath that hold a manifest, sorted by

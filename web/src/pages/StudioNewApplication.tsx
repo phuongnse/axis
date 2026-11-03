@@ -10,14 +10,14 @@ import { PlatformContext } from './context'
 type Problem = 'exists' | 'invalid' | 'failed'
 
 /**
- * The New application button and its dialog. The dialog asks for a name and for Blank or an installed template, and
+ * The New application… button and its dialog. The button is the solid main button with `primary`. The dialog asks for a name and for Blank or an installed template, and
  * shows each template's title and description in the UI locale, with `en` as the fallback. A built-in template keeps the
  * server's order and carries a "Built in" tag after its title. Create stays off while the
  * name breaks the API's rule. A `409` shows that the name is taken, and a `400` that it is refused, and the dialog stays
  * open in both cases. When the template list does not load, the dialog offers only Blank. `onCreated` gets the new
  * application's name once the create succeeds.
  */
-export function StudioNewApplication({ onCreated }: { onCreated: (name: string) => void }) {
+export function StudioNewApplication({ onCreated, primary }: { onCreated: (name: string) => void; primary?: boolean }) {
   const t = useText()
   const { lost } = useStudioConnection()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -91,7 +91,9 @@ export function StudioNewApplication({ onCreated }: { onCreated: (name: string) 
 
   return (
     <>
-      <Button onClick={show}>{t('shell.studio.newApplication.button')}</Button>
+      <Button type={primary ? 'primary' : 'default'} onClick={show}>
+        {t('shell.studio.newApplication.button')}
+      </Button>
       <Modal
         open={open}
         title={t('shell.studio.newApplication.title')}

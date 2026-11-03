@@ -59,6 +59,40 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     }
 
     [Fact]
+    public async Task The_list_gives_each_application_its_titles_and_descriptions_by_locale()
+    {
+        using var setup = await Setup.StartAsync(database);
+        using var client = setup.Factory.CreateClient().SignedInAs("author");
+        using var created = await PostAsync(client, """{ "name": "PurchaseOrders" }""");
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var broken = Path.Combine(setup.ApplicationsPath, "broken");
+        Directory.CreateDirectory(Path.Combine(broken, "texts"));
+        await File.WriteAllTextAsync(Path.Combine(broken, "application.json"), """{ "name": "Broken", "label": { "textKey": "t" } }""", CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(broken, "texts", "en.json"), "not json", CancellationToken);
+
+        using var list = await GetAsync(client, "/api/studio/apps");
+
+        var items = list.RootElement.GetProperty("items").EnumerateArray().ToDictionary(item => item.GetProperty("name").GetString()!);
+        Assert.Equal(["Broken", "PurchaseOrders", "PurchaseRequests"], items.Keys.Order(StringComparer.Ordinal));
+        var sample = items["PurchaseRequests"];
+        Assert.Equal(
+            new Dictionary<string, string> { ["en"] = "Purchase requests", ["vi"] = "Yêu cầu mua hàng" },
+            Strings(sample.GetProperty("titles")));
+        Assert.Equal(
+            new Dictionary<string, string>
+            {
+                ["en"] = "Runs the company's purchases, from the request to approval and ordering.",
+                ["vi"] = "Quản lý việc mua hàng của công ty, từ yêu cầu đến phê duyệt và đặt hàng.",
+            },
+            Strings(sample.GetProperty("descriptions")));
+        foreach (var name in new[] { "PurchaseOrders", "Broken" })
+        {
+            Assert.Empty(items[name].GetProperty("titles").EnumerateObject());
+            Assert.Empty(items[name].GetProperty("descriptions").EnumerateObject());
+        }
+    }
+
+    [Fact]
     public async Task A_create_from_a_template_copies_every_file_with_new_ids_and_the_same_diagnostics()
     {
         using var setup = await Setup.StartAsync(database);
@@ -228,6 +262,9 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return await ReadAsync(response);
     }
+
+    private static Dictionary<string, string> Strings(JsonElement element) =>
+        element.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.GetString()!);
 
     private static async Task<JsonDocument> ReadAsync(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));

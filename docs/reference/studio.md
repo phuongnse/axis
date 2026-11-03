@@ -24,13 +24,13 @@ Run and the Test results list, the read-only views of a module entity, a module 
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`. The id of a module entity, process or policy opens it too, as `&resource=<id>`,
   when the id is not one of the folder's own resources.
-- **New application.** A **New application** button shows beside the picker (New application… on the list, _planned for M31_)
+- **New application.** A **New application…** button shows on the list of applications, as its main button, and beside the picker
   when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
   lists no application. The dialog asks for a name and checks it with the API's
   rule before it sends anything. It offers Blank or a template from
   `GET /api/studio/templates`, with the title and description in the UI locale
   and `en` as the fallback. A built-in template is listed first, with a "Built in" mark. A `409` or a `400` shows next to the name. A success
-  adds the application to the picker, picks it, and loads its resources and
+  adds the application to the list and the picker, picks it, and loads its resources and
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
@@ -60,8 +60,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
     the diagnostics that the create answered, and the editor opens the resource.
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
-  `GET /api/studio/apps` lists. With only one application, it is picked at
-  once. The list becomes tiles by title, see [applications](studio-workspace.md#applications) _(planned for M31)_. An **Off-standard** tag shows beside it while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio).
+  `GET /api/studio/apps` lists. `/studio` with no application open lists them as tiles by title, see
+  [applications](studio-workspace.md#applications). A single application is not picked at once. The picker shows while an application is open. An **Off-standard** tag shows beside it while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio).
 - **Resource list.** The list groups the resources by kind (in the sidebar, see [workspace](studio-workspace.md#workspace), _planned for M31_). The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows

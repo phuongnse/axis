@@ -5,7 +5,7 @@ band, its page headings, its Overview and its Releases list. What each editor, d
 [Studio](studio.md). The conventions of [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
-[D129](../decisions/d129-rules-from-the-studio-editors-review.md). All of this page is _(planned for M31)_.
+[D129](../decisions/d129-rules-from-the-studio-editors-review.md). The Applications section is built. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
