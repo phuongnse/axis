@@ -160,7 +160,8 @@ _(planned for M31)_.
   - `GET /api/sites` gives each site its `application`, `{ "name", "titles", "descriptions" }`, the application's name
     and its title and description per locale it has texts for, from the `label` and `description` in its
     `application.json`, its name when it has no label and `null` descriptions when it has no description, so the home
-    page can group the sites. Each site also gets its `descriptions` per available locale, or `null`. It lists only the
+    page can group the sites. Each site also gets its `descriptions` per available locale, or `null`, and its `legal`, see
+    [legal settings](legal.md#legal-settings). It lists only the
     sites that allow the provider of the session, so a person signed in through a provider that one site allows sees
     that site only.
   - `GET /api/me` adds a boolean `console`, true when the person holds the role `Console:OperatorRole` names, see the
