@@ -211,6 +211,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
         builder.Configuration.Sources.Clear();
         var settings = WorkerTenantSettings();
         settings["Worker:PollInterval"] = "00:00:00.05";
+        settings["Worker:IdlePollCeiling"] = "00:00:00.05";
         settings["Worker:LeaseDuration"] = "00:00:02";
         builder.Configuration.AddInMemoryCollection(settings);
         builder.Logging.ClearProviders();

@@ -30,6 +30,8 @@ public sealed class AxisMetricsTests
         ["axis.calls.attempts"] = ["axis.tenant", "axis.application", "axis.connector", "axis.package", "axis.operation", "axis.outcome"],
         ["axis.dead_letters.created"] = ["axis.tenant", "axis.work_item.kind"],
         ["axis.backup.last_success"] = ["axis.tenant"],
+        ["axis.worker.active_tenants"] = [],
+        ["axis.worker.polls"] = ["axis.poll.found"],
     };
 
     [Fact]
@@ -53,6 +55,7 @@ public sealed class AxisMetricsTests
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         var tenantDatabases = new TenantDatabaseGauge(services.GetRequiredService<IMeterFactory>());
         var rateLimitRefusals = new RateLimitRefusals(services.GetRequiredService<IMeterFactory>());
+        var workerPolls = new WorkerPollMetrics(services.GetRequiredService<IMeterFactory>());
 
         void Record<T>(Instrument instrument, T measurement, ReadOnlySpan<KeyValuePair<string, object?>> tags, object? state)
             where T : struct
@@ -85,6 +88,9 @@ public sealed class AxisMetricsTests
         gauges.Publish("default", [new WorkItemGauge("process.step", 3, 12.5)], [new PendingFieldsGauge("PurchaseRequests", 2)]);
         tenantDatabases.Record("default", true);
         rateLimitRefusals.Record(Partition.Session);
+        workerPolls.ObserveActiveTenants(() => 2);
+        workerPolls.RecordPoll(true);
+        workerPolls.RecordPoll(false);
         listener.RecordObservableInstruments();
 
         Assert.Equal([.. _allowed.Keys.Order(StringComparer.Ordinal)], [.. published.Order(StringComparer.Ordinal)]);

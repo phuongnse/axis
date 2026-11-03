@@ -35,7 +35,7 @@ public static class WorkerServiceCollectionExtensions
     /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs and the emails it sends for each tenant per UTC day, in the platform database over <c>ConnectionStrings:Platform</c>. An email past the tenant's <c>emailsPerDay</c> quota waits until 00:00 UTC. The dry run or commit of an import waits for a <c>concurrentImports</c> lease of the tenant, and is due again in one second when none is free.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:IdlePollCeiling</c> is below <c>Worker:PollInterval</c>, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -52,6 +52,11 @@ public static class WorkerServiceCollectionExtensions
         if (options.PollInterval <= TimeSpan.Zero)
         {
             throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.PollInterval)}' must be positive.");
+        }
+
+        if (options.IdlePollCeiling < options.PollInterval)
+        {
+            throw new InvalidOperationException($"'{WorkerOptions.SectionName}:{nameof(WorkerOptions.IdlePollCeiling)}' must be at least '{WorkerOptions.SectionName}:{nameof(WorkerOptions.PollInterval)}'.");
         }
 
         if (options.MetricsInterval <= TimeSpan.Zero)
@@ -167,6 +172,8 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<StartupCheckState>();
         services.AddSingleton<AxisGauges>();
         services.AddSingleton<WorkerGauges>();
+        services.AddMetrics();
+        services.AddSingleton<WorkerPollMetrics>();
         services.AddHostedService<WorkerService>();
         services.AddHostedService<WorkerMetricsService>();
         return services;

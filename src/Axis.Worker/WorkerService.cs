@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
+using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
 using Axis.Data.Files;
 using Axis.Data.Records;
@@ -16,15 +17,20 @@ namespace Axis.Worker;
 
 /// <summary>
 /// Under the directory source it first reads the tenant directory, and retries until a read works. Then it runs
-/// <c>Worker:Concurrency</c> loops and one poll. The poll runs every <c>Worker:PollInterval</c>. A wake signal from <see cref="WakeSignalListener"/>
-/// checks its tenant at once and joins it to the list, without housekeeping and without moving the next poll, and a reconnect of the listener polls every tenant. The loops share the
+/// <c>Worker:Concurrency</c> loops and one poll. The poll gives each tenant its own next poll time, see <see cref="TenantPolls"/>.
+/// A tenant that has work is polled every <c>Worker:PollInterval</c>. After each poll that finds nothing due, the wait of an idle
+/// tenant doubles, up to <c>Worker:IdlePollCeiling</c>, and its next poll comes at its earliest due time when that is sooner.
+/// The poll reads the schema versions, reads the directory again and reports that it is alive at most every <c>Worker:PollInterval</c>.
+/// A wake signal from <see cref="WakeSignalListener"/> checks its tenant at once and joins it to the list, without housekeeping, and
+/// resets the wait of the tenant. A reconnect of the listener resets every wait and polls every tenant. The loops share the
 /// active list of <see cref="TenantRounds"/>: the tenants that have work due, which get <c>Worker:Quantum</c> work items times
 /// their <c>workerWeight</c> in each turn. A loop takes the tenant whose turn it is, claims and runs one of its work items, and
-/// takes the next. A tenant leaves the list when a claim finds nothing due and none of its other items runs, or when a run fails, and the next poll puts it back.
+/// takes the next. A tenant leaves the list when a claim finds nothing due and none of its other items runs, or when a run fails, and a later poll puts it back.
 /// So a tenant with a large backlog does not hold back the others, and a tenant alone runs at full speed.
 /// In a cell a call waits when its tenant has no <c>concurrentConnectorCalls</c> lease free: the claim leaves it due, the tenant's
 /// turn ends, and the tenant stays in the list, idle until one of its items ends or the next poll.
-/// The poll checks the tenants in ordinal order of their ids, then adds every tenant that is ready to the list in one step.
+/// The poll checks the tenants that are due in ordinal order of their ids, reads the earliest due time of each, then adds every tenant that has work due to the list in one step.
+/// Each poll counts in <c>axis.worker.polls</c>, and <c>axis.worker.active_tenants</c> is the length of the list.
 /// A tenant whose database the server has not migrated yet is skipped until it has. Under the directory source the poll
 /// reads the directory again every <c>Tenancy:RefreshInterval</c>. The refresh pauses the loops, waits for the work items
 /// already running, and drops the pools of the tenants that changed or left, so no pool is dropped while one of its items runs.
@@ -55,6 +61,7 @@ internal sealed partial class WorkerService(
     StartupCheckState checkState,
     CellOptions cell,
     WakeSignals wake,
+    WorkerPollMetrics metrics,
     ILogger<WorkerService> logger,
     TenantUsageStore? usage = null) : BackgroundService
 {
@@ -73,6 +80,11 @@ internal sealed partial class WorkerService(
     // The tenants with work due, shared by the loops. In a cell a tenant's weight is its workerWeight quota, otherwise 1.
     // A weight that is missing, null or below 1 counts as 1, so no tenant with work due starves.
     private readonly TenantRounds _rounds = new(options.Quantum, tenantId => Math.Max(1, quotas.Limit(tenantId, QuotaKeys.WorkerWeight) ?? 1));
+
+    // The next poll time and the wait of each tenant. A stopwatch, not the injected clock: a test may freeze that clock, and the
+    // next poll would never come.
+    private readonly TenantPolls _polls = new(options.PollInterval, options.IdlePollCeiling);
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
 
     // A loop holds one permit while it claims and runs an item. A refresh of the directory holds them all.
     private readonly SemaphoreSlim _running = new(options.Concurrency);
@@ -101,6 +113,7 @@ internal sealed partial class WorkerService(
             LogTenantsSectionIgnored();
         }
 
+        metrics.ObserveActiveTenants(() => _rounds.Count);
         await LoadTenantsAsync(stoppingToken);
         _lastRefresh = time.GetUtcNow();
         using var stopLoops = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
@@ -127,20 +140,35 @@ internal sealed partial class WorkerService(
     }
 
     /// <summary>
-    /// Polls every tenant every poll interval. In between, a wake signal for a known tenant checks that tenant and puts it in the
-    /// active list at once, without housekeeping, and does not move the next poll. A signal for an unknown tenant is ignored.
+    /// Polls each tenant at its own next poll time, see <see cref="TenantPolls"/>. Every poll interval it also reads the schema
+    /// versions, reads the directory again and reports that it is alive. In between, a wake signal for a known tenant checks that
+    /// tenant, puts it in the active list at once without housekeeping, and resets its wait. A signal for an unknown tenant is ignored.
     /// It is the only code that changes the ready state, so none of it is shared with the loops.
     /// </summary>
     private async Task PollAsync(CancellationToken stoppingToken)
     {
-        // A stopwatch, not the injected clock: a test may freeze that clock, and the next poll would never come.
+        TimeSpan? lastRound = null;
         while (!stoppingToken.IsCancellationRequested)
         {
-            await PollTenantsAsync(stoppingToken);
-            var nextPoll = Stopwatch.GetTimestamp() + (long)(options.PollInterval.TotalSeconds * Stopwatch.Frequency);
+            if (lastRound is not { } last || _clock.Elapsed - last >= options.PollInterval)
+            {
+                lastRound = _clock.Elapsed;
+                health.Polled();
+                await ReadSchemaVersionsAsync(stoppingToken);
+                await RefreshIfDueAsync(stoppingToken);
+            }
+
+            var tenantIds = tenants.Tenants.Select(tenant => tenant.Id).ToArray();
+            await PollTenantsAsync(_polls.Due(tenantIds, _clock.Elapsed), stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
-                var remaining = Stopwatch.GetElapsedTime(Stopwatch.GetTimestamp(), nextPoll);
+                var wakeAt = lastRound.Value + options.PollInterval;
+                if (_polls.Earliest is { } earliest && earliest < wakeAt)
+                {
+                    wakeAt = earliest;
+                }
+
+                var remaining = wakeAt - _clock.Elapsed;
                 if (remaining <= TimeSpan.Zero || !await WaitForWakeAsync(remaining, stoppingToken))
                 {
                     break;
@@ -148,6 +176,7 @@ internal sealed partial class WorkerService(
 
                 if (await WakeTenantsAsync(stoppingToken))
                 {
+                    _polls.ResetAll();
                     break;
                 }
             }
@@ -170,7 +199,7 @@ internal sealed partial class WorkerService(
     }
 
     /// <summary>
-    /// Reads the wake signals that are waiting. Each known tenant is checked and put in the active list, and an unknown one is dropped.
+    /// Reads the wake signals that are waiting. Each known tenant is checked, put in the active list, and has its wait reset, and an unknown one is dropped.
     /// It is true when an entry wakes every tenant: nothing is checked then, and the caller polls them all.
     /// </summary>
     private async Task<bool> WakeTenantsAsync(CancellationToken stoppingToken)
@@ -195,6 +224,7 @@ internal sealed partial class WorkerService(
         }
 
         var ready = new List<string>();
+        var known = new List<string>();
         foreach (var tenantId in woken)
         {
             if (tenants.Find(tenantId) is null)
@@ -202,6 +232,8 @@ internal sealed partial class WorkerService(
                 LogWakeIgnored();
                 continue;
             }
+
+            known.Add(tenantId);
 
             using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
             {
@@ -213,31 +245,62 @@ internal sealed partial class WorkerService(
         }
 
         _rounds.Join(ready);
+        var now = _clock.Elapsed;
+        foreach (var tenantId in known)
+        {
+            _polls.Reset(tenantId, now);
+        }
+
         return false;
     }
 
-    /// <summary>Checks the tenants, runs their housekeeping, and puts the tenants that are ready in the active list.</summary>
-    private async Task PollTenantsAsync(CancellationToken stoppingToken)
+    /// <summary>
+    /// Polls the tenants that are due: checks each in ordinal order of its id, and reads its earliest due time. A tenant that has work due
+    /// joins the active list and keeps its wait. One that has none waits longer, and one that is not ready or whose read failed is
+    /// tried again after one poll interval. Then it runs the housekeeping of the tenants that passed the check.
+    /// </summary>
+    private async Task PollTenantsAsync(IReadOnlyList<string> due, CancellationToken stoppingToken)
     {
-        health.Polled();
-        await ReadSchemaVersionsAsync(stoppingToken);
-        await RefreshIfDueAsync(stoppingToken);
-
         // Every check comes first, so the first tenant does not run alone while the checks of the next one run.
         var ready = new List<string>();
-        var tenantIds = tenants.Tenants.Select(tenant => tenant.Id).Order(StringComparer.Ordinal).ToArray();
-        foreach (var tenantId in tenantIds)
+        var checkedIds = new List<string>();
+        foreach (var tenantId in due)
         {
             using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
             {
-                if (await CheckTenantAsync(tenantId, stoppingToken))
+                if (!await CheckTenantAsync(tenantId, stoppingToken))
                 {
-                    ready.Add(tenantId);
+                    _polls.Retry(tenantId, _clock.Elapsed);
+                    continue;
+                }
+
+                checkedIds.Add(tenantId);
+                try
+                {
+                    var nextDue = await runner.ReadNextDueAsync(tenantId, stoppingToken);
+                    var found = nextDue <= TimeSpan.Zero;
+                    metrics.RecordPoll(found);
+                    if (found)
+                    {
+                        ready.Add(tenantId);
+                        _polls.Found(tenantId, _clock.Elapsed);
+                    }
+                    else
+                    {
+                        _polls.Idle(tenantId, _clock.Elapsed, nextDue);
+                    }
+                }
+                catch (Exception exception) when (exception is not StartupCheckException
+                    && (exception is not OperationCanceledException || !stoppingToken.IsCancellationRequested))
+                {
+                    // The tenant is polled again after the poll interval, so a database that is down is not polled in a tight loop.
+                    LogRunFailed(exception, tenantId);
+                    _polls.Retry(tenantId, _clock.Elapsed);
                 }
             }
         }
 
-        foreach (var tenantId in ready)
+        foreach (var tenantId in checkedIds)
         {
             using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
             {
@@ -423,6 +486,7 @@ internal sealed partial class WorkerService(
             foreach (var tenantId in result.Retired)
             {
                 _rounds.Leave(tenantId);
+                _polls.Forget(tenantId);
                 await pools.RetireAsync(tenantId);
                 _ready.Remove(tenantId);
                 _waitingLogged.Remove(tenantId);

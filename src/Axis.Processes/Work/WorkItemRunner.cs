@@ -133,6 +133,30 @@ public sealed partial class WorkItemRunner
     }
 
     /// <summary>
+    /// Reads how long it is until the earliest due time of the tenant's claimable items of the kinds this worker handles, see
+    /// <see cref="WorkItemQueue.ReadNextDueAsync"/>. It is <see langword="null"/> when there is none.
+    /// </summary>
+    public async Task<TimeSpan?> ReadNextDueAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (_kinds.Length == 0)
+        {
+            return null;
+        }
+
+        var previous = _accessor.Current;
+        _accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
+            return await WorkItemQueue.ReadNextDueAsync(connection, tenantId, _kinds, cancellationToken);
+        }
+        finally
+        {
+            _accessor.Current = previous;
+        }
+    }
+
+    /// <summary>
     /// Runs a claimed item. When the handler succeeds, its writes commit together with the item's
     /// deletion. When it throws, its writes roll back, and a following transaction deletes the item
     /// and calls the handler's failure callback. Both commit only if the claim is still current.

@@ -653,5 +653,5 @@ does not read `Quotas:Defaults` yet.
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |
 | `Worker:Concurrency` | Worker | The loops that claim work at once, 4 by default, see [fair share](worker-scheduling.md#fair-share). |
 | `Worker:Quantum` | Worker | The work items a tenant of weight 1 runs in a round, 10 by default. |
-| `Worker:IdlePollCeiling` | Worker | The longest wait between two polls of an idle tenant, 30 seconds by default. |
+| `Worker:IdlePollCeiling` | Worker | The longest wait between two polls of an idle tenant, 30 seconds by default. It must be at least `Worker:PollInterval`, or the worker stops at start. |
 

@@ -144,6 +144,37 @@ public sealed class WakeSignalTests(AdminBackupFixture fixture) : IClassFixture<
     }
 
     [Fact]
+    public async Task With_its_listen_connection_ended_the_worker_still_runs_new_work_within_the_ceiling_and_listens_again()
+    {
+        var pollInterval = TimeSpan.FromSeconds(0.5);
+        var ceiling = TimeSpan.FromSeconds(3);
+        await using var server = CreateDirectoryServer(fixture.Scenario.Platform);
+        await RefreshAsync(server);
+        using var requester = server.CreateClient().SignedInAs("requester");
+        var worker = await StartListeningWorkerAsync(requester, pollInterval, ceiling);
+        try
+        {
+            var pid = await ListenerPidAsync(_received);
+            await PostgreSqlServer.AdminScalarAsync(fixture.Scenario.Platform, $"SELECT pg_terminate_backend({pid})", CancellationToken);
+            await Polling.WaitUntilAsync(async () => await ListenerPidAsync(TimeSpan.Zero) is { } now && now != pid, "The worker did not listen again.", _received);
+
+            // The idle tenant has backed off by now.
+            await Task.Delay(ceiling, CancellationToken);
+
+            // The configuration-source server sends no signal, so only a poll can find the instance.
+            using var unsignalled = fixture.CreateClient();
+            var subject = await AdminBackupFixture.CreateRequestAsync(unsignalled);
+            var instance = await StartAsync(unsignalled, subject);
+
+            await Polling.WaitUntilAsync(async () => await StateAsync(instance) == Waiting, "The instance did not wait for its manager within the ceiling.", ceiling + TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            await StopAsync(worker);
+        }
+    }
+
+    [Fact]
     public async Task A_signal_that_names_an_unknown_tenant_claims_no_work_and_does_not_stop_the_worker()
     {
         await using var server = CreateDirectoryServer(fixture.Scenario.Platform);
@@ -186,10 +217,10 @@ public sealed class WakeSignalTests(AdminBackupFixture fixture) : IClassFixture<
         return body.RootElement.GetProperty("id").GetGuid();
     }
 
-    // Starts a worker on the directory with a long poll interval, waits until it listens, and lets it run one instance, so its tenant is ready.
-    private async Task<WebApplication> StartListeningWorkerAsync(HttpClient requester)
+    // Starts a worker on the directory with a long poll interval unless it gets one, waits until it listens, and lets it run one instance, so its tenant is ready.
+    private async Task<WebApplication> StartListeningWorkerAsync(HttpClient requester, TimeSpan? pollInterval = null, TimeSpan? idlePollCeiling = null)
     {
-        var worker = await RestoredTenantWorkTests.BuildWorkerAsync(fixture.Scenario.Platform, _longPoll);
+        var worker = await RestoredTenantWorkTests.BuildWorkerAsync(fixture.Scenario.Platform, pollInterval ?? _longPoll, idlePollCeiling);
         try
         {
             Assert.NotNull(await ListenerPidAsync(_received));

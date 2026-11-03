@@ -49,6 +49,12 @@ public static class AxisMetrics
     /// <summary>When each tenant's backup last succeeded, in Unix seconds, by tenant. A tenant that never succeeded has no point.</summary>
     public const string BackupLastSuccess = "axis.backup.last_success";
 
+    /// <summary>The tenants in the active list of the worker, the ones that have work due. It has no attributes.</summary>
+    public const string WorkerActiveTenants = "axis.worker.active_tenants";
+
+    /// <summary>The polls of a tenant by the worker, by whether the poll found work due.</summary>
+    public const string WorkerPolls = "axis.worker.polls";
+
     /// <summary>
     /// The attribute keys that the HTTP client and DNS metrics keep. Any other key, such as
     /// <c>server.address</c>, <c>server.port</c>, <c>network.peer.address</c> or <c>dns.question.name</c>,

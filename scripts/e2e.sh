@@ -363,7 +363,7 @@ if affected playwright; then
         Tenants__default__DataKeys__1=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE= Tenants__default__LookupKeys__1=AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= \
         Tenants__journey__Hosts__0=127.0.0.2 Tenants__journey__ConnectionString="$AXIS_E2E_JOURNEY_DATABASE" \
         DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
-        Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 Worker__DeliveryAttempts=2 \
+        Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 Worker__DeliveryAttempts=2 Worker__IdlePollCeiling=00:00:01 \
         Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
         Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
         Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \

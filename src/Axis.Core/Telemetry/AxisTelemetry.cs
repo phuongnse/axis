@@ -41,6 +41,9 @@ public static class AxisTelemetry
     public const string OutcomeTag = "axis.outcome";
     public const string PartitionTag = "axis.partition";
 
+    /// <summary>Whether a poll of a tenant found work due, <c>true</c> or <c>false</c>.</summary>
+    public const string PollFoundTag = "axis.poll.found";
+
     /// <summary>The standard tag that names the type of the exception that failed a span. Its message is never recorded.</summary>
     public const string ErrorTypeTag = "error.type";
 

@@ -91,7 +91,7 @@ public sealed class WorkerSessionCleanupTests(PostgreSqlFixture database) : ICla
     private static IHost BuildHost(TimeProvider clock, LogCollector logs, params (string TenantId, string ConnectionString)[] tenants)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
-        var settings = new Dictionary<string, string?> { ["Worker:PollInterval"] = "00:00:00.05" };
+        var settings = new Dictionary<string, string?> { ["Worker:PollInterval"] = "00:00:00.05", ["Worker:IdlePollCeiling"] = "00:00:00.05" };
         foreach (var (tenantId, connectionString) in tenants)
         {
             settings[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";

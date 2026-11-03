@@ -173,7 +173,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         new NpgsqlConnectionStringBuilder(fixture.Scenario.Platform) { Database = row.DatabaseName }.ConnectionString;
 
     // A worker on the tenant directory. It runs as Development, the only environment that lets a connector call an http URL.
-    internal static async Task<WebApplication> BuildWorkerAsync(string platform, TimeSpan? pollInterval = null)
+    internal static async Task<WebApplication> BuildWorkerAsync(string platform, TimeSpan? pollInterval = null, TimeSpan? idlePollCeiling = null)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -185,6 +185,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
             ["Modules:Path"] = SampleModules.Path,
             ["Health:Urls"] = "http://127.0.0.1:0",
             ["Worker:PollInterval"] = (pollInterval ?? TimeSpan.FromMilliseconds(50)).ToString("c", CultureInfo.InvariantCulture),
+            ["Worker:IdlePollCeiling"] = (idlePollCeiling ?? pollInterval ?? TimeSpan.FromMilliseconds(50)).ToString("c", CultureInfo.InvariantCulture),
         });
         builder.Logging.ClearProviders();
         builder.Services.AddAxisWorker(

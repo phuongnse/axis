@@ -90,6 +90,7 @@ public sealed class FileSweepTests(PostgreSqlFixture database) : IClassFixture<P
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:IdlePollCeiling"] = "00:00:00.05",
             ["Tenants:a:Hosts:0"] = "a.example.test",
             ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenant),
         });

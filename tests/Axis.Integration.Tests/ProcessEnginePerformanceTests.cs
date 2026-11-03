@@ -83,6 +83,7 @@ public sealed class ProcessEnginePerformanceTests(ProcessStepFixture fixture) : 
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:IdlePollCeiling"] = "00:00:00.05",
             [$"Tenants:{ProcessStepFixture.TenantId}:Hosts:0"] = $"{ProcessStepFixture.TenantId}.example.test",
             [$"Tenants:{ProcessStepFixture.TenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString),
         });
