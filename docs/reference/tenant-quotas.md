@@ -12,9 +12,9 @@ outside a cell. The worker in a cell also samples each tenant's storage and coun
 [usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
 `emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
 event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
-are the `storage` refusals of record creates and updates, imports, file uploads and inbound endpoint calls. The
-`storage` refusals of Studio saves and publishes, the other `users` refusals, among them the first sign-in of a
-brokered user, and the leases are still planned, and so are the usage columns that the text marks. The conventions of
+are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
+saves and publishes. The other `users` refusals, among them the first sign-in of a brokered user, and the leases are
+still planned, and so are the usage columns that the text marks. The conventions of
 [architecture.md](../architecture.md) apply.
 
 The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
