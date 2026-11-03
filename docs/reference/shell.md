@@ -11,14 +11,16 @@ endpoints and the widgets are in [frontend](frontend.md), and sign-in and the se
 heading on the sign-in card, sign-in that starts at once, the shell that fills the window, the menus, the theme that
 follows the system and the home page. D98's and D114's rules are built, and so are the design system's shell previews and
 their Shell group of cards. [D128](../decisions/d128-rules-from-the-studio-review.md) changes the sidebar, the account
-button, how the page scrolls, the footer, the tiles and sign-out, and adds the Studio group of cards _(planned for M31)_.
+button, how the page scrolls, the footer, the tiles and sign-out, and adds the Studio group of cards. Its sidebar,
+account button, scrolling, footer and tile rules are built. Sign-out and the Studio group of cards are
+_(planned for M31)_.
 
 ## Layout
 
 - **Header.** One row, 48 px high, on `surface` with a `borderSubtle` rule below it. From the left: the button that
   collapses the sidebar, the site's mark, the site's title, then on the right the notification bell, the app switcher,
   the language and theme menu and the account button. The account button is the person's avatar, the initials of
-  their name on a `primary` circle, then their name and a caret _(planned for M31)_: a circle is a person, as a rounded square
+  their name on a `primary` circle, then their name and a caret: a circle is a person, as a rounded square
   is an application or a site. The mark is the first letter of the site's title on a
   `primary` tile with `radius-base` corners. The mark and the title are one link to the site's first navigation page.
   The header's items are centred by its flex row, never by its line height. The header has
@@ -27,25 +29,26 @@ button, how the page scrolls, the footer, the tiles and sign-out, and adds the S
   on keyboard focus, see [buttons](actions-and-controls.md#buttons). The platform site's title and mark name Axis, because the tenant has no name yet, as the
   [sign-in card](#platform-home-page) does.
 - **Sidebar.** The site's navigation entries, in configuration order, in a sidebar 224 px wide on `surface` with a
-  `borderSubtle` rule on its right. Each entry shows its icon, see [navigation icons](#navigation-icons), and its
-  label. _(planned for M31)_: an open entry shows its label alone, and no entry shows a count. The entry of the current page is
-  drawn in `primaryText` on a `primary` tint and marked `aria-current`.
-- **A page's own sidebar** _(planned for M31)_. A page with its own navigation, such as Studio, claims the sidebar and draws
-  its navigation there in place of the site's. Such a page is a workspace: `spacing-md` round its content, a compact
-  band and 32 px sidebar entries, see [Studio workspace](studio-workspace.md#workspace).
+  `borderSubtle` rule on its right. An open entry shows its label alone. A collapsed entry shows its icon alone, see
+  [navigation icons](#navigation-icons). No entry shows a count. The entry of the current page is drawn in
+  `primaryText` on a `primary` tint and marked `aria-current`.
+- **A page's own sidebar.** A page with its own navigation, such as Studio, claims the sidebar by rendering
+  `ShellSidebar`, and draws its navigation there in place of the site's. Such a page is a workspace: `spacing-md`
+  round its content and 32 px sidebar entries, and a compact band _(planned for M31)_, see
+  [Studio workspace](studio-workspace.md#workspace). The sidebar and its collapse button show even on a one-page site.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a strip 64 px wide of the entries' icons, each
   named by a tooltip, and opens it again. Each icon is centred, and a group's title gives way to a thin rule _(planned for M31)_. The button names what it does, "Collapse navigation" or "Expand
   navigation", and has `aria-expanded`. The sidebar stays open or collapsed while the person moves between pages.
 - **One-page sites.** A site with one navigation entry, such as the platform site, has no sidebar and no button to
-  collapse it. The page takes the whole width.
+  collapse it, unless a page claims the sidebar. The page takes the whole width.
 - **Narrow width.** Below 992 px the sidebar gives way to a panel under the header, which a Menu button opens and
   closes, as it does today.
 - **Window.** The shell fills the browser window: the page has no margin round it, and the
   document behind it is `canvas` in both modes, so no white shows at its edges or when the page scrolls past its
   end.
-- **Scrolling** _(planned for M31)_. The page keeps the browser's own scroll. The header stays at the top, a compact band stays
-  under it, and the sidebar's background runs the page's height while its navigation stays under the header with a
-  scroll of its own. A regular band and the footer scroll with the page. The page declares its colour scheme, so every
+- **Scrolling.** The page keeps the browser's own scroll. The header stays at the top, a compact band
+  _(planned for M31)_ stays under it, and the sidebar's background runs the page's height while its navigation stays
+  under the header with a scroll of its own. A regular band and the footer scroll with the page. The page declares its colour scheme, so every
   scrollbar, the page's and the sidebar's, follows the mode.
 - **Page area.** Pages draw on `canvas` with `spacing-lg` padding. A wide table scrolls inside its widget, so the
   page never scrolls sideways.
@@ -53,13 +56,11 @@ button, how the page scrolls, the footer, the tiles and sign-out, and adds the S
   `surface` with a `borderSubtle` rule above it. _(planned for M31)_: beside a sidebar it sits under the content
   column only, so the sidebar runs to the bottom of the window and is never pushed up by it, see
   [D129](../decisions/d129-rules-from-the-studio-editors-review.md). On the left it reads "© <year> Axis", then " · v<version>" for a
-  signed-in person only, as in "© 2026 Axis · v0.1.0". On the right it shows the server's readiness, "Server status"
-  and a dot with Ready, Checking or Unavailable. _(planned for M31)_: the readiness goes, because the footer read it once when
-  the page loaded, and a page that cannot reach the server says so where it fails. The legal links take the right,
+  signed-in person only, as in "© 2026 Axis · v0.1.0". It shows no server status, and a page that cannot reach the
+  server says so where it fails. The legal links take the right,
   as the [legal line](legal.md#legal-line) says. An anonymous visitor
   never sees the version, because it tells an attacker which known weaknesses to try. The footer
-  has `spacing-xs` padding above and below and `spacing-lg` at its sides. Its text is in `textMuted`, and the
-  readiness reads "Server status:" with the dot and the word after it. In a design system preview, each state's
+  has `spacing-xs` padding above and below and `spacing-lg` at its sides. Its text is in `textMuted`. In a design system preview, each state's
   frame shows the whole shell, from the header to the footer.
 
 ## Navigation icons
@@ -136,9 +137,9 @@ button, how the page scrolls, the footer, the tiles and sign-out, and adds the S
   - The tools, and the sites inside an application, sit in the home grid, which takes as many columns as it has tiles,
     up to three: one tile fills the row, two share it, and three or more take a third each, the fourth starting the
     next row. Its columns are `repeat(auto-fit, minmax(max(0px, calc((100% - 2 × spacing-md) / 3)), 1fr))` with a
-    `spacing-md` gap, so no code counts the tiles. Below 992 px it is one column. _(planned for M31)_: every row is as tall as
+    `spacing-md` gap, so no code counts the tiles. Below 992 px it is one column. Every row is as tall as
     the tallest (`grid-auto-rows: 1fr`), and a description takes at most two lines, ending in an ellipsis with the whole
-    text in a tooltip, here and in Studio.
+    text in a tooltip, here and in Studio _(planned for M31)_.
 - **Signed out.** A person who opens Axis without a session goes straight to the sign-in page of
   [Axis's identity provider](identity-provider.md#theme). Axis draws no screen of its own in front of it. The page
   starts sign-in when `GET /api/me` or `GET /api/sites` answers `401`.

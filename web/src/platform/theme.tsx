@@ -46,6 +46,8 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   useEffect(() => {
     document.body.style.backgroundColor = designTokensFor(mode).colour.canvas
+    // Scrollbars and other browser controls follow the mode.
+    document.documentElement.style.colorScheme = mode
   }, [mode])
 
   return (

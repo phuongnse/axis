@@ -6,9 +6,21 @@ export async function waitForCanvas(page: Page) {
 }
 
 /**
+ * Scrolls `element` to the top of the window, just below the shell's sticky header, which covers the top of the window
+ * and would take the mouse of a drag that starts or aims there.
+ */
+export async function scrollBelowHeader(element: Locator) {
+  await element.evaluate((node) => {
+    const header = document.querySelector('header')
+    node.scrollIntoView({ block: 'start' })
+    window.scrollBy(0, -(header?.getBoundingClientRect().height ?? 0))
+  })
+}
+
+/**
  * Drags `source` with the mouse to the point of `target` that is `fraction` of its height down: a small move starts the
  * drag, then steps reach the point. `designer` is the test id of the Design tab, 'studio-page-design' or
- * 'studio-form-design'. It is scrolled to the top of the window first, and both points are measured after that, because
+ * 'studio-form-design'. It is scrolled to the top of the window, below the header, first, and both points are measured after that, because
  * the page scrolls while it loads and a mouse outside the window hits nothing. On a page designer it first waits until
  * the canvas has drawn the latest draft, and until the target holds still, because a redraw can move the target. After
  * the mouse reaches the point, a page designer aims again until the canvas marks the target with `data-drop-over`, and
@@ -17,7 +29,7 @@ export async function waitForCanvas(page: Page) {
  * moves to 40% down first, because the drag library scrolls the window while the pointer stays in that fifth.
  */
 export async function dragTo(page: Page, designer: string, source: Locator, target: Locator, fraction = 0.5) {
-  await page.getByTestId(designer).evaluate((element) => element.scrollIntoView({ block: 'start' }))
+  await scrollBelowHeader(page.getByTestId(designer))
   await expect(
     page.getByTestId(designer).locator('[data-testid="studio-page-canvas"][aria-busy="true"]'),
   ).toHaveCount(0)

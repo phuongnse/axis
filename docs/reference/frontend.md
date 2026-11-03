@@ -890,7 +890,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - With nobody signed in, it is a **Sign in** button, except on the home page `/`, which starts sign-in or shows a card.
     It sends the browser to `/api/auth/sign-in` with the current path and query string as `returnUrl`, so the person
     comes back there, but to `/` from the card addresses `/?signIn=failed` and `/?signedOut`.
-  - With someone signed in, it shows their display name, and _(planned for M31)_ their avatar before it and a caret
+  - With someone signed in, it shows their display name, with their avatar before it and a caret
     after it. Its menu holds **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
     ends the session. The server ends the identity provider's session itself and the browser goes to `/?signedOut`. Only
     when that fails does the browser go to the identity provider's sign-out page, see

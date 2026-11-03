@@ -3,11 +3,10 @@ import type { Locator } from '@playwright/test'
 import { useSession } from '../sessions'
 import { chooseLanguage, chooseTheme, expectChosen } from '../shell'
 
-test('the home page loads and reports a ready server', async ({ page }) => {
+test('the home page loads', async ({ page }) => {
   await page.goto('/?signedOut')
 
   await expect(page).toHaveTitle('Axis')
-  await expect(page.getByTestId('footer-server-status')).toContainText('Ready')
   // Nobody is signed in, so the page is the signed-out card.
   await expect(page.getByRole('main').getByText('You have signed out', { exact: true })).toBeVisible()
   await expect(page.getByRole('main').getByRole('button', { name: 'Sign in again', exact: true })).toBeVisible()
@@ -141,10 +140,10 @@ test('switching the locale changes the texts and survives a reload', async ({ pa
   await chooseLanguage(page, 'Tiếng Việt')
 
   await expect(page.getByRole('main').getByText('Bạn đã đăng xuất', { exact: true })).toBeVisible()
-  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ:', { exact: true })).toBeVisible()
+  await expect(page.getByRole('contentinfo')).not.toContainText('Trạng thái máy chủ')
   await page.reload()
   await expect(page.getByRole('main').getByText('Bạn đã đăng xuất', { exact: true })).toBeVisible()
-  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ:', { exact: true })).toBeVisible()
+  await expect(page.getByRole('contentinfo')).not.toContainText('Trạng thái máy chủ')
   await expectChosen(page, 'Tiếng Việt', 'Ngôn ngữ và giao diện')
 })
 
@@ -227,6 +226,19 @@ test('a site collapses its sidebar to icons and keeps it collapsed on the next p
   expect((await sidebar.boundingBox())?.width).toBe(64)
 })
 
+test('the page scrolls in the browser while the header and the sidebar navigation stay under it', async ({ page }) => {
+  await page.setViewportSize({ width: 992, height: 300 })
+  await useSession(page, 'requester')
+  await page.goto('/e2e/notes')
+  await expect(page.getByRole('menuitem', { name: 'Notes', exact: true })).toBeVisible()
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  expect((await page.getByRole('banner').boundingBox())?.y).toBe(0)
+  expect((await page.locator('#shell-sidebar nav').boundingBox())?.y).toBe(48)
+})
+
 test('the platform site has no sidebar and no collapse button', async ({ page }) => {
   await page.goto('/?signedOut')
 
@@ -240,7 +252,7 @@ test('the footer shows the version only to a signed-in person', async ({ page })
   await page.goto('/?signedOut')
   const footer = page.getByRole('contentinfo')
   await expect(footer).toContainText(`© ${year} Axis`)
-  await expect(footer.getByTestId('footer-server-status')).toContainText('Ready')
+  await expect(footer).not.toContainText('Server status')
   await expect(footer).not.toContainText(' · v')
 
   await useSession(page, 'requester')

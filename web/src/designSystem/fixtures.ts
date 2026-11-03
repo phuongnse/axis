@@ -974,7 +974,7 @@ export const siteTexts: Record<string, string> = {
 }
 
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
-export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about', '/health/ready'] as const
+export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about'] as const
 
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
@@ -1003,5 +1003,4 @@ export const routes: Record<string, () => unknown> = {
   '/api/sites': () => ({ sites: listedSites }),
   '/api/me': () => currentUser,
   '/api/about': () => ({ version: '0.1.0' }),
-  '/health/ready': () => new Response(null, { status: 200 }),
 }

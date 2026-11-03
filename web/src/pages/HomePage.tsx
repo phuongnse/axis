@@ -39,6 +39,7 @@ function useHomeGrid(): CSSProperties {
   return {
     display: 'grid',
     gridTemplateColumns: narrow ? '1fr' : homeGridColumns(spacing.md),
+    gridAutoRows: '1fr',
     gap: spacing.md,
   }
 }
@@ -127,11 +128,16 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
       >
         {createElement(navigationIcon(icon), { 'aria-hidden': true, style: { fontSize: 20 } })}
       </span>
-      <Flex vertical>
+      <Flex vertical style={{ minWidth: 0 }}>
         <Typography.Text strong style={{ color: colour.primaryText }}>
           {title}
         </Typography.Text>
-        <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>
+        <Typography.Paragraph
+          ellipsis={{ rows: 2, tooltip: description }}
+          style={{ margin: 0, color: colour.textMuted }}
+        >
+          {description}
+        </Typography.Paragraph>
       </Flex>
     </Link>
   )
@@ -240,7 +246,12 @@ function ApplicationCard({
                   {siteTitle(site, locale)}
                 </Typography.Text>
                 {siteDescription !== null && (
-                  <Typography.Text style={{ color: colour.textMuted }}>{siteDescription}</Typography.Text>
+                  <Typography.Paragraph
+                    ellipsis={{ rows: 2, tooltip: siteDescription }}
+                    style={{ margin: 0, color: colour.textMuted }}
+                  >
+                    {siteDescription}
+                  </Typography.Paragraph>
                 )}
               </Flex>
             </Link>
