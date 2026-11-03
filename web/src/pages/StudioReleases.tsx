@@ -1,12 +1,16 @@
 import { PlayCircleOutlined } from '@ant-design/icons'
-import { Button, Flex, Modal, Tag, Typography } from 'antd'
-import { useContext, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { Alert, Button, Flex, Modal, Tag, Typography } from 'antd'
+import { useContext, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
 import { EmptyDash, NotSet } from '../platform/EmptyValue'
 import {
+  fetchStudioRelease,
   relaxedPointWords,
+  resourceTitle,
+  type StudioReleaseDetail as StudioReleaseDetailData,
+  type StudioReleasePart,
   releaseActorName,
   releaseGroups,
   type StudioRelaxedPoint,
@@ -16,6 +20,7 @@ import {
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { kindName } from './studioViews'
 import { dialogWidth } from '../platform/dialogButtons'
 
 /**
@@ -30,6 +35,7 @@ import { dialogWidth } from '../platform/dialogButtons'
  * relaxed points, with Activate… in `headingSlot`, the page heading's right side.
  */
 export function StudioReleasesList({
+  application,
   history,
   canRollBack: canActivate,
   busy,
@@ -39,6 +45,7 @@ export function StudioReleasesList({
   historyAddress,
   headingSlot,
 }: {
+  application: string
   history: StudioReleases
   canRollBack: boolean
   busy: boolean
@@ -112,7 +119,7 @@ export function StudioReleasesList({
     return (
       <section data-testid="studio-release" data-number={shown.number}>
         {activate && (headingSlot ? createPortal(activate, headingSlot) : activate)}
-        <StudioReleaseDetail release={shown} time={time} />
+        <StudioReleaseDetail application={application} history={history} release={shown} time={time} />
         {dialog}
       </section>
     )
@@ -228,23 +235,109 @@ export function ReleaseTags({ release }: { release: StudioReleaseGroup }) {
   )
 }
 
+/** Proposed: a section of a release's page: its title, an optional muted line, then its content. */
+function ReleaseSection({
+  title,
+  intro,
+  testId,
+  children,
+}: {
+  title: string
+  intro?: string
+  testId: string
+  children?: ReactNode
+}) {
+  const { colour } = useDesignTokens()
+  return (
+    <Flex vertical gap="small" data-testid={testId}>
+      <Typography.Title level={5} style={{ margin: 0 }}>
+        {title}
+      </Typography.Title>
+      {intro && <Typography.Text style={{ color: colour.textMuted }}>{intro}</Typography.Text>}
+      {children}
+    </Flex>
+  )
+}
+
+/** Proposed: one activation of a release, with the release it replaced and when another replaced it. */
+interface ReleaseActivationRow {
+  key: string
+  activatedAt: string
+  actor: { actor: string; actorName?: string | null }
+  replaced: number | null
+  until: string | null
+}
+
 /**
- * Proposed: a release's page under its heading, "Release 6" with its label under it: when it was published, by whom
- * and its note, as a description list, then, for an off-standard release, its relaxed points as a table, each with its
- * module, the point in words and the reason given.
+ * Proposed: a release's page under its heading, "Release 6" with its tags: its facts as a description list (label,
+ * whether it is live, when it was published and by whom, and its note on a line of its own), then, for an off-standard
+ * release, its relaxed points; then what changed from the release numbered just below it, the modules and packages it
+ * pins with their versions, and every time it was activated.
  */
-function StudioReleaseDetail({ release, time }: { release: StudioReleaseGroup; time: Intl.DateTimeFormat }) {
+function StudioReleaseDetail({
+  application,
+  history,
+  release,
+  time,
+}: {
+  application: string
+  history: StudioReleases
+  release: StudioReleaseGroup
+  time: Intl.DateTimeFormat
+}) {
   const t = useText()
   const { colour, spacing, type } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const fact = (key: string, span: number, value: ReactNode) => (
-    <div key={key} style={{ gridColumn: `span ${span}`, minWidth: 0 }}>
-      <dt style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
-        {t(key)}
-      </dt>
+  const [detail, setDetail] = useState<{ number: number; value: StudioReleaseDetailData | 'failed' }>()
+  const activationCount = history.items.length
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchStudioRelease(application, release.number, controller.signal).then(
+      (value) => setDetail({ number: release.number, value }),
+      (error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.warn(`Loading release ${release.number} failed`, error)
+          setDetail({ number: release.number, value: 'failed' })
+        }
+      },
+    )
+    return () => controller.abort()
+  }, [application, release.number, activationCount])
+
+  // Proposed: every activation of the release, newest first, from the whole history in time order: the one before it
+  // is the release it replaced, and the one after it is when it stopped being live.
+  const ordered = history.items.toSorted((left, right) => Date.parse(left.activatedAt) - Date.parse(right.activatedAt))
+  const activations: ReleaseActivationRow[] = ordered
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.releaseId === release.releaseId)
+    .map(({ item, index }) => ({
+      key: `${item.activatedAt}/${index}`,
+      activatedAt: item.activatedAt,
+      actor: item,
+      replaced: index > 0 && ordered[index - 1].releaseId !== item.releaseId ? ordered[index - 1].number : null,
+      until: ordered[index + 1]?.activatedAt ?? null,
+    }))
+    .reverse()
+  const last = activations[0]
+  const at = (value: string) => time.format(new Date(value))
+
+  const fact = (key: string, span: number, label: string, value: ReactNode) => (
+    <div key={key} style={{ gridColumn: `span ${span}`, minWidth: 0 }} data-testid={`studio-release-${key}`}>
+      <dt style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>{label}</dt>
       <dd style={{ margin: '6px 0 0', fontSize: type.fontSize, lineHeight: '22px', color: colour.text }}>{value}</dd>
     </div>
   )
+  const shown = detail?.number === release.number ? detail.value : undefined
+  const previous = shown && shown !== 'failed' ? shown.previous : null
+  const parts: StudioReleasePartRow[] =
+    shown && shown !== 'failed'
+      ? [
+          ...shown.modules.map((part) => ({ ...part, type: 'module' as const })),
+          ...shown.packages.map((part) => ({ ...part, type: 'package' as const })),
+        ]
+      : []
+
   return (
     <Flex vertical gap={spacing.lg}>
       <dl
@@ -257,18 +350,27 @@ function StudioReleaseDetail({ release, time }: { release: StudioReleaseGroup; t
           alignItems: 'start',
         }}
       >
-        {fact('shell.studio.releases.published', 3, time.format(new Date(release.published.activatedAt)))}
-        {fact('shell.studio.releases.publishedBy', 3, releaseActorName(release.published, t))}
-        {fact('shell.studio.releases.note', 6, release.note ?? <NotSet />)}
+        {fact('label', 3, t('shell.studio.releases.label'), release.label ?? <NotSet />)}
+        {fact(
+          'status',
+          3,
+          t('shell.studio.release.status'),
+          release.live
+            ? t('shell.studio.release.liveSince').replace('{time}', at(last.activatedAt))
+            : last?.until
+              ? t('shell.studio.release.replacedOn').replace('{time}', at(last.until))
+              : t('shell.studio.release.notLive'),
+        )}
+        {fact('published', 3, t('shell.studio.releases.published'), at(release.published.activatedAt))}
+        {fact('publishedBy', 3, t('shell.studio.releases.publishedBy'), releaseActorName(release.published, t))}
+        {fact('note', 12, t('shell.studio.releases.note'), release.note ?? <NotSet />)}
       </dl>
       {release.relaxed.length > 0 && (
-        <Flex vertical gap="small" data-testid="studio-release-relaxed">
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            {t('shell.studio.releases.relaxed')}
-          </Typography.Title>
-          <Typography.Text style={{ color: colour.textMuted }}>
-            {t('shell.studio.release.relaxedIntro')}
-          </Typography.Text>
+        <ReleaseSection
+          title={t('shell.studio.releases.relaxed')}
+          intro={t('shell.studio.release.relaxedIntro')}
+          testId="studio-release-relaxed"
+        >
           <AxisTable<StudioRelaxedPoint>
             rows={release.relaxed}
             rowKey={(point) => `${point.module}/${point.point}`}
@@ -305,8 +407,158 @@ function StudioReleaseDetail({ release, time }: { release: StudioReleaseGroup; t
               },
             ]}
           />
-        </Flex>
+        </ReleaseSection>
       )}
+      {shown === 'failed' && (
+        <Alert type="error" data-testid="studio-release-detail-error" title={t('shell.studio.release.loadFailed')} />
+      )}
+      {shown && shown !== 'failed' && (
+        <>
+          <ReleaseSection
+            // Proposed: what this release changed, from the release just below it, as the Overview lists the changes
+            // not live yet. The names are the release's own, as the folder may have moved on, so none is a link.
+            title={
+              previous === null
+                ? t('shell.studio.release.changes.title')
+                : t('shell.studio.release.changes.from').replace('{previous}', String(previous))
+            }
+            intro={
+              previous === null
+                ? t('shell.studio.release.changes.first')
+                : shown.changes.length === 0
+                  ? t('shell.studio.release.changes.none').replace('{previous}', String(previous))
+                  : undefined
+            }
+            testId="studio-release-changes"
+          >
+            {shown.changes.length > 0 && (
+              <ul
+                style={{
+                  margin: 0,
+                  padding: 0,
+                  listStyle: 'none',
+                  display: 'grid',
+                  gridTemplateColumns: 'fit-content(320px) max-content max-content',
+                  columnGap: spacing.lg,
+                  rowGap: spacing.xs,
+                  alignItems: 'baseline',
+                }}
+              >
+                {shown.changes.map((change) => (
+                  <li key={change.path} style={{ display: 'contents' }}>
+                    <Typography.Text>
+                      {resourceTitle(
+                        {
+                          file: change.path,
+                          name: change.name ?? null,
+                          titles: change.titles ?? null,
+                          locale: change.locale ?? null,
+                        },
+                        locale,
+                      )}
+                    </Typography.Text>
+                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
+                      {change.kind ? kindName(change.kind, t) : ''}
+                    </Typography.Text>
+                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
+                      {t(`shell.studio.overview.change.${change.change}`)}
+                    </Typography.Text>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ReleaseSection>
+          {parts.length > 0 && (
+            <ReleaseSection title={t('shell.studio.release.parts')} testId="studio-release-parts">
+              <AxisTable<StudioReleasePartRow>
+                rows={parts}
+                rowKey={(part) => `${part.type}/${part.id}`}
+                emptyText=""
+                pagination={false}
+                columns={[
+                  {
+                    key: 'name',
+                    title: t('shell.studio.release.part.name'),
+                    kind: 'text',
+                    render: (part) => part.label ?? part.id,
+                  },
+                  {
+                    key: 'type',
+                    title: t('shell.studio.release.part.type'),
+                    kind: 'fit',
+                    render: (part) => t(`shell.studio.release.part.${part.type}`),
+                  },
+                  {
+                    key: 'version',
+                    title: t('shell.studio.release.part.version'),
+                    kind: 'fit',
+                    render: (part) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{part.version}</span>,
+                  },
+                  ...(previous === null
+                    ? []
+                    : [
+                        {
+                          // Proposed: how the part differs from the previous release: added, or the version it had.
+                          key: 'previous',
+                          title: t('shell.studio.release.part.from').replace('{previous}', String(previous)),
+                          kind: 'fit' as const,
+                          render: (part: StudioReleasePartRow) =>
+                            part.previousVersion === '' ? (
+                              t('shell.studio.overview.change.added')
+                            ) : part.previousVersion && part.previousVersion !== part.version ? (
+                              t('shell.studio.release.part.was').replace('{version}', part.previousVersion)
+                            ) : (
+                              <EmptyDash />
+                            ),
+                        },
+                      ]),
+                ]}
+              />
+            </ReleaseSection>
+          )}
+        </>
+      )}
+      <ReleaseSection title={t('shell.studio.release.activations')} testId="studio-release-activations">
+        <AxisTable<ReleaseActivationRow>
+          rows={activations}
+          rowKey={(row) => row.key}
+          emptyText=""
+          pagination={false}
+          columns={[
+            {
+              key: 'activatedAt',
+              title: t('shell.studio.release.activatedAt'),
+              kind: 'fit',
+              render: (row) => at(row.activatedAt),
+            },
+            {
+              key: 'by',
+              title: t('shell.studio.release.activatedBy'),
+              kind: 'text',
+              render: (row) => releaseActorName(row.actor, t),
+            },
+            {
+              key: 'replaced',
+              title: t('shell.studio.release.replaced'),
+              kind: 'fit',
+              render: (row) =>
+                row.replaced === null ? (
+                  <EmptyDash />
+                ) : (
+                  t('shell.studio.release.title').replace('{number}', String(row.replaced))
+                ),
+            },
+            {
+              key: 'until',
+              title: t('shell.studio.release.liveUntil'),
+              kind: 'fit',
+              render: (row) => (row.until ? at(row.until) : t('shell.studio.release.now')),
+            },
+          ]}
+        />
+      </ReleaseSection>
     </Flex>
   )
 }
+
+type StudioReleasePartRow = StudioReleasePart & { type: 'module' | 'package' }

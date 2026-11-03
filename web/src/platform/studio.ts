@@ -989,6 +989,47 @@ export async function fetchStudioRequest(
 }
 
 /** Loads the release history of an application. A 401 shows the sign-in prompt and throws, as any other failure does. */
+/** Proposed: a file that differs between two versions of an application, named from the side that holds it. */
+export interface StudioFileChange {
+  path: string
+  change: 'added' | 'changed' | 'removed'
+  kind?: string | null
+  name?: string | null
+  titles?: Record<string, string> | null
+  locale?: string | null
+}
+
+/** Proposed: a module or package a release pins; `previousVersion` is empty when the previous release had none. */
+export interface StudioReleasePart {
+  id: string
+  label?: string | null
+  version: string
+  previousVersion?: string | null
+}
+
+/** Proposed: one release's page, from `GET /api/studio/apps/{application}/releases/{number}`. */
+export interface StudioReleaseDetail {
+  number: number
+  previous: number | null
+  changes: StudioFileChange[]
+  modules: StudioReleasePart[]
+  packages: StudioReleasePart[]
+}
+
+/** Proposed: loads what one release holds beyond its history row. */
+export async function fetchStudioRelease(
+  application: string,
+  number: number,
+  signal?: AbortSignal,
+): Promise<StudioReleaseDetail> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${number}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioReleaseDetail
+}
+
 export async function fetchStudioReleases(application: string, signal?: AbortSignal): Promise<StudioReleases> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/releases`
   const response = await studioFetch(path, { signal })

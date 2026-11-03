@@ -14,7 +14,7 @@ import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
 import { useTileGrid } from './homeGrid'
 import { SiteTile, TileFocusStyle } from './SiteTile'
-import { studioKindGroups, type StudioView } from './studioViews'
+import { kindName, studioKindGroups, type StudioView } from './studioViews'
 
 /**
  * Proposed: the first view of an open application, which says what to do next rather than what the application
@@ -286,11 +286,6 @@ function Release({
 }
 
 /** Proposed: a kind's name for one resource, in the singular, such as Entity, where the sidebar's list says Entities. */
-function kindName(kind: string, t: (key: string) => string): string {
-  const key = `shell.studio.kindOne.${kind}`
-  const name = t(key)
-  return name === key ? kind : name
-}
 
 /**
  * Proposed: what runs now, the application's live sites as the home page shows them, each its mark, its title as the

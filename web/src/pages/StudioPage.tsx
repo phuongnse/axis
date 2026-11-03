@@ -510,7 +510,7 @@ function StudioWorkspace() {
               ? `${t('shell.studio.module')}: ${selectedModuleItem.module}`
               : view.name === 'overview' && openApp
                 ? studioApplicationDescription(openApp, locale)
-                : (openRelease?.label ?? undefined)
+                : undefined
         }
         titleExtra={openRelease ? <ReleaseTags release={openRelease} /> : undefined}
         headingExtra={

@@ -96,6 +96,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/names", NamesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/policy-matrix", PolicyMatrixAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/releases/{number:int}", ReleaseAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
@@ -703,6 +704,102 @@ internal static class StudioEndpoints
         }
     }
 
+    /// <summary>
+    /// Proposed: what one release holds beyond its history row, for its page: the files that differ from the release
+    /// numbered just below it, each named from the release that holds it; the modules it pins, each with its label and
+    /// version and the version the previous release pinned; and the packages it pins. A module's own files are left out
+    /// of the changes, as its version says what changed. The first release has no previous one, so it lists no changes.
+    /// </summary>
+    private static async Task<IResult> ReleaseAsync(
+        string application,
+        int number,
+        HttpContext httpContext,
+        StudioOptions options,
+        TenantDatabase database)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (StudioFolder.List(folder).FirstOrDefault(file => file.File == "application.json")?.Id is not { } applicationId)
+        {
+            return NotFound("The release was not found.");
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        var context = await database.GetConfigurationAsync(cancellationToken);
+        var activations = await new ActiveReleaseStore(context).ListActivationsAsync(applicationId, cancellationToken);
+        if (activations.FirstOrDefault(row => row.Number == number) is not { } release)
+        {
+            return NotFound("The release was not found.");
+        }
+
+        var previous = activations.Where(row => row.Number < number).MaxBy(row => row.Number);
+        var ids = previous is null ? new[] { release.ReleaseId } : [release.ReleaseId, previous.ReleaseId];
+        var files = await context.ReleaseResources
+            .AsNoTracking()
+            .Where(resource => ids.Contains(resource.ReleaseId))
+            .Select(resource => new { resource.ReleaseId, resource.Path, resource.Content })
+            .ToListAsync(cancellationToken);
+        var current = files.Where(file => file.ReleaseId == release.ReleaseId).ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+        var before = previous is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : files.Where(file => file.ReleaseId == previous.ReleaseId).ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+
+        var changes = new List<StudioReleaseChange>();
+        if (previous is not null)
+        {
+            var currentTexts = ReleaseTexts(current.Values);
+            var beforeTexts = ReleaseTexts(before.Values);
+            static bool Own(string path) => !path.StartsWith("modules/", StringComparison.Ordinal);
+            foreach (var (path, content) in current.Where(file => Own(file.Key)))
+            {
+                if (!before.TryGetValue(path, out var old))
+                {
+                    changes.Add(RemovedChange(path, content, currentTexts) with { Change = "added" });
+                }
+                else if (old != content)
+                {
+                    changes.Add(RemovedChange(path, content, currentTexts) with { Change = "changed" });
+                }
+            }
+
+            changes.AddRange(before.Where(file => Own(file.Key) && !current.ContainsKey(file.Key)).Select(file => RemovedChange(file.Key, file.Value, beforeTexts)));
+        }
+
+        var beforeModules = Modules(before).ToDictionary(module => module.Id, module => module.Version, StringComparer.Ordinal);
+        var modules = Modules(current)
+            .Select(module => module with { PreviousVersion = previous is null ? null : beforeModules.GetValueOrDefault(module.Id) ?? "" })
+            .ToList();
+        var pinned = await context.ReleasePackages
+            .AsNoTracking()
+            .Where(package => ids.Contains(package.ReleaseId))
+            .Select(package => new { package.ReleaseId, package.PackageId, package.Version })
+            .ToListAsync(cancellationToken);
+        var beforePackages = pinned.Where(package => package.ReleaseId != release.ReleaseId).ToDictionary(package => package.PackageId, package => package.Version, StringComparer.Ordinal);
+        var packages = pinned
+            .Where(package => package.ReleaseId == release.ReleaseId)
+            .OrderBy(package => package.PackageId, StringComparer.Ordinal)
+            .Select(package => new StudioReleasePackage(
+                package.PackageId, package.Version, previous is null ? null : beforePackages.GetValueOrDefault(package.PackageId) ?? ""))
+            .ToList();
+        return Results.Ok(new StudioReleaseDetail(
+            number, previous?.Number, [.. changes.OrderBy(change => change.Path, StringComparer.Ordinal)], modules, packages));
+
+        static IEnumerable<StudioReleaseModule> Modules(Dictionary<string, string> releaseFiles) =>
+            releaseFiles
+                .Where(file => file.Key.StartsWith("modules/", StringComparison.Ordinal) && file.Key.EndsWith("/module.json", StringComparison.Ordinal))
+                .Select(file => JsonNode.Parse(file.Value))
+                .Where(node => node?["id"] is not null)
+                .Select(node => new StudioReleaseModule(
+                    node!["id"]!.GetValue<string>(),
+                    node["label"]?.GetValue<string>(),
+                    node["version"]?.GetValue<string>() ?? ""))
+                .OrderBy(module => module.Label ?? module.Id, StringComparer.Ordinal);
+    }
+
     /// <summary>Proposed: the texts of each text resource of a release, by its locale, read from its canonical JSON.</summary>
     private static Dictionary<string, Dictionary<string, string>> ReleaseTexts(IEnumerable<string> contents)
     {
@@ -1302,6 +1399,26 @@ internal sealed record StudioReleaseChange(
     string? Name = null,
     IReadOnlyDictionary<string, string>? Titles = null,
     string? Locale = null);
+
+/// <summary>
+/// Proposed: one release's page: its number, the number of the release just below it or null for the first, the files
+/// that differ from that release, the modules and the packages it pins.
+/// </summary>
+internal sealed record StudioReleaseDetail(
+    int Number,
+    int? Previous,
+    IReadOnlyList<StudioReleaseChange> Changes,
+    IReadOnlyList<StudioReleaseModule> Modules,
+    IReadOnlyList<StudioReleasePackage> Packages);
+
+/// <summary>
+/// Proposed: a module a release pins: its id, its label, its version, and the version the previous release pinned,
+/// empty when it pinned none, or null for the first release.
+/// </summary>
+internal sealed record StudioReleaseModule(string Id, string? Label, string Version, string? PreviousVersion = null);
+
+/// <summary>Proposed: a package a release pins, its version and the previous release's, as for a module.</summary>
+internal sealed record StudioReleasePackage(string Id, string Version, string? PreviousVersion = null);
 
 /// <summary>The active release: its id, its number and its content hash.</summary>
 internal sealed record StudioActiveRelease(Guid ReleaseId, int Number, string ContentHash);

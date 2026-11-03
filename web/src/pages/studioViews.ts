@@ -74,3 +74,10 @@ export function studioViewKey(view: StudioView): string {
   }
   return view.name === 'kind' ? `kind:${view.kind}` : view.name
 }
+
+/** A kind's name for one resource, such as Entity, or the kind as written when no text names it. */
+export function kindName(kind: string, t: (key: string) => string): string {
+  const key = `shell.studio.kindOne.${kind}`
+  const name = t(key)
+  return name === key ? kind : name
+}

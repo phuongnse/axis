@@ -40,7 +40,7 @@ function renderList(overrides: { history?: StudioReleases; canRollBack?: boolean
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioReleasesList
+        <StudioReleasesList application="PurchaseRequests"
           history={overrides.history ?? history}
           canRollBack={overrides.canRollBack ?? true}
           busy={overrides.busy ?? false}

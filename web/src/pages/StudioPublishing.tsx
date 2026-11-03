@@ -328,6 +328,7 @@ export function StudioPublishing({
             />
           )}
           <StudioReleasesList
+            application={application}
             history={history}
             canRollBack={canPublish}
             busy={busy}
