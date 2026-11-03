@@ -49,9 +49,10 @@ describe('missingMessages', () => {
 })
 
 describe('the theme messages', () => {
-  it('cover every platform locale with every key of the English bundle', () => {
+  // The login theme sits in this folder and the email theme in its own folder.
+  it.each(['./', './email/'])('of %s cover every platform locale with every key of the English bundle', (theme) => {
     // The folders sit in variables because Vite rewrites a literal `new URL('...', import.meta.url)` into an asset.
-    const [texts, theme] = ['../../src/Axis.Presentation/Texts/', './']
+    const texts = '../../src/Axis.Presentation/Texts/'
     const textsFolder = fileURLToPath(new URL(texts, import.meta.url))
     const themeFolder = fileURLToPath(new URL(theme, import.meta.url))
     const locales = readdirSync(textsFolder)

@@ -493,6 +493,7 @@ flowchart LR
 | P98 | A disabled person keeps a session or signs in. | Administrator and users page | Elevation of privilege | High | **Mitigated** | `UserCommandTests` (disabling a person ends their sessions and refuses their sign-in). |
 | P99 | An administrator locks the tenant out by disabling themselves or removing their own administrator role. | Administrator and users page | Denial of service | Medium | **Mitigated** | `UserCommandTests` (disabling oneself, and removing one's own administrator role, answer 409 and change nothing). |
 | P110 | A sign-out ends another person's identity provider session, or a slow identity provider holds sign-out up. | Server and realm | Denial of service | Medium | **Mitigated** | `SignInTests` (sign-out ends only the `sid` stored with the caller's own session, on the CSRF-checked route, and falls back to the end-session address when the call fails). |
+| P111 | Keycloak's account console is a second self-service surface, where a person changes their account outside Axis's account page. | Browser and sign-in page | Elevation of privilege | Low | **Mitigated** | `AdminTenantRealmTests` (`tenant create` turns off the `account-console` client and takes `manage-account` out of the default roles, and a rerun restores both after a hand change). |
 
 An identity provider session's lifetime and CSRF are covered by P1, P2 and P8.
 
@@ -508,8 +509,6 @@ Each becomes a **Gap** row, linked to its issue, once that issue exists.
 Planned with [D128](../decisions/d128-rules-from-the-studio-review.md) _(planned for M31)_, each to become a row with
 its test when it is built:
 
-- (Elevation of privilege, Low) Keycloak's account console is a second self-service surface. `tenant create` turns it
-  off and drops `manage-account`, and Axis's account page starts only Keycloak's own application-initiated actions.
 - (Repudiation, Low) a person denies accepting the terms. Keycloak records when each person accepted, and a new terms
   version asks everyone again.
 - (Information disclosure, Low) the public `/licences` page shows which libraries Axis ships. It shows versions only to

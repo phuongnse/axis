@@ -4,8 +4,10 @@ import { mergeConfig, type Plugin } from 'vite'
 import config from './vite.config.ts'
 
 const themeFolder = path.resolve(import.meta.dirname, '../artifacts/keycloak-theme/axis/login')
+const emailThemeFolder = path.resolve(import.meta.dirname, '../artifacts/keycloak-theme/axis/email')
 
-// Copies what Keycloak reads as it is: the theme's properties, its templates and its message bundles.
+// Copies what Keycloak reads as it is: the login theme's properties, templates and message bundles, and the whole email
+// theme, which has no script or style sheet to build.
 function copyThemeFiles(): Plugin {
   return {
     name: 'copy-theme-files',
@@ -23,12 +25,14 @@ function copyThemeFiles(): Plugin {
           recursive: true,
         })
       }
+      cpSync(path.resolve(import.meta.dirname, 'keycloak-theme/email'), emailThemeFolder, { recursive: true })
     },
   }
 }
 
-// Builds the Keycloak login theme `axis` into artifacts/keycloak-theme, never into the server's web root. The
-// script and the style sheet get fixed names because login.ftl names them. The fonts keep their hashed names.
+// Builds the Keycloak login theme `axis` into artifacts/keycloak-theme, and copies the email theme `axis` beside it, never
+// into the server's web root. The script and the style sheet get fixed names because login.ftl names them. The fonts
+// keep their hashed names.
 export default mergeConfig(config, {
   base: './',
   plugins: [copyThemeFiles()],

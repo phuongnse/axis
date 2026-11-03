@@ -33,7 +33,7 @@ administrator and the users page are in [user administration](user-administratio
 - The realm holds the account rules of [accounts](user-administration.md#accounts): an authenticator code at every
   sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed
   sign-ins, a password reset link of 30 minutes and no self-registration.
-- The realm's login theme is the Axis theme `axis`, and so is its email theme _(planned for M31)_, see [theme](#theme).
+- The realm's login theme is the Axis theme `axis`, and so is its email theme, see [theme](#theme).
 - The realm also has its people, its brokered identity providers and a client for each site.
 - The realm's display name is the organization's name, which every sign-in page shows above its card, see
   [theme](#theme). `tenant create` gives the realm no display name until it takes the organization's name, and a rerun
@@ -267,9 +267,10 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   realm setting, for activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
   platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
   second run updates the realm, brings it up to the account rules and sets its login theme to `axis` again, and its
-  email theme too _(planned for M31)_. _(planned for M31)_: it also turns off Keycloak's account console client and removes
+  email theme too. It also turns off Keycloak's account console client `account-console` and removes
   `manage-account` from the realm's default roles, because Axis's [account page](platform-pages.md#account-page)
-  replaces it, and leaves the Terms and Conditions required action off until the tenant sets terms, see
+  replaces it. The older `account` client stays, as Keycloak's application-initiated actions may need it.
+  _(planned for M31)_: it leaves the Terms and Conditions required action off until the tenant sets terms, see
   [accepting the terms](legal.md#accepting-the-terms). It turns on language support in the realm, with `en` and `vi` and `en` as the default, so
   `kc_locale` and the theme's language links work. It also creates the first-login flow
   `axis first login` for brokered users. It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
@@ -432,12 +433,16 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 - **Cancel from the account page** _(planned for M31)_. When a person starts Change password or Authenticators from Axis's
   [account page](platform-pages.md#account-page), the page that sets a password and the page that adds an
   authenticator show Cancel, which returns to the account page with nothing changed.
-- **Emails** _(planned for M31)_. The Axis email theme `axis` sits beside the login theme and gives every email the identity
+- **Emails** _(built)_. The Axis email theme `axis` sits beside the login theme and gives every email the identity
   provider sends the organization's mark and name, one white card and a muted footer, in tables and inline styles in
   the light tokens, as mail clients need. The invitation, an administrator's request to act and the password reset
   have Axis bodies with one button and the link's lifetime, and the link itself sits in the plain-text part, because an
   action link holds a token of some 2,000 characters. The bundles are in every locale the platform offers, Vietnamese
-  included, which Keycloak's own email theme lacks.
+  included, which Keycloak's own email theme lacks. Keycloak sends the invitation and an administrator's request to act
+  through one template, so the email reads as the invitation when the actions are exactly a password and an
+  authenticator, and as a request that lists its actions otherwise. The frame names Axis, never the realm id, when the
+  realm has no display name. Other emails, such as the verification email, get the frame but keep Keycloak's English
+  text in Vietnamese.
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts, which activation writes to the realm (_built_).
@@ -463,7 +468,8 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
   context: its `login.ftl`, `login-otp.ftl`, `login-config-totp.ftl`, `login-reset-password.ftl` and `login-update-password.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep`, `addAuthenticator`, `resetPassword` or `updatePassword`, and a React bundle draws the page. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
-  fonts. The pages the theme has no template for, such as the page after "Send link", still come from Keycloak's `keycloak` parent theme
+  fonts. It also copies the email theme from `web/keycloak-theme/email/` into `artifacts/keycloak-theme/axis/email/`
+  and fails when one of its files is missing. The pages the theme has no template for, such as the page after "Send link", still come from Keycloak's `keycloak` parent theme
   (none is left _(planned for M31)_: `logout-confirm.ftl`, `info.ftl`, `error.ftl`, `login-page-expired.ftl`,
   `select-authenticator.ftl`, `login-update-profile.ftl`, `idp-review-user-profile.ftl`, `saml-post-form.ftl`,
   `frontchannel-logout.ftl` and `terms.ftl` join them, with `frame.ftl` holding the macros they share). The development realm `axis` uses the theme as
