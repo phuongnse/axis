@@ -40,6 +40,7 @@ internal static class Session
     private const string SessionIdClaim = "axis:session_id";
     private const string IdentityProviderClaim = "axis:identity_provider";
     private const string ApplicationRoleClaim = "axis:application_role";
+    private const string IdpSessionIdClaim = "axis:idp_session_id";
 
     /// <summary>How recent the person's last login at the identity provider must be for the session to end sessions.</summary>
     public static readonly TimeSpan ReauthenticationWindow = TimeSpan.FromMinutes(5);
@@ -48,6 +49,7 @@ internal static class Session
     /// <param name="sessionId">The public id of the stored session, set only for a principal that the store read.</param>
     /// <param name="identityProvider">The alias of the provider that signed the person in, or null for the tenant's accounts.</param>
     /// <param name="applicationRoles">The roles that each application's provider mapping gave the person, by application id, or null for none.</param>
+    /// <param name="idpSessionId">The identity provider's id of its own session, the ID token's <c>sid</c>, or null when it has none.</param>
     public static ClaimsPrincipal CreatePrincipal(
         string tenantId,
         string userId,
@@ -56,7 +58,8 @@ internal static class Session
         DateTimeOffset? authenticatedAt = null,
         string? sessionId = null,
         string? identityProvider = null,
-        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? applicationRoles = null)
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? applicationRoles = null,
+        string? idpSessionId = null)
     {
         List<Claim> claims =
         [
@@ -78,6 +81,11 @@ internal static class Session
         if (!string.IsNullOrWhiteSpace(identityProvider))
         {
             claims.Add(new Claim(IdentityProviderClaim, identityProvider));
+        }
+
+        if (!string.IsNullOrWhiteSpace(idpSessionId))
+        {
+            claims.Add(new Claim(IdpSessionIdClaim, idpSessionId));
         }
 
         foreach (var (applicationId, applicationRoleNames) in applicationRoles ?? new Dictionary<Guid, IReadOnlyList<string>>())
@@ -133,6 +141,10 @@ internal static class Session
     /// <summary>The alias of the provider that signed the person in, or null for a sign-in through the accounts.</summary>
     public static string? ReadIdentityProvider(ClaimsPrincipal principal) =>
         principal.FindFirstValue(IdentityProviderClaim) is { Length: > 0 } alias ? alias : null;
+
+    /// <summary>The identity provider's id of its own session, or null when the principal holds none.</summary>
+    public static string? ReadIdpSessionId(ClaimsPrincipal principal) =>
+        principal.FindFirstValue(IdpSessionIdClaim) is { Length: > 0 } sid ? sid : null;
 
     /// <summary>The public id of the stored session, or null when the principal did not come from the store.</summary>
     public static string? ReadSessionId(ClaimsPrincipal principal) => principal.FindFirstValue(SessionIdClaim);

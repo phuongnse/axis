@@ -201,10 +201,33 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     }
 
     [Fact]
-    public async Task Sign_out_ends_the_session_and_answers_the_identity_providers_sign_out_address()
+    public async Task Sign_out_ends_the_identity_provider_session_named_by_the_stored_sid_and_answers_the_signed_out_page()
     {
         using var client = CreateClient();
         await SignInAsync(client, "requester", "/");
+        var sid = Assert.Single(await ReadSessionsAsync("a")).IdpSessionId;
+        Assert.False(string.IsNullOrEmpty(sid));
+        Assert.Contains(sid, await ListRealmSessionIdsAsync("requester"));
+
+        var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
+        var me = await SendAsync(client, HttpMethod.Get, "/api/me");
+
+        Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
+        using var body = JsonDocument.Parse(await signOut.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal("/?signedOut", body.RootElement.GetProperty("signOutUrl").GetString());
+        Assert.DoesNotContain(sid, await ListRealmSessionIdsAsync("requester"));
+        Assert.Empty(await ReadSessionsAsync("a"));
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+    }
+
+    [Fact]
+    public async Task Sign_out_answers_the_identity_providers_sign_out_address_when_the_session_cannot_be_ended_there()
+    {
+        await using var factory = Factory.WithWebHostBuilder(builder => builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", "wrong-secret"));
+        using var client = CreateClient(factory);
+        await SignInAsync(client, "requester", "/");
+        var sid = Assert.Single(await ReadSessionsAsync("a")).IdpSessionId;
+        Assert.False(string.IsNullOrEmpty(sid));
 
         var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
         var me = await SendAsync(client, HttpMethod.Get, "/api/me");
@@ -215,7 +238,9 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.StartsWith($"{Authority}/protocol/openid-connect/logout?", signOutUrl, StringComparison.Ordinal);
         Assert.Contains("client_id=axis", signOutUrl, StringComparison.Ordinal);
         Assert.Contains($"post_logout_redirect_uri={Uri.EscapeDataString("http://localhost:5206/?signedOut")}", signOutUrl, StringComparison.Ordinal);
+        Assert.Empty(await ReadSessionsAsync("a"));
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        Assert.Contains(sid, await ListRealmSessionIdsAsync("requester"));
     }
 
     [Fact]
@@ -606,6 +631,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
             builder.UseSetting("ForwardedHeaders:KnownProxies:0", Proxy);
             UseKeycloak(builder, "a", authority);
             UseKeycloak(builder, "b", authority);
+            // Only tenant a can end the identity provider session. Tenant b has no users secret.
+            builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", KeycloakFixture.UsersClientSecret);
             builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, ProxyStartupFilter>());
         });
     }
@@ -829,15 +856,38 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         await using var connection = new NpgsqlConnection(_databases[tenant]);
         await connection.OpenAsync(CancellationToken);
-        await using var command = new NpgsqlCommand("SELECT id_hash, user_id, display_name, roles, authenticated_at FROM axis.sessions", connection);
+        await using var command = new NpgsqlCommand("SELECT id_hash, user_id, display_name, roles, authenticated_at, idp_session_id FROM axis.sessions", connection);
         var rows = new List<SessionRow>();
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         while (await reader.ReadAsync(CancellationToken))
         {
-            rows.Add(new SessionRow(reader.GetFieldValue<byte[]>(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3), await reader.IsDBNullAsync(4, CancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(4)));
+            rows.Add(new SessionRow(reader.GetFieldValue<byte[]>(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3), await reader.IsDBNullAsync(4, CancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(4), await reader.IsDBNullAsync(5, CancellationToken) ? null : reader.GetString(5)));
         }
 
         return rows;
+    }
+
+    /// <summary>The ids of the realm sessions of a user, read through the admin API as the <c>axis-users</c> client.</summary>
+    private async Task<List<string>> ListRealmSessionIdsAsync(string userId)
+    {
+        using var http = new HttpClient { BaseAddress = await keycloak.BaseAddressAsync() };
+        using var tokenResponse = await http.PostAsync(
+            "realms/axis/protocol/openid-connect/token",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "client_credentials",
+                ["client_id"] = "axis-users",
+                ["client_secret"] = KeycloakFixture.UsersClientSecret,
+            }),
+            CancellationToken);
+        tokenResponse.EnsureSuccessStatusCode();
+        using var token = JsonDocument.Parse(await tokenResponse.Content.ReadAsStringAsync(CancellationToken));
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"admin/realms/axis/users/{Uri.EscapeDataString(userId)}/sessions");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.RootElement.GetProperty("access_token").GetString());
+        using var response = await http.SendAsync(request, CancellationToken);
+        response.EnsureSuccessStatusCode();
+        using var sessions = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return [.. sessions.RootElement.EnumerateArray().Select(session => session.GetProperty("id").GetString()!)];
     }
 
     // A JWT is three base64url parts, and its header always starts with eyJ, which is {" encoded.
@@ -846,7 +896,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
     private sealed record SignInResult(string ReturnedTo, string SessionCookie);
 
-    private sealed record SessionRow(byte[] IdHash, string UserId, string DisplayName, string[] Roles, DateTimeOffset? AuthenticatedAt);
+    private sealed record SessionRow(byte[] IdHash, string UserId, string DisplayName, string[] Roles, DateTimeOffset? AuthenticatedAt, string? IdpSessionId);
 
     private sealed record ProfileRow(string UserId, string DisplayName, string? Email, string? Locale, DateTimeOffset FirstSignedInAt, DateTimeOffset LastSignedInAt);
 
