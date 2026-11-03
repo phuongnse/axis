@@ -352,6 +352,69 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task A_validate_whose_tenant_connection_broke_is_claimed_again_at_once_and_succeeds()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null), kind: "validate");
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var text = new StringWriter();
+        var output = TextWriter.Synchronized(text);
+        var publisher = await StartPublisherAsync(scenario, Publisher.DefaultLeaseDuration, output);
+        try
+        {
+            await WaitForStatusAsync(scenario, ids[0], request, "running");
+            await CutWaitingConnectionAsync(scenario, ids[0]);
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
+        }
+        finally
+        {
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await publisher.StopAsync();
+        }
+
+        var lines = PublisherOutput(output, text).Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(2, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Contains($"{ids[0]} validate failed: terminating connection due to administrator command", lines);
+        Assert.Contains(lines, line => line.StartsWith($"{ids[0]} claim released:", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.EndsWith("NpgsqlTransaction", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_request_whose_tenant_connection_broke_on_its_third_claim_fails_with_AXC0215()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null), kind: "validate");
+        await SetRunningAsync(scenario, ids[0], request, 2, "now() - interval '1 minute'");
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var publisher = await StartPublisherAsync(scenario, Publisher.DefaultLeaseDuration);
+        try
+        {
+            await WaitUntilAsync(
+                async () => (int)(await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"))! == 3,
+                "The publisher did not claim the request a third time.",
+                TimeSpan.FromSeconds(180));
+            await CutWaitingConnectionAsync(scenario, ids[0]);
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
+        }
+        finally
+        {
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await publisher.StopAsync();
+        }
+
+        Assert.Equal("failed", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(3, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, ids[0], $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
+        var diagnostic = Assert.Single(diagnostics)!;
+        Assert.Equal("AXC0215", diagnostic["code"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Two_publishers_run_one_request_of_an_application_at_a_time()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -668,6 +731,16 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
 
         public async ValueTask DisposeAsync() => await _connection.DisposeAsync();
     }
+
+    // Ends the session of the publisher that waits on the lock of ReleasesHold, as a crash of the database connection does.
+    private static async Task CutWaitingConnectionAsync(AdminScenario scenario, string tenant) =>
+        await WaitUntilAsync(
+            async () => (long)(await PostgreSqlServer.AdminScalarAsync(
+                new NpgsqlConnectionStringBuilder(scenario.Platform) { Database = "postgres" }.ConnectionString,
+                $"SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = 'axis_{tenant}' AND wait_event_type = 'Lock'",
+                CancellationToken))! >= 1,
+            "No session of the publisher waited on the lock.",
+            TimeSpan.FromSeconds(60));
 
     // Makes the row look as if a publisher claimed it and then died: running, with the given claims and lease.
     private static async Task SetRunningAsync(AdminScenario scenario, string tenant, Guid request, int claims, string leaseSql) =>

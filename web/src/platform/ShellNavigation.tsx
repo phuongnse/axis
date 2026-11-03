@@ -13,7 +13,8 @@ export interface ShellNavigationEntry {
 
 /**
  * The navigation menu of the shell, for the site's entries and for the entries a page puts in the sidebar. An open
- * entry shows its label alone. A collapsed entry shows its icon alone, and Ant Design gives it the label as a tooltip.
+ * entry shows its label alone. A collapsed entry shows its icon alone, and Ant Design gives it the label as a tooltip. The collapsed state is passed on, because a page's entries
+ * render through a portal and so do not see the Sider's context.
  * No entry shows a count.
  */
 export function ShellNavigation({
@@ -38,6 +39,12 @@ export function ShellNavigation({
     }
   })
   return (
-    <Menu mode="inline" style={{ borderInlineEnd: 'none' }} selectedKeys={activeKey ? [activeKey] : []} items={items} />
+    <Menu
+      mode="inline"
+      inlineCollapsed={collapsed}
+      style={{ borderInlineEnd: 'none' }}
+      selectedKeys={activeKey ? [activeKey] : []}
+      items={items}
+    />
   )
 }

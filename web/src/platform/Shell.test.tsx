@@ -507,6 +507,10 @@ describe('Shell sidebar claimed by a page', () => {
     for (const entry of screen.getAllByRole('menuitem')) {
       expect(entry.querySelector('.anticon')).toHaveAttribute('aria-hidden', 'true')
     }
+    await userEvent.hover(screen.getByRole('menuitem', { name: 'Releases' }))
+    await waitFor(() =>
+      expect(screen.getAllByRole('tooltip').map((tooltip) => tooltip.textContent)).toContain('Releases'),
+    )
   })
 })
 
