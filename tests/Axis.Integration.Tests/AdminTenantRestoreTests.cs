@@ -253,6 +253,60 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task An_archive_with_an_unsafe_Studio_path_is_refused_at_check_and_creates_nothing()
+    {
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
+        var scenario = fixture.Scenario;
+        var content = Encoding.UTF8.GetBytes("x");
+        var unsafeNames = new[] { "studio/../x", "studio//x", "studio/", "studio/a/./b", "studio//etc/passwd", "studio/a\\b" };
+
+        foreach (var name in unsafeNames)
+        {
+            var archive = Rewrite(file, folder.Path, $"unsafe-{Math.Abs(name.GetHashCode(StringComparison.Ordinal))}", _ => { }, (name, content));
+            var id = scenario.NewTenantId();
+            var entries = await scenario.CountEntriesAsync();
+
+            var result = await scenario.RunAsync(RestoreArgs(archive, id, $"{id}.example.test"), path: fixture.Tools.PathSetting);
+
+            Assert.True(result.Exit == 2, $"{name} exited with {result.Exit}");
+            Assert.Equal([$"{id} check failed: the archive holds an unsafe Studio path: {name}"], result.Output);
+            Assert.Empty(result.Error);
+            await AssertNothingCreatedAsync(id, entries);
+        }
+
+        // The same name twice is unsafe too.
+        var duplicate = Rewrite(file, folder.Path, "duplicate", _ => { }, ("studio/a.json", content), ("studio/a.json", content));
+        var duplicateId = scenario.NewTenantId();
+        var duplicateResult = await scenario.RunAsync(RestoreArgs(duplicate, duplicateId, $"{duplicateId}.example.test"), path: fixture.Tools.PathSetting);
+        Assert.Equal(2, duplicateResult.Exit);
+        Assert.Equal([$"{duplicateId} check failed: the archive holds an unsafe Studio path: studio/a.json"], duplicateResult.Output);
+    }
+
+    [Fact]
+    public async Task Outside_a_cell_a_restore_skips_the_Studio_files_with_one_warning()
+    {
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
+        var archive = Rewrite(file, folder.Path, "studio", _ => { }, ("studio/app/application.json", Encoding.UTF8.GetBytes("{}")));
+        using var studio = new TemporaryFolder();
+        var scenario = fixture.Scenario;
+        var id = scenario.NewTenantId();
+
+        var result = await scenario.RunAsync(
+            RestoreArgs(archive, id, $"{id}.example.test"),
+            path: fixture.Tools.PathSetting,
+            extra: new Dictionary<string, string?> { ["Studio:ApplicationsPath"] = studio.Path });
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(_steps.Select(step => $"{id} {step} ok"), result.Output);
+        Assert.Equal([$"{id} warning the archive holds Studio files, and a restore outside a cell does not write them"], result.Error);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(studio.Path));
+    }
+
+    [Fact]
     public async Task Each_refusal_exits_2_and_leaves_no_entry_role_or_database()
     {
         using var folder = new TemporaryFolder();
@@ -697,8 +751,8 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         throw new InvalidOperationException("The archive has no manifest.");
     }
 
-    // Copies the archive and edits its manifest. The dump stays as it was.
-    private static string Rewrite(string source, string folder, string name, Action<JsonObject> edit)
+    // Copies the archive and edits its manifest. The dump stays as it was. The Studio entries, if any, go between the manifest and the dump.
+    private static string Rewrite(string source, string folder, string name, Action<JsonObject> edit, params (string Name, byte[] Content)[] studio)
     {
         string? manifest = null;
         var dump = Path.Combine(folder, $"{name}.dump");
@@ -713,7 +767,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
                     using var text = new StreamReader(entry.DataStream!, Encoding.UTF8);
                     manifest = text.ReadToEnd();
                 }
-                else
+                else if (entry.Name == "tenant.dump")
                 {
                     using var output = File.Create(dump);
                     entry.DataStream!.CopyTo(output);
@@ -724,7 +778,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var node = JsonNode.Parse(manifest!)!.AsObject();
         edit(node);
         var destination = Path.Combine(folder, $"{name}.tar");
-        WriteArchive(destination, node.ToJsonString(), dump);
+        WriteArchive(destination, node.ToJsonString(), dump, studio);
         return destination;
     }
 
@@ -736,13 +790,18 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await encrypted.WriteAsync(content, CancellationToken);
     }
 
-    private static void WriteArchive(string destination, string manifest, string dumpFile)
+    private static void WriteArchive(string destination, string manifest, string dumpFile, params (string Name, byte[] Content)[] studio)
     {
         using var archive = File.Create(destination);
         using (var encrypted = BackupArchive.Encrypt(archive, AdminScenario.BackupKeyBytes))
         using (var writer = new TarWriter(encrypted, TarEntryFormat.Pax, leaveOpen: true))
         {
             writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "manifest.json") { DataStream = new MemoryStream(Encoding.UTF8.GetBytes(manifest)) });
+            foreach (var (name, content) in studio)
+            {
+                writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, name) { DataStream = new MemoryStream(content) });
+            }
+
             using var dump = File.OpenRead(dumpFile);
             writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "tenant.dump") { DataStream = dump });
         }

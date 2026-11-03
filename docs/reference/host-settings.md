@@ -159,7 +159,8 @@ and a JSON view, and shows the diagnostics.
   only there. Studio creates the folder the first time it uses it. Another tenant's application, by
   name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
   message names `Studio:Folders` and `Cell:Id`, because the folders would be reached by every tenant.
-  _(planned for M31)_ The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell),
+  The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell) _(built)_, and
+  a restore writes it under the new tenant. _(planned for M31)_ The tenant's folder joins its
   [export and deletion](tenant-lifecycle.md), see [cells](cells.md).
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
