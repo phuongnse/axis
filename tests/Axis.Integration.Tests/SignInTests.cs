@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -106,6 +107,55 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Contains("prompt=login", query, StringComparison.Ordinal);
         Assert.Contains("max_age=0", query, StringComparison.Ordinal);
         Assert.DoesNotContain("max_age=28800", query, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sign_in_with_the_update_password_action_sends_it_to_the_identity_provider_as_kc_action()
+    {
+        using var client = CreateClient();
+
+        var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in?action=UPDATE_PASSWORD");
+
+        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+        Assert.Contains("kc_action=UPDATE_PASSWORD", challenge.Headers.Location!.Query, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sign_in_with_a_delete_credential_action_forwards_it_unchanged()
+    {
+        using var client = CreateClient();
+        const string Action = "delete_credential:0b6f1c2e-6a4f-4f3b-9d55-2f1d1a7c9e10";
+
+        var challenge = await SendAsync(client, HttpMethod.Get, $"/api/auth/sign-in?action={Uri.EscapeDataString(Action)}");
+
+        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+        Assert.Equal(Action, QueryHelpers.ParseQuery(challenge.Headers.Location!.Query)["kc_action"]);
+    }
+
+    [Theory]
+    [InlineData("TERMS_AND_CONDITIONS")]
+    [InlineData("update_password")]
+    [InlineData("")]
+    [InlineData("delete_credential:../admin")]
+    public async Task Sign_in_with_an_action_that_is_not_allowed_answers_400_and_does_not_redirect(string action)
+    {
+        using var client = CreateClient();
+
+        var response = await SendAsync(client, HttpMethod.Get, $"/api/auth/sign-in?action={Uri.EscapeDataString(action)}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+    }
+
+    [Fact]
+    public async Task Sign_in_without_an_action_sends_no_kc_action()
+    {
+        using var client = CreateClient();
+
+        var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in");
+
+        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+        Assert.DoesNotContain("kc_action", challenge.Headers.Location!.Query, StringComparison.Ordinal);
     }
 
     [Fact]

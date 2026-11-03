@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Server.Http;
@@ -25,7 +26,13 @@ namespace Axis.Server.Authentication;
 /// </summary>
 internal static partial class AuthEndpoints
 {
+    internal const string ActionParameter = "kc_action";
+
     private static readonly TimeSpan _identityProviderLimit = TimeSpan.FromSeconds(5);
+
+    // The identity provider's application-initiated actions that the account page starts. Matching is exact and case-sensitive.
+    [GeneratedRegex("^(UPDATE_PASSWORD|CONFIGURE_TOTP|delete_credential:[A-Za-z0-9-]{1,64})$")]
+    private static partial Regex AllowedAction();
 
     public static void MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -41,7 +48,8 @@ internal static partial class AuthEndpoints
         ITenantContextAccessor tenants,
         SiteSignIn sites,
         CancellationToken cancellationToken,
-        bool reauthenticate = false)
+        bool reauthenticate = false,
+        string? action = null)
     {
         if (string.IsNullOrEmpty(returnUrl))
         {
@@ -50,6 +58,11 @@ internal static partial class AuthEndpoints
         else if (!returnUrl.StartsWith('/') || returnUrl.StartsWith("//", StringComparison.Ordinal) || returnUrl.StartsWith("/\\", StringComparison.Ordinal))
         {
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The return address must be a local path.");
+        }
+
+        if (action is not null && !AllowedAction().IsMatch(action))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The action is not one that sign-in allows.");
         }
 
         var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");
@@ -81,6 +94,12 @@ internal static partial class AuthEndpoints
             // The handler prefers these over its options, so the identity provider asks for credentials even when its own session is open.
             properties.SetParameter(OpenIdConnectParameterNames.Prompt, "login");
             properties.SetParameter<TimeSpan?>(OpenIdConnectParameterNames.MaxAge, TimeSpan.Zero);
+        }
+
+        if (action is not null)
+        {
+            // A parameter is not saved in the state, and only the redirect needs the action.
+            properties.SetParameter(ActionParameter, action);
         }
 
         return Results.Challenge(properties, [TenantSignIn.SchemeName(tenant.TenantId)]);

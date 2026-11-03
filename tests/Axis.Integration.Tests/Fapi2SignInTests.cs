@@ -84,6 +84,23 @@ public sealed class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture
     }
 
     [Fact]
+    public async Task A_fapi2_sign_in_with_an_action_sends_kc_action_in_the_pushed_authorization_request()
+    {
+        var authority = await keycloak.StartAsync();
+        var (factory, calls, _, _) = await StartConfigurationHostAsync(authority);
+        await using var _ = factory;
+        using var client = CreateClient(factory, _fapiAddress);
+
+        using var challenge = await SendAsync(client, "/api/auth/sign-in?action=CONFIGURE_TOTP");
+
+        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+        Assert.Contains("request_uri=", challenge.Headers.Location!.Query, StringComparison.Ordinal);
+        Assert.DoesNotContain("kc_action", challenge.Headers.Location.Query, StringComparison.Ordinal);
+        var par = Assert.Single(calls["fapi"].Calls, call => call.Url.EndsWith(ParPath, StringComparison.Ordinal));
+        Assert.Equal("CONFIGURE_TOTP", par.Form["kc_action"]);
+    }
+
+    [Fact]
     public async Task A_standard_tenant_signs_in_without_par_and_without_a_client_assertion()
     {
         var authority = await keycloak.StartAsync();

@@ -69,7 +69,7 @@ built, see [installation key](#installation-key). The
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
-| `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
+| `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](fapi2-profile.md)                      |
 | `--client-key`                 | Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
 | `--retire-client-key <kid>`    | Removes the client key with that key id                                                       |
 
