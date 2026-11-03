@@ -160,3 +160,17 @@ the review.
     which cannot tell "not given" from "not loaded" or "failed", and never N/A, which says "does not apply" and does
     not translate. For the issue: `formatValue` gives an empty string for no value, so every table of the platform,
     the `table` widget included, shows nothing today; the same rule applies to them all.
+- **One table for the whole platform.** The owner asked whether row actions or select-then-act is right, and whether
+  every table should have the same search, filter, Refresh, Export and Import. The owner's rule: every table is built
+  on one shared table, as tables that each go their own way cannot be kept right. Agreed:
+  - An action on one row stays on the row, as D59 and D96 have it. Selecting rows is for bulk actions alone: a table
+    shows checkboxes only when it has one, and a selection shows an "N selected" bar that holds them. For the docs
+    change: a Proposed rule, as D59 left bulk actions for after M12.
+  - D96's toolbar holds for every table of the platform, Studio's and the console's too: the view controls, search and
+    filters, on the left; Refresh, the secondary actions such as Export and Import, and the main action last, on the
+    right. Their places and looks are fixed; whether a table has each depends on what it needs, as a list of a few
+    dozen releases needs no search.
+  - For the issue: Studio's and the console's tables, the Releases list among them, are built on the same shared
+    table as the `table` widget, which draws the toolbar, the row actions and their fold into a menu below 992 px, the
+    paging and a cell with no value. The Releases list today lacks the fold and the paging because it is drawn on its
+    own.
