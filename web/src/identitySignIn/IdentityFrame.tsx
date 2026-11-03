@@ -1,6 +1,7 @@
 import { Card, Flex, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
+import { LegalLine } from '../platform/LegalLine'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { PreferencesMenu } from '../platform/PreferencesMenu'
 import { TextContext } from '../platform/texts'
@@ -9,7 +10,7 @@ import type { IdentityFrameContext } from './signInContext'
 
 /**
  * The frame of the identity provider's pages: the organization's mark and name above one card, with the shell's
- * "Language and theme" gear at the top right and the copyright line below.
+ * "Language and theme" gear at the top right and the legal line below.
  */
 export function IdentityFrame({
   title,
@@ -82,7 +83,9 @@ export function IdentityFrame({
           {children}
         </Flex>
       </Card>
-      <Typography.Text type="secondary">{`© ${year} Axis`}</Typography.Text>
+      <div style={{ width: '100%', maxWidth: 400 }}>
+        <LegalLine copyright={`© ${year} Axis`} links={frame.legal} />
+      </div>
     </Flex>
   )
 }

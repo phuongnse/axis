@@ -27,14 +27,12 @@ lists the licences of what Axis ships, and the step where a person accepts the t
 
 ## Legal line
 
-_(planned for M31)_
-
 - **One line in two places.** Every page of the identity provider ends in it, under the card and as wide as the card,
-  and so does the shell's footer, see [layout](shell.md#layout).
+  and so does the shell's footer _(planned for M31)_, see [layout](shell.md#layout).
 - **Copyright at the start, links at the end.** The line starts with the copyright in `textMuted`. At its end sit the
   links, in `primaryText` as links: Privacy and Terms when the site or its tenant sets them, then Licences, always. At
   narrow width the links wrap and stay at the end. The links sit in a navigation landmark named Legal.
-- **Labels.** Privacy, Terms and Licences, in Vietnamese Quyền riêng tư, Điều khoản and Giấy phép. The page that
+- **Labels.** Privacy, Terms and Licences, in Vietnamese Quyền riêng tư, Điều khoản and Giấy phép. The landmark's name is Legal, in Vietnamese Pháp lý. The page that
   Licences opens keeps its full title.
 
 ## Open source licences

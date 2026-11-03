@@ -1,3 +1,5 @@
+import type { LegalLinks } from '../platform/LegalLine'
+
 export interface SignInProvider {
   alias: string
   /** The provider's name, such as "Contoso ID". */
@@ -24,7 +26,7 @@ export interface FrameTexts {
   dark: string
 }
 
-/** What every page of the identity provider shares: the organization's name and the "Language and theme" gear's languages and texts. */
+/** What every page of the identity provider shares: the organization's name and the "Language and theme" gear's languages and texts, and the legal line. */
 export interface IdentityFrameContext {
   /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
   realmName?: string
@@ -32,6 +34,11 @@ export interface IdentityFrameContext {
   locale: string
   locales: SignInLocale[]
   frameTexts: FrameTexts
+  /**
+   * The legal line under the card. `privacyUrl`, `termsUrl` and `licencesUrl` come from the client attributes
+   * `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, and are absent when not set, or when the page has no client.
+   */
+  legal: LegalLinks
 }
 
 /** The page's texts. `continueWith` and `providerOnly` hold a `{provider}` placeholder for the provider's label. */

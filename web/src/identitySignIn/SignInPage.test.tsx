@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { identityFrameTexts } from '../designSystem/fixtures'
+import { identityFrameTexts, identityLegal } from '../designSystem/fixtures'
 import { designTokensFor } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { SignInPage } from './SignInPage'
@@ -23,6 +23,7 @@ const context: SignInContext = {
     { tag: 'vi', label: 'Tiếng Việt', url: '/vi' },
   ],
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: {
     continueWith: 'Continue with {provider}',
     providerOnly: 'Your organization signs in only with {provider}.',

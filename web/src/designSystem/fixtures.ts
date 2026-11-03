@@ -1,5 +1,6 @@
 import type { ChartKind } from '../platform/chartOption'
 import type { CurrentUser } from '../platform/currentUser'
+import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
 import type { DeadLetterPage, InstancePage } from '../platform/inspection'
@@ -835,6 +836,14 @@ export const identityFrameTexts: FrameTexts = {
   dark: 'Dark',
 }
 
+/** The legal line under the identity provider's cards in the design system, in English. */
+export const identityLegal: LegalLinks = {
+  privacyUrl: '#privacy',
+  termsUrl: '#terms',
+  licencesUrl: '#licences',
+  texts: { legal: 'Legal', privacy: 'Privacy', terms: 'Terms', licences: 'Licences' },
+}
+
 /** What the identity provider's sign-in page draws in the design system. */
 export const identitySignInContext: SignInContext = {
   page: 'signIn',
@@ -852,6 +861,7 @@ export const identitySignInContext: SignInContext = {
     { tag: 'vi', label: 'Tiếng Việt', url: '#vi' },
   ],
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identitySignInTexts,
 }
 
@@ -879,6 +889,7 @@ export const identityTwoStepContext: TwoStepContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityTwoStepTexts,
 }
 
@@ -903,6 +914,7 @@ export const identityResetPasswordContext: ResetPasswordContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityResetPasswordTexts,
 }
 
@@ -927,6 +939,7 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityUpdatePasswordTexts,
 }
 
@@ -961,6 +974,7 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityAddAuthenticatorTexts,
 }
 
@@ -985,6 +999,7 @@ export const identitySelectAuthenticatorContext: SelectAuthenticatorContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identitySelectAuthenticatorTexts,
 }
 
@@ -1016,6 +1031,7 @@ export const identityUpdateProfileContext: UpdateProfileContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityUpdateProfileTexts,
 }
 
@@ -1030,6 +1046,7 @@ export const identitySignOutContext: SignOutContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: { message: 'Do you want to sign out?', signOut: 'Sign out', backToApplication: 'Back to application' },
 }
 
@@ -1044,6 +1061,7 @@ export const identityNoticeContext: NoticeContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
 }
 
 /** The message of the identity provider's error page in the design system. */
@@ -1059,6 +1077,7 @@ export const identityErrorContext: ErrorContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: { backToApplication: 'Back to application' },
 }
 
@@ -1072,6 +1091,7 @@ export const identityPageExpiredContext: PageExpiredContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: {
     message: 'This page took too long and has expired. Continue where you were, or start again.',
     continue: 'Continue',
@@ -1090,6 +1110,7 @@ export const identitySamlPostContext: SamlPostContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: { message: 'Taking you to the next step. If nothing happens, select Continue.', continue: 'Continue' },
 }
 
@@ -1106,6 +1127,7 @@ export const identityFrontChannelSignOutContext: FrontChannelSignOutContext = {
   locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
   frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: { message: 'Signing you out of your applications. This page goes on by itself.', continue: 'Continue' },
 }
 

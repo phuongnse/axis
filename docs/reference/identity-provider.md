@@ -413,14 +413,12 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 ## Theme
 
 - Every page of Axis's identity provider has one frame: the organization's mark and name above one card in the middle
-  of the page on `canvas`, and below it "© <year> Axis". The shell's gear button, named "Language and theme", sits at the
+  of the page on `canvas`, and below it the [legal line](legal.md#legal-line), as wide as the card. The shell's gear button, named "Language and theme", sits at the
   page's top right, level with the organization's heading and as far from the top edge as from the right one. It opens
   the shell's language and theme menu, every language named in its own language, then System, Light and Dark. Picking a
   language reloads the page in it, and picking a theme switches light or dark mode at once. A theme choice is kept in
   the browser per origin, so one made on the identity provider's host does not carry over to Axis on another host.
-  _(planned for M31)_: below the card, as wide as it, the [legal line](legal.md#legal-line) takes the
-  copyright's place. It follows light and dark mode and the
-  Axis tokens and fonts, as the SPA does. The mark is 32 px, the first letter of the name on a `primary` tile as a
+  The page follows light and dark mode and the Axis tokens and fonts, as the SPA does. The mark is 32 px, the first letter of the name on a `primary` tile as a
   site's mark is, with the name beside it. The name is the realm's display name, and Axis while the realm has none.
   The card is at most 400 px wide, on `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl`
   padding. Its title, such as "Sign in", names the step and does not repeat the organization's name. Axis's own
@@ -486,7 +484,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   from the applications' texts, which activation writes to the realm (_built_).
 - _(built)_ The sign-in page is drawn by shared React components in `web/src/identitySignIn/` from a sign-in context:
   title, providers, accounts, site, username, error, notice, login address, remember-me, forgot-password address, locale, locales (each with its
-  tag) and texts. Every page's context also holds `frameTexts`, the texts of the gear. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's
+  tag) and texts. Every page's context also holds `frameTexts`, the texts of the gear, and `legal`, the addresses and labels of the [legal line](legal.md#legal-line). The `texts` macro of `frame.ftl` writes `legal` from the client attributes `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, and a page without a client leaves the addresses out. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's
   providers and accounts flag. The page then lists only those providers, and shows the account form only when the realm
   and the site both allow accounts. A client without `axis.accounts`, such as `axis`, has no `site`, so the page shows
   every provider and the form as before. The account form is a real `<form method="post">` to the login address. The templates leave `realmName` out when the realm's display name is empty or equals the realm id. The components

@@ -4,6 +4,8 @@
      realm.displayName falls back to the realm id, so the context leaves it out when the display name is empty or equals
      the id, and the page then names Axis, never the tenant id. The "locales" hold each language's tag, its name in its
      own language and the url that switches to it. The "frameTexts" are the texts of the 'Language and theme' gear.
+     The "legal" holds the addresses of the legal line's links, from the client attributes axis.privacyUrl, axis.termsUrl
+     and axis.licencesUrl, each left out when not set or when the page has no client, and the labels of the line.
      Keycloak escapes output as HTML, so every string goes through ?json_string?no_esc: ?json_string also escapes
      "</", which keeps the script element closed. -->
 <#macro head title>
@@ -44,5 +46,19 @@
       "system": "${msg("axisThemeSystem")?json_string?no_esc}",
       "light": "${msg("axisThemeLight")?json_string?no_esc}",
       "dark": "${msg("axisThemeDark")?json_string?no_esc}"
+    },
+    "legal": {
+        <#list ["privacyUrl", "termsUrl", "licencesUrl"] as name>
+            <#assign address = ((client.attributes['axis.' + name])!'')>
+            <#if address?has_content>
+      "${name}": "${address?json_string?no_esc}",
+            </#if>
+        </#list>
+      "texts": {
+        "legal": "${msg("axisLegal")?json_string?no_esc}",
+        "privacy": "${msg("axisPrivacy")?json_string?no_esc}",
+        "terms": "${msg("axisTerms")?json_string?no_esc}",
+        "licences": "${msg("axisLicences")?json_string?no_esc}"
+      }
     },
 </#macro>
