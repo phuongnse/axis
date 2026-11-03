@@ -338,6 +338,11 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 reason: null,
                 context.HttpContext.RequestAborted);
             await SaveProfileAsync(context.HttpContext, user);
+            // A brokered sign-in may have created a realm user. A failed recheck never fails the sign-in.
+            if (Session.ReadIdentityProvider(context.Principal!) is not null)
+            {
+                await UsersQuotaStep.RefreshAsync(context.HttpContext.RequestServices, tenantId);
+            }
         };
         // The browser goes to the shell's sign-in page. The record is best effort, as the callback has already failed.
         options.Events.OnRemoteFailure = async context =>
