@@ -35,6 +35,7 @@ public sealed class AdminCommandTableTests
                 ["tenant data-key rotate"] = AuditMark.OnePerTenant,
                 ["tenant data-key retire"] = AuditMark.OnePerTenant,
                 ["platform rekey"] = AuditMark.OnePerRun,
+                ["cell operator invite"] = AuditMark.OnePerRun,
                 ["tenant list"] = AuditMark.None,
                 ["tenant binding list"] = AuditMark.None,
                 ["version"] = AuditMark.None,

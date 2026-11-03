@@ -25,7 +25,9 @@ conventions of [architecture.md](../architecture.md) apply.
   holds no account in a customer's realm, and no tenant's account reaches the cell console.
 - **Accounts only.** The realm has accounts that the identity provider holds, with no brokered
   provider. A new operator account is created by an existing operator in the realm's admin console,
-  or by `Axis.Admin cell operator invite <email>` for the first one.
+  or by `Axis.Admin cell operator invite <email>` for the first one. That command makes the realm, or
+  brings it up to date, and removes any brokered provider that it finds, see
+  [cell operator invite](administration.md#cell-operator-invite).
 - **Second factor.** Every sign-in needs a password and a second factor: an authenticator app or a
   passkey. The realm's required action sets one up at the first sign-in, and an account without one
   cannot finish signing in.

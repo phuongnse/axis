@@ -85,6 +85,7 @@ internal static partial class AdminCommands
                tenant host remove <id> <host>
                tenant host move <host> --to <id>
                platform rekey
+               cell operator invite <email>
                publisher
                version
         """;
@@ -191,6 +192,7 @@ internal static partial class AdminCommands
         new("migrate", AuditMark.OnePerTenant, run => MigrateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
@@ -1775,7 +1777,7 @@ internal static partial class AdminCommands
     /// Reads the identity provider settings of <c>tenant create</c>. The address must be an absolute http or https URL, and https
     /// outside Development and Testing. A message names the setting and never its value.
     /// </summary>
-    private static IdentityProviderAdmin? ReadIdentityProvider(IConfiguration configuration, IHostEnvironment environment, out string problem)
+    internal static IdentityProviderAdmin? ReadIdentityProvider(IConfiguration configuration, IHostEnvironment environment, out string problem)
     {
         problem = "";
         var url = configuration[IdentityProviderUrlSetting];

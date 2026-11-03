@@ -6,7 +6,7 @@ import { startDirectoryServer } from '../directory-server'
 import { waitForDialog } from '../dialogs'
 import { addAuthenticator, submitCode, submitPassword } from '../keycloak'
 import { addRealmAccount, realmClientIds, setRealmPassword, userCredentialTypes } from '../tenant-realm'
-import { nextTotp, totp } from '../totp'
+import { liveTotp, nextTotp } from '../totp'
 
 // tenant create makes a database, two roles and a realm, and the realm step waits on Keycloak.
 test.setTimeout(180_000)
@@ -83,7 +83,7 @@ test('a person signs in over https on the host of the new tenant and reaches the
 
     await page.goto(`https://${host}/api/auth/sign-in?returnUrl=/`)
     await submitPassword(page, account.username, account.password)
-    await submitCode(page, totp(account.secret))
+    await submitCode(page, await liveTotp(account.secret))
     await page.waitForURL(`https://${host}/`)
     await expect(page.getByRole('banner')).toBeVisible()
 
@@ -113,7 +113,7 @@ test('the administrator disables an account on the users page, its next sign-in 
     // A person who is not an administrator is told that the users page is not theirs.
     await memberPage.goto(signIn)
     await submitPassword(memberPage, member.username, member.password)
-    const firstCode = totp(member.secret)
+    const firstCode = await liveTotp(member.secret)
     await submitCode(memberPage, firstCode)
     await memberPage.waitForURL(`https://${host}/`)
     await memberPage.goto(`https://${host}/users`)
@@ -182,7 +182,7 @@ test('after tenant host add a person signs in on the added host and reaches the 
 
     await page.goto(`https://${host}/api/auth/sign-in?returnUrl=/`)
     await submitPassword(page, account.username, account.password)
-    await submitCode(page, totp(account.secret))
+    await submitCode(page, await liveTotp(account.secret))
     await page.waitForURL(`https://${host}/`)
     await expect(page.getByRole('banner')).toBeVisible()
   } finally {
