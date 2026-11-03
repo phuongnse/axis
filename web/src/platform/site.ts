@@ -35,6 +35,12 @@ export interface SiteApplication {
   descriptions: Record<string, string> | null
 }
 
+/** The privacy and terms links of a site. A link that is not set is `null`. */
+export interface SiteLegal {
+  privacyUrl: string | null
+  termsUrl: string | null
+}
+
 /** One application site in the list served by `GET /api/sites`, with its title and description per available locale. */
 export interface SiteListItem {
   path: string
@@ -43,6 +49,8 @@ export interface SiteListItem {
   /** The description per locale, or `null` when the site has none. */
   descriptions: Record<string, string> | null
   application: SiteApplication
+  /** The site's own links, or else its tenant's, or `null` or missing when neither sets any. */
+  legal?: SiteLegal | null
 }
 
 /** The site title in the given locale, or in the site's first locale when it lacks that one. */

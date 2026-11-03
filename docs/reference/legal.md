@@ -3,8 +3,7 @@
 Detailed reference for the privacy policy and terms of service links, the legal line that shows them, the page that
 lists the licences of what Axis ships, and the step where a person accepts the terms. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
-[decisions.md](../decisions.md). The rules come from [D128](../decisions/d128-rules-from-the-studio-review.md). All of
-this page is _(planned for M31)_.
+[decisions.md](../decisions.md). The rules come from [D128](../decisions/d128-rules-from-the-studio-review.md).
 
 ## Legal settings
 
@@ -17,13 +16,17 @@ this page is _(planned for M31)_.
   line only. The commands are in [legal links](tenant-setting-commands.md#legal-links). Under the `configuration`
   tenancy source, the tenant's `Legal` block holds the same values, see
   [tenancy settings](host-settings.md#tenancy-settings).
-- **Where they show.** `GET /api/sites` gives each site's `legal`: its own addresses, or else its tenant's, and
-  nothing when neither sets them. The platform site, the home page and Studio take the tenant's. The realm sync writes
-  the identity provider's copy on each client, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step):
+- **Where they show.** `GET /api/sites` gives each site's `legal`, written `{ "privacyUrl", "termsUrl" }`: its own
+  addresses when it sets either, else its tenant's, and `null` when neither sets any. A site that sets either address
+  uses only its own pair. The platform site, the home page and Studio take the tenant's _(planned for M31)_. The realm
+  sync writes the identity provider's copy on each client _(planned for M31)_, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step):
   `axis.privacyUrl` and `axis.termsUrl` (the site's, or else the tenant's), `axis.licencesUrl` (the tenant host's
   `/licences`), and `axis.tenantPrivacyUrl` and `axis.tenantTermsUrl` on every client, for the terms step.
 
 ## Legal line
+
+_(planned for M31)_
 
 - **One line in two places.** Every page of the identity provider ends in it, under the card and as wide as the card,
   and so does the shell's footer, see [layout](shell.md#layout).
@@ -34,6 +37,8 @@ this page is _(planned for M31)_.
   Licences opens keeps its full title.
 
 ## Open source licences
+
+_(planned for M31)_
 
 - **`/licences` lists what Axis ships.** The page opens without signing in. It first names Axis's licence, the AGPL,
   with its text and a link to Axis's source, which
@@ -50,6 +55,8 @@ this page is _(planned for M31)_.
   [sites and pages](configuration.md).
 
 ## Accepting the terms
+
+_(planned for M31)_
 
 - **Once, then on each new version.** After a person's first sign-in, and again when the tenant's terms change
   version, the identity provider asks them to accept the terms in a step of its own, never as a box on every sign-in.

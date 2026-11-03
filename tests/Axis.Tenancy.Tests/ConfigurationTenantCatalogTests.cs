@@ -266,6 +266,54 @@ public sealed class ConfigurationTenantCatalogTests
     }
 
     [Fact]
+    public void A_Legal_block_is_read_into_the_tenant_entry_with_a_site_override()
+    {
+        var entry = Assert.Single(Load(
+            [
+                .. Valid(),
+                "Tenants:default:Legal:PrivacyUrl=https://example.test/privacy",
+                "Tenants:default:Legal:TermsUrl=https://example.test/terms",
+                "Tenants:default:Legal:TermsVersion=2026-11-01",
+                "Tenants:default:Legal:Sites:Shop:PrivacyUrl=https://example.test/shop-privacy",
+                "Tenants:default:Legal:Sites:blank:PrivacyUrl=  ",
+            ]).Tenants);
+
+        var legal = entry.Legal!;
+        Assert.Equal("2026-11-01", legal.TermsVersion);
+        Assert.Equal(new SiteLegal("https://example.test/shop-privacy", null), legal.ForSite("shop"));
+        Assert.Equal(new SiteLegal("https://example.test/privacy", "https://example.test/terms"), legal.ForSite("other"));
+        Assert.Equal(new SiteLegal("https://example.test/privacy", "https://example.test/terms"), legal.ForSite("blank"));
+        Assert.Null(Assert.Single(Load(Valid()).Tenants).Legal);
+    }
+
+    [Theory]
+    [InlineData("Tenants:default:Legal:PrivacyUrl=http://example.test/privacy", "Tenants:default:Legal:PrivacyUrl")]
+    [InlineData("Tenants:default:Legal:TermsUrl=https://example.test/terms", "Tenants:default:Legal:TermsVersion")]
+    [InlineData("Tenants:default:Legal:TermsVersion=1", "Tenants:default:Legal:TermsUrl")]
+    [InlineData("Tenants:default:Legal:Sites:shop:TermsUrl=ftp://example.test/terms", "Tenants:default:Legal:Sites:shop:TermsUrl")]
+    [InlineData("Tenants:default:Legal:Sites:shop:TermsVersion=1", "Tenants:default:Legal:Sites:shop:TermsVersion")]
+    [InlineData("Tenants:default:Legal:Sites:studio:PrivacyUrl=https://example.test/privacy", "Tenants:default:Legal:Sites:studio")]
+    [InlineData("Tenants:default:Legal:Sites:1shop:PrivacyUrl=https://example.test/privacy", "Tenants:default:Legal:Sites:1shop")]
+    public void A_bad_Legal_block_refuses_the_start_naming_the_setting_and_no_value(string setting, string named)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => Load([.. Valid(), setting]));
+
+        Assert.Contains(named, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("example.test", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_preview_tenant_takes_its_main_tenants_Legal_block_and_refuses_one_of_its_own()
+    {
+        var catalog = Load([.. PreviewPair(), "Tenants:main:Legal:PrivacyUrl=https://example.test/privacy"]);
+
+        Assert.Equal(new SiteLegal("https://example.test/privacy", null), catalog.Find("main-preview")!.Legal?.ForSite("shop"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Load([.. PreviewPair(), "Tenants:main-preview:Legal:PrivacyUrl=https://example.test/privacy"]));
+        Assert.Contains("Tenant 'main-preview' is a preview tenant and has its own Legal block.", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_text_of_an_entry_shows_no_secret()
     {
         var entry = Assert.Single(Load(
