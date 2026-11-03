@@ -1003,5 +1003,7 @@
   "shell.studio.newApplication.exists": "An application with this name already exists.",
   "shell.studio.newApplication.invalid": "A name uses letters and digits, starts with a letter, has at most 60 characters and is not api, health, assets or studio.",
   "shell.studio.newApplication.failed": "The application could not be created.",
-  "shell.studio.newApplication.templatesFailed": "The templates could not be loaded. You can start from Blank."
+  "shell.studio.newApplication.templatesFailed": "The templates could not be loaded. You can start from Blank.",
+  "notices.emailsHeld.subject": "Emails are held until tomorrow",
+  "notices.emailsHeld.body": "This tenant has sent its {limit} emails for today. The other emails wait until 00:00 UTC."
 }

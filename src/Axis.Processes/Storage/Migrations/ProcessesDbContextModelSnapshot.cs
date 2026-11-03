@@ -436,7 +436,7 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("recipient");
 
-                    b.Property<Guid>("ApplicationId")
+                    b.Property<Guid?>("ApplicationId")
                         .HasColumnType("uuid")
                         .HasColumnName("application_id");
 
@@ -459,7 +459,7 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("open_parameters");
 
-                    b.Property<Guid>("ReleaseId")
+                    b.Property<Guid?>("ReleaseId")
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
@@ -482,6 +482,10 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasKey("Id", "RecipientKind", "Recipient")
                         .HasName("pk_notifications");
+
+                    b.HasIndex("RecipientKind", "Recipient", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_tenant_recipient_created_at")
+                        .HasFilter("application_id IS NULL");
 
                     b.HasIndex("ApplicationId", "RecipientKind", "Recipient", "CreatedAt")
                         .HasDatabaseName("ix_notifications_application_id_recipient_created_at");

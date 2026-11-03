@@ -2,20 +2,21 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// A row of <c>axis.notifications</c>: one in-app notification for one user or one role, which a
-/// <c>notify</c> step stored. All the rows of one step run share the notification's id. Times use the
-/// database clock.
+/// <c>notify</c> step stored, or one notice for the tenant's administrators, which the worker stored. All the rows
+/// of one step run share the notification's id. Times use the database clock.
 /// </summary>
 public sealed class NotificationRow
 {
     /// <summary>The notification's id, a version 7 UUID. Every recipient's row has it.</summary>
     public required Guid Id { get; init; }
 
-    public required Guid ApplicationId { get; init; }
+    /// <summary>The application of the notifying instance, or null for a tenant notice.</summary>
+    public Guid? ApplicationId { get; init; }
 
-    /// <summary>The release the notifying instance is pinned to. It resolves the text keys and the page.</summary>
-    public required Guid ReleaseId { get; init; }
+    /// <summary>The release the notifying instance is pinned to. It resolves the text keys and the page. It is null for a tenant notice, whose text keys are platform texts.</summary>
+    public Guid? ReleaseId { get; init; }
 
-    /// <summary>The kind of the recipient: <c>user</c> or <c>role</c>.</summary>
+    /// <summary>The kind of the recipient: <c>user</c>, <c>role</c> or, for a tenant notice, <c>platformRole</c>.</summary>
     public required string RecipientKind { get; init; }
 
     /// <summary>The user id or the role name.</summary>

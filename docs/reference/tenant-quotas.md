@@ -10,7 +10,8 @@ In place: the `platform.tenant_quotas` table, the cell's defaults and the readin
 directory. The server and the worker answer a tenant's effective quota from them, and answer no limit
 outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
 [usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
-`emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
+`emailsPerDay` until 00:00 UTC, and stores one in-app notice a day for the tenant's administrators when it
+holds one, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
 event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
 are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
 saves and publishes. So are `platform.tenant_leases`, the `concurrentQueries` lease of a record list read and a data
@@ -141,8 +142,17 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 - **Outside a cell** nothing is counted or held.
 - The platform reader role gets `INSERT` and `UPDATE` on the table, and no `DELETE`. Old rows are kept,
   one small row for each tenant and day.
-- The tenant's administrators get one in-app notification the first time a day that emails are held.
-  _(planned for M31)_
+- **The notice.** The tenant's administrators get one in-app notice the first time a day that an email
+  is held, see [D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md). The worker takes the
+  counter `emailsHeldNotice` for the day with a limit of 1. When it gets it, it inserts the notice row
+  in the same tenant transaction that makes the item due at 00:00 UTC, and later holds that day store
+  nothing. A transaction that fails or loses its claim gives the counter back. A worker that crashes
+  between taking the counter and the commit loses that day's notice. When the platform database cannot
+  be reached for the counter, the email is still held, no notice is stored, and the worker logs one
+  warning for the tenant. The notice is a row with no application and no release, whose texts are the
+  platform texts `notices.emailsHeld.subject` and `notices.emailsHeld.body` with the value `limit`,
+  the tenant's `emailsPerDay`. A tenant with no limit, and a worker outside a cell, store none. The
+  routes that read the notice and the bell are _(planned for M31)_.
 
 ## Usage
 
