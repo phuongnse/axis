@@ -34,6 +34,13 @@ public sealed class StorageQuotaRouteTests
         "POST /api/apps/{app}/entities/{module}/{entity}/records",
         "PATCH /api/apps/{app}/entities/{entity}/records/{id}",
         "PATCH /api/apps/{app}/entities/{module}/{entity}/records/{id}",
+        "PATCH /api/studio/apps/{application}/resources/{id}",
+        "POST /api/studio/apps",
+        "POST /api/studio/apps/{application}/changes",
+        "POST /api/studio/apps/{application}/publish",
+        "POST /api/studio/apps/{application}/resources",
+        "PUT /api/studio/apps/{application}/modules/{module}/resources/{id}",
+        "PUT /api/studio/apps/{application}/texts/{key}",
     ];
 
     // Routes that can write and are not refused over the quota on purpose. Deletes, process starts and task work go on,
@@ -88,21 +95,18 @@ public sealed class StorageQuotaRouteTests
         "POST /api/users/{id}/resend-invitation",
         "POST /api/users/{id}/reset-authenticator",
 
-        // Studio writes, until the Studio part of #2398.
+        // Studio deletes are never refused.
         "DELETE /api/studio/apps/{application}/resources/{id}",
-        "PATCH /api/studio/apps/{application}/resources/{id}",
-        "POST /api/studio/apps",
-        "POST /api/studio/apps/{application}/changes",
-        "POST /api/studio/apps/{application}/expressions/check",
+
+        // Validate, preview, test and rollback store a request and go on over the quota.
         "POST /api/studio/apps/{application}/preview",
-        "POST /api/studio/apps/{application}/publish",
         "POST /api/studio/apps/{application}/releases/{id}/rollback",
-        "POST /api/studio/apps/{application}/resources",
-        "POST /api/studio/apps/{application}/resources/{id}/page-metadata",
         "POST /api/studio/apps/{application}/test",
         "POST /api/studio/apps/{application}/validate",
-        "PUT /api/studio/apps/{application}/modules/{module}/resources/{id}",
-        "PUT /api/studio/apps/{application}/texts/{key}",
+
+        // The expression check and the page metadata compile in memory and write nothing.
+        "POST /api/studio/apps/{application}/expressions/check",
+        "POST /api/studio/apps/{application}/resources/{id}/page-metadata",
     };
 
     [Fact]

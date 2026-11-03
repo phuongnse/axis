@@ -24,6 +24,7 @@ namespace Axis.Server.Studio;
 /// <c>application/json</c> (415) and a JSON object with only a string <c>label</c> of up to 100 characters and a string
 /// <c>note</c> of up to 2000 (400). A <c>validate</c> ignores its body. The status route answers 404 for a request
 /// of another application or tenant, because it reads this tenant's database for this application only.
+/// In a cell, <c>publish</c> checks the tenant's storage quota (403 <c>quota-exceeded</c>) right after the session.
 /// <c>POST /api/studio/apps/{application}/releases/{id}/rollback</c> stores a <c>rollback</c> request that names a release of
 /// the application's history in this tenant, with no snapshot, and answers as <c>publish</c> does. It runs the same checks
 /// as <c>publish</c>, and then answers 404 for an <c>id</c> that is not a UUID or is not in the history. It ignores its body.
@@ -44,7 +45,7 @@ internal static class StudioPublishEndpoints
     public static void MapStudioPublishEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/api/studio/apps/{application}/validate", ValidateAsync).WithRateLimit(Partition.Publishing);
-        endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync).WithRateLimit(Partition.Publishing).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/preview", PreviewAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/test", TestAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/rollback", RollbackAsync).WithRateLimit(Partition.Publishing);
