@@ -85,7 +85,7 @@ the review.
   see "A block for what is live" below. Get started stays
   for an application with no entity. More you can add stays in full, as the owner found it useful: by the sidebar's
   groups, each kind the application has none of as a link to its list, what it is for, and in textMuted when one is
-  needed, leaving out migrations, which the entity designer writes with the entity (D54). For the docs change: a
+  needed, migrations too (see "One list of kinds" below). For the docs change: a
   Proposed `changes` list on `GET .../releases`, the files that differ from the live release, compared as the
   canonical JSON a release stores.
 - **The Overview says nothing twice.** The owner found that the block's line naming the live release, its number and
@@ -143,3 +143,7 @@ the review.
     entity, asks for the name alone, or the locale for a text resource.
   One button that changed its words and its dialog with the page was not taken: the band's button always does the
   same thing.
+- **One list of kinds.** The owner's rule: a kind an author may create shows everywhere kinds are offered, never in
+  one place and not another. D54 lets an author write a migration by hand, though the entity designer usually writes
+  it, so More you can add offers Migrations as New resource… does, with "Seldom by hand: the entity designer writes
+  one whenever a change it saves needs it."

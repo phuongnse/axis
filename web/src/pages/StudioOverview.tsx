@@ -77,13 +77,10 @@ export function StudioOverview({
 /** The kinds that Get started already leads to. */
 const startKinds = ['entity', 'page', 'site']
 
-/** Kinds Studio writes itself, as the entity designer saves an entity's migration with it (D54), which are not offered. */
-const generatedKinds = ['migration']
-
 /**
  * Proposed: every kind the application has no resource of yet, by the sidebar's groups: the kind as a link to its
- * list, where New resource… starts with it, what it is for, and in textMuted when one is needed. A kind Studio writes
- * itself is left out.
+ * list, where New resource… starts with it, what it is for, and in textMuted when one is needed. Every kind the
+ * dialog offers is here, a migration too, which the entity designer usually writes itself.
  */
 function More({
   resources,
@@ -102,10 +99,7 @@ function More({
       key: group.key,
       kinds: group.kinds
         .map((entry) => entry.kind)
-        .filter(
-          (kind) =>
-            starterKinds.includes(kind) && !present.has(kind) && !skip.includes(kind) && !generatedKinds.includes(kind),
-        ),
+        .filter((kind) => starterKinds.includes(kind) && !present.has(kind) && !skip.includes(kind)),
     }))
     .filter((group) => group.kinds.length > 0)
   if (groups.length === 0) {

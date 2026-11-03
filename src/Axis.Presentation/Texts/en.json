@@ -556,6 +556,7 @@
   "shell.studio.overview.when.endpoint": "When a partner system sends records in, it calls an endpoint.",
   "shell.studio.overview.when.text": "One for each further language people use the application in.",
   "shell.studio.overview.when.scenario": "Keeps a behaviour working as the application changes: one scenario for each behaviour that matters.",
+  "shell.studio.overview.when.migration": "Seldom by hand: the entity designer writes one whenever a change it saves needs it.",
   "shell.studio.overview.when.event": "Lets other systems and processes hear that something happened to a record.",
   "shell.studio.overview.when.trigger": "For a process that starts on its own, on a schedule or when a record changes.",
   "shell.studio.overview.when.webhook": "For a system that must hear of an event the moment it happens.",

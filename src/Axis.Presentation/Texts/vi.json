@@ -556,6 +556,7 @@
   "shell.studio.overview.when.endpoint": "Khi một hệ thống đối tác gửi bản ghi vào, nó gọi một endpoint.",
   "shell.studio.overview.when.text": "Mỗi ngôn ngữ nữa mà mọi người dùng ứng dụng có một tài nguyên văn bản.",
   "shell.studio.overview.when.scenario": "Giữ cho một hành vi luôn chạy đúng khi ứng dụng thay đổi: mỗi hành vi quan trọng một kịch bản.",
+  "shell.studio.overview.when.migration": "Hiếm khi phải tự viết: entity designer tự tạo khi một thay đổi được lưu cần tới.",
   "shell.studio.overview.when.event": "Cho hệ thống và quy trình khác biết có chuyện xảy ra với một bản ghi.",
   "shell.studio.overview.when.trigger": "Dành cho quy trình tự bắt đầu, theo lịch hoặc khi một bản ghi thay đổi.",
   "shell.studio.overview.when.webhook": "Dành cho hệ thống cần biết về một sự kiện ngay khi nó xảy ra.",
