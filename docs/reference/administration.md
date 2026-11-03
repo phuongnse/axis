@@ -530,7 +530,9 @@ A second loop of the same process does the same for `test` requests, see below. 
 - **Lease.** The lease is five minutes, fixed. The publisher renews it every
   third of the lease while the request runs, so a long request is not claimed
   twice. A `running` request whose lease has run out is claimed again by any
-  publisher, because its publisher died. A request that has been claimed three
+  publisher, because its publisher died. A request whose publisher lost its tenant
+  database connection is claimed again in the next round, without waiting for the
+  lease. A request that has been claimed three
   times and whose lease runs out again ends `failed` with `AXC0215`, see the
   [lifecycle](authoring.md#lifecycle). A `publish` gets a
   `release.publishFailed` audit record with it, a `rollback` gets a

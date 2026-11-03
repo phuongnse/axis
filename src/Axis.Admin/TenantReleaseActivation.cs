@@ -1,3 +1,4 @@
+using System.Data;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -196,7 +197,14 @@ internal sealed class TenantReleaseActivation(
                 finally
                 {
                     // Nothing is kept. This also frees the connection for the final status.
-                    await transaction.RollbackAsync(CancellationToken.None);
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None);
+                    }
+                    catch (Exception) when (connection.State != ConnectionState.Open)
+                    {
+                        // The connection broke, and the server rolled the transaction back with it.
+                    }
                 }
             });
     }
