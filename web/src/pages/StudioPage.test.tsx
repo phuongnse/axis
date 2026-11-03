@@ -1113,6 +1113,31 @@ describe('StudioPage publishing', () => {
     expect(screen.getByRole('button', { name: 'Validate' })).toBeEnabled()
   })
 
+  it('shows the quota title when a publish is refused past the storage quota', async () => {
+    const fetchMock = stubPublishing(publisher)
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === `${folder}/publish` && init?.method === 'POST'
+        ? new Response(
+            JSON.stringify({
+              title: 'This tenant has reached its storage quota.',
+              status: 403,
+              reason: 'quota-exceeded',
+              quota: 'storage',
+            }),
+            { status: 403 },
+          )
+        : base(input, init),
+    )
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+
+    expect(await screen.findByTestId('studio-request-error')).toHaveTextContent(
+      'This tenant has reached its storage quota.',
+    )
+  })
+
   it.each([
     ['studioPreviewHost is null', publisher, false],
     ['studioPreviewHost is set', previewer(), true],

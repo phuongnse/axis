@@ -209,10 +209,11 @@ This is _(built)_.
   of a child row works the same and uploads to its own route.
 - **Refused upload.** A refused upload shows its message under the input. A
   `413` shows that the file is too large, a `415` that its type is not
-  accepted, and any other failure that the upload failed. The texts are
-  platform texts chosen by the status code, not the server's problem title. A
-  file larger than `maxSize` is refused in the browser with the message of a
-  `413`, and is not uploaded. `accept` only filters the file picker, and the
+  accepted, and any other failure that the upload failed. A `403` for a quota
+  refusal shows the server's title, as [refusals](tenant-quotas.md#refusals)
+  says. The other texts are platform texts chosen by the status code, not the
+  server's problem title. A file larger than `maxSize` is refused in the
+  browser with the message of a `413`, and is not uploaded. `accept` only filters the file picker, and the
   server decides the type.
 - **Table, detail and read-only child rows.** They show the file's name as a
   download link. A file column cannot be sorted.
