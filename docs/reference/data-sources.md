@@ -557,6 +557,10 @@ checked after the query and before the database.
   `or`, so the whole query fails closed. The server logs the policy and grant
   index of each of the user's read filters on the root entity, never a
   record value.
+- **`503` for a busy tenant.** A rows read in a cell, when the tenant's `concurrentQueries` quota has no
+  free lease for 5 seconds, after the sign-in, path and grant checks. The title is "This tenant is busy.
+  Try again in a moment.", the answer carries `Retry-After: 1` and nothing was queried. See
+  [work at once](tenant-quotas.md#work-at-once).
 - **`503` for a query timeout.** The rows query runs past
   `Data:QueryTimeout` and PostgreSQL cancels it. The title is the record API's:
   "The query took too long. Try again or narrow it." The server logs the data

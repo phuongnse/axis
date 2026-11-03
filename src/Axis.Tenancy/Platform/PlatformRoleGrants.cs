@@ -6,7 +6,8 @@ namespace Axis.Tenancy.Platform;
 /// Limits the platform reader role, the user of <c>ConnectionStrings:Platform</c>, to reading the
 /// <c>platform</c> schema: <c>USAGE</c> on the schema and <c>SELECT</c> on its tables, and <c>INSERT</c> on
 /// <c>data_protection_keys</c>, where the server stores its keys, and <c>INSERT</c>, <c>UPDATE</c> and <c>DELETE</c> on
-/// <c>tenant_usage</c> and <c>tenant_usage_latest</c>, where a cell's worker keeps usage, and nothing else. The one exception to reading is
+/// <c>tenant_usage</c> and <c>tenant_usage_latest</c>, where a cell's worker keeps usage, and on <c>tenant_leases</c>, where
+/// the hosts of a cell share their running work, and nothing else. The one exception to reading is
 /// <c>audit_records</c>: the role has no right on it at all.
 /// Any wider right it had there is revoked. The role name comes from configuration, so an EF Core migration
 /// cannot hold it. The server runs this step after the platform migrations.
@@ -56,6 +57,7 @@ public static class PlatformRoleGrants
             GRANT SELECT ON ALL TABLES IN SCHEMA platform TO {role};
             GRANT INSERT ON platform.data_protection_keys TO {role};
             GRANT INSERT, UPDATE, DELETE ON platform.tenant_usage, platform.tenant_usage_latest TO {role};
+            GRANT INSERT, UPDATE, DELETE ON platform.tenant_leases TO {role};
             REVOKE ALL ON platform.audit_records FROM {role};
             ALTER DEFAULT PRIVILEGES IN SCHEMA platform REVOKE ALL ON TABLES FROM {role};
             ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT SELECT ON TABLES TO {role};

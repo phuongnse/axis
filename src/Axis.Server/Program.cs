@@ -154,6 +154,8 @@ builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>();
+builder.Services.AddSingleton(provider => new TenantLeases(provider.GetRequiredService<NpgsqlDataSource>(), provider.GetRequiredService<ILogger<TenantLeases>>()));
+builder.Services.AddSingleton<QueryLeases>();
 builder.Services.AddSingleton<IStudioFileWriter, StudioFileWriter>();
 builder.Services.AddSingleton<TenantDatabaseGauge>();
 
