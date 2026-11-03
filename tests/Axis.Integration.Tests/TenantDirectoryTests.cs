@@ -558,6 +558,8 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             var otherId = otherManifest.RootElement.GetProperty("id").GetString()!;
             using var otherTexts = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "b", "app-b", "texts", "en.json"), CancellationToken));
             var otherTextsId = otherTexts.RootElement.GetProperty("id").GetString()!;
+            // HttpClient removes the ".." segment of the last case, so it reaches an unknown /api route. That route answers 404
+            // whether or not the SPA is built.
             var refused = new (HttpMethod Method, string Path, string? Body, string? ContentType)[]
             {
                 (HttpMethod.Get, "/api/studio/apps/AppB/resources", null, null),
