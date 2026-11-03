@@ -75,6 +75,8 @@ describe('design-system previews', () => {
         'Forgot password',
         'Set password',
         'Add an authenticator',
+        'Choose how to sign in',
+        'Update your profile',
         'Sign out',
         'Notice',
         'Error',
