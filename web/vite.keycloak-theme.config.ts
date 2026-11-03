@@ -20,6 +20,9 @@ function copyThemeFiles(): Plugin {
         'login-config-totp.ftl',
         'login-reset-password.ftl',
         'login-update-password.ftl',
+        'select-authenticator.ftl',
+        'login-update-profile.ftl',
+        'idp-review-user-profile.ftl',
         'messages',
       ]) {
         cpSync(path.resolve(import.meta.dirname, 'keycloak-theme', name), path.join(themeFolder, name), {

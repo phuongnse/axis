@@ -5,9 +5,11 @@ import {
   identityAddAuthenticatorContext,
   identityQrCode,
   identityResetPasswordContext,
+  identitySelectAuthenticatorContext,
   identitySignInContext,
   identityTwoStepContext,
   identityUpdatePasswordContext,
+  identityUpdateProfileContext,
 } from '../src/designSystem/fixtures'
 import { previews } from '../src/designSystem/previews'
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
@@ -74,6 +76,30 @@ function expectAddAuthenticatorPage(container: HTMLElement) {
   expect(form).toHaveAttribute('method', 'post')
   expect(form.querySelector('input[name="totp"]')).toBeInTheDocument()
   expect(form.querySelector('input[name="totpSecret"]')).toHaveValue(identityAddAuthenticatorContext.secret)
+}
+
+function expectSelectAuthenticatorPage(container: HTMLElement) {
+  expect(screen.getByText('Choose how to sign in')).toBeInTheDocument()
+  const form = container.querySelector('form') as HTMLFormElement
+  expect(form).toHaveAttribute('action', identitySelectAuthenticatorContext.loginAction)
+  expect(form).toHaveAttribute('method', 'post')
+  expect(
+    [...form.querySelectorAll('button[name="authenticationExecution"]')].map((b) => b.getAttribute('value')),
+  ).toEqual(identitySelectAuthenticatorContext.methods.map((method) => method.id))
+  expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute(
+    'href',
+    identitySelectAuthenticatorContext.restartUrl,
+  )
+}
+
+function expectUpdateProfilePage(container: HTMLElement) {
+  expect(screen.getByText('Update your profile')).toBeInTheDocument()
+  const form = container.querySelector('form') as HTMLFormElement
+  expect(form).toHaveAttribute('action', identityUpdateProfileContext.loginAction)
+  expect(form).toHaveAttribute('method', 'post')
+  expect(form.querySelector('input[name="firstName"]')).toHaveValue('Alex')
+  expect(form.querySelector('input[name="email"]')).toHaveAttribute('type', 'email')
+  expect(screen.getByRole('alert')).toHaveTextContent(identityUpdateProfileContext.notice!)
 }
 
 describe('the Keycloak theme entry', () => {
@@ -149,6 +175,42 @@ describe('the Keycloak theme entry', () => {
       </ThemeModeProvider>,
     )
     expectAddAuthenticatorPage(preview.container)
+  })
+
+  it('draws the same method choice as the identitySignIn preview', () => {
+    writeContextBlock(identitySelectAuthenticatorContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectSelectAuthenticatorPage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previews.identitySignIn[7].draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectSelectAuthenticatorPage(preview.container)
+  })
+
+  it('draws the same update profile page as the identitySignIn preview', () => {
+    writeContextBlock(identityUpdateProfileContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectUpdateProfilePage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previews.identitySignIn[8].draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectUpdateProfilePage(preview.container)
+  })
+
+  it('draws the review profile page with its own title', () => {
+    writeContextBlock({ ...identityUpdateProfileContext, page: 'reviewProfile', title: 'Review your profile' })
+    render(<SignInEntry context={readSignInContext(document)} />)
+
+    expect(screen.getByText('Review your profile')).toBeInTheDocument()
+    expect(screen.getByLabelText('First name')).toHaveValue('Alex')
   })
 
   it('fails with a clear error when the sign-in context is missing', () => {

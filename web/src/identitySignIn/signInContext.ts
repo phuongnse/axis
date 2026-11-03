@@ -185,6 +185,76 @@ export interface UpdatePasswordContext extends IdentityFrameContext {
   texts: UpdatePasswordTexts
 }
 
+/** The texts of the page that offers the ways to sign in, which "Try another way" opens. */
+export interface SelectAuthenticatorTexts {
+  title: string
+  message: string
+  backToSignIn: string
+}
+
+/** One way to sign in that Keycloak offers, such as the authenticator app or the password. */
+export interface AuthenticationMethod {
+  /** Keycloak's execution id, posted as `authenticationExecution`. */
+  id: string
+  label: string
+  help?: string
+}
+
+/** What the page behind "Try another way" draws: one row per method, which posts the chosen one. */
+export interface SelectAuthenticatorContext extends IdentityFrameContext {
+  page: 'selectAuthenticator'
+  title: string
+  /** The message to show above the methods. No error means no alert. */
+  error?: string
+  /** Where the chosen method posts `authenticationExecution`. */
+  loginAction: string
+  /** Where "Back to sign in" restarts the sign-in. */
+  restartUrl: string
+  methods: AuthenticationMethod[]
+  texts: SelectAuthenticatorTexts
+}
+
+/** The texts of the pages that update a profile. */
+export interface UpdateProfileTexts {
+  submit: string
+  /** Holds `{field}` for the field's label. */
+  fieldRequired: string
+}
+
+/** One field of the user profile, in the order Keycloak lists them. */
+export interface ProfileField {
+  /** The attribute's name, which the form posts it as. */
+  name: string
+  label: string
+  value?: string
+  required: boolean
+  readOnly: boolean
+  autoComplete?: string
+  /** Keycloak's error for this field. */
+  error?: string
+}
+
+/** What the update profile and the review profile pages draw: one field per user profile attribute. */
+export interface UpdateProfileContext extends IdentityFrameContext {
+  /** `updateProfile` is Keycloak's required action and `reviewProfile` is the review after a first brokered sign-in. Only the title differs. */
+  page: 'updateProfile' | 'reviewProfile'
+  title: string
+  /** Keycloak's message that is not an error, such as "You need to update your user profile". It shows above the fields. */
+  notice?: string
+  /** A Keycloak error that belongs to no field. */
+  error?: string
+  /** Where the form posts the fields. */
+  loginAction: string
+  fields: ProfileField[]
+  texts: UpdateProfileTexts
+}
+
 /** What the page of the identity provider's theme draws, told apart by `page`. */
 export type IdentityContext =
-  SignInContext | TwoStepContext | AddAuthenticatorContext | ResetPasswordContext | UpdatePasswordContext
+  | SignInContext
+  | TwoStepContext
+  | AddAuthenticatorContext
+  | ResetPasswordContext
+  | UpdatePasswordContext
+  | SelectAuthenticatorContext
+  | UpdateProfileContext

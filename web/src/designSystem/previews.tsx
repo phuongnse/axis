@@ -280,6 +280,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Set password', draw: () => <IdentitySignIn page="updatePassword" />, frameHeight: 600 },
     { caption: 'Add an authenticator', draw: () => <IdentitySignIn page="addAuthenticator" />, frameHeight: 760 },
     {
+      caption: 'Choose how to sign in',
+      draw: () => <IdentitySignIn page="selectAuthenticator" />,
+      frameHeight: 600,
+    },
+    { caption: 'Update your profile', draw: () => <IdentitySignIn page="updateProfile" />, frameHeight: 720 },
+    {
       caption: 'Language and theme',
       draw: () => (
         <ClickOnMount selector='button[aria-label="Language and theme"]'>
