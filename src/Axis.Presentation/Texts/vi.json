@@ -1113,6 +1113,8 @@
   "shell.studio.entity.migration.uniqueWarning": "Thêm unique không có migration. Validate báo AXC0016.",
   "shell.studio.newResource.button": "Tài nguyên mới…",
   "shell.studio.newResource.title": "Tài nguyên mới",
+  "shell.studio.newResource.buttonOf": "Thêm {kind}…",
+  "shell.studio.newResource.titleOf": "Thêm {kind}",
   "shell.studio.newResource.kind": "Loại",
   "shell.studio.newResource.name": "Tên",
   "shell.studio.newResource.locale": "Ngôn ngữ",

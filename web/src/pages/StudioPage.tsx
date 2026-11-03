@@ -146,6 +146,7 @@ function StudioWorkspace() {
   // Proposed: `view` and `kind` pick the part of the workspace the sidebar opened; an open resource wins.
   const view: StudioView = parseView(params.get('view'), params.get('kind'))
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null)
+  const { spacing } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
@@ -449,7 +450,16 @@ function StudioWorkspace() {
             />
           ) : undefined
         }
-        actions={<div ref={setActionsSlot} style={{ display: 'flex' }} />}
+        actions={
+          // Proposed: New resource… heads the band's actions, a spacing-lg apart from the ones that check and publish,
+          // so it reads as a group of its own and sits near Publish… but never beside it.
+          <Flex align="center" gap={spacing.lg}>
+            {loaded && 'resources' in loaded && (
+              <StudioNewResource application={application} resources={resources} inBand onCreated={onCreated} />
+            )}
+            <div ref={setActionsSlot} style={{ display: 'flex' }} />
+          </Flex>
+        }
       >
         {loaded && 'resources' in loaded && (
           <StudioPublishing

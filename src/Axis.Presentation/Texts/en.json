@@ -1113,6 +1113,8 @@
   "shell.studio.entity.migration.uniqueWarning": "Adding unique has no migration. Validate reports AXC0016.",
   "shell.studio.newResource.button": "New resource…",
   "shell.studio.newResource.title": "New resource",
+  "shell.studio.newResource.buttonOf": "New {kind}…",
+  "shell.studio.newResource.titleOf": "New {kind}",
   "shell.studio.newResource.kind": "Kind",
   "shell.studio.newResource.name": "Name",
   "shell.studio.newResource.locale": "Locale",

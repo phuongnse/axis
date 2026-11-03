@@ -133,3 +133,13 @@ the review.
   cannot yet: a row opens the resource as it is now. D119 and D125 already agree a diff view, planned for M35, which
   the publish dialog shows from the live release. The owner chose to leave it to that plan and not to design a second
   one here; whether the Overview links to it is for when it is built.
+- **Where a resource is created.** The owner asked for one place to create a resource of any kind, and for a kind's
+  own page to create that kind without asking it. The sidebar's application row was recommended first; the owner
+  found it already tight and asked for the band, near Publish…. Agreed, two buttons:
+  - The band's New resource…, on every page, heads the band's actions as a text button, a spacing-lg apart from
+    Validate, Preview, Run tests and Publish…, so it is a group of its own and never beside Publish…. Its dialog asks
+    for a kind, by its name for one resource in the sidebar's groups and order, Other last, then for a name.
+  - A kind's list has its own button in its toolbar, named for the kind, such as New entity…, whose dialog, New
+    entity, asks for the name alone, or the locale for a text resource.
+  One button that changed its words and its dialog with the page was not taken: the band's button always does the
+  same thing.
