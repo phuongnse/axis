@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Formats.Tar;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Realms;
 using Axis.Configuration.Releases;
@@ -30,7 +31,9 @@ namespace Axis.Admin;
 /// The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk. The <c>check</c> step also
 /// reads the <c>studio/</c> entries before the dump and refuses a path that is not safe. In a cell, a <c>studio</c> step before <c>version</c>
 /// writes them under the new tenant's folder in <c>Studio:ApplicationsPath</c>, over a file of the same path and leaving others alone.
-/// Outside a cell they are skipped with a warning.
+/// Outside a cell they are skipped with a warning. The <c>check</c> step also reads <c>realm.json</c>, which sits right after the manifest, and
+/// keeps it in memory. When the tenant gets a new realm, it refuses a file that is too large or not valid, and the <c>realm</c> step imports the
+/// file into the new realm after the sync, see <see cref="TenantRealmImport"/>, so people sign in as before. A rerun imports again and skips what exists.
 /// </summary>
 internal sealed class TenantRestore : IAsyncDisposable
 {
@@ -41,6 +44,8 @@ internal sealed class TenantRestore : IAsyncDisposable
     private const string ManifestEntry = "manifest.json";
 
     private const string DumpEntry = "tenant.dump";
+
+    private const string RealmEntryName = "realm.json";
 
     private const string StudioPrefix = "studio/";
 
@@ -134,7 +139,8 @@ internal sealed class TenantRestore : IAsyncDisposable
             refusal.NewRealm,
             refusal.StudioEntries,
             settings.InCell,
-            settings.StudioApplicationsPath);
+            settings.StudioApplicationsPath,
+            refusal.RealmEntry.Document);
     }
 
     public async Task<int> RunAsync()
@@ -214,7 +220,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         RestoreSettings settings, TenantRestoreRequest request, byte[] backupKey, TenantRealm? realm, CancellationToken cancellationToken)
     {
         var problems = new List<string>();
-        var (manifest, readProblem, studio) = ReadManifest(request.File, backupKey);
+        var (manifest, readProblem, studio, realmEntry) = ReadManifest(request.File, backupKey);
         var trusted = false;
         var preview = false;
         if (manifest is null)
@@ -329,6 +335,12 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
         }
 
+        // The archive's realm.json is used only for a new realm. A restore that keeps the archive's realm never reads it.
+        if (newRealm && realmEntry.Problem is { } realmProblem)
+        {
+            problems.Add(realmProblem);
+        }
+
         if (trusted)
         {
             var required = manifest!.Packages.Where(package => package.Required).ToList();
@@ -357,7 +369,7 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
         }
 
-        return new CheckResult(manifest, problems, newRealm, studio.Count);
+        return new CheckResult(manifest, problems, newRealm, studio.Count, realmEntry);
     }
 
     // The realm of the archive is the realm its authority names, on this installation's identity provider.
@@ -379,8 +391,9 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     // Decrypts the archive as far as the manifest and the start of the dump. Returns the manifest, or null and the reason when the file is
     // not an encrypted archive that the key opens, with a complete manifest and a dump. Chunks after that are checked by the restore step.
-    // It also lists the studio/ entries before the dump, and only those, so the check sees every entry that the studio step writes.
-    private static (BackupManifest? Manifest, string Problem, StudioListing Studio) ReadManifest(string file, byte[] key)
+    // It also lists the studio/ entries before the dump, and only those, so the check sees every entry that the studio step writes. A realm.json
+    // before the dump is read into memory, unless it is larger than the limit.
+    private static (BackupManifest? Manifest, string Problem, StudioListing Studio, RealmEntry Realm) ReadManifest(string file, byte[] key)
     {
         const string Unreadable = "the archive cannot be read";
         try
@@ -393,6 +406,8 @@ internal sealed class TenantRestore : IAsyncDisposable
             var studioCount = 0;
             var unsafeNames = new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            var realmEntry = RealmEntry.None;
+            var hasRealm = false;
             while ((manifest is null || !hasDump) && reader.GetNextEntry() is { } entry)
             {
                 if (!hasDump && entry.Name.StartsWith(StudioPrefix, StringComparison.Ordinal))
@@ -410,10 +425,17 @@ internal sealed class TenantRestore : IAsyncDisposable
                 {
                     if (entry.Length > MaxManifestBytes)
                     {
-                        return (null, Unreadable, StudioListing.None);
+                        return (null, Unreadable, StudioListing.None, RealmEntry.None);
                     }
 
                     manifest = JsonSerializer.Deserialize<BackupManifest>(data, _json);
+                }
+                else if (!hasDump && entry.Name == RealmEntryName && entry.DataStream is { } realmData)
+                {
+                    // A second realm.json is not valid, because it is unclear which one the restore means.
+                    var (document, problem) = hasRealm ? (null, TenantRealmImport.Invalid) : TenantRealmImport.Read(realmData, entry.Length);
+                    realmEntry = new RealmEntry(document, problem);
+                    hasRealm = true;
                 }
                 else if (entry.Name == DumpEntry && entry.DataStream is not null)
                 {
@@ -422,17 +444,17 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
 
             return hasDump && manifest is not null && IsComplete(manifest)
-                ? (manifest, "", new StudioListing(studioCount, unsafeNames))
-                : (null, Unreadable, StudioListing.None);
+                ? (manifest, "", new StudioListing(studioCount, unsafeNames), realmEntry)
+                : (null, Unreadable, StudioListing.None, RealmEntry.None);
         }
         catch (BackupArchiveException exception)
         {
-            return (null, exception.Message, StudioListing.None);
+            return (null, exception.Message, StudioListing.None, RealmEntry.None);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or FormatException
             or JsonException or NotSupportedException or ArgumentException)
         {
-            return (null, Unreadable, StudioListing.None);
+            return (null, Unreadable, StudioListing.None, RealmEntry.None);
         }
     }
 
@@ -835,6 +857,12 @@ internal sealed class TenantRestore : IAsyncDisposable
         })]).Plan;
         await ActivationRealmSync.SyncAsync(
             _http, DirectoryTenantCatalog.Realm(row, cipher), DirectoryTenantCatalog.Bindings(_id, rows, cipher), plan, _cancellationToken);
+
+        // The realm is named after the tenant id, as EnsureForTenantAsync makes it.
+        if (_plan.Realm is { } document)
+        {
+            await new TenantRealmImport(_realm!).ImportAsync(_id, document, _cancellationToken);
+        }
     }
 
     // The name of the first binding of an oidc or saml provider that has no value or the wrong kind, ignoring letter case, or null when all
@@ -918,7 +946,13 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     private void Failed(string step, string message) => _output.WriteLine($"{_id} {step} failed: {message}");
 
-    private sealed record CheckResult(BackupManifest? Manifest, IReadOnlyList<string> Problems, bool NewRealm, int StudioEntries);
+    private sealed record CheckResult(BackupManifest? Manifest, IReadOnlyList<string> Problems, bool NewRealm, int StudioEntries, RealmEntry RealmEntry);
+
+    // The realm.json of the archive: the document, or the reason it is refused. None is an archive without one.
+    private sealed record RealmEntry(JsonObject? Document, string? Problem)
+    {
+        public static RealmEntry None { get; } = new(null, null);
+    }
 
     // The studio/ entries before the dump: how many are safe, and the names of those that are not.
     private sealed record StudioListing(int Count, IReadOnlyList<string> Unsafe)
@@ -931,6 +965,8 @@ internal sealed class TenantRestore : IAsyncDisposable
 /// What the <c>check</c> step found: the request with the archive's full path, the manifest, the backup key, the path of <c>pg_restore</c> and whether
 /// the tenant gets a new realm (<paramref name="NewRealm"/>) or keeps the archive's sign-in. <paramref name="StudioEntries"/> counts the
 /// <c>studio/</c> entries of the archive. The folder is <paramref name="StudioApplicationsPath"/> and is set only in a cell (<paramref name="InCell"/>).
+/// <paramref name="Realm"/> is the archive's <c>realm.json</c>, checked and in memory, or null when the archive has none or its file is not valid.
+/// It is kept also when the tenant keeps the archive's realm, because a rerun that finds the new realm made imports again.
 /// </summary>
 internal sealed record RestorePlan(
     TenantRestoreRequest Request,
@@ -940,4 +976,5 @@ internal sealed record RestorePlan(
     bool NewRealm,
     int StudioEntries = 0,
     bool InCell = false,
-    string? StudioApplicationsPath = null);
+    string? StudioApplicationsPath = null,
+    JsonObject? Realm = null);
