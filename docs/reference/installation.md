@@ -200,7 +200,7 @@ CREATE DATABASE axis_identity OWNER axis_identity;
 | Database role | Used for |
 | --- | --- |
 | `axis_platform_schema` | `ConnectionStrings:PlatformSchema`. It owns the `platform` schema. |
-| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, and write access to the two usage tables `platform.tenant_usage` and `platform.tenant_usage_latest`. It has no access to `platform.audit_records`. |
+| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, write access to the two usage tables `platform.tenant_usage` and `platform.tenant_usage_latest`, and insert and update on `platform.tenant_daily_counters`. It has no access to `platform.audit_records`. |
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 | `axis_identity` | The identity provider's own database, `axis_identity`. It owns that database and nothing else. |
 

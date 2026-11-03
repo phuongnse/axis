@@ -27,52 +27,42 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   library. Where the library leaves a state out, such as loading (`aria-busy`)
   or the current page (`aria-current`, as on the active navigation entry), the
   widget adds it.
-- **Design tokens and previews.** The token file
-  `web/src/platform/designTokens.ts` holds every colour, type, spacing and
-  radius value of the theme, in Axis names. The colours are primary, success,
-  warning, danger, info, primaryText, successText, warningText, dangerText,
-  infoText, canvas, surface, text, textMuted, border, borderSubtle, divider and
-  focusRing, each with a light and a dark value. The first five are seeds: they
-  colour fills, icons and tints. The `*Text` tokens colour text in that state
-  colour: state text, links, the selected tab, the active navigation entry and
-  form validation messages, the current page of a pagination, destructive menu
-  entries and the text of outlined and danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid 2px keyboard focus of
-  every control. Every text colour reaches 4.5:1 and every border and focus
-  ring reaches 3:1 on surface and canvas, in both modes. The shadow group
-  holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast
-  it, and widgets, cards, sections and buttons cast none. Type has the body and
-  code fonts and the font size, spacing runs from xs to xl, and radius has the
-  base radius. The body font is IBM Plex Sans, a variable font for weights 100
-  to 700, and the code font is IBM Plex Mono at weight 400. The SPA ships the
-  Google Fonts files from the Fontsource npm packages unchanged. Only the
-  Latin, Latin Extended and Vietnamese subsets ship, each with a
-  `unicode-range` in `web/src/fonts.css`, so a browser downloads only the
-  subsets a page uses. The fonts are under the SIL Open Font License 1.1. Its
-  texts ship at `/fonts/OFL-IBM-Plex-Sans.txt` and
-  `/fonts/OFL-IBM-Plex-Mono.txt`, from `web/public/fonts`. The font files are
-  part of the build output and load from the SPA's own origin (`font-src
-  'self'`), so an install with no internet shows them too. The design-system
-  bundle carries no fonts. `web/src/platform/antTheme.ts` is the only file that maps them to Ant
-  Design tokens. A component that needs a theme value reads Axis tokens through
-  `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test
-  fails on a hard-coded colour, font family or radius in `web/src` outside those
-  two files. The shared chart component in `web/src/platform/Chart.tsx` maps the
-  Axis tokens to chart colours, font and grid, and loads the library in its own
-  chunk. Widget previews draw every widget, container and field input from
-  fixture metadata, in light and dark mode. `scripts/design-system.sh` builds
-  them into one classic script that sets `window.Axis` with a mount per preview.
-  A mounted widget follows `data-theme` on the page's root element. For the
-  current mode it also reads the custom properties `--primary` to `--focusRing`
-  for the colours (named as above, so `--primaryText` to `--infoText` and
-  `--focusRing` too), `--shadowOverlay`, `--spacing-xs` to `--spacing-xl`,
-  `--radius-base`, `--font-sans` and `--font-code` from that element, and
-  redraws when one changes. A property the page leaves out, or sets to a value
-  the theme cannot use, keeps its token file value. A shadow value is usable
-  when it is not empty and has no `;`, `{` or `}`. Only the design-system
-  bundle reads them. See [Development](../development.md#widget-previews),
+- **Design tokens and previews.** The token file `web/src/platform/designTokens.ts` holds every colour, type, spacing
+  and radius value of the theme, in Axis names. The colours are primary, success, warning, danger, info, primaryText,
+  successText, warningText, dangerText, infoText, canvas, surface, text, textMuted, border, borderSubtle, divider and
+  focusRing, each with a light and a dark value. The first five are seeds: they colour fills, icons and tints. The
+  `*Text` tokens colour text in that state colour: state text, links, the selected tab, the active navigation entry and
+  form validation messages, the current page of a pagination, destructive menu entries and the text of outlined and
+  danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid 2px keyboard focus of
+  every control. Every text colour reaches 4.5:1 and every border and focus ring reaches 3:1 on surface and canvas, in
+  both modes. The shadow group holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast it, and
+  widgets, cards, sections and buttons cast none. Type has the body and code fonts and the font size, spacing runs from
+  xs to xl, and radius has the base radius. _(planned for M31)_: the size group holds `bar`, 48 px, the height of the
+  shell's header, a page's band and Studio's application row, `smallControl`, 24 px, a small icon button and the line of
+  text beside it, and `tableRow`, 40 px, a table's row and header. No size, space, type, radius or colour is a number of
+  its own in a component; a layout technique, such as a column's 1 % width, takes its size from a token, see
+  [D129](../decisions/d129-rules-from-the-studio-editors-review.md). The body font is IBM Plex Sans, a variable font for
+  weights 100 to 700, and the code font is IBM Plex Mono at weight 400. The SPA ships the Google Fonts files from the
+  Fontsource npm packages unchanged. Only the Latin, Latin Extended and Vietnamese subsets ship, each with a
+  `unicode-range` in `web/src/fonts.css`, so a browser downloads only the subsets a page uses. The fonts are under the
+  SIL Open Font License 1.1. Its texts ship at `/fonts/OFL-IBM-Plex-Sans.txt` and `/fonts/OFL-IBM-Plex-Mono.txt`, from
+  `web/public/fonts`. The font files are part of the build output and load from the SPA's own origin (`font-src
+  'self'`), so an install with no internet shows them too. The design-system bundle carries no fonts.
+  `web/src/platform/antTheme.ts` is the only file that maps them to Ant Design tokens. A component that needs a theme
+  value reads Axis tokens through `useDesignTokens`, never through Ant Design's `theme.useToken`. A Vitest test fails on
+  a hard-coded colour, font family or radius in `web/src` outside those two files. The shared chart component in
+  `web/src/platform/Chart.tsx` maps the Axis tokens to chart colours, font and grid, and loads the library in its own
+  chunk. Widget previews draw every widget, container and field input from fixture metadata, in light and dark mode.
+  `scripts/design-system.sh` builds them into one classic script that sets `window.Axis` with a mount per preview. A
+  mounted widget follows `data-theme` on the page's root element. For the current mode it also reads the custom
+  properties `--primary` to `--focusRing` for the colours (named as above, so `--primaryText` to `--infoText` and
+  `--focusRing` too), `--shadowOverlay`, `--spacing-xs` to `--spacing-xl`, `--radius-base`, `--font-sans` and
+  `--font-code` from that element, and redraws when one changes. A property the page leaves out, or sets to a value the
+  theme cannot use, keeps its token file value. A shadow value is usable when it is not empty and has no `;`, `{` or
+  `}`. Only the design-system bundle reads them. See [Development](../development.md#widget-previews),
   [D67](../decisions/d67-live-widget-previews-in-the-design-system.md),
-  [D57](../decisions/d57-a-design-system-published-from-the-repository.md) and
-  [Design changes](../delivery.md#design-changes).
+  [D57](../decisions/d57-a-design-system-published-from-the-repository.md) and [Design
+  changes](../delivery.md#design-changes).
 - **Icons.** Every icon comes from `@ant-design/icons`, and nothing in the SPA
   draws one by hand. Only the outlined style is used, so icons look alike. An
   icon takes the text colour and size of its control, so its colour comes from
@@ -526,9 +516,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     [layout](shell.md#layout) of [Shell and home page](shell.md).
     The page header, app switcher and language and theme menu work as they do on the platform site, see
     [page header](shell.md#page-header) and [app switcher and preferences](shell.md#app-switcher-and-preferences).
-- **Table widget.** A page whose widget is a `table` lists the records of its
-  entity through the record API, or the rows of its data source, in the
-  shared Ant Design table.
+- **Table widget.** A page whose widget is a `table` lists the records of its entity through the record API, or the rows
+  of its data source, in the shared Ant Design table. _(planned for M31)_: it draws on the platform's one shared table,
+  which every table of the platform uses, see [tables](actions-and-controls.md#tables).
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
     child collection and a `references` field have no column.
@@ -536,11 +526,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       entity's `displayField` when the table shows it, and otherwise the first
       column. For a data source it is the first column. It comes first. With a
       `navigate` row action it is the link that opens the row, see **Links**.
-    - **Layout**. Text, enum and reference columns are at most
-      320 px wide, and their text wraps. Every cell and the actions column
-      line up at the top, so a row with wrapped text reads along its first
-      line. Number columns sit on the right in tabular figures, see **Shown
-      values**.
+    - **Layout**. Text, enum and reference columns are at most 320 px wide, and their text wraps. _(planned for M31)_: a
+      text, reference or file column is free text and the free text columns share the width left in equal parts; every
+      other column fits its content; rows are 40 px, see [tables](actions-and-controls.md#tables). Every cell and the
+      actions column line up at the top, so a row with wrapped text reads along its first line. Number columns sit on
+      the right in tabular figures, see **Shown values**.
   - **URL state.** Paging, sorting and search live in the URL as the record
     API's own `page`, `pageSize`, `sort` (`-` and the field name for
     descending) and `search`, so reload, sharing and the back button keep

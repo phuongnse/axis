@@ -50,7 +50,9 @@ button, how the page scrolls, the footer, the tiles and sign-out, and adds the S
 - **Page area.** Pages draw on `canvas` with `spacing-lg` padding. A wide table scrolls inside its widget, so the
   page never scrolls sideways.
 - **Footer.** A slim footer runs the full width under the sidebar and the page, as the header does above them, on
-  `surface` with a `borderSubtle` rule above it. On the left it reads "© <year> Axis", then " · v<version>" for a
+  `surface` with a `borderSubtle` rule above it. _(planned for M31)_: beside a sidebar it sits under the content
+  column only, so the sidebar runs to the bottom of the window and is never pushed up by it, see
+  [D129](../decisions/d129-rules-from-the-studio-editors-review.md). On the left it reads "© <year> Axis", then " · v<version>" for a
   signed-in person only, as in "© 2026 Axis · v0.1.0". On the right it shows the server's readiness, "Server status"
   and a dot with Ready, Checking or Unavailable. _(planned for M31)_: the readiness goes, because the footer read it once when
   the page loaded, and a page that cannot reach the server says so where it fails. The legal links take the right,
