@@ -638,6 +638,11 @@ does not read `Quotas:Defaults` yet.
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
 | `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup` and `tenant restore` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
+| `Cell:BackupStorage:ServiceUrl` | Admin | The address of the S3-compatible service that `cell backup` uploads to. Only `cell backup` reads the five `Cell:BackupStorage` settings, and it stops with exit code `2` when one is blank, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
+| `Cell:BackupStorage:Region` | Admin | The signing region of that service. |
+| `Cell:BackupStorage:Bucket` | Admin | The bucket that receives `<tenant id>/<yyyy-mm-dd>.axisbak`. |
+| `Cell:BackupStorage:AccessKeyId` | Admin | The access key id of the service. |
+| `Cell:BackupStorage:SecretAccessKey` | Admin | The secret access key of the service. It is never printed. |
 | `Cell:RuntimeDatabaseHost` | Server, worker | The address of every tenant's runtime database connection, such as PgBouncer, see [connections](cells.md#connections). Those connections also take `Maximum Pool Size=5`, `Minimum Pool Size=0`, `Connection Idle Lifetime=60` and `Max Auto Prepare=0`. Without it each connection uses the host of the tenant's directory row. The schema role, the publisher, the worker's `LISTEN` connection and the platform connections never use it. |
 | `Cell:RuntimeDatabasePort` | Server, worker | The port of that address. It defaults to the port of the tenant's directory row. Setting it without `Cell:RuntimeDatabaseHost` stops the start. |
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |

@@ -13,8 +13,8 @@ outside a cell. The worker in a cell also samples each tenant's storage and coun
 `emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
 event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
 are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
-saves and publishes. So are `platform.tenant_leases` and the `concurrentQueries` lease of a record list read and a data
-source rows read. The other `users` refusals, among them the first sign-in of a brokered user, and the other leases are
+saves and publishes. So are `platform.tenant_leases`, the `concurrentQueries` lease of a record list read and a data
+source rows read, and the `concurrentConnectorCalls` lease of a connector or package call in the worker. The other `users` refusals, among them the first sign-in of a brokered user, and the other leases are
 still planned, and so are the usage columns that the text marks. The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -106,14 +106,16 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
     keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. The
     lease is held until the work has committed.
   - A connector or package call is not claimed by the worker while the tenant has no lease free.
-    The work item stays due, and the worker runs other tenants' work.
+    The work item stays due, and the worker runs other tenants' work. The worker retries the claim
+    at the tenant's next turn, after one of its items ends or at the next poll. The lease is held
+    until the run of the item ends.
   - A data source query, a record list read, a record export or a data source export waits up to
     5 seconds for a lease. It then answers `503` problem details titled "This tenant is busy. Try
     again in a moment.", with `Retry-After: 1`. The query timeout counts from the start of the
     query, not of the wait. A query or a list read takes a `concurrentQueries` lease and an export
     takes a `concurrentImports` lease, so a busy slot of one never blocks the other. An export
     releases its lease when its file is complete, before the file is sent.
-- **When the platform database is down.** A read, an export or an import that cannot reach the
+- **When the platform database is down.** A read, an export, an import or a connector or package call that cannot reach the
   platform database runs without a lease, and the server or the worker logs a warning. Under `directory` the server keeps serving from the last good
   directory then, and the limit would otherwise turn a platform outage into a cell-wide read outage.
 - **Cost.** A lease costs two short statements on the platform database. The
