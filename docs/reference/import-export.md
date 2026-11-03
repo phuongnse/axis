@@ -80,6 +80,8 @@ the SPA.
 - **Timeout.** The query runs under `Data:ExportQueryTimeout`, see
   [data settings](host-settings.md#data-settings). A query past it is a `503`
   and sends no file.
+- **Concurrency.** In a cell an export takes a `concurrentImports` lease of the tenant. When none is
+  free after 5 seconds it answers `503`, see [work at once](tenant-quotas.md#work-at-once).
 - **Audit.** Each export writes `records.exported` after the file is complete
   and before it is sent, in a transaction of its own. An export that fails
   writes no audit record and sends no file. It holds no value. See
@@ -160,6 +162,9 @@ the SPA.
   user only. Any other user, an unknown id and an import of another entity
   get `404`. The import is stored in `axis.record_imports`, see
   [storage](storage.md).
+- **Concurrency.** In a cell the dry run and the commit each take a `concurrentImports` lease of
+  the tenant. With none free the work item is due again in 1 second and the import keeps its
+  state, see [work at once](tenant-quotas.md#work-at-once).
 - **Commit.** Only the uploader of a `checked` import
   commits it. The checks come in order: session `401`, in a cell the tenant's
   [storage quota](tenant-quotas.md#refusals) `403`, the path `404`, the

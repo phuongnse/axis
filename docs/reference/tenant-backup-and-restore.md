@@ -35,7 +35,8 @@ can recover them.
    tenant database as its schema role. It reads one consistent snapshot, so the
    tenant keeps running and its hosts keep answering. The tool reads the
    manifest data inside the same snapshot, so a release that is activated during
-   the backup is in both the dump and the manifest or in neither. The schema
+   the backup is in both the dump and the manifest or in neither. The row
+   counts of the manifest are read in that snapshot too. The schema
    role's password goes to `pg_dump` in its environment, never in its
    arguments. The tool holds one transaction open until the dump ends, so
    vacuum on the tenant database waits, and so does an activation that changes
@@ -59,6 +60,7 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `packages` | Every extension package version that a stored release pins. Each has `id`, `version` and `required`. |
 | `modules` | Every module version that a stored release pins. Each has `id` and `version`. |
 | `keys` | The tenant's data keys and lookup keys. Each has `kind` (`data` or `lookup`), `number` and `key`, the base64 text of its 32 bytes. A restore stores them under its own installation key with the same numbers. An archive with no `keys` gets number 1 of each kind. |
+| `counts` | The row count of each ordinary table of the tenant database outside the system schemas, keyed `schema.table`, read in the dump's snapshot. A restore does not use it, and an archive without `counts` restores as before. |
 
 `directory` holds these fields:
 
@@ -276,7 +278,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant and the Studio folder in the archive, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest and the Studio folder in the archive, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -320,8 +322,8 @@ format and the steps above stay, with the changes below.
   [secret](keys-and-data-protection.md#secret) data, and the archive's encryption covers it. A
   restore imports it into the new tenant's realm, so its people sign in as before, and needs no new
   invitation. An archive without `realm.json` restores as today.
-- **Counts in the manifest.** The manifest gets `counts`: the row count of each table of the tenant
-  database, read in the dump's snapshot.
+- **Counts in the manifest** _(built)_. The manifest gets `counts`: the row count of each table of the tenant
+  database, read in the dump's snapshot. Every `tenant backup` writes them, also outside a cell.
 
 **Weekly restore check.** Each Sunday at 03:00 in the region's time zone, a job checks that a restore
 works.

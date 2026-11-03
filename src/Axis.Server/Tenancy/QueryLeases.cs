@@ -7,10 +7,10 @@ using Npgsql;
 namespace Axis.Server.Tenancy;
 
 /// <summary>
-/// Takes the <c>concurrentQueries</c> lease of the tenant for a record list read or a data source rows read, see
-/// <c>docs/reference/tenant-quotas.md#work-at-once</c>. When none is free the read waits, retrying every 250 ms, for up
-/// to five seconds, and then answers <c>503</c>. Outside a cell, or for a tenant with no limit, no lease is taken and the
-/// platform database is not read. When the platform database cannot be reached the read goes ahead without a lease and
+/// Takes a lease of the tenant for a record list read or a data source rows read (<c>concurrentQueries</c>), or for a
+/// record or data source export (<c>concurrentImports</c>), see <c>docs/reference/tenant-quotas.md#work-at-once</c>.
+/// When none is free the read or export waits, retrying every 250 ms, for up to five seconds, and then answers <c>503</c>. Outside a cell, or for a tenant with no limit, no lease is taken and the
+/// platform database is not read. When the platform database cannot be reached the read or export goes ahead without a lease and
 /// the server logs a warning, as under <c>directory</c> the server keeps serving while the platform database is down.
 /// </summary>
 internal sealed partial class QueryLeases(
@@ -26,12 +26,12 @@ internal sealed partial class QueryLeases(
     public static readonly TimeSpan Retry = TimeSpan.FromMilliseconds(250);
 
     /// <summary>
-    /// Takes the lease, waiting for one when the tenant has none free. <see cref="QueryLeaseOutcome.Busy"/> is set when the wait
-    /// ended with none. Dispose <see cref="QueryLeaseOutcome.Lease"/> when the read ends.
+    /// Takes a lease of <paramref name="quota"/>, waiting for one when the tenant has none free. <see cref="QueryLeaseOutcome.Busy"/>
+    /// is set when the wait ended with none. Dispose <see cref="QueryLeaseOutcome.Lease"/> when the read or export ends.
     /// </summary>
-    public async Task<QueryLeaseOutcome> TakeAsync(CancellationToken cancellationToken)
+    public async Task<QueryLeaseOutcome> TakeAsync(string quota, CancellationToken cancellationToken)
     {
-        if (tenants.Current?.TenantId is not { } tenantId || quotas.Limit(tenantId, QuotaKeys.ConcurrentQueries) is not { } limit)
+        if (tenants.Current?.TenantId is not { } tenantId || quotas.Limit(tenantId, quota) is not { } limit)
         {
             return QueryLeaseOutcome.None;
         }
@@ -41,7 +41,7 @@ internal sealed partial class QueryLeases(
         {
             while (true)
             {
-                if (await leases.TryTakeAsync(tenantId, QuotaKeys.ConcurrentQueries, limit, cancellationToken) is { } lease)
+                if (await leases.TryTakeAsync(tenantId, quota, limit, cancellationToken) is { } lease)
                 {
                     return new QueryLeaseOutcome(false, lease);
                 }
@@ -57,20 +57,20 @@ internal sealed partial class QueryLeases(
         }
         catch (NpgsqlException exception)
         {
-            LogUnavailable(tenantId, exception.GetType().Name);
+            LogUnavailable(quota, tenantId, exception.GetType().Name);
             return QueryLeaseOutcome.None;
         }
     }
 
-    /// <summary>The <c>503</c> answer of a read that found no free lease. It tells the caller to try again in a second.</summary>
+    /// <summary>The <c>503</c> answer of a read or export that found no free lease. It tells the caller to try again in a second.</summary>
     public static IResult Busy(HttpContext context)
     {
         context.Response.Headers.RetryAfter = "1";
         return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "This tenant is busy. Try again in a moment.");
     }
 
-    [LoggerMessage(LogLevel.Warning, "A concurrentQueries lease of tenant {TenantId} could not be taken over ConnectionStrings:Platform ({Cause}). The read runs without one.")]
-    private partial void LogUnavailable(string tenantId, string cause);
+    [LoggerMessage(LogLevel.Warning, "A {Quota} lease of tenant {TenantId} could not be taken over ConnectionStrings:Platform ({Cause}). The read runs without one.")]
+    private partial void LogUnavailable(string quota, string tenantId, string cause);
 
     private sealed class NoLease : IAsyncDisposable
     {
