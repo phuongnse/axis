@@ -143,7 +143,9 @@ Shopify's settings pages:
 - **A list of objects is a table.** One column per property, named by its field text; a value of a known kind by its
   label (a module or package by the label of its manifest), a nested list or map by its count. Add… (such as Add
   module…) is the table's main action; each row has Edit… and Remove as icons. Edit… and Add… open the item in a
-  dialog, medium for plain values and large for an item holding a list or a map. The dialog edits its own copy: Done
+  dialog, medium for plain values and large for an item holding a list or a map, titled by the verb of the button that
+  opened it: "Add module", as it adds an installed module and creates none (the owner found New module wrong), and
+  "Edit module". The dialog edits its own copy: Done
   writes it to the list as one step to undo and waits for the item's required fields; Cancel leaves the list as it was,
   so Add… adds no row until Done (the owner saw an empty row appear behind the dialog). Choosing a module or package
   fills an empty version range with its newest version, "^1.2.0"; a chosen module with no roles or connectors says so. Inside the dialog a nested list is rows of inputs with Add row, as a dialog never opens another.

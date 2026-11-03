@@ -490,7 +490,11 @@ function ListTable({
         open={open !== null}
         width={dialogWidth(nested ? 'large' : 'medium')}
         title={
-          open?.isNew ? textOr(t, `${listKey}.new`, 'shell.studio.list.new').replace('{item}', itemTitle) : itemTitle
+          // Proposed: a dialog's title is the verb of the button that opened it: Add module for Add module…, which adds an
+          // installed module to the application and creates none, and Edit module for Edit.
+          open?.isNew
+            ? textOr(t, `${listKey}.addTitle`, 'shell.studio.list.addTitle').replace('{item}', itemTitle)
+            : textOr(t, `${listKey}.editTitle`, 'shell.studio.list.editTitle').replace('{item}', itemTitle)
         }
         okText={t('shell.studio.list.done')}
         cancelText={t('shell.studio.cancel')}
