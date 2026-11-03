@@ -23,6 +23,7 @@ import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import { BindingPicker } from './BindingPicker'
 import { ReferencePicker } from './ReferencePicker'
 import {
   fieldControls,
@@ -945,6 +946,23 @@ function SchemaNode({
             onChange(versionPointer, `^${newest}`)
           }
         }}
+      />
+    )
+  } else if (control === 'urlBinding' || control === 'secretBinding' || control === 'storageBinding') {
+    // Proposed: a binding is chosen from the tenant's bindings of its kind. File storage is optional: cleared, the
+    // whole fileStorage entry goes, and the files stay in the tenant's database.
+    const storage = control === 'storageBinding'
+    input = (
+      <BindingPicker
+        kind={control === 'urlBinding' ? 'url' : control === 'secretBinding' ? 'secret' : 'storage'}
+        label={title}
+        value={typeof value === 'string' ? value : undefined}
+        placeholder={storage ? t('shell.studio.binding.tenantDatabase') : undefined}
+        onChange={(next) =>
+          storage && next === undefined
+            ? onChange(pointer.slice(0, pointer.lastIndexOf('/')), undefined)
+            : onChange(pointer, next)
+        }
       />
     )
   } else if (control === 'versionRange') {

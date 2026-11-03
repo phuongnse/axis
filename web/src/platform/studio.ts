@@ -1295,3 +1295,19 @@ export function sortRelaxed(
       collator.compare(words.get(a)!.title, words.get(b)!.title),
   )
 }
+
+/** Proposed: the names of the tenant's deployment bindings by kind, never their values, from `GET /api/studio/bindings`. */
+export interface StudioBindingNames {
+  url: string[]
+  secret: string[]
+  storage: string[]
+}
+
+/** Proposed: loads the tenant's binding names. */
+export async function fetchStudioBindings(signal?: AbortSignal): Promise<StudioBindingNames> {
+  const response = await studioFetch('/api/studio/bindings', { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '/api/studio/bindings' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioBindingNames
+}

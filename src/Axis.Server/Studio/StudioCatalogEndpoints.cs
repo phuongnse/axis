@@ -14,8 +14,34 @@ namespace Axis.Server.Studio;
 /// </summary>
 internal static class StudioCatalogEndpoints
 {
-    public static void MapStudioCatalogEndpoints(this IEndpointRouteBuilder endpoints) =>
+    public static void MapStudioCatalogEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapGet("/api/studio/catalog", CatalogAsync);
+        endpoints.MapGet("/api/studio/bindings", BindingsAsync);
+    }
+
+    /// <summary>
+    /// Proposed: <c>GET /api/studio/bindings</c> answers the names of the request tenant's deployment bindings by kind,
+    /// url, secret and storage, so a connector's, a webhook's and the application's file storage binding are chosen
+    /// rather than typed. It never answers a value, a secret's least of all: a release names bindings and never holds
+    /// them, and an author needs only their names. Sorted by name.
+    /// </summary>
+    private static async Task<IResult> BindingsAsync(
+        HttpContext httpContext, StudioOptions options, Axis.Tenancy.ITenantCatalog catalog, Axis.Core.Tenancy.ITenantContextAccessor tenants)
+    {
+        if (await StudioEndpoints.RefuseAsync(httpContext, options) is { } refusal)
+        {
+            return refusal;
+        }
+
+        var bindings = tenants.Current?.TenantId is { } id && catalog.Find(id) is { } tenant ? tenant.Bindings : new Dictionary<string, Axis.Tenancy.TenantBinding>();
+        List<string> Names(string kind) =>
+            [.. bindings.Where(pair => pair.Value.Kind == kind).Select(pair => pair.Key).Order(StringComparer.OrdinalIgnoreCase)];
+        return Results.Ok(new StudioBindingNames(
+            Names(Axis.Tenancy.DeploymentBindingKinds.Url),
+            Names(Axis.Tenancy.DeploymentBindingKinds.Secret),
+            Names(Axis.Tenancy.DeploymentBindingKinds.Storage)));
+    }
 
     private static async Task<IResult> CatalogAsync(
         HttpContext httpContext, StudioOptions options, ModuleCatalog modules, PackageCatalog packages)
@@ -117,3 +143,6 @@ internal sealed record StudioCatalogSlot(string Name, IReadOnlyDictionary<string
 
 /// <summary>Proposed: an installed extension package: its id, its label, and its versions newest first.</summary>
 internal sealed record StudioCatalogPackage(string Id, string? Label, IReadOnlyList<string> Versions);
+
+/// <summary>Proposed: the names of a tenant's deployment bindings by kind, never their values.</summary>
+internal sealed record StudioBindingNames(IReadOnlyList<string> Url, IReadOnlyList<string> Secret, IReadOnlyList<string> Storage);

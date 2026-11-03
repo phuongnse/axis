@@ -234,3 +234,11 @@ Group and Material advise, and as mail and documents do:
   of its own, its label (the field label's style, tied to the select) above its select. A group's fields sit in from
   the group's label behind a thin 2 px rule in borderSubtle, so they read as its fields and not its peers, as GitHub
   and Linear set sub-fields apart.
+- **A binding is chosen, never typed.** The owner asked what File storage is and what its box takes. It takes the name
+  of the tenant's storage binding, which decides where the bytes of file fields go (today only `database`; none keeps
+  them in the tenant's database). Agreed: a new `GET /api/studio/bindings` answers the request tenant's binding names
+  by kind, url, secret and storage, and never a value; `BindingPicker` chooses from the names of the kind the place
+  needs, for file storage ("The tenant's database, with no binding" when none, clearing the whole entry), a webhook's
+  URL and secret, and a connector's base URL, token URL and secrets. A name the tenant lacks stays shown with "The
+  tenant has no … binding named X, so activation will refuse it." This changes an API and makes `studio.md`'s "not a
+  pick from a list, because no route lists a tenant's binding names" false, so the docs change rewrites it.

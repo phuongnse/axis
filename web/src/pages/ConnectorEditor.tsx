@@ -1,5 +1,6 @@
 import { Button, Card, Checkbox, Flex, Input, Select, Typography } from 'antd'
 import { useText } from '../platform/texts'
+import { BindingPicker } from './BindingPicker'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -97,14 +98,18 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
     )
   }
 
+  // Proposed: a binding is chosen from the tenant's bindings of the kind its place needs: a url binding for a base URL
+  // or a token URL, a secret binding for the rest.
   function bindingField(pointer: string, label: string, current: unknown) {
+    const kind = pointer === '/baseUrl/binding' || pointer === '/auth/tokenUrl/binding' ? 'url' : 'secret'
     return (
       <div data-testid={`studio-field-${pointer}`}>
         <div>{label}</div>
-        <Input
-          aria-label={label}
-          value={bindingName(current)}
-          onChange={(event) => onChange(pointer, event.target.value)}
+        <BindingPicker
+          kind={kind}
+          label={label}
+          value={bindingName(current) || undefined}
+          onChange={(next) => onChange(pointer, next ?? '')}
         />
         <Typography.Text type="secondary">{t('shell.studio.connector.bindingHint')}</Typography.Text>
       </div>
