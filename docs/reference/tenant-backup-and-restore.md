@@ -163,6 +163,11 @@ what is missing:
 - A package version with `required` set to `true` is not installed under
   `Extensions:Path`. The message lists every missing version, not only the first.
 - The archive's `realm` is `true` and `IdentityProvider:Url` is not set, or the identity provider cannot say whether the realm exists.
+- The tenant gets a new realm and the archive's `realm.json` is larger than 64 MiB, or is not a valid realm document: it is not JSON, or it
+  lacks `realm`, `roles`, `groups` or `users` in the shape that `tenant backup` writes, or a user has no `id` or `username`. The messages are
+  `the archive's realm.json is larger than 64 MiB`, which is decided from the entry's length before anything is read, and
+  `the archive's realm.json is not valid`. Neither shows any content of the file. A restore that keeps the archive's realm never uses the file,
+  so it never refuses it.
 - In a cell, the archive holds Studio files and `Studio:ApplicationsPath` is not set. The message is
   `the archive holds Studio files and the setting Studio:ApplicationsPath is not set`.
 - The restored tenant keeps the archive's sign-in and `AXIS_OIDC_CLIENT_SECRET` is missing. This one is written to standard error, before any `check` line.
@@ -187,7 +192,8 @@ it keeps working without the module installed.
 **Steps, in order.** Each step writes its own line.
 
 1. `check`: read the archive and make every check above. It decrypts the archive only as far as the manifest and the start of
-   `tenant.dump`. It reads the `studio/` entries before the dump and no other. It asks the identity provider whether the archive's realm exists.
+   `tenant.dump`. It reads the `studio/` entries before the dump and no other. It also reads `realm.json`, which sits right after the manifest, and keeps it
+   in memory. It asks the identity provider whether the archive's realm exists.
 2. `entry`: write the directory entry with status `provisioning`. It takes the
    new id and hosts, and everything else from `directory` in the manifest. A `--host` that matches a `sites` entry's `host`, ignoring letter case, gets its site. A tenant that gets a new realm has empty sign-in settings until the `realm` step. A
    `secret` binding is restored by name and kind, without a value. A `url` or `storage`
@@ -221,7 +227,14 @@ it keeps working without the module installed.
     the realm in step with the tenant's active releases: a `site-` client for each site, and a brokered provider for each `oidc`
     identity provider. The archive holds no secret value, so a provider whose bindings have no value yet is left out, with a
     `<id> warning ...` line on standard error that names the provider and the binding. The next `activate`, publish or
-    server start adds it once the operator has set those bindings.
+    server start adds it once the operator has set those bindings. When the archive holds `realm.json`, the step then imports it into
+    the new realm with the identity provider's partial import, as the master admin client, and skips what already exists. It imports the
+    roles and groups first, then the users in batches of 100. Each user keeps the id, so the `sub` claim and every reference in the tenant
+    database still match, and keeps the password hash and the authenticators, so people sign in as before without an invitation. The old
+    realm's default role, `default-roles-<archive realm name in lower case>`, is mapped to the new realm's default role. A role of a client that the
+    new realm lacks, such as a `site-` client that no active release makes, is dropped from the roles, the composites and the mappings. A
+    failed import fails the step. Users, password changes and authenticators added after the backup are lost, and people deleted since come back.
+    The file holds no link to a brokered provider, so such a person is not linked again. Sessions, brute-force counters and consents are not restored.
 13. `studio`: only in a cell, and only when the archive holds `studio/` entries. Write each of them as a file under
     `<Studio:ApplicationsPath>/<new id>/`, creating its folders. A file of the same path is overwritten and any other file of
     the folder stays, so a rerun writes them again. Outside a cell, a restore of an archive with Studio files runs no `studio`
@@ -232,7 +245,8 @@ it keeps working without the module installed.
     archive whose manifest does not match its dump.
 
 **Running it again.** On a `provisioning` entry, the same command skips every
-step already done and finishes the rest, as `tenant create` does. An entry that already holds the secrets of a new realm goes on with the new realm. A failed
+step already done and finishes the rest, as `tenant create` does. An entry that already holds the secrets of a new realm goes on with the new realm and imports `realm.json` again, which skips what the first run imported, so
+the import can finish after a failure in the middle. A failed
 `restore` step restored nothing, so the rerun restores again, with the same archive or a good copy of it. A rerun also writes the tenant's keys again from the archive. A database that
 already holds tables counts as restored, so the rerun does not restore it a
 second time. On an `active` or `suspended` tenant it is refused.
@@ -247,8 +261,8 @@ option or a missing setting.
    secret from `AXIS_OIDC_CLIENT_SECRET`, and a tenant with a new realm has its client secret already.
 2. Run [`tenant resume <id>`](tenant-status-commands.md#tenant-resume).
 
-A tenant with a new realm has no accounts, because a restore does not import `realm.json` yet, even when the archive holds one. Its people
-need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
+A tenant with a new realm has the people of `realm.json` when the archive holds one, and they sign in as before. An archive without it gives a realm with no
+accounts but the service accounts, and the people need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
 
 Set each `secret` binding with
 [`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings), see
@@ -289,7 +303,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive, the `cell backup` command with its metric `axis.backup.last_success`, and the chart's CronJob, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive and its import by a restore into a new realm, the `cell backup` command with its metric `axis.backup.last_success`, and the chart's CronJob, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -353,7 +367,7 @@ format and the steps above stay, with the changes below.
 - **Object lock.** The bucket has object lock in compliance mode for 30 days and a lifecycle rule
   that deletes an archive after 30 days. Nobody, the operator included, can delete or change an
   archive before then.
-- **The realm in the archive** _(the backup half is built, the restore import is planned for M31)_. The archive gets a third entry, `realm.json`: the tenant's realm with
+- **The realm in the archive** _(built)_. The archive gets a third entry, `realm.json`: the tenant's realm with
   its users, role mappings, credentials and required actions, as the identity provider's export
   writes it. `tenant backup` writes it when `IdentityProvider:DatabaseConnectionString` is set, see step 2 of [tenant backup](#tenant-backup). The chart and the Compose files do not set that setting yet, so the daily `cell backup` writes no `realm.json` until they do. The credentials are hashes and authenticator secrets, so the entry is
   [secret](keys-and-data-protection.md#secret) data, and the archive's encryption covers it. A
