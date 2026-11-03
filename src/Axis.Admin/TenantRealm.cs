@@ -24,7 +24,7 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// a password reset link that lasts 30 minutes and no self-registration. It offers the platform locales
 /// (<see cref="PlatformLocales"/>) on its sign-in pages. It allows two users to share an email, which
 /// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
-/// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user, and it turns off the Verify Profile step. It also turns off the account console client and takes <c>manage-account</c> out of the
+/// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose steps are a deny step that <see cref="RealmUsersQuota"/> switches, off when made, and one that creates a new user, and it turns off the Verify Profile step. It also turns off the account console client and takes <c>manage-account</c> out of the
 /// realm's default roles, as Axis's account page replaces Keycloak's. It also gets three clients: the platform client
 /// <c>axis</c>, which <see cref="EnsureForTenantAsync"/> gives the redirect addresses of the tenant's hosts, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
 /// Keycloak requires for them and which also covers every realm setting), and <c>axis-users</c> with
@@ -365,8 +365,10 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     }
 
     /// <summary>
-    /// Makes the flow that brokered providers use at a person's first sign-in. Its one required step creates a new user if
-    /// none has the username. It has no step that reviews the profile, offers to link an existing user or asks for an email.
+    /// Makes the flow that brokered providers use at a person's first sign-in. Its first step denies access with the message of
+    /// <see cref="RealmUsersQuota.RefusalMessageKey"/>. It is off when made, a rerun leaves it as it is, and <see cref="RealmUsersQuota"/> switches it.
+    /// Its second step is required and creates a new user if none has the username. It has no step that reviews the profile,
+    /// offers to link an existing user or asks for an email.
     /// </summary>
     private async Task EnsureFirstLoginFlowAsync(string token, string realmPath, CancellationToken cancellationToken)
     {
@@ -390,6 +392,15 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
         var path = $"{realmPath}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions";
         var executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        if (!executions.Any(execution => ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider))
+        {
+            // Keycloak adds a new step as DISABLED, which is how the quota step starts. A rerun never sets its requirement.
+            using var added = await SendAsync(
+                token, HttpMethod.Post, $"{path}/execution", new Dictionary<string, object?> { ["provider"] = RealmUsersQuota.DenyAccessProvider }, cancellationToken);
+            EnsureSuccess(added, "add the users quota step");
+            executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        }
+
         if (!executions.Any(execution => ProviderOf(execution) == CreateUserIfUnique))
         {
             using var added = await SendAsync(
@@ -398,9 +409,17 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             executions = await ReadExecutionsAsync(token, path, cancellationToken);
         }
 
+        var keptDeny = false;
         var keptCreate = false;
+        var deletedAny = false;
         foreach (var execution in executions)
         {
+            if (ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider && !keptDeny)
+            {
+                keptDeny = true;
+                continue;
+            }
+
             if (ProviderOf(execution) == CreateUserIfUnique && !keptCreate)
             {
                 keptCreate = true;
@@ -410,6 +429,36 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             using var deleted = await SendAsync(
                 token, HttpMethod.Delete, $"{realmPath}/authentication/executions/{execution.GetProperty("id").GetString()}", null, cancellationToken);
             EnsureSuccess(deleted, "remove another step of the first-login flow");
+            deletedAny = true;
+        }
+
+        if (deletedAny)
+        {
+            executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        }
+
+        var denyIndex = executions.FindIndex(execution => ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider);
+        var createIndex = executions.FindIndex(execution => ProviderOf(execution) == CreateUserIfUnique);
+        var deny = executions[denyIndex];
+        if (denyIndex > createIndex)
+        {
+            using var raised = await SendAsync(
+                token, HttpMethod.Post, $"{realmPath}/authentication/executions/{deny.GetProperty("id").GetString()}/raise-priority", null, cancellationToken);
+            EnsureSuccess(raised, "move the users quota step first");
+            executions = await ReadExecutionsAsync(token, path, cancellationToken);
+            deny = executions.First(execution => ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider);
+        }
+
+        if (!deny.TryGetProperty("authenticationConfig", out _))
+        {
+            var config = new Dictionary<string, object?>
+            {
+                ["alias"] = "axis users quota",
+                ["config"] = new Dictionary<string, string> { [RealmUsersQuota.DenyMessageConfigKey] = RealmUsersQuota.RefusalMessageKey },
+            };
+            using var configured = await SendAsync(
+                token, HttpMethod.Post, $"{realmPath}/authentication/executions/{deny.GetProperty("id").GetString()}/config", config, cancellationToken);
+            EnsureSuccess(configured, "set the users quota message");
         }
 
         var create = executions.First(execution => ProviderOf(execution) == CreateUserIfUnique);

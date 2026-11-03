@@ -213,10 +213,10 @@ public sealed partial class UpstreamRealms : IDisposable
     /// <summary>
     /// Plays a browser that starts at <paramref name="authorize"/>, an address of the tenant realm that sends the person to the
     /// provider, logs in at the <paramref name="upstream"/> realm and follows every redirect until Keycloak sends it to an address
-    /// that starts with <paramref name="callbackPrefix"/>. Returns that address. A page on the way, such as one that offers to link an
-    /// account, fails the test with its HTML.
+    /// that starts with <paramref name="callbackPrefix"/>. Returns that address, or <see langword="null"/> and the HTML of the page
+    /// where the sign-in stopped instead, such as a refusal.
     /// </summary>
-    public async Task<Uri> LogInAsync(Uri authorize, string upstream, string callbackPrefix)
+    public async Task<(Uri? Callback, string Html)> SignInAsync(Uri authorize, string upstream, string callbackPrefix)
     {
         var jar = new List<(string Name, string Path, string Value)>();
         var (page, html) = await FollowAsync(jar, HttpMethod.Get, authorize, null, callbackPrefix);
@@ -230,8 +230,18 @@ public sealed partial class UpstreamRealms : IDisposable
             ["password"] = UpstreamPassword,
             ["credentialId"] = "",
         }, callbackPrefix);
-        Assert.True(stopped is null, stoppedHtml);
-        return new Uri(stoppedHtml);
+        return stopped is null ? (new Uri(stoppedHtml), stoppedHtml) : (null, stoppedHtml);
+    }
+
+    /// <summary>
+    /// Plays the same browser as <see cref="SignInAsync"/> and returns the callback address. A page on the way, such as one that
+    /// offers to link an account, fails the test with its HTML.
+    /// </summary>
+    public async Task<Uri> LogInAsync(Uri authorize, string upstream, string callbackPrefix)
+    {
+        var (callback, html) = await SignInAsync(authorize, upstream, callbackPrefix);
+        Assert.True(callback is not null, html);
+        return callback;
     }
 
     public async Task<JsonElement> GetJsonAsync(string path)

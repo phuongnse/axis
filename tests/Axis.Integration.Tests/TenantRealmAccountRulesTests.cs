@@ -197,21 +197,43 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     }
 
     [Fact]
-    public async Task A_second_run_leaves_a_first_login_flow_that_only_creates_a_user_and_the_realm_allows_duplicate_emails()
+    public async Task A_second_run_leaves_a_first_login_flow_that_denies_then_creates_a_user_and_the_realm_allows_duplicate_emails()
     {
         var realm = await NewRealmAsync();
         await EnsureAsync(realm);
 
         var flow = Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias);
-        var executions = await GetJsonAsync($"admin/realms/{realm}/authentication/flows/{flow}/executions");
-        var only = Assert.Single(executions.EnumerateArray());
-        Assert.Equal("idp-create-user-if-unique", only.GetProperty("providerId").GetString());
-        Assert.Equal("REQUIRED", only.GetProperty("requirement").GetString());
+        var executions = (await GetJsonAsync($"admin/realms/{realm}/authentication/flows/{flow}/executions")).EnumerateArray().ToList();
+        Assert.Equal(2, executions.Count);
+        Assert.Equal("deny-access-authenticator", executions[0].GetProperty("providerId").GetString());
+        Assert.Equal("DISABLED", executions[0].GetProperty("requirement").GetString());
+        Assert.True(executions[0].TryGetProperty("authenticationConfig", out _));
+        Assert.Equal("idp-create-user-if-unique", executions[1].GetProperty("providerId").GetString());
+        Assert.Equal("REQUIRED", executions[1].GetProperty("requirement").GetString());
         var flows = await GetJsonAsync($"admin/realms/{realm}/authentication/flows");
         Assert.Equal(1, flows.EnumerateArray().Count(f => f.GetProperty("alias").GetString() == RealmSync.FirstLoginFlowAlias));
         var body = await GetJsonAsync($"admin/realms/{realm}");
         Assert.True(body.GetProperty("duplicateEmailsAllowed").GetBoolean());
         Assert.False(body.GetProperty("loginWithEmailAllowed").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_second_run_keeps_a_switched_on_users_quota_step_on()
+    {
+        var realm = await NewRealmAsync();
+        var path = $"admin/realms/{realm}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions";
+        var deny = (await GetJsonAsync(path)).EnumerateArray().First();
+        var representation = deny.Deserialize<Dictionary<string, JsonElement>>()!;
+        representation["requirement"] = JsonSerializer.SerializeToElement("REQUIRED");
+        using var switchedOn = await SendAsync(HttpMethod.Put, path, representation);
+        Assert.Equal(HttpStatusCode.NoContent, switchedOn.StatusCode);
+
+        await EnsureAsync(realm);
+
+        var executions = (await GetJsonAsync(path)).EnumerateArray().ToList();
+        Assert.Equal(2, executions.Count);
+        Assert.Equal("deny-access-authenticator", executions[0].GetProperty("providerId").GetString());
+        Assert.Equal("REQUIRED", executions[0].GetProperty("requirement").GetString());
     }
 
     [Fact]
