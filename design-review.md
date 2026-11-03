@@ -46,6 +46,11 @@ by what the person does, never by taste:
   little (a reason, a name, an invitation, a publish's label and note) or choosing one thing (Choose…). Never a
   record's detail or a long form, and never a dialog from a dialog. What needs much scrolling, or to be come back to,
   is a page.
+- **A dialog's body scrolls at the dialog's edge.** The owner saw a focused field's sides cut thin and a scrollbar set in
+  from the edge. Both came from the body scrolling inside the frame's 24 px padding. Agreed, as Material, Fluent and
+  Carbon do: the body reaches the frame's edges and keeps the padding inside it, so the scrollbar runs at the dialog's
+  right edge from under the title to above the buttons, which stay, and a field's focus ring has room; the scrollbar
+  is the thin one, in the page's mode.
 - **Three dialog sizes, by what the dialog holds:** small, about 400 px, for a confirmation or one question; medium,
   about 560 px, for a short form of two to six fields; large, about 800 px, for content that needs the width, such as a
   list to choose from or an import's preview. No larger size on a desktop: what needs more is a page. Below 992 px every
