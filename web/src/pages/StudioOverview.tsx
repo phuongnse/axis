@@ -14,6 +14,7 @@ import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
 import { useTileGrid } from './homeGrid'
 import { SiteTile, TileFocusStyle } from './SiteTile'
+import { StudioChangeList } from './StudioChangeList'
 import { kindName, studioKindGroups, type StudioView } from './studioViews'
 
 /**
@@ -198,7 +199,7 @@ function Release({
   addressOf: (target: StudioView | { resource: string }) => string
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   let body: ReactNode
   if (releases === 'failed') {
     body = <Typography.Text type="danger">{t('shell.studio.releases.loadFailed')}</Typography.Text>
@@ -215,57 +216,32 @@ function Release({
       body = (
         <>
           {folderDiffers(releases) ? (
-            // Proposed: the changes in three aligned columns, as the table rules have them: the resource, which is free
-            // text and wraps at 320 px, then its kind and what changed, each as wide as its content, with no separator
-            // between them. Each row is a list item whose cells sit in the list's grid.
-            <ul
-              data-testid="studio-overview-changes"
-              style={{
-                margin: 0,
-                padding: 0,
-                listStyle: 'none',
-                display: 'grid',
-                gridTemplateColumns: 'fit-content(320px) max-content max-content',
-                columnGap: spacing.lg,
-                rowGap: spacing.xs,
-                alignItems: 'baseline',
-              }}
-            >
-              {changes.map((change) => {
+            <StudioChangeList
+              testId="studio-overview-changes"
+              rows={changes.map((change) => {
                 const item = resources.find((resource) => resource.file === change.path)
                 // Proposed: a removed file is named from the live release, as the folder no longer holds it, and is
                 // not a link, as there is nothing left to open.
-                const title = item
-                  ? resourceTitle(item, locale)
-                  : resourceTitle(
-                      {
-                        file: change.path,
-                        name: change.name ?? null,
-                        titles: change.titles ?? null,
-                        locale: change.locale ?? null,
-                      },
-                      locale,
-                    )
                 const kind = item?.kind ?? change.kind
-                return (
-                  <li key={change.path} style={{ display: 'contents' }}>
-                    {item ? (
-                      <Link to={addressOf({ resource: item.id })} style={{ color: colour.primaryText }}>
-                        {title}
-                      </Link>
-                    ) : (
-                      <Typography.Text>{title}</Typography.Text>
-                    )}
-                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
-                      {kind ? kindName(kind, t) : ''}
-                    </Typography.Text>
-                    <Typography.Text style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>
-                      {t(`shell.studio.overview.change.${change.change}`)}
-                    </Typography.Text>
-                  </li>
-                )
+                return {
+                  key: change.path,
+                  name: item
+                    ? resourceTitle(item, locale)
+                    : resourceTitle(
+                        {
+                          file: change.path,
+                          name: change.name ?? null,
+                          titles: change.titles ?? null,
+                          locale: change.locale ?? null,
+                        },
+                        locale,
+                      ),
+                  kind: kind ? kindName(kind, t) : '',
+                  change: t(`shell.studio.overview.change.${change.change}`),
+                  to: item ? addressOf({ resource: item.id }) : undefined,
+                }
               })}
-            </ul>
+            />
           ) : (
             <Typography.Text style={{ color: colour.textMuted }}>
               {t('shell.studio.overview.release.allLive')}

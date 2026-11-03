@@ -20,6 +20,7 @@ import {
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { StudioChangeList, type StudioChangeRow } from './StudioChangeList'
 import { kindName } from './studioViews'
 import { dialogWidth } from '../platform/dialogButtons'
 
@@ -501,32 +502,18 @@ function StudioReleaseDetail({
                 ? t('shell.studio.release.changes.title')
                 : t('shell.studio.release.changes.from').replace('{previous}', String(previous))
             }
-            intro={previous === null ? t('shell.studio.release.changes.first') : undefined}
+            // Proposed: the changes are the Overview's change list; with none, one line says so, as the Overview's does.
+            intro={
+              previous === null
+                ? t('shell.studio.release.changes.first')
+                : changeRows(shown, locale, t).length === 0
+                  ? t('shell.studio.release.changes.none').replace('{previous}', String(previous))
+                  : undefined
+            }
             testId="studio-release-changes"
           >
-            {previous !== null && (
-              <AxisTable<ReleaseChangeRow>
-                rows={changeRows(shown, locale, t)}
-                rowKey={(row) => row.key}
-                emptyText={t('shell.studio.release.changes.none').replace('{previous}', String(previous))}
-                pagination={false}
-                onRow={() => ({ 'data-testid': 'studio-release-change' }) as HTMLAttributes<HTMLElement>}
-                columns={[
-                  {
-                    key: 'name',
-                    title: t('shell.studio.release.change.name'),
-                    kind: 'text',
-                    render: (row) => row.name,
-                  },
-                  { key: 'kind', title: t('shell.studio.release.change.kind'), kind: 'fit', render: (row) => row.kind },
-                  {
-                    key: 'change',
-                    title: t('shell.studio.release.change.change'),
-                    kind: 'text',
-                    render: (row) => row.change,
-                  },
-                ]}
-              />
+            {previous !== null && changeRows(shown, locale, t).length > 0 && (
+              <StudioChangeList testId="studio-release-change-list" rows={changeRows(shown, locale, t)} />
             )}
           </ReleaseSection>
           <ReleaseSection title={t('shell.studio.release.parts')} testId="studio-release-parts">
@@ -604,15 +591,7 @@ function StudioReleaseDetail({
 
 type StudioReleasePartRow = StudioReleasePart & { type: 'module' | 'package' }
 
-/** Proposed: one row of a release's changes: a resource, or a module or package by its version. */
-interface ReleaseChangeRow {
-  key: string
-  name: string
-  kind: string
-  change: string
-}
-
-function changeRows(detail: StudioReleaseDetailData, locale: string, t: (key: string) => string): ReleaseChangeRow[] {
+function changeRows(detail: StudioReleaseDetailData, locale: string, t: (key: string) => string): StudioChangeRow[] {
   const files = detail.changes.map((change) => ({
     key: `file/${change.path}`,
     name: resourceTitle(

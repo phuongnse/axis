@@ -82,10 +82,15 @@ industry practice (GitHub's issue sidebar, Salesforce and Jira record pages, Fio
   asked why it led the band, against the standard. It broke D129's rule that the band's states are words with no icon
   or tag, and it marked the folder, not the release. Agreed: the band reads "Release 3 is live, off-standard" in
   textMuted; the Off-standard tag stays only beside a release's number, in the list and on its page.
-- **Changes are a table, modules and packages included.** The owner did not understand the plain list nor the "Since
-  release 2" column. Agreed: Changes from release N is a table of Name, Kind and Change, whose rows are the changed
-  resources and the modules and packages that differ ("Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0", "Removed, was
-  1.0.0"); Modules and packages lists Name, Type and Version only.
+- **One change list, modules and packages included.** The owner did not understand the "Since release 2" column, then
+  found a table for the changes unlike the Overview's list of the same thing. Agreed: Studio has one change list
+  component, the Overview's three aligned columns (name, kind, change, D129), used by the Overview's changes since the
+  live release and by a release's changes from the one before it. Its rows are the changed resources and the modules
+  and packages that differ ("Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0", "Removed, was 1.0.0"); with none, one
+  line says so. Modules and packages lists Name, Type and Version only.
+- **Later: a change opens a comparison.** On a release page a changed resource is text, not a link, as the folder may
+  have moved on. Opening a comparison of the two releases' versions (as GitHub shows a commit's file) is left for later,
+  while the editors are still being built on main.
 - **An empty table keeps its header.** The owner noted that the standard empty table, as the artifact's Table card
   shows, keeps its header with the empty text in its body. Agreed for every table, the release page's included. The
   empty text is textMuted: Ant Design drew it at a quarter of the text colour, 1.8:1, which fails 4.5:1; fixed in
