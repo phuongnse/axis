@@ -85,6 +85,9 @@ public static class WorkerServiceCollectionExtensions
 
         var cell = CellOptions.Load(configuration);
         services.AddSingleton(cell);
+
+        // Read before any database work too, so a bad value stops the start.
+        var runtimeAddress = TenantRuntimeAddress.Load(configuration, cell);
         services.AddSingleton(QuotaDefaults.Load(configuration, cell));
         services.AddSingleton<TenantQuotas>();
 
@@ -112,7 +115,8 @@ public static class WorkerServiceCollectionExtensions
                 platformConnectionString,
                 cipher,
                 refreshInterval,
-                configuration.GetSection(TenantOptions.SectionName).Exists());
+                configuration.GetSection(TenantOptions.SectionName).Exists(),
+                runtimeAddress);
             keySource = new DirectoryTenantKeySource(platformConnectionString, cipher);
 
             // A cell always reads the directory, so its usage is written to the same platform database.

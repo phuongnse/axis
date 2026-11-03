@@ -120,6 +120,41 @@ public sealed class CellStartTests(PostgreSqlFixture database) : IClassFixture<P
         Assert.Equal(0, accepted.Exit);
     }
 
+    [Fact]
+    public async Task The_server_in_a_cell_with_a_bad_runtime_database_port_stops_at_start_naming_the_setting()
+    {
+        var platform = await database.CreateDatabaseAsync("cell_bad_port_platform", CancellationToken);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => CreateFactory(platform, BadRuntimePort).CreateClient());
+
+        Assert.Contains("Cell:RuntimeDatabasePort", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_worker_in_a_cell_with_a_bad_runtime_database_port_stops_at_start_naming_the_setting()
+    {
+        var platform = await database.CreateDatabaseAsync("cell_worker_bad_port_platform", CancellationToken);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => BuildWorker(platform, BadRuntimePort));
+
+        Assert.Contains("Cell:RuntimeDatabasePort", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Axis_Admin_never_reads_the_runtime_database_address()
+    {
+        var result = await RunAdminAsync(BadRuntimePort);
+
+        Assert.Equal(0, result.Exit);
+    }
+
+    private static (string Key, string Value)[] BadRuntimePort =>
+    [
+        .. _cellSettings,
+        ("Cell:RuntimeDatabaseHost", "pgbouncer.invalid"),
+        ("Cell:RuntimeDatabasePort", "many"),
+    ];
+
     private static async Task<(int Exit, string Error)> RunAdminAsync(IEnumerable<(string Key, string Value)> settings)
     {
         var configuration = new ConfigurationBuilder()
