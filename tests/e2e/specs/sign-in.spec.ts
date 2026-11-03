@@ -37,24 +37,26 @@ test('opening the home page without a session lands on the Keycloak sign-in page
   expect(new URL(page.url()).origin).toBe(new URL(process.env.AXIS_E2E_KEYCLOAK_URL!).origin)
 })
 
-test('after signing out from the header menu, the current user endpoint answers 401 and the signed-out card can sign in again', async ({
+test('after signing out from the header menu, no identity provider page shows, the current user endpoint answers 401 and the signed-out card can sign in again', async ({
   page,
   baseURL,
 }) => {
   await signInAsAnna(page)
   const banner = page.getByRole('banner')
   await banner.getByRole('button', { name: 'Requester User', exact: true }).click()
+  // The server ends the identity provider's session itself, so the browser never visits Keycloak to sign out.
+  const visited: string[] = []
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) {
+      visited.push(frame.url())
+    }
+  })
   await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click()
 
-  // The server keeps no ID token, so Keycloak may ask to confirm the sign-out.
-  const confirm = page.locator('#kc-logout')
   const signedOut = page.getByRole('main').getByText('You have signed out', { exact: true })
-  await expect(confirm.or(signedOut)).toBeVisible()
-  if (await confirm.isVisible()) {
-    await confirm.click()
-  }
-
   await page.waitForURL(`${baseURL}/?signedOut`)
+  const keycloakOrigin = new URL(process.env.AXIS_E2E_KEYCLOAK_URL!).origin
+  expect(visited.filter((url) => new URL(url).origin === keycloakOrigin)).toEqual([])
   expect((await page.request.get('/api/me')).status()).toBe(401)
   await expect(signedOut).toBeVisible()
   await expect(page.getByText('You can close this page, or sign in again.', { exact: true })).toBeVisible()

@@ -12,7 +12,7 @@ namespace Axis.Tenancy.Realms;
 /// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
 /// It reads one page of users with the number of all users that match the search, and for each user on the page the
 /// alias of the first federated identity. It counts the enabled users. It also finds one user, disables or enables a user, ends a user's realm
-/// sessions and removes a user's authenticators. It also invites a person: it finds an account by email, creates an account with
+/// sessions or one realm session by its id and removes a user's authenticators. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
 /// also normalises an email address. An error names the step and the status code, never a response body or a secret.
 /// </summary>
@@ -132,6 +132,22 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         var token = await TokenAsync(cancellationToken);
         using var response = await SendAsync(token, HttpMethod.Post, $"{UserPath(userId)}/logout", null, cancellationToken);
         EnsureSuccess(response, "end the realm sessions of the user");
+    }
+
+    /// <summary>Ends one realm session by its id, the ID token's <c>sid</c>. Returns false when the realm has no such session.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<bool> EndSessionAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await SendAsync(
+            token, HttpMethod.Delete, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/sessions/{Uri.EscapeDataString(sessionId)}", null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        EnsureSuccess(response, "end the realm session");
+        return true;
     }
 
     /// <summary>Removes the user's authenticator app, so the next sign-in asks for a new one.</summary>

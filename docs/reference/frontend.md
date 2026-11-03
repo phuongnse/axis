@@ -892,9 +892,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     comes back there, but to `/` from the card addresses `/?signIn=failed` and `/?signedOut`.
   - With someone signed in, it shows their display name, and _(planned for M31)_ their avatar before it and a caret
     after it. Its menu holds **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
-    ends the session and then sends the browser to the identity provider's sign-out page. _(Planned for M31: the server
-    ends the identity provider's session itself and the browser goes to `/?signedOut`, see
-    [sign-in and the session](security.md#sign-in-and-the-session).)_
+    ends the session. The server ends the identity provider's session itself and the browser goes to `/?signedOut`. Only
+    when that fails does the browser go to the identity provider's sign-out page, see
+    [sign-in and the session](security.md#sign-in-and-the-session).
   - The **sessions screen** at `/account` and the **users page** at `/users` are platform routes beside `/studio`,
     before the site route, so `account` and `users` are reserved site paths, and so is `licences` _(planned for M31)_. See
     [platform pages](platform-pages.md).
