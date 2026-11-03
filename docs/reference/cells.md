@@ -37,7 +37,9 @@ A host runs as a cell when `Cell:Id` is set, see [cell settings](host-settings.m
   region gets its tenants' records one by one, instead of the wildcard.
 - **Wildcard certificate.** The cell's ingress serves one certificate for `*.<tenant domain>`.
   cert-manager gets and renews it over ACME with the DNS-01 challenge, because a wildcard needs DNS
-  validation. The DNS provider's token is a Kubernetes Secret of the cell, never a setting.
+  validation. The DNS provider's token is a Kubernetes Secret of the cell, never a setting. The chart renders
+  the Issuer and the Certificate, see the `cell.certificate` values in
+  [installation](installation.md#settings-and-secrets).
 - **A host of the tenant's own.** A tenant administrator, or the operator through the
   [provisioning API](tenant-lifecycle.md#hosts), adds a host such as `approvals.acme.vn`.
   1. The cell answers with a verification token. The customer adds the DNS record

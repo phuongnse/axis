@@ -1,0 +1,16 @@
+{{- if .Values.cell.certificate.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}-tenant-subdomains
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+spec:
+  secretName: {{ required "cell.certificate.secretName is required: the TLS Secret that cert-manager writes and the cell's ingress serves" .Values.cell.certificate.secretName | quote }}
+  dnsNames:
+    - {{ printf "*.%s" (required "cell.tenantDomain is required when cell.certificate is on: the domain of the cell's tenant subdomains" .Values.cell.tenantDomain) | quote }}
+  issuerRef:
+    name: {{ .Release.Name }}-tenant-subdomains
+    kind: Issuer
+    group: cert-manager.io
+{{- end }}

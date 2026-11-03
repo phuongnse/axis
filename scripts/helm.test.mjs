@@ -367,8 +367,63 @@ describe('the Axis Helm chart', () => {
       ].flatMap((key) => ['--set', `cell.${key}=`]),
       '--set',
       'cell.consoleAllowedNetworks=null',
+      '--set',
+      'cell.certificate.enabled=false',
     )
     assert.doesNotMatch(output, /Cell__/)
+  })
+
+  test('the Certificate names the wildcard of the tenant domain, its Secret and the Issuer', () => {
+    const certificate = find(renderOk(), 'Certificate', 'axis-tenant-subdomains')
+    assert.match(certificate, /apiVersion: cert-manager\.io\/v1\n/)
+    assert.match(certificate, /dnsNames:\n\s+- "\*\.vn\.example\.com"\n/)
+    assert.match(certificate, /secretName: "axis-tenants-tls"\n/)
+    assert.match(certificate, /issuerRef:\n\s+name: axis-tenant-subdomains\n\s+kind: Issuer\n\s+group: cert-manager\.io\n/)
+  })
+
+  test('the Issuer has one DNS-01 solver whose token is a Secret reference', () => {
+    const issuer = find(renderOk(), 'Issuer', 'axis-tenant-subdomains')
+    assert.match(issuer, /apiVersion: cert-manager\.io\/v1\n/)
+    assert.match(issuer, /server: "https:\/\/acme-v02\.api\.letsencrypt\.org\/directory"\n/)
+    assert.match(issuer, /email: "ops@example\.com"\n/)
+    assert.match(issuer, /privateKeySecretRef:\n\s+name: axis-tenant-subdomains-acme-account\n/)
+    assert.match(issuer, /dns01:\n\s+cloudflare:\n\s+apiTokenSecretRef:\n\s+name: "axis-dns"\n\s+key: "api-token"\n/)
+    assert.equal(issuer.match(/- dns01:/g).length, 1)
+
+    const digitalocean = find(renderOk('--set', 'cell.certificate.issuer.dns01.provider=digitalocean'), 'Issuer', 'axis-tenant-subdomains')
+    assert.match(digitalocean, /dns01:\n\s+digitalocean:\n\s+tokenSecretRef:\n\s+name: "axis-dns"\n\s+key: "api-token"\n/)
+    assert.doesNotMatch(digitalocean, /cloudflare/)
+  })
+
+  test('the Issuer omits the email when it is empty', () => {
+    const issuer = find(renderOk('--set', 'cell.certificate.issuer.email='), 'Issuer', 'axis-tenant-subdomains')
+    assert.doesNotMatch(issuer, /email:/)
+  })
+
+  test('an inline token under cell.certificate.issuer fails rendering and never appears in the output', () => {
+    for (const path of ['cell.certificate.issuer.token', 'cell.certificate.issuer.dns01.token']) {
+      const result = render('--set', `${path}=leak`)
+      assert.notEqual(result.status, 0, path)
+      assert.match(result.stderr, /token/, path)
+      assert.doesNotMatch(result.stdout, /leak/, path)
+    }
+  })
+
+  test('a DNS provider that the chart does not know fails rendering', () => {
+    const result = render('--set', 'cell.certificate.issuer.dns01.provider=route53')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /provider/)
+  })
+
+  test('with the certificate off, no Issuer or Certificate renders', () => {
+    const output = renderOk('--set', 'cell.certificate.enabled=false')
+    assert.doesNotMatch(output, /^kind: (Issuer|Certificate)$/m)
+  })
+
+  test('with the certificate on, an empty cell.tenantDomain fails and names it', () => {
+    const result = render('--set', 'cell.tenantDomain=')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /cell\.tenantDomain/)
   })
 
   test('the database authority volume mounts only when set', () => {
@@ -385,6 +440,9 @@ describe('the Axis Helm chart', () => {
     ['identity.passwordBlacklists.volume', 'identity.passwordBlacklists.volume=null'],
     ['secrets.identityDatabaseUrl.name', 'secrets.identityDatabaseUrl.name='],
     ['secrets.identityAdminClientSecret.name', 'secrets.identityAdminClientSecret.name='],
+    ['cell.certificate.issuer.dns01.tokenSecret.name', 'cell.certificate.issuer.dns01.tokenSecret.name='],
+    ['cell.certificate.secretName', 'cell.certificate.secretName='],
+    ['cell.certificate.issuer.server', 'cell.certificate.issuer.server='],
   ]) {
     test(`a missing ${value} fails and names it`, () => {
       const result = render('--set', set)

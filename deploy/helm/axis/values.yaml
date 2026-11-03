@@ -66,6 +66,25 @@ cell:
   operatorRealm: ""
   operatorRole: ""
   backupKeyFile: ""
+  # The wildcard certificate of the tenant subdomains, "*.<tenantDomain>", which
+  # cert-manager gets and renews over ACME with the DNS-01 challenge. Turning it
+  # on renders a cert-manager Issuer and Certificate, so cert-manager must be
+  # installed in the cluster, and it needs tenantDomain, secretName and the
+  # token Secret name. cert-manager writes the certificate into the TLS Secret
+  # named by secretName, which the cell's ingress serves. The DNS provider's
+  # token is a reference to an existing Secret and never a value. provider is
+  # "cloudflare" or "digitalocean".
+  certificate:
+    enabled: false
+    secretName: ""
+    issuer:
+      server: https://acme-v02.api.letsencrypt.org/directory
+      email: ""
+      dns01:
+        provider: cloudflare
+        tokenSecret:
+          name: ""
+          key: api-token
 
 # Extension packages, mounted read-only at /extensions. Empty uses the empty
 # folder of the image. Give any Kubernetes volume source, for example:
