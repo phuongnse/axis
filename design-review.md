@@ -164,3 +164,11 @@ Shopify's settings pages:
   searchable select of the time zones the server knows (the catalog's `timeZones`, so every choice passes AXC0277),
   each "(UTC+07:00) Asia/Ho Chi Minh", by offset then id; cleared, the application's dates are UTC. A schedule
   trigger's time zone is the same control. Selects take the field's full width, as every field does.
+- **A section's one list puts Add… in the heading.** The owner did not want Add module… on a row of its own: a section
+  that holds one list puts its main action on the right of the section's heading, and the table has no toolbar row.
+- **A cell shows content, never a bare count.** The owner found counts such as Roles 2 or Relaxed points 4 of no use.
+  Agreed: a nested list or map shows what it holds in words. A module's roles are one line per slot, "Budget approver:
+  Department manager", a slot no role plays reading "Not mapped" in warningText; its relaxed points are the Off-standard
+  tag, as the Releases list marks a release, the points being in its dialog; a column that would be empty in every
+  row, such as Connectors when no module has any, is left out, while the dialog keeps every field. Short fixed-form
+  columns (a version range, a tag) are as wide as their content, so the free text has the room.

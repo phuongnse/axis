@@ -663,6 +663,7 @@
   "shell.studio.palette.moved": "Moved",
   "shell.studio.palette.cannotMoveFurther": "The widget cannot move further.",
   "shell.studio.save": "Save",
+  "shell.studio.slots.notMapped": "Not mapped",
   "shell.studio.timeZone.none": "UTC, when none is chosen",
   "shell.studio.translations.open": "Translations",
   "shell.studio.translations.title": "Translations",

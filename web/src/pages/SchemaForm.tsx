@@ -1,6 +1,7 @@
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
-import { Button, Checkbox, Flex, Input, InputNumber, Modal, Select, Typography } from 'antd'
+import { Button, Checkbox, Flex, Input, InputNumber, Modal, Select, Tag, Typography } from 'antd'
 import { createContext, lazy, Suspense, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable } from '../platform/AxisTable'
@@ -20,6 +21,7 @@ import { ReferencePicker } from './ReferencePicker'
 import {
   fieldControls,
   fieldTextKey,
+  fitColumns,
   identityProperties,
   SchemaFormKindContext,
   schemaFormSections,
@@ -165,6 +167,7 @@ function SectionPanel({
   children: ReactNode
 }) {
   const { colour, radius, spacing } = useDesignTokens()
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null)
   return (
     <section
       data-testid={`studio-form-section-${testId || 'more'}`}
@@ -177,16 +180,20 @@ function SectionPanel({
     >
       <Flex vertical gap={spacing.md}>
         {(title || description) && (
-          <Flex vertical gap={4}>
-            {title && (
-              <Typography.Title level={5} style={{ margin: 0 }}>
-                {title}
-              </Typography.Title>
-            )}
-            {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
+          // Proposed: a section's main action, such as Add module…, sits on the right of its heading.
+          <Flex align="center" gap={spacing.md}>
+            <Flex vertical gap={4} style={{ flex: 1 }}>
+              {title && (
+                <Typography.Title level={5} style={{ margin: 0 }}>
+                  {title}
+                </Typography.Title>
+              )}
+              {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
+            </Flex>
+            <div ref={setSlot} />
           </Flex>
         )}
-        {children}
+        <SectionActionSlot.Provider value={slot}>{children}</SectionActionSlot.Provider>
       </Flex>
     </section>
   )
@@ -225,6 +232,9 @@ function timeZoneLabel(zone: { id: string; offset: number }): string {
   return `(UTC${sign}${offset}) ${zone.id.replace(/_/g, ' ')}`
 }
 
+/** Proposed: the right side of the heading of the section a node sits in. */
+const SectionActionSlot = createContext<HTMLElement | null>(null)
+
 /** Proposed: whether a node is drawn inside a list's dialog, where a nested list is rows of inputs, never a dialog. */
 const InListDialogContext = createContext(false)
 
@@ -235,10 +245,64 @@ function textOr(t: (key: string) => string, key: string, fallback: string): stri
 }
 
 /** Proposed: what a list's cell shows for a value: its label for a known kind of value, a count for a list or a map. */
-function CellValue({ schema, value, path }: { schema: JsonSchema; value: unknown; path: string }) {
+function CellValue({
+  schema,
+  value,
+  path,
+  item,
+}: {
+  schema: JsonSchema
+  value: unknown
+  path: string
+  item?: unknown
+}) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const catalog = useContext(StudioCatalogContext)
+  const names = useContext(StudioNamesContext)
+  const titleOf = useContext(StudioResourceTitle)
   const control = fieldControls[path]
+  // Proposed: a cell shows what a list or map holds, in words, never a bare count. A module's role or connector map is
+  // one line per slot, "Budget approver: Department manager", and a slot no role plays says Not mapped in warningText.
+  if (control === 'moduleRoles' || control === 'moduleConnectors') {
+    const slots = control === 'moduleRoles' ? 'roles' : 'connectors'
+    const id = (item as Record<string, unknown> | undefined)?.id
+    const module = catalog?.modules.find((entry) => entry.id === id)
+    const map = typeof value === 'object' && value !== null ? (value as Record<string, string>) : {}
+    if (!module || module[slots].length === 0) {
+      return <EmptyDash />
+    }
+    const locale = document.documentElement.lang || 'en'
+    const resourcesOf = slots === 'roles' ? names?.roles : names?.connectors
+    return (
+      <Flex vertical>
+        {module[slots].map((slot) => {
+          const label = slot.titles[locale] ?? slot.titles.en ?? slot.name
+          const target = map[slot.name]
+          const resource = resourcesOf?.find((entry) => entry.name === target)
+          return (
+            <span key={slot.name}>
+              {label}:{' '}
+              {target ? (
+                (resource && titleOf(resource.id)) || target
+              ) : (
+                <span style={{ color: colour.warningText }}>{t('shell.studio.slots.notMapped')}</span>
+              )}
+            </span>
+          )
+        })}
+      </Flex>
+    )
+  }
+  // Proposed: a module's relaxed points show as the Off-standard tag, as the Releases list marks a release; the points
+  // themselves are in its dialog.
+  if (control === 'relaxedPoints') {
+    return Array.isArray(value) && value.length > 0 ? (
+      <Tag color="warning">{t('shell.studio.offStandard')}</Tag>
+    ) : (
+      <EmptyDash />
+    )
+  }
   if (control === 'module' && typeof value === 'string') {
     return <>{catalog?.modules.find((module) => module.id === value)?.label ?? value}</>
   }
@@ -266,11 +330,32 @@ function CellValue({ schema, value, path }: { schema: JsonSchema; value: unknown
  * The dialog edits the item in place, medium for an item of plain values and large for one that holds a list or a
  * map; Done keeps the edit, Cancel puts the item back as it was or, for a new one, removes it.
  */
-function ListTable({ node, root, rootValue, pointer, value, onChange, kind }: NodeProps & { kind: string }) {
+function ListTable({
+  node,
+  root,
+  rootValue,
+  pointer,
+  value,
+  onChange,
+  kind,
+  inHeading = false,
+}: NodeProps & { kind: string; inHeading?: boolean }) {
   const t = useText()
+  const slot = useContext(SectionActionSlot)
+  const catalog = useContext(StudioCatalogContext)
   const items = Array.isArray(value) ? (value as unknown[]) : []
   const itemSchema = resolveSchema(node.items!, root)
-  const properties = Object.entries(itemSchema.properties ?? {})
+  // Proposed: a column that would be empty in every row is left out, such as Connectors when no module has any.
+  const properties = Object.entries(itemSchema.properties ?? {}).filter(([name]) => {
+    const control = fieldControls[fieldTextKey(kind, `${pointer}/0/${name}`).replace('shell.studio.field.', '')]
+    if (control === 'moduleConnectors') {
+      return items.some((item) => {
+        const id = (item as Record<string, unknown> | undefined)?.id
+        return (catalog?.modules.find((module) => module.id === id)?.connectors.length ?? 0) > 0
+      })
+    }
+    return true
+  })
   const listKey = fieldTextKey(kind, pointer)
   const [open, setOpen] = useState<{ index: number; isNew: boolean; before: unknown } | null>(null)
   const nested = properties.some(([, child]) => {
@@ -292,28 +377,31 @@ function ListTable({ node, root, rootValue, pointer, value, onChange, kind }: No
     setOpen(null)
   }
 
+  const addButton = (
+    <AxisButton role="main" onClick={add} data-testid={`studio-list-add-${pointer}`}>
+      {textOr(t, `${listKey}.add`, 'shell.studio.list.add')}
+    </AxisButton>
+  )
   return (
     <>
+      {inHeading && slot && createPortal(addButton, slot)}
       <AxisTable<{ index: number; item: unknown }>
         rows={items.map((item, index) => ({ index, item }))}
         rowKey={(row) => row.index}
         emptyText={textOr(t, `${listKey}.empty`, 'shell.studio.list.empty')}
         pagination={false}
         testId={`studio-list-${pointer}`}
-        toolbar={{
-          main: (
-            <AxisButton role="main" onClick={add} data-testid={`studio-list-add-${pointer}`}>
-              {textOr(t, `${listKey}.add`, 'shell.studio.list.add')}
-            </AxisButton>
-          ),
-        }}
+        toolbar={inHeading && slot ? undefined : { main: addButton }}
         columns={properties.map(([name, child]) => ({
           key: name,
           title: textOrNull(t, fieldTextKey(kind, `${pointer}/0/${name}`)) ?? name,
-          kind: 'text' as const,
+          kind: fitColumns.has(fieldTextKey(kind, `${pointer}/0/${name}`).replace('shell.studio.field.', ''))
+            ? ('fit' as const)
+            : ('text' as const),
           render: (row: { index: number; item: unknown }) => (
             <CellValue
               schema={resolveSchema(child, root)}
+              item={row.item}
               value={(row.item as Record<string, unknown> | undefined)?.[name]}
               path={fieldTextKey(kind, `${pointer}/0/${name}`).replace('shell.studio.field.', '')}
             />
@@ -355,7 +443,7 @@ function ListTable({ node, root, rootValue, pointer, value, onChange, kind }: No
         {open && (
           <InListDialogContext.Provider value={true}>
             <Flex vertical gap="middle" data-testid="studio-list-dialog">
-              {properties.map(([name, child]) => (
+              {Object.entries(itemSchema.properties ?? {}).map(([name, child]) => (
                 <SchemaNode
                   key={name}
                   node={child}
@@ -718,6 +806,7 @@ function SchemaNode({
         value={value}
         onChange={onChange}
         kind={kind}
+        inHeading={bare}
       />
     )
   } else if (unsupported) {
