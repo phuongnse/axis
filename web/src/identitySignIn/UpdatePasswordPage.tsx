@@ -8,10 +8,11 @@ import type { UpdatePasswordContext } from './signInContext'
  * The page that sets a password, which an invitation and a reset link open. It is a real `<form method="post">` to the
  * login address, with `password-new` and `password-confirm`. The hidden `logout-sessions=on` keeps Keycloak's default
  * of signing the person out on other devices. The browser checks only that both fields are filled and that they match.
- * Keycloak checks the password rules and shows its error above the form.
+ * Keycloak checks the password rules and shows its error above the form. When an application started the step, a second
+ * form below posts `cancel-aia=true`, which skips these checks and returns to the application with nothing changed.
  */
 export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext }) {
-  const { texts, error, loginAction } = context
+  const { texts, error, loginAction, appInitiated } = context
   const { colour } = useDesignTokens()
   const formId = useId()
   const labelStyle = { fontWeight: 500, color: colour.textMuted }
@@ -58,6 +59,14 @@ export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext
           {texts.setPassword}
         </Button>
       </Form>
+      {appInitiated && (
+        <form method="post" action={loginAction}>
+          <input type="hidden" name="cancel-aia" value="true" />
+          <Button htmlType="submit" name="cancel-aia" value="true" block>
+            {texts.cancel}
+          </Button>
+        </form>
+      )}
     </IdentityFrame>
   )
 }

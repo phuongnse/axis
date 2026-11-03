@@ -911,6 +911,7 @@ export const identityUpdatePasswordTexts: UpdatePasswordTexts = {
   newPasswordRequired: 'Enter a new password.',
   passwordsDiffer: 'The passwords do not match.',
   setPassword: 'Set password',
+  cancel: 'Cancel',
 }
 
 /** What the identity provider's page that sets a password draws in the design system. */
@@ -936,6 +937,7 @@ export const identityAddAuthenticatorTexts: AddAuthenticatorTexts = {
   deviceName: 'Device name',
   deviceNameRequired: 'Enter a name for this device.',
   submit: 'Add authenticator',
+  cancel: 'Cancel',
 }
 
 /** A small PNG with a QR-like pattern. It shows the layout of the page and does not scan. */

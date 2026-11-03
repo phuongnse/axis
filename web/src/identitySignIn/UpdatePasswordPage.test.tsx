@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { identityUpdatePasswordContext } from '../designSystem/fixtures'
@@ -70,6 +70,36 @@ describe('UpdatePasswordPage', () => {
 
     await waitFor(() => expect(screen.getByText(context.texts.newPasswordRequired)).toBeInTheDocument())
     expect(submit).not.toHaveBeenCalled()
+  })
+
+  it('posts cancel-aia=true from its own form, only for an application-initiated action', () => {
+    const started = render(<UpdatePasswordPage context={{ ...context, appInitiated: true }} />, {
+      wrapper: ThemeModeProvider,
+    })
+    const forms = started.container.querySelectorAll('form')
+    expect(forms).toHaveLength(2)
+    expect(forms[1]).toHaveAttribute('method', 'post')
+    expect(forms[1]).toHaveAttribute('action', '/set-password?code=1')
+    expect(forms[1].querySelector('input[name="cancel-aia"]')).toHaveValue('true')
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('name', 'cancel-aia')
+    started.unmount()
+
+    const invited = render(<UpdatePasswordPage context={context} />, { wrapper: ThemeModeProvider })
+    expect(invited.container.querySelectorAll('form')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('skips the checks when it cancels', () => {
+    const { container } = render(<UpdatePasswordPage context={{ ...context, appInitiated: true }} />, {
+      wrapper: ThemeModeProvider,
+    })
+    const cancel = container.querySelectorAll('form')[1]
+
+    expect(cancel.querySelector('input[name="password-new"]')).toBeNull()
+    fireEvent.submit(cancel)
+
+    expect(screen.queryByText(context.texts.newPasswordRequired)).not.toBeInTheDocument()
+    expect(screen.queryByText(context.texts.passwordsDiffer)).not.toBeInTheDocument()
   })
 
   it('shows an error above the form', () => {

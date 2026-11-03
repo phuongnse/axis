@@ -77,6 +77,8 @@ export interface UpdatePasswordTexts {
   newPasswordRequired: string
   passwordsDiffer: string
   setPassword: string
+  /** The button that cancels an application-initiated action. */
+  cancel: string
 }
 
 /** The texts of the page that adds an authenticator. */
@@ -92,6 +94,8 @@ export interface AddAuthenticatorTexts {
   deviceName: string
   deviceNameRequired: string
   submit: string
+  /** The button that cancels an application-initiated action. */
+  cancel: string
 }
 
 /** What the site that started the sign-in allows. */
@@ -156,6 +160,8 @@ export interface AddAuthenticatorContext extends IdentityFrameContext {
   mode?: string
   /** Whether the person already has an authenticator, so that the device name is required. */
   deviceNameRequired: boolean
+  /** Whether an application started this step, such as the account page, which shows Cancel. An invitation or a reset link leaves it out. */
+  appInitiated?: boolean
   texts: AddAuthenticatorTexts
 }
 
@@ -182,6 +188,8 @@ export interface UpdatePasswordContext extends IdentityFrameContext {
   error?: string
   /** Where the form posts `password-new`, `password-confirm` and `logout-sessions`. */
   loginAction: string
+  /** Whether an application started this step, such as the account page, which shows Cancel. An invitation or a reset link leaves it out. */
+  appInitiated?: boolean
   texts: UpdatePasswordTexts
 }
 

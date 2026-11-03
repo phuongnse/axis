@@ -1,5 +1,5 @@
 <#-- The Axis page that sets a password, which an invitation's update-password action and a reset link open. It writes
-     Keycloak's data as JSON into the same element as login.ftl and the React bundle draws the page from it. The "page"
+     Keycloak's data as JSON into the same element as login.ftl and the React bundle draws the page from it. When an application started the step, the page shows Cancel. The "page"
      field tells the bundle which page to draw. Keycloak escapes output as HTML, so every string goes through
      ?json_string?no_esc: ?json_string also escapes "</", which keeps the script element closed. -->
 <#import "frame.ftl" as frame>
@@ -19,6 +19,9 @@
     "error": "${message.summary?json_string?no_esc}",
     </#if>
     "loginAction": "${url.loginAction?json_string?no_esc}",
+    <#if isAppInitiatedAction??>
+    "appInitiated": true,
+    </#if>
     <@frame.locales/>
     <@frame.texts/>
     "texts": {
@@ -28,7 +31,8 @@
       "confirmPassword": "${msg("axisConfirmPassword")?json_string?no_esc}",
       "newPasswordRequired": "${msg("axisNewPasswordRequired")?json_string?no_esc}",
       "passwordsDiffer": "${msg("axisPasswordsDiffer")?json_string?no_esc}",
-      "setPassword": "${msg("axisSetPassword")?json_string?no_esc}"
+      "setPassword": "${msg("axisSetPassword")?json_string?no_esc}",
+      "cancel": "${msg("axisCancel")?json_string?no_esc}"
     }
   }
   </script>

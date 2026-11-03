@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { identityAddAuthenticatorContext, identityQrCode } from '../designSystem/fixtures'
@@ -82,6 +82,35 @@ describe('AddAuthenticatorPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add authenticator' }))
 
     await waitFor(() => expect(screen.getByText(context.texts.codeRequired)).toBeInTheDocument())
+  })
+
+  it('posts cancel-aia=true from its own form, only for an application-initiated action', () => {
+    const started = render(<AddAuthenticatorPage context={{ ...context, appInitiated: true }} />, {
+      wrapper: ThemeModeProvider,
+    })
+    const forms = started.container.querySelectorAll('form')
+    expect(forms).toHaveLength(2)
+    expect(forms[1]).toHaveAttribute('method', 'post')
+    expect(forms[1]).toHaveAttribute('action', '/add?code=1')
+    expect(forms[1].querySelector('input[name="cancel-aia"]')).toHaveValue('true')
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('name', 'cancel-aia')
+    started.unmount()
+
+    const required = render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
+    expect(required.container.querySelectorAll('form')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('skips the checks when it cancels', () => {
+    const { container } = render(<AddAuthenticatorPage context={{ ...context, appInitiated: true }} />, {
+      wrapper: ThemeModeProvider,
+    })
+    const cancel = container.querySelectorAll('form')[1]
+
+    expect(cancel.querySelector('input[name="totp"]')).toBeNull()
+    fireEvent.submit(cancel)
+
+    expect(screen.queryByText(context.texts.codeRequired)).not.toBeInTheDocument()
   })
 
   it('shows an error above the form', () => {

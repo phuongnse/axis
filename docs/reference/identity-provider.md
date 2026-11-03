@@ -442,9 +442,10 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   - _(planned for M31)_ The choice of method behind "Try another way", one row per method, and the update profile and
     review profile steps, drawn from the user profile's fields with Keycloak's reminder as an info alert and its field
     errors under the fields. The terms step is in [accepting the terms](legal.md#accepting-the-terms).
-- **Cancel from the account page** _(planned for M31)_. When a person starts Change password or Authenticators from Axis's
-  [account page](platform-pages.md#account-page), the page that sets a password and the page that adds an
-  authenticator show Cancel, which returns to the account page with nothing changed.
+- **Cancel from an application** _(built)_. When an application such as Axis's
+  [account page](platform-pages.md#account-page) starts Change password or Authenticators, the page that sets a
+  password and the page that adds an authenticator show Cancel, which returns to that application with nothing changed.
+  An invitation or a reset link shows no Cancel, because there the step is required.
 - **Emails** _(built)_. The Axis email theme `axis` sits beside the login theme and gives every email the identity
   provider sends the organization's mark and name, one white card and a muted footer, in tables and inline styles in
   the light tokens, as mail clients need. The invitation, an administrator's request to act and the password reset
@@ -474,8 +475,9 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   `logout-sessions=on`. The page that adds an authenticator is
   drawn too, from its own context with `page` set to `addAuthenticator`: the QR code (a base64 PNG), the manual key, the secret, the
   same six code boxes and the device name, in a real `<form method="post">` to the login address that posts `totp`, `totpSecret`,
-  `userLabel` and, when Keycloak gave one, `mode`. It leaves out Keycloak's "Sign out from other devices" box and the cancel button
-  of an app-initiated action. The design system's
+  `userLabel` and, when Keycloak gave one, `mode`. It leaves out Keycloak's "Sign out from other devices" box. When the context has
+  `appInitiated`, which the templates write when Keycloak sets `isAppInitiatedAction`, both pages draw Cancel as a second form
+  that posts `cancel-aia=true` to the login address. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
   context: its `login.ftl`, `login-otp.ftl`, `login-config-totp.ftl`, `login-reset-password.ftl`, `login-update-password.ftl`, `logout-confirm.ftl`, `info.ftl`, `error.ftl`, `login-page-expired.ftl`, `saml-post-form.ftl` and `frontchannel-logout.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep`, `addAuthenticator`, `resetPassword`, `updatePassword`, `signOut`, `notice`, `error`, `pageExpired`, `samlPost` or `frontChannelSignOut`, and a React bundle draws the page.
