@@ -6,11 +6,13 @@ import { releaseActorName, releaseGroups, type StudioReleaseGroup, type StudioRe
 import { fitContent, freeText } from '../platform/tableColumns'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { visuallyHidden } from '../platform/visuallyHidden'
 import { PlatformContext } from './context'
 
 /**
- * Proposed: the releases of the open application, one row per release, the highest number first: its label and note,
- * which its publish gave, who published it and when, and Live on the one that runs, as the band says. When
+ * Proposed: the releases of the open application, one row per release, the highest number first: its number, with
+ * Live beside the one that runs, as the band says, its label, when it was published and by whom, and its note last. A
+ * label or note its publish did not give shows as no value. When
  * `canActivate`, every release that is not live has an icon button, Activate…, off while `busy`: activating goes
  * either way, back to an older release or forward to a newer one, so one verb names it. The button opens a dialog that
  * says which release replaces the live one, and its confirmation calls `onActivate`.
@@ -61,31 +63,43 @@ export function StudioReleasesList({
           }
           columns={[
             {
+              // Proposed: the release's number, with Live beside the one that runs, as the band says. No status column:
+              // a release that is not live has no state of its own to name.
               key: 'number',
               title: t('shell.studio.releases.number'),
               ...fitContent,
-              render: (_, release) => release.number,
+              render: (_, release) => (
+                <Flex align="center" gap="small">
+                  {release.number}
+                  {release.live && <Tag color="success">{t('shell.studio.releases.live')}</Tag>}
+                </Flex>
+              ),
             },
             {
               key: 'label',
               title: t('shell.studio.releases.label'),
               ...freeText,
-              render: (_, release) => release.label,
+              render: (_, release) => release.label ?? <NoValue />,
             },
-            { key: 'note', title: t('shell.studio.releases.note'), ...freeText, render: (_, release) => release.note },
             {
+              // Proposed: when and by whom a release was published are two columns, as facts of different kinds are.
               key: 'published',
               title: t('shell.studio.releases.published'),
               ...fitContent,
-              render: (_, release) =>
-                `${releaseActorName(release.published, t)} · ${time.format(new Date(release.published.activatedAt))}`,
+              render: (_, release) => time.format(new Date(release.published.activatedAt)),
             },
             {
-              key: 'status',
-              title: t('shell.studio.releases.status'),
-              ...fitContent,
-              render: (_, release) =>
-                release.live ? <Tag color="success">{t('shell.studio.releases.live')}</Tag> : null,
+              key: 'publishedBy',
+              title: t('shell.studio.releases.publishedBy'),
+              ...freeText,
+              render: (_, release) => releaseActorName(release.published, t),
+            },
+            {
+              // Proposed: the note, the longest text and the most often missing, comes last, so it takes the width left.
+              key: 'note',
+              title: t('shell.studio.releases.note'),
+              ...freeText,
+              render: (_, release) => release.note ?? <NoValue />,
             },
             ...(canActivate
               ? [
@@ -131,5 +145,22 @@ export function StudioReleasesList({
         )}
       </Modal>
     </section>
+  )
+}
+
+/**
+ * Proposed: a cell with no value shows an em dash in textMuted, never nothing, which cannot tell "not given" from
+ * "not loaded", and never N/A, which says "does not apply". A screen reader hears "No value".
+ */
+function NoValue() {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  return (
+    <>
+      <span aria-hidden="true" style={{ color: colour.textMuted }}>
+        —
+      </span>
+      <span style={visuallyHidden}>{t('shell.value.none')}</span>
+    </>
   )
 }

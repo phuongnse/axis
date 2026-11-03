@@ -148,3 +148,15 @@ the review.
   one place and not another. D54 lets an author write a migration by hand, though the entity designer usually writes
   it, so More you can add offers Migrations as New resource… does, with "Seldom by hand: the entity designer writes
   one whenever a change it saves needs it."
+- **The Releases list's columns.** The owner asked whether Published should be two columns, whether the optional label
+  and note belong at the front, what an empty cell shows, and why Status only ever says Live. Recommended and agreed:
+  - Release, then Label, Published, Published by and Note, then the row's Activate… icon. When and by whom are two
+    columns, as facts of different kinds are; the date and time is as wide as its content.
+  - The label stays second: when given it is the name people know a release by, as a release's title is. The note,
+    the longest text and the most often missing, comes last and takes the width left.
+  - No Status column: a release that is not live has no state of its own to name, so Live is a tag beside the number
+    of the one that runs, as the band says.
+  - A cell with no value shows an em dash in textMuted, which a screen reader hears as "No value": never nothing,
+    which cannot tell "not given" from "not loaded" or "failed", and never N/A, which says "does not apply" and does
+    not translate. For the issue: `formatValue` gives an empty string for no value, so every table of the platform,
+    the `table` widget included, shows nothing today; the same rule applies to them all.
