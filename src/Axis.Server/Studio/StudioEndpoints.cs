@@ -97,6 +97,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/policy-matrix", PolicyMatrixAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases/{number:int}", ReleaseAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/relaxed", RelaxedAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
         endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
@@ -893,6 +894,29 @@ internal static class StudioEndpoints
                 .OrderBy(module => module.Label ?? module.Id, StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// Proposed: the relaxed points of the folder's <c>application.json</c>, each in words and with the id of the module
+    /// contract that holds it, read from the module copies the folder compiles with, so Settings lists them read-only and
+    /// links each to the contract page, the one place a point is relaxed or its relax undone.
+    /// </summary>
+    private static async Task<IResult> RelaxedAsync(
+        string application, HttpContext httpContext, StudioOptions options, PackageCatalog packages, ModuleCatalog modules)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var manifestPath = Path.Combine(folder, "application.json");
+        var manifest = File.Exists(manifestPath) ? await File.ReadAllTextAsync(manifestPath, httpContext.RequestAborted) : null;
+        var compiled = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules);
+        var files = compiled.Resources
+            .Where(resource => resource.Path.StartsWith("modules/", StringComparison.Ordinal))
+            .ToDictionary(resource => resource.Path, resource => resource.Content, StringComparer.Ordinal);
+        return Results.Ok(StudioRelaxedPointLabels.Describe(RelaxedPoints(manifest), files));
+    }
+
     /// <summary>Proposed: the texts of each text resource of a release, by its locale, read from its canonical JSON.</summary>
     private static Dictionary<string, Dictionary<string, string>> ReleaseTexts(IEnumerable<string> contents)
     {
@@ -1565,4 +1589,5 @@ internal sealed record StudioRelaxedPoint(
     string? ModuleTitle = null,
     string? Part = null,
     IReadOnlyDictionary<string, string>? EntityTitles = null,
-    IReadOnlyDictionary<string, string>? Titles = null);
+    IReadOnlyDictionary<string, string>? Titles = null,
+    string? ContractId = null);

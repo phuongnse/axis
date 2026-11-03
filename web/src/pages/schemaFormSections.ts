@@ -42,9 +42,13 @@ export const StudioCatalogContext = createContext<import('../platform/studio').S
  * Proposed: the fields whose control knows what they hold, by their path under the kind: a module or package to choose
  * from those installed, or the map of a module's role or connector slots to the application's roles or connectors.
  */
-export const fieldControls: Record<string, 'module' | 'package' | 'moduleRoles' | 'moduleConnectors'> = {
+export const fieldControls: Record<
+  string,
+  'module' | 'package' | 'moduleRoles' | 'moduleConnectors' | 'relaxedPoints'
+> = {
   'application.modules.id': 'module',
   'application.packages.id': 'package',
   'application.modules.roles': 'moduleRoles',
   'application.modules.connectors': 'moduleConnectors',
+  'application.modules.relax': 'relaxedPoints',
 }

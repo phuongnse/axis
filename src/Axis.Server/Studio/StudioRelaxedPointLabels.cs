@@ -103,7 +103,7 @@ internal static class StudioRelaxedPointLabels
                 "ceiling" => ("ceiling", Named(_manifest?["roles"], name)?["label"]),
                 _ => ((string?)null, (JsonNode?)null),
             };
-            return point with { ModuleTitle = moduleTitle, Part = part, EntityTitles = entityTitles, Titles = Titles(label) };
+            return point with { ModuleTitle = moduleTitle, Part = part, EntityTitles = entityTitles, Titles = Titles(label), ContractId = contract?["id"]?.GetValue<string>() };
         }
 
         private Dictionary<string, string>? Titles(JsonNode? label)

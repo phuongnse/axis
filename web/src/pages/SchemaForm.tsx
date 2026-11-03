@@ -1,12 +1,13 @@
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { Button, Checkbox, Flex, Input, InputNumber, Modal, Select, Typography } from 'antd'
-import { createContext, lazy, Suspense, useContext, useState, type ReactNode } from 'react'
+import { createContext, lazy, Suspense, useContext, useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable } from '../platform/AxisTable'
 import { dialogWidth } from '../platform/dialogButtons'
 import { EmptyDash } from '../platform/EmptyValue'
 import { getAt } from '../platform/jsonPatch'
-import type { StudioNames } from '../platform/studio'
+import { fetchStudioRelaxed, relaxedPointWords, type StudioNames, type StudioRelaxedPoint } from '../platform/studio'
 import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
@@ -424,6 +425,75 @@ function InlineRows({ node, root, rootValue, pointer, value, onChange, kind }: N
 }
 
 /**
+ * Proposed: a module's relaxed points in Settings, read-only: each point in words, as the release page names it, linked
+ * to the contract page, the one place a point is relaxed or its relax undone, and its reason. With none, the table
+ * says the application follows every contract of the module.
+ */
+function RelaxedPointsView({ pointer, rootValue }: { pointer: string; rootValue: unknown }) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const resource = useContext(LabelTextsContext)
+  const locale = document.documentElement.lang || 'en'
+  const [points, setPoints] = useState<StudioRelaxedPoint[] | null>(null)
+  const moduleId = getAt(rootValue, `${pointer.slice(0, pointer.lastIndexOf('/'))}/id`)
+  const application = resource?.application
+  useEffect(() => {
+    if (!application) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioRelaxed(application, controller.signal).then(setPoints, (error: unknown) => {
+      if (!controller.signal.aborted) {
+        console.warn('Loading the relaxed points failed', error)
+        setPoints([])
+      }
+    })
+    return () => controller.abort()
+  }, [application])
+  const rows = (points ?? []).filter((point) => point.module === moduleId)
+  return (
+    <Flex vertical gap="small">
+      <Typography.Text style={{ color: colour.textMuted }}>
+        {t('shell.studio.relaxed.changeOnContract')}
+      </Typography.Text>
+      <AxisTable<StudioRelaxedPoint>
+        rows={points === null ? undefined : rows}
+        loading={points === null}
+        rowKey={(point) => point.point}
+        emptyText={t('shell.studio.relaxed.noneForModule')}
+        pagination={false}
+        columns={[
+          {
+            key: 'point',
+            title: t('shell.studio.relaxed.point'),
+            kind: 'text',
+            render: (point) => {
+              const words = relaxedPointWords(point, locale, t)
+              return (
+                <Flex vertical>
+                  {point.contractId && application ? (
+                    <Link
+                      to={`/studio?app=${encodeURIComponent(application)}&resource=${encodeURIComponent(point.contractId)}`}
+                      style={{ color: colour.primaryText }}
+                    >
+                      {words.title}
+                    </Link>
+                  ) : (
+                    <span>{words.title}</span>
+                  )}
+                  {words.kind && <span style={{ color: colour.textMuted }}>{words.kind}</span>}
+                </Flex>
+              )
+            },
+          },
+          { key: 'reason', title: t('shell.studio.relaxed.reason'), kind: 'text', render: (point) => point.reason },
+        ]}
+      />
+    </Flex>
+  )
+}
+
+/**
  * Proposed: the map of a module's role or connector slots: one row per slot of the chosen module, its label, then the
  * application's role or connector that plays it, to choose. A module not yet chosen has no slots to map.
  */
@@ -586,6 +656,8 @@ function SchemaNode({
         onChange={(next) => onChange(pointer, next)}
       />
     )
+  } else if (control === 'relaxedPoints') {
+    input = <RelaxedPointsView pointer={pointer} rootValue={rootValue} />
   } else if (control === 'moduleRoles' || control === 'moduleConnectors') {
     input = (
       <SlotMap

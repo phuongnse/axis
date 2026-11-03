@@ -141,5 +141,16 @@ Shopify's settings pages:
   deleting does; its dialog still asks. The application has none.
 - **No file line under a resource's heading.** The owner agreed to drop the muted file and path line D129 put there: a
   technical name, which the JSON view shows to whoever needs it. Amends D129's "Every page has one heading".
-- **Still to come:** Uses and Used by by name, after the Danger zone moves below them.
+- **Relaxed points in Settings are read-only (option A).** The owner asked whether B was set aside only for its extra
+  work. It was not: a relax is a decision that needs the point's context, which the contract page shows, and each
+  thing is edited in one place, as GitHub edits a branch rule on its own page. Settings lists a module's relaxed
+  points in words, each linked to its contract page, with its reason and a line saying where to relax or undo; a new
+  `GET .../relaxed` gives them, and each point carries its contract's id. A page of every relaxed point, should bulk
+  review be needed, is the place to edit many at once, never a dialog.
+- **Uses and Used by by name.** Two panels after the form and before the Danger zone, each Studio's one change list:
+  the other resource by its label as the link that opens it (a Used by entry at the path of the reference), its kind,
+  and how the one uses the other in words ("Grants to it", "Assigns tasks to it", one text per relation of the
+  compiler). No file, path or relation code; a label's text is left out of Uses, as the form shows the label; the
+  same resource used the same way shows once; with none, one line says so. Entries no longer expand a level: the link
+  opens the resource, whose page has its own lists.
 

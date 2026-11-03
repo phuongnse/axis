@@ -186,6 +186,7 @@ export function StudioEditor({
   onTextsWritten,
   onDeleted,
   onOpen,
+  references,
 }: {
   application: string
   item: StudioResourceItem
@@ -195,6 +196,8 @@ export function StudioEditor({
   onOpen: OpenResource
   onSaved: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem[]) => void
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
+  /** Proposed: the resource's Uses and Used by, which sit after its form and before its Danger zone. */
+  references?: ReactNode
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
@@ -1036,6 +1039,7 @@ export function StudioEditor({
         )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
+      {references}
       {item.kind !== 'application' && (
         // Proposed: deleting a resource is the last section of its page, a Danger zone as GitHub's settings have, so the
         // one destructive action is apart from every edit and says what it does before its dialog asks again.

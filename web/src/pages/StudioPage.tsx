@@ -585,6 +585,13 @@ function StudioWorkspace() {
               <Flex vertical gap="middle">
                 <StudioNamesContext.Provider value={names ?? undefined}>
                   <StudioEditor
+                    references={
+                      <StudioReferences
+                        key={`references-${selected.id}`}
+                        application={application!}
+                        resourceId={selected.id}
+                      />
+                    }
                     key={`editor-${selected.id}`}
                     application={application!}
                     item={selected}
@@ -615,12 +622,6 @@ function StudioWorkspace() {
                     }}
                   />
                 </StudioNamesContext.Provider>
-                <StudioReferences
-                  key={`references-${selected.id}`}
-                  application={application!}
-                  resourceId={selected.id}
-                  onOpen={openReference}
-                />
               </Flex>
             ) : selectedModuleItem ? (
               <Flex vertical gap="middle">

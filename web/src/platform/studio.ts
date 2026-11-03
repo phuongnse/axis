@@ -818,6 +818,18 @@ export interface StudioRelaxedPoint {
   entityTitles?: Record<string, string> | null
   /** Proposed: the label per locale of the transition, state, validation, effect or role slot the point names. */
   titles?: Record<string, string> | null
+  /** Proposed: the id of the module contract that holds the point, whose page relaxes it. */
+  contractId?: string | null
+}
+
+/** Proposed: the relaxed points of the folder's application.json, in words, from `GET .../relaxed`. */
+export async function fetchStudioRelaxed(application: string, signal?: AbortSignal): Promise<StudioRelaxedPoint[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/relaxed`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRelaxedPoint[]
 }
 
 /**

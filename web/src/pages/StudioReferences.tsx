@@ -1,16 +1,18 @@
-import { Alert, Button, Flex, Tag, Typography } from 'antd'
-import { useContext, useEffect, useRef, useState } from 'react'
+import { Alert, Flex, Typography } from 'antd'
+import { useContext, useEffect, useState } from 'react'
 import {
   fetchResourceReferences,
-  fetchTextReferences,
   ServerUnreachableError,
   type StudioReference,
-  type StudioReferenceNode,
   type StudioResourceReferences,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
+import { StudioCatalogContext } from './schemaFormSections'
+import { StudioChangeList, type StudioChangeRow } from './StudioChangeList'
 import { StudioResourceTitle } from './studioResourceTitle'
+import { kindName } from './studioViews'
 
 type Direction = 'uses' | 'usedBy'
 
@@ -24,12 +26,10 @@ export type OpenResource = (id: string, path: string | null) => void
 export function StudioReferences({
   application,
   resourceId,
-  onOpen,
 }: {
   application: string
   resourceId: string
-  onOpen: OpenResource
-}) {
+})  {
   const t = useText()
   const { generation, lost } = useStudioConnection()
   const [references, setReferences] = useState<StudioResourceReferences>()
@@ -57,151 +57,109 @@ export function StudioReferences({
   if (!references) {
     return null
   }
+  // Proposed: Uses and Used by are two panels, as the form's sections are, each Studio's one change list: the other
+  // resource by its label as the link that opens it, its kind, and how the one uses the other, in words. A label's text
+  // is left out of Uses, as the form shows the label itself. The same resource used the same way shows once.
   return (
     <Flex vertical gap="middle">
-      <section data-testid="studio-uses">
-        <Typography.Title level={5}>{t('shell.studio.uses')}</Typography.Title>
-        <ReferenceList entries={references.uses} direction="uses" application={application} onOpen={onOpen} />
-      </section>
-      <section data-testid="studio-used-by">
-        <Typography.Title level={5}>{t('shell.studio.usedBy')}</Typography.Title>
-        <ReferenceList entries={references.usedBy} direction="usedBy" application={application} onOpen={onOpen} />
-      </section>
+      <ReferencePanel
+        testId="studio-uses"
+        title={t('shell.studio.uses')}
+        entries={references.uses.filter((entry) => entry.node.type !== 'text')}
+        empty={t('shell.studio.uses.none')}
+        application={application}
+        direction="uses"
+      />
+      <ReferencePanel
+        testId="studio-used-by"
+        title={t('shell.studio.usedBy')}
+        entries={references.usedBy}
+        empty={t('shell.studio.usedBy.none')}
+        application={application}
+        direction="usedBy"
+      />
     </Flex>
   )
 }
 
-function ReferenceList({
+function ReferencePanel({
+  testId,
+  title,
   entries,
-  direction,
+  empty,
   application,
-  onOpen,
+  direction,
 }: {
+  testId: string
+  title: string
   entries: StudioReference[]
-  direction: Direction
+  empty: string
   application: string
-  onOpen: OpenResource
+  direction: Direction
 }) {
   const t = useText()
-  if (entries.length === 0) {
-    return <Typography.Text type="secondary">{t('shell.studio.noReferences')}</Typography.Text>
-  }
-  return (
-    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-      {entries.map((entry, index) => (
-        <ReferenceEntry key={index} entry={entry} direction={direction} application={application} onOpen={onOpen} />
-      ))}
-    </ul>
-  )
-}
-
-function ReferenceEntry({
-  entry,
-  direction,
-  application,
-  onOpen,
-}: {
-  entry: StudioReference
-  direction: Direction
-  application: string
-  onOpen: OpenResource
-}) {
-  const t = useText()
+  const { colour, radius, spacing } = useDesignTokens()
   const titleOf = useContext(StudioResourceTitle)
-  const { lost } = useStudioConnection()
-  const { node } = entry
-  const expandable = node.type === 'resource' || node.type === 'text'
-  const [expanded, setExpanded] = useState(false)
-  const [details, setDetails] = useState<StudioResourceReferences>()
-  const [failed, setFailed] = useState(false)
-  const requested = useRef(false)
-
-  function toggle() {
-    const next = !expanded
-    setExpanded(next)
-    if (next && !requested.current) {
-      requested.current = true
-      loadDetails(application, node)?.then(setDetails, (error: unknown) => {
-        requested.current = false
-        if (error instanceof ServerUnreachableError) {
-          lost()
-          return
-        }
-        console.warn('Loading the references of an entry failed', error)
-        setFailed(true)
+  const catalog = useContext(StudioCatalogContext)
+  const seen = new Set<string>()
+  const rows: StudioChangeRow[] = []
+  for (const entry of entries) {
+    const node = entry.node
+    const id = node.type === 'text' ? node.key : node.id
+    const key = `${node.type}/${id}/${entry.relation}`
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    const relationKey = `shell.studio.relation.${entry.relation.replace(/ ([a-z])/g, (_, letter: string) => letter.toUpperCase())}`
+    const relation = t(relationKey) === relationKey ? '' : t(relationKey)
+    if (node.type === 'resource') {
+      const address = `/studio?app=${encodeURIComponent(application)}&resource=${encodeURIComponent(node.id)}`
+      rows.push({
+        key,
+        name: titleOf(node.id) ?? node.name ?? node.file,
+        kind: kindName(node.kind, t),
+        change: relation,
+        to: direction === 'usedBy' ? `${address}&path=${encodeURIComponent(entry.path)}` : address,
       })
+    } else if (node.type === 'module') {
+      rows.push({
+        key,
+        name: catalog?.modules.find((module) => module.id === node.id)?.label ?? node.id,
+        kind: t('shell.studio.release.part.module'),
+        change: relation,
+      })
+    } else if (node.type === 'package') {
+      rows.push({
+        key,
+        name: catalog?.packages.find((pkg) => pkg.id === node.id)?.label ?? node.id,
+        kind: t('shell.studio.release.part.package'),
+        change: relation,
+      })
+    } else {
+      rows.push({ key, name: node.key, kind: '', change: relation })
     }
   }
-
   return (
-    <li data-testid="studio-reference">
-      <Flex vertical gap={4}>
-        <Flex align="center" gap="small" wrap>
-          <Tag>{entry.relation}</Tag>
-          {node.type === 'resource' ? (
-            <Button
-              type="link"
-              style={{ padding: 0, height: 'auto' }}
-              onClick={() => onOpen(node.id, direction === 'usedBy' ? entry.path : null)}
-            >
-              {nodeTitle(node, titleOf)}
-            </Button>
-          ) : (
-            <span>{nodeTitle(node, titleOf)}</span>
-          )}
-          {expandable && (
-            <Button type="text" size="small" aria-expanded={expanded} onClick={toggle}>
-              {expanded ? t('shell.studio.collapse') : t('shell.studio.expand')}
-            </Button>
-          )}
-        </Flex>
-        <Typography.Text type="secondary">{`${entry.file} · ${t('shell.studio.path')}: ${entry.path}`}</Typography.Text>
-        {expanded && (
-          <Flex vertical gap="small" style={{ paddingLeft: 16 }}>
-            {failed && <Alert type="error" title={t('shell.studio.referencesFailed')} />}
-            {details && (
-              <>
-                {node.type === 'resource' && (
-                  <div>
-                    <Typography.Text strong>{t('shell.studio.uses')}</Typography.Text>
-                    <ReferenceList entries={details.uses} direction="uses" application={application} onOpen={onOpen} />
-                  </div>
-                )}
-                <div>
-                  <Typography.Text strong>{t('shell.studio.usedBy')}</Typography.Text>
-                  <ReferenceList
-                    entries={details.usedBy}
-                    direction="usedBy"
-                    application={application}
-                    onOpen={onOpen}
-                  />
-                </div>
-              </>
-            )}
-          </Flex>
+    <section
+      data-testid={testId}
+      style={{
+        background: colour.surface,
+        border: `1px solid ${colour.borderSubtle}`,
+        borderRadius: radius.base,
+        padding: spacing.lg,
+      }}
+    >
+      <Flex vertical gap={spacing.md}>
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          {title}
+        </Typography.Title>
+        {rows.length === 0 ? (
+          <Typography.Text style={{ color: colour.textMuted }}>{empty}</Typography.Text>
+        ) : (
+          <StudioChangeList testId={`${testId}-list`} rows={rows} />
         )}
       </Flex>
-    </li>
+    </section>
   )
-}
-
-/** Loads one step of a reference. A text key has no Uses list, so its answer has none. Packages and modules have no references. */
-function loadDetails(application: string, node: StudioReferenceNode): Promise<StudioResourceReferences> | undefined {
-  if (node.type === 'resource') {
-    return fetchResourceReferences(application, node.id)
-  }
-  if (node.type === 'text') {
-    return fetchTextReferences(application, node.key).then(({ usedBy }) => ({ uses: [], usedBy }))
-  }
-  return undefined
-}
-
-function nodeTitle(node: StudioReferenceNode, titleOf: (id: string) => string | undefined): string {
-  if (node.type === 'resource') {
-    return titleOf(node.id) ?? node.name ?? node.file
-  }
-  if (node.type === 'text') {
-    return node.key
-  }
-  return node.id
 }
