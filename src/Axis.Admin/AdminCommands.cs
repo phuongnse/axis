@@ -86,6 +86,7 @@ internal static partial class AdminCommands
                tenant host move <host> --to <id>
                platform rekey
                cell operator invite <email>
+               cell backup
                publisher
                version
         """;
@@ -193,6 +194,7 @@ internal static partial class AdminCommands
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
+        new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
@@ -1604,7 +1606,7 @@ internal static partial class AdminCommands
     }
 
     /// <summary><c>tenant backup</c> needs the platform database and the installation key, and <c>PATH</c> to find <c>pg_dump</c>. It needs no admin role and no client secret.</summary>
-    private static BackupSettings? ReadBackupSettings(IConfiguration configuration, out string problem)
+    internal static BackupSettings? ReadBackupSettings(IConfiguration configuration, out string problem)
     {
         var platform = ReadPlatformSettings(configuration, out problem);
         if (platform is null)

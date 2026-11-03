@@ -265,7 +265,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant and the counts in the manifest, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest and the `cell backup` command, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -287,11 +287,27 @@ format and the steps above stay, with the changes below.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
   key. Its archives stay in object storage until their lock ends, and nothing can read them. One
   leaked tenant key opens only that tenant's archives.
-- **Daily job.** A Kubernetes CronJob runs `cell backup` at 01:00 in the region's time zone. It backs up
+- **Daily job.** A Kubernetes CronJob runs `cell backup` at 01:00 in the region's time zone
+  _(planned for M31)_. The command is _(built)_. It backs up
   every `active` and `suspended` tenant, four at a time, and writes each archive to the region's
-  object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`. It writes a platform audit record and the
-  metric `axis.backup.last_success` for each tenant. A failed tenant is tried again once, and the
-  others go on. The job ends within 6 hours or fails.
+  object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`, where the date is the UTC date when the run starts. A
+  `provisioning` tenant is skipped. Each archive is encrypted with the tenant's own backup key,
+  written to a temporary folder that only its owner can use, uploaded and deleted. The command writes one platform audit
+  record for each tenant, `cell backup`, before the first try, and a retry writes none. The metric
+  `axis.backup.last_success` for each tenant is _(planned for M31)_. A failed tenant is tried again once, at once,
+  and the others go on. The run ends within 6 hours: after that it stops and exits with code `1`.
+  - **Settings.** `Cell:BackupStorage:ServiceUrl`, `:Region`, `:Bucket`, `:AccessKeyId` and `:SecretAccessKey` name
+    an S3-compatible service, reached with the AWS SDK and path-style addressing, see
+    [host settings](host-settings.md#cell-settings). All five are required. The command also needs `Cell:Id`,
+    `Cell:BackupKeyFile`, the platform database, the installation key and `pg_dump` on `PATH`.
+  - **Output.** Each line starts with the tenant id. A try writes the lines of the `tenant backup` steps,
+    `dump` and `archive`, and then `upload ok`. A step that fails writes `<step> failed: <message>`, where the step is
+    `key` (the tenant has no backup key or it does not unwrap), `check` (the tenant cannot be backed up, for example
+    because it is no longer in the directory), `dump`, `archive` or `upload`. The message of `upload` is the error code of the service or the
+    name of the error type, never the address or a key. When the time runs out, the last line is
+    `cell backup stopped: the run reached its 6-hour limit`. No line holds the secret access key.
+  - **Exit codes.** `0` when every tenant succeeded. `1` when any tenant failed or the time ran out. `2` outside a cell
+    or when a setting or `pg_dump` is missing, before anything is uploaded or audited.
 - **Object lock.** The bucket has object lock in compliance mode for 30 days and a lifecycle rule
   that deletes an archive after 30 days. Nobody, the operator included, can delete or change an
   archive before then.
