@@ -83,6 +83,20 @@
     "approvals.actions.view": "View",
     "approvals.actions.submit": "Submit",
     "approvals.roles.admin": "Administrator",
-    "approvals.roles.member": "Member"
+    "approvals.roles.member": "Member",
+    "approvals.contract.request.draft": "Draft",
+    "approvals.contract.request.submitted": "Submitted",
+    "approvals.contract.request.approved": "Approved",
+    "approvals.contract.request.returned": "Returned",
+    "approvals.contract.request.rejected": "Rejected",
+    "approvals.contract.request.cancelled": "Cancelled",
+    "approvals.contract.request.submit": "Submit",
+    "approvals.contract.request.approve": "Approve",
+    "approvals.contract.request.return": "Return",
+    "approvals.contract.request.reject": "Reject",
+    "approvals.contract.request.cancel": "Cancel",
+    "approvals.contract.request.oneDecisionPerStep": "One decision per step",
+    "approvals.contract.request.frozenAfterSubmit": "Locked after it is submitted",
+    "approvals.contract.requestType.hasStepForEveryAmount": "A step for every amount"
   }
 }

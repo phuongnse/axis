@@ -39,6 +39,11 @@
     "organization.actions.new": "Thêm mới",
     "organization.actions.open": "Mở",
     "organization.roles.admin": "Quản trị viên tổ chức",
-    "organization.roles.member": "Thành viên tổ chức"
+    "organization.roles.member": "Thành viên tổ chức",
+    "organization.contract.department.notOwnParent": "Không là đơn vị cha của chính nó",
+    "organization.contract.employee.notOwnManager": "Không tự quản lý chính mình",
+    "organization.contract.employee.notOwnDelegate": "Không tự uỷ quyền cho chính mình",
+    "organization.contract.employee.delegateHasDates": "Uỷ quyền có ngày bắt đầu và kết thúc",
+    "organization.contract.employee.delegateDatesInOrder": "Ngày uỷ quyền đúng thứ tự"
   }
 }

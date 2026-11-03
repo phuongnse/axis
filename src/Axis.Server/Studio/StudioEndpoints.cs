@@ -628,10 +628,29 @@ internal static class StudioEndpoints
         var names = await UserProfiles.FindDisplayNamesAsync(
             await database.GetConnectionAsync(cancellationToken), [.. activations.Select(row => row.Actor)], cancellationToken);
         var manifests = await store.GetManifestsAsync([.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
+        // Proposed: the relaxed points of an off-standard release carry their words, from the module files that release
+        // stores, read once for each such release.
+        var offStandard = manifests.Where(pair => RelaxedPoints(pair.Value).Count > 0).Select(pair => pair.Key).ToList();
+        var moduleFiles = offStandard.Count == 0
+            ? []
+            : (await (await database.GetConfigurationAsync(cancellationToken)).ReleaseResources
+                .AsNoTracking()
+                .Where(resource => offStandard.Contains(resource.ReleaseId) && resource.Path.StartsWith("modules/"))
+                .Select(resource => new { resource.ReleaseId, resource.Path, resource.Content })
+                .ToListAsync(cancellationToken))
+                .GroupBy(resource => resource.ReleaseId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyDictionary<string, string>)group.ToDictionary(resource => resource.Path, resource => resource.Content, StringComparer.Ordinal));
+        var described = offStandard.ToDictionary(
+            releaseId => releaseId,
+            releaseId => StudioRelaxedPointLabels.Describe(
+                RelaxedPoints(manifests[releaseId]),
+                moduleFiles.GetValueOrDefault(releaseId) ?? new Dictionary<string, string>()));
         var items = activations
             .Select(row =>
             {
-                var relaxed = RelaxedPoints(manifests.GetValueOrDefault(row.ReleaseId));
+                var relaxed = described.GetValueOrDefault(row.ReleaseId) ?? [];
                 return new StudioReleaseItem(
                     row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId,
                     relaxed.Count > 0, relaxed);
@@ -1304,5 +1323,19 @@ internal sealed record StudioReleaseItem(
     bool OffStandard,
     IReadOnlyList<StudioRelaxedPoint> Relaxed);
 
-/// <summary>A relax entry of a release's application: the module, the point it turns off and the reason.</summary>
-internal sealed record StudioRelaxedPoint(string Module, string Point, string Reason);
+/// <summary>
+/// A relax entry of a release's application: the module, the point it turns off and the reason. Proposed: the words
+/// for people, from the module files the release stores: <c>ModuleTitle</c>, the module's label; <c>Part</c>, what
+/// the point is (<c>transition</c>, <c>initial</c>, <c>deletable</c>, <c>validation</c>, <c>effect</c>,
+/// <c>ceiling</c> or <c>others</c>); <c>EntityTitles</c>, the entity's label per locale; and <c>Titles</c>, the label
+/// per locale of the transition, state, validation, effect or role slot it names. Each is null when the release has no
+/// words for it.
+/// </summary>
+internal sealed record StudioRelaxedPoint(
+    string Module,
+    string Point,
+    string Reason,
+    string? ModuleTitle = null,
+    string? Part = null,
+    IReadOnlyDictionary<string, string>? EntityTitles = null,
+    IReadOnlyDictionary<string, string>? Titles = null);

@@ -25,6 +25,7 @@
             "required": ["name"],
             "properties": {
               "name": { "$ref": "#/$defs/name" },
+              "label": { "$ref": "#/$defs/textReference" },
               "initial": { "type": "boolean" },
               "deletable": { "type": "boolean" },
               "protected": { "type": "boolean" }
@@ -39,6 +40,7 @@
             "required": ["name", "from", "to"],
             "properties": {
               "name": { "$ref": "#/$defs/name" },
+              "label": { "$ref": "#/$defs/textReference" },
               "from": {
                 "type": "array",
                 "minItems": 1,
@@ -60,6 +62,7 @@
         "required": ["name", "expression", "message", "field"],
         "properties": {
           "name": { "$ref": "#/$defs/name" },
+          "label": { "$ref": "#/$defs/textReference" },
           "expression": { "type": "string", "minLength": 1 },
           "message": { "$ref": "#/$defs/textReference" },
           "field": { "$ref": "#/$defs/name" }
@@ -74,6 +77,7 @@
         "required": ["name", "on", "create"],
         "properties": {
           "name": { "$ref": "#/$defs/name" },
+          "label": { "$ref": "#/$defs/textReference" },
           "on": { "$ref": "#/$defs/name" },
           "create": {
             "type": "object",

@@ -810,6 +810,36 @@ export interface StudioRelaxedPoint {
   module: string
   point: string
   reason: string
+  /** Proposed: the module's label, from the module files the release stores, or null when it has none. */
+  moduleTitle?: string | null
+  /** Proposed: what the point is, or null for a point the release's contracts no longer have. */
+  part?: 'transition' | 'initial' | 'deletable' | 'validation' | 'effect' | 'ceiling' | 'others' | null
+  /** Proposed: the entity's label per locale. */
+  entityTitles?: Record<string, string> | null
+  /** Proposed: the label per locale of the transition, state, validation, effect or role slot the point names. */
+  titles?: Record<string, string> | null
+}
+
+/**
+ * Proposed: a relaxed point in words: its module's label, its own label and a line that says what kind of point it is
+ * and on which entity, as Studio never shows a technical name. A point the release has no label for keeps the name as
+ * written, which the issue's required `label` on every named part of a contract leaves for older releases alone.
+ */
+export function relaxedPointWords(
+  point: StudioRelaxedPoint,
+  locale: string,
+  t: (key: string) => string,
+): { module: string; title: string; kind: string | null } {
+  const pick = (titles: Record<string, string> | null | undefined) => titles?.[locale] ?? titles?.en
+  const segments = point.point.split('/')
+  const entity = pick(point.entityTitles) ?? segments[0]
+  const title =
+    point.part === 'others' ? t('shell.studio.relaxed.others') : (pick(point.titles) ?? segments[2] ?? point.point)
+  return {
+    module: point.moduleTitle ?? point.module,
+    title,
+    kind: point.part ? t(`shell.studio.relaxed.part.${point.part}`).replace('{entity}', entity) : null,
+  }
 }
 
 /**

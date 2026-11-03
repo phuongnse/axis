@@ -8,6 +8,8 @@ export type StudioView =
   | { name: 'kind'; kind: string }
   | { name: 'policies' }
   | { name: 'releases' }
+  // Proposed: one release's own page, under the Releases entry.
+  | { name: 'release'; number: number }
 
 /**
  * Proposed: the resource kinds by what an author does with them, each with its Axis icon. A kind outside these groups
@@ -67,5 +69,8 @@ export const groupedKinds = new Set(studioKindGroups.flatMap((group) => group.ki
 
 /** The key of the sidebar entry a view belongs to. */
 export function studioViewKey(view: StudioView): string {
+  if (view.name === 'release') {
+    return 'releases'
+  }
   return view.name === 'kind' ? `kind:${view.kind}` : view.name
 }

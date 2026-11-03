@@ -39,6 +39,11 @@
     "organization.actions.new": "New",
     "organization.actions.open": "Open",
     "organization.roles.admin": "Organization administrator",
-    "organization.roles.member": "Organization member"
+    "organization.roles.member": "Organization member",
+    "organization.contract.department.notOwnParent": "Not its own parent",
+    "organization.contract.employee.notOwnManager": "Not their own manager",
+    "organization.contract.employee.notOwnDelegate": "Not their own delegate",
+    "organization.contract.employee.delegateHasDates": "A delegation has its dates",
+    "organization.contract.employee.delegateDatesInOrder": "Delegation dates in order"
   }
 }

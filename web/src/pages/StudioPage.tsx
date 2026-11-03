@@ -23,6 +23,7 @@ import {
   type StudioResource,
   type StudioResourceItem,
   waitForServer,
+  releaseGroups,
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -40,6 +41,7 @@ import { StudioProblemsPanel } from './StudioProblems'
 import { StudioStatus } from './StudioStatus'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
+import { ReleaseTags } from './StudioReleases'
 import { StudioNavigation } from './StudioNavigation'
 import type { StudioView } from './studioViews'
 import { StudioReferences } from './StudioReferences'
@@ -176,8 +178,10 @@ function StudioWorkspace() {
   const resourceId = params.get('resource')
   const path = params.get('path')
   // Proposed: `view` and `kind` pick the part of the workspace the sidebar opened; an open resource wins.
-  const view: StudioView = parseView(params.get('view'), params.get('kind'))
+  const view: StudioView = parseView(params.get('view'), params.get('kind'), params.get('release'))
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null)
+  // Proposed: the right side of a release page's heading, where its Activate… shows.
+  const [headingSlot, setHeadingSlot] = useState<HTMLDivElement | null>(null)
   const { spacing } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [apps, setApps] = useState<AppsState>()
@@ -441,7 +445,16 @@ function StudioWorkspace() {
     title = t('shell.studio.view.policies')
   } else if (view.name === 'releases') {
     title = t('shell.studio.nav.releases')
+  } else if (view.name === 'release') {
+    title = t('shell.studio.release.title').replace('{number}', String(view.number))
   }
+  // Proposed: a release's page heads with "Release 6", its tags beside it and its label under it.
+  const releaseHistory =
+    releases?.application === application && releases.history !== 'failed' ? releases.history : undefined
+  const openRelease =
+    view.name === 'release' && !selected && releaseHistory
+      ? releaseGroups(releaseHistory).find((group) => group.number === view.number)
+      : undefined
 
   function kindLabel(kind: string) {
     const key = `shell.studio.kind.${kind}`
@@ -497,8 +510,9 @@ function StudioWorkspace() {
               ? `${t('shell.studio.module')}: ${selectedModuleItem.module}`
               : view.name === 'overview' && openApp
                 ? studioApplicationDescription(openApp, locale)
-                : undefined
+                : (openRelease?.label ?? undefined)
         }
+        titleExtra={openRelease ? <ReleaseTags release={openRelease} /> : undefined}
         headingExtra={
           selected && canTest && selected.kind === 'scenario' && selected.name ? (
             <Button
@@ -508,6 +522,8 @@ function StudioWorkspace() {
             >
               {t('shell.studio.runScenario')}
             </Button>
+          ) : view.name === 'release' && !selected ? (
+            <div ref={setHeadingSlot} style={{ display: 'contents' }} />
           ) : undefined
         }
         status={
@@ -558,7 +574,11 @@ function StudioWorkspace() {
             onOpenScenario={selectDiagnostic}
             onBusyChange={setRequestBusy}
             actionsSlot={actionsSlot}
-            showHistory={view.name === 'releases' && !selected}
+            showHistory={(view.name === 'releases' || view.name === 'release') && !selected}
+            release={view.name === 'release' && !selected ? view.number : undefined}
+            releaseAddress={(number) => studioAddress(application, { name: 'release', number })}
+            historyAddress={studioAddress(application, { name: 'releases' })}
+            headingSlot={headingSlot}
             onHistory={(history) => setReleases({ application, history })}
             ref={publishing}
           />
@@ -696,14 +716,19 @@ function studioAddress(application: string, view: StudioView): string {
     case 'policies':
     case 'releases':
       return `/studio?${app}&view=${view.name}`
+    case 'release':
+      return `/studio?${app}&view=release&release=${view.number}`
     default:
       return `/studio?${app}`
   }
 }
 
-function parseView(view: string | null, kind: string | null): StudioView {
+function parseView(view: string | null, kind: string | null, release: string | null): StudioView {
   if (view === 'kind' && kind) {
     return { name: 'kind', kind }
+  }
+  if (view === 'release' && release && /^[1-9][0-9]*$/.test(release)) {
+    return { name: 'release', number: Number(release) }
   }
   if (view === 'policies' || view === 'releases') {
     return { name: view }

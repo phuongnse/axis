@@ -26,6 +26,7 @@ export function PageLayout({
   status,
   subtitle,
   headingExtra,
+  titleExtra,
   children,
 }: {
   title: string
@@ -43,6 +44,8 @@ export function PageLayout({
   subtitle?: ReactNode
   /** Proposed: what sits on the right of a compact page's heading, such as a scenario's Run scenario. */
   headingExtra?: ReactNode
+  /** Proposed: what follows a compact page's title on its line, such as a release's Live and Off-standard tags. */
+  titleExtra?: ReactNode
   children: ReactNode
 }) {
   const { colour, spacing } = useDesignTokens()
@@ -71,7 +74,14 @@ export function PageLayout({
         {(actions || status) && <CompactBand actions={actions} status={status} />}
         <Flex vertical gap={4}>
           <Flex align="center" justify="space-between" gap="middle" wrap>
-            {title4}
+            {titleExtra ? (
+              <Flex align="center" gap="small" wrap>
+                {title4}
+                {titleExtra}
+              </Flex>
+            ) : (
+              title4
+            )}
             {headingExtra}
           </Flex>
           {subtitle && <Typography.Text style={{ color: colour.textMuted }}>{subtitle}</Typography.Text>}

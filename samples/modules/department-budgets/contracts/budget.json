@@ -6,10 +6,15 @@
   "entity": "Budget",
   "lifecycle": {
     "field": "status",
-    "states": [{ "name": "draft", "initial": true, "deletable": true }, { "name": "approved" }, { "name": "rejected" }],
+    "states": [
+      { "name": "draft", "label": { "textKey": "department-budgets.contract.budget.draft" }, "initial": true, "deletable": true },
+      { "name": "approved", "label": { "textKey": "department-budgets.contract.budget.approved" } },
+      { "name": "rejected", "label": { "textKey": "department-budgets.contract.budget.rejected" } }
+    ],
     "transitions": [
       {
         "name": "approve",
+        "label": { "textKey": "department-budgets.contract.budget.approve" },
         "from": ["draft"],
         "to": "approved",
         "guard": "accountableUser() != null and accountableUser() != requester",
@@ -17,6 +22,7 @@
       },
       {
         "name": "reject",
+        "label": { "textKey": "department-budgets.contract.budget.reject" },
         "from": ["draft"],
         "to": "rejected",
         "guard": "accountableUser() != null and accountableUser() != requester",
@@ -27,6 +33,7 @@
   "validations": [
     {
       "name": "amountFrozenOnceDecided",
+      "label": { "textKey": "department-budgets.contract.budget.amountFrozenOnceDecided" },
       "expression": "previous(status) == null or previous(status) == 'draft' or amount == previous(amount)",
       "message": { "textKey": "department-budgets.budget.amountFrozen" },
       "field": "amount"
@@ -35,6 +42,7 @@
   "effects": [
     {
       "name": "decisionRecorded",
+      "label": { "textKey": "department-budgets.contract.budget.decisionRecorded" },
       "on": "approve",
       "create": {
         "entity": "BudgetDecision",

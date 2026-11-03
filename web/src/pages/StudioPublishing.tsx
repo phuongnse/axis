@@ -67,6 +67,10 @@ export function StudioPublishing({
   actionsSlot,
   showHistory = true,
   onHistory,
+  release,
+  releaseAddress,
+  historyAddress,
+  headingSlot,
   ref,
 }: {
   application: string
@@ -84,6 +88,11 @@ export function StudioPublishing({
   showHistory?: boolean
   /** Proposed: called with the release history each time it loads, for the workspace's overview. */
   onHistory?: (history: StudioReleases | 'failed') => void
+  /** Proposed: the release whose own page shows in place of the history, its address and its heading's right side. */
+  release?: number
+  releaseAddress?: (number: number) => string
+  historyAddress?: string
+  headingSlot?: HTMLElement | null
   ref?: Ref<StudioPublishingHandle>
 }) {
   const t = useText()
@@ -310,7 +319,7 @@ export function StudioPublishing({
       )}
       {showHistory && history && history !== 'failed' && (
         <>
-          {folderDiffers(history) && (
+          {release === undefined && folderDiffers(history) && (
             <Alert
               data-testid="studio-folder-differs"
               type="warning"
@@ -321,7 +330,11 @@ export function StudioPublishing({
             history={history}
             canRollBack={canPublish}
             busy={busy}
-            onRollBack={(release) => send(() => rollbackStudioRelease(application, release.releaseId))}
+            onRollBack={(target) => send(() => rollbackStudioRelease(application, target.releaseId))}
+            release={release}
+            releaseAddress={releaseAddress}
+            historyAddress={historyAddress}
+            headingSlot={headingSlot}
           />
         </>
       )}

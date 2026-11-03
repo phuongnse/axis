@@ -27,6 +27,13 @@
     "department-budgets.budgetApproval.approve": "Phê duyệt",
     "department-budgets.budgetApproval.reject": "Từ chối",
     "department-budgets.roles.approver": "Người phê duyệt ngân sách",
-    "department-budgets.roles.administrator": "Quản trị tổ chức"
+    "department-budgets.roles.administrator": "Quản trị tổ chức",
+    "department-budgets.contract.budget.draft": "Nháp",
+    "department-budgets.contract.budget.approved": "Đã duyệt",
+    "department-budgets.contract.budget.rejected": "Đã từ chối",
+    "department-budgets.contract.budget.approve": "Duyệt",
+    "department-budgets.contract.budget.reject": "Từ chối",
+    "department-budgets.contract.budget.amountFrozenOnceDecided": "Khoá số tiền khi đã quyết định",
+    "department-budgets.contract.budget.decisionRecorded": "Ghi lại quyết định"
   }
 }
