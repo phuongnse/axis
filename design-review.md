@@ -136,8 +136,9 @@ the review.
 - **Where a resource is created.** The owner asked for one place to create a resource of any kind, and for a kind's
   own page to create that kind without asking it. The sidebar's application row was recommended first; the owner
   found it already tight and asked for the band, near Publish…. Agreed, two buttons:
-  - The band's New resource…, on every page, heads the band's actions as a text button, a spacing-lg apart from
-    Validate, Preview, Run tests and Publish…, so it is a group of its own and never beside Publish…. Its dialog asks
+  - The band's New resource…, on every page, heads the band's actions as a text button, the same gap apart as
+    Validate, Preview, Run tests and Publish…, and never beside Publish…. A wider gap to set it apart was tried and
+    looked stray to the owner; moving it to the band's left was not taken, as the left holds the state. Its dialog asks
     for a kind, by its name for one resource in the sidebar's groups and order, Other last, then for a name.
   - A kind's list has its own button in its toolbar, named for the kind, such as New entity…, whose dialog, New
     entity, asks for the name alone, or the locale for a text resource.

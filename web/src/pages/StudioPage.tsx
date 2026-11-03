@@ -451,9 +451,9 @@ function StudioWorkspace() {
           ) : undefined
         }
         actions={
-          // Proposed: New resource… heads the band's actions, a spacing-lg apart from the ones that check and publish,
-          // so it reads as a group of its own and sits near Publish… but never beside it.
-          <Flex align="center" gap={spacing.lg}>
+          // Proposed: New resource… heads the band's actions, the same gap apart as the others, as every one acts on the
+          // application; Publish… stands out as the one solid button and is never beside it.
+          <Flex align="center" gap={spacing.xs}>
             {loaded && 'resources' in loaded && (
               <StudioNewResource application={application} resources={resources} inBand onCreated={onCreated} />
             )}
