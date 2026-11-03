@@ -27,5 +27,8 @@ artifacts/
 # Built SPA served by the server
 src/Axis.Server/wwwroot/
 
+# The licence list with versions, written by scripts/build.sh
+src/Axis.Server/licences.json
+
 deploy/compose/secrets/
 deploy/compose/server-tls/
