@@ -93,7 +93,8 @@ public static class WorkItemQueue
     /// <paramref name="revision"/> the revision of the instance that a timer item resumes,
     /// <paramref name="escalation"/> the zero-based index of the escalation that a <c>task.escalate</c> item runs,
     /// <paramref name="emailId"/> the outbox email a <c>notification.email</c> item sends, and
-    /// <paramref name="webhookDeliveryId"/> the webhook delivery a <c>webhook.deliver</c> item sends.
+    /// <paramref name="webhookDeliveryId"/> the webhook delivery a <c>webhook.deliver</c> item sends. An item due now adds
+    /// <paramref name="tenantId"/> to the open <see cref="WorkSignals"/> scope.
     /// </summary>
     public static async Task<Guid> EnqueueAsync(
         NpgsqlConnection connection,
@@ -143,6 +144,11 @@ public static class WorkItemQueue
         command.Parameters.Add(new NpgsqlParameter("email", NpgsqlDbType.Uuid) { Value = (object?)emailId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("webhookDelivery", NpgsqlDbType.Uuid) { Value = (object?)webhookDeliveryId ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
+        if (dueAt <= DateTimeOffset.UtcNow)
+        {
+            WorkSignals.Add(tenantId);
+        }
+
         return id;
     }
 
