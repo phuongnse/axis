@@ -66,8 +66,14 @@ const rowLine: CSSProperties = {
   verticalAlign: 'top',
 }
 
-/** A column as wide as its content keeps spacing-lg on each side, so such columns do not crowd each other. */
-const fitted: CSSProperties = { width: '1%', whiteSpace: 'nowrap', paddingInline: spacingTokens.lg }
+/**
+ * Proposed: every cell keeps spacing-md on each side, so two columns sit spacing-xl apart, close enough to read a row
+ * as one line and far enough apart that columns fitted to their content do not crowd each other.
+ */
+const cellInline = spacingTokens.md
+
+/** A column as wide as its content, never wrapping. */
+const fitted: CSSProperties = { width: '1%', whiteSpace: 'nowrap', paddingInline: cellInline }
 
 /** The value of a `text` or `fill` cell: no narrower than `textColumn`, wrapping at 320 px. */
 const textValue: CSSProperties = {
@@ -130,12 +136,12 @@ export function AxisTable<T extends object>({
     const fills = column.key === fillKey
     const numbers: CSSProperties = numeric ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {}
     const cell: CSSProperties = fills
-      ? { paddingInline: spacingTokens.lg, ...rowLine, ...numbers }
+      ? { paddingInline: cellInline, ...rowLine, ...numbers }
       : kind === 'fit'
         ? { ...fitted, ...rowLine, ...numbers }
-        : { width: '1%', paddingInline: spacingTokens.lg, ...rowLine }
+        : { width: '1%', paddingInline: cellInline, ...rowLine }
     const header: CSSProperties = fills
-      ? { paddingInline: spacingTokens.lg, ...(numeric ? { textAlign: 'right' } : {}) }
+      ? { paddingInline: cellInline, ...(numeric ? { textAlign: 'right' } : {}) }
       : { ...fitted, ...(numeric ? { textAlign: 'right' } : {}) }
     return {
       ...column,
