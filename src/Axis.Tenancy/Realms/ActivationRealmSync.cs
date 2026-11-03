@@ -28,23 +28,29 @@ public static class ActivationRealmSync
     }
 
     /// <summary>
-    /// Syncs the tenant's realm to <paramref name="plan"/>. It does nothing when the tenant has no realm details.
+    /// Syncs the tenant's realm to <paramref name="plan"/>, then writes the tenant's <paramref name="legal"/> links and the Terms and Conditions step
+    /// (<see cref="RealmSync.SyncLegalAsync"/>). <paramref name="users"/> asks the realm's existing users to accept new terms, and
+    /// is <c>null</c> when the tenant has no <c>axis-users</c> client. It does nothing when the tenant has no realm details.
     /// </summary>
-    public static Task SyncAsync(
+    public static async Task SyncAsync(
         HttpClient http,
         TenantRealmAccess? realm,
         IReadOnlyDictionary<string, TenantBinding> bindings,
         RealmPlan plan,
+        RealmLegal legal,
+        TenantRealmUsers? users,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(http);
         if (realm is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return new RealmSync(http, realm.BaseAddress)
-            .SyncAsync(realm.Name, realm.ActivationClientSecret.Reveal(), ToState(plan, bindings) with { PlatformClientSecret = realm.PlatformClientSecret?.Reveal() }, cancellationToken);
+        var secret = realm.ActivationClientSecret.Reveal();
+        var sync = new RealmSync(http, realm.BaseAddress);
+        await sync.SyncAsync(realm.Name, secret, ToState(plan, bindings) with { PlatformClientSecret = realm.PlatformClientSecret?.Reveal() }, cancellationToken);
+        await sync.SyncLegalAsync(realm.Name, secret, legal, users is null ? null : new RealmUsers(http, users), cancellationToken);
     }
 
     private static RealmBrokeredProvider ToProvider(RealmProvider provider, IReadOnlyDictionary<string, TenantBinding> bindings)

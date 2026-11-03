@@ -6,7 +6,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Answers the calls that <c>TenantRealm</c> and <c>RealmSync</c> make to the identity provider with success, so a test that only
 /// needs a tenant, or that activates a release in one, does not create or change a realm in the shared Keycloak. It reports
-/// no provider and no mapper, creates every client the sync asks for and serves one discovery document for every issuer.
+/// no provider, no mapper and no user, creates every client the sync asks for and serves one discovery document for every issuer.
 /// It records the path of every request.
 /// </summary>
 internal sealed class StubIdentityProvider : HttpMessageHandler
@@ -54,7 +54,8 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
 
     private static string Body(Uri uri)
     {
-        if (uri.AbsolutePath.EndsWith("/protocol-mappers/models", StringComparison.Ordinal)
+        if (uri.AbsolutePath.EndsWith("/users", StringComparison.Ordinal)
+            || uri.AbsolutePath.EndsWith("/protocol-mappers/models", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/identity-provider/instances", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/mappers", StringComparison.Ordinal))
         {

@@ -140,10 +140,9 @@ internal static class TenantSettings
             return Usage(run);
         }
 
-        return await ChangeAsync(
+        return await LegalAsync(
             run,
             run.Args[3],
-            "legal",
             (platform, command) => TenantLegalSettings.SetAsync(platform, command, run.Args[3], change, run.CancellationToken));
     }
 
@@ -156,11 +155,67 @@ internal static class TenantSettings
             return Usage(run);
         }
 
-        return await ChangeAsync(
+        return await LegalAsync(
             run,
             args[3],
-            "legal",
             (platform, command) => TenantLegalSettings.ClearAsync(platform, command, args[3], withSite ? args[5] : null, run.CancellationToken));
+    }
+
+    // The key decrypts the realm's secrets, which the legal sync needs.
+    private static async Task<int> LegalAsync(AdminRun run, string id, Func<PlatformDbContext, string, Task<TenantSettingResult>> change)
+    {
+        var (setup, exit) = await PrepareAsync(run, needsCipher: true);
+        if (setup is null)
+        {
+            return exit;
+        }
+
+        TenantSettingResult result;
+        try
+        {
+            await using var platform = NewContext(setup.Connection);
+            result = await change(platform, run.Command.Name);
+        }
+        catch (OperationCanceledException)
+        {
+            run.Error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return await LegalRealmAsync(run, setup, id, result);
+    }
+
+    /// <summary>
+    /// After a stored change of the legal settings, writes the legal links and the terms step to the tenant's realm. A tenant without a realm of its
+    /// own, such as a preview tenant, has nothing to write. The stored change stays when the identity provider fails: the next activation or legal command brings the realm in step.
+    /// </summary>
+    private static async Task<int> LegalRealmAsync(AdminRun run, Setup setup, string id, TenantSettingResult result)
+    {
+        if (result.Outcome != TenantSettingOutcome.Changed)
+        {
+            return Print(run, id, "legal", result);
+        }
+
+        try
+        {
+            await using var platform = NewContext(setup.Connection);
+            var row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id, run.CancellationToken);
+            if (row is not null && DirectoryTenantCatalog.Realm(row, setup.Cipher!) is { } realm)
+            {
+                var legal = await DirectoryTenantCatalog.ReadRealmLegalAsync(platform, row, run.CancellationToken);
+                using var http = AdminCommands.IdentityProviderClient(run.IdentityProviderHandler);
+                var users = DirectoryTenantCatalog.RealmUsers(row, setup.Cipher!);
+                await new RealmSync(http, realm.BaseAddress).SyncLegalAsync(
+                    realm.Name, realm.ActivationClientSecret.Reveal(), legal, users is null ? null : new RealmUsers(http, users), run.CancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or OperationCanceledException or NpgsqlException)
+        {
+            run.Output.WriteLine($"{id} realm failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
+
+        return Print(run, id, "legal", result);
     }
 
     public static async Task<int> EmailSetAsync(AdminRun run)
@@ -302,7 +357,14 @@ internal static class TenantSettings
         try
         {
             using var http = AdminCommands.IdentityProviderClient(run.IdentityProviderHandler);
-            await ActivationRealmSync.SyncAsync(http, realm, bindings, plan, run.CancellationToken);
+            RealmLegal legal;
+            await using (var platform = NewContext(setup.Connection))
+            {
+                legal = await DirectoryTenantCatalog.ReadRealmLegalAsync(platform, row!, run.CancellationToken);
+            }
+
+            await ActivationRealmSync.SyncAsync(
+                http, realm, bindings, plan, legal, DirectoryTenantCatalog.RealmUsers(row!, setup.Cipher!), run.CancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or OperationCanceledException)
         {

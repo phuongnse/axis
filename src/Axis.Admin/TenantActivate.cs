@@ -6,6 +6,7 @@ using Axis.Data.Records;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 
 namespace Axis.Admin;
 
@@ -23,6 +24,7 @@ internal sealed class TenantActivate(
     IReadOnlyList<TenantRow> tenants,
     IReadOnlyDictionary<string, ActivationBindings> bindings,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, TenantBinding>> realmBindings,
+    IReadOnlyDictionary<string, RealmLegal> realmLegal,
     RealmMail mail,
     HttpClient http,
     string folder,
@@ -78,6 +80,8 @@ internal sealed class TenantActivate(
                 DirectoryTenantCatalog.Realm(row, settings.Cipher),
                 realmBindings[row.Id],
                 mail.For(DirectoryTenantCatalog.Email(row, settings.Cipher)),
+                realmLegal[row.Id],
+                DirectoryTenantCatalog.RealmUsers(row, settings.Cipher),
                 cancellationToken));
         return run.Succeeded;
     }

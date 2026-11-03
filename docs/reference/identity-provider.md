@@ -270,7 +270,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   email theme too. It also turns off Keycloak's account console client `account-console` and removes
   `manage-account` from the realm's default roles, because Axis's [account page](platform-pages.md#account-page)
   replaces it. The older `account` client stays, as Keycloak's application-initiated actions may need it.
-  _(planned for M31)_: it leaves the Terms and Conditions required action off until the tenant sets terms, see
+  It leaves the Terms and Conditions required action off until the tenant sets terms, see
   [accepting the terms](legal.md#accepting-the-terms). It turns on language support in the realm, with `en` and `vi` and `en` as the default, so
   `kc_locale` and the theme's language links work. It also creates the first-login flow
   `axis first login` for brokered users, with a deny step that is off, before the create-user step. In a cell the server switches that step by the tenant's users quota, see [refusals](tenant-quotas.md#refusals). It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
@@ -297,13 +297,13 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   `site-<path>` clients and `oidc-` and `saml-` providers match a desired state. Each site client puts the alias of the provider that
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
   display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
-  `<provider alias>.<subject>`. _(planned for M31)_: it writes the [legal links](legal.md#legal-settings) on every client, and turns
-  the Terms and Conditions required action on while the tenant sets terms, and off when it has none. Each provider also gets an `acr` mapper (`oidc-user-session-note-idp-mapper`) that copies the
+  `<provider alias>.<subject>`. After the full sync it writes the [legal links](legal.md#legal-settings) on every client and the terms
+  version, see the legal links bullet below. Each provider also gets an `acr` mapper (`oidc-user-session-note-idp-mapper`) that copies the
   upstream `acr` claim into the person's realm session, and each site client an `identity provider acr` mapper that puts
   that session value into its ID token as the `identity_provider_acr` claim. Each site client also gets one mapper for each roles claim of
   the providers its site allows, named `axis_roles_<claim>`, which puts that user attribute into the ID token. The sync removes such a
   mapper that the site no longer needs. Each provider names the realm's first-login flow. It touches no other client or
-  provider, apart from the legal links _(planned for M31)_, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A `saml-` provider is
+  provider, apart from the legal links, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A `saml-` provider is
   imported from its metadata: the sync reads the metadata from the `metadata` binding's address before it changes the
   realm, and uploads it to Keycloak's import-config endpoint, so an unreachable address changes nothing. The provider
   asks for a persistent NameID, takes the person's subject from it, and signs its requests with the realm's own key
@@ -317,7 +317,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` and
   `identity provider acr` mappers stay as they are, and a mapper that is removed from `axis` is not removed from the site clients. Each site client also carries two attributes that every sync rewrites:
   `axis.providers`, the aliases of the providers the site allows separated by spaces, and `axis.accounts`, `true` or
-  `false`. _(planned for M31)_: also `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, the links of the site's legal line, see
+  `false`. The legal sync also writes `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, the links of the site's legal line, see
   [legal settings](legal.md#legal-settings). The sync refuses an alias that is empty or contains a space. It also copies the redirect addresses, web origins and post-logout redirect
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
   HMAC-SHA256(platform secret, client id), so the server can compute it. Without a platform secret, Keycloak makes the
@@ -337,12 +337,27 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   path order, or `en` when it has no site. When several applications share a provider, the label comes from the
   application with the lowest application id. A tenant created before `manage-realm` was granted needs `tenant create` again, or activation
   fails at the label step with a 403.
+- **Legal links and terms:** after every full sync, and after `tenant legal set` and `clear`, the sync writes the tenant's
+  [legal settings](legal.md#legal-settings) to the realm. It lists every client and sets `axis.privacyUrl`, `axis.termsUrl`,
+  `axis.licencesUrl`, `axis.tenantPrivacyUrl` and `axis.tenantTermsUrl`, and keeps every other attribute. A `site-<path>`
+  client gets its site's own privacy and terms links, else the tenant's. Every other client gets the tenant's. The licences
+  link is `https://<host>/licences`, where the host is the tenant's first host, in ordinal order, that belongs to no site,
+  or else its first host. It removes an attribute whose value is not set, but `axis.licencesUrl` stays while the tenant
+  has a host. A client is written only when its attributes differ, and a bearer-only client, such as `realm-management` and
+  `broker`, is left alone because no one signs in through it and Keycloak refuses to update some of them. The sync turns the Terms and Conditions
+  required action on, with `defaultAction` so new users get it, while the tenant has a terms address, and off when it has
+  none. It stores the tenant's terms version in the realm attribute `axis.termsVersion`. When the version differs from the
+  stored one, it first adds the required action to every user of the realm through the `axis-users` client, one request for
+  each user, and then stores the version, so a failure leaves the old version and the next sync asks again. Changing only the
+  addresses asks no one. When the tenant has no terms, the sync clears the stored version, so terms set later ask every user.
+  A tenant with no `axis-users` client gets the step on for new users but asks no existing user and stores no version. The
+  host commands do not rerun this sync, so a changed host updates `axis.licencesUrl` at the next full sync or legal command.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. The
   stored platform providers are always part of the plan, so a provider that only the platform sign-in names stays in
   the realm. A provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
   Built for `Axis.Admin`: `activate`, and the publisher's `publish`, `publish` with target `preview` and `rollback`
-  update the realm, with its mail server, inside their `activate` step, after the activation has committed. A tenant without an activation
+  update the realm, with its mail server and legal settings, inside their `activate` step, after the activation has committed. A tenant without an activation
   secret, such as a preview tenant or one that signs in through an outside identity provider, skips the update. A
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`

@@ -406,7 +406,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     // The privacy and terms links of a tenant row with the rows of its sites, or null when the tenant sets none. Legal
     // links stay out of DatabaseKey and OidcKey: each refresh swaps in the whole catalog, so a changed link shows at the
     // next refresh and needs no pool or sign-in rebuild.
-    private static TenantLegal? Legal(TenantRow tenant, IEnumerable<TenantSiteLegalRow> siteRows)
+    public static TenantLegal? Legal(TenantRow tenant, IEnumerable<TenantSiteLegalRow> siteRows)
     {
         var sites = new Dictionary<string, SiteLegal>(StringComparer.OrdinalIgnoreCase);
         foreach (var site in siteRows)
@@ -418,6 +418,37 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         return privacy is null && terms is null && version is null && sites.Count == 0
             ? null
             : new TenantLegal(privacy, terms, version, sites);
+    }
+
+    /// <summary>
+    /// What the realm sync writes of a tenant's legal settings, built from the tenant's row, its host rows and the rows of its
+    /// sites. The licences address uses the tenant's first host that belongs to no site.
+    /// </summary>
+    public static RealmLegal RealmLegalOf(TenantRow row, IEnumerable<TenantHostRow> hosts, IEnumerable<TenantSiteLegalRow> siteRows)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(hosts);
+        ArgumentNullException.ThrowIfNull(siteRows);
+
+        var held = hosts.ToList();
+        var hostSites = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var host in held.Where(host => host.SitePath is not null))
+        {
+            hostSites[host.Host] = host.SitePath!;
+        }
+
+        return RealmLegal.Of(Legal(row, siteRows), held.Select(host => host.Host), hostSites);
+    }
+
+    /// <summary>Reads the hosts and the site links of the tenant <paramref name="row"/> and builds its <see cref="RealmLegal"/>.</summary>
+    public static async Task<RealmLegal> ReadRealmLegalAsync(PlatformDbContext platform, TenantRow row, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(platform);
+        ArgumentNullException.ThrowIfNull(row);
+
+        var hosts = await platform.TenantHosts.AsNoTracking().Where(host => host.TenantId == row.Id).ToListAsync(cancellationToken);
+        var siteRows = await platform.TenantSiteLegalLinks.AsNoTracking().Where(link => link.TenantId == row.Id).ToListAsync(cancellationToken);
+        return RealmLegalOf(row, hosts, siteRows);
     }
 
     // The runtime connection of a tenant: the row's database, user and password, the TLS settings of the platform
