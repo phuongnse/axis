@@ -19,7 +19,7 @@ namespace Axis.Server.Authentication;
 /// cookie holds only the key of a session. The key is 32 random bytes in base64url, and the row's key
 /// is the SHA-256 hash of those bytes. The row never holds the key or a token. A request reads the row,
 /// moves its last request time and refuses it once it is past <see cref="Session.IdleTimeout"/> or
-/// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts, and the roles that each application's provider mapping gave the person, by application id. It never holds the roles that an administrator gave: the same statement that moves the last request time reads them from <c>axis.given_roles</c>, and they live in the request's principal only, so a change applies at the next request on every replica. A given platform role is stored by its kind, and the request maps it to the role name that the host setting configures, which joins the roles of the sign-in. A preview tenant has no users page, so a request on it reads the given roles of its main tenant from the main tenant's database in the same way. It holds the site path of the host that made it, null for the tenant's own
+/// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts, the provider's id of its own session, the ID token's <c>sid</c>, which sign-out ends, and the roles that each application's provider mapping gave the person, by application id. It never holds the roles that an administrator gave: the same statement that moves the last request time reads them from <c>axis.given_roles</c>, and they live in the request's principal only, so a change applies at the next request on every replica. A given platform role is stored by its kind, and the request maps it to the role name that the host setting configures, which joins the roles of the sign-in. A preview tenant has no users page, so a request on it reads the given roles of its main tenant from the main tenant's database in the same way. It holds the site path of the host that made it, null for the tenant's own
 /// hosts, and a request on another host of the tenant neither uses nor deletes it. The overloads without an <see cref="HttpContext"/> cannot know the
 /// tenant, so they are not supported.
 /// </summary>
@@ -42,8 +42,8 @@ internal sealed class SessionStore : ITicketStore
         var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at, site_path, identity_provider, application_roles)
-            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt, @site, @identityProvider, @applicationRoles)
+            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at, site_path, identity_provider, application_roles, idp_session_id)
+            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt, @site, @identityProvider, @applicationRoles, @idpSessionId)
             """,
             connection);
         command.Parameters.AddWithValue("hash", SHA256.HashData(id));
@@ -61,6 +61,10 @@ internal sealed class SessionStore : ITicketStore
             Value = (object?)Session.ReadIdentityProvider(ticket.Principal) ?? DBNull.Value,
         });
         command.Parameters.Add(new NpgsqlParameter("applicationRoles", NpgsqlDbType.Jsonb) { Value = JsonSerializer.Serialize(user.ApplicationRoles) });
+        command.Parameters.Add(new NpgsqlParameter("idpSessionId", NpgsqlDbType.Text)
+        {
+            Value = (object?)Session.ReadIdpSessionId(ticket.Principal) ?? DBNull.Value,
+        });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return Base64Url.EncodeToString(id);
     }
@@ -91,16 +95,16 @@ internal sealed class SessionStore : ITicketStore
         string? userId = null, displayName = null;
         string[] storedRoles = [], givenPlatformKinds = [];
         DateTimeOffset? authenticatedAt = null;
-        string? identityProvider = null;
+        string? identityProvider = null, idpSessionId = null;
         Dictionary<Guid, IReadOnlyList<string>> applicationRoles = [];
         await using (var update = new NpgsqlCommand(
             """
             WITH touched AS (
                 UPDATE axis.sessions SET last_request_at = @now
                 WHERE id_hash = @hash AND site_path IS NOT DISTINCT FROM @site AND signed_in_at > @signedInAfter AND last_request_at > @activeAfter
-                RETURNING user_id, display_name, roles, authenticated_at, identity_provider, application_roles::text AS application_roles
+                RETURNING user_id, display_name, roles, authenticated_at, identity_provider, application_roles::text AS application_roles, idp_session_id
             )
-            SELECT t.user_id, t.display_name, t.roles, t.authenticated_at, t.identity_provider, t.application_roles,
+            SELECT t.user_id, t.display_name, t.roles, t.authenticated_at, t.identity_provider, t.application_roles, t.idp_session_id,
                 ARRAY(SELECT g.application_id FROM axis.given_roles g WHERE g.user_id = t.user_id AND g.application_id IS NOT NULL ORDER BY g.application_id, g.role),
                 ARRAY(SELECT g.role FROM axis.given_roles g WHERE g.user_id = t.user_id AND g.application_id IS NOT NULL ORDER BY g.application_id, g.role),
                 ARRAY(SELECT g.role FROM axis.given_roles g WHERE g.user_id = t.user_id AND g.application_id IS NULL ORDER BY g.role)
@@ -123,8 +127,9 @@ internal sealed class SessionStore : ITicketStore
                 identityProvider = await reader.IsDBNullAsync(4, cancellationToken) ? null : reader.GetString(4);
                 applicationRoles = JsonSerializer.Deserialize<Dictionary<Guid, string[]>>(reader.GetString(5))!
                     .ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value);
-                MergeGivenRoles(applicationRoles, reader.GetFieldValue<Guid[]>(6), reader.GetFieldValue<string[]>(7));
-                givenPlatformKinds = reader.GetFieldValue<string[]>(8);
+                idpSessionId = await reader.IsDBNullAsync(6, cancellationToken) ? null : reader.GetString(6);
+                MergeGivenRoles(applicationRoles, reader.GetFieldValue<Guid[]>(7), reader.GetFieldValue<string[]>(8));
+                givenPlatformKinds = reader.GetFieldValue<string[]>(9);
             }
         }
 
@@ -159,7 +164,8 @@ internal sealed class SessionStore : ITicketStore
             authenticatedAt,
             Base64Url.EncodeToString(hash),
             identityProvider,
-            applicationRoles);
+            applicationRoles,
+            idpSessionId);
         // The handler renews a cookie only for a ticket that carries both times.
         var properties = new AuthenticationProperties { IssuedUtc = now, ExpiresUtc = now + Session.IdleTimeout };
         return new AuthenticationTicket(principal, properties, Session.Scheme);

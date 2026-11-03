@@ -2,6 +2,8 @@ using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Server.Http;
 using Axis.Server.Users;
+using Axis.Tenancy;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
@@ -16,12 +18,15 @@ namespace Axis.Server.Authentication;
 /// <c>returnUrl</c>. A callback that fails creates no session and redirects to
 /// <see cref="TenantSignIn.FailedPath"/>. A <c>returnUrl</c> that opens an active site starts the sign-in through that site's
 /// client, see <see cref="SiteSignIn"/>.
-/// <c>POST /api/auth/sign-out</c> ends the session and answers the identity provider's sign-out
-/// address, for the SPA to send the browser to. The answer carries <c>Clear-Site-Data</c>, so the
+/// <c>POST /api/auth/sign-out</c> ends the session. It first ends the identity provider's own session by the stored <c>sid</c>, as
+/// the realm's <c>axis-users</c> client, and answers <c>/?signedOut</c>. It answers the identity provider's sign-out address, for
+/// the SPA to send the browser to, only when that call cannot be made or fails. The answer carries <c>Clear-Site-Data</c>, so the
 /// browser drops the site's cache and storage.
 /// </summary>
-internal static class AuthEndpoints
+internal static partial class AuthEndpoints
 {
+    private static readonly TimeSpan _identityProviderLimit = TimeSpan.FromSeconds(5);
+
     public static void MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var auth = endpoints.MapGroup("/api/auth");
@@ -85,6 +90,9 @@ internal static class AuthEndpoints
         HttpContext httpContext,
         ITenantContextAccessor tenants,
         IOptionsMonitor<OpenIdConnectOptions> oidcOptions,
+        ITenantCatalog catalog,
+        IHttpClientFactory httpClients,
+        ILogger<AuthLog> logger,
         CancellationToken cancellationToken)
     {
         // A session of another tenant, or an expired one, counts as none and writes no record.
@@ -93,12 +101,23 @@ internal static class AuthEndpoints
             await SessionAudit.AppendAsync(httpContext, AuditActions.SessionSignedOut, user.Id, reason: null, cancellationToken);
         }
 
+        // The session store reads the sid from the row, so it is read before the sign-out deletes the row.
+        var current = await httpContext.AuthenticateAsync(Session.Scheme);
+        var idpSessionId = current.Succeeded ? Session.ReadIdpSessionId(current.Principal) : null;
+
         await httpContext.SignOutAsync(Session.Scheme);
 
         // The browser drops the site's HTTP cache and storage once it receives this answer (ASVS V14.3.1).
         httpContext.Response.Headers["Clear-Site-Data"] = "\"cache\", \"storage\"";
 
         var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");
+        if (idpSessionId is not null
+            && catalog.Find(tenant.TenantId)?.RealmUsers is { } access
+            && await TryEndIdentityProviderSessionAsync(httpClients, access, idpSessionId, tenant.TenantId, logger, cancellationToken))
+        {
+            return Results.Ok(new SignOutResponse("/?signedOut"));
+        }
+
         var options = oidcOptions.Get(TenantSignIn.SchemeName(tenant.TenantId));
         var configuration = await options.ConfigurationManager!.GetConfigurationAsync(cancellationToken);
         var request = httpContext.Request;
@@ -111,5 +130,36 @@ internal static class AuthEndpoints
         return Results.Ok(new SignOutResponse(signOutUrl));
     }
 
+    // A realm that no longer has the session counts as ended. The call gets a limit, so a slow identity provider cannot hold sign-out up.
+    private static async Task<bool> TryEndIdentityProviderSessionAsync(
+        IHttpClientFactory httpClients,
+        TenantRealmUsers access,
+        string idpSessionId,
+        string tenantId,
+        ILogger<AuthLog> logger,
+        CancellationToken cancellationToken)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(_identityProviderLimit);
+        try
+        {
+            using var client = httpClients.CreateClient(nameof(AuthEndpoints));
+            await new RealmUsers(client, access).EndSessionAsync(idpSessionId, limit.Token);
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException
+            || (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            LogEndSessionFailed(logger, tenantId, exception.Message);
+            return false;
+        }
+    }
+
+    [LoggerMessage(LogLevel.Warning, "The identity provider session of a user of tenant {TenantId} could not be ended. {Reason}")]
+    private static partial void LogEndSessionFailed(ILogger logger, string tenantId, string reason);
+
     private sealed record SignOutResponse(string SignOutUrl);
 }
+
+/// <summary>The category of the log lines of the auth routes.</summary>
+internal sealed class AuthLog;
