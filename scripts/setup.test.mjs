@@ -67,6 +67,7 @@ function cacheTools(home, { schemas = true } = {}) {
   }
   if (schemas) {
     mkdirSync(join(tools, `kubernetes-schemas-${version('KUBERNETES_VERSION')}`), { recursive: true })
+    mkdirSync(join(tools, `crd-schemas-${version('CRDS_CATALOG_COMMIT')}`), { recursive: true })
   }
 }
 
@@ -174,7 +175,7 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         },
       })
       assert.equal(result.status, 0, result.stderr)
-      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 12)
+      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 20)
       assert.match(result.stderr, /Attempt 1 of 4 failed with status 22/)
       const schemas = join(home, '.cache', 'axis-tools', `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
       assert.deepEqual(readdirSync(schemas).sort(), [
@@ -182,6 +183,8 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         'job-batch-v1.json',
         'service-v1.json',
       ])
+      const crd = join(home, '.cache', 'axis-tools', `crd-schemas-${version('CRDS_CATALOG_COMMIT')}`)
+      assert.deepEqual(readdirSync(join(crd, 'cert-manager.io')).sort(), ['certificate_v1.json', 'issuer_v1.json'])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

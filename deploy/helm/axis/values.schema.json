@@ -91,7 +91,31 @@
         "internalUrl": { "type": "string" },
         "operatorRealm": { "type": "string" },
         "operatorRole": { "type": "string" },
-        "backupKeyFile": { "type": "string" }
+        "backupKeyFile": { "type": "string" },
+        "certificate": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "secretName": { "type": "string" },
+            "issuer": {
+              "type": "object",
+              "properties": {
+                "server": { "type": "string" },
+                "email": { "type": "string" },
+                "dns01": {
+                  "type": "object",
+                  "properties": {
+                    "provider": { "enum": ["cloudflare", "digitalocean"] },
+                    "tokenSecret": { "$ref": "#/definitions/secretReference" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
       }
     },
     "extensions": {

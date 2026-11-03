@@ -1,0 +1,32 @@
+{{- if .Values.cell.certificate.enabled }}
+{{- $issuer := .Values.cell.certificate.issuer }}
+{{- $token := $issuer.dns01.tokenSecret }}
+{{- $tokenName := required "cell.certificate.issuer.dns01.tokenSecret.name is required: the Kubernetes Secret that holds the DNS provider's token" $token.name }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Release.Name }}-tenant-subdomains
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+spec:
+  acme:
+    server: {{ required "cell.certificate.issuer.server is required: the ACME directory URL" $issuer.server | quote }}
+    {{- if $issuer.email }}
+    email: {{ $issuer.email | quote }}
+    {{- end }}
+    privateKeySecretRef:
+      name: {{ .Release.Name }}-tenant-subdomains-acme-account
+    solvers:
+      - dns01:
+          {{- if eq $issuer.dns01.provider "digitalocean" }}
+          digitalocean:
+            tokenSecretRef:
+              name: {{ $tokenName | quote }}
+              key: {{ $token.key | quote }}
+          {{- else }}
+          cloudflare:
+            apiTokenSecretRef:
+              name: {{ $tokenName | quote }}
+              key: {{ $token.key | quote }}
+          {{- end }}
+{{- end }}
