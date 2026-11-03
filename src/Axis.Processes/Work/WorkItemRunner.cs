@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
+using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -17,10 +18,14 @@ namespace Axis.Processes.Work;
 /// each transaction it opens. Every transaction of a run, including each one an external handler opens
 /// through <see cref="WorkItemQueue.BeginAsync"/>, is under the statement limit of
 /// <see cref="WorkItemSettings"/>, one minute by default. When an <see cref="IWorkItemUsage"/> is given, it is told of
-/// each item that ran, right after the item's own transaction ended.
+/// each item that ran, right after the item's own transaction ended. When an <see cref="ICallLeases"/> is given,
+/// <see cref="TryRunNextAsync"/> claims a connector call or a package call only with a lease, and holds the lease until the run
+/// of the item ends. With no lease free the item stays due and unclaimed.
 /// </summary>
 public sealed partial class WorkItemRunner
 {
+    private static readonly HashSet<string> _callKinds = [ProcessStarts.ConnectorCallWorkItemKind, ProcessStarts.PackageCallWorkItemKind];
+
     private readonly ITenantConnectionFactory _connections;
     private readonly ITenantContextAccessor _accessor;
     private readonly ILogger<WorkItemRunner> _logger;
@@ -29,6 +34,7 @@ public sealed partial class WorkItemRunner
     private readonly string[] _kinds;
     private readonly TimeSpan _statementTimeout;
     private readonly IWorkItemUsage? _usage;
+    private readonly ICallLeases? _callLeases;
 
     /// <exception cref="InvalidOperationException">Two handlers of either sort have the same kind.</exception>
     public WorkItemRunner(
@@ -38,10 +44,12 @@ public sealed partial class WorkItemRunner
         ILogger<WorkItemRunner> logger,
         IEnumerable<IExternalWorkItemHandler>? externalHandlers = null,
         WorkItemSettings? settings = null,
-        IWorkItemUsage? usage = null)
+        IWorkItemUsage? usage = null,
+        ICallLeases? callLeases = null)
     {
         ArgumentNullException.ThrowIfNull(handlers);
         _usage = usage;
+        _callLeases = callLeases;
         _connections = connections;
         _accessor = accessor;
         _logger = logger;
@@ -246,17 +254,76 @@ public sealed partial class WorkItemRunner
         }
     }
 
-    /// <summary>Claims and runs the next item of the tenant. Returns <see langword="false"/> when nothing was claimed.</summary>
-    public async Task<bool> RunNextAsync(string tenantId, TimeSpan lease, CancellationToken cancellationToken)
+    /// <summary>Claims and runs the next item of the tenant. Returns <see langword="false"/> when nothing ran.</summary>
+    public async Task<bool> RunNextAsync(string tenantId, TimeSpan lease, CancellationToken cancellationToken) =>
+        await TryRunNextAsync(tenantId, lease, cancellationToken) == NextRun.Ran;
+
+    /// <summary>
+    /// Claims and runs the next item of the tenant. Without <see cref="ICallLeases"/> it claims as <see cref="ClaimAsync"/>
+    /// does. With them, a connector call or a package call is claimed only after a lease is taken, and the lease is freed when the
+    /// run ends, however it ends. When the next item is a call and the tenant has no lease free, nothing is claimed and the result
+    /// is <see cref="NextRun.Waiting"/>, and the item keeps its due time.
+    /// </summary>
+    public async Task<NextRun> TryRunNextAsync(string tenantId, TimeSpan lease, CancellationToken cancellationToken)
     {
-        var item = await ClaimAsync(tenantId, lease, cancellationToken);
-        if (item is null)
+        if (_callLeases is null)
         {
-            return false;
+            var plain = await ClaimAsync(tenantId, lease, cancellationToken);
+            if (plain is null)
+            {
+                return NextRun.None;
+            }
+
+            await ExecuteAsync(plain, cancellationToken);
+            return NextRun.Ran;
         }
 
-        await ExecuteAsync(item, cancellationToken);
-        return true;
+        if (_kinds.Length == 0)
+        {
+            return NextRun.None;
+        }
+
+        ClaimedWorkItem? item;
+        IAsyncDisposable? taken;
+        bool waiting;
+        var previous = _accessor.Current;
+        _accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
+            (item, taken, waiting) = await WorkItemQueue.ClaimGatedAsync(
+                connection,
+                tenantId,
+                _kinds,
+                lease,
+                _callKinds,
+                token => _callLeases.TryTakeAsync(tenantId, token),
+                cancellationToken,
+                InQueueOrder);
+        }
+        finally
+        {
+            _accessor.Current = previous;
+        }
+
+        if (item is null)
+        {
+            return waiting ? NextRun.Waiting : NextRun.None;
+        }
+
+        try
+        {
+            AxisMetrics.RecordClaimDelay(item.TenantId, item.Kind, item.ClaimDelay);
+            await ExecuteAsync(item, cancellationToken);
+            return NextRun.Ran;
+        }
+        finally
+        {
+            if (taken is not null)
+            {
+                await taken.DisposeAsync();
+            }
+        }
     }
 
     private static WorkItemOutcome Finish(Activity? activity, ClaimedWorkItem item, long start, WorkItemOutcome outcome)
@@ -283,4 +350,17 @@ public sealed partial class WorkItemRunner
 
     [LoggerMessage(LogLevel.Error, "Work item {ItemId} of kind {Kind} for tenant {TenantId} failed with {ErrorType}. Its writes were rolled back.")]
     private partial void LogFailed(Guid itemId, string kind, string tenantId, string errorType);
+}
+
+/// <summary>What <see cref="WorkItemRunner.TryRunNextAsync"/> did.</summary>
+public enum NextRun
+{
+    /// <summary>No item was due.</summary>
+    None,
+
+    /// <summary>An item was claimed and run.</summary>
+    Ran,
+
+    /// <summary>The next item is a connector call or a package call and the tenant has no lease free, so nothing was claimed.</summary>
+    Waiting,
 }
