@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Server.Authentication;
+using Axis.Server.CellApi;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -166,7 +167,10 @@ public sealed class DpopCallerTests(KeycloakFixture keycloak) : IAsyncLifetime
         var selector = Factory.Services.GetRequiredService<IOptionsMonitor<PolicySchemeOptions>>()
             .Get(EndpointCaller.RequestScheme).ForwardDefaultSelector
             ?? throw new InvalidOperationException("The request scheme has no selector.");
+        // The cell routes are left out: their scheme is the operator realm's, and a tenant host answers 404 for them
+        // before any sign-in work, so no tenant token reaches them. CellProvisioningApiTests covers their authorization.
         var bearerRoutes = ApiRoutes.From(Factory.Services)
+            .Where(route => route.Endpoint.Metadata.GetMetadata<CellOperatorRoute>() is null)
             .Where(route => selector(RouteContext(route)) != Session.Scheme)
             .ToList();
 

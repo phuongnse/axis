@@ -91,9 +91,11 @@ cell puts PgBouncer in front of it.
 - **Tested.** The integration tests run the record API and a worker process, a task step then an
   operation step, through PgBouncer in transaction mode with the same pool sizes, for the runtime
   role only. They also check that the schema role cannot connect through it.
-- **Settings.** The connection strings name PgBouncer's address for the runtime role and
-  PostgreSQL's for the rest. TLS with a full certificate check holds on both legs, as
-  [TLS](installation.md#tls) asks.
+- **Settings.** The server and the worker send every tenant's runtime connection to
+  `Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, PgBouncer's address, see
+  [cell settings](host-settings.md#cell-settings). The tenant directory row and the platform
+  connection strings keep PostgreSQL's address for everything else. TLS with a full certificate
+  check holds on both legs, as [TLS](installation.md#tls) asks.
 
 ## Cell size
 

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Axis.Server.Authentication;
+using Axis.Server.CellApi;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -81,8 +82,11 @@ public sealed class ServiceAccountRouteTests(KeycloakFixture keycloak) : IAsyncL
     public async Task A_service_token_without_a_session_is_a_401_on_every_route_outside_the_service_account_and_endpoint_routes()
     {
         var token = await RequestTokenAsync();
+        // The cell routes are left out: a tenant host answers 404 for them before any sign-in work, so they are not
+        // anonymous routes to review here. CellProvisioningApiTests covers their own authorization.
         var others = Routes()
             .Where(route => route.Endpoint.Metadata.GetMetadata<ServiceAccountRoute>() is null)
+            .Where(route => route.Endpoint.Metadata.GetMetadata<CellOperatorRoute>() is null)
             .Where(route => !EndpointCaller.IsEndpointPath(new PathString(route.Path)))
             .ToList();
         Assert.NotEmpty(others);

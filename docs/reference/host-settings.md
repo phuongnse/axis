@@ -614,6 +614,11 @@ setting. `Axis.Admin` refuses every command with exit code 2. The features the s
 are still planned, except the read routes of the
 [provisioning API](tenant-lifecycle.md#provisioning-api).
 
+The runtime database address is the exception. Only the server and the worker read and check
+`Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, and only with `Cell:Id` set. A port that is
+not a whole number from 1 to 65535, or a port with no host, stops their start and the message names
+the setting. `Axis.Admin` and the publisher never read them, so a wrong value does not stop them.
+
 In a cell the server and the worker also read and check `Quotas:Defaults`. Each child must be a
 [quota](tenant-quotas.md#quotas) key and its value a whole number of zero or more. An unknown key or a
 wrong value stops the start, and the message names the setting, never its value. A quota with no setting
@@ -634,6 +639,8 @@ does not read `Quotas:Defaults` yet.
 | `Cell:OperatorRole` | Server | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
 | `IdentityProvider:Url` | Server | In a cell with `Cell:ConsoleHost` or `Cell:InternalUrl` set, the server reads the identity provider's address, described in the [admin settings](#admin-settings), and finds the operator realm at `realms/<Cell:OperatorRealm>` under it. A missing or wrong value stops the start, and the message names the setting. |
 | `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup` and `tenant restore` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
+| `Cell:RuntimeDatabaseHost` | Server, worker | The address of every tenant's runtime database connection, such as PgBouncer, see [connections](cells.md#connections). Those connections also take `Maximum Pool Size=5`, `Minimum Pool Size=0`, `Connection Idle Lifetime=60` and `Max Auto Prepare=0`. Without it each connection uses the host of the tenant's directory row. The schema role, the publisher, the worker's `LISTEN` connection and the platform connections never use it. |
+| `Cell:RuntimeDatabasePort` | Server, worker | The port of that address. It defaults to the port of the tenant's directory row. Setting it without `Cell:RuntimeDatabaseHost` stops the start. |
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |
 | `Worker:Concurrency` | Worker | The loops that claim work at once, 4 by default, see [fair share](worker-scheduling.md#fair-share). |
 | `Worker:Quantum` | Worker | The work items a tenant of weight 1 runs in a round, 10 by default. |

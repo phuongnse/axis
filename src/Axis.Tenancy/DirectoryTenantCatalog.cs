@@ -154,7 +154,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     /// <summary>
     /// Reads the tenants, their hosts and the bindings of the active tenants over <paramref name="platformConnectionString"/>. The
     /// catalog has no schema connection, because under the <c>directory</c> source the server holds only the runtime
-    /// database role.
+    /// database role. With <paramref name="address"/>, each tenant's runtime connection goes to that host and port, and
+    /// takes small pool values, instead of the row's host and port.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The directory cannot be read. The message names <c>ConnectionStrings:Platform</c> and holds no connection value.
@@ -166,10 +167,11 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     public static Task<DirectoryTenantCatalog> LoadAsync(
         string platformConnectionString,
         TenantSecretCipher cipher,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TenantRuntimeAddress? address = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
-        return LoadAsync(platformConnectionString, TenantDatabaseTls.From(platformConnectionString), cipher, cancellationToken);
+        return LoadAsync(platformConnectionString, TenantDatabaseTls.From(platformConnectionString), cipher, cancellationToken, address);
     }
 
     // The tenant connections carry the TLS settings of the platform connection string, which the test PostgreSQL
@@ -178,7 +180,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         string platformConnectionString,
         TenantDatabaseTls tls,
         TenantSecretCipher cipher,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TenantRuntimeAddress? address = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
         ArgumentNullException.ThrowIfNull(tls);
@@ -240,6 +243,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 platformProviders.Where(provider => provider.TenantId == (row.PreviewOf ?? row.Id)),
                 cipher,
                 tls,
+                address,
                 row.PreviewOf is null ? null : byId[row.PreviewOf],
                 row.PreviewOf is null ? PlatformSignInProviders.From(platformProviders.Where(provider => provider.TenantId == row.Id)) : null,
                 quotas.Where(quota => quota.TenantId == row.Id))),
@@ -342,6 +346,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         IEnumerable<TenantPlatformProviderRow> platformProviders,
         TenantSecretCipher cipher,
         TenantDatabaseTls tls,
+        TenantRuntimeAddress? address,
         TenantRow? main,
         IReadOnlyList<IdentityProviderModel>? realmProviders,
         IEnumerable<TenantQuotaRow> quotaRows)
@@ -350,18 +355,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         var bindings = Bindings(id, bindingRows, cipher);
 
         var connectionString = SecretValue.Deferred(() =>
-        {
-            var builder = new NpgsqlConnectionStringBuilder
-            {
-                Host = row.DatabaseHost,
-                Port = row.DatabasePort,
-                Database = row.DatabaseName,
-                Username = row.RuntimeUser,
-                Password = cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(),
-            };
-            tls.ApplyTo(builder);
-            return builder.ConnectionString;
-        });
+            RuntimeConnectionString(row, cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(), tls, address));
 
         var signIn = main ?? row;
         var oidc = new TenantOidc(
@@ -401,6 +395,23 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             realmProviders,
             hostSites,
             Quotas(quotaRows));
+    }
+
+    // The runtime connection of a tenant: the row's database, user and password, the TLS settings of the platform
+    // connection, and the row's host and port unless a runtime address replaces them.
+    internal static string RuntimeConnectionString(TenantRow row, string password, TenantDatabaseTls tls, TenantRuntimeAddress? address)
+    {
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = row.DatabaseHost,
+            Port = row.DatabasePort,
+            Database = row.DatabaseName,
+            Username = row.RuntimeUser,
+            Password = password,
+        };
+        tls.ApplyTo(builder);
+        address?.ApplyTo(builder);
+        return builder.ConnectionString;
     }
 
     /// <summary>

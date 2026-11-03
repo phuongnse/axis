@@ -1,5 +1,6 @@
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace Axis.Tenancy.Tests;
 
@@ -285,6 +286,57 @@ public sealed class DirectoryTenantCatalogTests
             RealmActivationClientSecret = cipher.Encrypt("acme", TenantSecretFields.RealmActivationClientSecret, ActivationSecret),
             RealmUsersClientSecret = cipher.Encrypt("acme", TenantSecretFields.RealmUsersClientSecret, UsersSecret),
             OidcClientSecret = cipher.Encrypt("acme", TenantSecretFields.OidcClientSecret, PlatformSecret),
+        };
+
+    [Fact]
+    public void A_runtime_address_replaces_the_host_and_port_of_the_row_and_adds_the_pool_values()
+    {
+        var connectionString = DirectoryTenantCatalog.RuntimeConnectionString(
+            Row(),
+            "secret",
+            TenantDatabaseTls.From("Host=x;SSL Mode=VerifyFull"),
+            new TenantRuntimeAddress("pgbouncer.internal", 6432));
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        Assert.Equal("pgbouncer.internal", builder.Host);
+        Assert.Equal(6432, builder.Port);
+        Assert.Equal(5, builder.MaxPoolSize);
+        Assert.Equal(0, builder.MinPoolSize);
+        Assert.Equal(60, builder.ConnectionIdleLifetime);
+        Assert.Equal(0, builder.MaxAutoPrepare);
+        Assert.Equal("axis_acme", builder.Database);
+        Assert.Equal("axis_acme_runtime", builder.Username);
+        Assert.Equal("secret", builder.Password);
+        Assert.Equal(SslMode.VerifyFull, builder.SslMode);
+    }
+
+    [Fact]
+    public void Without_a_runtime_address_the_connection_uses_the_host_and_port_of_the_row_and_no_pool_values()
+    {
+        var connectionString = DirectoryTenantCatalog.RuntimeConnectionString(
+            Row(),
+            "secret",
+            TenantDatabaseTls.From("Host=x;SSL Mode=VerifyFull"),
+            address: null);
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        var defaults = new NpgsqlConnectionStringBuilder();
+        Assert.Equal("pg.internal", builder.Host);
+        Assert.Equal(5432, builder.Port);
+        Assert.Equal(defaults.MaxPoolSize, builder.MaxPoolSize);
+        Assert.Equal(defaults.MinPoolSize, builder.MinPoolSize);
+        Assert.Equal(defaults.ConnectionIdleLifetime, builder.ConnectionIdleLifetime);
+        Assert.Equal(defaults.MaxAutoPrepare, builder.MaxAutoPrepare);
+    }
+
+    private static TenantRow Row() =>
+        new()
+        {
+            Id = "acme",
+            DatabaseHost = "pg.internal",
+            DatabasePort = 5432,
+            DatabaseName = "axis_acme",
+            RuntimeUser = "axis_acme_runtime",
         };
 
     private static TenantSecretCipher CipherFor() =>
