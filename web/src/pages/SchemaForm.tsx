@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { DeleteOutlined } from '@ant-design/icons'
 import { Button, Checkbox, Flex, Input, InputNumber, Modal, Select, Tag, Typography } from 'antd'
 import { createContext, lazy, Suspense, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -453,6 +453,7 @@ function ListTable({
   inHeading = false,
 }: NodeProps & { kind: string; inHeading?: boolean }) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const slot = useContext(SectionActionSlot)
   const notifyRemoved = useContext(RemovedNoticeContext)
   const catalog = useContext(StudioCatalogContext)
@@ -550,31 +551,41 @@ function ListTable({
         pagination={false}
         testId={`studio-list-${pointer}`}
         toolbar={inHeading && slot ? undefined : { main: addButton }}
-        columns={properties.map(([name, child]) => ({
+        // Proposed: the identifying column comes first and is the link that opens the row, as every table has it, so a
+        // row has no Edit of its own: the link opens the item's dialog. It is a button that looks like a link, as it
+        // opens a dialog and goes to no address.
+        columns={properties.map(([name, child], column) => ({
           key: name,
           title: textOrNull(t, fieldTextKey(kind, `${pointer}/0/${name}`)) ?? name,
           kind: fitColumns.has(fieldTextKey(kind, `${pointer}/0/${name}`).replace('shell.studio.field.', ''))
             ? ('fit' as const)
             : ('text' as const),
-          render: (row: { index: number; item: unknown }) => (
-            <CellValue
-              schema={resolveSchema(child, root)}
-              item={row.item}
-              value={(row.item as Record<string, unknown> | undefined)?.[name]}
-              path={fieldTextKey(kind, `${pointer}/0/${name}`).replace('shell.studio.field.', '')}
-            />
-          ),
+          render: (row: { index: number; item: unknown }) => {
+            const cell = (
+              <CellValue
+                schema={resolveSchema(child, root)}
+                item={row.item}
+                value={(row.item as Record<string, unknown> | undefined)?.[name]}
+                path={fieldTextKey(kind, `${pointer}/0/${name}`).replace('shell.studio.field.', '')}
+              />
+            )
+            return column === 0 ? (
+              <Button
+                type="link"
+                data-testid="studio-list-open"
+                style={{ padding: 0, height: 'auto', color: colour.primaryText }}
+                onClick={() => setOpen({ index: row.index, isNew: false, item: items[row.index] })}
+              >
+                {cell}
+              </Button>
+            ) : (
+              cell
+            )
+          },
         }))}
         rowActions={{
-          count: 2,
+          count: 1,
           of: (row) => [
-            {
-              key: 'edit',
-              labelKey: 'shell.studio.list.edit',
-              nameSuffix: `${itemTitle} ${row.index + 1}`,
-              icon: <EditOutlined />,
-              onClick: () => setOpen({ index: row.index, isNew: false, item: items[row.index] }),
-            },
             {
               key: 'remove',
               labelKey: 'shell.studio.list.remove',

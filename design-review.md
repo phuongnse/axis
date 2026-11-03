@@ -242,3 +242,7 @@ Group and Material advise, and as mail and documents do:
   URL and secret, and a connector's base URL, token URL and secrets. A name the tenant lacks stays shown with "The
   tenant has no … binding named X, so activation will refuse it." This changes an API and makes `studio.md`'s "not a
   pick from a list, because no route lists a tenant's binding names" false, so the docs change rewrites it.
+- **A list's row opens from its identifying cell.** The owner noted that the standard table opens a row from a link,
+  so an Edit icon is redundant. Agreed, as D96 and D129 have it: the first column, the module or package by its label,
+  is the link that opens the item's Edit dialog, a button styled as a link as it goes to no address; each row keeps
+  Remove alone.
