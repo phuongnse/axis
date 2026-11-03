@@ -315,7 +315,7 @@ internal static class CellBackup
     }
 
     // Never ToString(): the message of an upload error can name the service URL or the object key.
-    private static string SafeUpload(Exception exception) => exception switch
+    internal static string SafeUpload(Exception exception) => exception switch
     {
         OperationCanceledException => "canceled",
         AmazonServiceException { ErrorCode: { Length: > 0 } code } => code,

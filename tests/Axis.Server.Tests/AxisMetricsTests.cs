@@ -30,6 +30,7 @@ public sealed class AxisMetricsTests
         ["axis.calls.attempts"] = ["axis.tenant", "axis.application", "axis.connector", "axis.package", "axis.operation", "axis.outcome"],
         ["axis.dead_letters.created"] = ["axis.tenant", "axis.work_item.kind"],
         ["axis.backup.last_success"] = ["axis.tenant"],
+        ["axis.backup.restore_check"] = ["axis.tenant"],
     };
 
     [Fact]
@@ -81,6 +82,7 @@ public sealed class AxisMetricsTests
         AxisMetrics.RecordQueryTimeout("default", null);
         AxisMetrics.RecordDeadLetter("default", "event.deliver");
         AxisMetrics.RecordBackupLastSuccess("default", DateTimeOffset.UtcNow);
+        AxisMetrics.RecordBackupRestoreCheck("default", true);
 
         gauges.Publish("default", [new WorkItemGauge("process.step", 3, 12.5)], [new PendingFieldsGauge("PurchaseRequests", 2)]);
         tenantDatabases.Record("default", true);

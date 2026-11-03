@@ -8,7 +8,7 @@ and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant sign-in set`, `tenant binding list|set|remove`,
-`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `cell operator invite`, `cell backup`, `publisher` and `version`.
+`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `cell operator invite`, `cell backup`, `cell restore-check`, `publisher` and `version`.
 `platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). `tenant suspend`, `tenant resume` and
 `tenant list` are in [tenant status commands](tenant-status-commands.md). The
 commands that change a tenant after it is created are in
@@ -783,6 +783,27 @@ is set. The behaviour is in [backups in a cell](tenant-backup-and-restore.md#bac
   the gauge `axis.backup.last_success` and, when an OTLP endpoint is set, exports it, see
   [host settings](host-settings.md#telemetry-export).
 - **Audit.** One platform audit record for each tenant, written before its first try. A retry writes no second record.
+
+## Cell restore check
+
+`cell restore-check` checks once that a recent archive restores: it restores the newest archive of a random tenant into a scratch
+tenant, compares its row counts and users with the archive, removes the scratch tenant and records the result. It runs only in a cell,
+where `Cell:Id` is set. The behaviour is in
+[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). The scenario runs of that check and its weekly job are
+_(planned for M31)_.
+
+- **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Admin:ConnectionString`, `Cell:BackupKeyFile`,
+  `Cell:InternalDomain`, the five `Cell:BackupStorage` settings, the `IdentityProvider` settings, `Studio:ApplicationsPath` when an archive holds
+  Studio files, and `PATH`, to find `pg_restore`.
+- **Output.** Each line starts with a tenant id, then the step and `ok` or `failed: <message>`. The last line is
+  `<source tenant> restore-check passed` or `failed`. A table or a number is named, never a row or a username.
+- **Exit codes.** `0` when the check passed, `1` when any step after the pick failed or no tenant has an archive of today or
+  yesterday, and `2` outside a cell, with an argument, for a missing setting or `pg_restore`, or for an OTLP endpoint setting that is not an
+  `https` URL outside Development, with nothing changed.
+- **Metric.** The gauge `axis.backup.restore_check` is `1` for a pass and `0` for a failure, tagged with the source tenant. When an OTLP
+  endpoint is set the command exports it, see [host settings](host-settings.md#telemetry-export).
+- **Audit.** One platform audit record, for the source tenant, written before the first change. It lists `tenant: <scratch tenant id>`. It does not
+  hold the result, which goes to the metric and the output. A run that picks no tenant, or exits `2`, writes none.
 
 ## Version
 

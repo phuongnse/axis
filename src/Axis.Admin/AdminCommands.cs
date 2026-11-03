@@ -93,6 +93,7 @@ internal static partial class AdminCommands
                platform rekey
                cell operator invite <email>
                cell backup
+               cell restore-check
                publisher
                version
         """;
@@ -203,6 +204,7 @@ internal static partial class AdminCommands
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
+        new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
@@ -780,7 +782,7 @@ internal static partial class AdminCommands
     /// database cannot be read, the key does not unwrap, or the tenant has no key. With <paramref name="unknownTenant"/>, a tenant
     /// that is not in the directory gets that message instead of <paramref name="noKey"/>.
     /// </summary>
-    private static async Task<byte[]?> ReadCellBackupKeyAsync(
+    internal static async Task<byte[]?> ReadCellBackupKeyAsync(
         string platformConnection,
         string tenantId,
         TenantSecretCipher cellCipher,
@@ -1610,7 +1612,7 @@ internal static partial class AdminCommands
         return new ReleaseSettings(packages, modules, limit, activationTimeout);
     }
 
-    private static string? ResolveFolder(string? setting) =>
+    internal static string? ResolveFolder(string? setting) =>
         string.IsNullOrWhiteSpace(setting) ? null : Path.GetFullPath(setting);
 
     private static MigrateRequest? ParseMigrate(string[] args)
@@ -1685,7 +1687,7 @@ internal static partial class AdminCommands
     /// The identity provider settings are optional here: only an archive of a tenant with its own realm needs them, which the check step finds out.
     /// A value that is given must still be valid.
     /// </summary>
-    private static RestoreSettings? ReadRestoreSettings(IConfiguration configuration, out string problem)
+    internal static RestoreSettings? ReadRestoreSettings(IConfiguration configuration, out string problem)
     {
         var create = ReadCreateSettings(configuration, readClientSecret: true, out problem);
         if (create is null)
@@ -2108,9 +2110,10 @@ internal sealed record TenantBackupRequest(string Id, string Out, string? Backup
 
 /// <summary>
 /// <c>tenant restore</c>. <paramref name="BackupKeyFile"/> is the key file of an installation outside a cell. <paramref name="From"/> is the tenant
-/// of a cell whose backup key opens the archive.
+/// of a cell whose backup key opens the archive. <paramref name="Scratch"/> is set only by <c>cell restore-check</c>: the restored tenant always gets a new
+/// realm, whether or not the realm of the archive exists, and its imported users get new ids.
 /// </summary>
-internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts, string? BackupKeyFile, string? From = null);
+internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts, string? BackupKeyFile, string? From = null, bool Scratch = false);
 
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);

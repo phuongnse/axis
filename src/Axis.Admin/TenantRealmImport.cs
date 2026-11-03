@@ -48,7 +48,11 @@ internal sealed class TenantRealmImport(TenantRealm realm)
         }
     }
 
-    public async Task ImportAsync(string target, JsonObject document, CancellationToken cancellationToken)
+    /// <summary>
+    /// Imports <paramref name="document"/> into the realm <paramref name="target"/>. With <paramref name="newIds"/>, the users and their credentials
+    /// lose their ids and the identity provider makes new ones, because those ids are global and a second realm cannot import the ids of a live one.
+    /// </summary>
+    public async Task ImportAsync(string target, JsonObject document, bool newIds, CancellationToken cancellationToken)
     {
         var token = await realm.AdminTokenAsync(cancellationToken);
         var realmPath = $"admin/realms/{Uri.EscapeDataString(target)}";
@@ -61,7 +65,7 @@ internal sealed class TenantRealmImport(TenantRealm realm)
         var clients = await ClientIdsAsync(token, realmPath, cancellationToken);
 
         var prepared = (JsonObject)document.DeepClone();
-        Prepare(prepared, DefaultRolePrefix + ((string)document["realm"]!).ToLowerInvariant(), newDefault, clients);
+        Prepare(prepared, DefaultRolePrefix + ((string)document["realm"]!).ToLowerInvariant(), newDefault, clients, newIds);
 
         using var structure = await realm.SendAsync(
             token,
@@ -123,7 +127,7 @@ internal sealed class TenantRealmImport(TenantRealm realm)
     }
 
     // Makes the document fit the new realm, in place: the old default role goes, and so do the roles of clients that the realm lacks.
-    private static void Prepare(JsonObject document, string oldDefault, string newDefault, HashSet<string> clients)
+    private static void Prepare(JsonObject document, string oldDefault, string newDefault, HashSet<string> clients, bool newIds)
     {
         var roles = document["roles"]!.AsObject();
         var realmRoles = roles["realm"]!.AsArray();
@@ -153,7 +157,19 @@ internal sealed class TenantRealmImport(TenantRealm realm)
 
         foreach (var user in document["users"]!.AsArray())
         {
-            Remap(user!.AsObject(), oldDefault, newDefault, clients, "realmRoles", "clientRoles");
+            var member = user!.AsObject();
+            Remap(member, oldDefault, newDefault, clients, "realmRoles", "clientRoles");
+            if (newIds)
+            {
+                member.Remove("id");
+                if (member["credentials"] is JsonArray credentials)
+                {
+                    foreach (var credential in credentials.OfType<JsonObject>())
+                    {
+                        credential.Remove("id");
+                    }
+                }
+            }
         }
     }
 
