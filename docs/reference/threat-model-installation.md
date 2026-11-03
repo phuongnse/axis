@@ -179,7 +179,7 @@ Other categories do not apply to stored keys. A changed key ring fails to start,
 
 ### Cell console and provisioning API
 
-The platform operator, through the cell console on `Cell:ConsoleHost` and the provisioning API under `/api/cell/`, acts on every tenant of a cell. Everything here is _(planned for M31)_.
+The platform operator, through the cell console on `Cell:ConsoleHost` and the provisioning API under `/api/cell/`, acts on every tenant of a cell. The read routes under `/api/cell/` are built. The rest, the writes, the jobs and the console, is _(planned for M31)_.
 
 ```mermaid
 flowchart LR
@@ -214,17 +214,15 @@ flowchart LR
 
 The planned controls are in [cell console](cell-console.md#sign-in), [what the console never shows](cell-console.md#what-the-console-never-shows),
 [provisioning API](tenant-lifecycle.md#provisioning-api), [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) and
-[hosts and certificates](cells.md#hosts-and-certificates). No row is written yet. A **Gap** row links the open issue that closes it,
-and no open M31 issue is linked here.
+[hosts and certificates](cells.md#hosts-and-certificates). The read routes have one row, P110 in the
+[product threat model](threat-model-product.md), because it is about the caller and the server: a tenant realm token or a
+token without the operator role reads the cell's tenants, and a tenant host answers `404` for every path under `/api/cell/`.
+No other row is written yet. A **Gap** row links the open issue that closes it, and no open M31 issue is linked here.
 
 Open, waiting for an issue:
 
 - (Spoofing, High) an attacker takes over an operator account and acts on every tenant of the cell. Sign-in needs a
   password and a second factor in the operator realm, which has accounts only.
-- (Elevation of privilege, High) a token of a tenant realm is used on `/api/cell/`. Every route needs the operator realm
-  and the role `Cell:OperatorRole`, and refuses a tenant token with `401`.
-- (Elevation of privilege, High) a tenant host serves `/api/cell/`, and a tenant's user reaches the provisioning API.
-  A tenant host answers `404` for every path under `/api/cell/`.
 - (Tampering, Medium) a replayed job repeats a change to a tenant, such as a create or a delete. Each `POST` needs an
   `Idempotency-Key`, and the same key with the same body answers the first job again.
 - (Information disclosure, High) an export is read by someone who is not a caller of the provisioning API, or kept
