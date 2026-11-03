@@ -104,9 +104,24 @@ export async function checkStudioExpression(
   return (await response.json()) as ExpressionCheck
 }
 
-/** An application in the list of `GET /api/studio/apps`. */
+/**
+ * An application in the list of `GET /api/studio/apps`. `titles` and `descriptions` map a locale to a text and are
+ * empty when the folder gives none.
+ */
 export interface StudioApplication {
   name: string
+  titles: Record<string, string>
+  descriptions: Record<string, string>
+}
+
+/** The title of an application in `locale`, then in `en`, then its `name`. */
+export function studioAppTitle(app: StudioApplication, locale: string): string {
+  return app.titles[locale] ?? app.titles.en ?? app.name
+}
+
+/** The description of an application in `locale`, then in `en`, or null when it has none. */
+export function studioAppDescription(app: StudioApplication, locale: string): string | null {
+  return app.descriptions[locale] ?? app.descriptions.en ?? null
 }
 
 /**

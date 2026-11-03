@@ -117,8 +117,12 @@ internal static class StudioEndpoints
             return refusal;
         }
 
-        return Results.Ok(new StudioApplicationListResponse(
-            [.. StudioFolder.Applications(ForRequest(httpContext, options)).Select(name => new StudioApplicationItem(name))]));
+        return Results.Ok(new StudioApplicationListResponse([.. StudioFolder.ApplicationFolders(ForRequest(httpContext, options))
+            .Select(application =>
+            {
+                var (titles, descriptions) = StudioApplicationTexts.Read(application.Folder);
+                return new StudioApplicationItem(application.Name, titles, descriptions);
+            })]));
     }
 
     private static async Task<IResult> ListAsync(
@@ -960,8 +964,12 @@ internal static class StudioEndpoints
 /// <summary>The applications of the Studio folders, in folder order.</summary>
 internal sealed record StudioApplicationListResponse(IReadOnlyList<StudioApplicationItem> Items);
 
-/// <summary>One application in the list: the <c>name</c> in its manifest.</summary>
-internal sealed record StudioApplicationItem(string Name);
+/// <summary>
+/// One application in the list: the <c>name</c> in its manifest, and its title and description by locale. A locale
+/// whose text resource lacks the manifest's <c>label</c> or <c>description</c> key is left out.
+/// </summary>
+internal sealed record StudioApplicationItem(
+    string Name, IReadOnlyDictionary<string, string> Titles, IReadOnlyDictionary<string, string> Descriptions);
 
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
 internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceItem> Items);

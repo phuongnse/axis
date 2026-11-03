@@ -9,8 +9,9 @@ import { isSignInNeeded } from '../platform/signInNeeded'
 import { assignLocation } from '../platform/navigation'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
+import type { StudioApplication, StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { segmentLabel } from '../test/antd'
+import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 
 vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
@@ -181,7 +182,7 @@ interface ExpressionStub {
 
 /** Stubs `fetch` with the Studio list routes, the read, patch and delete of the purchase request entity, and its references. `apps` is the status or list of `/api/studio/apps`. */
 function stubServer(
-  apps: { name: string }[] | number = [{ name: 'PurchaseRequests' }],
+  apps: (Partial<StudioApplication> & { name: string })[] | number = [{ name: 'PurchaseRequests' }],
   patch: PatchAnswer = { status: 200, body: { version: 'b2', diagnostics: [savedDiagnostic] } },
   outage: Outage = { down: null },
   expressions: ExpressionStub = {},
@@ -218,7 +219,9 @@ function stubServer(
       return json(applicationNames)
     }
     if (input === '/api/studio/apps') {
-      return typeof apps === 'number' ? json({ title: 'No.' }, apps) : json({ items: apps })
+      return typeof apps === 'number'
+        ? json({ title: 'No.' }, apps)
+        : json({ items: apps.map((app) => ({ titles: {}, descriptions: {}, ...app })) })
     }
     if (input === `${folder}/resources`) {
       return json({ items: resources })
@@ -257,8 +260,8 @@ function Location() {
   return <div data-testid="location">{location.pathname + location.search}</div>
 }
 
-function renderPage(entry = '/studio?app=PurchaseRequests') {
-  render(
+function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
+  const page = (
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <MemoryRouter initialEntries={[entry]}>
@@ -266,7 +269,14 @@ function renderPage(entry = '/studio?app=PurchaseRequests') {
           <Location />
         </MemoryRouter>
       </TextProvider>
-    </ThemeModeProvider>,
+    </ThemeModeProvider>
+  )
+  render(
+    locale === undefined ? (
+      page
+    ) : (
+      <PlatformContext.Provider value={{ current: { locale, texts: {} } } as Platform}>{page}</PlatformContext.Provider>
+    ),
   )
 }
 
@@ -550,13 +560,14 @@ describe('StudioPage', () => {
     }
   })
 
-  it('picks the only application by itself', async () => {
+  it('lists the only application as a tile and stays on the list', async () => {
     const fetchMock = stubServer()
     renderPage('/studio')
 
-    expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
-    expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests')
-    expect(fetchMock).toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/resources', expect.anything())
+    expect(await screen.findByTestId('studio-app-PurchaseRequests')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio$/)
+    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/resources', expect.anything())
   })
 
   it('switches between the resources and the policy matrix, kept in the address', async () => {
@@ -611,13 +622,51 @@ describe('StudioPage', () => {
     warn.mockRestore()
   })
 
-  it('waits for the person to pick when there are several applications', async () => {
-    stubServer([{ name: 'PurchaseRequests' }, { name: 'LeaveRequests' }])
-    renderPage('/studio')
+  describe('application tiles', () => {
+    const apps: (Partial<StudioApplication> & { name: string })[] = [
+      {
+        name: 'PurchaseRequests',
+        titles: { en: 'Purchase requests', vi: 'Yêu cầu mua hàng' },
+        descriptions: { en: 'Runs the purchases.', vi: 'Quản lý việc mua hàng.' },
+      },
+      { name: 'LeaveRequests', titles: { en: 'Leave requests' }, descriptions: {} },
+      { name: 'Inventory' },
+    ]
 
-    expect(await screen.findByRole('combobox', { name: 'Application' })).toBeInTheDocument()
-    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio$/)
-    expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
+    it('shows one tile per application with its title and description in the UI locale', async () => {
+      stubServer(apps)
+      renderPage('/studio', 'vi')
+
+      const purchases = await screen.findByTestId('studio-app-PurchaseRequests')
+      expect(within(purchases).getByText('Yêu cầu mua hàng')).toBeInTheDocument()
+      expect(within(purchases).getByText('Quản lý việc mua hàng.')).toBeInTheDocument()
+      expect(purchases).toHaveAttribute('href', '/studio?app=PurchaseRequests')
+      expect(screen.getByTestId('studio-apps').children).toHaveLength(3)
+      expect(screen.queryByRole('combobox', { name: 'Application' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
+    })
+
+    it('falls back to en, then to the name, and shows no description when there is none', async () => {
+      stubServer(apps)
+      renderPage('/studio', 'vi')
+
+      const leave = await screen.findByTestId('studio-app-LeaveRequests')
+      expect(within(leave).getByText('Leave requests')).toBeInTheDocument()
+      expect(leave).toHaveAttribute('href', '/studio?app=LeaveRequests')
+      const inventory = screen.getByTestId('studio-app-Inventory')
+      expect(inventory).toHaveTextContent(/^IInventory$/)
+      expect(inventory).toHaveAttribute('href', '/studio?app=Inventory')
+    })
+
+    it('opens an application when its tile is clicked', async () => {
+      stubServer(apps)
+      renderPage('/studio')
+
+      await userEvent.click(await screen.findByTestId('studio-app-LeaveRequests'))
+
+      expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=LeaveRequests')
+      expect(await screen.findByRole('combobox', { name: 'Application' })).toBeInTheDocument()
+    })
   })
 
   it('shows the forbidden page when the server answers 403', async () => {
@@ -1235,7 +1284,7 @@ describe('StudioPage publishing', () => {
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
   })
 
-  describe('New application', () => {
+  describe('New application…', () => {
     function stubCreateAccess(studioCreate: boolean, apps: { name: string }[] = [{ name: 'PurchaseRequests' }]) {
       const fetchMock = stubServer(apps)
       const base = fetchMock.getMockImplementation()!
@@ -1248,22 +1297,35 @@ describe('StudioPage publishing', () => {
     it.each([
       ['studioCreate is true', true, true],
       ['studioCreate is false', false, false],
-    ])('shows New application only when it may create: %s', async (_name, studioCreate, shown) => {
+    ])('shows New application… beside the picker only when it may create: %s', async (_name, studioCreate, shown) => {
       stubCreateAccess(studioCreate)
       renderPage()
 
       expect(await screen.findByTestId(`studio-resource-${entityId}`)).toBeInTheDocument()
       await waitFor(() =>
-        expect(screen.queryAllByRole('button', { name: 'New application' })).toHaveLength(shown ? 1 : 0),
+        expect(screen.queryAllByRole('button', { name: 'New application…' })).toHaveLength(shown ? 1 : 0),
       )
     })
 
-    it('shows New application when Studio lists no application', async () => {
+    it.each([
+      ['studioCreate is true', true, true],
+      ['studioCreate is false', false, false],
+    ])('shows New application… on the list only when it may create: %s', async (_name, studioCreate, shown) => {
+      stubCreateAccess(studioCreate)
+      renderPage('/studio')
+
+      expect(await screen.findByTestId('studio-app-PurchaseRequests')).toBeInTheDocument()
+      await waitFor(() =>
+        expect(screen.queryAllByRole('button', { name: 'New application…' })).toHaveLength(shown ? 1 : 0),
+      )
+    })
+
+    it('shows New application… when Studio lists no application', async () => {
       stubCreateAccess(true, [])
       renderPage()
 
       expect(await screen.findByTestId('studio-no-applications')).toBeInTheDocument()
-      expect(await screen.findByRole('button', { name: 'New application' })).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'New application…' })).toBeInTheDocument()
     })
   })
 
