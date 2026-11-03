@@ -11,7 +11,7 @@ namespace Axis.Tenancy.Realms;
 /// Lists and changes the users of a tenant's realm. It signs in to the realm as <c>axis-users</c> with the client
 /// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
 /// It reads one page of users with the number of all users that match the search, and for each user on the page the
-/// alias of the first federated identity. It also finds one user, disables or enables a user, ends a user's realm
+/// alias of the first federated identity. It counts the enabled users. It also finds one user, disables or enables a user, ends a user's realm
 /// sessions and removes a user's authenticators. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
 /// also normalises an email address. An error names the step and the status code, never a response body or a secret.
@@ -61,6 +61,20 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
                 user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
                 aliases[index]))],
             total);
+    }
+
+    /// <summary>
+    /// Counts the enabled users of the realm, invited and brokered ones included. A service account is not counted, because the
+    /// search of * leaves it out.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<int> CountEnabledAsync(CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await GetAsync(
+            token, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users/count?search=*&enabled=true", cancellationToken);
+        EnsureSuccess(response, "count the users");
+        return await response.Content.ReadFromJsonAsync<int>(cancellationToken);
     }
 
     /// <summary>
