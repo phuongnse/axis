@@ -120,10 +120,14 @@ internal sealed class TenantDatabaseSteps(
         return _schemaConnection;
     }
 
-    /// <summary>The text for a step's line. Never <c>ToString()</c>: an Npgsql message can name the host.</summary>
+    /// <summary>
+    /// The text for a step's line. Never <c>ToString()</c>: an Npgsql message can name the host. An exception that wraps a
+    /// PostgreSQL error, as the retry wrapper of a broken connection does, gives the error's own text.
+    /// </summary>
     public static string Safe(Exception exception) => exception switch
     {
         OperationCanceledException => "canceled",
+        InvalidOperationException { InnerException: PostgresException inner } => inner.MessageText,
         InvalidOperationException invalid => invalid.Message,
         PostgresException postgres => postgres.MessageText,
         _ => exception.GetType().Name,

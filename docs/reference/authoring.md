@@ -844,7 +844,7 @@ the outcome, see [Studio](studio.md).
 stateDiagram-v2
     [*] --> queued: request stored
     queued --> running: publisher claims it
-    running --> running: lease expired, claimed again
+    running --> running: lease expired or connection lost, claimed again
     running --> succeeded: all steps passed
     running --> failed: a step failed, or third expired claim (AXC0215)
     succeeded --> [*]
@@ -855,7 +855,7 @@ stateDiagram-v2
   reads them.
 - The publisher claims a request with a lease, and renews the lease while the
   request runs, so a long recompute is not claimed twice. A request whose
-  publisher died is claimed again after its lease ran out. It stays `running`.
+  publisher died is claimed again after its lease ran out, and one whose publisher lost its tenant database connection in the next round. It stays `running`.
 - A request that has been claimed three times, and whose lease runs out again,
   ends `failed` with `AXC0215` in place of a fourth claim. A request that
   crashes the publisher cannot block the queue for good.

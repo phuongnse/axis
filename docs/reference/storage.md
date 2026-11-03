@@ -860,7 +860,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 - **Claim.** The publisher takes the oldest `queued` `publish`, `validate` or `rollback` row of an application with
   `FOR UPDATE SKIP LOCKED`, sets `running`, `claimed_by`, `lease_until` and
   adds 1 to `claims`. It skips an application that has a `running` row.
-  A `running` row whose `lease_until` has passed is claimed again the same way.
+  A `running` row whose `lease_until` has passed is claimed again the same way. A publisher that lost its connection sets `lease_until` to now.
   A row with `claims` of 3 and an expired lease becomes `failed` with `AXC0215`.
 - **Test requests.** A `test` row has its own queue for each
   application: at most one runs at a time, oldest first, and it does not wait
