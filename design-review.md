@@ -172,3 +172,19 @@ Shopify's settings pages:
   tag, as the Releases list marks a release, the points being in its dialog; a column that would be empty in every
   row, such as Connectors when no module has any, is left out, while the dialog keeps every field. Short fixed-form
   columns (a version range, a tag) are as wide as their content, so the free text has the room.
+
+## How lists are ordered
+
+The owner asked what the tables sort by and whether there is a standard. There was none: each followed its file or its
+server. Agreed, three rules chosen by what a list is:
+
+- **An order the author gives keeps it.** Process steps, wizard steps, a table's columns, a form's fields, navigation:
+  as written, and the author moves them. Sorting them would change their meaning.
+- **Records in time are newest first.** Releases, activations, history.
+- **A set sorts by name.** Modules, packages, relaxed points, Uses and Used by, the changes: by the name a person reads,
+  with the page language's collation (`Intl.Collator`, so Đ follows D in Vietnamese). A list that mixes kinds groups
+  them first in the sidebar's order (the application, Data, Pages, Logic, Access, Integration, Texts, Tests, then
+  modules and packages), then by name; relaxed points by module, then by point. The order of a module's pins in
+  `application.json` only decides which entry AXC0306 reports, so it is no author's order.
+- **Sorting is for display only.** The file keeps its order, so adding a module adds one line to its diff. Studio's
+  small tables have no sort by column, as their order is already the one to expect; the `table` widget keeps D96's rules.

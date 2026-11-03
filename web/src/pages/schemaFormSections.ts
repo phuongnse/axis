@@ -64,3 +64,9 @@ export const fitColumns = new Set([
   'application.modules.relax',
   'application.packages.version',
 ])
+
+/**
+ * Proposed: the lists that are sets, whose order means nothing to the author, which the form shows by name; every other
+ * list keeps the order it is written in. The file keeps its order either way.
+ */
+export const setLists = new Set(['application.modules', 'application.packages'])

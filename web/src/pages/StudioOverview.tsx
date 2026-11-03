@@ -15,7 +15,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { useTileGrid } from './homeGrid'
 import { SiteTile, TileFocusStyle } from './SiteTile'
 import { StudioChangeList } from './StudioChangeList'
-import { kindName, studioKindGroups, type StudioView } from './studioViews'
+import { kindName, kindOrder, studioKindGroups, type StudioView } from './studioViews'
 
 /**
  * Proposed: the first view of an open application, which says what to do next rather than what the application
@@ -239,6 +239,7 @@ function Release({
                   kind: kind ? kindName(kind, t) : '',
                   change: t(`shell.studio.overview.change.${change.change}`),
                   to: item ? addressOf({ resource: item.id }) : undefined,
+                  order: kindOrder(kind),
                 }
               })}
             />

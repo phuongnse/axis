@@ -8,6 +8,7 @@ import { EmptyDash, NotSet } from '../platform/EmptyValue'
 import {
   fetchStudioRelease,
   relaxedPointWords,
+  sortRelaxed,
   resourceTitle,
   type StudioReleaseDetail as StudioReleaseDetailData,
   type StudioReleasePart,
@@ -21,7 +22,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { StudioChangeList, type StudioChangeRow } from './StudioChangeList'
-import { kindName } from './studioViews'
+import { kindName, kindOrder } from './studioViews'
 import { dialogWidth } from '../platform/dialogButtons'
 
 /** Proposed: what one release holds beyond its history row, loaded again when the history changes. */
@@ -453,7 +454,8 @@ function StudioReleaseDetail({
           {/* Proposed: an empty table keeps its header and says what it means in its body, as every table does. */}
           {
             <AxisTable<StudioRelaxedPoint>
-              rows={release.relaxed}
+              // Proposed: relaxed points are a set, so they sort by module, then by point, by their words.
+              rows={sortRelaxed(release.relaxed, locale, t)}
               rowKey={(point) => `${point.module}/${point.point}`}
               emptyText={t('shell.studio.release.relaxed.none')}
               pagination={false}
@@ -606,11 +608,13 @@ function changeRows(detail: StudioReleaseDetailData, locale: string, t: (key: st
     ),
     kind: change.kind ? kindName(change.kind, t) : '',
     change: t(`shell.studio.overview.change.${change.change}`),
+    order: kindOrder(change.kind),
   }))
   const parts = (detail.partChanges ?? []).map((part) => ({
     key: `${part.type}/${part.id}`,
     name: part.label ?? part.id,
     kind: t(`shell.studio.release.part.${part.type}`),
+    order: kindOrder(part.type),
     change: t(`shell.studio.release.partChange.${part.change}`)
       .replace('{version}', part.version ?? '')
       .replace('{previous}', part.previousVersion ?? ''),

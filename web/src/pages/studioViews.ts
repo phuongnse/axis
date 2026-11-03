@@ -81,3 +81,24 @@ export function kindName(kind: string, t: (key: string) => string): string {
   const name = t(key)
   return name === key ? kind : name
 }
+
+/**
+ * Proposed: where a kind sorts among others in a list that mixes kinds, such as the changes or Uses and Used by: the
+ * application first, then the sidebar's order of its groups and kinds, then a kind outside them, then modules and
+ * packages last.
+ */
+export function kindOrder(kind: string | null | undefined): number {
+  if (kind === 'application') {
+    return -1
+  }
+  const index = studioKindGroups.flatMap((group) => group.kinds.map((entry) => entry.kind)).indexOf(kind ?? '')
+  if (index >= 0) {
+    return index
+  }
+  return kind === 'module' ? 1000 : kind === 'package' ? 1001 : 999
+}
+
+/** Proposed: the order of names as a person reads them, in the page's language, so Đ sorts after D in Vietnamese. */
+export function nameCollator(): Intl.Collator {
+  return new Intl.Collator(document.documentElement.lang || 'en', { sensitivity: 'base', numeric: true })
+}

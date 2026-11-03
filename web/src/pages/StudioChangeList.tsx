@@ -1,6 +1,7 @@
 import { Typography } from 'antd'
 import { Link } from 'react-router'
 import { useDesignTokens } from '../platform/themeMode'
+import { nameCollator } from './studioViews'
 
 /** Proposed: one change in a change list: what changed, its kind and how, and where it opens, if anywhere. */
 export interface StudioChangeRow {
@@ -9,6 +10,8 @@ export interface StudioChangeRow {
   kind: string
   change: string
   to?: string
+  /** Proposed: where its kind sorts, from `kindOrder`; rows sort by it, then by name. */
+  order?: number
 }
 
 /**
@@ -20,6 +23,10 @@ export interface StudioChangeRow {
  */
 export function StudioChangeList({ rows, testId }: { rows: readonly StudioChangeRow[]; testId: string }) {
   const { colour, spacing } = useDesignTokens()
+  // Proposed: a change list is a set with no order of its own, so it sorts by kind, in the sidebar's order, then by
+  // name as a person reads it.
+  const collator = nameCollator()
+  const sorted = [...rows].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || collator.compare(a.name, b.name))
   return (
     <ul
       data-testid={testId}
@@ -34,7 +41,7 @@ export function StudioChangeList({ rows, testId }: { rows: readonly StudioChange
         alignItems: 'baseline',
       }}
     >
-      {rows.map((row) => (
+      {sorted.map((row) => (
         <li key={row.key} style={{ display: 'contents' }} data-testid={`${testId}-row`}>
           {row.to ? (
             <Link to={row.to} style={{ color: colour.primaryText }}>

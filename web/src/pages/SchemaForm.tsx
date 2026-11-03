@@ -8,7 +8,13 @@ import { AxisTable } from '../platform/AxisTable'
 import { dialogWidth } from '../platform/dialogButtons'
 import { EmptyDash } from '../platform/EmptyValue'
 import { getAt } from '../platform/jsonPatch'
-import { fetchStudioRelaxed, relaxedPointWords, type StudioNames, type StudioRelaxedPoint } from '../platform/studio'
+import {
+  fetchStudioRelaxed,
+  relaxedPointWords,
+  sortRelaxed,
+  type StudioNames,
+  type StudioRelaxedPoint,
+} from '../platform/studio'
 import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
@@ -22,12 +28,14 @@ import {
   fieldControls,
   fieldTextKey,
   fitColumns,
+  setLists,
   identityProperties,
   SchemaFormKindContext,
   schemaFormSections,
   StudioCatalogContext,
 } from './schemaFormSections'
 import { StudioResourceTitle } from './studioResourceTitle'
+import { nameCollator } from './studioViews'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -377,6 +385,23 @@ function ListTable({
     setOpen(null)
   }
 
+  // Proposed: a list that is a set shows by name, a module or package by its label; each row keeps its place in the
+  // file, which Edit… and Remove use.
+  const collator = nameCollator()
+  const rowName = (item: unknown) => {
+    const id = (item as Record<string, unknown> | undefined)?.id
+    const label =
+      typeof id === 'string'
+        ? (catalog?.modules.find((entry) => entry.id === id)?.label ??
+          catalog?.packages.find((entry) => entry.id === id)?.label ??
+          id)
+        : ''
+    return label
+  }
+  const tableRows = items.map((item, index) => ({ index, item }))
+  if (setLists.has(listKey.replace('shell.studio.field.', ''))) {
+    tableRows.sort((a, b) => collator.compare(rowName(a.item), rowName(b.item)))
+  }
   const addButton = (
     <AxisButton role="main" onClick={add} data-testid={`studio-list-add-${pointer}`}>
       {textOr(t, `${listKey}.add`, 'shell.studio.list.add')}
@@ -386,7 +411,7 @@ function ListTable({
     <>
       {inHeading && slot && createPortal(addButton, slot)}
       <AxisTable<{ index: number; item: unknown }>
-        rows={items.map((item, index) => ({ index, item }))}
+        rows={tableRows}
         rowKey={(row) => row.index}
         emptyText={textOr(t, `${listKey}.empty`, 'shell.studio.list.empty')}
         pagination={false}
@@ -546,7 +571,11 @@ function RelaxedPointsView({ pointer, rootValue }: { pointer: string; rootValue:
     })
     return () => controller.abort()
   }, [application])
-  const rows = (points ?? []).filter((point) => point.module === moduleId)
+  const rows = sortRelaxed(
+    (points ?? []).filter((point) => point.module === moduleId),
+    locale,
+    t,
+  )
   return (
     <Flex vertical gap="small">
       <Typography.Text style={{ color: colour.textMuted }}>

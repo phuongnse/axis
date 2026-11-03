@@ -12,7 +12,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { StudioCatalogContext } from './schemaFormSections'
 import { StudioChangeList, type StudioChangeRow } from './StudioChangeList'
 import { StudioResourceTitle } from './studioResourceTitle'
-import { kindName } from './studioViews'
+import { kindName, kindOrder } from './studioViews'
 
 type Direction = 'uses' | 'usedBy'
 
@@ -23,13 +23,7 @@ export type OpenResource = (id: string, path: string | null) => void
  * The Uses and Used by lists of a selected resource. A load failure shows an alert in their place. An entry
  * expands one more step, and its own lists load once.
  */
-export function StudioReferences({
-  application,
-  resourceId,
-}: {
-  application: string
-  resourceId: string
-})  {
+export function StudioReferences({ application, resourceId }: { application: string; resourceId: string }) {
   const t = useText()
   const { generation, lost } = useStudioConnection()
   const [references, setReferences] = useState<StudioResourceReferences>()
@@ -121,6 +115,7 @@ function ReferencePanel({
         kind: kindName(node.kind, t),
         change: relation,
         to: direction === 'usedBy' ? `${address}&path=${encodeURIComponent(entry.path)}` : address,
+        order: kindOrder(node.kind),
       })
     } else if (node.type === 'module') {
       rows.push({

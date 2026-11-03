@@ -1280,3 +1280,18 @@ export async function fetchStudioCatalog(signal?: AbortSignal): Promise<StudioCa
   }
   return (await response.json()) as StudioCatalog
 }
+
+/** Proposed: relaxed points by module, then by point, each by its words. */
+export function sortRelaxed(
+  points: readonly StudioRelaxedPoint[],
+  locale: string,
+  t: (key: string) => string,
+): StudioRelaxedPoint[] {
+  const collator = new Intl.Collator(document.documentElement.lang || 'en', { sensitivity: 'base', numeric: true })
+  const words = new Map(points.map((point) => [point, relaxedPointWords(point, locale, t)]))
+  return [...points].sort(
+    (a, b) =>
+      collator.compare(words.get(a)!.module, words.get(b)!.module) ||
+      collator.compare(words.get(a)!.title, words.get(b)!.title),
+  )
+}
