@@ -124,8 +124,13 @@ Shopify's settings pages:
   `shell.studio.field.<kind>.<path>` and `….help`, drawn as the form widget draws them: the label in medium textMuted,
   the help in small textMuted between the label and the input. No `formatVersion`, `textKey` or `modules 1`.
 - **The file's identity is hidden.** `id`, `kind` and `formatVersion` are not shown; `name` is, with its help.
-- **A label is a text box per language,** named by the language. Its key is Studio's own, made from the resource and
-  the path, and never shown. Its texts are part of the resource's one Save: no Write texts button.
+- **A label is one text box, in the author's language.** The owner asked whether a box per language is the standard;
+  it is not, as it grows with every language. Agreed, as Contentful, Sanity and Webflow edit one language at a time and
+  Shopify, Salesforce and WPML translate on a screen of their own: one box in the author's language, or the
+  application's first when it lacks that one; Translations…, a globe icon beside it, opens every language of the label
+  in a medium dialog (Done keeps, Cancel puts back); a muted line under the box names the languages it lacks, "Missing
+  in Vietnamese". Many labels at once are translated in the text resources' table. The key is Studio's own, made from
+  the resource and the path, and never shown. The texts are part of the resource's one Save: no Write texts button.
 - **One save bar.** While there are unsaved changes, a bar stays at the foot of the window across the content:
   "Unsaved changes" on the left, Discard and Save on the right. With nothing to save it is not drawn. Save writes the
   label texts first, then the resource.
