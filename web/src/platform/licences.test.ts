@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { axisSourceUrl, licenceUrl, sourceUrl } from './licences'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { axisSourceUrl, fetchLicences, licenceUrl, sourceUrl } from './licences'
 
 describe('sourceUrl', () => {
   it.each([
@@ -34,5 +34,23 @@ describe('licenceUrl', () => {
     ['', null],
   ])('gives the page of the licence %j', (licence, expected) => {
     expect(licenceUrl(licence)).toBe(expected)
+  })
+})
+
+describe('fetchLicences', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('lists a package once in the public list, however many versions it ships at', async () => {
+    const entry = { name: '@babel/runtime', licence: 'MIT' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input === '/licences.json'
+          ? new Response(JSON.stringify({ npm: [entry, entry], nuget: [] }), { status: 200 })
+          : new Response(null, { status: 401 }),
+      ),
+    )
+
+    expect(await fetchLicences()).toEqual({ npm: [entry], nuget: [] })
   })
 })

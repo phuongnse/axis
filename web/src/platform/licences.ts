@@ -35,7 +35,15 @@ export async function fetchLicences(signal?: AbortSignal): Promise<Licences> {
   if (!publicResponse.ok) {
     throw new Error(`Loading the public licences failed with status ${publicResponse.status}.`)
   }
-  return (await publicResponse.json()) as Licences
+  return withoutDuplicates((await publicResponse.json()) as Licences)
+}
+
+/** The public list has no versions, so a package shipped at two versions would show twice. */
+function withoutDuplicates(licences: Licences): Licences {
+  const unique = (packages: LicencePackage[]) => [
+    ...new Map(packages.map((entry) => [`${entry.name}/${entry.licence}`, entry])).values(),
+  ]
+  return { npm: unique(licences.npm), nuget: unique(licences.nuget) }
 }
 
 /** The source at the commit when the version's build metadata is 7 to 40 hex characters, else the repository root. */

@@ -106,7 +106,7 @@ function PackageList({ title, entries, testId }: { title: string; entries: Licen
       <Typography.Title level={5}>{title}</Typography.Title>
       <Table<LicencePackage>
         size="small"
-        rowKey={(entry) => `${entry.name}/${entry.version ?? ''}`}
+        rowKey={(entry) => `${entry.name}/${entry.version ?? ''}/${entry.licence}`}
         pagination={false}
         dataSource={entries}
         columns={[
