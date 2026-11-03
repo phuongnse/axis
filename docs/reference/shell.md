@@ -222,8 +222,8 @@ The `application` manifest and each `site` may have a `description`, one line of
   - `shell`: Application site, Navigation collapsed, Form page, Platform site, App switcher and Language and theme.
   - `signIn`: Sign-in refused, Signed out and Session ended, with the organization's heading over the cards.
   - `identitySignIn`: the sign-in page of [Axis's identity provider](identity-provider.md#theme), in Sign in, Wrong
-    password, Organization sign-in only, Two-step verification, Forgot password, Set password and Add an authenticator,
-    and _(planned for M31)_ Fields left empty, Language and theme, Terms and privacy, Terms not accepted, Sign out, Notice,
+    password, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator and Language and theme (the gear's menu open),
+    and _(planned for M31)_ Fields left empty, Terms and privacy, Terms not accepted, Sign out, Notice,
     Error, Choose how to sign in and Update your profile. It is built from fixtures through the shared sign-in components in `web/src/identitySignIn/`. Two-step
     verification, Forgot password, Set password and Add an authenticator are the same components that the theme draws.
 - A shell preview draws the shell in a frame at least as tall as its height, which grows to hold the whole shell, so

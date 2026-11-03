@@ -14,6 +14,7 @@ function copyThemeFiles(): Plugin {
     closeBundle() {
       for (const name of [
         'theme.properties',
+        'frame.ftl',
         'login.ftl',
         'login-otp.ftl',
         'login-config-totp.ftl',
