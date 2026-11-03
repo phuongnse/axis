@@ -13,10 +13,10 @@
 //   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
 //   evidence. A Met row names only test classes that exist. A Gap row links the GitHub issue that
 //   closes it.
-// - docs/reference/threat-model.md, when it exists, has a threat table with the same header in each
-//   scope section, with a unique id on the whole page, a status and a rating from the lists, and
-//   evidence. A Mitigated row names only test classes that exist, a Gap row links the GitHub issue
-//   that closes it, and an Accepted row gives a date.
+// - Every threat table under docs/, found by its header line, such as the ones in
+//   docs/reference/threat-model-*.md, has a unique id across all of them, a status and a rating from
+//   the lists, and evidence. A Mitigated row names only test classes that exist, a Gap row links the
+//   GitHub issue that closes it, and an Accepted row gives a date.
 // - docs/reference/security.md, when it exists with samples/keycloak/axis-realm.json, has a '### Development users'
 //   table that lists the same users with the same axis roles as the realm's users, except service accounts, and
 //   each realm user's id is its username.
@@ -48,7 +48,6 @@ const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
 const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
 const asvsFile = 'docs/reference/asvs.md'
-const threatModelFile = 'docs/reference/threat-model.md'
 const threatHeader = '| Id | Threat | Boundary | Category | Rating | Status | Evidence |'
 const threatSeparator = '| --- | --- | --- | --- | --- | --- | --- |'
 const securityFile = 'docs/reference/security.md'
@@ -145,10 +144,9 @@ function checkAsvs(root, asvs, report, testClasses) {
   }
 }
 
-/** Checks every threat table of the threat model page, with an id unique across the whole page. */
-function checkThreatModel(file, report, testClasses) {
+/** Checks every threat table of a doc. The ids must be unique across the docs that share `seen`. */
+function checkThreatTables(file, report, testClasses, seen, relative) {
   const text = lines(file)
-  const seen = new Map()
   for (let header = 0; header < text.length; header++) {
     if (text[header].trim() !== threatHeader) continue
     for (let i = header + 1; i < text.length && text[i].startsWith('|'); i++) {
@@ -159,8 +157,10 @@ function checkThreatModel(file, report, testClasses) {
       const [rating, status, evidence] = cells.slice(4)
       const rawEvidence = raw[7] ?? ''
       const line = i + 1
-      if (seen.has(id)) report(file, line, `${id} has a row already, on line ${seen.get(id)}`)
-      else seen.set(id, line)
+      const first = seen.get(id)
+      if (!first) seen.set(id, { file, line })
+      else if (first.file === file) report(file, line, `${id} has a row already, on line ${first.line}`)
+      else report(file, line, `${id} has a row already, in ${relative(first.file)} on line ${first.line}`)
       const statusName = /^\*\*(.+)\*\*$/.exec(status)?.[1]
       if (!threatStatuses.includes(statusName)) {
         report(file, line, `${id} status '${status}' is not one of ${threatStatuses.map((name) => `**${name}**`).join(', ')}`)
@@ -290,8 +290,10 @@ export function checkDocs(root, { baseLineCount } = {}) {
   const asvs = path.join(root, asvsFile)
   if (existsSync(asvs)) checkAsvs(root, asvs, report, testClasses)
 
-  const threatModel = path.join(root, threatModelFile)
-  if (existsSync(threatModel)) checkThreatModel(threatModel, report, testClasses)
+  const seenThreats = new Map()
+  for (const file of files) {
+    if (lines(file).some((line) => line.trim() === threatHeader)) checkThreatTables(file, report, testClasses, seenThreats, relative)
+  }
 
   if (existsSync(path.join(root, securityFile)) && existsSync(path.join(root, realmFile))) {
     checkDevelopmentUsers(root, report)
@@ -385,7 +387,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the ASVS table, the threat model table, the development users and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the ASVS table, the threat model tables, the development users and the doc and skill sizes are in order.')
   return 0
 }
 
