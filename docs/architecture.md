@@ -382,7 +382,7 @@ bindings work. Status rules and publishing are built too.
   - The session state is in the tenant database, so sign-out revokes it at once
     (D84). A tenant can turn on the FAPI 2.0 profile (D83). See
     [service accounts](reference/security.md#service-accounts) and
-    [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
+    [FAPI 2.0 profile](reference/fapi2-profile.md).
 - **Hardening (D82, D84, D85).**
   - The server sets security headers on every response and rate limits the routes a caller can
     repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and

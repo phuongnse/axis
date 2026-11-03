@@ -280,7 +280,7 @@ serves a tenant only when this value is the one the host was built for, see [adm
     `platform.tenant_backup_keys`, wrapped by the cell's key (`Cell:BackupKeyFile`) and not by the installation key;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
     `platform.tenants`, with the field name `oidc_client_key` and the key id,
-    see [FAPI 2.0 profile](security.md#fapi-20-profile).
+    see [FAPI 2.0 profile](fapi2-profile.md).
 - **Encrypted format.** An encrypted value is a `bytea` that holds a 12-byte
   nonce, the ciphertext and a 16-byte tag. The cipher is AES-256-GCM with the
   installation key `Platform:SecretKey`, see

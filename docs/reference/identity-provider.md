@@ -376,7 +376,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   change, see [sign-in settings](tenant-setting-commands.md#sign-in-settings). Each client lists every key the tenant
   will hold, under its [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) key id. Under `fapi2` the clients use
   `client-jwt` with ES256, require PAR, PKCE `S256` and DPoP-bound tokens, see
-  [FAPI 2.0 profile](security.md#fapi-20-profile). Under `standard` they use `client-secret` and require neither PAR nor
+  [FAPI 2.0 profile](fapi2-profile.md). Under `standard` they use `client-secret` and require neither PAR nor
   DPoP. A failure of the identity provider fails the command and changes nothing in the tenant directory. A tenant that
   signs in through an outside identity provider is unchanged.
 

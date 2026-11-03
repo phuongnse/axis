@@ -402,11 +402,22 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 context.ProtocolMessage.AcrValues = acrValues;
             }
 
+            CopyAction(context);
             return Task.CompletedTask;
         };
         options.TokenValidationParameters.AudienceValidator = (audiences, _, _) =>
             audiences.Any(audience => audience == tenant.ClientId || audience.StartsWith(RealmSync.SiteClientPrefix, StringComparison.Ordinal));
         options.ProtocolValidator = new SiteClientProtocolValidator { RequireStateValidation = false, NonceLifetime = TimeSpan.FromMinutes(15) };
+    }
+
+    // The sign-in endpoint has checked the action against its allow-list. Under fapi2 the handler pushes this message to the
+    // PAR endpoint, so the parameter reaches the identity provider there.
+    private static void CopyAction(RedirectContext context)
+    {
+        if (context.Properties.GetParameter<string>(AuthEndpoints.ActionParameter) is { Length: > 0 } action)
+        {
+            context.ProtocolMessage.SetParameter("kc_action", action);
+        }
     }
 
     // The handler checks that the ID token's iss matches the metadata, so metadata from another issuer would pass with a
@@ -436,6 +447,7 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
     {
         options.Events.OnRedirectToIdentityProvider = async context =>
         {
+            CopyAction(context);
             var configuration = await context.Options.ConfigurationManager!.GetConfigurationAsync(context.HttpContext.RequestAborted);
             if (string.IsNullOrEmpty(configuration.PushedAuthorizationRequestEndpoint))
             {

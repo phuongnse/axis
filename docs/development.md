@@ -346,7 +346,7 @@ The realm also has the confidential client `axis-users`, with the development se
 server's `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them. Until the Keycloak container is recreated, as above, the list route answers `502`, and so do the commands, because the client of an older realm cannot change users.
 The realm also has the client `axis-fapi` for the `fapi2` sign-in profile. Only an integration
 test host uses it, and it signs in with the development keys in `samples/keycloak`, see
-[FAPI 2.0 profile](reference/security.md#fapi-20-profile).
+[FAPI 2.0 profile](reference/fapi2-profile.md).
 
 ## Hot reload with `scripts/dev.sh`
 
