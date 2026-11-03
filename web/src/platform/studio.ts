@@ -1014,6 +1014,10 @@ export interface StudioReleaseDetail {
   changes: StudioFileChange[]
   modules: StudioReleasePart[]
   packages: StudioReleasePart[]
+  /** Proposed: the live release's number, or null when this release is live or none is. */
+  live?: number | null
+  /** Proposed: the modules that stop this release from replacing the live one; empty when it can. */
+  blockers?: { module: string; label?: string | null; liveVersion: string; version?: string | null }[]
 }
 
 /** Proposed: loads what one release holds beyond its history row. */

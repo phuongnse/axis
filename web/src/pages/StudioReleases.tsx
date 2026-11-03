@@ -23,6 +23,71 @@ import { PlatformContext } from './context'
 import { kindName } from './studioViews'
 import { dialogWidth } from '../platform/dialogButtons'
 
+/** Proposed: what one release holds beyond its history row, loaded again when the history changes. */
+function useReleaseDetail(application: string, number: number | undefined, refresh: number) {
+  const [detail, setDetail] = useState<{ number: number; value: StudioReleaseDetailData | 'failed' }>()
+  useEffect(() => {
+    if (number === undefined) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioRelease(application, number, controller.signal).then(
+      (value) => setDetail({ number, value }),
+      (error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.warn(`Loading release ${number} failed`, error)
+          setDetail({ number, value: 'failed' })
+        }
+      },
+    )
+    return () => controller.abort()
+  }, [application, number, refresh])
+  return number !== undefined && detail?.number === number ? detail.value : undefined
+}
+
+/**
+ * Proposed: why a release cannot replace the live one, said before Activate… is sent: each module the live release
+ * pins that this release lacks, or pins at a version without some of its entities or fields, then the rule.
+ */
+function ReleaseBlockers({ detail, plain = false }: { detail: StudioReleaseDetailData; plain?: boolean }) {
+  const t = useText()
+  const blockers = detail.blockers ?? []
+  const live = String(detail.live ?? '')
+  const reasons = (
+    <Flex vertical gap={4} data-testid={plain ? 'studio-release-blockers' : undefined}>
+      {blockers.map((blocker) => (
+        <Typography.Text key={blocker.module}>
+          {(blocker.version
+            ? t('shell.studio.release.blocker.older').replace('{version}', blocker.version)
+            : t('shell.studio.release.blocker.missing')
+          )
+            .replace('{module}', blocker.label ?? blocker.module)
+            .replace('{live}', live)
+            .replace('{liveVersion}', blocker.liveVersion)}
+        </Typography.Text>
+      ))}
+      <Typography.Text>{t('shell.studio.release.blocker.why')}</Typography.Text>
+    </Flex>
+  )
+  // Proposed: in the dialog, whose title already says it, the reasons are plain text; on the page a warning holds them.
+  return plain ? (
+    reasons
+  ) : (
+    <Alert
+      type="warning"
+      data-testid="studio-release-blockers"
+      title={cannotReplaceTitle(t, detail)}
+      description={reasons}
+    />
+  )
+}
+
+function cannotReplaceTitle(t: (key: string) => string, detail: StudioReleaseDetailData) {
+  return t('shell.studio.release.cannotReplace')
+    .replace('{number}', String(detail.number))
+    .replace('{live}', String(detail.live ?? ''))
+}
+
 /**
  * Proposed: the releases of the open application, one row per release, the highest number first: its number, with
  * Live beside the one that runs, as the band says, its label, when it was published and by whom, and its note last. A
@@ -61,6 +126,12 @@ export function StudioReleasesList({
   const [pending, setPending] = useState<StudioReleaseGroup | null>(null)
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
   const live = history.active?.number
+  const refresh = history.items.length
+  // Proposed: the release whose page shows, and the one Activate… asks about, each checked against the live release.
+  const pageDetail = useReleaseDetail(application, release, refresh)
+  const pendingDetail = useReleaseDetail(application, pending?.number, refresh)
+  const pendingBlocked =
+    pendingDetail !== undefined && pendingDetail !== 'failed' && (pendingDetail.blockers?.length ?? 0) > 0
 
   function confirm() {
     const release = pending
@@ -74,13 +145,24 @@ export function StudioReleasesList({
     <Modal
       width={dialogWidth('small')}
       open={pending !== null}
-      title={t('shell.studio.activate.title').replace('{number}', String(pending?.number ?? ''))}
+      title={
+        pendingBlocked
+          ? cannotReplaceTitle(t, pendingDetail)
+          : t('shell.studio.activate.title').replace('{number}', String(pending?.number ?? ''))
+      }
       okText={t('shell.studio.activate.confirm')}
-      cancelText={t('shell.studio.cancel')}
+      cancelText={pendingBlocked ? t('shell.studio.release.close') : t('shell.studio.cancel')}
+      // Proposed: the dialog checks the release before it offers Activate: while it checks, Activate is off; a release
+      // that cannot replace the live one says why, and the dialog offers Close alone.
+      okButtonProps={{
+        disabled: pendingDetail === undefined,
+        style: pendingBlocked ? { display: 'none' } : undefined,
+      }}
       onOk={confirm}
       onCancel={() => setPending(null)}
     >
-      {pending && (
+      {pending && pendingBlocked && <ReleaseBlockers detail={pendingDetail} plain />}
+      {pending && !pendingBlocked && (
         <Flex vertical gap={4} data-testid="studio-rollback-release">
           <Typography.Text>
             {(live === undefined ? t('shell.studio.activate.first') : t('shell.studio.activate.replaces'))
@@ -110,16 +192,25 @@ export function StudioReleasesList({
       )
     }
     // Proposed: Activate… is the page's own action, on the right of its heading, as Run scenario is on a scenario's.
+    // A release that cannot replace the live one has Activate… off, and the warning at the head of the page says why.
+    const blocked = pageDetail && pageDetail !== 'failed' && (pageDetail.blockers?.length ?? 0) > 0
     const activate =
       canActivate && !shown.live ? (
-        <Button data-testid={`studio-activate-${shown.number}`} disabled={busy} onClick={() => setPending(shown)}>
+        <Button
+          data-testid={`studio-activate-${shown.number}`}
+          disabled={busy || blocked}
+          onClick={() => setPending(shown)}
+        >
           {t('shell.studio.activate')}
         </Button>
       ) : null
     return (
       <section data-testid="studio-release" data-number={shown.number}>
         {activate && (headingSlot ? createPortal(activate, headingSlot) : activate)}
-        <StudioReleaseDetail application={application} history={history} release={shown} time={time} />
+        <Flex vertical gap="large">
+          {blocked && <ReleaseBlockers detail={pageDetail as StudioReleaseDetailData} />}
+          <StudioReleaseDetail history={history} release={shown} detail={pageDetail} time={time} />
+        </Flex>
         {dialog}
       </section>
     )
@@ -275,35 +366,19 @@ interface ReleaseActivationRow {
  * pins with their versions, and every time it was activated.
  */
 function StudioReleaseDetail({
-  application,
   history,
   release,
+  detail: shown,
   time,
 }: {
-  application: string
   history: StudioReleases
   release: StudioReleaseGroup
+  detail: StudioReleaseDetailData | 'failed' | undefined
   time: Intl.DateTimeFormat
 }) {
   const t = useText()
   const { colour, spacing, type } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const [detail, setDetail] = useState<{ number: number; value: StudioReleaseDetailData | 'failed' }>()
-  const activationCount = history.items.length
-
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchStudioRelease(application, release.number, controller.signal).then(
-      (value) => setDetail({ number: release.number, value }),
-      (error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn(`Loading release ${release.number} failed`, error)
-          setDetail({ number: release.number, value: 'failed' })
-        }
-      },
-    )
-    return () => controller.abort()
-  }, [application, release.number, activationCount])
 
   // Proposed: every activation of the release, newest first, from the whole history in time order: the one before it
   // is the release it replaced, and the one after it is when it stopped being live.
@@ -328,7 +403,6 @@ function StudioReleaseDetail({
       <dd style={{ margin: '6px 0 0', fontSize: type.fontSize, lineHeight: '22px', color: colour.text }}>{value}</dd>
     </div>
   )
-  const shown = detail?.number === release.number ? detail.value : undefined
   const previous = shown && shown !== 'failed' ? shown.previous : null
   const parts: StudioReleasePartRow[] =
     shown && shown !== 'failed'
@@ -365,48 +439,54 @@ function StudioReleaseDetail({
         {fact('publishedBy', 3, t('shell.studio.releases.publishedBy'), releaseActorName(release.published, t))}
         {fact('note', 12, t('shell.studio.releases.note'), release.note ?? <NotSet />)}
       </dl>
-      {release.relaxed.length > 0 && (
+      {/* Proposed: every part of a release shows, an empty one with a sentence that says what it means; only a part
+          that does not apply is left out: a release that pins no module has no contract to relax. */}
+      {(release.relaxed.length > 0 || (shown && shown !== 'failed' && shown.modules.length > 0)) && (
         <ReleaseSection
           title={t('shell.studio.releases.relaxed')}
-          intro={t('shell.studio.release.relaxedIntro')}
+          intro={
+            release.relaxed.length > 0 ? t('shell.studio.release.relaxedIntro') : t('shell.studio.release.relaxed.none')
+          }
           testId="studio-release-relaxed"
         >
-          <AxisTable<StudioRelaxedPoint>
-            rows={release.relaxed}
-            rowKey={(point) => `${point.module}/${point.point}`}
-            emptyText=""
-            pagination={false}
-            onRow={() => ({ 'data-testid': 'release-relaxed-point' }) as HTMLAttributes<HTMLElement>}
-            columns={[
-              {
-                key: 'module',
-                title: t('shell.studio.relaxed.module'),
-                kind: 'text',
-                render: (point) => relaxedPointWords(point, locale, t).module,
-              },
-              {
-                // Proposed: the point by its label, with what kind of point it is and its entity on a muted line.
-                key: 'point',
-                title: t('shell.studio.relaxed.point'),
-                kind: 'text',
-                render: (point) => {
-                  const words = relaxedPointWords(point, locale, t)
-                  return (
-                    <Flex vertical>
-                      <span>{words.title}</span>
-                      {words.kind && <span style={{ color: colour.textMuted }}>{words.kind}</span>}
-                    </Flex>
-                  )
+          {release.relaxed.length > 0 && (
+            <AxisTable<StudioRelaxedPoint>
+              rows={release.relaxed}
+              rowKey={(point) => `${point.module}/${point.point}`}
+              emptyText=""
+              pagination={false}
+              onRow={() => ({ 'data-testid': 'release-relaxed-point' }) as HTMLAttributes<HTMLElement>}
+              columns={[
+                {
+                  key: 'module',
+                  title: t('shell.studio.relaxed.module'),
+                  kind: 'text',
+                  render: (point) => relaxedPointWords(point, locale, t).module,
                 },
-              },
-              {
-                key: 'reason',
-                title: t('shell.studio.relaxed.reason'),
-                kind: 'text',
-                render: (point) => point.reason,
-              },
-            ]}
-          />
+                {
+                  // Proposed: the point by its label, with what kind of point it is and its entity on a muted line.
+                  key: 'point',
+                  title: t('shell.studio.relaxed.point'),
+                  kind: 'text',
+                  render: (point) => {
+                    const words = relaxedPointWords(point, locale, t)
+                    return (
+                      <Flex vertical>
+                        <span>{words.title}</span>
+                        {words.kind && <span style={{ color: colour.textMuted }}>{words.kind}</span>}
+                      </Flex>
+                    )
+                  },
+                },
+                {
+                  key: 'reason',
+                  title: t('shell.studio.relaxed.reason'),
+                  kind: 'text',
+                  render: (point) => point.reason,
+                },
+              ]}
+            />
+          )}
         </ReleaseSection>
       )}
       {shown === 'failed' && (
@@ -468,8 +548,12 @@ function StudioReleaseDetail({
               </ul>
             )}
           </ReleaseSection>
-          {parts.length > 0 && (
-            <ReleaseSection title={t('shell.studio.release.parts')} testId="studio-release-parts">
+          <ReleaseSection
+            title={t('shell.studio.release.parts')}
+            intro={parts.length === 0 ? t('shell.studio.release.parts.none') : undefined}
+            testId="studio-release-parts"
+          >
+            {parts.length > 0 && (
               <AxisTable<StudioReleasePartRow>
                 rows={parts}
                 rowKey={(part) => `${part.type}/${part.id}`}
@@ -514,8 +598,8 @@ function StudioReleaseDetail({
                       ]),
                 ]}
               />
-            </ReleaseSection>
-          )}
+            )}
+          </ReleaseSection>
         </>
       )}
       <ReleaseSection title={t('shell.studio.release.activations')} testId="studio-release-activations">

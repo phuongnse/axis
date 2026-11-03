@@ -737,7 +737,10 @@ internal static class StudioEndpoints
         }
 
         var previous = activations.Where(row => row.Number < number).MaxBy(row => row.Number);
-        var ids = previous is null ? new[] { release.ReleaseId } : [release.ReleaseId, previous.ReleaseId];
+        var store = new ActiveReleaseStore(context);
+        var live = await store.FindByApplicationIdAsync(applicationId, cancellationToken);
+        var liveRow = live is null || live.ReleaseId == release.ReleaseId ? null : activations.FirstOrDefault(row => row.ReleaseId == live.ReleaseId);
+        var ids = new[] { release.ReleaseId, previous?.ReleaseId, liveRow?.ReleaseId }.OfType<Guid>().Distinct().ToArray();
         var files = await context.ReleaseResources
             .AsNoTracking()
             .Where(resource => ids.Contains(resource.ReleaseId))
@@ -785,8 +788,41 @@ internal static class StudioEndpoints
             .Select(package => new StudioReleasePackage(
                 package.PackageId, package.Version, previous is null ? null : beforePackages.GetValueOrDefault(package.PackageId) ?? ""))
             .ToList();
+        // Proposed: whether the release can replace the live one, told before Activate… is sent. A module's tables hold
+        // data once it is live, so a release that lacks a module the live release pins, or pins a version without some
+        // of its entities or fields, is refused on activation (AXC0213). The same check runs here on the two stored
+        // releases, and each module it names is listed with the live version and this release's. What depends on the
+        // tenant at that moment, such as its bindings, is still checked only on activation.
+        var blockers = new List<StudioReleaseBlocker>();
+        if (liveRow is not null)
+        {
+            Axis.Configuration.Storage.ReleaseResource Row(Guid releaseId, KeyValuePair<string, string> file) =>
+                new() { ReleaseId = releaseId, Path = file.Key, Content = file.Value };
+            var liveFiles = files.Where(file => file.ReleaseId == liveRow.ReleaseId).ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+            var diagnostics = Axis.Data.ModuleUpgradeCheck.Check(
+                [.. liveFiles.Select(file => Row(liveRow.ReleaseId, file))],
+                [.. current.Select(file => Row(release.ReleaseId, file))]);
+            var liveModules = Modules(liveFiles).ToDictionary(module => module.Id, StringComparer.Ordinal);
+            var targetModules = modules.ToDictionary(module => module.Id, module => module.Version, StringComparer.Ordinal);
+            blockers.AddRange(diagnostics
+                .Select(diagnostic => diagnostic.File.Split('/') is { Length: > 2 } parts && parts[0] == "modules" ? parts[1] : null)
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .Select(id => new StudioReleaseBlocker(
+                    id,
+                    liveModules.GetValueOrDefault(id)?.Label,
+                    liveModules.GetValueOrDefault(id)?.Version ?? "",
+                    targetModules.GetValueOrDefault(id))));
+        }
+
         return Results.Ok(new StudioReleaseDetail(
-            number, previous?.Number, [.. changes.OrderBy(change => change.Path, StringComparer.Ordinal)], modules, packages));
+            number,
+            previous?.Number,
+            [.. changes.OrderBy(change => change.Path, StringComparer.Ordinal)],
+            modules,
+            packages,
+            liveRow?.Number,
+            blockers));
 
         static IEnumerable<StudioReleaseModule> Modules(Dictionary<string, string> releaseFiles) =>
             releaseFiles
@@ -1409,7 +1445,15 @@ internal sealed record StudioReleaseDetail(
     int? Previous,
     IReadOnlyList<StudioReleaseChange> Changes,
     IReadOnlyList<StudioReleaseModule> Modules,
-    IReadOnlyList<StudioReleasePackage> Packages);
+    IReadOnlyList<StudioReleasePackage> Packages,
+    int? Live = null,
+    IReadOnlyList<StudioReleaseBlocker>? Blockers = null);
+
+/// <summary>
+/// Proposed: a module that stops a release from replacing the live one: its id, its label, the version the live release
+/// pins, and the version this release pins, or null when it pins none.
+/// </summary>
+internal sealed record StudioReleaseBlocker(string Module, string? Label, string LiveVersion, string? Version);
 
 /// <summary>
 /// Proposed: a module a release pins: its id, its label, its version, and the version the previous release pinned,

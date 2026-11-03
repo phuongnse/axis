@@ -52,3 +52,29 @@ by what the person does, never by taste:
   dialog takes the width less the page margin. A dialog is as tall as its content, at most the window less its
   margins; its body scrolls while its title and buttons stay. The size is a token that a dialog names, never a width of
   its own.
+- **A fuller release page.** The owner found the page too thin and asked where the label was. Agreed: the facts are
+  Label, Status (live since, or replaced on), Published, Published by, and Note on a line of its own; then Relaxed
+  points, Changes from the release numbered just below it (named from the release that holds each file, not links,
+  as the folder may have moved on), Modules and packages (version, and Added or "Was 1.1.0" since the previous
+  release), and Activations (when, by whom, the release it replaced, live until). A new
+  `GET .../releases/{number}` gives the changes, modules and packages.
+- **Activate… says up front when it cannot.** Activating an older release that lacks a module the live release pins,
+  or pins it at a version without some of its entities or fields, was accepted and then refused by the publisher
+  (AXC0213). Agreed: the release endpoint runs the same module check on the two stored releases; the release page
+  shows "Release 1 cannot replace release 2" with each module and the rule, and Activate… is off; the dialog opened
+  from the list checks first, titles itself with the same sentence and offers Close alone. What depends on the tenant
+  at that moment, such as its bindings, is still checked only on activation. This changes an API, so it needs a
+  decision.
+
+## Showing what is empty
+
+The owner proposed that information always shows, with Not set or no data, rather than being hidden. Agreed, by
+industry practice (GitHub's issue sidebar, Salesforce and Jira record pages, Fiori object pages):
+
+- **A field the object always has always shows.** Empty, it reads "Not set" on a form or a detail and the muted dash
+  in a table cell, as D96 has it.
+- **A list that is a standing part of the object always shows.** Empty, it says in one line what that means, such as
+  "This release uses no modules or packages." or "None. This release follows every contract of its modules."
+- **Hide only what does not apply or is not allowed.** A part that does not apply to the object's kind or state, such
+  as relaxed points for a release that pins no module, or a field the person may not read, is left out.
+- **Loading and failing are never empty.** A part that is still loading or failed to load says so, never Not set.
