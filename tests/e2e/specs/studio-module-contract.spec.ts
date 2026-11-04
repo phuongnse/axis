@@ -8,6 +8,7 @@ import { confirmDialog, waitForDialog } from "../dialogs";
 import { pickOption, pickOptions } from "../select";
 import { approvalsApp, e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
+import { openKind } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -41,6 +42,7 @@ test.describe("Studio adds states and transitions to a module contract as a laye
   async function openContract(page: Page) {
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=ApprovalsApp`);
+    await openKind(page, "contract");
     await page
       .getByTestId("studio-group-module-contracts")
       .getByRole("button", { name: "approvals/RequestContract", exact: true })

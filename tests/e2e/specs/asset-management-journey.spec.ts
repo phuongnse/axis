@@ -10,7 +10,7 @@ import { assetManagement, journeyApplications, journeyURL } from '../server-sett
 import { csrfHeaders } from '../csrf'
 import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
-import { createResource, openFormTab, openTab } from '../studio-resources'
+import { createResource, hasKind, openFormTab, openKind, openTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -202,6 +202,7 @@ test.describe('the author builds the asset management application with Studio on
   }
 
   async function openPage(page: Page, name: string) {
+    await openKind(page, 'page')
     await page.getByTestId('studio-group-page').getByRole('button', { name, exact: true }).click()
     await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
@@ -247,15 +248,23 @@ test.describe('the author builds the asset management application with Studio on
       .click()
   }
 
-  // Deleting the last migration removes its group from the tree, so the loop ends when the group has no buttons.
+  // The migration kind has no sidebar entry without a migration. Deleting the last migration removes the entry,
+  // so the list is reopened only while one is left.
   async function deleteMigrations(page: Page) {
+    if (!(await hasKind(page, 'migration'))) {
+      return
+    }
     const migrations = page.getByTestId('studio-group-migration')
+    await openKind(page, 'migration')
     while ((await migrations.getByRole('button').count()) > 0) {
       const before = await migrations.getByRole('button').count()
       await migrations.getByRole('button').first().click()
       await expectForm(page)
       await page.getByRole('button', { name: 'Delete', exact: true }).click()
       await confirmDialog(page, 'Delete')
+      if (before > 1) {
+        await openKind(page, 'migration')
+      }
       await expect(migrations.getByRole('button')).toHaveCount(before - 1)
     }
   }
@@ -322,6 +331,7 @@ test.describe('the author builds the asset management application with Studio on
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const starter = page.getByTestId('studio-group-text')
+    await openKind(page, 'text')
     await starter.getByRole('button').click()
     await expectForm(page)
 
@@ -329,11 +339,11 @@ test.describe('the author builds the asset management application with Studio on
     await confirmDialog(page, 'Delete')
     await expect(starter.getByRole('button')).toHaveCount(0)
 
-    await createResource(page, 'text', 'en', 'TextsEn')
+    await createResource(page, 'text', 'en')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/en.json')
     await expectForm(page)
 
-    await createResource(page, 'text', 'vi', 'TextsVi')
+    await createResource(page, 'text', 'vi')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
     await expectForm(page)
 
@@ -609,7 +619,10 @@ test.describe('the author builds the asset management application with Studio on
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
-    await page.getByTestId('studio-group-application').getByRole('button').click()
+    await page
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('link', { name: 'Settings', exact: true })
+      .click()
     await expectForm(page)
     await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
     await writeLabel(page, 'studio-field-/label', 'application.title', en['application.title'])
@@ -761,6 +774,7 @@ test.describe('the author builds the asset management application with Studio on
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
+    await openKind(page, 'site')
     await page.getByTestId('studio-group-site').getByRole('button').click()
     await expectForm(page)
 
@@ -786,6 +800,7 @@ test.describe('the author builds the asset management application with Studio on
 
     // The sample has no Home page, and nothing points to it now.
     const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
+    await openKind(page, 'page')
     await home.click()
     await openFormTab(page)
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
@@ -1144,6 +1159,7 @@ test.describe('the author builds the asset management application with Studio on
     await pick(page, 'studio-field-/process', 'WarrantyReminder')
     await save(page)
 
+    await openKind(page, 'event')
     await page.getByTestId('studio-group-event').getByRole('button', { name: 'Placeholder', exact: true }).click()
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await confirmDialog(page, 'Delete')

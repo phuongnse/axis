@@ -8,7 +8,7 @@ import { startServer } from '../activate'
 import { waitForDialog } from '../dialogs'
 import { e2eApp, templatesPath } from '../server-settings'
 import { useSession } from '../sessions'
-import { openNewApplication } from '../studio-resources'
+import { openKind, openNewApplication } from '../studio-resources'
 import { chooseTheme } from '../shell'
 
 // A second server starts in beforeAll, which takes a few seconds.
@@ -106,7 +106,9 @@ test.describe('Studio creates an application', () => {
     await createApplication(page, 'Inventory')
 
     await expect(page).toHaveURL(/app=Inventory$/)
+    await openKind(page, 'site')
     await expect(page.getByTestId('studio-group-site')).toBeVisible()
+    await openKind(page, 'text')
     await expect(page.getByTestId('studio-group-text')).toBeVisible()
     await expect(page.getByTestId('studio-diagnostics')).toContainText('No diagnostics')
   })
@@ -118,8 +120,11 @@ test.describe('Studio creates an application', () => {
     await createApplication(page, 'Onboarding', 'Request approval')
 
     await expect(page).toHaveURL(/app=Onboarding$/)
+    await openKind(page, 'entity')
     await expect(page.getByTestId('studio-group-entity')).toBeVisible()
+    await openKind(page, 'process')
     await expect(page.getByTestId('studio-group-process')).toBeVisible()
+    await openKind(page, 'site')
     await expect(page.getByTestId('studio-group-site')).toBeVisible()
   })
 

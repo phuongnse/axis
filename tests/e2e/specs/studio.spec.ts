@@ -7,7 +7,7 @@ import { startServer } from '../activate'
 import { openSelect, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openFormTab } from '../studio-resources'
+import { openFormTab, openKind } from '../studio-resources'
 
 // A server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -55,11 +55,16 @@ test.describe('Studio on a copy of its own', () => {
     }
   })
 
-  test('an author opens Studio from the app switcher, searches for a resource and opens it', async ({ page }) => {
+  test('an author opens a kind from the sidebar, opens a resource from its list, and keeps it after a reload', async ({
+    page,
+  }) => {
     await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
+    const entitiesLink = page
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('link', { name: 'Entities', exact: true })
 
     await page.goto(`${server.url}/`)
     await page.getByRole('banner').getByRole('button', { name: 'Switch to', exact: true }).click()
@@ -67,11 +72,16 @@ test.describe('Studio on a copy of its own', () => {
     // Studio lists the applications as tiles, even when there is only one, so the author picks it.
     await page.getByTestId('studio-app-PurchaseRequests').click()
     await expect(page).toHaveURL(/\/studio\?app=PurchaseRequests$/)
-    await page.getByRole('searchbox', { name: 'Search by name or id', exact: true }).fill('PurchaseRequest')
+    await openKind(page, 'entity')
     await page.getByTestId(`studio-resource-${entity.id}`).click()
 
+    await expect(page).toHaveURL(new RegExp(`/studio\\?app=PurchaseRequests&resource=${entity.id}$`))
+    await expect(entitiesLink).toHaveAttribute('aria-current', 'page')
+
+    await page.reload()
+    await expect(page).toHaveURL(new RegExp(`/studio\\?app=PurchaseRequests&resource=${entity.id}$`))
+    await expect(entitiesLink).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
-    await expect(page).toHaveURL(/resource=/)
     await expect(page.getByTestId('studio-diagnostics')).toBeVisible()
   })
 
@@ -354,11 +364,13 @@ test.describe('Studio on a copy of its own', () => {
 
       const { port } = restarted
       await restarted.stop()
+      await openKind(page, 'entity')
       await page.getByTestId(`studio-resource-${lineItem.id}`).click()
       await expect(page.getByTestId('studio-reconnecting')).toBeVisible()
 
       restarted = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy }, port)
       await expect(page.getByTestId('studio-reconnecting')).toBeHidden({ timeout: 90_000 })
+      await openKind(page, 'entity')
       await page.getByTestId(`studio-resource-${supplier.id}`).click()
       await expect(page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton')).toHaveValue(
         String(next),

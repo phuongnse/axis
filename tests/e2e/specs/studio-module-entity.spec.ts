@@ -7,6 +7,7 @@ import { expect, test } from "../test";
 import { startServer } from "../activate";
 import { e2eApp, leaveRequests } from "../server-settings";
 import { useSession } from "../sessions";
+import { openKind } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -47,6 +48,7 @@ test.describe("Studio edits a module entity as a layer", () => {
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=LeaveRequests`);
 
+    await openKind(page, "entity");
     await page
       .getByTestId("studio-group-module-entities")
       .getByRole("button", { name: "organization/Department", exact: true })
@@ -92,6 +94,7 @@ test.describe("Studio edits a module entity as a layer", () => {
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=LeaveRequests`);
 
+    await openKind(page, "entity");
     await page
       .getByTestId("studio-group-module-entities")
       .getByRole("button", { name: "organization/Department", exact: true })

@@ -311,24 +311,29 @@ afterEach(() => {
 })
 
 describe('StudioPage', () => {
-  it('lists the resources in one group per kind', async () => {
+  it('the Overview shows the application heading and lists no resources', async () => {
     stubServer()
     renderPage()
 
-    const entities = await screen.findByTestId('studio-group-entity')
-    expect(within(entities).getByText('entity')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 4, name: 'PurchaseRequests' })).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
+    expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-resource-details')).not.toBeInTheDocument()
+  })
+
+  it('&kind=entity lists only the entities under the kind name', async () => {
+    stubServer()
+    renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+    expect(await screen.findByRole('heading', { level: 4, name: 'Entities' })).toBeInTheDocument()
+    const entities = screen.getByTestId('studio-group-entity')
     expect(
       within(entities)
         .getAllByRole('button')
         .map((button) => button.textContent),
     ).toEqual(['Department', 'PurchaseRequest'])
-    const forms = screen.getByTestId('studio-group-form')
-    expect(
-      within(forms)
-        .getAllByRole('button')
-        .map((button) => button.textContent),
-    ).toEqual(['PurchaseRequestForm'])
-    expect(screen.getByText('Select a resource.')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-group-form')).not.toBeInTheDocument()
+    expect(screen.queryByTestId(`studio-resource-${formId}`)).not.toBeInTheDocument()
   })
 
   it('shows the off-standard mark above Validate and Publish when application.json has a relax entry', async () => {
@@ -354,40 +359,16 @@ describe('StudioPage', () => {
     })
     renderPage()
 
-    await screen.findByTestId('studio-group-entity')
+    await screen.findByRole('heading', { level: 4, name: 'PurchaseRequests' })
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/resources/${manifestId}`)).toBe(true),
     )
     expect(screen.queryByTestId('studio-off-standard')).not.toBeInTheDocument()
   })
 
-  it('filters the resources by part of a name in any letter case', async () => {
+  it('shows the details of a resource and keeps it in the address without its kind', async () => {
     stubServer()
-    renderPage()
-    await screen.findByTestId('studio-group-entity')
-
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search by name or id' }), 'purchaserEQ')
-
-    expect(screen.getByTestId(`studio-resource-${entityId}`)).toBeInTheDocument()
-    expect(screen.getByTestId(`studio-resource-${formId}`)).toBeInTheDocument()
-    expect(screen.queryByTestId(`studio-resource-${departmentId}`)).not.toBeInTheDocument()
-  })
-
-  it('filters the resources by part of an id in any letter case', async () => {
-    stubServer()
-    renderPage()
-    await screen.findByTestId('studio-group-entity')
-
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search by name or id' }), '5B6C7D8E')
-
-    expect(screen.getByTestId(`studio-resource-${formId}`)).toBeInTheDocument()
-    expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument()
-    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
-  })
-
-  it('shows the details of a resource and keeps it in the address', async () => {
-    stubServer()
-    renderPage()
+    renderPage('/studio?app=PurchaseRequests&kind=entity')
 
     await userEvent.click(await screen.findByTestId(`studio-resource-${entityId}`))
 
@@ -397,6 +378,7 @@ describe('StudioPage', () => {
     expect(details).toHaveTextContent(entityId)
     expect(details).toHaveTextContent('entities/purchase-request.json')
     expect(screen.getByTestId('location')).toHaveTextContent(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
   })
 
   it('opens the resource named in the address', async () => {
@@ -512,18 +494,13 @@ describe('StudioPage', () => {
     expect(within(panel).getByText(/application\.json · Path: \/description/)).toBeInTheDocument()
   })
 
-  it('selects the resource of a clicked diagnostic, clears the search and shows its file', async () => {
+  it('selects the resource of a clicked diagnostic and shows its file', async () => {
     stubServer()
     renderPage()
-    await screen.findByTestId('studio-group-entity')
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search by name or id' }), 'Department')
-    expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /AXC0101/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
 
     expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
-    expect(screen.getByRole('searchbox', { name: 'Search by name or id' })).toHaveValue('')
-    expect(screen.getByTestId(`studio-resource-${entityId}`)).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
   })
 
@@ -598,9 +575,9 @@ describe('StudioPage', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/resources', expect.anything())
   })
 
-  it('switches between the resources and the policy matrix from the sidebar, kept in the address', async () => {
+  it('switches between the kind list and the policy matrix from the sidebar, kept in the address', async () => {
     const fetchMock = stubServer()
-    renderPage()
+    renderPage('/studio?app=PurchaseRequests&kind=entity')
 
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalledWith(`${folder}/policy-matrix`, expect.anything())
@@ -615,7 +592,8 @@ describe('StudioPage', () => {
 
     await userEvent.click(within(sidebar!).getByRole('link', { name: 'Overview' }))
 
-    expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 4, name: 'PurchaseRequests' })).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
   })
 
@@ -645,7 +623,7 @@ describe('StudioPage', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
 
     expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
-    expect(screen.getByTestId('studio-group-entity')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
   })
@@ -788,7 +766,7 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
   })
 
-  it('shows only the kind of the address in the resource list, and keeps the kind when a resource is picked', async () => {
+  it('shows only the kind of the address in its list, and drops the kind when a resource is picked', async () => {
     stubServer()
     renderPage('/studio?app=PurchaseRequests&kind=entity')
 
@@ -798,7 +776,9 @@ describe('StudioPage', () => {
     await userEvent.click(screen.getByTestId(`studio-resource-${entityId}`))
 
     expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
-    expect(screen.getByTestId('location')).toHaveTextContent(`app=PurchaseRequests&kind=entity&resource=${entityId}`)
+    expect(screen.getByTestId('location')).toHaveTextContent(`app=PurchaseRequests&resource=${entityId}`)
+    expect(screen.getByTestId('location')).not.toHaveTextContent('kind=')
+    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
   })
 
   it('shows a load error when the folder cannot be loaded', async () => {
@@ -988,12 +968,11 @@ describe('StudioPage', () => {
     expect(within(within(dialog).getByTestId('studio-delete-warning')).getByText('3')).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
 
-    await waitFor(() => expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/))
     const deletes = fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE')
     expect(deletes).toHaveLength(1)
     const [, init] = deletes[0]
     expect(new Headers(init!.headers).get('If-Match')).toBe('"b"')
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/))
   })
 
   it('loads the names again after a save and after a delete', async () => {
@@ -1553,7 +1532,7 @@ describe('StudioPage publishing', () => {
         texts: { 'app.title': 'Tiêu đề' },
       })
       expect(body.id).toMatch(/^[0-9a-f-]{36}$/)
-      expect(screen.getByTestId(`studio-resource-${newId}`)).toBeInTheDocument()
+      expect(screen.getByTestId('studio-resource-details')).toBeInTheDocument()
       expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
     })
 

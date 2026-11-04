@@ -39,6 +39,11 @@ const kindGroups: readonly (readonly [string, readonly string[]])[] = [
 
 const groupedKinds = new Set(kindGroups.flatMap(([, kinds]) => kinds))
 
+/** The plural name of a kind in the UI locale, or the kind itself when the kind has no name. */
+export function kindName(kind: string, t: (key: string) => string): string {
+  return Object.hasOwn(kindIcons, kind) ? t(`shell.studio.nav.kind.${kind}`) : kind
+}
+
 /**
  * The sidebar entries of an open application, in the order that docs/reference/studio-workspace.md#workspace gives.
  */
@@ -54,15 +59,12 @@ export function studioNavigation(
     ...resources.map((item) => item.kind),
     ...moduleGroups.filter((group) => group.items.length > 0).map((group) => group.kind),
   ])
-  const kindEntry = (kind: string): ShellNavigationEntry => {
-    const known = Object.hasOwn(kindIcons, kind)
-    return {
-      key: `kind:${kind}`,
-      path: path({ kind }),
-      icon: known ? kindIcons[kind] : null,
-      label: known ? t(`shell.studio.nav.kind.${kind}`) : kind,
-    }
-  }
+  const kindEntry = (kind: string): ShellNavigationEntry => ({
+    key: `kind:${kind}`,
+    path: path({ kind }),
+    icon: Object.hasOwn(kindIcons, kind) ? kindIcons[kind] : null,
+    label: kindName(kind, t),
+  })
   const policyMatrix: ShellNavigationEntry = {
     key: 'policies',
     path: path({ view: 'policies' }),
