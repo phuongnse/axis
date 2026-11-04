@@ -386,8 +386,14 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
         interrupt(run)
       }
     })
-    assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
+    // The 60 seconds are for the stop. A cold start builds and starts the server first, which may take longer.
+    const deadline = Date.now() + 600_000
+    while (!sent && Date.now() < deadline) {
+      assert.equal(run.exitCode, undefined, `dev.sh exited early with ${run.exitCode}.\n${run.stdout}\n${run.stderr}`)
+      await sleep(500)
+    }
     assert.ok(sent, run.stdout)
+    assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
     assert.match(run.stdout, /\[dev\] Stopping/)
     await sleep(500)
     assert.deepEqual(

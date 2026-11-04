@@ -13,7 +13,7 @@ import {
   rollbackStudioRelease,
   ServerUnreachableError,
   type StudioDiagnostic,
-  type StudioReleaseRow,
+  type StudioReleaseListRow,
   type StudioReleases,
   type StudioResourceItem,
   type StudioRequest,
@@ -41,14 +41,14 @@ export interface StudioPublishingHandle {
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
  * sends a publish request. A publish refused by a tenant quota shows the server's title in the error alert.
- * A Roll back button in the history sends a rollback request.
+ * An Activate… button in the history sends a rollback request.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
  * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
  * stored under the status line, when it stored any.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
  * status meanwhile. When it ends, its diagnostics go to the diagnostics panel. A succeeded publish or rollback
- * shows its release number, found in the release history by the request's `releaseId`. Publish and Roll back show
+ * shows its release number, found in the release history by the request's `releaseId`. Publish and Activate… show
  * only when `canPublish`. They and Validate are off while a request runs and while the reconnect message shows. The
  * history loads when the application is picked, and again after a request ends, after the reconnect, and when
  * `folderRevision` changes, which the page does after a save or a delete. A warning shows when the folder differs
@@ -298,7 +298,7 @@ export function StudioPublishing({
             history={history}
             canRollBack={canPublish}
             busy={busy}
-            onRollBack={(row: StudioReleaseRow) => send(() => rollbackStudioRelease(application, row.releaseId))}
+            onRollBack={(row: StudioReleaseListRow) => send(() => rollbackStudioRelease(application, row.releaseId))}
           />
         </>
       )}

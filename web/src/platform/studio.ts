@@ -1003,8 +1003,23 @@ export interface StudioReleases {
   items: StudioReleaseItem[]
 }
 
-/** A row of the release list. `active` is set on one row only. */
-export type StudioReleaseRow = StudioReleaseItem & { active: boolean }
+/**
+ * A row of the release list: one release. Its `label`, `note`, `publishedAt`, `actor` and `actorName` are those of its
+ * first activation, which is the publish (or the startup or operator activation that gave it its number). `live` is set
+ * on the release that runs, and `offStandard` and `relaxed` are the release's own.
+ */
+export interface StudioReleaseListRow {
+  releaseId: string
+  number: number
+  label: string | null
+  note: string | null
+  publishedAt: string
+  actor: string
+  actorName: string | null
+  live: boolean
+  offStandard: boolean
+  relaxed: StudioRelaxedPoint[]
+}
 
 /** The optional label and note of a publish. */
 export interface PublishDetails {
@@ -1121,18 +1136,51 @@ export async function fetchStudioReleases(application: string, signal?: AbortSig
 }
 
 /**
- * The rows of the release list, newest activation first. Rows with the same time keep the server's order. A release
- * that was activated more than once has a row for each activation, and only its newest row is active.
+ * The rows of the release list: one for each release, the highest number first. A release that was activated more than
+ * once has one row, which takes its details from its first activation, the earliest `activatedAt`. On equal times the
+ * server's order decides.
  */
-export function releaseRows(history: StudioReleases): StudioReleaseRow[] {
-  const sorted = history.items.toSorted((left, right) => Date.parse(right.activatedAt) - Date.parse(left.activatedAt))
-  const activeId = history.active?.releaseId
-  let activeSeen = false
-  return sorted.map((item) => {
-    const active = !activeSeen && activeId !== undefined && item.releaseId === activeId
-    activeSeen ||= active
-    return { ...item, active }
-  })
+export function releaseList(history: StudioReleases): StudioReleaseListRow[] {
+  const first = new Map<string, StudioReleaseItem>()
+  for (const item of history.items) {
+    const known = first.get(item.releaseId)
+    if (!known || Date.parse(item.activatedAt) < Date.parse(known.activatedAt)) {
+      first.set(item.releaseId, item)
+    }
+  }
+  const liveId = history.active?.releaseId
+  return [...first.values()]
+    .map((item) => ({
+      releaseId: item.releaseId,
+      number: item.number,
+      label: item.label,
+      note: item.note,
+      publishedAt: item.activatedAt,
+      actor: item.actor,
+      actorName: item.actorName,
+      live: item.releaseId === liveId,
+      offStandard: item.offStandard,
+      relaxed: item.relaxed,
+    }))
+    .sort((left, right) => right.number - left.number)
+}
+
+/**
+ * Who published a release, in words: the person's name, "System" for a startup activation, "The platform operator" for
+ * an operator activation, and "Someone no longer known" for any other actor, so a raw id is never shown.
+ */
+export function releasePublisher(row: StudioReleaseListRow, t: (key: string) => string): string {
+  if (row.actorName) {
+    return row.actorName
+  }
+  switch (row.actor) {
+    case 'startup':
+      return t('shell.studio.releases.system')
+    case 'operator':
+      return t('shell.studio.releases.operator')
+    default:
+      return t('shell.studio.releases.unknown')
+  }
 }
 
 /** Whether a release is active and the folder compiles to other content than that release. */

@@ -2,6 +2,7 @@ import { DeleteOutlined } from '@ant-design/icons'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
+import type { HTMLAttributes } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps } from './AxisTable'
 import { designTokensFor } from './designTokens'
@@ -141,6 +142,24 @@ describe('AxisTable', () => {
     expect(screen.getByText('Nothing here')).toBeInTheDocument()
   })
 
+  it('lists every row on one page without paging when pagination is false', () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({ id: String(index), name: `Row ${index}`, amount: index }))
+    renderTable({ dataSource: many, pagination: false })
+
+    expect(screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)).toHaveLength(25)
+    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+  })
+
+  it('puts the attributes of rowAttributes on the row element', () => {
+    renderTable({
+      rowAttributes: (row) =>
+        ({ 'data-testid': 'a-row', 'data-amount': row.amount ?? undefined }) as HTMLAttributes<HTMLElement>,
+    })
+
+    const found = screen.getAllByTestId('a-row')
+    expect(found.map((row) => row.getAttribute('data-amount'))).toEqual(['12', null])
+  })
+
   it('shows the failure in place of the rows and keeps the toolbar', () => {
     renderTable({ failure: <p>Failed</p>, toolbar: { onRefresh: () => {} } })
 
@@ -162,6 +181,22 @@ describe('AxisTable', () => {
       expect(within(row).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
       expect(within(row).getByRole('button', { name: 'Open' })).toHaveTextContent('Open')
       expect(within(row).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+    })
+
+    it('appends the name suffix of an icon action to its accessible name only', async () => {
+      const user = userEvent.setup()
+      renderTable({ rowActions: actionsFor({ ...deleteAction, nameSuffix: '7' }) })
+
+      const button = screen.getByRole('button', { name: 'Delete 7' })
+      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+      await user.hover(button)
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Delete$/)
+    })
+
+    it('names the actions column for screen readers, so its header is not empty', () => {
+      renderTable({ rowActions: actionsFor(deleteAction) })
+
+      expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
     })
 
     it('draws nothing in a row that gives no actions', () => {

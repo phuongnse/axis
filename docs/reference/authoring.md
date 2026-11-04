@@ -892,7 +892,7 @@ newest first.
 - Activating the release that is already active adds no row and keeps the number. Otherwise every restart under
   `scripts/dev.sh` would fill the history with copies.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds both the author role and the publisher role
-  and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
+  and Studio is on. It is built. Studio uses it to hide Publish and Activate….
 - `GET /api/me` gains a boolean `studioTest`, true when `studio` is true and `Studio:Tests` is true. Studio uses it to
   hide **Run tests** and the **Run** action of a scenario.
 - `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and `Studio:ApplicationsPath` is set. It is
