@@ -16,6 +16,7 @@ namespace Axis.Integration.Tests;
 /// directory rows, keys, database, roles, realm and Studio folder, and the source tenant stays. A second removal succeeds and changes nothing.
 /// An id without the <c>restore-check-</c> prefix is refused and its tenant stays whole.
 /// </summary>
+[Collection(AdminCellRestoreCheckTests.ScratchTenantCollection)]
 public sealed class AdminScratchTenantRemovalTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string ScratchId = "restore-check-20261101";

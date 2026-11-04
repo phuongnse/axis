@@ -29,7 +29,8 @@ test('a first sign-in on a tenant with terms asks for them, asks again for an un
   ])
   expect(legal.status, `${legal.stdout}\n${legal.stderr}`).toBe(0)
 
-  const server = await startDirectoryServer()
+  // Offset 1, because the tenant create spec serves its tenant on the base port and may run at the same time.
+  const server = await startDirectoryServer(1)
   // The browser sends the host on port 443 to the server's https port. Node's own requests would ignore this rule.
   const browser = await chromium.launch({
     args: [`--host-resolver-rules=MAP ${host}:443 127.0.0.1:${server.httpsPort}`],

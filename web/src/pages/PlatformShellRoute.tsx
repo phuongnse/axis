@@ -46,6 +46,7 @@ export function PlatformShellRoute({ children }: { children: ReactNode }) {
         locales={site.locales.available}
         locale={current.locale}
         onLocaleChange={changeLocale}
+        legal={site.legal}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
         {children}

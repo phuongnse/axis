@@ -5,8 +5,8 @@ using Microsoft.Extensions.Configuration;
 namespace Axis.Admin;
 
 /// <summary>
-/// Where <c>cell backup</c> uploads the archives: an S3-compatible service with path-style addressing, from the five
-/// <c>Cell:BackupStorage</c> settings. Only <c>cell backup</c> reads them. A message names a setting and never holds its value,
+/// Where <c>cell backup</c> uploads the archives and <c>cell restore-check</c> reads them: an S3-compatible service with path-style addressing, from the five
+/// <c>Cell:BackupStorage</c> settings. Only those two commands read them. A message names a setting and never holds its value,
 /// and the secret access key is never printed.
 /// </summary>
 internal sealed record CellBackupStorage(string ServiceUrl, string Region, string Bucket, string AccessKeyId, string SecretAccessKey)

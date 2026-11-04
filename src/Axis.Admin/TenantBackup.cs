@@ -280,7 +280,7 @@ internal sealed class TenantBackup : IAsyncDisposable
 
         _packages = await ReadPackagesAsync(connection, transaction);
         _modules = await ReadModulesAsync(connection, transaction);
-        _counts = await ReadCountsAsync(connection, transaction);
+        _counts = await ReadTableCountsAsync(connection, transaction, _cancellationToken);
         await RunPgDumpAsync(snapshot, password);
         await transaction.CommitAsync(_cancellationToken);
     }
@@ -347,7 +347,8 @@ internal sealed class TenantBackup : IAsyncDisposable
     }
 
     // The row count of each ordinary table outside the system schemas, keyed schema.table, as the dump holds them.
-    private async Task<SortedDictionary<string, long>> ReadCountsAsync(NpgsqlConnection connection, NpgsqlTransaction transaction)
+    internal static async Task<SortedDictionary<string, long>> ReadTableCountsAsync(
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, CancellationToken cancellationToken)
     {
         // Npgsql allows one open reader per connection, so the tables are listed before any count runs.
         var tables = new List<(string Schema, string Table)>();
@@ -359,9 +360,9 @@ internal sealed class TenantBackup : IAsyncDisposable
             """,
             connection,
             transaction))
-        await using (var reader = await list.ExecuteReaderAsync(_cancellationToken))
+        await using (var reader = await list.ExecuteReaderAsync(cancellationToken))
         {
-            while (await reader.ReadAsync(_cancellationToken))
+            while (await reader.ReadAsync(cancellationToken))
             {
                 tables.Add((reader.GetString(0), reader.GetString(1)));
             }
@@ -374,7 +375,7 @@ internal sealed class TenantBackup : IAsyncDisposable
                 $"SELECT count(*) FROM {EntityNaming.Quote(schema)}.{EntityNaming.Quote(table)}",
                 connection,
                 transaction);
-            counts[$"{schema}.{table}"] = (long)(await count.ExecuteScalarAsync(_cancellationToken))!;
+            counts[$"{schema}.{table}"] = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
         return counts;

@@ -12,7 +12,7 @@ import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
-import type { NavigationItem } from './site'
+import type { NavigationItem, SiteLegal } from './site'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
@@ -28,6 +28,8 @@ interface ShellProps {
   onLocaleChange: (locale: string) => void
   /** Where the notification bell reads, set on an application site. Without it the header has no bell. */
   notifications?: { path: string; sitePath: string }
+  /** The privacy and terms links the footer shows, from the site the shell shows. */
+  legal?: SiteLegal | null
   children: ReactNode
 }
 
@@ -56,11 +58,20 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * A footer runs across the bottom. Ant Design components and dayjs follow the locale. At narrow width, below
+ * A footer runs across the bottom, with the copyright at the start and the legal links at the end. Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header.
  */
-export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, notifications, children }: ShellProps) {
+export function Shell({
+  titleKey,
+  navigation,
+  locales,
+  locale,
+  onLocaleChange,
+  notifications,
+  legal,
+  children,
+}: ShellProps) {
   const t = useText()
   const { mode } = useThemeMode()
   const { pathname } = useLocation()
@@ -226,7 +237,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
               <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
             </Layout.Content>
           </Layout>
-          <ShellFooter />
+          <ShellFooter legal={legal} />
         </Layout>
       </ConfigProvider>
     </div>

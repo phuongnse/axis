@@ -446,7 +446,7 @@ describe('Shell above narrow width', () => {
   it('has no sidebar and no collapse button on a one-page site', () => {
     renderShell('en', ['/'], notesNavigation.slice(0, 1))
 
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Collapse navigation' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Expand navigation' })).not.toBeInTheDocument()
   })
@@ -494,7 +494,7 @@ describe('Shell sidebar claimed by a page', () => {
 
     view.rerender(shellFor(notesNavigation.slice(0, 1), <p>No claim</p>))
 
-    expect(screen.queryByRole('navigation')).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Collapse navigation' })).toBeNull()
   })
 
