@@ -806,6 +806,26 @@ describe('TableWidget', () => {
     expect(screen.getByRole('columnheader', { name: 'price' })).toHaveStyle({ textAlign: 'right' })
   })
 
+  it('wraps free text at 320 px and fits an enum to its content', async () => {
+    stubRecords(
+      `{"items":[{"id":"${noteId}","version":1,"values":{"title":"Buy paper","status":"open"},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,
+    )
+
+    renderWidget('', {
+      ...noteWidget,
+      entity: {
+        ...noteWidget.entity!,
+        fields: [field('title', 'text', 'note.title'), { ...field('status', 'enum', 'note.status'), values: ['open'] }],
+      },
+    })
+
+    const title = await screen.findByRole('cell', { name: 'Buy paper' })
+    expect(title.firstElementChild).toHaveStyle({ maxWidth: '320px', whiteSpace: 'normal' })
+    const status = screen.getByRole('cell', { name: 'open' })
+    expect(status).toHaveStyle({ width: '1%', whiteSpace: 'nowrap' })
+    expect(status.firstElementChild).toBeNull()
+  })
+
   it('shows a null cell as a muted italic dash', async () => {
     stubRecords(
       `{"items":[{"id":"${noteId}","version":3,"values":{"title":null},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,

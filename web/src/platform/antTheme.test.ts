@@ -1,6 +1,6 @@
 import { theme } from 'antd'
 import { describe, expect, it } from 'vitest'
-import { antConfigFor, antThemeFor, fieldRules } from './antTheme'
+import { antConfigFor, antThemeFor, fieldRules, tableTheme } from './antTheme'
 import {
   colourTokens,
   designTokensFor,
@@ -237,5 +237,15 @@ describe('theme values', () => {
         .map(([what]) => `${file}: ${what}`),
     )
     expect(found).toEqual([])
+  })
+})
+
+describe('the table theme', () => {
+  it('pads a cell by spacing-xs above and below and spacing-lg on each side', () => {
+    const { spacing } = designTokensFor('light')
+    expect(tableTheme(designTokensFor('light')).components?.Table).toEqual({
+      cellPaddingBlock: spacing.xs,
+      cellPaddingInline: spacing.lg,
+    })
   })
 })

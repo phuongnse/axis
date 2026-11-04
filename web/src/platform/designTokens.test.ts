@@ -4,6 +4,7 @@ import {
   designTokensFor,
   radiusTokens,
   shadowTokens,
+  sizeTokens,
   spacingTokens,
   typeTokens,
   type ColourName,
@@ -147,5 +148,19 @@ describe('tokens with page values', () => {
     expect(typeTokens.codeFontFamily.startsWith("'IBM Plex Mono'")).toBe(true)
     expect(typeTokens.fontFamily).not.toContain('Inter')
     expect(typeTokens.codeFontFamily).not.toContain('Inter')
+  })
+})
+
+describe('size tokens', () => {
+  it('are the shell bar, the small control and the table row', () => {
+    expect(sizeTokens).toEqual({ bar: 48, smallControl: 24, tableRow: 40 })
+  })
+
+  it.each(['light', 'dark'] as const)('are returned for %s mode', (mode) => {
+    expect(designTokensFor(mode).size).toEqual({ bar: 48, smallControl: 24, tableRow: 40 })
+  })
+
+  it('are not changed by a page', () => {
+    expect(designTokensFor('light', { '--size-bar': '99', '--size-tableRow': '99' }).size).toEqual(sizeTokens)
   })
 })

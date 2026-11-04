@@ -8,6 +8,7 @@ import { AxisButton } from './AxisButton'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { NotificationBell } from './NotificationBell'
 import { PreferencesMenu } from './PreferencesMenu'
+import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
 import { ShellSidebarContext } from './shellSidebarContext'
@@ -18,7 +19,7 @@ import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
 import { useNarrowWidth } from './useNarrowWidth'
 
-const headerHeight = 48
+const headerHeight = sizeTokens.bar
 
 interface ShellProps {
   titleKey: string
