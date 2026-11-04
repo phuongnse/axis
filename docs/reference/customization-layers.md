@@ -252,8 +252,8 @@ the module's.
 Studio shows each module resource with the application's layer applied, and an author changes it
 as they change any resource of their own. The [authoring API](authoring.md) reads the resource with the layer
 applied, its marks and its removed elements, its [save route](module-resource-saves.md) writes the layer, and its
-[reset route](module-resource-saves.md#element-reset) takes one element out of it. All three are built. The module entity editor
-and the module process editor are built, with their Customized tag, **Reset all**, the element marks and
+[reset route](module-resource-saves.md#element-reset) takes one element out of it. All three are built. The module entity editor,
+the module process editor and the module page editor are built, with their Customized tag, **Reset all**, the element marks and
 **Reset to module**. The module process opens in the [process designer](process-designer.md), and
 its marks and resets are on steps. A module text opens in the text table with the layer applied, with Added and Changed marks on
 its keys, **Reset to module** and **Reset all**. A module policy opens in the module editor, built with the policy matrix's
@@ -261,7 +261,9 @@ action checkboxes, and its marks and resets are on grants, keyed by `name`. It e
 shows a grant's filter and fields read-only, and there is no way yet to add a grant. A grant past the module contract's ceiling
 (`AXC0334`) shows in the diagnostics panel after the save. A module form opens in the [form designer](form-designer.md) with the layer applied. Its marks and resets are
 on sections and steps, keyed by `name`, and on a section's fields, keyed by `field`, all in the outline. A module contract opens in its contract editor, where the author adds and removes
-the application's own states and transitions, marked **Added**, and **Save** writes the contract's layer. The editors of the other kinds are _(planned for M25)_.
+the application's own states and transitions, marked **Added**, and **Save** writes the contract's layer. The module page opens in the [page designer](studio.md), and its marks
+and resets are on widgets, actions, row actions, toolbar actions, columns and tabs. The canvas draws the saved page
+with the layer, so it changes after a save or a reset. The editors of the other kinds are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.
@@ -272,6 +274,13 @@ the application's own states and transitions, marked **Added**, and **Save** wri
 - **Marks.** An element the layer added shows **Added**, one it changed **Changed**, and the
   editor's header shows that the resource has a layer. A removed element stays listed as **Removed**
   in a muted row.
+- **Module pages.** A module page opens in the [page designer](studio.md) with every input on and a
+  Save button, and with no Form tab, JSON tab, Undo or Delete. A widget, action, row action, toolbar
+  action, column or tab that the layer added or changed is marked on its tree row, its card or its
+  row in the container's panel. A change inside a nested widget also marks every container that holds
+  it as **Changed**. A label is a plain text key, with no box for each locale, so a save writes no
+  text. The canvas draws the saved page from the [module page route](draft-page-metadata.md), so it
+  changes after **Save** or a reset and not while the author types.
 - **Reset.** Each added, changed or removed element has **Reset to module**, which takes it out of
   the layer with the [reset route](module-resource-saves.md#element-reset) and keeps the rest of the layer.
   The resource's header has **Reset all**, which deletes the layer file with the

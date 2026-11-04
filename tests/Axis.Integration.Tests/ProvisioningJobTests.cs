@@ -50,12 +50,12 @@ public sealed class ProvisioningJobTests(PostgreSqlFixture database) : IClassFix
         var firstRuns = 0;
         var secondRuns = 0;
         var kinds = Kinds(
-            new JobStep("first", (_, _) =>
+            new JobStep("first", (_, _, _) =>
             {
                 firstRuns++;
                 return Task.FromResult<string?>(null);
             }),
-            new JobStep("second", (_, _) =>
+            new JobStep("second", (_, _, _) =>
             {
                 secondRuns++;
                 return secondRuns == 1 ? throw new InvalidOperationException("The step broke.") : Task.FromResult<string?>(null);
@@ -119,7 +119,7 @@ public sealed class ProvisioningJobTests(PostgreSqlFixture database) : IClassFix
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = scenario.NewTenantId();
-        var kinds = Kinds(new JobStep("status", (_, _) => throw new InvalidOperationException("The step broke.")));
+        var kinds = Kinds(new JobStep("status", (_, _, _) => throw new InvalidOperationException("The step broke.")));
         var job = await ProvisioningJobs.QueueAsync(scenario.Platform, kinds, "suspend", id, "operator-1", null, null, CancellationToken);
         var jobs = new ProvisioningJobs(scenario.Platform, kinds, _lease);
 
@@ -156,7 +156,7 @@ public sealed class ProvisioningJobTests(PostgreSqlFixture database) : IClassFix
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = scenario.NewTenantId();
-        var kinds = Kinds(new JobStep("status", (_, _) => Task.FromResult<string?>(null)));
+        var kinds = Kinds(new JobStep("status", (_, _, _) => Task.FromResult<string?>(null)));
         var running = await ProvisioningJobs.QueueAsync(scenario.Platform, kinds, "suspend", id, "operator-1", null, null, CancellationToken);
         var queued = await ProvisioningJobs.QueueAsync(scenario.Platform, kinds, "resume", id, "operator-1", null, null, CancellationToken);
         await ScalarAsync(scenario, $"UPDATE platform.jobs SET state = 'running', claims = 1, lease_until = now() + interval '1 hour' WHERE id = '{running}'");

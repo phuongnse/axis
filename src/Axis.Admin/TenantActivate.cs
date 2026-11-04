@@ -32,7 +32,7 @@ internal sealed class TenantActivate(
     ModuleCatalog modules,
     int inlineRecomputeLimit,
     TimeSpan activationTimeout,
-    TenantAudit audit,
+    TenantAudit? audit,
     TextWriter output,
     TextWriter error,
     CancellationToken cancellationToken)
@@ -61,7 +61,7 @@ internal sealed class TenantActivate(
 
     private async Task<bool> ActivateTenantAsync(TenantRow row)
     {
-        if (!await audit.WriteAsync(row.Id, output, cancellationToken))
+        if (audit is not null && !await audit.WriteAsync(row.Id, output, cancellationToken))
         {
             return false;
         }

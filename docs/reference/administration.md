@@ -35,13 +35,13 @@ which host holds which connection. There is no HTTP API for provisioning.
 
 | Setting | Environment variable | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create`, `tenant restore` and `tenant rotate-passwords` read it, so `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
+| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create`, `tenant restore` and `tenant rotate-passwords` read it, and `publisher` reads it in a cell for the [create job](#create-job). `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant and `cell operator invite` read it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
-| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when it is set. |
-| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. It is never stored and never printed. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant and `cell operator invite` read it, and `tenant restore` reads it when it is set. In a cell, `publisher` reads it for the [create job](#create-job). `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
+| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when it is set. In a cell, `publisher` reads it for the [create job](#create-job). |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. In a cell, `publisher` reads it for the [create job](#create-job). It is never stored and never printed. |
 | `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | Optional. A connection string to the identity provider's database, for a role that is read-only and has `SELECT` on Keycloak's `credential` table and no other right. Only `tenant backup` and `cell backup` read it, to put the password hashes and authenticator secrets of a realm's users into `realm.json`, see [Tenant backup](tenant-backup-and-restore.md#tenant-backup). A `tenant restore` into a new realm imports that file and needs no such setting. It is never printed. Without it, no archive holds a `realm.json`. A value that is not a connection string exits with code 2, naming the setting. |
 | `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher`, `cell operator invite` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
@@ -477,6 +477,10 @@ agrees. See [test](authoring.md#test) for the route.
   settings error.
 - `Activation:InlineRecomputeLimit`, as for `activate`.
 - `Data:ActivationTimeout`, as for `activate`.
+- In a cell (`Cell:Id` set), the settings of the [create job](#create-job): `Admin:ConnectionString`, the
+  `IdentityProvider` settings, `Cell:BackupKeyFile`, `Cell:TenantDomain`, `Studio:ApplicationsPath` and `Templates:Path`. The
+  publisher reads them without stopping. When one is missing or wrong, it still starts and runs its other requests, and only the
+  create job fails, at the first step that needs the setting, with a message that names it. The `Email` block it reads anyway.
 - `Scenarios:ServerConnectionString`, the role that creates
   the scenario databases of `test` requests and of the contract scenarios of
   `publish` and `validate` requests. It is optional. The publisher
@@ -708,6 +712,29 @@ its tenants at start or stops on an error that it cannot recover from. `2` for a
 usage error or a missing or bad setting, which includes a tenant under
 `configuration` that has no `SchemaConnectionString`. A request that fails is not an exit
 code, because it is stored on the request.
+
+### Create job
+
+In a cell, the publisher runs the `create` job that `POST /api/cell/tenants` queues, see
+[creating a tenant](tenant-lifecycle.md#creating-a-tenant). Outside a cell it knows no `create` kind, because the provisioning API
+answers `404` there. The job has five steps, and each can run again:
+
+1. `tenant`: runs the code of `tenant create` for the host `<id>.<Cell:TenantDomain>`, with no administrator and the cell's backup key.
+   The tenant stays `provisioning`, so no host serves it. The step writes no audit record of its own, because the job writes one when
+   it ends. A rerun on a `provisioning` entry reuses the realm, the secrets and the keys. A refusal that `tenant create` gives before
+   it does any work, such as a taken host or an id that is already an active tenant, fails the job at once. Any other failure ends the claim.
+2. `application`: copies the newest version of the template in the job's `application` into
+   `<Studio:ApplicationsPath>/<id>/<kebab-case name>`, as Studio creates an application from a template. The copy keeps the template's
+   application name and gets new resource ids. It is written to a hidden temporary folder and then renamed. The step is skipped when the
+   folder already holds an application with that name. A template that is not installed fails the job at once.
+3. `activate`: compiles that folder and activates its release in the tenant, as `activate` does, while the tenant is still
+   `provisioning`. It writes no `activate` audit record. A failed activation fails the job at once.
+4. `invite`: invites the administrator in the job's `administrator`, as `tenant create --administrator` does. It finds the account by
+   its email before it creates one. The invite records name `tenant create` as their actor.
+5. `resume`: sets the tenant `active`. A tenant that is already `active` is ok.
+
+A step that throws ends the claim, and the next claim runs the job again from the first step that has not succeeded. A job gets three
+claims, see [provisioning API](tenant-lifecycle.md#provisioning-api). The run again of a failed job is _(planned for M31)_.
 
 ## What else to back up
 

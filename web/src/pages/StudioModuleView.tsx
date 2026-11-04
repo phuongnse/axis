@@ -3,7 +3,6 @@ import type { ModuleResourceItem, StudioDiagnostic, StudioResource, StudioResour
 import { useText } from '../platform/texts'
 import { StudioModuleContract } from './StudioModuleContract'
 import { StudioModuleEditor } from './StudioModuleEditor'
-import { StudioModulePage } from './StudioModulePage'
 import { StudioModuleReadOnly } from './StudioModuleReadOnly'
 import { useStudioModuleContent } from './useStudioModuleContent'
 
@@ -33,9 +32,9 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
 }
 
 /**
- * The view of a module resource, by its kind. An entity, a process, a policy, a text and a form are edited as a layer, and so are the
- * states and transitions that a contract takes from the application. A page has its own read-only view, and any other
- * kind, scenarios included, opens in the read-only JSON view. `diagnostics` are the folder's.
+ * The view of a module resource, by its kind. An entity, a process, a policy, a text, a form and a page are edited as a
+ * layer, and so are the states and transitions that a contract takes from the application. Any other kind, scenarios
+ * included, opens in the read-only JSON view. `diagnostics` are the folder's.
  */
 export function ModuleResourceView({
   application,
@@ -60,6 +59,7 @@ export function ModuleResourceView({
     case 'policy':
     case 'text':
     case 'form':
+    case 'page':
       return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'contract':
       return (
@@ -74,8 +74,6 @@ export function ModuleResourceView({
           onManifestStale={onManifestStale}
         />
       )
-    case 'page':
-      return <StudioModulePage application={application} module={item.module} id={item.id} />
     default:
       return <StudioModuleJson application={application} module={item.module} id={item.id} />
   }

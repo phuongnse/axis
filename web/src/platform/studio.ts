@@ -215,7 +215,8 @@ export async function fetchStudioPageMetadata(
 }
 
 /**
- * Loads the metadata of a page of the module version that the application pins, so Studio can draw it read-only. `id` is
+ * Loads the metadata of a page of the module version that the application pins, so Studio can draw it on the page
+ * designer's canvas. `id` is
  * the id written in the module's file. Any status other than 200 throws, as does a server that does not answer.
  */
 export async function fetchStudioModulePageMetadata(

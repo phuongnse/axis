@@ -125,7 +125,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await page.reload();
     const myRequests = page
       .getByTestId("studio-group-page")
-      .getByRole("button", { name: "MyRequests", exact: true });
+      .getByRole("button", { name: "My requests", exact: true });
     await openKind(page, "page");
     await myRequests.click();
     await expect(

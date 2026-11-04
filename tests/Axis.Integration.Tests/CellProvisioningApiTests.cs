@@ -459,6 +459,168 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(0, await CountAsync("platform.jobs"));
     }
 
+    [Fact]
+    public async Task An_operator_queues_a_create_job_with_five_pending_steps_and_the_job_read_hides_its_input()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var create = await PostJobAsync(client, "/api/cell/tenants", token, "create-d", CreateBody("d"));
+
+        Assert.Equal(HttpStatusCode.Accepted, create.StatusCode);
+        var queued = await create.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("create", queued.GetProperty("kind").GetString());
+        Assert.Equal("d", queued.GetProperty("tenantId").GetString());
+        Assert.Equal("queued", queued.GetProperty("state").GetString());
+        var id = queued.GetProperty("id").GetGuid();
+        Assert.Equal($"/api/cell/jobs/{id:D}", create.Headers.Location?.OriginalString);
+
+        using var read = await GetAsync(client, $"/api/cell/jobs/{id:D}", token);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(
+            ["tenant", "application", "activate", "invite", "resume"],
+            job.GetProperty("steps").EnumerateArray().Select(step => step.GetProperty("name").GetString()));
+        Assert.All(job.GetProperty("steps").EnumerateArray(), step => Assert.Equal("pending", step.GetProperty("state").GetString()));
+        Assert.False(job.TryGetProperty("input", out _));
+        Assert.Equal(
+            """{"application":"request-approval","administrator":"admin@example.test"}""",
+            await ScalarAsync("SELECT input::text FROM platform.jobs") is string input ? Compact(input) : null);
+    }
+
+    [Fact]
+    public async Task An_id_of_an_existing_tenant_or_an_unfinished_create_job_answers_409()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var existing = await PostJobAsync(client, "/api/cell/tenants", token, "k-b", CreateBody("b"));
+        using var preview = await PostJobAsync(client, "/api/cell/tenants", token, "k-preview", CreateBody("a-preview"));
+        using var first = await PostJobAsync(client, "/api/cell/tenants", token, "k-d", CreateBody("d"));
+        using var queued = await PostJobAsync(client, "/api/cell/tenants", token, "k-d-again", CreateBody("d"));
+
+        Assert.Equal(HttpStatusCode.Conflict, existing.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, queued.StatusCode);
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task A_cell_at_its_tenant_cap_answers_409_this_cell_is_full_and_counts_unfinished_create_jobs()
+    {
+        // The fixture holds the directory rows a, b, c and a-preview, so a cap of 4 is reached.
+        await using (var full = await StartAsync(tenantCap: 4))
+        {
+            using var client = CreateClient(full, _console);
+            var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+            using var response = await PostJobAsync(client, "/api/cell/tenants", token, "full-d", CreateBody("d"));
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var problem = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal("This cell is full.", problem.GetProperty("title").GetString());
+            Assert.Equal(0, await CountAsync("platform.jobs"));
+        }
+
+        await using var room = await StartAsync(tenantCap: 5);
+        using var roomClient = CreateClient(room, _console);
+        var roomToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var last = await PostJobAsync(roomClient, "/api/cell/tenants", roomToken, "room-d", CreateBody("d"));
+        using var over = await PostJobAsync(roomClient, "/api/cell/tenants", roomToken, "room-e", CreateBody("e"));
+
+        Assert.Equal(HttpStatusCode.Accepted, last.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, over.StatusCode);
+        Assert.Equal("This cell is full.", (await over.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("title").GetString());
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task Creating_without_the_role_answers_403_and_a_bad_request_answers_400_with_no_job_queued()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        using var noRole = await PostJobAsync(client, "/api/cell/tenants", noRoleToken, "k-1", CreateBody("d"));
+        using var noKey = await PostJobAsync(client, "/api/cell/tenants", operatorToken, key: null, CreateBody("d"));
+        using var unknownTemplate = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-2", CreateBody("d", application: "nothing"));
+        using var upperCase = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-3", CreateBody("Upper"));
+        using var reserved = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-4", CreateBody("master"));
+        using var tooLong = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-5", CreateBody(new string('a', 51)));
+        using var badEmail = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-6", CreateBody("d", administrator: "not-an-email"));
+        using var notJson = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-7", "{");
+        using var noBody = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-8");
+
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noKey.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, unknownTemplate.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, upperCase.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, reserved.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, badEmail.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, notJson.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noBody.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task The_same_key_and_body_sent_after_the_tenant_exists_answer_the_first_job_and_another_body_answers_422()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await PostJobAsync(client, "/api/cell/tenants", token, "create-once", CreateBody("d"));
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenants (
+                id, status, database_host, database_port, database_name, runtime_user, schema_user,
+                runtime_password, schema_password, oidc_authority, oidc_client_id, oidc_client_secret)
+            VALUES ('d', 'provisioning', 'localhost', 5432, 'db', 'r', 's', '\x00', '\x00', 'http://idp.test', 'axis', '\x00')
+            """);
+        using var again = await PostJobAsync(client, "/api/cell/tenants", token, "create-once", CreateBody("d"));
+        using var other = await PostJobAsync(client, "/api/cell/tenants", token, "create-once", CreateBody("e"));
+        using var withoutKey = await PostJobAsync(client, "/api/cell/tenants", token, "create-twice", CreateBody("d"));
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid(),
+            (await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, other.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, withoutKey.StatusCode);
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task Parallel_creates_of_one_id_with_different_keys_queue_one_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6)
+            .Select(index => PostJobAsync(client, "/api/cell/tenants", token, $"race-{index}", CreateBody("d"))));
+        try
+        {
+            Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.Accepted));
+            Assert.Equal(5, responses.Count(response => response.StatusCode == HttpStatusCode.Conflict));
+            Assert.Equal(1, await CountAsync("platform.jobs"));
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
     private async Task<bool> RunJobAsync() =>
         await new ProvisioningJobs(_platform, ProvisioningJobs.Builtin(_platform), TimeSpan.FromMinutes(5))
             .RunNextAsync(TextWriter.Null, CancellationToken);
@@ -494,6 +656,27 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         var quota = quotas.GetProperty(key);
         Assert.Equal(value, quota.GetProperty("value").ValueKind == JsonValueKind.Null ? null : quota.GetProperty("value").GetInt64());
         Assert.Equal(overridden, quota.GetProperty("overridden").GetBoolean());
+    }
+
+    private static string CreateBody(string id, string application = "request-approval", string administrator = "admin@example.test") =>
+        JsonSerializer.Serialize(new { id, application, administrator });
+
+    private static string Compact(string json) => JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>(json));
+
+    private async Task<object?> ScalarAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        return await command.ExecuteScalarAsync(CancellationToken);
+    }
+
+    private async Task ExecuteAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
     private async Task<long> CountAsync(string table)
@@ -568,7 +751,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<WebApplicationFactory<Program>> StartAsync()
+    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null)
     {
         var authority = await keycloak.StartAsync();
         var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
@@ -586,6 +769,11 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             builder.UseSetting("Cell:OperatorRealm", _realm);
             builder.UseSetting("Cell:OperatorRole", OperatorRole);
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());
+            builder.UseSetting("Templates:Path", SampleTemplates.Path);
+            if (tenantCap is { } cap)
+            {
+                builder.UseSetting("Cell:TenantCap", cap.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
         });
     }
 }

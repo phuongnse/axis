@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Templates;
 using Json.Patch;
 
 namespace Axis.Server.Studio;
@@ -72,14 +72,6 @@ internal sealed record StudioTextVersion(string Id, string Locale, string Versio
 /// </summary>
 internal static class StudioWrites
 {
-    private static readonly JsonWriterOptions _writer = new()
-    {
-        Indented = true,
-        IndentSize = 2,
-        NewLine = "\n",
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
-
     /// <summary>
     /// The files of <paramref name="folder"/> as a publish request stores them. It holds the write lock, so the
     /// snapshot never sees a write half done and includes every write that finished before the call. It throws
@@ -561,17 +553,7 @@ internal static class StudioWrites
     internal static string Unquote(string value) =>
         value.Length >= 2 && value[0] == '"' && value[^1] == '"' ? value[1..^1] : value;
 
-    internal static byte[] Serialize(JsonObject content)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream, _writer))
-        {
-            content.WriteTo(writer);
-        }
-
-        stream.WriteByte((byte)'\n');
-        return stream.ToArray();
-    }
+    internal static byte[] Serialize(JsonObject content) => TemplateApplications.Serialize(content);
 
     // The full path of the file, or null when it is not a real *.json file inside the folder: it leaves the
     // folder, or the file or a folder on the way to it is a link.

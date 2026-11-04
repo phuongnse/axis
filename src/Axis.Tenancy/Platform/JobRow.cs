@@ -9,7 +9,7 @@ public sealed class JobRow
 {
     public Guid Id { get; set; }
 
-    /// <summary>The kind of job, such as <c>suspend</c> or <c>resume</c>.</summary>
+    /// <summary>The kind of job, such as <c>suspend</c>, <c>resume</c> or <c>create</c>.</summary>
     public string Kind { get; set; } = "";
 
     public string TenantId { get; set; } = "";
@@ -20,6 +20,9 @@ public sealed class JobRow
     public string Steps { get; set; } = "[]";
 
     public string? Error { get; set; }
+
+    /// <summary>The job's input as <c>jsonb</c>, such as a create's <c>{ application, administrator }</c>, or null.</summary>
+    public string? Input { get; set; }
 
     public string? IdempotencyKey { get; set; }
 

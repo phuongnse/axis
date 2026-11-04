@@ -29,7 +29,8 @@ namespace Axis.Server.Studio;
 /// compile has any error. Its diagnostics are those whose resource is the form. A resource that is neither a page nor a form
 /// is 404.
 /// <c>GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata</c> answers <c>{ page, diagnostics }</c>
-/// for a page of the module version the application pins, so Studio can draw it read-only. The <c>id</c> is the one written in
+/// for a page of the module version the application pins, with the application's layer applied, so Studio can draw it on the
+/// page designer's canvas. The <c>id</c> is the one written in
 /// the module's file, found as <see cref="StudioEndpoints"/> finds a module resource. The page has the shape above and each
 /// widget carries <c>path</c>. The page is null when the application's compile has any error. <c>diagnostics</c> are those of
 /// the page's file. The checks run as above: session (401), author role (403), then 404 for an unknown application, a module

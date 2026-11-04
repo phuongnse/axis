@@ -35,7 +35,9 @@ The `{id}` names the saved page.
   or in another file, answers `widget: null`.
 - **A module page.** `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata`
   answers `{ page, diagnostics }` for a page of the module version that the
-  application pins, so Studio can draw it read-only. The `{id}` is the id
+  application pins, with the application's layer applied, so Studio can draw the saved module page on the page
+  designer's canvas. The canvas does not show unsaved edits of a module page, because no route compiles a draft of
+  one. It shows a change after Save or a reset. The `{id}` is the id
   written in the module's file, as in the module resource route, not the id
   derived for the application. `page` has the shape above and each widget
   carries `path`. The route compiles the application's folder as it is, so
