@@ -386,9 +386,9 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
         interrupt(run)
       }
     })
-    // The server migrates and activates the sample applications first, which takes minutes on a
-    // slow runner. Only the stop after the interrupt has the short limit.
-    const deadline = Date.now() + 300_000
+    // The 60 seconds are for the stop. A cold start builds and starts the server first, which may take
+    // minutes: it migrates and activates the sample applications.
+    const deadline = Date.now() + 600_000
     while (!sent && Date.now() < deadline) {
       assert.equal(run.exitCode, undefined, `dev.sh exited before the worker started.\n${run.stdout}\n${run.stderr}`)
       await sleep(500)

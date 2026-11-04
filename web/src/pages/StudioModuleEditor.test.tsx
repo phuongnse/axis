@@ -52,7 +52,11 @@ function problem(status: number, title = 'Problem') {
 }
 
 function renderEditor(respond: (url: string, init?: RequestInit) => Response, editing: ModuleResourceItem = item) {
-  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => respond(String(input), init))
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
+    String(input).endsWith('/page-metadata')
+      ? new Response(JSON.stringify({ page: null, diagnostics: [] }))
+      : respond(String(input), init),
+  )
   vi.stubGlobal('fetch', fetchMock)
   const onWritten = vi.fn()
   render(
@@ -287,6 +291,50 @@ describe('StudioModuleEditor', () => {
     expect(
       await screen.findByRole('button', { name: 'submit · operation · Added' }, { timeout: 5000 }),
     ).toBeInTheDocument()
+  })
+
+  it('opens a module page in the page designer, marking a changed nested widget and a removed one', async () => {
+    const page = {
+      id: 'page-id',
+      kind: 'page',
+      name: 'Budgets',
+      widgets: [{ type: 'section', name: 'main', widgets: [{ type: 'table', name: 'list', dataSource: 'X' }] }],
+    }
+    const { fetchMock } = renderEditor(
+      (_url, init) =>
+        init?.method === 'POST'
+          ? new Response(
+              JSON.stringify({ file: 'customizations/budgets/Budgets.json', version: 'v2', diagnostics: [] }),
+            )
+          : read(
+              layer,
+              page,
+              [
+                { path: '/widgets/0', mark: 'changed' },
+                { path: '/widgets/0/widgets/0', mark: 'changed' },
+              ],
+              [{ list: '/widgets/0/widgets', key: 'old', content: { type: 'table', name: 'old' } }],
+            ),
+      { id: 'page-id', kind: 'page', name: 'budgets/Budgets', module: 'budgets' },
+    )
+
+    expect(await screen.findByTestId('studio-page-design', undefined, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByTestId('studio-module-reset-all')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-save')).toBeDisabled()
+    expect(screen.getByRole('note', { name: 'Changed list' })).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'Changed main' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset to module list' })).toBeEnabled()
+    const removed = screen.getByTestId('studio-layer-removed-/widgets/0/widgets/old')
+    expect(removed).toHaveAttribute('data-muted')
+    expect(within(removed).getByRole('note', { name: 'Removed old' })).toBeInTheDocument()
+
+    await userEvent.click(within(removed).getByRole('button', { name: 'Reset to module old' }))
+
+    await waitFor(() => expect(calls(fetchMock, 'POST')).toHaveLength(1))
+    expect(JSON.parse(calls(fetchMock, 'POST')[0][1].body as string)).toEqual({
+      list: '/widgets/0/widgets',
+      key: 'old',
+    })
   })
 
   it('opens a module text in the text table and resets one key through the reset route', async () => {

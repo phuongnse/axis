@@ -30,6 +30,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { innermostCollision, silent } from './designDrag'
 import { BindingChoice, PageDataPanel } from './PageDataPanel'
+import type { DesignerLayer } from './LayerMarkViews'
 import { PageWidgets } from './PageEditor'
 import { PagePalette } from './PagePalette'
 import { landedText, paletteReasons, usePartLabel } from './pagePaletteSupport'
@@ -68,22 +69,31 @@ function bindingOf(data: unknown): DataBinding | undefined {
  * The keyboard moves the selected canvas widget with Alt+ArrowDown and Alt+ArrowUp, one allowed place at a time, as one
  * edit of the draft. The live region names where it landed, or says that it cannot move further. The canvas, the
  * palette, the data panel and the drag library are one lazy chunk, which loads when the tab opens.
+ *
+ * With `module`, the page is a module page that the application customizes, and `resourceId` is the module's page.
+ * The canvas then draws the saved page with the layer from the module page route, so it shows a change after a save or a
+ * reset and not while the author types. With `layer`, the widget tree marks what the layer added, changed or removed.
  */
 export default function StudioPageDesign({
   application,
   resourceId,
+  module,
   draft,
   selected,
   onSelect,
   onChange,
+  layer,
 }: {
   application: string
   resourceId: string
+  /** The module that owns the page, when it is a module page. */
+  module?: string
   draft: Record<string, unknown>
   /** The pointer of the selected widget. */
   selected: string
   onSelect: (pointer: string) => void
   onChange: ChangeHandler
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const partLabel = usePartLabel()
@@ -286,6 +296,7 @@ export default function StudioPageDesign({
         <div style={{ flex: 1, minWidth: 0 }}>
           <StudioPageCanvas
             application={application}
+            module={module}
             resourceId={resourceId}
             draft={draft}
             selected={selected}
@@ -303,7 +314,7 @@ export default function StudioPageDesign({
             onChange={onChange}
           />
           <PageDataPanel onPick={pick} />
-          <PageWidgets value={draft} selected={selected} onSelect={onSelect} onChange={onChange} />
+          <PageWidgets value={draft} selected={selected} onSelect={onSelect} onChange={onChange} layer={layer} />
         </div>
       </Flex>
       <BindingChoice
