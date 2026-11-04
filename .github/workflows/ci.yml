@@ -25,10 +25,11 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # The checks run as six parallel jobs, so the run takes as long as its slowest job, not all of them.
-  # Playwright is split into three shards, each a job of its own. Each shard's step runs the command of
-  # NexKit's check for that shard, such as AXIS_E2E_SHARD=2/3 scripts/e2e.sh, so NexKit matches a pull
-  # request's failing e2e-2 check with a failed shard 2/3 here.
+  # The checks run as eight parallel jobs, so the run takes as long as its slowest job, not all of them.
+  # The integration tests and Playwright are each split into three shards, each a job of its own. Each
+  # shard's step runs the command of NexKit's check for that shard, such as
+  # AXIS_E2E_SHARD=2/3 scripts/e2e.sh or AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh, so NexKit
+  # matches a pull request's failing e2e-2 or integration-2 check with a failed shard 2/3 here.
   checks:
     if: github.event_name != 'schedule'
     name: ${{ matrix.name }}
@@ -42,8 +43,17 @@ jobs:
             name: Lint and unit tests
             artifact: test-results-unit
           - suite: integration
-            name: Integration tests
-            artifact: test-results-integration
+            name: Integration tests 1/3
+            shard: 1/3
+            artifact: test-results-integration-1
+          - suite: integration
+            name: Integration tests 2/3
+            shard: 2/3
+            artifact: test-results-integration-2
+          - suite: integration
+            name: Integration tests 3/3
+            shard: 3/3
+            artifact: test-results-integration-3
           - suite: smoke
             name: Smoke tests
             artifact: test-results-smoke
@@ -119,7 +129,7 @@ jobs:
         run: scripts/test.sh
       - name: Integration tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'integration' }}
-        run: scripts/integration.sh
+        run: AXIS_INTEGRATION_SHARD=${{ matrix.shard }} scripts/integration.sh
       - name: Smoke tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'smoke' }}
         run: scripts/smoke.sh
