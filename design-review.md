@@ -117,6 +117,15 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
   that belong together on one row, stacking below 992 px. The schema form draws `AxisFieldHeading`, the same heading, as its
   help comes from the text catalogue. The entity designer and the schema form use them, and Add module and Add package now
   have help for Module, Package, Point and Reason.
+- **Required mark:** the platform's own fields follow the form widget's rule of D96: a required field has a `*` in
+  `dangerText` after its label, hidden from screen readers, and its input carries `aria-required`. `AxisField` takes
+  `required`, and the schema form marks what its schema requires, but not inside an optional object such as `fileStorage`,
+  whose fields are needed only once it is there. A field never says "(optional)": the Publish dialog's Label and Note are now
+  fields with a heading and help, where they had only a placeholder. A short form whose every field is required, such as
+  sign-in, marks none.
+- **Nothing between help and input:** a field is its label, its help and its input. Guidance such as where a read-only list
+  is changed goes into the help, so Relaxed points' help says a point is relaxed on its contract's page, and its separate
+  line is gone. Add module leaves Relaxed points out, as a module being added has none.
 - **Validations and fields:** a validation is a rule on the whole record: its expression may read several fields or count
   child rows, and its `field` only says where its message shows. As Salesforce's validation rules and Dataverse's and
   Directus's field constraints do, the file stays as it is and the designer shows it twice: a field's drawer is to have a

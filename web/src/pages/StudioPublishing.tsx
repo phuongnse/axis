@@ -26,6 +26,7 @@ import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
 import { dialogWidth } from '../platform/dialogButtons'
+import { AxisField } from '../platform/AxisField'
 
 /** How long Studio waits between two checks of a request. */
 const pollDelay = 1000
@@ -416,22 +417,25 @@ export function StudioPublishing({
         onOk={publish}
         onCancel={() => setDialogOpen(false)}
       >
-        <Flex vertical gap="small">
-          <Input
-            aria-label={t('shell.studio.publish.label')}
-            placeholder={t('shell.studio.publish.label')}
-            maxLength={100}
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-          <Input.TextArea
-            aria-label={t('shell.studio.publish.note')}
-            placeholder={t('shell.studio.publish.note')}
-            maxLength={2000}
-            autoSize={{ minRows: 3, maxRows: 8 }}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
+        {/* Proposed: the release's label and note are fields like any other, with a heading and help, not a placeholder. */}
+        <Flex vertical gap="middle">
+          <AxisField label={t('shell.studio.publish.label')} help={t('shell.studio.publish.label.help')}>
+            <Input
+              aria-label={t('shell.studio.publish.label')}
+              maxLength={100}
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            />
+          </AxisField>
+          <AxisField label={t('shell.studio.publish.note')} help={t('shell.studio.publish.note.help')}>
+            <Input.TextArea
+              aria-label={t('shell.studio.publish.note')}
+              maxLength={2000}
+              autoSize={{ minRows: 3, maxRows: 8 }}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </AxisField>
         </Flex>
       </Modal>
     </Flex>

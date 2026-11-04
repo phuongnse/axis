@@ -312,9 +312,10 @@ function EntityGeneral({
   )
   return (
     <>
-      <AxisField {...field('name')}>
+      <AxisField {...field('name')} required>
         <Input
           aria-label={t('shell.studio.field.entity.name')}
+          aria-required
           value={text(value.name)}
           onChange={(event) => onChange('/name', event.target.value)}
         />
@@ -646,9 +647,10 @@ function FieldDrawer({
     >
       {index !== null && (
         <Flex vertical gap="middle">
-          <AxisField {...setting('name')}>
+          <AxisField {...setting('name')} required>
             <Input
               aria-label={t('shell.studio.field.entity.fields.name')}
+              aria-required
               value={text(field.name)}
               onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
             />
@@ -665,9 +667,10 @@ function FieldDrawer({
               />
             )}
           </AxisField>
-          <AxisField {...setting('type')}>
+          <AxisField {...setting('type')} required>
             <Select
               aria-label={t('shell.studio.field.entity.fields.type')}
+              aria-required
               showSearch
               optionFilterProp="label"
               virtual={false}

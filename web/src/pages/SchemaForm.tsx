@@ -156,6 +156,7 @@ function SectionedForm({
                 rootValue={value}
                 pointer={`/${escapeSegment(section.properties[0])}`}
                 value={value[section.properties[0]]}
+                optional={!required.has(section.properties[0])}
                 onChange={onChange}
               />
             ) : (
@@ -561,19 +562,28 @@ function ListTable({
         {open && (
           <InListDialogContext.Provider value={true}>
             <Flex vertical gap="middle" data-testid="studio-list-dialog">
-              {Object.entries(itemSchema.properties ?? {}).map(([name, child]) => (
-                <SchemaNode
-                  key={name}
-                  node={child}
-                  root={root}
-                  rootValue={dialogRoot}
-                  pointer={`${itemPointer}/${escapeSegment(name)}`}
-                  name={name}
-                  value={(open.item as Record<string, unknown> | undefined)?.[name]}
-                  required={new Set(itemSchema.required).has(name)}
-                  onChange={changeItem}
-                />
-              ))}
+              {Object.entries(itemSchema.properties ?? {})
+                // Proposed: a module being added has no relaxed points yet, as a point is relaxed on its contract's page
+                // once the module is in the application, so Add module leaves the read-only list out.
+                .filter(
+                  ([name]) =>
+                    !open.isNew ||
+                    fieldControls[fieldTextKey(kind, `${itemPointer}/${name}`).replace('shell.studio.field.', '')] !==
+                      'relaxedPoints',
+                )
+                .map(([name, child]) => (
+                  <SchemaNode
+                    key={name}
+                    node={child}
+                    root={root}
+                    rootValue={dialogRoot}
+                    pointer={`${itemPointer}/${escapeSegment(name)}`}
+                    name={name}
+                    value={(open.item as Record<string, unknown> | undefined)?.[name]}
+                    required={new Set(itemSchema.required).has(name)}
+                    onChange={changeItem}
+                  />
+                ))}
             </Flex>
           </InListDialogContext.Provider>
         )}
@@ -670,10 +680,8 @@ function RelaxedPointsView({ pointer, rootValue }: { pointer: string; rootValue:
     t,
   )
   return (
+    // Proposed: where a point is relaxed is said by the field's help, so nothing sits between the help and the table.
     <Flex vertical gap="small">
-      <Typography.Text style={{ color: colour.textMuted }}>
-        {t('shell.studio.relaxed.changeOnContract')}
-      </Typography.Text>
       <AxisTable<StudioRelaxedPoint>
         rows={points === null ? undefined : rows}
         loading={points === null}
@@ -813,8 +821,16 @@ function Properties({
   value,
   onChange,
   readOnlyNames,
-}: NodeProps & { readOnlyNames?: Set<string> }) {
-  const required = new Set(node.required)
+  optional = false,
+}: NodeProps & {
+  readOnlyNames?: Set<string>
+  /**
+   * Proposed: the object itself is optional, such as `fileStorage`, so none of its properties is marked required: they are
+   * required only once the object is there, and leaving them empty leaves the object out.
+   */
+  optional?: boolean
+}) {
+  const required = new Set(optional ? [] : node.required)
   return (
     <Flex vertical gap="small">
       {Object.entries(node.properties ?? {}).map(([name, child]) => (
@@ -882,6 +898,7 @@ function SchemaNode({
     input = (
       <Select
         aria-label={title}
+        aria-required={required || undefined}
         showSearch
         optionFilterProp="label"
         style={{ width: '100%' }}
@@ -924,6 +941,7 @@ function SchemaNode({
     input = (
       <Select
         aria-label={title}
+        aria-required={required || undefined}
         showSearch
         allowClear={!required}
         placeholder={t('shell.studio.timeZone.none')}
@@ -987,6 +1005,7 @@ function SchemaNode({
     input = (
       <Select
         aria-label={title}
+        aria-required={required || undefined}
         showSearch
         optionFilterProp="label"
         virtual={false}
@@ -1027,6 +1046,7 @@ function SchemaNode({
     input = (
       <Input
         aria-label={title}
+        aria-required={required || undefined}
         value={typeof value === 'string' ? value : ''}
         onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
       />
@@ -1035,6 +1055,7 @@ function SchemaNode({
     input = (
       <InputNumber
         aria-label={title}
+        aria-required={required || undefined}
         precision={schema.type === 'integer' ? 0 : undefined}
         min={schema.minimum}
         max={schema.maximum}
@@ -1134,7 +1155,11 @@ function SchemaNode({
   return (
     <div data-testid={`studio-field-${pointer}`}>
       {showsLabel &&
-        (kind !== null && !item ? <AxisFieldHeading label={title} help={help} helpId={helpId} /> : <div>{name}</div>)}
+        (kind !== null && !item ? (
+          <AxisFieldHeading label={title} help={help} helpId={helpId} required={required} />
+        ) : (
+          <div>{name}</div>
+        ))}
       {input}
     </div>
   )

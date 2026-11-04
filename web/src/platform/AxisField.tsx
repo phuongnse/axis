@@ -1,5 +1,6 @@
 import { Checkbox, Flex } from 'antd'
 import { useId, type ReactNode } from 'react'
+import { RequiredAsterisk } from './RequiredAsterisk'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
 
@@ -8,12 +9,23 @@ import { useNarrowWidth } from './useNarrowWidth'
  * help in small textMuted text between the label and the input. `AxisField` draws it; a schema-driven form whose help
  * comes from the text catalogue draws it alone, where a test checks the catalogue has every help.
  */
-export function AxisFieldHeading({ label, help, helpId }: { label: string; help: string | null; helpId: string }) {
+export function AxisFieldHeading({
+  label,
+  help,
+  helpId,
+  required = false,
+}: {
+  label: string
+  help: string | null
+  helpId: string
+  required?: boolean
+}) {
   const { colour, type } = useDesignTokens()
   return (
     <div style={{ marginBottom: 6 }}>
       <div style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
         {label}
+        {required && <RequiredAsterisk />}
       </div>
       {help && (
         <div id={helpId} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
@@ -28,23 +40,26 @@ export function AxisFieldHeading({ label, help, helpId }: { label: string; help:
  * Proposed: the one field of the platform's own screens, Studio's and the console's: its label, its help text, then
  * its input, one field to a row. Every field has help text, so `help` is required: a screen cannot leave it out. The
  * field is a group described by its help, so a screen reader reads the help with the input. `testId` is the id a
- * diagnostic opens at, such as `studio-field-/name`.
+ * diagnostic opens at, such as `studio-field-/name`. A `required` field has the form widget's mark (D96): a `*` in
+ * `dangerText` after its label, hidden from screen readers, and its input carries `aria-required`, which the screen sets.
  */
 export function AxisField({
   label,
   help,
+  required = false,
   testId,
   children,
 }: {
   label: string
   help: string
+  required?: boolean
   testId?: string
   children: ReactNode
 }) {
   const helpId = useId()
   return (
     <div role="group" aria-label={label} aria-describedby={helpId} data-testid={testId}>
-      <AxisFieldHeading label={label} help={help} helpId={helpId} />
+      <AxisFieldHeading label={label} help={help} helpId={helpId} required={required} />
       {children}
     </div>
   )
