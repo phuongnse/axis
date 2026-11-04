@@ -1,5 +1,6 @@
-import { Alert, Button, Flex, Input, Modal } from 'antd'
-import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { EllipsisOutlined } from '@ant-design/icons'
+import { Alert, Button, Dropdown, Flex, Input, Modal, Tooltip } from 'antd'
+import { type Ref, useEffect, useImperativeHandle, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { QuotaRefusedError } from '../platform/quota'
 import {
@@ -255,6 +256,32 @@ export function StudioPublishing({
 
   const busy = running || sending || reconnecting
 
+  // Proposed: when the band has too little room, the actions that check fold into one "…" menu. Publish stays. A new
+  // width starts over, as they may fit again.
+  const [folded, setFolded] = useState(false)
+  const [, measureAgain] = useReducer((count: number) => count + 1, 0)
+  const band = actionsSlot?.closest<HTMLElement>('[data-axis-band]') ?? null
+  useLayoutEffect(() => {
+    if (band && !folded && band.scrollWidth > band.clientWidth) {
+      setFolded(true)
+    }
+  })
+  useEffect(() => {
+    if (!band) {
+      return
+    }
+    let width = band.clientWidth
+    const observer = new ResizeObserver(() => {
+      if (band.clientWidth !== width) {
+        width = band.clientWidth
+        setFolded(false)
+        measureAgain()
+      }
+    })
+    observer.observe(band)
+    return () => observer.disconnect()
+  }, [band])
+
   useEffect(() => {
     onBusyChange?.(busy)
   }, [busy, onBusyChange])
@@ -263,31 +290,73 @@ export function StudioPublishing({
     runTests: (scenarios) => send(() => testStudioApp(application, scenarios)),
   }))
 
+  // Proposed: the actions that check, as text buttons in the band, so Publish is its one solid button.
+  const checks = [
+    {
+      key: 'validate',
+      labelKey: 'shell.studio.validate',
+      testId: undefined,
+      run: () => validateStudioApp(application),
+    },
+    ...(previewHost !== null
+      ? [
+          {
+            key: 'preview',
+            labelKey: 'shell.studio.preview',
+            testId: 'studio-preview',
+            run: () => previewStudioApp(application),
+          },
+        ]
+      : []),
+    ...(canTest
+      ? [
+          {
+            key: 'test',
+            labelKey: 'shell.studio.runTests',
+            testId: 'studio-run-tests',
+            run: () => testStudioApp(application),
+          },
+        ]
+      : []),
+  ]
+
   const actions = (
     <Flex gap="small" align="center">
-      {/* Proposed: in the band, the actions that check are text buttons, so Publish is its one solid button. */}
-      <Button type="text" disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
-        {t('shell.studio.validate')}
-      </Button>
-      {previewHost !== null && (
-        <Button
-          type="text"
-          data-testid="studio-preview"
-          disabled={busy}
-          onClick={() => send(() => previewStudioApp(application))}
+      {folded ? (
+        <Dropdown
+          trigger={['click']}
+          autoFocus
+          menu={{
+            'aria-label': t('shell.studio.moreActions'),
+            items: checks.map((check) => ({
+              key: check.key,
+              label: t(check.labelKey),
+              disabled: busy,
+              onClick: () => send(check.run),
+            })),
+          }}
         >
-          {t('shell.studio.preview')}
-        </Button>
-      )}
-      {canTest && (
-        <Button
-          type="text"
-          data-testid="studio-run-tests"
-          disabled={busy}
-          onClick={() => send(() => testStudioApp(application))}
-        >
-          {t('shell.studio.runTests')}
-        </Button>
+          <Tooltip title={t('shell.studio.moreActions')} trigger={['hover', 'focus']}>
+            <Button
+              type="text"
+              data-testid="studio-more-actions"
+              aria-label={t('shell.studio.moreActions')}
+              icon={<EllipsisOutlined />}
+            />
+          </Tooltip>
+        </Dropdown>
+      ) : (
+        checks.map((check) => (
+          <Button
+            key={check.key}
+            type="text"
+            data-testid={check.testId}
+            disabled={busy}
+            onClick={() => send(check.run)}
+          >
+            {t(check.labelKey)}
+          </Button>
+        ))
       )}
       {canPublish && (
         <Button type="primary" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>

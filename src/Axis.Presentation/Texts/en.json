@@ -838,6 +838,7 @@
   "shell.studio.field.application.label": "Title",
   "shell.studio.field.application.label.help": "The title people see on the home page and at the head of the application.",
   "shell.studio.list.loading": "Loading…",
+  "shell.studio.moreActions": "More actions",
   "shell.studio.list.name": "Name",
   "shell.studio.list.description": "Description",
   "shell.studio.list.status": "Status",

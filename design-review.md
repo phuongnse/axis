@@ -52,6 +52,12 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 - **Why:** SAP Fiori's pop-in keeps the data in sight, and moves columns with no setting, so every table gains at once.
 - **For the issue:** the `table` widget's columns are to take `priority` in the file format, and a column chooser is left out.
 
+### A band with too little room
+
+- **Asked:** the band's actions no longer push the page wider than the window.
+- **Built:** the band measures itself. When its actions do not fit, Validate, Preview and Run tests fold into one "…" menu, in
+  that order, and New resource… and Publish… stay. They unfold when the room comes back.
+
 ### Lost in merges
 
 `main` stays the standard for behaviour, so what keeping the prototype lost is back in the prototype's files:

@@ -111,7 +111,10 @@ function CompactBand({ actions, status }: { actions?: ReactNode; status?: ReactN
   const pad = useBandMargin()
   return (
     <div
+      data-axis-band
       style={{
+        // Proposed: the band takes its width from the page alone, so what it holds can tell when it has too little room.
+        contain: 'inline-size',
         margin: `-${pad}px -${pad}px 0`,
         // Proposed: the compact band, which holds the page's actions, stays under the shell's header as the page scrolls.
         position: 'sticky',

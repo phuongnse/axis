@@ -315,6 +315,17 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Entity', draw: () => <ShellPreview />, entry: studioResource(studioEntity), frameHeight: 600 },
+    // Proposed: a band with too little room folds the actions that check into one menu.
+    {
+      caption: 'Band with too little room',
+      draw: () => (
+        <div style={{ maxWidth: 620 }}>
+          <ShellPreview />
+        </div>
+      ),
+      entry: `/studio?app=${studioApp}`,
+      frameHeight: 200,
+    },
     // Proposed: an application never published says so in the band.
     {
       caption: 'Sites of an application not published yet',
