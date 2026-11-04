@@ -13,7 +13,7 @@ test.setTimeout(180_000);
 
 // The module app pins the fixture module checklists, which the sample modules folder does not hold. The second server
 // reads a Modules:Path of its own, with the sample modules and checklists, and Studio edits a copy of the module app.
-test.describe("Studio opens a module's policies read-only and its contracts with only added states and transitions editable", () => {
+test.describe("Studio opens a module's contracts with only added states and transitions editable", () => {
   test.describe.configure({ mode: "serial" });
 
   let copy: string;
@@ -40,33 +40,6 @@ test.describe("Studio opens a module's policies read-only and its contracts with
     }
     if (modules) {
       await rm(modules, { recursive: true, force: true });
-    }
-  });
-
-  test("an author sees the grants of checklists/ChecklistAccess with no way to change them", async ({
-    page,
-  }) => {
-    await useSession(page, "author");
-    await page.goto(`${server.url}/studio?app=ModuleApp`);
-
-    await page
-      .getByTestId("studio-group-module-policies")
-      .getByRole("button", { name: "checklists/ChecklistAccess", exact: true })
-      .click();
-
-    const details = page.getByTestId("studio-resource-details");
-    const rows = page.getByTestId("studio-module-policy-grants").locator("tbody tr");
-    await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toContainText("Checklist");
-    await expect(rows.nth(0)).toContainText("read");
-    await expect(rows.nth(1)).toContainText("Checklists");
-    await expect(rows.nth(1)).toContainText("read");
-    await expect(details.getByRole("alert")).toContainText("read-only");
-    for (const role of ["textbox", "combobox", "checkbox"] as const) {
-      await expect(details.getByRole(role)).toHaveCount(0);
-    }
-    for (const name of ["Save", "Delete"]) {
-      await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
     }
   });
 

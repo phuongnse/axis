@@ -256,7 +256,10 @@ applied, its marks and its removed elements, its [save route](module-resource-sa
 and the module process editor are built, with their Customized tag, **Reset all**, the element marks and
 **Reset to module**. The module process opens in the [process designer](process-designer.md), and
 its marks and resets are on steps. A module text opens in the text table with the layer applied, with Added and Changed marks on
-its keys, **Reset to module** and **Reset all**. A module contract opens in its contract editor, where the author adds and removes
+its keys, **Reset to module** and **Reset all**. A module policy opens in the module editor, built with the policy matrix's
+action checkboxes, and its marks and resets are on grants, keyed by `name`. It edits a grant's actions and removes grants, and
+shows a grant's filter and fields read-only, and there is no way yet to add a grant. A grant past the module contract's ceiling
+(`AXC0334`) shows in the diagnostics panel after the save. A module contract opens in its contract editor, where the author adds and removes
 the application's own states and transitions, marked **Added**, and **Save** writes the contract's layer. The editors of the other kinds are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by

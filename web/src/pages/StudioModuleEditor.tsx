@@ -2,7 +2,13 @@ import { Alert, Button, Flex, Modal, Tag } from 'antd'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
-import { entityKeyedLists, layerMarks, processKeyedLists, textKeyedMaps } from '../platform/layerMarks'
+import {
+  entityKeyedLists,
+  layerMarks,
+  policyKeyedLists,
+  processKeyedLists,
+  textKeyedMaps,
+} from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   deleteStudioResource,
@@ -22,6 +28,7 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { EntityDesigner } from './EntityDesigner'
 import type { DesignerLayer } from './LayerMarkViews'
+import { StudioModulePolicy } from './StudioModulePolicy'
 import { TextTable } from './TextTable'
 
 const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
@@ -39,10 +46,10 @@ interface Loaded {
 }
 
 /**
- * An editor of a module resource, for the `entity`, `process` and `text` kinds. The resource opens with the application's layer applied
+ * An editor of a module resource, for the `entity`, `process`, `policy` and `text` kinds. The resource opens with the application's layer applied
  * and every input on. Save sends the whole entity to the module save route, which writes only the difference as the
  * layer. When the resource has a layer, a Customized tag and Reset all show, which delete the layer file, and the
- * entity designer, the process designer or the text table marks the elements the layer added, changed or removed, each with Reset to
+ * entity designer, the process designer, the policy grants or the text table marks the elements the layer added, changed or removed, each with Reset to
  * module, which undoes that one element on the server. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
  * diagnostics after a save, a Reset all or a Reset to module, with the layer the write added to the folder's list or the
  * id of the layer it removed.
@@ -328,6 +335,8 @@ export function StudioModuleEditor({
             layer={designerLayer({}, textKeyedMaps)}
           />
         )
+      ) : item.kind === 'policy' ? (
+        <StudioModulePolicy value={draft} onChange={change} layer={designerLayer(policyKeyedLists)} />
       ) : (
         <EntityDesigner value={draft} onChange={change} layer={designerLayer(entityKeyedLists)} />
       )}
