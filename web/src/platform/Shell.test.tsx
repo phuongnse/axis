@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { DatePicker, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
@@ -512,6 +512,54 @@ describe('Shell sidebar claimed by a page', () => {
       expect(screen.getAllByRole('tooltip').map((tooltip) => tooltip.textContent)).toContain('Releases'),
     )
   })
+
+  it('mounts a page that claims the sidebar once', async () => {
+    let mounts = 0
+    function Counted() {
+      useEffect(() => {
+        mounts += 1
+      }, [])
+      return claim()
+    }
+    renderShell('en', ['/'], notesNavigation.slice(0, 1), <Counted />)
+
+    await screen.findByRole('link', { name: 'Entities' })
+
+    expect(mounts).toBe(1)
+  })
+})
+
+describe('ShellNavigation groups', () => {
+  const groups = [
+    {
+      key: 'model',
+      label: 'Model',
+      entries: [{ key: 'entities', path: '/studio/entities', label: 'Entities' }],
+    },
+  ]
+
+  it('shows the title of an open group above its entries, with no rule', () => {
+    render(
+      <MemoryRouter>
+        <ShellNavigation entries={groups} />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Model')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Entities' })).toBeVisible()
+    expect(screen.queryByRole('separator')).toBeNull()
+  })
+
+  it('replaces the title of a collapsed group with a thin rule', () => {
+    render(
+      <MemoryRouter>
+        <ShellNavigation entries={groups} collapsed />
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText('Model')).toBeNull()
+    expect(screen.getByRole('separator')).toBeInTheDocument()
+  })
 })
 
 describe('Shell scrolling', () => {
@@ -533,6 +581,20 @@ describe('Shell scrolling', () => {
 })
 
 describe('Shell footer', () => {
+  it('sits under the content column beside a sidebar, and not in the sidebar', () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    const parent = screen.getByRole('contentinfo').parentElement!
+    expect(parent).toContainElement(screen.getByRole('main'))
+    expect(parent).not.toContainElement(document.getElementById('shell-sidebar'))
+  })
+
+  it('runs across the page, beside the header, on a one-page site', () => {
+    renderShell('en', ['/'], notesNavigation.slice(0, 1))
+
+    expect(screen.getByRole('contentinfo').parentElement).toBe(screen.getByRole('banner').parentElement)
+  })
+
   it('shows the version to a signed-in person', async () => {
     stubAbout('0.1.0')
     renderShell('en', ['/'], notesNavigation)

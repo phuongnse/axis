@@ -1,4 +1,4 @@
-import { Menu } from 'antd'
+import { Menu, type MenuProps } from 'antd'
 import { Link } from 'react-router'
 import { navigationIcon } from './navigationIcons'
 
@@ -11,22 +11,30 @@ export interface ShellNavigationEntry {
   icon?: string | null
 }
 
+/** A titled group of entries in the sidebar. */
+export interface ShellNavigationGroup {
+  key: string
+  label: string
+  entries: readonly ShellNavigationEntry[]
+}
+
 /**
  * The navigation menu of the shell, for the site's entries and for the entries a page puts in the sidebar. An open
- * entry shows its label alone. A collapsed entry shows its icon alone, and Ant Design gives it the label as a tooltip. The collapsed state is passed on, because a page's entries
- * render through a portal and so do not see the Sider's context.
- * No entry shows a count.
+ * entry shows its label alone, and an open group shows its label above its entries. A collapsed entry shows its icon
+ * alone, and Ant Design gives it the label as a tooltip. A collapsed group gives way to a thin rule above its entries.
+ * The collapsed state is passed on, because a page's entries render through a portal and so do not see the Sider's
+ * context. No entry shows a count.
  */
 export function ShellNavigation({
   entries,
   activeKey,
   collapsed = false,
 }: {
-  entries: readonly ShellNavigationEntry[]
+  entries: readonly (ShellNavigationEntry | ShellNavigationGroup)[]
   activeKey?: string
   collapsed?: boolean
 }) {
-  const items = entries.map((entry) => {
+  const item = (entry: ShellNavigationEntry) => {
     const Icon = navigationIcon(entry.icon)
     return {
       key: entry.key,
@@ -37,6 +45,11 @@ export function ShellNavigation({
         </Link>
       ),
     }
+  }
+  const items = entries.flatMap((entry): NonNullable<MenuProps['items']> => {
+    if (!('entries' in entry)) return [item(entry)]
+    if (collapsed) return [{ key: `${entry.key}-divider`, type: 'divider' as const }, ...entry.entries.map(item)]
+    return [{ key: entry.key, type: 'group' as const, label: entry.label, children: entry.entries.map(item) }]
   })
   return (
     <Menu

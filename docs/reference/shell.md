@@ -37,7 +37,7 @@ _(planned for M31)_.
   round its content and 32 px sidebar entries, and a compact band _(planned for M31)_, see
   [Studio workspace](studio-workspace.md#workspace). The sidebar and its collapse button show even on a one-page site.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a strip 64 px wide of the entries' icons, each
-  named by a tooltip, and opens it again. Each icon is centred, and a group's title gives way to a thin rule _(planned for M31)_. The button names what it does, "Collapse navigation" or "Expand
+  named by a tooltip, and opens it again. Each icon is centred, and a group's title gives way to a thin rule. The button names what it does, "Collapse navigation" or "Expand
   navigation", and has `aria-expanded`. The sidebar stays open or collapsed while the person moves between pages.
 - **One-page sites.** A site with one navigation entry, such as the platform site, has no sidebar and no button to
   collapse it, unless a page claims the sidebar. The page takes the whole width.
@@ -52,9 +52,9 @@ _(planned for M31)_.
   scrollbar, the page's and the sidebar's, follows the mode.
 - **Page area.** Pages draw on `canvas` with `spacing-lg` padding. A wide table scrolls inside its widget, so the
   page never scrolls sideways.
-- **Footer.** A slim footer runs the full width under the sidebar and the page, as the header does above them, on
-  `surface` with a `borderSubtle` rule above it. _(planned for M31)_: beside a sidebar it sits under the content
-  column only, so the sidebar runs to the bottom of the window and is never pushed up by it, see
+- **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it. Without a sidebar it runs the full
+  width under the page. Beside a sidebar it sits under the content column only, so the sidebar runs to the bottom of
+  the window and is never pushed up by it, see
   [D129](../decisions/d129-rules-from-the-studio-editors-review.md). On the left it reads "© <year> Axis", then " · v<version>" for a
   signed-in person only, as in "© 2026 Axis · v0.1.0". It shows no server status, and a page that cannot reach the
   server says so where it fails. The legal links take the right,
