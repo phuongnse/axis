@@ -41,6 +41,17 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 - **To change in the docs:** D39 (the list shows `usedBy`, which it no longer does; the API still answers it),
   "Reads and diagnostics touch no database" in the authoring API, the resource file formats, and D132's rule on sorting if a paged list is to have a sort by column.
 
+### A table with too little room
+
+- **Asked:** one rule for every table, in place of the sideways scroll that hid columns such as Status.
+- **Built, in `AxisTable`:** a table measures its own width. Its text columns narrow to 160 px first. Then columns move under
+  their row one at a time, from the right, or by a column's `priority` (`high` last, `low` first), as "Title: value" on the
+  row's own surface, with no line between the row and them. The identifying column, the first, never moves. A moved cell with
+  no value is left out, while a column that fits still shows its dash. Only when what stays does not fit does the table scroll
+  sideways, with the first column fixed.
+- **Why:** SAP Fiori's pop-in keeps the data in sight, and moves columns with no setting, so every table gains at once.
+- **For the issue:** the `table` widget's columns are to take `priority` in the file format, and a column chooser is left out.
+
 ### Lost in merges
 
 `main` stays the standard for behaviour, so what keeping the prototype lost is back in the prototype's files:
@@ -60,8 +71,6 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 - A label field in an application with no text resource crashed. It now says a text resource is needed.
 - A status tag's words take the text tokens, as Ant Design's own fall to 3.37:1 in light mode. The Live tag of a release and
   other `Tag color` uses have the same problem, left as they are for the issue.
-- At 992 px the table is wider than its frame, so Status and the last modified columns need a sideways scroll, as the table
-  rules say. The owner is to say whether that holds.
 
 ### For the issue
 

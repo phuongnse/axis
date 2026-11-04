@@ -162,6 +162,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
       () => requestTable(emptyTableWidget),
     ),
     { caption: 'Many row actions', draw: () => requestTable(manyActionsTableWidget) },
+    // Proposed: a table with too little room for its columns.
+    {
+      caption: 'Columns under their row',
+      draw: () => <div style={{ maxWidth: 480 }}>{requestTable(tableWidget)}</div>,
+    },
   ],
   form: [
     {

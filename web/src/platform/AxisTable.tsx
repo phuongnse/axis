@@ -1,10 +1,22 @@
 import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Table, Tooltip, type TableColumnType, type TableProps } from 'antd'
-import type { CSSProperties, HTMLAttributes, Key, ReactNode } from 'react'
+import {
+  isValidElement,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type HTMLAttributes,
+  type Key,
+  type ReactNode,
+} from 'react'
 import { AxisButton } from './AxisButton'
+import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
 import { sizeTokens, spacingTokens } from './designTokens'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
 
 /**
@@ -22,6 +34,8 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'render' | 'onCell' | 'onHe
   kind: ColumnKind
   /** Numbers are right-aligned, with digits of equal width so they line up. */
   numeric?: boolean
+  /** Proposed: when the table lacks room, a `low` column moves under its row first and a `high` one last. */
+  priority?: 'high' | 'low'
   render: (row: T, index: number) => ReactNode
 }
 
@@ -71,11 +85,30 @@ const rowLine: CSSProperties = {
 /** Every cell keeps spacing-lg on each side, so columns fitted to their content do not crowd each other. */
 const cellInline = spacingTokens.lg
 
+/** Ant Design's own padding of the cell that holds the columns under a row, which `cellInline` lines up with. */
+const movedCellInline = 16
+
+const priorityRank = { low: 0, undefined: 1, high: 2 } as const
+
+/**
+ * Proposed: the columns that may move under their row, in the order they move: every column but the identifying one, the
+ * first, by priority and then from the right.
+ */
+function moveOrder<T>(columns: readonly AxisColumn<T>[]): string[] {
+  return columns
+    .slice(1)
+    .map((column, index) => ({ key: column.key, index, rank: priorityRank[`${column.priority}`] }))
+    .sort((a, b) => a.rank - b.rank || b.index - a.index)
+    .map((column) => column.key)
+}
+
+const isEmpty = (value: ReactNode) => value == null || (isValidElement(value) && value.type === EmptyDash)
+
 /** A column as wide as its content, never wrapping. */
 const fitted: CSSProperties = { width: '1%', whiteSpace: 'nowrap', paddingInline: cellInline }
 
-/** The value of a `text` cell, wrapping at 320 px (D96). */
-const textValue: CSSProperties = { maxWidth: 320, overflowWrap: 'anywhere', whiteSpace: 'normal' }
+/** The value of a `text` cell, wrapping at 320 px (D96). Proposed: it narrows to 160 px before a column moves. */
+const textValue: CSSProperties = { minWidth: 160, maxWidth: 320, overflowWrap: 'anywhere', whiteSpace: 'normal' }
 
 /** The row's actions fold into one menu from this many on, and at narrow width whatever their number (D96). */
 const foldFrom = 3
@@ -83,8 +116,11 @@ const foldFrom = 3
 /**
  * Proposed: the one table of the platform, which every table is built on: the `table` widget, Studio's and the
  * console's. It draws the toolbar, the columns by their kind, rows of the `tableRow` size, the row actions, folded into one "…" menu
- * from three on or below 992 px, the paging, and sideways scrolling when the table is narrower than its columns. A
- * cell with no value shows `EmptyDash`, which the column's `render` returns.
+ * from three on or below 992 px, and the paging. A cell with no value shows `EmptyDash`, which the column's `render`
+ * returns. Proposed: when the table is narrower than its columns, its text columns narrow first, then columns move under their row one at a time, from the right
+ * or by `priority`, as "Title: value", until it fits. The identifying column, the first, stays, and a moved cell with no
+ * value is left out. The table measures its own width, so a sidebar counts. Only when the identifying column and the row
+ * actions alone do not fit does it scroll sideways, with the first column fixed.
  */
 export function AxisTable<T extends object>({
   rows,
@@ -119,42 +155,92 @@ export function AxisTable<T extends object>({
   instead?: ReactNode
 }) {
   const narrow = useNarrowWidth()
-  const texts = columns.filter((column) => column.kind === 'text').length
-  // Each column of free text takes an equal share of the width; a table with none gives it all to its last column.
-  const share = texts > 0 ? `${100 / texts}%` : undefined
-  const lastKey = columns.at(-1)?.key
-  const fold = narrow || (rowActions?.count ?? 0) >= foldFrom
+  const { colour, spacing } = useDesignTokens()
+  const host = useRef<HTMLDivElement>(null)
+  const [movedCount, setMovedCount] = useState(0)
+  const [scrolls, setScrolls] = useState(false)
+  const order = moveOrder(columns)
+  const moved = new Set(order.slice(0, movedCount))
+  const shown = columns.filter((column) => !moved.has(column.key))
+  const under = columns.filter((column) => moved.has(column.key))
 
-  const antColumns: TableColumnType<T>[] = columns.map(({ kind, numeric, render, ...column }) => {
-    const numbers: CSSProperties = numeric ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {}
-    const width = kind === 'text' ? share : texts === 0 && column.key === lastKey ? undefined : '1%'
-    const cell: CSSProperties = {
-      width,
-      paddingInline: cellInline,
-      ...(kind === 'fit' ? { whiteSpace: 'nowrap' } : {}),
-      ...rowLine,
-      ...numbers,
+  // Before the browser paints, one more column moves while the table is wider than its place.
+  useLayoutEffect(() => {
+    const width = host.current?.clientWidth ?? 0
+    const table = host.current?.querySelector('table')
+    if (!table || width === 0) {
+      return
     }
-    const header: CSSProperties = {
-      width,
-      paddingInline: cellInline,
-      whiteSpace: 'nowrap',
-      ...rowLine,
-      ...(numeric ? { textAlign: 'right' } : {}),
-    }
-    return {
-      ...column,
-      onHeaderCell: () => ({ style: header }),
-      onCell: () => ({ style: cell }),
-      render: (_: unknown, row: T, index: number) =>
-        kind === 'fit' ? render(row, index) : <div style={textValue}>{render(row, index)}</div>,
+    const over = table.offsetWidth > width
+    if (over && movedCount < order.length) {
+      setMovedCount(movedCount + 1)
+    } else {
+      setScrolls(over)
     }
   })
+
+  // A new width starts over, as columns that moved may fit again.
+  useEffect(() => {
+    if (!host.current) {
+      return
+    }
+    let width = host.current.clientWidth
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width !== width) {
+        width = entry.contentRect.width
+        setMovedCount(0)
+        setScrolls(false)
+      }
+    })
+    observer.observe(host.current)
+    return () => observer.disconnect()
+  }, [])
+
+  const cellsUnder = (row: T, index: number) =>
+    under
+      .map((column) => ({ key: column.key, title: column.title as ReactNode, value: column.render(row, index) }))
+      .filter((cell) => !isEmpty(cell.value))
+  // A row with cells under it ends below them, so the line between its two parts goes.
+  const closesRow = (row: T) => under.length === 0 || cellsUnder(row, (rows ?? []).indexOf(row)).length === 0
+  const texts = shown.filter((column) => column.kind === 'text').length
+  // Each column of free text takes an equal share of the width; a table with none gives it all to its last column.
+  const share = texts > 0 ? `${100 / texts}%` : undefined
+  const lastKey = shown.at(-1)?.key
+  const fold = narrow || (rowActions?.count ?? 0) >= foldFrom
+
+  const antColumns: TableColumnType<T>[] = shown.map(
+    ({ kind, numeric, priority: _priority, render, ...column }, place) => {
+      const numbers: CSSProperties = numeric ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {}
+      const width = kind === 'text' ? share : texts === 0 && column.key === lastKey ? undefined : '1%'
+      const cell: CSSProperties = {
+        width,
+        paddingInline: cellInline,
+        ...(kind === 'fit' ? { whiteSpace: 'nowrap' } : {}),
+        ...rowLine,
+        ...numbers,
+      }
+      const header: CSSProperties = {
+        width,
+        paddingInline: cellInline,
+        whiteSpace: 'nowrap',
+        ...rowLine,
+        ...(numeric ? { textAlign: 'right' } : {}),
+      }
+      return {
+        ...column,
+        fixed: scrolls && place === 0 ? 'left' : undefined,
+        onHeaderCell: () => ({ style: header }),
+        onCell: (row: T) => ({ style: closesRow(row) ? cell : { ...cell, borderBottom: 'none' } }),
+        render: (_: unknown, row: T, index: number) =>
+          kind === 'fit' ? render(row, index) : <div style={textValue}>{render(row, index)}</div>,
+      }
+    },
+  )
   if (rowActions && rowActions.count > 0) {
     antColumns.push({
       key: '$actions',
       onHeaderCell: () => ({ style: { ...fitted, ...rowLine } }),
-      onCell: () => ({ style: { ...fitted, ...rowLine } }),
+      onCell: (row: T) => ({ style: { ...fitted, ...rowLine, ...(closesRow(row) ? {} : { borderBottom: 'none' }) } }),
       render: (_: unknown, row: T) => <RowActions actions={rowActions.of(row)} fold={fold} />,
     })
   }
@@ -186,20 +272,46 @@ export function AxisTable<T extends object>({
       )}
       {above}
       {instead ?? (
-        <Table<T>
-          rowKey={rowKey}
-          columns={antColumns}
-          // Where the page is narrower than the columns' content, the table scrolls sideways.
-          scroll={{ x: 'max-content' }}
-          dataSource={rows as T[] | undefined}
-          loading={loading}
-          // Proposed: an empty table keeps its header and says so in its body in textMuted. Ant Design draws the text
-          // at a quarter of the text colour, 1.8:1 on surface, which fails the 4.5:1 that text needs.
-          locale={{ emptyText: <EmptyState text={emptyText || undefined} /> }}
-          pagination={pagination}
-          onChange={onChange}
-          onRow={onRow}
-        />
+        <div ref={host}>
+          <Table<T>
+            rowKey={rowKey}
+            columns={antColumns}
+            // Where even the columns that stay do not fit, the table scrolls sideways.
+            scroll={scrolls ? { x: 'max-content' } : undefined}
+            expandable={
+              under.length === 0
+                ? undefined
+                : {
+                    showExpandColumn: false,
+                    expandedRowKeys: (rows ?? []).filter((row, index) => cellsUnder(row, index).length > 0).map(rowKey),
+                    rowExpandable: (row) => cellsUnder(row, (rows ?? []).indexOf(row)).length > 0,
+                    expandedRowRender: (row, index) => (
+                      <Flex
+                        wrap
+                        gap={`${spacing.xs}px ${spacing.lg}px`}
+                        data-testid="axis-table-moved"
+                        style={{ marginBlockStart: -spacing.sm, paddingInlineStart: cellInline - movedCellInline }}
+                      >
+                        {cellsUnder(row, index).map((cell) => (
+                          <span key={cell.key}>
+                            <span style={{ color: colour.textMuted }}>{cell.title}: </span>
+                            {cell.value}
+                          </span>
+                        ))}
+                      </Flex>
+                    ),
+                  }
+            }
+            dataSource={rows as T[] | undefined}
+            loading={loading}
+            // Proposed: an empty table keeps its header and says so in its body in textMuted. Ant Design draws the text
+            // at a quarter of the text colour, 1.8:1 on surface, which fails the 4.5:1 that text needs.
+            locale={{ emptyText: <EmptyState text={emptyText || undefined} /> }}
+            pagination={pagination}
+            onChange={onChange}
+            onRow={onRow}
+          />
+        </div>
       )}
     </Flex>
   )

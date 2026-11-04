@@ -121,6 +121,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       // Axis token: so the tables, inputs and empty states in it sit on the colour they were made for, and the mask
       // behind sets it apart from the page.
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
+      // Proposed: the columns that moved under a row sit on the row's own surface, as part of it.
+      Table: { rowExpandedBg: colour.surface },
     },
   }
 }
