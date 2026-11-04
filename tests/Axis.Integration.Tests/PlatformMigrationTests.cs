@@ -32,7 +32,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "operator_sessions", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_usage", "tenant_usage_latest", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "jobs", "operator_sessions", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_usage", "tenant_usage_latest", "tenants"], tables);
     }
 
     [Theory]
@@ -271,7 +271,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "operator_sessions", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_usage", "tenant_usage_latest", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "jobs", "operator_sessions", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_usage", "tenant_usage_latest", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)

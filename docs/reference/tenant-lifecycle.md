@@ -5,7 +5,7 @@ cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 Everything in this file is _(planned for M31)_, except the two read routes and the quotas route of the
-[provisioning API](#provisioning-api) and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+[provisioning API](#provisioning-api), the job runner for suspend and resume described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -39,11 +39,17 @@ implementation.
   code as the `Axis.Admin` command, over the schema role. `GET /api/cell/jobs/{id}` answers the job,
   with `state` `queued`, `running`, `succeeded` or `failed`, its steps, and the error of a failed
   step. A failed job can be run again, and it skips the steps already done, as `tenant create` does.
+  The `platform.jobs` table and the runner in the publisher are built for the `suspend` and `resume` kinds, each with one
+  `status` step. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
+  already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
+  The routes that queue a job, the other kinds and the run again of a failed job are _(planned for M31)_.
 - **Idempotency.** _(planned for M31)_ Each `POST` needs an `Idempotency-Key` header. The same key with the same body
   answers the first job again for 24 hours. The same key with another body answers `422`.
-- **Audit.** _(planned for M31)_ Each job writes one platform audit record when it ends, with the operator or the
-  machine caller as actor, the tenant and the job kind, and no secret. A refused call writes a log
-  event, not a record.
+- **Audit.** Each job writes one platform audit record when it ends, with the operator or the
+  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend` and `resume` is built: it writes the
+  record in the same transaction as the job's final state, whether the job succeeded or failed, with the command name of the
+  matching `Axis.Admin` command and `job:<id>` in `changed`. A refused call writes a log
+  event, not a record _(planned for M31)_.
 
 | Route | What it does |
 | --- | --- |

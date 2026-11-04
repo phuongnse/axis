@@ -1333,7 +1333,8 @@ internal static partial class AdminCommands
             testLimit,
             output,
             error,
-            cancellationToken).RunAsync();
+            cancellationToken,
+            new ProvisioningJobs(settings.Platform.PlatformConnectionString, ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString), lease)).RunAsync();
     }
 
     private static async Task<int> ConfigurationPublisherAsync(

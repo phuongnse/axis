@@ -437,8 +437,11 @@ runs until it is stopped.
 
 `publisher`
 
-It takes no option. It writes no [platform audit record](tenant-setting-commands.md#platform-audit-records),
-because it acts on no tenant on its own: the audit of a publish is the release's own record in the tenant
+It takes no option. Under `Tenancy:Source=directory` it also runs the provisioning jobs of `platform.jobs`, see
+[provisioning API](tenant-lifecycle.md#provisioning-api), in a third loop. It claims each job with a lease, runs one job at a time for each
+tenant and lets a running job finish when it is stopped. A job that it ends writes one
+[platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor. The publisher
+writes no other record, because it acts on no tenant on its own: the audit of a publish is the release's own record in the tenant
 database. It has no HTTP endpoint and listens on no port, so nothing
 can call it. The `axis-admin` image runs it. Both production installs start
 one, see [installation](installation.md). `scripts/dev.sh`, the Docker Compose
