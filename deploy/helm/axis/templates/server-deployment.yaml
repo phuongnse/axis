@@ -1,5 +1,5 @@
-{{- if and .Values.studio.folders (not .Values.studio.persistence) }}
-{{- fail "studio.persistence is required when studio.folders is set: a ReadWriteMany volume source that every server replica mounts at /studio" }}
+{{- if and (or .Values.studio.folders .Values.cell.id) (not .Values.studio.persistence) }}
+{{- fail "studio.persistence is required when studio.folders is set or in a cell: a ReadWriteMany volume source that every server replica mounts at /studio" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -44,6 +44,11 @@ spec:
               value: /server-tls/tls.crt
             - name: Kestrel__Endpoints__Https__Certificate__KeyPath
               value: /server-tls/tls.key
+            {{- if .Values.cell.id }}
+            # The create job of the publisher writes the tenants' applications here.
+            - name: Studio__ApplicationsPath
+              value: /studio
+            {{- end }}
             {{- range $i, $folder := .Values.studio.folders }}
             - name: Studio__Folders__{{ $i }}
               value: {{ printf "/studio/%s" $folder | quote }}
@@ -83,7 +88,7 @@ spec:
             - name: server-tls
               mountPath: /server-tls
               readOnly: true
-            {{- if .Values.studio.folders }}
+            {{- if or .Values.studio.folders .Values.cell.id }}
             - name: studio
               mountPath: /studio
             {{- end }}
@@ -99,7 +104,7 @@ spec:
                 path: tls.crt
               - key: tls.key
                 path: tls.key
-        {{- if .Values.studio.folders }}
+        {{- if or .Values.studio.folders .Values.cell.id }}
         - name: studio
           {{- toYaml .Values.studio.persistence | nindent 10 }}
         {{- end }}

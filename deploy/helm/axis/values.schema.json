@@ -157,6 +157,10 @@
       "type": "object",
       "properties": { "volume": { "$ref": "#/definitions/volume" } }
     },
+    "templates": {
+      "type": "object",
+      "properties": { "volume": { "$ref": "#/definitions/volume" } }
+    },
     "studio": {
       "type": "object",
       "properties": {
