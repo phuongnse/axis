@@ -385,11 +385,11 @@ works on a fresh clone:
   `artifacts/modules/<id>/<version>/`, where the Development settings of the server and
   the worker point `Modules:Path`. The server reads the module catalog only when it starts,
   so a module edit needs a restart of the script.
-- It installs the sample templates, `samples/templates/*`, into
-  `artifacts/templates/<id>/<version>/`, and creates that folder even when there is no
-  sample. The Development settings of the server point `Templates:Path` there, and so do
+- It installs the sample templates, `samples/templates/*`, and the built-in applications,
+  `applications/*`, into `artifacts/templates/<id>/<version>/`, and creates that folder even
+  when there are none. The Development settings of the server point `Templates:Path` there, and so do
   the E2E settings. The Compose server sets it to `/templates`, which holds the
-  `request-approval` sample template. The server reads the template catalog only when it starts, so a template
+  `request-approval` sample template and the built-in `approvals` application. The server reads the template catalog only when it starts, so a template
   edit needs a restart of the script. The production images and `deploy/` set no
   `Templates:Path`, so they list no template.
 - E2E's journey server sets `Studio:ApplicationsPath` to a temporary folder. `scripts/dev.sh` and

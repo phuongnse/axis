@@ -1,0 +1,22 @@
+{
+  "id": "cb22f7c3-8c17-4d8f-ae04-96c508dc80b4",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "application.title": "Approvals",
+    "application.description": "Departments, employees, out-of-office periods and approval requests.",
+    "site.title": "Approvals",
+    "site.description": "Send requests, decide on them and manage the organization.",
+    "nav.myRequests": "My requests",
+    "nav.toDecide": "To decide",
+    "nav.outOfOffice": "Out of office",
+    "nav.allRequests": "All requests",
+    "nav.requestTypes": "Request types",
+    "nav.departments": "Departments",
+    "nav.employees": "Employees",
+    "role.admin": "Administrator",
+    "role.employee": "Employee"
+  }
+}

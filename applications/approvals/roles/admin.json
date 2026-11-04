@@ -1,0 +1,7 @@
+{
+  "id": "1c28c2aa-fa31-4175-87b2-6d14b0062b98",
+  "kind": "role",
+  "name": "admin",
+  "formatVersion": 1,
+  "label": { "textKey": "role.admin" }
+}

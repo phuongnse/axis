@@ -1,0 +1,14 @@
+{
+  "kind": "applicationTemplate",
+  "id": "approvals",
+  "version": "1.0.0",
+  "builtIn": true,
+  "title": {
+    "en": "Approvals",
+    "vi": "Phê duyệt"
+  },
+  "description": {
+    "en": "Departments, employees, out-of-office periods and approval requests, from the built-in organization and approvals modules.",
+    "vi": "Phòng ban, nhân viên, thời gian vắng mặt và yêu cầu phê duyệt, từ các mô-đun tích hợp organization và approvals."
+  }
+}

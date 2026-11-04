@@ -162,7 +162,7 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The built-in modules and the sample module department-budgets, which scripts/build.sh
     // installs. The worker gets the same folder from scripts/e2e.sh.
     Modules__Path: modulesPath,
-    // The sample templates, which scripts/build.sh installs. Only the server reads them.
+    // The sample templates and the built-in applications, which scripts/build.sh installs. Only the server reads them.
     Templates__Path: templatesPath,
     // Studio edits the copy of the purchase request sample for the author role. appsettings.Development.json
     // lists every sample itself, and these blank entries keep the others out of every E2E server.

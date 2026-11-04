@@ -113,6 +113,43 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
     }
 
     [Fact]
+    public async Task A_create_job_from_the_built_in_approvals_application_ends_with_the_tenant_active_and_both_modules_pinned()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        await mailpit.SmtpHostAsync();
+        var id = scenario.NewTenantId();
+        _realms.Add(id);
+        var applications = NewApplicationsFolder();
+        var settings = Settings(applications);
+        settings["Templates:Path"] = BuiltInApplications.Path;
+        settings["Modules:Path"] = Path.Combine(AppContext.BaseDirectory, "BuiltInModules");
+        var job = await QueueAsync(scenario, settings, id, NewEmail(), "approvals");
+
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings, identityProvider: _handler);
+        try
+        {
+            await WaitUntilAsync(async () => await ScalarAsync(scenario, $"SELECT state FROM platform.jobs WHERE id = '{job}'") is "succeeded" or "failed", "The job did not end.", TimeSpan.FromSeconds(180));
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+
+        var result = await run;
+
+        Assert.Equal(0, result.Exit);
+        Assert.Empty(result.Error);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, $"SELECT state FROM platform.jobs WHERE id = '{job}'"));
+        Assert.Equal("active", (await scenario.RowAsync(id)).Status);
+        Assert.True(File.Exists(Path.Combine(applications, id, "approvals", "application.json")));
+
+        await using var connection = await TenantConnectionAsync(scenario, id);
+        Assert.Equal(1L, await CountAsync(connection, "SELECT count(*) FROM axis.active_releases"));
+        Assert.Equal(2L, await CountAsync(connection, "SELECT count(*) FROM axis.release_resources WHERE path IN ('modules/organization/module.json', 'modules/approvals/module.json')"));
+    }
+
+    [Fact]
     public async Task A_create_job_whose_activate_step_throws_once_ends_succeeded_at_the_next_claim_with_one_realm_and_one_application_folder()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -190,7 +227,7 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
 
     private static string NewEmail() => $"{Guid.NewGuid():N}@example.test";
 
-    private static string Input(string email) => JsonSerializer.Serialize(new { application = Template, administrator = email });
+    private static string Input(string email, string application = Template) => JsonSerializer.Serialize(new { application, administrator = email });
 
     private string NewApplicationsFolder()
     {
@@ -243,11 +280,11 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
         return AdminCommands.ReadCreateJobSettings(configuration, CellOptions.Load(configuration), activate);
     }
 
-    private static async Task<Guid> QueueAsync(AdminScenario scenario, Dictionary<string, string?> settings, string id, string email)
+    private static async Task<Guid> QueueAsync(AdminScenario scenario, Dictionary<string, string?> settings, string id, string email, string application = Template)
     {
         using var http = new HttpClient();
         var kinds = new Dictionary<string, IReadOnlyList<JobStep>> { ["create"] = CreateJob.Steps(Read(scenario, settings), http, TextWriter.Null, TextWriter.Null) };
-        return await ProvisioningJobs.QueueAsync(scenario.Platform, kinds, "create", id, "operator-1", null, null, CancellationToken, Input(email));
+        return await ProvisioningJobs.QueueAsync(scenario.Platform, kinds, "create", id, "operator-1", null, null, CancellationToken, Input(email, application));
     }
 
     private static async Task<string[]> StepNamesAsync(AdminScenario scenario, Guid job) =>

@@ -490,6 +490,31 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task A_create_from_the_built_in_approvals_application_answers_202_when_it_is_installed_and_400_when_it_is_not()
+    {
+        await using (var without = await StartAsync())
+        {
+            using var client = CreateClient(without, _console);
+            var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+            using var response = await PostJobAsync(client, "/api/cell/tenants", token, "approvals-missing", CreateBody("d", application: "approvals"));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal(0, await CountAsync("platform.jobs"));
+        }
+
+        await using var with = await StartAsync(templates: BuiltInApplications.Path);
+        using var installedClient = CreateClient(with, _console);
+        var installedToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var created = await PostJobAsync(installedClient, "/api/cell/tenants", installedToken, "approvals-installed", CreateBody("d", application: "approvals"));
+
+        Assert.Equal(HttpStatusCode.Accepted, created.StatusCode);
+        Assert.Equal("create", (await created.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("kind").GetString());
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
     public async Task An_id_of_an_existing_tenant_or_an_unfinished_create_job_answers_409()
     {
         await using var factory = await StartAsync();
@@ -751,7 +776,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null)
+    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null, string? templates = null)
     {
         var authority = await keycloak.StartAsync();
         var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
@@ -769,7 +794,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             builder.UseSetting("Cell:OperatorRealm", _realm);
             builder.UseSetting("Cell:OperatorRole", OperatorRole);
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());
-            builder.UseSetting("Templates:Path", SampleTemplates.Path);
+            builder.UseSetting("Templates:Path", templates ?? SampleTemplates.Path);
             if (tenantCap is { } cap)
             {
                 builder.UseSetting("Cell:TenantCap", cap.ToString(System.Globalization.CultureInfo.InvariantCulture));
