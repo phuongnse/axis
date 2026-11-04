@@ -19,7 +19,7 @@ notice. This decision proposes that it is an in-app notification of the platform
 - **The bell.** The platform site gets a bell that lists these notices, as an application site's bell lists the
   notifications of that application.
 
-Until it is agreed, the docs mark only the bell for tenant notices as planned.
+The row, the routes and the bell are built, while the decision is still proposed.
 
 _Why:_ one table, one retention and one read-mark model serve every in-app notice, and a notice for the tenant needs no
 fake application.

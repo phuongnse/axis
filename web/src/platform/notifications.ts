@@ -10,7 +10,8 @@ export interface NotificationOpen {
 /** One notification as the list route serves it, with its texts rendered. */
 export interface NotificationItem {
   id: string
-  releaseId: string
+  /** The release that sent the notification, or `null` for a tenant notice. */
+  releaseId: string | null
   subject: string
   body: string
   open: NotificationOpen | null
