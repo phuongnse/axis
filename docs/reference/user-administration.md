@@ -82,7 +82,8 @@ seven commands are built. The invite, resend an invitation, disable, enable and 
   no administrator role and no recent login at the identity provider, because it only reads. When the identity provider
   fails, it answers `502` with a fixed title.
 - **A user:** clicking a row opens a side panel with the person's roles, one section for each active application and one
-  for the platform. Each role shows the "Given" tag when the person has it. A given role that is not declared any more
+  for the platform. _(planned for M31)_: a user opens as a page of its own, see
+  [opening things](actions-and-controls.md#opening-things), which holds the same sections. Each role shows the "Given" tag when the person has it. A given role that is not declared any more
   has a "Not declared" tag, and its section lists it even when its application is not active. A Give or Remove button
   asks for confirmation, names the role, the place and the person, and then calls the give-role or remove-role route and
   loads the roles again. The panel shows a `403` as "Sign in again to change a platform role." and a `409` as
