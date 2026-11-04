@@ -232,6 +232,7 @@ export function StudioEditor({
   }, [])
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [jsonActions, setJsonActions] = useState<HTMLDivElement | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
@@ -863,6 +864,8 @@ export function StudioEditor({
               <Tabs
                 activeKey={tab}
                 onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
+                // Proposed: the JSON view's actions end the tab bar, so they take no height from it.
+                tabBarExtraContent={tab === 'json' ? <div ref={setJsonActions} /> : undefined}
                 items={[
                   // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
                   // guard on return, and clears the guard when the author leaves. Its code loads on first use.
@@ -1050,6 +1053,7 @@ export function StudioEditor({
                       <Flex vertical gap="small">
                         <JsonEditor
                           label={t('shell.studio.json')}
+                          actionsSlot={jsonActions}
                           schema={schema ?? null}
                           value={jsonText ?? JSON.stringify(draft, null, 2)}
                           onChange={changeJson}

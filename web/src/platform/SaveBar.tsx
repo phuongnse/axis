@@ -47,6 +47,7 @@ export function SaveBar({
       role="region"
       aria-label={t('shell.studio.saveBar.label')}
       data-testid="studio-save-bar"
+      data-save-bar
       style={{
         position: 'sticky',
         bottom: 0,

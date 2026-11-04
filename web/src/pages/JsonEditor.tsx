@@ -1,13 +1,35 @@
+import {
+  AlignLeftOutlined,
+  CloseOutlined,
+  CopyOutlined,
+  DownOutlined,
+  SearchOutlined,
+  UpOutlined,
+} from '@ant-design/icons'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { json, jsonParseLinter } from '@codemirror/lang-json'
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language'
-import { linter, lintGutter, type Diagnostic } from '@codemirror/lint'
+import { diagnosticCount, linter, lintGutter, nextDiagnostic, type Diagnostic } from '@codemirror/lint'
+import {
+  closeSearchPanel,
+  findNext,
+  findPrevious,
+  openSearchPanel,
+  search,
+  searchKeymap,
+  SearchQuery,
+  setSearchQuery,
+} from '@codemirror/search'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { tags } from '@lezer/highlight'
 import Ajv2020, { type ErrorObject, type ValidateFunction } from 'ajv/dist/2020'
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Button, Flex, Input, message as antMessage, Typography, type InputRef } from 'antd'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
+import { selectedItemTint } from '../platform/antTheme'
+import { AxisButton } from '../platform/AxisButton'
 import type { designTokensFor } from '../platform/designTokens'
 import { ShellSidebarContext } from '../platform/shellSidebar'
 import type { JsonSchema } from '../platform/studioSchemas'
@@ -89,6 +111,129 @@ function spanAt(state: EditorState, pointer: string): { from: number; to: number
   return node ? { from: node.from, to: node.to, key } : { from: 0, to: 0 }
 }
 
+/** Whether the text parses as JSON. */
+function isJson(text: string): boolean {
+  try {
+    JSON.parse(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** How many matches the text has, and which of them is selected, counted from 1, or 0 when none is. */
+function matchesOf(state: EditorState, text: string): { index: number; count: number } {
+  if (text === '') {
+    return { index: 0, count: 0 }
+  }
+  const { from, to } = state.selection.main
+  const cursor = new SearchQuery({ search: text }).getCursor(state)
+  let index = 0
+  let count = 0
+  for (let match = cursor.next(); !match.done; match = cursor.next()) {
+    count += 1
+    if (match.value.from === from && match.value.to === to) {
+      index = count
+    }
+  }
+  return { index, count }
+}
+
+/**
+ * Proposed: the find bar at the top of the JSON view. The browser's own find cannot see the lines a code editor has not
+ * drawn, so a long resource needs this one. It finds as one types: Enter moves to the next match, Shift+Enter to the one
+ * before, and Escape closes it and goes back to the text.
+ */
+function JsonFindBar({ view }: { view: EditorView }) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const input = useRef<InputRef>(null)
+  // Each letter searches again from where the bar opened, so typing never walks past the first match.
+  const start = useRef(view.state.selection.main.from)
+  const [text, setText] = useState('')
+  const { index, count } = matchesOf(view.state, text)
+
+  useEffect(() => {
+    input.current?.focus({ cursor: 'all' })
+  }, [])
+
+  function change(next: string) {
+    setText(next)
+    view.dispatch({
+      effects: setSearchQuery.of(new SearchQuery({ search: next })),
+      selection: { anchor: start.current },
+    })
+    if (next !== '') {
+      findNext(view)
+    }
+  }
+
+  function close() {
+    closeSearchPanel(view)
+    view.focus()
+  }
+
+  function press(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      if (event.shiftKey) {
+        findPrevious(view)
+      } else {
+        findNext(view)
+      }
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      close()
+    }
+  }
+
+  const label = t('shell.studio.json.find')
+  const none = text !== '' && count === 0
+  return (
+    <Flex
+      data-testid="studio-json-find"
+      align="center"
+      gap={spacing.xs}
+      style={{ padding: `${spacing.xs}px ${spacing.sm}px`, fontFamily: 'initial' }}
+    >
+      <Input
+        ref={input}
+        size="small"
+        aria-label={label}
+        placeholder={label}
+        value={text}
+        status={none ? 'error' : undefined}
+        onChange={(event) => change(event.target.value)}
+        onKeyDown={press}
+        style={{ width: 240 }}
+        {...{ 'main-field': 'true' }}
+      />
+      <Typography.Text role="status" style={{ color: colour.textMuted, minWidth: 72 }}>
+        {none
+          ? t('shell.studio.json.findNone')
+          : text === ''
+            ? ''
+            : t('shell.studio.json.findCount').replace('{index}', String(index)).replace('{count}', String(count))}
+      </Typography.Text>
+      <AxisButton
+        role="icon"
+        nameKey="shell.studio.json.findPrevious"
+        icon={<UpOutlined />}
+        disabled={count === 0}
+        onClick={() => findPrevious(view)}
+      />
+      <AxisButton
+        role="icon"
+        nameKey="shell.studio.json.findNext"
+        icon={<DownOutlined />}
+        disabled={count === 0}
+        onClick={() => findNext(view)}
+      />
+      <AxisButton role="icon" nameKey="shell.studio.json.findClose" icon={<CloseOutlined />} onClick={close} />
+    </Flex>
+  )
+}
+
 /** A schema error in words a person reads, never Ajv's own. */
 function message(error: ErrorObject, t: (key: string) => string): string {
   const params = error.params as Record<string, unknown>
@@ -113,16 +258,20 @@ function message(error: ErrorObject, t: (key: string) => string): string {
  * checks as one types, each marked at its line in the gutter and underlined where it is: a syntax error where the text
  * stops being JSON, and every place the content breaks the kind's schema, said in words ("Add version.", "colour is
  * not a field of this resource."). The text goes to `onChange` on every change; the editor keeps the draft whole.
+ * `actionsSlot` is the element at the end of the tab bar that its actions draw in: how many problems there are, which
+ * moves to the next one, Find, Format, which is off while the text is not JSON, and Copy.
  */
 export function JsonEditor({
   value,
   schema,
   label,
+  actionsSlot,
   onChange,
 }: {
   value: string
   schema: JsonSchema | null
   label: string
+  actionsSlot: HTMLElement | null
   onChange: (text: string) => void
 }) {
   const t = useText()
@@ -133,6 +282,12 @@ export function JsonEditor({
   const viewRef = useRef<EditorView | null>(null)
   const latest = useRef({ onChange, schema, t })
   const themeCompartment = useMemo(() => new Compartment(), [])
+  const [messageApi, messageHolder] = antMessage.useMessage()
+  const [problems, setProblems] = useState(0)
+  const [broken, setBroken] = useState(() => !isJson(value))
+  const [findHost, setFindHost] = useState<HTMLElement | null>(null)
+  // The find bar's count reads the editor's state, which React does not hold.
+  const [, setRevision] = useState(0)
   useEffect(() => {
     latest.current = { onChange, schema, t }
   })
@@ -178,12 +333,26 @@ export function JsonEditor({
           json(),
           lineNumbers(),
           history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
+          search({
+            top: true,
+            createPanel: () => {
+              const dom = document.createElement('div')
+              return { dom, top: true, mount: () => setFindHost(dom), destroy: () => setFindHost(null) }
+            },
+          }),
+          keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
           linter(schemaLinter, { delay: 300 }),
           lintGutter(),
           themeCompartment.of(editorTheme(tokens, mode)),
           EditorView.contentAttributes.of({ 'aria-label': label }),
           EditorView.updateListener.of((update) => {
+            setProblems(diagnosticCount(update.state))
+            if (update.docChanged) {
+              setBroken(!isJson(update.state.doc.toString()))
+            }
+            if (update.docChanged || update.selectionSet) {
+              setRevision((revision) => revision + 1)
+            }
             if (update.docChanged && !update.transactions.some((transaction) => transaction.annotation(external))) {
               latest.current.onChange(update.state.doc.toString())
             }
@@ -204,8 +373,8 @@ export function JsonEditor({
     viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(editorTheme(tokens, mode)) })
   }, [themeCompartment, tokens, mode])
 
-  // Proposed: the view reaches down to spacing-md above the footer, whatever the window's height, as a fixed share of the
-  // window left a band under it that grew with the screen. It never goes under its minimum, and the page scrolls then.
+  // Proposed: the view reaches down to spacing-md above the footer or the save bar, whatever the window's height, as a
+  // fixed share of the window left a band under it that grew with the screen. It never goes under its minimum, and the page scrolls then.
   useLayoutEffect(() => {
     const host = hostRef.current!
     function fit() {
@@ -213,15 +382,21 @@ export function JsonEditor({
         return
       }
       const top = host.getBoundingClientRect().top + window.scrollY
-      const footer = document.querySelector('footer')?.offsetHeight ?? 0
+      // The save bar sits over the footer while it shows, so it is what the view stops above.
+      const below = document.querySelector<HTMLElement>('[data-save-bar]') ?? document.querySelector('footer')
       host.style.setProperty(
         '--json-view-height',
-        `${Math.max(minimumHeight, window.innerHeight - top - footer - bottomGap)}px`,
+        `${Math.max(minimumHeight, window.innerHeight - top - (below?.offsetHeight ?? 0) - bottomGap)}px`,
       )
     }
     fit()
     const observer = new ResizeObserver(fit)
     observer.observe(host)
+    // The page area changes height when the save bar comes and goes.
+    const page = host.closest('main')
+    if (page) {
+      observer.observe(page)
+    }
     window.addEventListener('resize', fit)
     return () => {
       observer.disconnect()
@@ -236,7 +411,71 @@ export function JsonEditor({
     }
   }, [value])
 
-  return <div ref={hostRef} data-testid="studio-json-editor" />
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(viewRef.current!.state.doc.toString())
+      void messageApi.success(t('shell.studio.json.copied'))
+    } catch (error) {
+      console.warn('Copying the JSON failed', error)
+      void messageApi.error(t('shell.studio.json.copyFailed'))
+    }
+  }
+
+  function format() {
+    const view = viewRef.current!
+    const text = view.state.doc.toString()
+    const formatted = JSON.stringify(JSON.parse(text), null, 2)
+    if (formatted !== text) {
+      view.dispatch({ changes: { from: 0, to: text.length, insert: formatted } })
+    }
+  }
+
+  function nextProblem() {
+    const view = viewRef.current!
+    view.focus()
+    nextDiagnostic(view)
+  }
+
+  const actions = (
+    <Flex align="center" gap={tokens.spacing.xs}>
+      {problems > 0 && (
+        <Button
+          type="text"
+          data-testid="studio-json-problems"
+          style={{ color: tokens.colour.dangerText }}
+          onClick={nextProblem}
+        >
+          {problems === 1
+            ? t('shell.studio.json.problem')
+            : t('shell.studio.json.problems').replace('{count}', String(problems))}
+        </Button>
+      )}
+      <AxisButton
+        role="icon"
+        nameKey="shell.studio.json.find"
+        icon={<SearchOutlined />}
+        aria-keyshortcuts="Control+F Meta+F"
+        onClick={() => openSearchPanel(viewRef.current!)}
+      />
+      <AxisButton
+        role="icon"
+        nameKey="shell.studio.json.format"
+        icon={<AlignLeftOutlined />}
+        disabled={broken}
+        onClick={format}
+      />
+      <AxisButton role="icon" nameKey="shell.studio.json.copy" icon={<CopyOutlined />} onClick={() => void copy()} />
+    </Flex>
+  )
+
+  return (
+    <>
+      {messageHolder}
+      <div ref={hostRef} data-testid="studio-json-editor" />
+      {actionsSlot && createPortal(actions, actionsSlot)}
+      {findHost && viewRef.current && createPortal(<JsonFindBar view={viewRef.current} />, findHost)}
+    </>
+  )
 }
 
 function editorTheme({ colour, radius, spacing, type }: ReturnType<typeof designTokensFor>, mode: 'light' | 'dark') {
@@ -264,6 +503,14 @@ function editorTheme({ colour, radius, spacing, type }: ReturnType<typeof design
           backgroundColor: colour.surface,
           color: colour.textMuted,
           borderRight: `1px solid ${colour.borderSubtle}`,
+        },
+        '.cm-panels': { backgroundColor: colour.surface, color: colour.text },
+        '.cm-panels.cm-panels-top': { borderBottom: `1px solid ${colour.borderSubtle}` },
+        // Proposed: every match has a thin outline and the one in focus the selected tint, from the tokens, not CodeMirror's yellow.
+        '.cm-searchMatch': { backgroundColor: 'transparent', outline: `1px solid ${colour.border}` },
+        '.cm-searchMatch.cm-searchMatch-selected, .cm-searchMatch-selected span': {
+          backgroundColor: selectedItemTint(mode),
+          outline: `1px solid ${colour.primaryText}`,
         },
       },
       { dark: mode === 'dark' },
