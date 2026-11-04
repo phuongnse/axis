@@ -44,7 +44,7 @@ hidden or `readOnlyWhen` field.
   [the task API](task-api.md#task-api-errors).
 - **Steps.** `steps` is an optional list on the form. Each step has a `name`,
   unique in the form ignoring letter case, a `title`
-  label and `sections`, a list of section names. When `steps` is present,
+  label and `sections`, a list of section names. A [customization layer](customization-layers.md#list-keys) finds a step by its `name`. When `steps` is present,
   every section is in exactly one step. The steps show in
   the order listed. A step whose sections are all hidden is skipped. Keep to
   about six steps: from seven the steps bar shows only numbers. Studio warns

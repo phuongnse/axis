@@ -246,7 +246,7 @@ widgets `columns`, `tabs` and `section` hold other widgets, see
   Every `widgets`, `columns` and `tabs` list has at least one entry.
 - The compiler checks every widget at any depth. A problem is reported at the
   widget's own JSON pointer, such as `/widgets/0/columns/1/widgets/0/entity`.
-- A widget, an action, a row action, a toolbar action, a column and a tab require a `name`.
+- A widget, an action, a row action, a toolbar action, a column and a tab require a `name`, which a [customization layer](customization-layers.md#list-keys) finds each element by.
   A missing one is `AXC0004` at the element, such as `/widgets/0/tabs/1`.
 - A widget's `name` is unique on the whole page, at any depth, ignoring letter case.
   A repeat is `AXC0361`, reported at the later widget's `name`.
@@ -278,7 +278,7 @@ A `seed` holds records with fixed ids for one entity:
   that names a record of another seed, such as a department's `head`, sorts after it.
 - Each record's `id` is the record id, fixed so that the startup step
   inserts the record once. It is unique across every seed file of the
-  application (`AXC0034`).
+  application (`AXC0034`). A [customization layer](customization-layers.md#list-keys) finds a record by its `id`.
 - `sync` is optional and defaults to `false`. When `true`, the startup step
   keeps existing records in step with the file. It writes only the fields
   the seed declares and never deletes a record (see

@@ -231,7 +231,7 @@ a payment reference from the sample extension package, see
   when a start fails the condition.
 - `start` names the first step.
 - `steps` is an array of step objects. Each has a `name` and a `type`. The
-  other properties depend on the type, see [Steps](#steps).
+  other properties depend on the type, see [Steps](#steps). A [customization layer](customization-layers.md#list-keys) finds a step, a branch or a task's outcome by its `name`.
 - Transitions name the next step by its name: `next`, `branches[].next`,
   `otherwise` and `outcomes[].next` of a task.
 - `kind` stays the resource kind. Steps use `type`, as fields and widgets do.
