@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "axis-controlplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controlplane
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "axis-controlplane.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: https
+      port: {{ .Values.service.port }}
+      targetPort: https

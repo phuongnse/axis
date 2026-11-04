@@ -6,8 +6,9 @@ Detailed reference for the control plane: the service that runs Axis's own busin
 [D126](../decisions/d126-sign-up-trials-and-the-control-plane.md) and
 [D127](../decisions/d127-plans-payments-and-invoices.md). Everything in this file is _(planned for
 M33)_, except the parts that billing adds, _(planned for M34)_, and except the service itself, its
-settings and its health, which are built: `controlplane/src/Axis.ControlPlane` starts, checks its
-`ControlPlane:` settings, applies its own migrations and answers `/health/live` and `/health/ready`. The
+settings, its health, its image and its Helm chart, which are built: `controlplane/src/Axis.ControlPlane`
+starts, checks its `ControlPlane:` settings, applies its own migrations and answers `/health/live` and
+`/health/ready`, the `axis-controlplane` image packs it, and `deploy/helm/axis-controlplane` installs it. The
 conventions of [architecture.md](../architecture.md) apply.
 
 ## What it is
@@ -87,6 +88,28 @@ connection string may also come from the key-per-file secret `/run/secrets/Contr
 At start the service applies its migrations to the `control_plane` schema, with the history table
 `control_plane.__control_plane_migrations`. A failed migration stops the start. One database role runs
 the migrations and the queries for now.
+
+## Image and chart
+
+- **Image.** Build it with
+  `docker build --target axis-controlplane --build-arg AXIS_VERSION=<version> .`. It runs as the
+  non-root user of the base image in the Production environment, works on a read-only root file system,
+  carries the version as the OCI label `org.opencontainers.image.version`, and holds no sample,
+  extension package or module.
+- **Chart.** `deploy/helm/axis-controlplane` installs one Deployment and one ClusterIP Service. The
+  Deployment has startup, liveness and readiness probes on `/health/live` and `/health/ready`.
+- **HTTPS only.** The control plane listens on port 8443 with the certificate of a Kubernetes TLS Secret
+  (`secrets.certificate`), and the Service forwards its port 443 to it. The probes use HTTPS.
+- **Values.** `controlPlane.region` and `controlPlane.tenantDomain` set the settings of the same name.
+  `secrets.connectionString` names the Kubernetes Secret, and optionally its key, that holds the
+  connection string. The chart mounts it as the file `/run/secrets/ControlPlane__ConnectionString`.
+  `image`, `replicas`, `resources` and `service` are the usual. The chart holds no secret value and
+  creates no Secret, and its schema rejects a `value` in a secret reference.
+- **Render failures.** Rendering fails and names the value when `controlPlane.region`,
+  `controlPlane.tenantDomain`, `secrets.connectionString.name` or `secrets.certificate.name` is not set.
+- **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the Kubernetes
+  schemas, `scripts/helm-controlplane.test.mjs` tests the render, the image scan covers the image, and
+  the `images` smoke suite starts it read-only against PostgreSQL over TLS.
 
 ## Health and telemetry
 

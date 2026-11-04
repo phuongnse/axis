@@ -95,7 +95,7 @@ describe('scripts/scan-images.sh', () => {
     const stages = [...dockerfile.matchAll(/^FROM\s+\S+\s+AS\s+(axis-[\w-]+)\s*$/gim)].map((match) => match[1])
     const fixture = readFileSync(path.join(root, 'tests/Axis.Integration.Tests/KeycloakFixture.cs'), 'utf8')
     const keycloak = fixture.match(/public const string Image = "([^"]+)";/)[1]
-    for (const target of ['axis-server', 'axis-worker', 'axis-admin']) assert.ok(stages.includes(target), target)
+    for (const target of ['axis-server', 'axis-worker', 'axis-admin', 'axis-controlplane']) assert.ok(stages.includes(target), target)
     assert.match(keycloak, /keycloak/)
 
     const result = scan()

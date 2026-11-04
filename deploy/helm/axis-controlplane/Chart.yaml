@@ -1,0 +1,6 @@
+apiVersion: v2
+name: axis-controlplane
+description: Installs the Axis control plane of a region on Kubernetes.
+type: application
+version: 0.1.0
+appVersion: "0.0.0-dev"
