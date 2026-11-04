@@ -1,8 +1,7 @@
-using System.Globalization;
-using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Resources;
+using Axis.Configuration.Templates;
 
 namespace Axis.Server.Studio;
 
@@ -103,26 +102,7 @@ internal static partial class StudioFileNames
     /// <summary>Whether <paramref name="name"/> is an application name: a letter, then letters and digits, at most 60 characters.</summary>
     internal static bool IsName(string name) => Name().IsMatch(name);
 
-    // A hyphen goes before a capital that follows a lower-case letter or a digit, or before the last capital
-    // of an acronym that a lower-case letter follows. Everything is then lower-cased.
-    internal static string Kebab(string name)
-    {
-        var builder = new StringBuilder(name.Length + 8);
-        for (var index = 0; index < name.Length; index++)
-        {
-            var character = name[index];
-            if (index > 0 && char.IsUpper(character)
-                && (char.IsLower(name[index - 1]) || char.IsDigit(name[index - 1])
-                    || (char.IsUpper(name[index - 1]) && index + 1 < name.Length && char.IsLower(name[index + 1]))))
-            {
-                builder.Append('-');
-            }
-
-            builder.Append(character);
-        }
-
-        return builder.ToString().ToLower(CultureInfo.InvariantCulture);
-    }
+    internal static string Kebab(string name) => TemplateApplications.Kebab(name);
 
     private static string? String(JsonObject content, string property) =>
         content[property] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;

@@ -569,7 +569,7 @@ The manifest is `template.json` at the root of the folder:
 - **Installation.** Templates are installed per installation under
   `Templates:Path/<id>/<version>/`. The environment variable is
   `Templates__Path`, and relative paths are resolved against the server content
-  root. The server reads them. Without the setting no
+  root. The server reads them, and in a cell the publisher reads them for the create job. Without the setting no
   template is installed. A setting that names a missing folder stops the
   server. A template version with a bad manifest, with folder names that differ
   from its manifest, or without exactly one site is left out and logged as a

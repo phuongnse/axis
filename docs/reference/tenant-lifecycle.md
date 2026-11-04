@@ -5,7 +5,7 @@ cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend and resume described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+[provisioning API](#provisioning-api), the job runner for suspend, resume and create described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -46,8 +46,8 @@ implementation.
   which may insert into `platform.jobs` and nothing else there, and answers `202` with a `Location` header of `/api/cell/jobs/{id}`.
   The job's actor is the operator's id, the subject of the token or the session. The create route is built too: it queues a `create` job with the five steps of
   [creating a tenant](#creating-a-tenant), all `pending`, and keeps the request's `application` and `administrator` in the job's
-  `input`, which the job read never returns. The runner for `create` is _(planned for M31)_, so until it exists the publisher fails a
-  queued create job as a kind it does not know. The routes for the other kinds and the run again of a failed job are _(planned for M31)_.
+  `input`, which the job read never returns. The publisher runs the `create` job in a cell with the five steps, see the
+  [create job](administration.md#create-job). The routes for the other kinds and the run again of a failed job are _(planned for M31)_.
 - **Idempotency.** Each `POST` that queues a job needs an `Idempotency-Key` header of 1 to 255 characters, and the answer is `400`
   without one, with no job queued. The same key with the same request answers the first job again for 24 hours. The request is the kind,
   the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.

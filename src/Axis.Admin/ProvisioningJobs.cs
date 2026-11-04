@@ -7,10 +7,10 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// One step of a provisioning job. <paramref name="RunAsync"/> gets the tenant id and returns <see langword="null"/> on success
-/// or a refusal message. A refusal fails the job at once, and an exception that it throws ends only the claim.
+/// One step of a provisioning job. <paramref name="RunAsync"/> gets the tenant id and the job's input JSON, which may be null, and
+/// returns <see langword="null"/> on success or a refusal message. A refusal fails the job at once, and an exception that it throws ends only the claim.
 /// </summary>
-internal sealed record JobStep(string Name, Func<string, CancellationToken, Task<string?>> RunAsync);
+internal sealed record JobStep(string Name, Func<string, string?, CancellationToken, Task<string?>> RunAsync);
 
 /// <summary>
 /// The provisioning jobs of <c>platform.jobs</c>, which the publisher runs under <c>Tenancy:Source=directory</c>. A job is queued
@@ -59,7 +59,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         SET state = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.kind, p.tenant_id, p.steps::text, p.actor, p.claims
+        RETURNING p.id, p.kind, p.tenant_id, p.steps::text, p.actor, p.claims, p.input::text
         """;
 
     // The claims count is the fencing token: it goes up on every claim, so a publisher that lost its claim changes no row.
@@ -82,8 +82,8 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
     public static IReadOnlyDictionary<string, IReadOnlyList<JobStep>> Builtin(string platformConnectionString) =>
         new Dictionary<string, IReadOnlyList<JobStep>>
         {
-            ["suspend"] = [new JobStep("status", (tenantId, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.SuspendChangeAsync, tenantId, cancellationToken))],
-            ["resume"] = [new JobStep("status", (tenantId, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.ResumeChangeAsync, tenantId, cancellationToken))],
+            ["suspend"] = [new JobStep("status", (tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.SuspendChangeAsync, tenantId, cancellationToken))],
+            ["resume"] = [new JobStep("status", (tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.ResumeChangeAsync, tenantId, cancellationToken))],
         };
 
     /// <summary>Adds a <c>queued</c> job with every step of <paramref name="kind"/> <c>pending</c>, and returns its id.</summary>
@@ -95,7 +95,8 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         string actor,
         string? idempotencyKey,
         string? requestHash,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? input = null)
     {
         ArgumentNullException.ThrowIfNull(kinds);
         if (!kinds.TryGetValue(kind, out var steps))
@@ -113,6 +114,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             State = "queued",
             Steps = JsonSerializer.Serialize(steps.Select(step => new StoredStep(step.Name, Pending, null)), _json),
             Actor = actor,
+            Input = input,
             IdempotencyKey = idempotencyKey,
             RequestHash = requestHash,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -182,7 +184,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
-                claimed = new ClaimedJob(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt32(5));
+                claimed = new ClaimedJob(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetString(6));
             }
         }
 
@@ -244,7 +246,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             string? refusal;
             try
             {
-                refusal = await defined[index].RunAsync(job.TenantId, cancellationToken);
+                refusal = await defined[index].RunAsync(job.TenantId, job.Input, cancellationToken);
             }
             catch (Exception exception)
             {
@@ -347,7 +349,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private sealed record ClaimedJob(Guid Id, string Kind, string TenantId, string Steps, string Actor, int Claims);
+    private sealed record ClaimedJob(Guid Id, string Kind, string TenantId, string Steps, string Actor, int Claims, string? Input);
 
     private sealed record StoredStep(string Name, string State, string? Error);
 }
