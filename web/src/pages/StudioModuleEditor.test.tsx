@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioConnectionContext } from '../platform/studioConnection'
-import type { ModuleResourceItem } from '../platform/studio'
+import type { ModuleResourceItem, StudioNames } from '../platform/studio'
+import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioModuleEditor } from './StudioModuleEditor'
 
@@ -51,7 +52,11 @@ function problem(status: number, title = 'Problem') {
   return new Response(JSON.stringify({ title }), { status, headers: { 'Content-Type': 'application/problem+json' } })
 }
 
-function renderEditor(respond: (url: string, init?: RequestInit) => Response, editing: ModuleResourceItem = item) {
+function renderEditor(
+  respond: (url: string, init?: RequestInit) => Response,
+  editing: ModuleResourceItem = item,
+  names?: StudioNames,
+) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
     String(input).endsWith('/page-metadata')
       ? new Response(JSON.stringify({ page: null, diagnostics: [] }))
@@ -64,7 +69,9 @@ function renderEditor(respond: (url: string, init?: RequestInit) => Response, ed
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
-            <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
+            <StudioNamesContext.Provider value={names}>
+              <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
+            </StudioNamesContext.Provider>
           </StudioConnectionContext.Provider>
         </TextProvider>
       </ThemeModeProvider>
@@ -536,6 +543,94 @@ describe('StudioModuleEditor', () => {
       expect(within(removed).getByRole('note', { name: 'Removed code' })).toBeInTheDocument()
       expect(within(removed).getByRole('button', { name: 'Reset to module code' })).toBeEnabled()
       expect(resets(fetchMock)).toEqual([])
+    })
+  })
+
+  describe('a module data source and a module seed', () => {
+    const dataSourceItem: ModuleResourceItem = {
+      id: 'orders-id',
+      kind: 'dataSource',
+      name: 'organization/Orders',
+      module: 'organization',
+    }
+    const seedItem: ModuleResourceItem = {
+      id: 'departments-id',
+      kind: 'seed',
+      name: 'organization/Departments',
+      module: 'organization',
+    }
+    const moduleNames = {
+      locales: [],
+      entities: [{ id: 'department-id', name: 'organization/Department', module: 'organization', fields: [] }],
+      dataSources: [],
+      processes: [],
+      rules: [],
+      connectors: [],
+      events: [],
+      roles: [],
+      sequences: [],
+      forms: [],
+      pages: [],
+      texts: [],
+    } as unknown as StudioNames
+
+    function readOf(
+      kind: string,
+      content: Record<string, unknown>,
+      marks: { path: string; mark: 'added' | 'changed' }[],
+    ) {
+      return new Response(
+        JSON.stringify({
+          id: 'resource-id',
+          kind,
+          name: 'Resource',
+          file: 'modules/organization/resource.json',
+          version: 'm1',
+          content: { id: 'resource-id', kind, name: 'Resource', ...content },
+          layer,
+          marks,
+          removed: [],
+        }),
+      )
+    }
+
+    it('marks a changed field Changed with Reset to module', async () => {
+      renderEditor(
+        () =>
+          readOf('dataSource', { entity: 'Department', fields: [{ name: 'title', path: 'title' }] }, [
+            { path: '/fields/0', mark: 'changed' },
+          ]),
+        dataSourceItem,
+      )
+
+      expect(await screen.findByRole('note', { name: 'Changed title' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reset to module title' })).toBeEnabled()
+      expect(screen.getByTestId('studio-module-layer')).toBeInTheDocument()
+    })
+
+    it('marks an added record Added in the seed grid', async () => {
+      renderEditor(
+        (url) =>
+          url.endsWith('/department-id')
+            ? read(null, entity)
+            : readOf(
+                'seed',
+                {
+                  entity: 'Department',
+                  records: [
+                    { id: 'r1', values: { title: 'Sales' } },
+                    { id: 'r2', values: { title: 'Support' } },
+                  ],
+                },
+                [{ path: '/records/1', mark: 'added' }],
+              ),
+        seedItem,
+        moduleNames,
+      )
+
+      const rows = await screen.findAllByTestId('studio-seed-row')
+      expect(within(rows[1]).getByRole('note', { name: 'Added r2' })).toBeInTheDocument()
+      expect(within(rows[0]).queryByRole('note')).toBeNull()
     })
   })
 })

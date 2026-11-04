@@ -1,18 +1,21 @@
 import { Alert, Button, Flex, Modal, Tag } from 'antd'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import {
+  dataSourceKeyedLists,
   entityKeyedLists,
   formKeyedLists,
   layerMarks,
   pageListKey,
   policyKeyedLists,
   processKeyedLists,
+  seedKeyedLists,
   textKeyedMaps,
   type KeyedLists,
 } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
+import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
   fetchStudioModuleResource,
@@ -26,13 +29,17 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { StudioNamesContext } from '../platform/studioNames'
 import { isObject } from '../platform/scenarioSteps'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { EntityDesigner } from './EntityDesigner'
 import type { DesignerLayer } from './LayerMarkViews'
+import { SchemaForm } from './SchemaForm'
+import { SeedGrid } from './SeedGrid'
 import { StudioModulePolicy } from './StudioModulePolicy'
 import { TextTable } from './TextTable'
+import { triggerSchema } from './triggerSchema'
 
 const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
 const LazyStudioPageDesign = lazy(() => import('./StudioPageDesign'))
@@ -41,6 +48,19 @@ const LazyStudioFormDesign = lazy(() => import('./StudioFormDesign'))
 type Content = Record<string, unknown>
 
 const noDiagnosticPaths: readonly string[] = []
+const noProblems = new Map<string, string>()
+
+/** The kinds whose editor is the schema form, or the process designer, and so waits for the kind's schema. */
+const schemaKinds: readonly string[] = ['process', 'dataSource', 'rule', 'trigger', 'sequence', 'event', 'seed']
+
+/** The root properties of a module resource that show as text: its identity, and its name, which the save route refuses to change. */
+const moduleReadOnlyNames = new Set(['id', 'kind', 'name', 'formatVersion'])
+
+/** The fields of the entity a seed names, or `null` when they could not be read. */
+interface SeedEntity {
+  id: string
+  fields: SeedField[] | null
+}
 
 /** What the editor loaded: the module resource with the layer applied, and the layer when there is one. */
 interface Loaded {
@@ -51,13 +71,17 @@ interface Loaded {
 }
 
 /**
- * An editor of a module resource, for the `entity`, `process`, `policy`, `text`, `form` and `page` kinds. The resource
+ * An editor of a module resource, for every kind but `scenario` and `contract`. The resource
  * opens with the application's layer applied and every input on. Save sends the whole resource to the module save
  * route, which writes only the difference as the layer. When the resource has a layer, a Customized tag and Reset all
  * show, which delete the layer file, and the entity designer, the process designer, the policy grants, the text table,
  * the form designer's outline or the page designer marks the elements the layer added, changed or removed, each with
  * Reset to module, which undoes that one element on the server. The page designer draws the saved page on its canvas,
- * so the canvas changes after a save or a reset. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
+ * so the canvas changes after a save or a reset. A data source, a rule, a trigger, a sequence and an event open in the
+ * schema form, and a seed in the seed grid with a form of its other properties. The data source's `fields`,
+ * `parameters` and `aggregate.groupBy` and the seed's `records` are marked like the other keyed lists, and the other
+ * kinds show only the Customized tag. `name` shows as text, because the save route refuses a renamed module
+ * resource. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
  * diagnostics after a save, a Reset all or a Reset to module, with the layer the write added to the folder's list or the
  * id of the layer it removed.
  */
@@ -86,6 +110,8 @@ export function StudioModuleEditor({
   const [selected, setSelected] = useState<number | null>(null)
   const [pageSelected, setPageSelected] = useState('/widgets/0')
   const [formPath, setFormPath] = useState<string | null>(null)
+  const names = useContext(StudioNamesContext)
+  const [seedEntity, setSeedEntity] = useState<SeedEntity>()
 
   /** Takes a read as what was loaded. Unless `force`, a draft with unsaved edits stays. */
   function adopt(resource: StudioModuleResource, force: boolean) {
@@ -124,14 +150,14 @@ export function StudioModuleEditor({
   }, [application, item.module, item.id, generation, lost])
 
   useEffect(() => {
-    if (item.kind !== 'process') {
+    if (!schemaKinds.includes(item.kind)) {
       return
     }
     let current = true
-    loadKindSchema('process').then(
+    loadKindSchema(item.kind).then(
       (loadedSchema) => current && setSchema(loadedSchema),
       (error: unknown) => {
-        console.warn(`Loading the process schema failed`, error)
+        console.warn(`Loading the ${item.kind} schema failed`, error)
         if (current) {
           setLoadFailed(true)
         }
@@ -142,14 +168,69 @@ export function StudioModuleEditor({
     }
   }, [item.kind])
 
+  // The entity of a seed is found by name among the entities of the seed's module, ignoring letter case.
+  const entityName =
+    item.kind === 'seed' && typeof draft.entity === 'string'
+      ? (draft.entity.includes('/') ? draft.entity : `${item.module}/${draft.entity}`).toLowerCase()
+      : undefined
+  const entityId = entityName
+    ? names?.entities.find((entity) => entity.module === item.module && entity.name.toLowerCase() === entityName)?.id
+    : undefined
+
+  useEffect(() => {
+    if (entityId === undefined) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioModuleResource(application, item.module, entityId, controller.signal).then(
+      (entity) => setSeedEntity({ id: entityId, fields: seedFieldsOf(entity.content) }),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the entity '${entityId}' of the seed failed`, error)
+        setSeedEntity({ id: entityId, fields: null })
+      },
+    )
+    return () => controller.abort()
+  }, [application, item.module, entityId, generation, lost])
+
+  const seedFields = entityId !== undefined && seedEntity?.id === entityId ? seedEntity.fields : null
+  const problems = useMemo(
+    () => (seedFields ? seedProblems(draft.records, seedColumns(seedFields)) : noProblems),
+    [seedFields, draft.records],
+  )
+  const seedSchema = useMemo(() => {
+    if (!schema || !seedFields) {
+      return undefined
+    }
+    const { records: _records, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
+  }, [schema, seedFields])
+
   if (loadFailed) {
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
-  if (!loaded || (item.kind === 'process' && !schema)) {
+  if (
+    !loaded ||
+    (schemaKinds.includes(item.kind) && !schema) ||
+    (entityId !== undefined && seedEntity?.id !== entityId)
+  ) {
     return null
   }
 
   const patch = diffPatch(loaded.content, draft)
+
+  /** Sets the draft's value at the pointer as it is. A seed cell that picks `false` must keep it. */
+  function update(pointer: string, value: unknown) {
+    setDraft((current) => setAt(current, pointer, value) as Content)
+    setSaved(false)
+    setSaveError(null)
+  }
 
   function change(pointer: string, next: unknown) {
     // Unticking a box that the file never had leaves the key out, so the undo of a tick is no change.
@@ -157,9 +238,7 @@ export function StudioModuleEditor({
     const parent = getAt(loaded!.content, pointer.slice(0, pointer.lastIndexOf('/')))
     const value =
       next === false && !Array.isArray(parent) && getAt(loaded!.content, pointer) === undefined ? undefined : next
-    setDraft((current) => setAt(current, pointer, value) as Content)
-    setSaved(false)
-    setSaveError(null)
+    update(pointer, value)
   }
 
   /** Reads the resource again and takes it, so the draft is what the server holds. */
@@ -370,6 +449,39 @@ export function StudioModuleEditor({
             layer={designerLayer(formKeyedLists(loaded.content))}
           />
         </Suspense>
+      ) : item.kind === 'seed' && schema ? (
+        seedSchema ? (
+          <Flex vertical gap="middle">
+            <SchemaForm schema={seedSchema} value={draft} onChange={change} readOnlyNames={moduleReadOnlyNames} />
+            <SeedGrid
+              fields={seedFields!}
+              records={draft.records}
+              problems={problems}
+              onChange={update}
+              layer={designerLayer(seedKeyedLists)}
+            />
+          </Flex>
+        ) : (
+          <SchemaForm schema={schema} value={draft} onChange={change} readOnlyNames={moduleReadOnlyNames} />
+        )
+      ) : item.kind === 'dataSource' && schema ? (
+        <SchemaForm
+          schema={schema}
+          value={draft}
+          onChange={change}
+          readOnlyNames={moduleReadOnlyNames}
+          layer={designerLayer(dataSourceKeyedLists)}
+          keyedLists={dataSourceKeyedLists}
+        />
+      ) : (item.kind === 'rule' || item.kind === 'sequence' || item.kind === 'event') && schema ? (
+        <SchemaForm schema={schema} value={draft} onChange={change} readOnlyNames={moduleReadOnlyNames} />
+      ) : item.kind === 'trigger' && schema ? (
+        <SchemaForm
+          schema={triggerSchema(schema, draft)}
+          value={draft}
+          onChange={change}
+          readOnlyNames={moduleReadOnlyNames}
+        />
       ) : item.kind === 'policy' ? (
         <StudioModulePolicy value={draft} onChange={change} layer={designerLayer(policyKeyedLists)} />
       ) : (
@@ -388,7 +500,7 @@ export function StudioModuleEditor({
         <AxisButton
           role="finish"
           data-testid="studio-save"
-          disabled={patch.length === 0 || conflict || saving || resetting || reconnecting}
+          disabled={patch.length === 0 || problems.size > 0 || conflict || saving || resetting || reconnecting}
           onClick={() => void save()}
         >
           {t('shell.studio.save')}
