@@ -4,6 +4,7 @@ import {
   isValidElement,
   useEffect,
   useLayoutEffect,
+  useReducer,
   useRef,
   useState,
   type CSSProperties,
@@ -159,12 +160,15 @@ export function AxisTable<T extends object>({
   const host = useRef<HTMLDivElement>(null)
   const [movedCount, setMovedCount] = useState(0)
   const [scrolls, setScrolls] = useState(false)
+  // With no column moved, a new width changes no state, and the table must still measure itself.
+  const [, measureAgain] = useReducer((count: number) => count + 1, 0)
   const order = moveOrder(columns)
   const moved = new Set(order.slice(0, movedCount))
   const shown = columns.filter((column) => !moved.has(column.key))
   const under = columns.filter((column) => moved.has(column.key))
 
-  // Before the browser paints, one more column moves while the table is wider than its place.
+  // Before the browser paints, one more column moves while the table is wider than its place. The place takes its width
+  // from the page alone, through `contain`, or a wide table would widen it and never look too wide.
   useLayoutEffect(() => {
     const width = host.current?.clientWidth ?? 0
     const table = host.current?.querySelector('table')
@@ -190,6 +194,7 @@ export function AxisTable<T extends object>({
         width = entry.contentRect.width
         setMovedCount(0)
         setScrolls(false)
+        measureAgain()
       }
     })
     observer.observe(host.current)
@@ -272,7 +277,7 @@ export function AxisTable<T extends object>({
       )}
       {above}
       {instead ?? (
-        <div ref={host}>
+        <div ref={host} style={{ contain: 'inline-size' }}>
           <Table<T>
             rowKey={rowKey}
             columns={antColumns}
