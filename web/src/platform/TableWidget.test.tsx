@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -1129,6 +1129,7 @@ describe('TableWidget', () => {
       const row = await screen.findByRole('row', { name: /Buy paper/ })
       const button = within(row).getByRole('button', { name: 'Delete note' })
       expect(button).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+      fireEvent.keyDown(document.body, { key: 'Tab' })
       act(() => button.focus())
 
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete note')
@@ -1218,6 +1219,7 @@ describe('TableWidget', () => {
       renderWidget()
 
       const refresh = await screen.findByRole('button', { name: 'Refresh' })
+      fireEvent.keyDown(document.body, { key: 'Tab' })
       act(() => refresh.focus())
 
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh')

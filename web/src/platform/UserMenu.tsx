@@ -1,27 +1,18 @@
-import { Avatar, Button, Dropdown, type MenuProps } from 'antd'
+import { DownOutlined } from '@ant-design/icons'
+import { Button, Dropdown, type MenuProps } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { AxisButton } from './AxisButton'
 import { startSignIn } from './api'
 import { fetchCurrentUser, signOutSession, type CurrentUser } from './currentUser'
-import { colourTokens } from './designTokens'
 import { assignLocation } from './navigation'
+import { PersonAvatar } from './PersonAvatar'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-
-/** Up to two initials of a name: the first letters of its first and last words, in upper case. */
-function initials(displayName: string): string {
-  const words = displayName.split(/\s+/).filter((word) => word !== '')
-  const letters = [words[0], words.length > 1 ? words[words.length - 1] : undefined].map((word) =>
-    word === undefined ? '' : (Array.from(word)[0] ?? ''),
-  )
-  return letters.join('').toUpperCase()
-}
 
 /**
  * The account button in the shell header. With nobody signed in, it is a sign-in button that goes
  * to the identity provider and back to the current page. With someone signed in, it shows their
- * initials on an avatar, their name and a caret, with a menu. Its Sessions entry opens the account screen. Its sign-out entry ends the
+ * name, with a menu. Its Sessions entry opens the account screen. Its sign-out entry ends the
  * session, then sends the browser to the identity provider's sign-out page. It renders nothing while
  * the user loads, when loading fails, or with nobody signed in on the home page, which starts sign-in or shows a sign-in card.
  */
@@ -67,21 +58,14 @@ export function UserMenu() {
 
   return (
     <Dropdown trigger={['click']} menu={{ items, 'aria-label': t('shell.account.label') }}>
-      <AxisButton
-        role="plain"
-        caret
-        style={{ display: 'inline-flex', alignItems: 'center', gap: spacing.xs, minWidth: 0, maxWidth: 200 }}
-      >
-        {/* The avatar is hidden from assistive technology, so the name alone names the button. */}
-        <Avatar
-          aria-hidden
-          size={24}
-          style={{ background: colour.primary, color: colourTokens.surface.light, flex: 'none' }}
-        >
-          {initials(user.displayName)}
-        </Avatar>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName}</span>
-      </AxisButton>
+      {/* Proposed: the person's avatar, their name and a caret, as a trigger with text that opens a menu ends in a caret. */}
+      <Button type="text" style={{ minWidth: 0, maxWidth: 220, paddingInline: spacing.xs }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, minWidth: 0 }}>
+          <PersonAvatar name={user.displayName} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName}</span>
+          <DownOutlined aria-hidden style={{ color: colour.textMuted, fontSize: 12 }} />
+        </span>
+      </Button>
     </Dropdown>
   )
 }

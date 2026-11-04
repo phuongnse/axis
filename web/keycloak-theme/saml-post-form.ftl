@@ -1,35 +1,34 @@
-<#-- The Axis SAML redirect: a short card, and a form that the React bundle posts at once. It writes Keycloak's data as
-     JSON into the same element as login.ftl and the React bundle draws the page from it. The "page" field tells the
-     bundle which page to draw. Only the SAML fields that Keycloak gives are written. Keycloak escapes output as HTML,
-     so every string goes through ?json_string?no_esc: ?json_string also escapes "</", which keeps the script element
-     closed. -->
-<#import "frame.ftl" as frame>
+<#-- Proposed: the Axis SAML redirect. The page posts the SAML message to the organization's provider at once; Continue posts it when the browser did not. -->
+<#import "frame.ftl" as axis>
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
-<@frame.head title=msg("axisRedirectTitle")/>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${msg("axisRedirectingTitle")}</title>
+  <link rel="stylesheet" href="${url.resourcesPath}/assets/axis-sign-in.css">
+</head>
 <body>
   <div id="root"></div>
   <script type="application/json" id="axis-sign-in-context">
   {
-    "page": "samlPost",
-    "title": "${msg("axisRedirectTitle")?json_string?no_esc}",
-    <@frame.realmName/>
-    "action": "${samlPost.url?json_string?no_esc}",
-    <#if samlPost.SAMLRequest??>
-    "samlRequest": "${samlPost.SAMLRequest?json_string?no_esc}",
-    </#if>
-    <#if samlPost.SAMLResponse??>
-    "samlResponse": "${samlPost.SAMLResponse?json_string?no_esc}",
-    </#if>
-    <#if samlPost.relayState??>
-    "relayState": "${samlPost.relayState?json_string?no_esc}",
-    </#if>
-    <@frame.locales/>
-    <@frame.texts/>
-    "texts": {
-      "message": "${msg("axisRedirectMessage")?json_string?no_esc}",
-      "continue": "${msg("axisContinue")?json_string?no_esc}"
-    }
+    "title": "${msg("axisRedirectingTitle")?json_string?no_esc}",
+    <@axis.realmName/>
+    "message": "${msg("axisRedirectingMessage")?json_string?no_esc}",
+    "autoSubmit": true,
+    "actions": [
+      { "kind": "post", "primary": true, "label": "${msg("axisContinue")?json_string?no_esc}", "href": "${samlPost.url?json_string?no_esc}",
+        "fields": {
+          <#assign samlFields = []>
+          <#if samlPost.SAMLRequest??><#assign samlFields = samlFields + ["\"SAMLRequest\": \"" + samlPost.SAMLRequest?json_string + "\""]></#if>
+          <#if samlPost.SAMLResponse??><#assign samlFields = samlFields + ["\"SAMLResponse\": \"" + samlPost.SAMLResponse?json_string + "\""]></#if>
+          <#if samlPost.relayState??><#assign samlFields = samlFields + ["\"RelayState\": \"" + samlPost.relayState?json_string + "\""]></#if>
+          ${samlFields?join(", ")?no_esc}
+        } }
+    ],
+    <@axis.preferences/>
+    <@axis.legal/>
+    "page": "message"
   }
   </script>
   <script type="module" src="${url.resourcesPath}/assets/axis-sign-in.js"></script>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { LargeDialogPreview, MediumDialogPreview, SmallDialogPreview } from './DialogPreview'
 import type { InitialEntry } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { SignInCard } from '../pages/HomePage'
@@ -146,6 +147,14 @@ const childCollectionStates: readonly PreviewState[] = [
 ]
 
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
+// Proposed: the purchase request sample's resources that the Studio cards open.
+const studioApp = 'PurchaseRequests'
+const studioEntity = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
+const studioPage = 'e0ee63b0-ff11-4f06-95ee-e73922f2c1a9'
+const studioForm = '77c7c183-7283-46a7-b56f-5cf5cec518aa'
+const studioProcess = '4b60c03e-02d0-4329-80c6-75f972190399'
+const studioResource = (id: string) => `/studio?app=${studioApp}&resource=${id}`
+
 export const previews: Record<string, readonly PreviewState[]> = {
   table: [
     ...withAndWithoutData(
@@ -201,6 +210,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
   tabs: typical(() => <WidgetTree widgets={[tabsWidget]} renderLeaf={renderLeaf} />),
   section: typical(() => <WidgetTree widgets={[sectionWidget]} renderLeaf={renderLeaf} />),
   // Loading and the load error look the same in every widget, so they are drawn once, in the table.
+  // Proposed: the three dialog sizes, each drawn by a dialog of its kind, in a frame that holds its mask.
+  dialogs: [
+    { caption: 'Small: a confirmation', draw: () => <SmallDialogPreview />, frameHeight: 280 },
+    { caption: 'Medium: a short form', draw: () => <MediumDialogPreview />, frameHeight: 380 },
+    { caption: 'Large: a list to choose from', draw: () => <LargeDialogPreview />, frameHeight: 420 },
+  ],
   states: [
     { caption: 'Loading', draw: () => requestTable(loadingTableWidget), routes: loadingRoutes },
     { caption: 'Load error', draw: () => requestTable(failingTableWidget), routes: failingRoutes },
@@ -271,24 +286,90 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 480,
     },
   ],
+  // Proposed: a Studio group of cards, drawn from Studio's own pages over the purchase request sample.
+  studio: [
+    { caption: 'Applications', draw: () => <ShellPreview />, entry: '/studio', frameHeight: 600 },
+    // Proposed: an application opens on its overview, which says what to do next.
+    { caption: 'Overview', draw: () => <ShellPreview />, entry: `/studio?app=${studioApp}`, frameHeight: 600 },
+    {
+      caption: 'Overview with errors and changes not live',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=LeaveRequests',
+      frameHeight: 600,
+    },
+    {
+      caption: 'Overview of a new application',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=Inventory',
+      frameHeight: 600,
+    },
+    {
+      caption: 'Entities',
+      draw: () => <ShellPreview />,
+      entry: `/studio?app=${studioApp}&view=kind&kind=entity`,
+      frameHeight: 600,
+    },
+    { caption: 'Entity', draw: () => <ShellPreview />, entry: studioResource(studioEntity), frameHeight: 600 },
+    // Proposed: an application never published says so in the band.
+    {
+      caption: 'Sites of an application not published yet',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=Inventory&view=kind&kind=site',
+      frameHeight: 600,
+    },
+    // Proposed: a list whose application has errors and changes not live: the band shows them, not the list's name.
+    {
+      caption: 'Entities with errors and changes not live',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=LeaveRequests&view=kind&kind=entity',
+      frameHeight: 600,
+    },
+    {
+      caption: 'Releases',
+      draw: () => <ShellPreview />,
+      entry: `/studio?app=${studioApp}&view=releases`,
+      frameHeight: 600,
+    },
+    // Proposed: a release activated again opens to its activations, and a newer release than the live one can be
+    // activated.
+    {
+      caption: 'Releases after activating an older one',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=LeaveRequests&view=releases',
+      frameHeight: 600,
+    },
+    {
+      caption: 'Policy matrix',
+      draw: () => <ShellPreview />,
+      entry: `/studio?app=${studioApp}&view=policies`,
+      frameHeight: 600,
+    },
+  ],
+  studioPageDesign: [
+    { caption: 'Page', draw: () => <ShellPreview />, entry: studioResource(studioPage), frameHeight: 600 },
+  ],
+  studioFormDesign: [
+    { caption: 'Form', draw: () => <ShellPreview />, entry: studioResource(studioForm), frameHeight: 600 },
+  ],
+  studioProcessDesign: [
+    { caption: 'Process', draw: () => <ShellPreview />, entry: studioResource(studioProcess), frameHeight: 600 },
+  ],
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },
     { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },
-    { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
-    { caption: 'Two-step verification', draw: () => <IdentitySignIn page="twoStep" />, frameHeight: 600 },
-    { caption: 'Forgot password', draw: () => <IdentitySignIn page="resetPassword" />, frameHeight: 600 },
-    { caption: 'Set password', draw: () => <IdentitySignIn page="updatePassword" />, frameHeight: 600 },
-    { caption: 'Add an authenticator', draw: () => <IdentitySignIn page="addAuthenticator" />, frameHeight: 760 },
     {
-      caption: 'Choose how to sign in',
-      draw: () => <IdentitySignIn page="selectAuthenticator" />,
+      // Proposed: each error keeps the whole gap before the next field.
+      caption: 'Fields left empty',
+      draw: () => (
+        <SubmittedOnMount>
+          <IdentitySignIn page="emptyFields" />
+        </SubmittedOnMount>
+      ),
       frameHeight: 600,
     },
-    { caption: 'Update your profile', draw: () => <IdentitySignIn page="updateProfile" />, frameHeight: 720 },
-    { caption: 'Sign out', draw: () => <IdentitySignIn page="signOut" />, frameHeight: 600 },
-    { caption: 'Notice', draw: () => <IdentitySignIn page="notice" />, frameHeight: 600 },
-    { caption: 'Error', draw: () => <IdentitySignIn page="error" />, frameHeight: 600 },
+    { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
     {
+      // Proposed: the language and theme menu at the page's top right, open.
       caption: 'Language and theme',
       draw: () => (
         <ClickOnMount selector='button[aria-label="Language and theme"]'>
@@ -297,6 +378,27 @@ export const previews: Record<string, readonly PreviewState[]> = {
       ),
       frameHeight: 600,
     },
+    { caption: 'Two-step verification', draw: () => <IdentitySignIn page="twoStep" />, frameHeight: 600 },
+    { caption: 'Forgot password', draw: () => <IdentitySignIn page="resetPassword" />, frameHeight: 600 },
+    { caption: 'Set password', draw: () => <IdentitySignIn page="updatePassword" />, frameHeight: 600 },
+    { caption: 'Add an authenticator', draw: () => <IdentitySignIn page="addAuthenticator" />, frameHeight: 760 },
+    // Proposed: the terms page after the first sign-in, then sent without the box ticked.
+    { caption: 'Terms and privacy', draw: () => <IdentitySignIn page="terms" />, frameHeight: 600 },
+    {
+      caption: 'Terms not accepted',
+      draw: () => (
+        <SubmittedOnMount>
+          <IdentitySignIn page="terms" />
+        </SubmittedOnMount>
+      ),
+      frameHeight: 600,
+    },
+    // Proposed: the pages that were still Keycloak's own.
+    { caption: 'Sign out', draw: () => <IdentitySignIn page="signOut" />, frameHeight: 480 },
+    { caption: 'Notice', draw: () => <IdentitySignIn page="notice" />, frameHeight: 480 },
+    { caption: 'Error', draw: () => <IdentitySignIn page="error" />, frameHeight: 480 },
+    { caption: 'Choose how to sign in', draw: () => <IdentitySignIn page="chooseMethod" />, frameHeight: 520 },
+    { caption: 'Update your profile', draw: () => <IdentitySignIn page="profile" />, frameHeight: 760 },
   ],
 }
 

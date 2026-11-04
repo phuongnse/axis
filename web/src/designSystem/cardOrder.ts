@@ -33,6 +33,9 @@ export const cardGroups: readonly { name: string; previews: readonly string[] }[
   { name: 'Charts and KPIs', previews: ['chart-bar', 'chart-line', 'chart-pie', 'kpi'] },
   { name: 'Process widgets', previews: ['taskInbox', 'processInspector'] },
   { name: 'Containers', previews: ['columns', 'tabs', 'section'] },
-  { name: 'Shared states', previews: ['states'] },
+  // Proposed: the dialogs card, the three sizes every dialog names.
+  { name: 'Shared states', previews: ['states', 'dialogs'] },
   { name: 'Shell', previews: ['shell', 'signIn', 'identitySignIn'] },
+  // Proposed: Studio, the workspace and its designers.
+  { name: 'Studio', previews: ['studio', 'studioPageDesign', 'studioFormDesign', 'studioProcessDesign'] },
 ]

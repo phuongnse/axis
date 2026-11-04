@@ -1,19 +1,14 @@
 import { StrictMode } from 'react'
 import { AddAuthenticatorPage } from '../src/identitySignIn/AddAuthenticatorPage'
-import { ErrorPage } from '../src/identitySignIn/ErrorPage'
-import { FrontChannelSignOutPage } from '../src/identitySignIn/FrontChannelSignOutPage'
-import { NoticePage } from '../src/identitySignIn/NoticePage'
-import { PageExpiredPage } from '../src/identitySignIn/PageExpiredPage'
 import { ResetPasswordPage } from '../src/identitySignIn/ResetPasswordPage'
-import { SelectAuthenticatorPage } from '../src/identitySignIn/SelectAuthenticatorPage'
-import { SamlPostPage } from '../src/identitySignIn/SamlPostPage'
 import { SignInPage } from '../src/identitySignIn/SignInPage'
-import { SignOutPage } from '../src/identitySignIn/SignOutPage'
-import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { TermsPage } from '../src/identitySignIn/TermsPage'
+import { MessagePage } from '../src/identitySignIn/MessagePage'
+import { ChooseMethodPage } from '../src/identitySignIn/ChooseMethodPage'
+import { ProfilePage } from '../src/identitySignIn/ProfilePage'
+import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { TwoStepPage } from '../src/identitySignIn/TwoStepPage'
 import { UpdatePasswordPage } from '../src/identitySignIn/UpdatePasswordPage'
-import { UpdateProfilePage } from '../src/identitySignIn/UpdateProfilePage'
 import { ThemeModeProvider } from '../src/platform/theme'
 
 function ThemePage({ context }: { context: IdentityContext }) {
@@ -30,27 +25,16 @@ function ThemePage({ context }: { context: IdentityContext }) {
       return <UpdatePasswordPage context={context} />
     case 'terms':
       return <TermsPage context={context} />
-    case 'selectAuthenticator':
-      return <SelectAuthenticatorPage context={context} />
-    case 'updateProfile':
-    case 'reviewProfile':
-      return <UpdateProfilePage context={context} />
-    case 'signOut':
-      return <SignOutPage context={context} />
-    case 'notice':
-      return <NoticePage context={context} />
-    case 'error':
-      return <ErrorPage context={context} />
-    case 'pageExpired':
-      return <PageExpiredPage context={context} />
-    case 'samlPost':
-      return <SamlPostPage context={context} />
-    case 'frontChannelSignOut':
-      return <FrontChannelSignOutPage context={context} />
+    case 'message':
+      return <MessagePage context={context} />
+    case 'chooseMethod':
+      return <ChooseMethodPage context={context} />
+    case 'profile':
+      return <ProfilePage context={context} />
   }
 }
 
-/** The theme's page: the shared sign-in, two-step, add-an-authenticator, forgot-password, set-password, terms, method choice, update profile, review profile, sign-out, notice, error, expired, SAML redirect or front-channel sign-out page with the SPA's theme provider, fed Keycloak's context. */
+/** The theme's page: the shared sign-in, two-step, add-an-authenticator, forgot-password or set-password or terms page with the SPA's theme provider, fed Keycloak's context. */
 export function SignInEntry({ context }: { context: IdentityContext }) {
   return (
     <StrictMode>

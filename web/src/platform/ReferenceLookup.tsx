@@ -5,6 +5,7 @@ import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from
 import type { FieldMetadata } from './site'
 import { recordQuery } from './tableQuery'
 import { useText } from './texts'
+import { dialogWidth } from './dialogButtons'
 
 interface ReferenceLookupProps {
   /** The reference field to choose a record for. Its `target` is not `null`. */
@@ -38,7 +39,7 @@ const searchDelay = 300
  */
 export function ReferenceLookup({ field, title, open, onPick, onClose }: ReferenceLookupProps) {
   return (
-    <Modal open={open} title={title} footer={null} onCancel={onClose} destroyOnHidden>
+    <Modal width={dialogWidth('large')} open={open} title={title} footer={null} onCancel={onClose} destroyOnHidden>
       {/* The dialog destroys its content when hidden, so each opening starts again at page 1 with no search. */}
       <LookupList field={field} onPick={onPick} />
     </Modal>

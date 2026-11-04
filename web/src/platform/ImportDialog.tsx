@@ -1,6 +1,6 @@
 import { Alert, Button, Flex, Modal, Typography, Upload } from 'antd'
 import { useEffect, useRef, useState } from 'react'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisButton } from './AxisButton'
 import {
   commitImport,
   fetchImport,
@@ -11,6 +11,7 @@ import {
 } from './imports'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
+import { dialogWidth } from './dialogButtons'
 
 /** How long the dialog waits between two checks of an import. */
 const pollDelay = 1000
@@ -201,30 +202,30 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
 
   return (
     <Modal
+      width={dialogWidth('large')}
       open
       title={t('shell.table.importTitle')}
       onCancel={onClose}
       destroyOnHidden
-      footer={
-        <AxisActionRow justify="end">
-          <AxisButton role="secondary" onClick={onClose}>
-            {t('shell.table.importClose')}
+      footer={[
+        <AxisButton key="close" role="secondary" onClick={onClose}>
+          {t('shell.table.importClose')}
+        </AxisButton>,
+        <AxisButton
+          key="check"
+          role={phase === 'checked' || phase === 'committing' ? 'secondary' : 'finish'}
+          disabled={file === null || busy || phase === 'checked'}
+          loading={phase === 'uploading' || phase === 'checking'}
+          onClick={() => void upload()}
+        >
+          {t('shell.table.importCheck')}
+        </AxisButton>,
+        (phase === 'checked' || phase === 'committing') && (
+          <AxisButton key="commit" role="finish" loading={phase === 'committing'} onClick={() => void commit()}>
+            {t('shell.table.importCommit')}
           </AxisButton>
-          <AxisButton
-            role={phase === 'checked' || phase === 'committing' ? 'secondary' : 'finish'}
-            disabled={file === null || busy || phase === 'checked'}
-            loading={phase === 'uploading' || phase === 'checking'}
-            onClick={() => void upload()}
-          >
-            {t('shell.table.importCheck')}
-          </AxisButton>
-          {(phase === 'checked' || phase === 'committing') && (
-            <AxisButton role="finish" loading={phase === 'committing'} onClick={() => void commit()}>
-              {t('shell.table.importCommit')}
-            </AxisButton>
-          )}
-        </AxisActionRow>
-      }
+        ),
+      ]}
     >
       <Flex vertical gap="middle">
         <Upload

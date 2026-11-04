@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RecordProblem } from './records'
 import { searchUsers, type ReassignBody, type ReassignRole, type UserOption } from './tasks'
 import { useText } from './texts'
+import { dialogWidth } from './dialogButtons'
 
 interface ReassignDialogProps {
   roles: readonly ReassignRole[]
@@ -112,6 +113,7 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
 
   return (
     <Modal
+      width={dialogWidth('medium')}
       open
       title={t('shell.task.reassignTitle')}
       okText={t('shell.task.reassignSend')}

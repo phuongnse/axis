@@ -2,17 +2,24 @@
      Keycloak's data as JSON into the same element as login.ftl and the React bundle draws the page from it. The "page"
      field tells the bundle which page to draw. Keycloak escapes output as HTML, so every string goes through
      ?json_string?no_esc: ?json_string also escapes "</", which keeps the script element closed. -->
-<#import "frame.ftl" as frame>
+<#import "frame.ftl" as axis>
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
-<@frame.head title=msg("axisTwoStepTitle")/>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${msg("axisTwoStepTitle")}</title>
+  <link rel="stylesheet" href="${url.resourcesPath}/assets/axis-sign-in.css">
+</head>
 <body>
   <div id="root"></div>
   <script type="application/json" id="axis-sign-in-context">
   {
     "page": "twoStep",
     "title": "${msg("axisTwoStepTitle")?json_string?no_esc}",
-    <@frame.realmName/>
+    <#if (realm.displayName)?has_content && realm.displayName != realm.name>
+    "realmName": "${realm.displayName?json_string?no_esc}",
+    </#if>
     <#if messagesPerField.existsError('totp')>
     "error": "${messagesPerField.get('totp')?json_string?no_esc}",
     <#elseif message?? && message.type == 'error'>
@@ -21,8 +28,8 @@
     "loginAction": "${url.loginAction?json_string?no_esc}",
     "restartUrl": "${url.loginRestartFlowUrl?json_string?no_esc}",
     "tryAnotherWay": ${(auth?? && auth.showTryAnotherWayLink())?c},
-    <@frame.locales/>
-    <@frame.texts/>
+    <@axis.preferences/>
+    <@axis.legal/>
     "texts": {
       "title": "${msg("axisTwoStepTitle")?json_string?no_esc}",
       "message": "${msg("axisTwoStepMessage")?json_string?no_esc}",

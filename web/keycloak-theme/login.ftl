@@ -5,20 +5,27 @@
      axis.accounts belongs to a site, so the context then holds a "site" object with the providers (axis.providers, a
      space-separated list of aliases) and the accounts flag that the site allows. Other clients get no "site". A
      provider's display name is plain text or a realm message key such as ${axisProvider.oidc-issuer}, which activation
-     writes for each language, so advancedMsg gives the label in the page's language. Keycloak's message that is not an
-     error, such as the notice after "Send link" on the "Forgot password?" page, becomes the "notice". The head, realm
-     name, locales and frame texts come from frame.ftl. -->
-<#import "frame.ftl" as frame>
+     writes for each language, so advancedMsg gives the label in the page's language. The "realmName" is the realm's
+     display name. Keycloak's realm.displayName falls back to the realm id, so the context leaves it out when the
+     display name is empty or equals the id, and the page then names Axis, never the tenant id. -->
+<#import "frame.ftl" as axis>
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
-<@frame.head title=msg("axisPageTitle")/>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${msg("axisPageTitle")}</title>
+  <link rel="stylesheet" href="${url.resourcesPath}/assets/axis-sign-in.css">
+</head>
 <body>
   <div id="root"></div>
   <script type="application/json" id="axis-sign-in-context">
   {
     "page": "signIn",
     "title": "${msg("axisSignInTitle")?json_string?no_esc}",
-    <@frame.realmName/>
+    <#if (realm.displayName)?has_content && realm.displayName != realm.name>
+    "realmName": "${realm.displayName?json_string?no_esc}",
+    </#if>
     "providers": [
       <#if social?? && social.providers??>
         <#list social.providers as p>
@@ -44,6 +51,7 @@
     <#elseif message?? && message.type == 'error'>
     "error": "${message.summary?json_string?no_esc}",
     </#if>
+    <#-- Proposed: a notice that Keycloak brings back to the sign-in page, such as the one after "Send link". -->
     <#if message?? && message.type != 'error'>
     "notice": "${message.summary?json_string?no_esc}",
     </#if>
@@ -52,8 +60,8 @@
     <#if realm.resetPasswordAllowed>
     "forgotPasswordUrl": "${url.loginResetCredentialsUrl?json_string?no_esc}",
     </#if>
-    <@frame.locales/>
-    <@frame.texts/>
+    <@axis.preferences/>
+    <@axis.legal/>
     "texts": {
       "continueWith": "${msg("axisContinueWith", "{provider}")?json_string?no_esc}",
       "providerOnly": "${msg("axisProviderOnly", "{provider}")?json_string?no_esc}",

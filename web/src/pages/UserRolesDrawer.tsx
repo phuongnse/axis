@@ -2,6 +2,7 @@ import { Alert, Button, Drawer, Flex, Modal, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { useText } from '../platform/texts'
 import { changeUserRole, fetchUserRoles, type RoleChange, type UserListItem, type UserRoles } from '../platform/users'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** One role of a section: given or not, and declared by the active release or not. */
 interface RoleRow {
@@ -129,6 +130,7 @@ function UserRolesPanel({ user }: { user: UserListItem }) {
         ))}
       </Flex>
       <Modal
+        width={dialogWidth('small')}
         open={pending !== null}
         title={pending && t(pending.give ? 'shell.users.roles.confirmGive' : 'shell.users.roles.confirmRemove')}
         okText={pending && t(pending.give ? 'shell.users.roles.give' : 'shell.users.roles.remove')}

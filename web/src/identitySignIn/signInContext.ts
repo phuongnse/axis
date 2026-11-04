@@ -1,5 +1,3 @@
-import type { LegalLinks } from '../platform/LegalLine'
-
 export interface SignInProvider {
   alias: string
   /** The provider's name, such as "Contoso ID". */
@@ -7,38 +5,26 @@ export interface SignInProvider {
   loginUrl: string
 }
 
+import type { LegalLinks, LegalTexts } from '../platform/LegalLine'
+import type { PreferencesTexts } from '../platform/PreferencesMenu'
+
+/** A language that the identity provider offers: its tag, such as `vi`, and the address that shows the page in it. */
 export interface SignInLocale {
-  /** The language tag, such as `en`. */
   tag: string
-  /** The language's name in its own language, such as "Tiếng Việt". */
-  label: string
-  /** Where the page opens in this language. */
   url: string
 }
 
-/** The texts of the frame's "Language and theme" gear. */
-export interface FrameTexts {
-  languageAndTheme: string
-  language: string
-  theme: string
-  system: string
-  light: string
-  dark: string
+/** Proposed: the legal links under the card and their names. The realm sync writes the site's or its tenant's links. */
+export interface SignInLegal {
+  links: LegalLinks
+  texts: LegalTexts
 }
 
-/** What every page of the identity provider shares: the organization's name and the "Language and theme" gear's languages and texts, and the legal line. */
-export interface IdentityFrameContext {
-  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
-  realmName?: string
-  /** The tag of the page's language. */
+/** Proposed: what the language and theme menu below the card needs: the page's language, every language offered and the menu's texts. */
+export interface SignInPreferences {
   locale: string
   locales: SignInLocale[]
-  frameTexts: FrameTexts
-  /**
-   * The legal line under the card. `privacyUrl`, `termsUrl` and `licencesUrl` come from the client attributes
-   * `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, and are absent when not set, or when the page has no client.
-   */
-  legal: LegalLinks
+  texts: PreferencesTexts
 }
 
 /** The page's texts. `continueWith` and `providerOnly` hold a `{provider}` placeholder for the provider's label. */
@@ -84,8 +70,6 @@ export interface UpdatePasswordTexts {
   newPasswordRequired: string
   passwordsDiffer: string
   setPassword: string
-  /** The button that cancels an application-initiated action. */
-  cancel: string
 }
 
 /** The texts of the page that adds an authenticator. */
@@ -101,8 +85,6 @@ export interface AddAuthenticatorTexts {
   deviceName: string
   deviceNameRequired: string
   submit: string
-  /** The button that cancels an application-initiated action. */
-  cancel: string
 }
 
 /** What the site that started the sign-in allows. */
@@ -114,9 +96,11 @@ export interface SignInSite {
 }
 
 /** What the identity provider's sign-in page draws. The design system feeds it fixtures, the theme feeds it Keycloak's. */
-export interface SignInContext extends IdentityFrameContext {
+export interface SignInContext {
   page: 'signIn'
   title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   providers: SignInProvider[]
   /** Whether people may sign in with an account of the realm, next to or instead of the providers. */
   accounts: boolean
@@ -125,19 +109,23 @@ export interface SignInContext extends IdentityFrameContext {
   username?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
-  /** Keycloak's message that is not an error, such as the notice after "Send link". It shows above the form. */
+  /** Proposed: a notice Keycloak brings back to the page, such as the one after "Send link", shown as a success alert. */
   notice?: string
   loginAction: string
   /** Whether the "Keep me signed in" checkbox shows. */
   rememberMe: boolean
   forgotPasswordUrl?: string
+  preferences: SignInPreferences
+  legal: SignInLegal
   texts: SignInTexts
 }
 
 /** What the two-step verification page draws: the 6-digit code that follows the password. */
-export interface TwoStepContext extends IdentityFrameContext {
+export interface TwoStepContext {
   page: 'twoStep'
   title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the code form posts `otp` and `login`, and where "Try another way" posts `tryAnotherWay=on`. */
@@ -146,13 +134,17 @@ export interface TwoStepContext extends IdentityFrameContext {
   restartUrl: string
   /** Whether Keycloak offers another way to sign in, which shows "Try another way". */
   tryAnotherWay: boolean
+  preferences: SignInPreferences
+  legal: SignInLegal
   texts: TwoStepTexts
 }
 
 /** What the page that adds an authenticator draws: the QR code, the key to type by hand, the code and the device name. */
-export interface AddAuthenticatorContext extends IdentityFrameContext {
+export interface AddAuthenticatorContext {
   page: 'addAuthenticator'
   title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the form posts `totp`, `totpSecret`, `userLabel` and `mode`. */
@@ -167,15 +159,17 @@ export interface AddAuthenticatorContext extends IdentityFrameContext {
   mode?: string
   /** Whether the person already has an authenticator, so that the device name is required. */
   deviceNameRequired: boolean
-  /** Whether an application started this step, such as the account page, which shows Cancel. An invitation or a reset link leaves it out. */
-  appInitiated?: boolean
+  preferences: SignInPreferences
+  legal: SignInLegal
   texts: AddAuthenticatorTexts
 }
 
 /** What the "Forgot password?" page draws: the email or username that Keycloak sends a link to. */
-export interface ResetPasswordContext extends IdentityFrameContext {
+export interface ResetPasswordContext {
   page: 'resetPassword'
   title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The username that the person typed on the sign-in page, if any. */
   username?: string
   /** The message to show above the form. No error means no alert. */
@@ -184,180 +178,153 @@ export interface ResetPasswordContext extends IdentityFrameContext {
   loginAction: string
   /** Where "Back to sign in" goes. */
   loginUrl: string
+  preferences: SignInPreferences
+  legal: SignInLegal
   texts: ResetPasswordTexts
 }
 
 /** What the page that sets a password draws. An invitation and a reset link both open it. */
-export interface UpdatePasswordContext extends IdentityFrameContext {
+export interface UpdatePasswordContext {
   page: 'updatePassword'
   title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the form posts `password-new`, `password-confirm` and `logout-sessions`. */
   loginAction: string
-  /** Whether an application started this step, such as the account page, which shows Cancel. An invitation or a reset link leaves it out. */
-  appInitiated?: boolean
+  preferences: SignInPreferences
+  legal: SignInLegal
   texts: UpdatePasswordTexts
 }
 
-/** The texts of the terms page. `accept` holds `{terms}` and `{privacy}` placeholders for the links, and `acceptTermsOnly` holds `{terms}`, for a tenant with no privacy policy. */
+/** Proposed: the texts of the terms page. `agree*` hold `{terms}` and `{privacy}` placeholders for the two links. */
 export interface TermsTexts {
   title: string
+  message: string
+  agreeBoth: string
+  agreeTerms: string
+  agreePrivacy: string
+  termsLink: string
+  privacyLink: string
+  agreeRequired: string
   accept: string
-  acceptTermsOnly: string
-  termsOfService: string
-  privacyPolicy: string
-  /** The error under the checkbox when Continue is pressed with the box unticked. */
-  required: string
-  continue: string
   decline: string
 }
 
-/** What the terms page draws: one required checkbox that names the tenant's Terms of service and Privacy policy, Continue and Decline. */
-export interface TermsContext extends IdentityFrameContext {
+/** Proposed: what the terms page draws: the tenant's terms and privacy policy, which the person accepts once. */
+export interface TermsContext {
   page: 'terms'
   title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
-  /** Where the form posts `accept`, and where Decline posts `cancel`. */
+  /** Where the form posts `accept`, or `cancel` to decline. */
   loginAction: string
-  /** The tenant's Terms of service, from the client attribute `axis.tenantTermsUrl`. Absent when not set. */
-  termsUrl?: string
-  /** The tenant's Privacy policy, from the client attribute `axis.tenantPrivacyUrl`. Absent when not set. */
-  privacyUrl?: string
+  /** The tenant's terms and privacy policy, which the person accepts. The action shows only while one is set. */
+  accept: { privacy?: string; terms?: string }
+  preferences: SignInPreferences
+  legal: SignInLegal
   texts: TermsTexts
 }
 
-/** The texts of the page that offers the ways to sign in, which "Try another way" opens. */
-export interface SelectAuthenticatorTexts {
-  title: string
-  message: string
-  backToSignIn: string
+/** Proposed: one way out of a message page: a link, or a form that posts its fields, such as Sign out. */
+export interface MessageAction {
+  kind: 'link' | 'post'
+  label: string
+  href: string
+  /** The hidden fields that a `post` action sends. */
+  fields?: Record<string, string>
+  /** The page's one solid button. The others are links. */
+  primary?: boolean
 }
 
-/** One way to sign in that Keycloak offers, such as the authenticator app or the password. */
-export interface AuthenticationMethod {
-  /** Keycloak's execution id, posted as `authenticationExecution`. */
+/**
+ * Proposed: what a message page draws: a title, a message and its ways out. Keycloak's sign-out question, notices,
+ * errors, the expired page, the front-channel sign-out and the SAML redirect all use it.
+ */
+export interface MessageContext {
+  page: 'message'
+  title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
+  /** The message under the title. An error shows it as an error alert. */
+  message?: string
+  tone?: 'error'
+  actions: MessageAction[]
+  /** The front-channel sign-out addresses, each loaded in a hidden frame. */
+  frames?: string[]
+  /** Where the page goes once its frames have loaded. */
+  redirect?: string
+  /** Whether the page posts its first `post` action at once, as the SAML redirect does. */
+  autoSubmit?: boolean
+  preferences: SignInPreferences
+  legal: SignInLegal
+}
+
+/** Proposed: one way to sign in that "Try another way" offers. */
+export interface SignInMethod {
   id: string
   label: string
   help?: string
 }
 
-/** What the page behind "Try another way" draws: one row per method, which posts the chosen one. */
-export interface SelectAuthenticatorContext extends IdentityFrameContext {
-  page: 'selectAuthenticator'
+/** Proposed: what the page that "Try another way" opens draws: each way to sign in as a button. */
+export interface ChooseMethodContext {
+  page: 'chooseMethod'
   title: string
-  /** The message to show above the methods. No error means no alert. */
-  error?: string
-  /** Where the chosen method posts `authenticationExecution`. */
+  realmName?: string
+  /** Where each button posts `authenticationExecution`. */
   loginAction: string
-  /** Where "Back to sign in" restarts the sign-in. */
-  restartUrl: string
-  methods: AuthenticationMethod[]
-  texts: SelectAuthenticatorTexts
+  methods: SignInMethod[]
+  preferences: SignInPreferences
+  legal: SignInLegal
 }
 
-/** The texts of the pages that update a profile. */
-export interface UpdateProfileTexts {
-  submit: string
-  /** Holds `{field}` for the field's label. */
-  fieldRequired: string
-}
-
-/** One field of the user profile, in the order Keycloak lists them. */
+/** Proposed: one field of the person's profile, from Keycloak's user profile. */
 export interface ProfileField {
-  /** The attribute's name, which the form posts it as. */
   name: string
   label: string
-  value?: string
+  value: string
   required: boolean
   readOnly: boolean
-  autoComplete?: string
-  /** Keycloak's error for this field. */
+  /** `email` for an email address, otherwise text. */
+  type: 'text' | 'email'
+  /** Keycloak's message for the field, after a refused post. */
   error?: string
 }
 
-/** What the update profile and the review profile pages draw: one field per user profile attribute. */
-export interface UpdateProfileContext extends IdentityFrameContext {
-  /** `updateProfile` is Keycloak's required action and `reviewProfile` is the review after a first brokered sign-in. Only the title differs. */
-  page: 'updateProfile' | 'reviewProfile'
-  title: string
-  /** Keycloak's message that is not an error, such as "You need to update your user profile". It shows above the fields. */
-  notice?: string
-  /** A Keycloak error that belongs to no field. */
-  error?: string
-  /** Where the form posts the fields. */
-  loginAction: string
-  fields: ProfileField[]
-  texts: UpdateProfileTexts
-}
-
-/** What the sign-out question draws: Keycloak asks whether to end the session when the server could not do it itself. */
-export interface SignOutContext extends IdentityFrameContext {
-  page: 'signOut'
-  title: string
-  /** Where the form posts `session_code` and `confirmLogout`. */
-  action: string
-  /** Keycloak's code of the sign-out, which the form posts back as `session_code`. */
-  sessionCode: string
-  /** Where "Back to application" goes. Absent when Keycloak gives none. */
-  backUrl?: string
-  texts: { message: string; signOut: string; backToApplication: string }
-}
-
-/** What a notice draws, such as "Your account has been updated", with its link onward. */
-export interface NoticeContext extends IdentityFrameContext {
-  page: 'notice'
+/** Proposed: the texts of the profile page. */
+export interface ProfileTexts {
   title: string
   message: string
-  /** Where the notice goes on, such as the application or the next step. Absent when Keycloak offers no link. */
-  linkUrl?: string
-  /** The text of the link. Set together with `linkUrl`. */
-  linkText?: string
+  required: string
+  submit: string
+  cancel: string
 }
 
-/** What an error page draws: Keycloak's message as an error alert. */
-export interface ErrorContext extends IdentityFrameContext {
-  page: 'error'
+/**
+ * Proposed: what the profile page draws: the fields Keycloak asks a person to fill in or review, such as their name
+ * and email, after an administrator asks for it or a brokered provider leaves one out.
+ */
+export interface ProfileContext {
+  page: 'profile'
   title: string
-  error: string
-  /** Where "Back to application" goes. Absent when the client has no home address. */
-  backUrl?: string
-  texts: { backToApplication: string }
-}
-
-/** What the expired page draws: what happened, with Continue and Start again. */
-export interface PageExpiredContext extends IdentityFrameContext {
-  page: 'pageExpired'
-  title: string
-  /** Where Continue goes, Keycloak's login action. */
-  continueUrl: string
-  /** Where Start again goes, Keycloak's restart address. */
-  restartUrl: string
-  texts: { message: string; continue: string; startAgain: string }
-}
-
-/** What the SAML redirect draws: a short card, and a form that posts at once. */
-export interface SamlPostContext extends IdentityFrameContext {
-  page: 'samlPost'
-  title: string
-  /** Where the form posts. */
-  action: string
-  samlRequest?: string
-  samlResponse?: string
-  relayState?: string
-  texts: { message: string; continue: string }
-}
-
-/** What the front-channel sign-out draws: the hidden sign-out frame of each client, then the redirect. */
-export interface FrontChannelSignOutContext extends IdentityFrameContext {
-  page: 'frontChannelSignOut'
-  title: string
-  /** The clients whose hidden frame signs them out. */
-  clients: { name: string; url: string }[]
-  /** Where the page goes on after the frames have loaded. Absent when Keycloak gives none. */
-  redirectUrl?: string
-  texts: { message: string; continue: string }
+  realmName?: string
+  error?: string
+  /** Keycloak's reminder of why the step shows, such as "You need to update your user profile", as an info alert. */
+  notice?: string
+  /** Where the form posts each field by its name. */
+  loginAction: string
+  fields: ProfileField[]
+  /** Fields the form posts as they are, such as the page's locale. */
+  hidden: Record<string, string>
+  /** Whether the person may leave, which posts `cancel-aia=true`: only when an application asked for the step. */
+  cancellable: boolean
+  preferences: SignInPreferences
+  legal: SignInLegal
+  texts: ProfileTexts
 }
 
 /** What the page of the identity provider's theme draws, told apart by `page`. */
@@ -368,11 +335,6 @@ export type IdentityContext =
   | ResetPasswordContext
   | UpdatePasswordContext
   | TermsContext
-  | SelectAuthenticatorContext
-  | UpdateProfileContext
-  | SignOutContext
-  | NoticeContext
-  | ErrorContext
-  | PageExpiredContext
-  | SamlPostContext
-  | FrontChannelSignOutContext
+  | MessageContext
+  | ChooseMethodContext
+  | ProfileContext

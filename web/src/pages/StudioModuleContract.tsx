@@ -21,6 +21,7 @@ import {
 } from './relaxEntries'
 import { StudioModuleReadOnly } from './StudioModuleReadOnly'
 import { useStudioModuleContent } from './useStudioModuleContent'
+import { dialogWidth } from '../platform/dialogButtons'
 
 const StudioContractLifecycle = lazy(() => import('./StudioContractLifecycle'))
 
@@ -132,6 +133,7 @@ function Point({ value }: { value: string }) {
         />
       )}
       <Modal
+        width={dialogWidth('medium')}
         open={open}
         title={t('shell.studio.contract.relaxTitle')}
         okText={t('shell.studio.contract.relax')}

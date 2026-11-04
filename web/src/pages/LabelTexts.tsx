@@ -1,11 +1,16 @@
-import { Alert, Button, Flex, Input, Space } from 'antd'
+import { TranslationOutlined } from '@ant-design/icons'
+import { Alert, Button, Flex, Input, Modal, Space, Typography } from 'antd'
 import { useContext, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import { dialogWidth } from '../platform/dialogButtons'
 import { getAt } from '../platform/jsonPatch'
 import { labelKey } from '../platform/labelKeys'
 import { putStudioTexts, ServerUnreachableError, type StudioNames } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
+import { PlatformContext } from './context'
 import type { ChangeHandler } from './SchemaForm'
 import { LabelTextsContext } from './labelTextsContext'
 
@@ -36,9 +41,112 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
   const [writing, setWriting] = useState(false)
   const [written, setWritten] = useState(false)
   const [failed, setFailed] = useState(false)
+  // Proposed: the texts as they were when Translations opened, which Cancel puts back, or null while it is closed.
+  const [translating, setTranslating] = useState<Record<string, string> | null>(null)
+  const uiLocale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { colour } = useDesignTokens()
 
   const known = names.texts.find((text) => text.key === key)
   const others = known ? known.usedBy - (getAt(resource.saved, `${pointer}/textKey`) === key ? 1 : 0) : 0
+  // Proposed: inside an editor with one Save, a label is a text box per language, named by the language, and its key
+  // is Studio's own: it is made from the resource and the path and never shown.
+  // Proposed: inside an editor with one Save, a label is one text box in the author's language, or the application's
+  // first when it lacks that one, as content tools edit one language at a time. Translations…, an icon beside it, opens
+  // every language of the label in a medium dialog, and a muted line under it names the languages it still lacks.
+  // Many labels at once are translated in the text resources' table. Its key is Studio's own and never shown.
+  if (resource.setPending) {
+    const setPending = resource.setPending
+    const shown = resource.pending?.[key] ?? textsOf(names, key)
+    const language = new Intl.DisplayNames([uiLocale], { type: 'language' })
+    const nameOf = (locale: string) => language.of(locale) ?? locale
+    const primary = names.locales.includes(uiLocale) ? uiLocale : names.locales[0]
+    const missing = names.locales.filter((locale) => locale !== primary && (shown[locale] ?? '').trim() === '')
+    const write = (locale: string, text: string) => {
+      setPending(key, { ...shown, [locale]: text })
+      if (getAt(value, '/textKey') !== key) {
+        onChange(pointer, { ...(isRecord(value) ? value : {}), textKey: key })
+      }
+    }
+    return (
+      <Flex vertical gap={4} data-testid="studio-label">
+        {/* Proposed: Translations sits inside the box, at its end, as a password box holds its eye, so the box is as wide
+            as every other field's. It stays a real button, reached with Tab and named by its tooltip. */}
+        <Input
+          aria-label={nameOf(primary)}
+          value={shown[primary] ?? ''}
+          onChange={(event) => write(primary, event.target.value)}
+          suffix={
+            names.locales.length > 1 ? (
+              <AxisButton
+                role="icon"
+                size="small"
+                nameKey="shell.studio.translations.open"
+                icon={<TranslationOutlined />}
+                onClick={() => setTranslating(shown)}
+                data-testid="studio-label-translations"
+                style={{ marginInlineEnd: -4, marginBlock: -1 }}
+              />
+            ) : undefined
+          }
+        />
+        {missing.length > 0 && (
+          <Typography.Text style={{ color: colour.textMuted, fontSize: 12 }} data-testid="studio-label-missing">
+            {t('shell.studio.translations.missing').replace(
+              '{languages}',
+              new Intl.ListFormat(uiLocale, { type: 'conjunction' }).format(missing.map(nameOf)),
+            )}
+          </Typography.Text>
+        )}
+        {others > 0 && (
+          <Alert
+            data-testid="studio-label-used-by"
+            type="warning"
+            title={
+              <>
+                {t('shell.studio.labelUsedBy')} <strong>{others}</strong>
+              </>
+            }
+          />
+        )}
+        <Modal
+          open={translating !== null}
+          width={dialogWidth('medium')}
+          title={t('shell.studio.translations.title')}
+          okText={t('shell.studio.list.done')}
+          cancelText={t('shell.studio.cancel')}
+          onOk={() => setTranslating(null)}
+          onCancel={() => {
+            if (translating) {
+              setPending(key, translating)
+            }
+            setTranslating(null)
+          }}
+          destroyOnHidden
+        >
+          <div
+            data-testid="studio-label-translations-dialog"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'max-content minmax(0, 1fr)',
+              columnGap: 16,
+              rowGap: 8,
+              alignItems: 'center',
+            }}
+          >
+            {names.locales.map((locale) => [
+              <Typography.Text key={`${locale}/name`}>{nameOf(locale)}</Typography.Text>,
+              <Input
+                key={`${locale}/text`}
+                aria-label={nameOf(locale)}
+                value={shown[locale] ?? ''}
+                onChange={(event) => write(locale, event.target.value)}
+              />,
+            ])}
+          </div>
+        </Modal>
+      </Flex>
+    )
+  }
 
   function changeKey(next: string) {
     setKey(next)

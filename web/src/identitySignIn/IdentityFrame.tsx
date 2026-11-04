@@ -1,42 +1,35 @@
+import { SettingOutlined } from '@ant-design/icons'
 import { Card, Flex, Typography } from 'antd'
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
-import { LegalLine } from '../platform/LegalLine'
+import { useState } from 'react'
+import { NamedIconButton } from '../platform/AxisButton'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
-import { PreferencesMenu } from '../platform/PreferencesMenu'
-import { TextContext } from '../platform/texts'
+import { nativeLanguageName } from '../platform/languageName'
+import { PreferencesDropdown } from '../platform/PreferencesMenu'
 import { useDesignTokens } from '../platform/themeMode'
-import type { IdentityFrameContext } from './signInContext'
+import { LegalLine } from '../platform/LegalLine'
+import type { SignInLegal, SignInPreferences } from './signInContext'
 
 /**
- * The frame of the identity provider's pages: the organization's mark and name above one card, with the shell's
- * "Language and theme" gear at the top right and the legal line below.
+ * The frame of the identity provider's pages: the organization's mark and name above one card, the copyright and the
+ * legal links below, and the language and theme button at the page's top right.
  */
 export function IdentityFrame({
   title,
-  frame,
+  organization,
+  preferences,
+  legal,
   children,
 }: {
   title: string
-  frame: IdentityFrameContext
+  /** The organization's name for the heading above the card. Absent means Axis. */
+  organization?: string
+  preferences: SignInPreferences
+  legal: SignInLegal
   children: ReactNode
 }) {
   const { colour, spacing, radius } = useDesignTokens()
   const [year] = useState(() => new Date().getFullYear())
-  // Keycloak pages have no text catalogue, so the gear's keys resolve from the page's context.
-  const frameText = useMemo(() => {
-    const { frameTexts, locales } = frame
-    const texts = new Map<string, string>([
-      ['shell.preferences.label', frameTexts.languageAndTheme],
-      ['shell.locale.label', frameTexts.language],
-      ['shell.theme.label', frameTexts.theme],
-      ['shell.theme.system', frameTexts.system],
-      ['shell.theme.light', frameTexts.light],
-      ['shell.theme.dark', frameTexts.dark],
-      ...locales.map(({ tag, label }): [string, string] => [`shell.locale.${tag}`, label]),
-    ])
-    return (key: string) => texts.get(key) ?? key
-  }, [frame])
   // A design-system frame sets --shell-min-height to its own height, so the page fills it.
   return (
     <Flex
@@ -44,28 +37,33 @@ export function IdentityFrame({
       align="center"
       gap={spacing.md}
       style={{
-        position: 'relative',
         paddingBlock: spacing.lg,
         background: colour.canvas,
         minHeight: 'var(--shell-min-height, 100%)',
         boxSizing: 'border-box',
+        position: 'relative',
       }}
     >
-      <div style={{ position: 'absolute', top: spacing.lg, right: spacing.lg }}>
-        <TextContext.Provider value={frameText}>
-          <PreferencesMenu
-            locales={frame.locales.map((locale) => locale.tag)}
-            locale={frame.locale}
-            onLocaleChange={(tag) => {
-              const target = frame.locales.find((locale) => locale.tag === tag)
-              if (target) {
-                window.location.assign(target.url)
-              }
-            }}
-          />
-        </TextContext.Provider>
+      {/* Proposed: the shell's language and theme button sits at the page's top right, where the shell header has it,
+          as far from the top edge as from the right one and level with the organization's heading. The card holds
+          only the sign-in. Its menu holds every language, named in its own language, and System, Light and Dark, so
+          more languages only add rows. */}
+      <div style={{ position: 'absolute', top: spacing.lg, insetInlineEnd: spacing.lg }}>
+        <PreferencesDropdown
+          languages={preferences.locales.map((entry) => ({ tag: entry.tag, label: nativeLanguageName(entry.tag) }))}
+          language={preferences.locale}
+          texts={preferences.texts}
+          onLanguageChange={(tag) => {
+            const target = preferences.locales.find((entry) => entry.tag === tag)
+            if (target) {
+              window.location.assign(target.url)
+            }
+          }}
+        >
+          <NamedIconButton name={preferences.texts.label} icon={<SettingOutlined />} />
+        </PreferencesDropdown>
       </div>
-      <OrganizationHeading name={frame.realmName} />
+      <OrganizationHeading name={organization} />
       <Card
         style={{
           width: '100%',
@@ -83,8 +81,9 @@ export function IdentityFrame({
           {children}
         </Flex>
       </Card>
+      {/* Proposed: the line is as wide as the card, so the copyright lines up with its start and the links with its end. */}
       <div style={{ width: '100%', maxWidth: 400 }}>
-        <LegalLine copyright={`© ${year} Axis`} links={frame.legal} />
+        <LegalLine copyright={`© ${year} Axis`} links={legal.links} texts={legal.texts} />
       </div>
     </Flex>
   )

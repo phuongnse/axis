@@ -77,6 +77,8 @@ fi
 # Keycloak's compose service mounts the theme from artifacts/keycloak-theme.
 log "Building the Keycloak theme"
 npm run build:keycloak-theme --prefix web
+# Prototype only (design review 2026-10-30-studio): the sample company realm's own login theme, beside the Axis theme.
+cp -R samples/keycloak/themes/. artifacts/keycloak-theme/
 
 # The health checks make --wait return once PostgreSQL accepts connections, the realm answers
 # and the purchasing system stub and Mailpit answer. --build rebuilds the stub's image when it changed.
@@ -89,6 +91,14 @@ AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PUR
 # hold it. A Keycloak container that this script reuses gets the flow here too, and a realm that has it is not changed.
 log "Adding the axis first login flow to the axis realm"
 node scripts/lib/development-realm.mjs "http://localhost:$keycloak_port"
+# Prototype only (design review 2026-10-30-studio): the realm's email theme and mail server, the company realm's theme,
+# and the axis client's address, which frame.ftl uses for the licences link.
+node scripts/lib/development-legal.mjs "http://localhost:$keycloak_port" "http://localhost:$web_port"
+# Prototype only (design review 2026-11-03-studio-settings): example legal links, so every link and the terms step show.
+# The realm sync writes them. The publisher reads no appsettings file and syncs too, so they are exported.
+export Tenants__default__Legal__PrivacyUrl="https://example.com/privacy"
+export Tenants__default__Legal__TermsUrl="https://example.com/terms"
+export Tenants__default__Legal__TermsVersion="2026-11-01"
 schema_connection=""
 # Bash cannot export a name with a hyphen, like Tenants__default-preview__ConnectionString. These
 # overrides reach the server and the worker through env instead.
@@ -206,6 +216,9 @@ bash scripts/lib/install-sample-templates.sh
 # the worker's and risk file-lock failures, so it is built here, before the server starts.
 log "Building the publisher"
 dotnet build src/Axis.Admin/Axis.Admin.csproj --nologo -v quiet
+# Prototype only: the lists of the Open source licences page. The SPA serves the public one and the server the one with
+# versions. It reads the NuGet project assets, so it runs after a build, and a first run may not have them all yet.
+node scripts/write-licences.mjs web/public/licences.json || log "The licence lists were not written. /licences stays empty."
 
 # A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
 # between starting a process and saving its pid.

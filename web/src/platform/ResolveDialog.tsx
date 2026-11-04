@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { resolveCall, type CallOutput, type InstanceCall } from './inspection'
 import { buildResolveBody } from './recordBody'
 import { useText } from './texts'
+import { dialogWidth } from './dialogButtons'
 
 interface ResolveDialogProps {
   call: InstanceCall
@@ -85,6 +86,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
 
   return (
     <Modal
+      width={dialogWidth('medium')}
       open
       title={t('shell.inspector.commands.resolve')}
       okText={t('shell.inspector.commands.send')}

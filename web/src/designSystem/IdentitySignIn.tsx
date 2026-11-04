@@ -1,46 +1,50 @@
 import { AddAuthenticatorPage } from '../identitySignIn/AddAuthenticatorPage'
-import { ErrorPage } from '../identitySignIn/ErrorPage'
-import { NoticePage } from '../identitySignIn/NoticePage'
 import { ResetPasswordPage } from '../identitySignIn/ResetPasswordPage'
-import { SelectAuthenticatorPage } from '../identitySignIn/SelectAuthenticatorPage'
 import { SignInPage } from '../identitySignIn/SignInPage'
-import { SignOutPage } from '../identitySignIn/SignOutPage'
+import { TermsPage } from '../identitySignIn/TermsPage'
+import { MessagePage } from '../identitySignIn/MessagePage'
+import { ChooseMethodPage } from '../identitySignIn/ChooseMethodPage'
+import { ProfilePage } from '../identitySignIn/ProfilePage'
 import { TwoStepPage } from '../identitySignIn/TwoStepPage'
 import { UpdatePasswordPage } from '../identitySignIn/UpdatePasswordPage'
-import { UpdateProfilePage } from '../identitySignIn/UpdateProfilePage'
 import {
   identityAddAuthenticatorContext,
-  identityErrorContext,
   identityInvalid,
-  identityNoticeContext,
   identityResetPasswordContext,
-  identitySelectAuthenticatorContext,
-  identitySignInContext,
+  identityTermsContext,
   identitySignOutContext,
+  identityNoticeContext,
+  identityErrorContext,
+  identityChooseMethodContext,
+  identityProfileContext,
+  identitySignInContext,
   identityTwoStepContext,
   identityUpdatePasswordContext,
-  identityUpdateProfileContext,
 } from './fixtures'
 
 export type IdentitySignInPage =
   | 'signIn'
+  | 'emptyFields'
   | 'wrongPassword'
   | 'organizationOnly'
   | 'twoStep'
   | 'resetPassword'
   | 'updatePassword'
   | 'addAuthenticator'
-  | 'selectAuthenticator'
-  | 'updateProfile'
+  | 'terms'
   | 'signOut'
   | 'notice'
   | 'error'
+  | 'chooseMethod'
+  | 'profile'
 
 /** The identity provider's sign-in page in one of its states, built from fixtures through the shared sign-in components. */
 export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
   switch (page) {
     case 'signIn':
       return <SignInPage context={identitySignInContext} />
+    case 'emptyFields':
+      return <SignInPage context={{ ...identitySignInContext, username: '' }} />
     case 'wrongPassword':
       return <SignInPage context={{ ...identitySignInContext, error: identityInvalid }} />
     case 'organizationOnly':
@@ -53,15 +57,17 @@ export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
       return <UpdatePasswordPage context={identityUpdatePasswordContext} />
     case 'addAuthenticator':
       return <AddAuthenticatorPage context={identityAddAuthenticatorContext} />
-    case 'selectAuthenticator':
-      return <SelectAuthenticatorPage context={identitySelectAuthenticatorContext} />
-    case 'updateProfile':
-      return <UpdateProfilePage context={identityUpdateProfileContext} />
+    case 'terms':
+      return <TermsPage context={identityTermsContext} />
     case 'signOut':
-      return <SignOutPage context={identitySignOutContext} />
+      return <MessagePage context={identitySignOutContext} />
     case 'notice':
-      return <NoticePage context={identityNoticeContext} />
+      return <MessagePage context={identityNoticeContext} />
     case 'error':
-      return <ErrorPage context={identityErrorContext} />
+      return <MessagePage context={identityErrorContext} />
+    case 'chooseMethod':
+      return <ChooseMethodPage context={identityChooseMethodContext} />
+    case 'profile':
+      return <ProfilePage context={identityProfileContext} />
   }
 }

@@ -4,6 +4,7 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { useText } from '../platform/texts'
 import { fetchUserRoles, inviteUser, type RoleChange, type UserRoles } from '../platform/users'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** The fields of the form. */
 interface InviteFields {
@@ -114,6 +115,7 @@ export function InviteUserModal({
   return (
     <>
       <Modal
+        width={dialogWidth('medium')}
         open
         title={t('shell.users.invite.title')}
         okText={t('shell.users.invite.send')}
@@ -177,6 +179,7 @@ export function InviteUserModal({
         </Flex>
       </Modal>
       <Modal
+        width={dialogWidth('small')}
         open={pending !== null}
         title={t('shell.users.invite.confirm')}
         okText={t('shell.users.invite.send')}

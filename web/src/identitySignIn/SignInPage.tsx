@@ -7,7 +7,12 @@ import type { SignInContext } from './signInContext'
 /** The identity provider's sign-in page: the providers first, then the account form when accounts are allowed. */
 export function SignInPage({ context }: { context: SignInContext }) {
   return (
-    <IdentityFrame title={context.title} frame={context}>
+    <IdentityFrame
+      title={context.title}
+      organization={context.realmName}
+      preferences={context.preferences}
+      legal={context.legal}
+    >
       <SignInBody context={context} />
     </IdentityFrame>
   )
@@ -23,7 +28,6 @@ function SignInBody({ context }: { context: SignInContext }) {
   const goTo = (url: string) => window.location.assign(url)
   return (
     <>
-      {notice && <Alert type="info" showIcon title={notice} />}
       {only && (
         <Typography.Paragraph style={{ margin: 0 }}>
           {texts.providerOnly.replace('{provider}', providers[0].label)}
@@ -35,6 +39,8 @@ function SignInBody({ context }: { context: SignInContext }) {
         </Button>
       ))}
       {accounts && providers.length > 0 && <Divider plain>{texts.or}</Divider>}
+      {/* Proposed: the notice after "Send link" confirms that the email is on its way. */}
+      {notice && !error && <Alert type="success" showIcon title={notice} />}
       {accounts && error && <Alert type="error" showIcon title={error} />}
       {accounts && <AccountForm context={context} />}
     </>

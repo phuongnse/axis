@@ -1,6 +1,6 @@
 import type { ChartKind } from '../platform/chartOption'
+import studioFixtures from './studioFixtures.json'
 import type { CurrentUser } from '../platform/currentUser'
-import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
 import type { DeadLetterPage, InstancePage } from '../platform/inspection'
@@ -22,25 +22,19 @@ import type { TaskPage } from '../platform/tasks'
 import type {
   AddAuthenticatorContext,
   AddAuthenticatorTexts,
-  ErrorContext,
-  FrameTexts,
-  FrontChannelSignOutContext,
-  NoticeContext,
-  PageExpiredContext,
   ResetPasswordContext,
   ResetPasswordTexts,
-  SamlPostContext,
-  SelectAuthenticatorContext,
-  SelectAuthenticatorTexts,
   SignInContext,
   SignInTexts,
-  SignOutContext,
   TwoStepContext,
   TwoStepTexts,
   UpdatePasswordContext,
   UpdatePasswordTexts,
-  UpdateProfileContext,
-  UpdateProfileTexts,
+  TermsContext,
+  MessageContext,
+  ChooseMethodContext,
+  ProfileContext,
+  TermsTexts,
 } from '../identitySignIn/signInContext'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
@@ -749,6 +743,7 @@ export const applicationSite: ApplicationSite = {
     { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
   ],
   notificationsPath,
+  legal: { privacyUrl: '#privacy', termsUrl: '#terms' },
 }
 
 const requestsPage: PageMetadata = {
@@ -770,10 +765,11 @@ const currentUser: CurrentUser = {
   displayName: 'Alex Morgan',
   roles: ['Author', 'Operator', 'Administrator'],
   studio: true,
-  studioPublisher: false,
-  studioCreate: false,
-  studioPreviewHost: null,
-  studioTest: false,
+  // Proposed: the Studio cards show every action an author who publishes, creates and tests sees.
+  studioPublisher: true,
+  studioCreate: true,
+  studioPreviewHost: 'preview.example.com',
+  studioTest: true,
   console: true,
   users: true,
 }
@@ -826,24 +822,6 @@ export const identitySignInTexts: SignInTexts = {
   signIn: 'Sign in',
 }
 
-/** The texts of the identity provider's "Language and theme" gear, in English. */
-export const identityFrameTexts: FrameTexts = {
-  languageAndTheme: 'Language and theme',
-  language: 'Language',
-  theme: 'Theme',
-  system: 'System',
-  light: 'Light',
-  dark: 'Dark',
-}
-
-/** The legal line under the identity provider's cards in the design system, in English. */
-export const identityLegal: LegalLinks = {
-  privacyUrl: '#privacy',
-  termsUrl: '#terms',
-  licencesUrl: '#licences',
-  texts: { legal: 'Legal', privacy: 'Privacy', terms: 'Terms', licences: 'Licences' },
-}
-
 /** What the identity provider's sign-in page draws in the design system. */
 export const identitySignInContext: SignInContext = {
   page: 'signIn',
@@ -855,13 +833,34 @@ export const identitySignInContext: SignInContext = {
   loginAction: '#sign-in',
   rememberMe: true,
   forgotPasswordUrl: '#forgot-password',
-  locale: 'en',
-  locales: [
-    { tag: 'en', label: 'English', url: '#en' },
-    { tag: 'vi', label: 'Tiếng Việt', url: '#vi' },
-  ],
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
+  preferences: {
+    locale: 'en',
+    locales: [
+      { tag: 'en', url: '#en' },
+      { tag: 'vi', url: '#vi' },
+    ],
+    texts: {
+      label: 'Language and theme',
+      language: 'Language',
+      theme: 'Theme',
+      system: 'System',
+      light: 'Light',
+      dark: 'Dark',
+    },
+  },
+  legal: {
+    links: {
+      privacy: '#privacy',
+      terms: '#terms',
+      licences: '#licences',
+    },
+    texts: {
+      label: 'Legal',
+      privacy: 'Privacy',
+      terms: 'Terms',
+      licences: 'Licences',
+    },
+  },
   texts: identitySignInTexts,
 }
 
@@ -886,10 +885,8 @@ export const identityTwoStepContext: TwoStepContext = {
   loginAction: '#verify',
   restartUrl: '#sign-in',
   tryAnotherWay: true,
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityTwoStepTexts,
 }
 
@@ -911,10 +908,8 @@ export const identityResetPasswordContext: ResetPasswordContext = {
   username: identitySignInContext.username,
   loginAction: '#reset',
   loginUrl: '#sign-in',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityResetPasswordTexts,
 }
 
@@ -927,7 +922,6 @@ export const identityUpdatePasswordTexts: UpdatePasswordTexts = {
   newPasswordRequired: 'Enter a new password.',
   passwordsDiffer: 'The passwords do not match.',
   setPassword: 'Set password',
-  cancel: 'Cancel',
 }
 
 /** What the identity provider's page that sets a password draws in the design system. */
@@ -936,11 +930,116 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   title: identityUpdatePasswordTexts.title,
   realmName: identitySignInContext.realmName,
   loginAction: '#set-password',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityUpdatePasswordTexts,
+}
+
+/** Proposed: the texts of the terms page, in English. */
+export const identityTermsTexts: TermsTexts = {
+  title: 'Terms and privacy',
+  message: 'Before you continue, read and accept the terms that apply to your account.',
+  agreeBoth: 'I have read and agree to the {terms} and the {privacy}.',
+  agreeTerms: 'I have read and agree to the {terms}.',
+  agreePrivacy: 'I have read and agree to the {privacy}.',
+  termsLink: 'Terms of service',
+  privacyLink: 'Privacy policy',
+  agreeRequired: 'Tick the box to accept before you continue.',
+  accept: 'Continue',
+  decline: 'Decline and sign out',
+}
+
+/** Proposed: what the terms page draws in the design system. */
+export const identityTermsContext: TermsContext = {
+  page: 'terms',
+  title: identityTermsTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#terms',
+  accept: { privacy: '#privacy', terms: '#terms' },
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+  texts: identityTermsTexts,
+}
+
+/** Proposed: the sign-out question, a message page with a post action and a link. */
+export const identitySignOutContext: MessageContext = {
+  page: 'message',
+  title: 'Sign out',
+  realmName: identitySignInContext.realmName,
+  message: 'Do you want to sign out?',
+  actions: [
+    { kind: 'post', primary: true, label: 'Sign out', href: '#sign-out', fields: { session_code: 'code' } },
+    { kind: 'link', label: 'Back to the application', href: '#back' },
+  ],
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+}
+
+/** Proposed: the notice after "Send link". */
+export const identityNoticeContext: MessageContext = {
+  ...identitySignOutContext,
+  title: 'Notice',
+  message: 'You should receive an email shortly with further instructions.',
+  actions: [{ kind: 'link', label: 'Back to the application', href: '#back' }],
+}
+
+/** Proposed: the error of an invitation link that expired. */
+export const identityErrorContext: MessageContext = {
+  ...identitySignOutContext,
+  title: 'Something went wrong',
+  message: 'Action expired. Please continue with login now.',
+  tone: 'error',
+  actions: [{ kind: 'link', label: 'Back to the application', href: '#back' }],
+}
+
+/** Proposed: the page that "Try another way" opens. */
+export const identityChooseMethodContext: ChooseMethodContext = {
+  page: 'chooseMethod',
+  title: 'Choose how to sign in',
+  realmName: identitySignInContext.realmName,
+  loginAction: '#choose',
+  methods: [
+    {
+      id: 'otp',
+      label: 'Authenticator application',
+      help: 'Enter a verification code from your authenticator application.',
+    },
+    { id: 'password', label: 'Password', help: 'Sign in by entering your password.' },
+  ],
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+}
+
+/** Proposed: the profile page, after an administrator asked for it. */
+export const identityProfileContext: ProfileContext = {
+  page: 'profile',
+  title: 'Update your profile',
+  realmName: identitySignInContext.realmName,
+  loginAction: '#profile',
+  fields: [
+    { name: 'username', label: 'Username', value: 'alex.morgan', required: true, readOnly: true, type: 'text' },
+    {
+      name: 'email',
+      label: 'Email',
+      value: 'alex.morgan@contoso.example',
+      required: true,
+      readOnly: false,
+      type: 'email',
+    },
+    { name: 'firstName', label: 'First name', value: 'Alex', required: true, readOnly: false, type: 'text' },
+    { name: 'lastName', label: 'Last name', value: '', required: true, readOnly: false, type: 'text' },
+  ],
+  hidden: {},
+  cancellable: false,
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+  texts: {
+    title: 'Update your profile',
+    message: 'Check your details before you continue.',
+    required: 'Fill in this field.',
+    submit: 'Save and continue',
+    cancel: 'Cancel',
+  },
 }
 
 /** The texts of the page that adds an authenticator, in English. */
@@ -954,7 +1053,6 @@ export const identityAddAuthenticatorTexts: AddAuthenticatorTexts = {
   deviceName: 'Device name',
   deviceNameRequired: 'Enter a name for this device.',
   submit: 'Add authenticator',
-  cancel: 'Cancel',
 }
 
 /** A small PNG with a QR-like pattern. It shows the layout of the page and does not scan. */
@@ -971,164 +1069,9 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   manualKey: 'JBSW Y3DP EHPK 3PXP',
   secret: 'fixture-secret',
   deviceNameRequired: false,
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityAddAuthenticatorTexts,
-}
-
-/** The texts of the page behind "Try another way", in English. */
-export const identitySelectAuthenticatorTexts: SelectAuthenticatorTexts = {
-  title: 'Choose how to sign in',
-  message: 'Pick another way to verify that it is you.',
-  backToSignIn: 'Back to sign in',
-}
-
-/** What the identity provider's page behind "Try another way" draws in the design system. */
-export const identitySelectAuthenticatorContext: SelectAuthenticatorContext = {
-  page: 'selectAuthenticator',
-  title: identitySelectAuthenticatorTexts.title,
-  realmName: identitySignInContext.realmName,
-  loginAction: '#select-authenticator',
-  restartUrl: '#restart',
-  methods: [
-    { id: 'otp', label: 'Authenticator app', help: 'Enter a verification code from your authenticator app.' },
-    { id: 'password', label: 'Password', help: 'Sign in with your password.' },
-  ],
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-  texts: identitySelectAuthenticatorTexts,
-}
-
-/** The texts of the pages that update a profile, in English. */
-export const identityUpdateProfileTexts: UpdateProfileTexts = {
-  submit: 'Save',
-  fieldRequired: '{field} is required.',
-}
-
-/** What the identity provider's update profile page draws in the design system. */
-export const identityUpdateProfileContext: UpdateProfileContext = {
-  page: 'updateProfile',
-  title: 'Update your profile',
-  realmName: identitySignInContext.realmName,
-  notice: 'You need to update your user profile to activate your account.',
-  loginAction: '#update-profile',
-  fields: [
-    {
-      name: 'email',
-      label: 'Email',
-      value: 'alex.morgan@contoso.example',
-      required: true,
-      readOnly: false,
-      autoComplete: 'email',
-    },
-    { name: 'firstName', label: 'First name', value: 'Alex', required: true, readOnly: false },
-    { name: 'lastName', label: 'Last name', value: 'Morgan', required: true, readOnly: false },
-  ],
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-  texts: identityUpdateProfileTexts,
-}
-
-/** What the identity provider's sign-out question draws in the design system. */
-export const identitySignOutContext: SignOutContext = {
-  page: 'signOut',
-  title: 'Sign out',
-  realmName: identitySignInContext.realmName,
-  action: '#sign-out',
-  sessionCode: 'fixture-session-code',
-  backUrl: '#application',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-  texts: { message: 'Do you want to sign out?', signOut: 'Sign out', backToApplication: 'Back to application' },
-}
-
-/** What the identity provider's notice page draws in the design system. */
-export const identityNoticeContext: NoticeContext = {
-  page: 'notice',
-  title: 'Notice',
-  realmName: identitySignInContext.realmName,
-  message: 'Your account has been updated.',
-  linkUrl: '#application',
-  linkText: 'Back to application',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-}
-
-/** The message of the identity provider's error page in the design system. */
-export const identityErrorMessage = 'The link is no longer valid.'
-
-/** What the identity provider's error page draws in the design system. */
-export const identityErrorContext: ErrorContext = {
-  page: 'error',
-  title: 'Something went wrong',
-  realmName: identitySignInContext.realmName,
-  error: identityErrorMessage,
-  backUrl: '#application',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-  texts: { backToApplication: 'Back to application' },
-}
-
-/** What the identity provider's expired page draws in the design system. */
-export const identityPageExpiredContext: PageExpiredContext = {
-  page: 'pageExpired',
-  title: 'Page expired',
-  realmName: identitySignInContext.realmName,
-  continueUrl: '#continue',
-  restartUrl: '#start-again',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-  texts: {
-    message: 'This page took too long and has expired. Continue where you were, or start again.',
-    continue: 'Continue',
-    startAgain: 'Start again',
-  },
-}
-
-/** What the identity provider's SAML redirect draws in the design system. */
-export const identitySamlPostContext: SamlPostContext = {
-  page: 'samlPost',
-  title: 'Redirecting',
-  realmName: identitySignInContext.realmName,
-  action: '#saml',
-  samlResponse: 'fixture-saml-response',
-  relayState: 'fixture-relay-state',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-  texts: { message: 'Taking you to the next step. If nothing happens, select Continue.', continue: 'Continue' },
-}
-
-/** What the identity provider's front-channel sign-out draws in the design system. */
-export const identityFrontChannelSignOutContext: FrontChannelSignOutContext = {
-  page: 'frontChannelSignOut',
-  title: 'Signing out',
-  realmName: identitySignInContext.realmName,
-  clients: [
-    { name: 'Purchase requests', url: '#purchase-requests-sign-out' },
-    { name: 'Leave requests', url: '#leave-requests-sign-out' },
-  ],
-  redirectUrl: '#signed-out',
-  locale: identitySignInContext.locale,
-  locales: identitySignInContext.locales,
-  frameTexts: identityFrameTexts,
-  legal: identityLegal,
-  texts: { message: 'Signing you out of your applications. This page goes on by itself.', continue: 'Continue' },
 }
 
 /** The site texts, in English. */
@@ -1174,12 +1117,135 @@ export const siteTexts: Record<string, string> = {
 }
 
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
-export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about'] as const
+export const fixtureScopes = [
+  `${apiPath}/`,
+  '/api/sites',
+  '/api/me',
+  '/api/about',
+  '/health/ready',
+  '/api/studio',
+] as const
 
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
  * queries (paging, sorting) are answered by the path alone.
  */
+
+const studioBlankApp = { name: 'Inventory', titles: { en: 'Inventory', vi: 'Kho hàng' }, descriptions: null }
+
+/** A resource of a Studio fixture folder. */
+const studioItem = (id: string, kind: string, name: string, file: string) => ({
+  id,
+  kind,
+  name,
+  file,
+  version: id,
+  usedBy: 0,
+})
+
+const leaveEntity = '5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e41'
+const leavePage = '5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e42'
+const leaveResources = [
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e40', 'application', 'LeaveRequests', 'application.json'),
+  studioItem(leaveEntity, 'entity', 'LeaveRequest', 'entities/leave-request.json'),
+  studioItem(leavePage, 'page', 'Requests', 'pages/requests.json'),
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e43', 'form', 'LeaveRequestForm', 'forms/leave-request-form.json'),
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e44', 'site', 'LeaveRequests', 'sites/leave-requests.json'),
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e45', 'role', 'Employee', 'roles/employee.json'),
+  studioItem(
+    '5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e46',
+    'identityProvider',
+    'accounts',
+    'identity-providers/accounts.json',
+  ),
+]
+const leaveDiagnostics = [
+  {
+    code: 'AXC0027',
+    severity: 'warning',
+    message: "The text key 'pages.requests.empty' is missing from locale 'vi'; locale 'en' has it.",
+    file: 'texts/vi.json',
+    path: '/texts',
+    resourceId: null,
+  },
+  {
+    code: 'AXC0021',
+    severity: 'error',
+    message: "The widget's entity 'LeaveRequests' names no loaded entity.",
+    file: 'pages/requests.json',
+    path: '/widgets/0/entity',
+    resourceId: leavePage,
+  },
+]
+// Proposed: release 3 was published, then release 2 activated again, so release 2 is live with two activations and
+// the newer release 3 can be activated.
+const leaveRelease = (number: number, activatedAt: string, label: string | null, requestId: string | null = null) => ({
+  releaseId: `01a18bb7-ef25-7408-8a42-9716776650a${number}`,
+  number,
+  contentHash: `a${number}`,
+  activatedAt,
+  actor: 'author',
+  actorName: 'Alex Morgan',
+  label,
+  note: null,
+  requestId,
+})
+const leaveReleases = {
+  active: { releaseId: '01a18bb7-ef25-7408-8a42-9716776650a2', number: 2, contentHash: 'a2' },
+  folderContentHash: 'a3',
+  items: [
+    leaveRelease(2, '2026-10-30T08:20:00+00:00', null, '5b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d'),
+    leaveRelease(3, '2026-10-29T10:45:00+00:00', 'Carry-over'),
+    leaveRelease(2, '2026-10-27T16:05:00+00:00', 'Half days'),
+    leaveRelease(1, '2026-10-20T09:30:00+00:00', 'First release'),
+  ],
+  // Proposed: the files that differ from the live release, as the Overview lists them.
+  changes: [
+    { path: 'entities/leave-request.json', change: 'changed' },
+    { path: 'forms/leave-request-form.json', change: 'added' },
+    { path: 'pages/requests.json', change: 'changed' },
+  ],
+}
+
+const blankResources = [
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f50', 'application', 'Inventory', 'application.json'),
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f51', 'site', 'Inventory', 'sites/inventory.json'),
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f52', 'page', 'Home', 'pages/home.json'),
+  studioItem(
+    '7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f53',
+    'identityProvider',
+    'accounts',
+    'identity-providers/accounts.json',
+  ),
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f54', 'text', 'en', 'texts/en.json'),
+]
+
+/** The answers Studio loads for one application's folder. */
+function studioFolder(name: string, items: unknown[], diagnostics: unknown[], releases: unknown) {
+  const base = `/api/studio/apps/${name}`
+  const names = {
+    locales: ['en'],
+    entities: [],
+    dataSources: [],
+    processes: [],
+    rules: [],
+    connectors: [],
+    events: [],
+    roles: [],
+    sequences: [],
+    forms: [],
+    pages: [],
+    policies: [],
+    texts: [],
+  }
+  return {
+    [`${base}/resources`]: () => ({ items }),
+    [`${base}/diagnostics`]: () => ({ diagnostics }),
+    [`${base}/names`]: () => names,
+    [`${base}/releases`]: () => releases,
+  }
+}
+
 export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
@@ -1203,4 +1269,22 @@ export const routes: Record<string, () => unknown> = {
   '/api/sites': () => ({ sites: listedSites }),
   '/api/me': () => currentUser,
   '/api/about': () => ({ version: '0.1.0' }),
+  '/health/ready': () => new Response(null, { status: 200 }),
+  // Proposed: Studio's answers for the purchase request sample, as the local stack gave them, with a short release history.
+  ...Object.fromEntries(Object.entries(studioFixtures).map(([path, body]) => [path, () => body])),
+  // Proposed: two more applications for Studio's overview: one with errors and changes that are not live yet, and one
+  // just created, with nothing but what a blank application holds.
+  '/api/studio/apps': () => ({ items: [...studioFixtures['/api/studio/apps'].items, studioBlankApp] }),
+  // Proposed: the sites' files, which the Overview reads for the address that opens each site.
+  '/api/studio/apps/PurchaseRequests/resources/0cec2d63-0949-465f-a29e-80b546dfa347': () => ({
+    ...studioItem('0cec2d63-0949-465f-a29e-80b546dfa347', 'site', 'Purchasing', 'sites/purchasing.json'),
+    titles: { en: 'Purchasing', vi: 'Mua hàng' },
+    content: { kind: 'site', name: 'Purchasing', path: 'purchasing', title: { textKey: 'site.title' } },
+  }),
+  '/api/studio/apps/LeaveRequests/resources/5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e44': () => ({
+    ...studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e44', 'site', 'LeaveRequests', 'sites/leave-requests.json'),
+    content: { kind: 'site', name: 'LeaveRequests', path: 'leave' },
+  }),
+  ...studioFolder('LeaveRequests', leaveResources, leaveDiagnostics, leaveReleases),
+  ...studioFolder('Inventory', blankResources, [], { active: null, folderContentHash: 'b1', items: [] }),
 }

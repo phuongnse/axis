@@ -1,7 +1,11 @@
 import { ConfigProvider } from 'antd'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { antConfigFor, fieldRules } from './antTheme'
+import { antThemeFor } from './antTheme'
+import { choiceAlignment } from './choiceAlignment'
+import { choiceErrorStyles } from './choiceErrors'
 import { designTokensFor } from './designTokens'
+import { dialogButtons } from './dialogButtons'
+import { fieldErrors } from './fieldErrors'
 import { ThemeModeContext, type ThemeChoice, type ThemeMode } from './themeMode'
 import { useReducedMotion } from './useReducedMotion'
 import { useSystemThemeMode } from './useSystemThemeMode'
@@ -42,18 +46,29 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   const value = useMemo(() => ({ mode, choice, choose }), [mode, choice, choose])
   const reducedMotion = useReducedMotion()
-  const config = useMemo(() => antConfigFor(mode, undefined, reducedMotion), [mode, reducedMotion])
+  const config = useMemo(() => antThemeFor(mode, undefined, reducedMotion), [mode, reducedMotion])
+  const choices = useMemo(() => choiceAlignment(config), [config])
+  const choiceErrors = useMemo(() => choiceErrorStyles(designTokensFor(mode).colour.dangerText), [mode])
 
   useEffect(() => {
     document.body.style.backgroundColor = designTokensFor(mode).colour.canvas
-    // Scrollbars and other browser controls follow the mode.
+    // Proposed: the browser draws its own parts, every scrollbar among them, in the mode the shell draws in.
     document.documentElement.style.colorScheme = mode
   }, [mode])
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider {...config}>
-        <style>{fieldRules(mode)}</style>
+      {/* Proposed: beside a dialog's solid button, Cancel is a text button, as every action beside a solid one. */}
+      {/* Proposed: a checkbox's or radio's box sits on its label's first line, in every form. */}
+      <ConfigProvider
+        theme={config}
+        modal={dialogButtons}
+        form={fieldErrors}
+        checkbox={choices.checkbox}
+        radio={choices.radio}
+      >
+        {/* Proposed: a checkbox or radio in a field with an error has the error border an input gets. */}
+        <style>{choiceErrors}</style>
         {children}
       </ConfigProvider>
     </ThemeModeContext.Provider>

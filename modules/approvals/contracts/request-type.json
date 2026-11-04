@@ -7,6 +7,7 @@
   "validations": [
     {
       "name": "hasStepForEveryAmount",
+      "label": { "textKey": "approvals.contract.requestType.hasStepForEveryAmount" },
       "expression": "count(steps, minAmount == null) >= 1",
       "message": { "textKey": "approvals.requestType.hasStepForEveryAmount" },
       "field": "steps"

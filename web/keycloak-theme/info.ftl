@@ -1,48 +1,36 @@
-<#-- The Axis notice page, such as "Your account has been updated", with the link onward. It writes Keycloak's data as
-     JSON into the same element as login.ftl and the React bundle draws the page from it. The "page" field tells the
-     bundle which page to draw. The title is Keycloak's message header when it gives one, and "Notice" otherwise. The
-     link is picked as Keycloak's info.ftl picks it: pageRedirectUri, then actionUri, then the client's home address,
-     and none when skipLink is set. Keycloak escapes output as HTML, so every string goes through ?json_string?no_esc:
-     ?json_string also escapes "</", which keeps the script element closed. -->
-<#import "frame.ftl" as frame>
-<#if messageHeader??>
-  <#assign noticeTitle = msg(messageHeader)>
-<#else>
-  <#assign noticeTitle = msg("axisNoticeTitle")>
-</#if>
-<#assign noticeMessage = (message.summary)!''>
-<#if requiredActions??>
-  <#assign actions = []>
-  <#list requiredActions as action>
-    <#assign actions += [msg("requiredAction." + action)]>
-  </#list>
-  <#assign noticeMessage = noticeMessage + ": " + actions?join(", ")>
-</#if>
+<#-- Proposed: the Axis notice page, such as the one after "Send link", the one before an invitation's steps and the one after an account change. A required step's link is the solid Continue button; otherwise the page links back to the application. -->
+<#import "frame.ftl" as axis>
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
-<@frame.head title=noticeTitle/>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${msg("axisInfoTitle")}</title>
+  <link rel="stylesheet" href="${url.resourcesPath}/assets/axis-sign-in.css">
+</head>
 <body>
   <div id="root"></div>
   <script type="application/json" id="axis-sign-in-context">
   {
-    "page": "notice",
-    "title": "${noticeTitle?json_string?no_esc}",
-    <@frame.realmName/>
-    <#if !skipLink??>
-      <#if pageRedirectUri?has_content>
-    "linkUrl": "${pageRedirectUri?json_string?no_esc}",
-    "linkText": "${msg("axisBackToApplication")?json_string?no_esc}",
-      <#elseif actionUri?has_content>
-    "linkUrl": "${actionUri?json_string?no_esc}",
-    "linkText": "${msg("axisProceed")?json_string?no_esc}",
-      <#elseif (client.baseUrl)?has_content>
-    "linkUrl": "${client.baseUrl?json_string?no_esc}",
-    "linkText": "${msg("axisBackToApplication")?json_string?no_esc}",
+    "title": "<#if messageHeader??>${msg(messageHeader)?json_string?no_esc}<#else>${msg("axisInfoTitle")?json_string?no_esc}</#if>",
+    <@axis.realmName/>
+    <#assign summary = (message.summary)!''>
+    <#if requiredActions??><#assign summary = summary + ": " + requiredActions?map(a -> msg("requiredAction." + a))?join(", ")></#if>
+    "message": "${summary?json_string?no_esc}",
+    "actions": [
+      <#if !(skipLink??)>
+        <#if pageRedirectUri?has_content>
+      { "kind": "link", "label": "${msg("axisBackToApplication")?json_string?no_esc}", "href": "${pageRedirectUri?json_string?no_esc}" }
+        <#elseif actionUri?has_content>
+      { "kind": "link", "primary": true, "label": "${msg("axisContinue")?json_string?no_esc}", "href": "${actionUri?json_string?no_esc}" }
+        <#elseif (client.baseUrl)?has_content>
+      { "kind": "link", "label": "${msg("axisBackToApplication")?json_string?no_esc}", "href": "${client.baseUrl?json_string?no_esc}" }
+        </#if>
       </#if>
-    </#if>
-    <@frame.locales/>
-    <@frame.texts/>
-    "message": "${noticeMessage?json_string?no_esc}"
+    ],
+    <@axis.preferences/>
+    <@axis.legal/>
+    "page": "message"
   }
   </script>
   <script type="module" src="${url.resourcesPath}/assets/axis-sign-in.js"></script>

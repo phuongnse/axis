@@ -7,13 +7,14 @@ export function homeGridColumns(gap: number): string {
   return `repeat(auto-fit, minmax(max(0px, calc((100% - ${2 * gap}px) / 3)), 1fr))`
 }
 
-/** The style of a grid of tiles: one column on a narrow screen, up to three otherwise. */
-export function useHomeGrid(): CSSProperties {
+/** The grid of tiles of the home page, which Studio's Overview uses for an application's live sites too. */
+export function useTileGrid(): CSSProperties {
   const narrow = useNarrowWidth()
   const { spacing } = useDesignTokens()
   return {
     display: 'grid',
     gridTemplateColumns: narrow ? '1fr' : homeGridColumns(spacing.md),
+    // Proposed: every row is as tall as the tallest, so a tile in one row matches the tiles in the others.
     gridAutoRows: '1fr',
     gap: spacing.md,
   }

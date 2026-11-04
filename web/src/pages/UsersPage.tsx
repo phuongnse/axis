@@ -16,6 +16,7 @@ import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { UserRolesDrawer } from './UserRolesDrawer'
+import { dialogWidth } from '../platform/dialogButtons'
 
 const pageSize = 20
 
@@ -159,7 +160,8 @@ export function UsersPage() {
                 setInviting(true)
               }}
             >
-              {t('shell.users.invite')}
+              {/* Proposed: an action that opens a dialog asking for more ends in an ellipsis. */}
+              {t('shell.users.invite.button')}
             </Button>
           </Flex>
           {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
@@ -240,6 +242,7 @@ export function UsersPage() {
         />
       )}
       <Modal
+        width={dialogWidth('small')}
         open={pending !== null}
         title={pending && t(`shell.users.${pending.command}.confirm`)}
         okText={pending && t(`shell.users.${pending.command}.ok`)}

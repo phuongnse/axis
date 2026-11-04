@@ -1,8 +1,8 @@
-import { Flex, Input, Modal, Typography } from 'antd'
+import { Button, Flex, Input, Modal, Typography } from 'antd'
 import { useState } from 'react'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
 import { useText } from '../platform/texts'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** The answers so far, with a `skip` for each question that the earlier answers make unnecessary. */
 function advance(questions: FieldQuestion[], answers: FieldAnswer[]): FieldAnswer[] {
@@ -52,24 +52,26 @@ export function EntityMigrationQuestions({
 
   return (
     <Modal
+      width={dialogWidth('medium')}
       open
       centered
       title={t(rename ? 'shell.studio.entity.migration.renameTitle' : 'shell.studio.entity.migration.removeTitle')}
       onCancel={onCancel}
       footer={
-        <AxisActionRow justify="end">
+        <Flex gap="small" justify="end">
+          {/* Proposed: beside the solid button, the other actions are text buttons. */}
           {rename && (
-            <AxisButton role="secondary" onClick={onCancel}>
+            <Button type="text" onClick={onCancel}>
               {t('shell.studio.cancel')}
-            </AxisButton>
+            </Button>
           )}
-          <AxisButton role="destructive" onClick={() => answer('drop')}>
+          <Button type="text" danger onClick={() => answer('drop')}>
             {t('shell.studio.entity.migration.dropData')}
-          </AxisButton>
-          <AxisButton role="finish" onClick={() => answer('keep')}>
+          </Button>
+          <Button type="primary" onClick={() => answer('keep')}>
             {t(rename ? 'shell.studio.entity.migration.keepData' : 'shell.studio.entity.migration.keepField')}
-          </AxisButton>
-        </AxisActionRow>
+          </Button>
+        </Flex>
       }
     >
       <div data-testid="studio-migration-question">
@@ -109,22 +111,23 @@ function ExpressionQuestion({
 
   return (
     <Modal
+      width={dialogWidth('medium')}
       open
       centered
       title={t(convert ? 'shell.studio.entity.migration.convertTitle' : 'shell.studio.entity.migration.fillTitle')}
       onCancel={onCancel}
       footer={
-        <AxisActionRow justify="end">
-          <AxisButton role="secondary" onClick={onCancel}>
+        <Flex gap="small" justify="end">
+          <Button type="text" onClick={onCancel}>
             {t('shell.studio.cancel')}
-          </AxisButton>
-          <AxisButton role="secondary" onClick={() => onAnswer('skip')}>
+          </Button>
+          <Button type="text" onClick={() => onAnswer('skip')}>
             {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
-          </AxisButton>
-          <AxisButton role="finish" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>
+          </Button>
+          <Button type="primary" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>
             {t(convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls')}
-          </AxisButton>
-        </AxisActionRow>
+          </Button>
+        </Flex>
       }
     >
       <div data-testid="studio-migration-question">

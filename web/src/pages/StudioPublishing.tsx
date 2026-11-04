@@ -1,6 +1,6 @@
-import { Alert, Flex, Input, Modal } from 'antd'
+import { Alert, Button, Flex, Input, Modal } from 'antd'
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { createPortal } from 'react-dom'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
@@ -13,7 +13,6 @@ import {
   rollbackStudioRelease,
   ServerUnreachableError,
   type StudioDiagnostic,
-  type StudioReleaseRow,
   type StudioReleases,
   type StudioResourceItem,
   type StudioRequest,
@@ -25,6 +24,7 @@ import { useText } from '../platform/texts'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
+import { dialogWidth } from '../platform/dialogButtons'
 
 /** How long Studio waits between two checks of a request. */
 const pollDelay = 1000
@@ -40,8 +40,7 @@ export interface StudioPublishingHandle {
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
- * sends a publish request. A publish refused by a tenant quota shows the server's title in the error alert.
- * A Roll back button in the history sends a rollback request.
+ * sends a publish request. A Roll back button in the history sends a rollback request.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
  * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
@@ -67,6 +66,13 @@ export function StudioPublishing({
   onDiagnostics,
   onOpenScenario,
   onBusyChange,
+  actionsSlot,
+  showHistory = true,
+  onHistory,
+  release,
+  releaseAddress,
+  historyAddress,
+  headingSlot,
   ref,
 }: {
   application: string
@@ -78,6 +84,17 @@ export function StudioPublishing({
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
   onOpenScenario: (resourceId: string, path: string) => void
   onBusyChange?: (busy: boolean) => void
+  /** Proposed: where the buttons draw, such as the workspace's header band. Without it they draw here. */
+  actionsSlot?: HTMLElement | null
+  /** Proposed: whether the release history draws here. The workspace shows it on its Releases view only. */
+  showHistory?: boolean
+  /** Proposed: called with the release history each time it loads, for the workspace's overview. */
+  onHistory?: (history: StudioReleases | 'failed') => void
+  /** Proposed: the release whose own page shows in place of the history, its address and its heading's right side. */
+  release?: number
+  releaseAddress?: (number: number) => string
+  historyAddress?: string
+  headingSlot?: HTMLElement | null
   ref?: Ref<StudioPublishingHandle>
 }) {
   const t = useText()
@@ -108,6 +125,16 @@ export function StudioPublishing({
     })
     return () => controller.abort()
   }, [application, generation, historyRevision, folderRevision, lost])
+
+  const historyHandler = useRef(onHistory)
+  useEffect(() => {
+    historyHandler.current = onHistory
+  }, [onHistory])
+  useEffect(() => {
+    if (history !== undefined) {
+      historyHandler.current?.(history)
+    }
+  }, [history])
 
   const diagnosticsHandler = useRef(onDiagnostics)
   useEffect(() => {
@@ -236,38 +263,43 @@ export function StudioPublishing({
     runTests: (scenarios) => send(() => testStudioApp(application, scenarios)),
   }))
 
+  const actions = (
+    <Flex gap="small" align="center">
+      {/* Proposed: in the band, the actions that check are text buttons, so Publish is its one solid button. */}
+      <Button type="text" disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
+        {t('shell.studio.validate')}
+      </Button>
+      {previewHost !== null && (
+        <Button
+          type="text"
+          data-testid="studio-preview"
+          disabled={busy}
+          onClick={() => send(() => previewStudioApp(application))}
+        >
+          {t('shell.studio.preview')}
+        </Button>
+      )}
+      {canTest && (
+        <Button
+          type="text"
+          data-testid="studio-run-tests"
+          disabled={busy}
+          onClick={() => send(() => testStudioApp(application))}
+        >
+          {t('shell.studio.runTests')}
+        </Button>
+      )}
+      {canPublish && (
+        <Button type="primary" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
+          {t('shell.studio.publish')}
+        </Button>
+      )}
+    </Flex>
+  )
+
   return (
     <Flex vertical gap="small">
-      <AxisActionRow align="center">
-        <AxisButton role="secondary" disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
-          {t('shell.studio.validate')}
-        </AxisButton>
-        {previewHost !== null && (
-          <AxisButton
-            role="secondary"
-            data-testid="studio-preview"
-            disabled={busy}
-            onClick={() => send(() => previewStudioApp(application))}
-          >
-            {t('shell.studio.preview')}
-          </AxisButton>
-        )}
-        {canTest && (
-          <AxisButton
-            role="secondary"
-            data-testid="studio-run-tests"
-            disabled={busy}
-            onClick={() => send(() => testStudioApp(application))}
-          >
-            {t('shell.studio.runTests')}
-          </AxisButton>
-        )}
-        {canPublish && (
-          <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
-            {t('shell.studio.publish')}
-          </AxisButton>
-        )}
-      </AxisActionRow>
+      {actionsSlot ? createPortal(actions, actionsSlot) : actions}
       {sendError !== null && <Alert data-testid="studio-request-error" type="error" title={sendError} />}
       {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
       {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
@@ -282,12 +314,12 @@ export function StudioPublishing({
           ))}
         </Flex>
       )}
-      {history === 'failed' && (
+      {showHistory && history === 'failed' && (
         <Alert data-testid="studio-releases-error" type="error" title={t('shell.studio.releases.loadFailed')} />
       )}
-      {history && history !== 'failed' && (
+      {showHistory && history && history !== 'failed' && (
         <>
-          {folderDiffers(history) && (
+          {release === undefined && folderDiffers(history) && (
             <Alert
               data-testid="studio-folder-differs"
               type="warning"
@@ -295,14 +327,20 @@ export function StudioPublishing({
             />
           )}
           <StudioReleasesList
+            application={application}
             history={history}
             canRollBack={canPublish}
             busy={busy}
-            onRollBack={(row: StudioReleaseRow) => send(() => rollbackStudioRelease(application, row.releaseId))}
+            onRollBack={(target) => send(() => rollbackStudioRelease(application, target.releaseId))}
+            release={release}
+            releaseAddress={releaseAddress}
+            historyAddress={historyAddress}
+            headingSlot={headingSlot}
           />
         </>
       )}
       <Modal
+        width={dialogWidth('medium')}
         open={dialogOpen}
         title={t('shell.studio.publish.title')}
         okText={t('shell.studio.publish.confirm')}

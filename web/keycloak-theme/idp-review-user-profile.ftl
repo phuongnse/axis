@@ -1,56 +1,54 @@
-<#-- The Axis page that reviews a profile after a first brokered sign-in. It is the update profile page with another
-     title. The form posts each user profile field under its attribute name. It writes Keycloak's data as JSON into the same
-     element as login.ftl and the React bundle draws the page from it. The "page" field tells the bundle which page to
-     draw. Keycloak escapes output as HTML, so every string goes through ?json_string?no_esc: ?json_string also escapes
-     "</", which keeps the script element closed. -->
-<#import "frame.ftl" as frame>
+<#-- Proposed: the Axis page that asks a person who signed in through their organization to review the profile it gave, from the user profile's fields. -->
+<#import "frame.ftl" as axis>
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
-<@frame.head title=msg("axisReviewProfileTitle")/>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${msg("axisReviewProfileTitle")}</title>
+  <link rel="stylesheet" href="${url.resourcesPath}/assets/axis-sign-in.css">
+</head>
 <body>
-  <#-- Whether any field has an error. A field's error shows under the field, so the page shows only an error that
-       belongs to no field above the form. -->
-  <#assign fieldError = false>
-  <#list profile.attributes as a>
-    <#if messagesPerField.existsError(a.name)><#assign fieldError = true></#if>
-  </#list>
   <div id="root"></div>
   <script type="application/json" id="axis-sign-in-context">
   {
-    "page": "reviewProfile",
     "title": "${msg("axisReviewProfileTitle")?json_string?no_esc}",
-    <@frame.realmName/>
-    <#if message?? && message.type != 'error'>
-    "notice": "${message.summary?json_string?no_esc}",
-    <#elseif message?? && !fieldError>
+    <@axis.realmName/>
+    <#if message?? && message.type == 'error'>
     "error": "${message.summary?json_string?no_esc}",
+    <#elseif message??>
+    "notice": "${message.summary?json_string?no_esc}",
     </#if>
     "loginAction": "${url.loginAction?json_string?no_esc}",
+    <#assign shown = []>
+    <#assign hiddenFields = []>
+    <#list profile.attributes as attribute>
+      <#if attribute.name == 'locale'>
+        <#assign hiddenFields = hiddenFields + [attribute]>
+      <#else>
+        <#assign shown = shown + [attribute]>
+      </#if>
+    </#list>
     "fields": [
-      <#list profile.attributes as a>
-      {
-        "name": "${a.name?json_string?no_esc}",
-        "label": "${advancedMsg(a.displayName!'')?json_string?no_esc}",
-        <#if a.value?has_content>
-        "value": "${a.value?json_string?no_esc}",
-        </#if>
-        <#if a.autocomplete?has_content>
-        "autoComplete": "${a.autocomplete?json_string?no_esc}",
-        </#if>
-        <#if messagesPerField.existsError(a.name)>
-        "error": "${messagesPerField.get(a.name)?json_string?no_esc}",
-        </#if>
-        "required": ${a.required?c},
-        "readOnly": ${a.readOnly?c}
-      }<#sep>,</#sep>
+      <#list shown as attribute>
+      { "name": "${attribute.name?json_string?no_esc}", "label": "${advancedMsg(attribute.displayName!attribute.name)?json_string?no_esc}",
+        "value": "${(attribute.value!'')?json_string?no_esc}", "required": ${attribute.required?c}, "readOnly": ${attribute.readOnly?c},
+        "type": "<#if ((attribute.annotations.inputType)!'')?contains('email') || attribute.name == 'email'>email<#else>text</#if>"<#if messagesPerField.existsError(attribute.name)>,
+        "error": "${messagesPerField.get(attribute.name)?json_string?no_esc}"</#if> }<#sep>,</#sep>
       </#list>
     ],
-    <@frame.locales/>
-    <@frame.texts/>
+    "hidden": { <#if (locale.currentLanguageTag)?has_content && hiddenFields?has_content>"locale": "${locale.currentLanguageTag?json_string?no_esc}"</#if> },
+    "cancellable": ${(isAppInitiatedAction??)?c},
     "texts": {
-      "submit": "${msg("axisSaveProfile")?json_string?no_esc}",
-      "fieldRequired": "${msg("axisFieldRequired", "{field}")?json_string?no_esc}"
-    }
+      "title": "${msg("axisReviewProfileTitle")?json_string?no_esc}",
+      "message": "${msg("axisProfileMessage")?json_string?no_esc}",
+      "required": "${msg("axisFieldRequired")?json_string?no_esc}",
+      "submit": "${msg("axisProfileSubmit")?json_string?no_esc}",
+      "cancel": "${msg("axisCancel")?json_string?no_esc}"
+    },
+    <@axis.preferences/>
+    <@axis.legal/>
+    "page": "profile"
   }
   </script>
   <script type="module" src="${url.resourcesPath}/assets/axis-sign-in.js"></script>

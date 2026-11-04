@@ -7,13 +7,13 @@ import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /**
- * The slim footer across the bottom of every site. At the start it holds the copyright, with the server's version
- * for a signed-in person only. At the end it holds the legal line: Privacy and Terms when `legal` gives their
- * addresses, and Licences always.
+ * The slim footer across the bottom of every site: the copyright, with the server's version for a
+ * signed-in person only, and the legal links. Proposed: no server readiness, which the footer read once at load and
+ * so could read Ready while the server was down; a page that cannot reach the server says so where it fails.
  */
 export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
-  const { colour, spacing } = useDesignTokens()
   const t = useText()
+  const { colour, spacing } = useDesignTokens()
   const [year] = useState(() => new Date().getFullYear())
   // `null` when nobody is signed in, `undefined` while it loads or when loading failed.
   const [version, setVersion] = useState<string | null | undefined>(undefined)
@@ -42,15 +42,15 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
       <LegalLine
         copyright={copyright}
         links={{
-          privacyUrl: legal?.privacyUrl ?? undefined,
-          termsUrl: legal?.termsUrl ?? undefined,
-          licencesUrl: '/licences',
-          texts: {
-            legal: t('shell.legal.label'),
-            privacy: t('shell.legal.privacy'),
-            terms: t('shell.legal.terms'),
-            licences: t('shell.legal.licences'),
-          },
+          privacy: legal?.privacyUrl ?? undefined,
+          terms: legal?.termsUrl ?? undefined,
+          licences: '/licences',
+        }}
+        texts={{
+          label: t('shell.legal.label'),
+          privacy: t('shell.legal.privacy'),
+          terms: t('shell.legal.terms'),
+          licences: t('shell.legal.licences'),
         }}
       />
     </Layout.Footer>

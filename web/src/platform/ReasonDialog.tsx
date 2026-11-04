@@ -2,6 +2,7 @@ import { Alert, Flex, Form, Input, Modal } from 'antd'
 import { useState, type ReactNode } from 'react'
 import type { CommandResult } from './inspection'
 import { useText } from './texts'
+import { dialogWidth } from './dialogButtons'
 
 const reasonMaxLength = 500
 
@@ -48,6 +49,7 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
 
   return (
     <Modal
+      width={dialogWidth('medium')}
       open
       title={title}
       okText={t('shell.inspector.commands.send')}

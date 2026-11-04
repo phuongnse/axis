@@ -12,8 +12,6 @@ import {
   putStudioTexts,
   releaseRows,
   ServerUnreachableError,
-  studioAppDescription,
-  studioAppTitle,
   type StudioReleaseItem,
   type StudioReleases,
   type StudioNames,
@@ -358,24 +356,5 @@ describe('previewSiteUrl', () => {
     expect(previewSiteUrl('preview.example.test', 'leave', { protocol: 'https:', port: '' })).toBe(
       'https://preview.example.test/leave',
     )
-  })
-})
-
-describe('studioAppTitle and studioAppDescription', () => {
-  const app = { name: 'Leave', titles: { en: 'Leave requests', vi: 'Nghỉ phép' }, descriptions: { en: 'Time off.' } }
-
-  it('take the text of the locale', () => {
-    expect(studioAppTitle(app, 'vi')).toBe('Nghỉ phép')
-    expect(studioAppDescription({ ...app, descriptions: { en: 'Time off.', vi: 'Nghỉ.' } }, 'vi')).toBe('Nghỉ.')
-  })
-
-  it('fall back to en, and the title then to the name', () => {
-    expect(studioAppTitle(app, 'de')).toBe('Leave requests')
-    expect(studioAppDescription(app, 'vi')).toBe('Time off.')
-    expect(studioAppTitle({ name: 'Leave', titles: {}, descriptions: {} }, 'en')).toBe('Leave')
-  })
-
-  it('give no description when there is none', () => {
-    expect(studioAppDescription({ name: 'Leave', titles: {}, descriptions: {} }, 'en')).toBeNull()
   })
 })

@@ -1,24 +1,23 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, Layout, Typography } from 'antd'
+import { Button, ConfigProvider, Flex, Layout, Menu, Typography } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { AppSwitcher } from './AppSwitcher'
 import { AxisButton } from './AxisButton'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
+import { navigationIcon } from './navigationIcons'
 import { NotificationBell } from './NotificationBell'
 import { PreferencesMenu } from './PreferencesMenu'
+import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
-import { ShellNavigation } from './ShellNavigation'
-import { ShellSidebarContext } from './shellSidebarContext'
+import { ShellSidebarContext } from './shellSidebar'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem, SiteLegal } from './site'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
 import { useNarrowWidth } from './useNarrowWidth'
-
-const headerHeight = 48
 
 interface ShellProps {
   titleKey: string
@@ -28,7 +27,7 @@ interface ShellProps {
   onLocaleChange: (locale: string) => void
   /** Where the notification bell reads, set on an application site. Without it the header has no bell. */
   notifications?: { path: string; sitePath: string }
-  /** The privacy and terms links the footer shows, from the site the shell shows. */
+  /** Proposed: the site's privacy policy and terms, which the footer links. */
   legal?: SiteLegal | null
   children: ReactNode
 }
@@ -54,13 +53,11 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
 /**
  * The layout of every site, the platform site and application sites alike. A 48 px header holds the
  * collapse button, the site's mark and title, the notification bell, the app switcher, the language
- * and theme menu and the account button. The page keeps the browser's scroll, while the header stays at the top
- * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
- * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
- * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * A footer runs across the bottom, with the copyright at the start and the legal links at the end. Ant Design components and dayjs follow the locale. At narrow width, below
- * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
- * there is no sidebar. The app switcher stays in the header.
+ * and theme menu and the account button. A site with two or more navigation entries has a sidebar of icons and
+ * labels that collapses to a strip of icons. A footer runs across the bottom, under the content only beside a sidebar. Ant Design components
+ * and dayjs follow the locale. At narrow width, below 992 px, the navigation and the language and
+ * theme menu sit in a panel that a Menu button opens and closes, and there is no sidebar. The app
+ * switcher stays in the header.
  */
 export function Shell({
   titleKey,
@@ -84,29 +81,32 @@ export function Shell({
   const toggle = useRef<HTMLButtonElement>(null)
   // The sidebar stays collapsed or open while the person moves between pages, as the shell stays mounted.
   const [collapsed, setCollapsed] = useState(false)
-  // A page claims the sidebar by rendering ShellSidebar, which draws its content into `target`.
-  const [claims, setClaims] = useState(0)
-  const [target, setTarget] = useState<HTMLElement | null>(null)
-  const claim = useCallback(() => {
-    setClaims((count) => count + 1)
-    return () => setClaims((count) => count - 1)
-  }, [])
-  const claimed = claims > 0
+  // Proposed: a page with its own navigation claims the sidebar and draws in `pageSidebarSlot`.
+  const [pageSidebar, setPageSidebar] = useState(false)
+  const [pageSidebarSlot, setPageSidebarSlot] = useState<HTMLElement | null>(null)
+  // Proposed: a page with its own navigation is a workspace, drawn compact: spacing-md round its content.
+  const contentPadding = pageSidebar ? spacing.md : spacing.lg
   const sidebarContext = useMemo(
-    () => ({ target, collapsed: collapsed && !narrow, claim }),
-    [target, collapsed, narrow, claim],
+    () => ({ slot: pageSidebarSlot, collapsed: collapsed && !narrow, claim: setPageSidebar, contentPadding }),
+    [pageSidebarSlot, collapsed, narrow, contentPadding],
   )
-  const hasSidebar = claimed || navigation.length > 1
+  const hasSidebar = navigation.length > 1 || pageSidebar
   const sidebar = hasSidebar && !narrow
   const home = navigation[0]?.path ?? '/'
-  const entries = navigation.map((item) => ({ ...item, label: t(item.labelKey) }))
-  // The page's own navigation, or the site's.
-  const navigationContent = (iconsOnly: boolean) =>
-    claimed ? (
-      <div ref={setTarget} />
-    ) : (
-      <ShellNavigation entries={entries} activeKey={activeKey} collapsed={iconsOnly} />
-    )
+  // Proposed: an entry is its label while the sidebar is open and its icon, centred, while it is collapsed, where a
+  // tooltip names it, as an action has text or an icon, never both.
+  const items = navigation.map((item) => {
+    const Icon = navigationIcon(item.icon)
+    return {
+      key: item.key,
+      icon: collapsed && !narrow ? <Icon aria-hidden /> : undefined,
+      label: (
+        <Link to={item.path} aria-current={item.key === activeKey ? 'page' : undefined}>
+          {t(item.labelKey)}
+        </Link>
+      ),
+    }
+  })
   const preferences = <PreferencesMenu locales={locales} locale={locale} onLocaleChange={onLocaleChange} />
 
   const bell = notifications && (
@@ -126,25 +126,22 @@ export function Shell({
     dayjs.locale(dayjsLocaleFor(locale))
   }, [locale])
 
-  // This provider sets the locale, and the tighter menu items while a page claims the sidebar, as the page draws its
-  // own navigation there. It inherits the rest of the theme from the provider in theme.tsx.
+  // This provider sets only the locale. It inherits the theme from the provider in theme.tsx.
   return (
-    <div data-theme-mode={mode} style={{ colorScheme: mode }}>
-      <ConfigProvider
-        locale={antLocaleFor(locale)}
-        theme={claimed ? { components: { Menu: { itemHeight: 32 } } } : undefined}
-      >
+    <div data-theme-mode={mode}>
+      <ConfigProvider locale={antLocaleFor(locale)}>
         {/* A design-system frame sets --shell-min-height to its own height, so its states fit their card. */}
         <Layout style={{ minHeight: 'var(--shell-min-height, 100vh)' }}>
           <Layout.Header
             style={{
+              // Proposed: the header stays at the top while the page scrolls under it.
               position: 'sticky',
               top: 0,
               zIndex: 10,
               display: 'flex',
               alignItems: 'center',
               gap: spacing.sm,
-              height: headerHeight,
+              height: sizeTokens.bar,
               lineHeight: 'normal',
               paddingInline: spacing.md,
               background: colour.surface,
@@ -205,7 +202,16 @@ export function Shell({
                 borderBottom: `1px solid ${colour.borderSubtle}`,
               }}
             >
-              {navigationContent(false)}
+              {pageSidebar ? (
+                <div ref={setPageSidebarSlot} />
+              ) : (
+                <Menu
+                  mode="inline"
+                  style={{ borderInlineEnd: 'none' }}
+                  selectedKeys={activeKey ? [activeKey] : []}
+                  items={items}
+                />
+              )}
               {preferences}
             </nav>
           )}
@@ -220,24 +226,42 @@ export function Shell({
                 trigger={null}
                 style={{ background: colour.surface, borderInlineEnd: `1px solid ${colour.borderSubtle}` }}
               >
-                <nav
-                  aria-label={t('shell.navigation.menu')}
+                {/* Proposed: the sidebar's background runs the page's height, and its navigation stays under the header
+                    while the page scrolls, with a scroll of its own when it is taller than the window. */}
+                <div
                   style={{
                     position: 'sticky',
-                    top: headerHeight,
-                    maxHeight: `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`,
+                    top: sizeTokens.bar,
+                    maxHeight: `calc(100vh - ${sizeTokens.bar}px)`,
                     overflowY: 'auto',
+                    // Proposed: its scrollbar is the page's own, as the colour scheme draws it, so the two match.
                   }}
                 >
-                  {navigationContent(collapsed)}
-                </nav>
+                  {pageSidebar ? (
+                    <div ref={setPageSidebarSlot} />
+                  ) : (
+                    <nav aria-label={t('shell.navigation.menu')}>
+                      <Menu
+                        mode="inline"
+                        style={{ borderInlineEnd: 'none' }}
+                        selectedKeys={activeKey ? [activeKey] : []}
+                        items={items}
+                      />
+                    </nav>
+                  )}
+                </div>
               </Layout.Sider>
             )}
-            <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
-              <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
-            </Layout.Content>
+            {/* Proposed: beside a sidebar the footer sits under the content only, so the sidebar runs to the bottom of
+                the page and its navigation, which stays under the header, is never pushed up nor cut short. */}
+            <Layout>
+              <Layout.Content style={{ padding: contentPadding }}>
+                <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
+              </Layout.Content>
+              {sidebar && <ShellFooter legal={legal} />}
+            </Layout>
           </Layout>
-          <ShellFooter legal={legal} />
+          {!sidebar && <ShellFooter legal={legal} />}
         </Layout>
       </ConfigProvider>
     </div>

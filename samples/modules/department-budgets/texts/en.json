@@ -27,6 +27,13 @@
     "department-budgets.budgetApproval.approve": "Approve",
     "department-budgets.budgetApproval.reject": "Reject",
     "department-budgets.roles.approver": "Budget approver",
-    "department-budgets.roles.administrator": "Organization administrator"
+    "department-budgets.roles.administrator": "Organization administrator",
+    "department-budgets.contract.budget.draft": "Draft",
+    "department-budgets.contract.budget.approved": "Approved",
+    "department-budgets.contract.budget.rejected": "Rejected",
+    "department-budgets.contract.budget.approve": "Approve",
+    "department-budgets.contract.budget.reject": "Reject",
+    "department-budgets.contract.budget.amountFrozenOnceDecided": "Amount locked once decided",
+    "department-budgets.contract.budget.decisionRecorded": "Decision recorded"
   }
 }

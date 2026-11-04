@@ -1,6 +1,8 @@
 import { ConfigProvider } from 'antd'
+import { dialogButtons } from '../platform/dialogButtons'
+import { fieldErrors } from '../platform/fieldErrors'
 import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
-import { antConfigFor, fieldRules } from '../platform/antTheme'
+import { antThemeFor } from '../platform/antTheme'
 import { designTokensFor, pageTokenPropertyNames, type PageTokenValues } from '../platform/designTokens'
 import { ThemeModeContext, type ThemeMode } from '../platform/themeMode'
 import { useReducedMotion } from '../platform/useReducedMotion'
@@ -49,12 +51,11 @@ export function PageTheme({ children }: { children: ReactNode }) {
     [mode, values],
   )
   const reducedMotion = useReducedMotion()
-  const config = useMemo(() => antConfigFor(mode, values, reducedMotion), [mode, values, reducedMotion])
+  const config = useMemo(() => antThemeFor(mode, values, reducedMotion), [mode, values, reducedMotion])
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider {...config}>
-        <style>{fieldRules(mode, values)}</style>
+      <ConfigProvider theme={config} modal={dialogButtons} form={fieldErrors}>
         {children}
       </ConfigProvider>
     </ThemeModeContext.Provider>

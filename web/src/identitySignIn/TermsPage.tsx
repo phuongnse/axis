@@ -1,45 +1,46 @@
 import { Alert, Button, Checkbox, Form, Typography } from 'antd'
-import { useId, useRef } from 'react'
-import { useDesignTokens } from '../platform/themeMode'
+import { Fragment, useId, useRef, type ReactNode } from 'react'
 import { IdentityFrame } from './IdentityFrame'
 import type { TermsContext } from './signInContext'
 
+/** The sentence with `{terms}` and `{privacy}` replaced by links that open in a new tab, so the form keeps its state. */
+function withLinks(sentence: string, links: Record<string, ReactNode>): ReactNode[] {
+  return sentence.split(/(\{terms\}|\{privacy\})/).map((part, index) => {
+    const link = links[part]
+    return <Fragment key={index}>{link ?? part}</Fragment>
+  })
+}
+
 /**
- * The page of Keycloak's Terms and Conditions step, which a tenant's first sign-in opens when the tenant sets terms. One
- * required checkbox names the Terms of service and the Privacy policy as links to the tenant's addresses, which open in a
- * new tab so the person keeps the step. A tenant with no privacy policy names only the Terms of service. It is a real
- * `<form method="post">` to the login address. Continue posts `accept=true` once the box is ticked, and the browser stops
- * a Continue with the box unticked. A second form below posts `cancel=true`, which Keycloak treats as Decline and answers
- * with `error=access_denied`.
+ * Proposed: the terms page, which Keycloak's "Terms and Conditions" required action shows after a person's first
+ * sign-in and again when the tenant's terms change version. It names the tenant's terms of service and privacy policy
+ * as links in one required checkbox; a site's own links change only the legal line under the card. Continue is a real
+ * `<form method="post">` to the login address with `accept`, and Keycloak records when the person accepted. "Decline and sign out" posts `cancel`, which ends the sign-in. The legal
+ * links stay under the card, as on every page.
  */
 export function TermsPage({ context }: { context: TermsContext }) {
-  const { texts, error, loginAction, termsUrl, privacyUrl } = context
-  const { colour } = useDesignTokens()
+  const { texts, error, loginAction, legal, accept } = context
   const formId = useId()
+  const [form] = Form.useForm<{ agree?: boolean }>()
   const submitRef = useRef<HTMLInputElement>(null)
-  const link = (label: string, href: string | undefined) =>
-    href ? (
-      <Typography.Link href={href} target="_blank" rel="noopener noreferrer" style={{ color: colour.primaryText }}>
-        {label}
-      </Typography.Link>
-    ) : (
-      label
-    )
-  const label = (privacyUrl ? texts.accept : texts.acceptTermsOnly)
-    .split(/(\{terms\}|\{privacy\})/)
-    .map((part, index) => {
-      if (part === '{terms}') {
-        return <span key={index}>{link(texts.termsOfService, termsUrl)}</span>
-      }
-      if (part === '{privacy}') {
-        return <span key={index}>{link(texts.privacyPolicy, privacyUrl)}</span>
-      }
-      return part
-    })
+  const link = (href: string, label: string) => (
+    <Typography.Link href={href} target="_blank" rel="noreferrer">
+      {label}
+    </Typography.Link>
+  )
+  const { privacy, terms } = accept
+  const sentence = terms && privacy ? texts.agreeBoth : terms ? texts.agreeTerms : texts.agreePrivacy
+  const label = withLinks(sentence, {
+    '{terms}': terms ? link(terms, texts.termsLink) : null,
+    '{privacy}': privacy ? link(privacy, texts.privacyLink) : null,
+  })
+
   return (
-    <IdentityFrame title={texts.title} frame={context}>
+    <IdentityFrame title={texts.title} organization={context.realmName} preferences={context.preferences} legal={legal}>
+      <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
       {error && <Alert type="error" showIcon title={error} />}
       <Form
+        form={form}
         name={formId}
         method="post"
         action={loginAction}
@@ -49,24 +50,24 @@ export function TermsPage({ context }: { context: TermsContext }) {
         onFinish={() => submitRef.current?.form?.submit()}
       >
         <Form.Item
-          name="accept"
+          name="agree"
           valuePropName="checked"
           rules={[
             {
-              validator: (_, value) => (value === true ? Promise.resolve() : Promise.reject(new Error(texts.required))),
+              validator: (_, value) => (value ? Promise.resolve() : Promise.reject(new Error(texts.agreeRequired))),
             },
           ]}
         >
-          <Checkbox>{label}</Checkbox>
+          <Checkbox aria-required>{label}</Checkbox>
         </Form.Item>
-        <input ref={submitRef} type="hidden" name="accept" value="true" />
+        <input ref={submitRef} type="hidden" name="accept" value="accept" />
         <Button type="primary" htmlType="submit" block>
-          {texts.continue}
+          {texts.accept}
         </Button>
       </Form>
       <form method="post" action={loginAction}>
-        <input type="hidden" name="cancel" value="true" />
-        <Button htmlType="submit" block>
+        <input type="hidden" name="cancel" value="cancel" />
+        <Button type="link" htmlType="submit" style={{ paddingInline: 0 }}>
           {texts.decline}
         </Button>
       </form>

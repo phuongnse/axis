@@ -104,24 +104,25 @@ export async function checkStudioExpression(
   return (await response.json()) as ExpressionCheck
 }
 
-/**
- * An application in the list of `GET /api/studio/apps`. `titles` and `descriptions` map a locale to a text and are
- * empty when the folder gives none.
- */
+/** An application in the list of `GET /api/studio/apps`. */
 export interface StudioApplication {
   name: string
-  titles: Record<string, string>
-  descriptions: Record<string, string>
+  /** Proposed: the application's title per locale, from its `label`, as the home page shows it. */
+  titles?: Record<string, string> | null
+  /** Proposed: the application's description per locale, or none when it declares none. */
+  descriptions?: Record<string, string> | null
 }
 
-/** The title of an application in `locale`, then in `en`, then its `name`. */
-export function studioAppTitle(app: StudioApplication, locale: string): string {
-  return app.titles[locale] ?? app.titles.en ?? app.name
+/** Proposed: the application's title in `locale`, else in its first locale, else its name. */
+export function studioApplicationTitle(app: StudioApplication, locale: string): string {
+  const titles = app.titles ?? {}
+  return titles[locale] ?? Object.values(titles)[0] ?? app.name
 }
 
-/** The description of an application in `locale`, then in `en`, or null when it has none. */
-export function studioAppDescription(app: StudioApplication, locale: string): string | null {
-  return app.descriptions[locale] ?? app.descriptions.en ?? null
+/** Proposed: the application's description in `locale`, else in its first locale, or undefined. */
+export function studioApplicationDescription(app: StudioApplication, locale: string): string | undefined {
+  const descriptions = app.descriptions ?? {}
+  return descriptions[locale] ?? Object.values(descriptions)[0]
 }
 
 /**
@@ -151,6 +152,10 @@ export interface StudioResourceItem {
   file: string
   version: string
   usedBy: number
+  /** Proposed: the resource's label in each locale that holds its key, or null when it has none. */
+  titles?: Record<string, string> | null
+  /** Proposed: the locale a text resource holds, or null for every other kind. */
+  locale?: string | null
 }
 
 /** A resource with its content, as `GET /api/studio/apps/{application}/resources/{id}` answers. */
@@ -816,6 +821,48 @@ export interface StudioRelaxedPoint {
   module: string
   point: string
   reason: string
+  /** Proposed: the module's label, from the module files the release stores, or null when it has none. */
+  moduleTitle?: string | null
+  /** Proposed: what the point is, or null for a point the release's contracts no longer have. */
+  part?: 'transition' | 'initial' | 'deletable' | 'validation' | 'effect' | 'ceiling' | 'others' | null
+  /** Proposed: the entity's label per locale. */
+  entityTitles?: Record<string, string> | null
+  /** Proposed: the label per locale of the transition, state, validation, effect or role slot the point names. */
+  titles?: Record<string, string> | null
+  /** Proposed: the id of the module contract that holds the point, whose page relaxes it. */
+  contractId?: string | null
+}
+
+/** Proposed: the relaxed points of the folder's application.json, in words, from `GET .../relaxed`. */
+export async function fetchStudioRelaxed(application: string, signal?: AbortSignal): Promise<StudioRelaxedPoint[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/relaxed`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRelaxedPoint[]
+}
+
+/**
+ * Proposed: a relaxed point in words: its module's label, its own label and a line that says what kind of point it is
+ * and on which entity, as Studio never shows a technical name. A point the release has no label for keeps the name as
+ * written, which the issue's required `label` on every named part of a contract leaves for older releases alone.
+ */
+export function relaxedPointWords(
+  point: StudioRelaxedPoint,
+  locale: string,
+  t: (key: string) => string,
+): { module: string; title: string; kind: string | null } {
+  const pick = (titles: Record<string, string> | null | undefined) => titles?.[locale] ?? titles?.en
+  const segments = point.point.split('/')
+  const entity = pick(point.entityTitles) ?? segments[0]
+  const title =
+    point.part === 'others' ? t('shell.studio.relaxed.others') : (pick(point.titles) ?? segments[2] ?? point.point)
+  return {
+    module: point.moduleTitle ?? point.module,
+    title,
+    kind: point.part ? t(`shell.studio.relaxed.part.${point.part}`).replace('{entity}', entity) : null,
+  }
 }
 
 /**
@@ -845,6 +892,20 @@ export interface StudioReleases {
   active: { releaseId: string; number: number; contentHash: string } | null
   folderContentHash: string | null
   items: StudioReleaseItem[]
+  /**
+   * Proposed: the files of the folder that differ from the live release, by path. A removed file, which the folder no
+   * longer holds, also has its kind, name, label in each locale and a text resource's locale, from the live release.
+   */
+  changes?:
+    | {
+        path: string
+        change: 'added' | 'changed' | 'removed'
+        kind?: string | null
+        name?: string | null
+        titles?: Record<string, string> | null
+        locale?: string | null
+      }[]
+    | null
 }
 
 /** A row of the release list. `active` is set on one row only. */
@@ -955,6 +1016,62 @@ export async function fetchStudioRequest(
 }
 
 /** Loads the release history of an application. A 401 shows the sign-in prompt and throws, as any other failure does. */
+/** Proposed: a file that differs between two versions of an application, named from the side that holds it. */
+export interface StudioFileChange {
+  path: string
+  change: 'added' | 'changed' | 'removed'
+  kind?: string | null
+  name?: string | null
+  titles?: Record<string, string> | null
+  locale?: string | null
+}
+
+/** Proposed: a module or package a release pins; `previousVersion` is empty when the previous release had none. */
+export interface StudioReleasePart {
+  id: string
+  label?: string | null
+  version: string
+  previousVersion?: string | null
+}
+
+/** Proposed: one release's page, from `GET /api/studio/apps/{application}/releases/{number}`. */
+export interface StudioReleaseDetail {
+  number: number
+  /** Proposed: the release it is compared with: the live one when this release is not live, else the one below it. */
+  previous: number | null
+  previousIsLive?: boolean
+  changes: StudioFileChange[]
+  modules: StudioReleasePart[]
+  packages: StudioReleasePart[]
+  /** Proposed: the live release's number, or null when this release is live or none is. */
+  live?: number | null
+  /** Proposed: the modules that stop this release from replacing the live one; empty when it can. */
+  blockers?: { module: string; label?: string | null; liveVersion: string; version?: string | null }[]
+  /** Proposed: the modules and packages that differ from the previous release. */
+  partChanges?: {
+    type: 'module' | 'package'
+    id: string
+    label?: string | null
+    change: 'added' | 'removed' | 'upgraded' | 'downgraded'
+    version?: string | null
+    previousVersion?: string | null
+  }[]
+}
+
+/** Proposed: loads what one release holds beyond its history row. */
+export async function fetchStudioRelease(
+  application: string,
+  number: number,
+  signal?: AbortSignal,
+): Promise<StudioReleaseDetail> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${number}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioReleaseDetail
+}
+
 export async function fetchStudioReleases(application: string, signal?: AbortSignal): Promise<StudioReleases> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/releases`
   const response = await studioFetch(path, { signal })
@@ -979,6 +1096,59 @@ export function releaseRows(history: StudioReleases): StudioReleaseRow[] {
   })
 }
 
+/**
+ * Proposed: one release of the history. `published` is its first activation, `label` and `note` are the ones its
+ * publish gave, and `live` marks the active release.
+ */
+export interface StudioReleaseGroup {
+  releaseId: string
+  number: number
+  label: string | null
+  note: string | null
+  published: StudioReleaseItem
+  live: boolean
+  relaxed: StudioRelaxedPoint[]
+}
+
+/** Proposed: the release list as one row per release, the highest number first, so a release activated again shows once. */
+export function releaseGroups(history: StudioReleases): StudioReleaseGroup[] {
+  const byRelease = new Map<string, StudioReleaseItem[]>()
+  for (const item of history.items) {
+    byRelease.set(item.releaseId, [...(byRelease.get(item.releaseId) ?? []), item])
+  }
+  return [...byRelease.entries()]
+    .map(([releaseId, items]) => {
+      const oldestFirst = items.toSorted((left, right) => Date.parse(left.activatedAt) - Date.parse(right.activatedAt))
+      return {
+        releaseId,
+        number: oldestFirst[0].number,
+        label: oldestFirst.find((item) => item.label)?.label ?? null,
+        note: oldestFirst.find((item) => item.note)?.note ?? null,
+        published: oldestFirst[0],
+        live: history.active?.releaseId === releaseId,
+        relaxed: oldestFirst[0].relaxed,
+      }
+    })
+    .sort((left, right) => right.number - left.number)
+}
+
+/**
+ * Proposed: who activated a release, in words: the person's name, the system for the server's activation at startup, or
+ * the platform operator. A user id with no name left is "someone no longer known", so Studio never shows an id.
+ */
+export function releaseActorName(
+  release: { actor: string; actorName?: string | null },
+  t: (key: string) => string,
+): string {
+  if (release.actorName) {
+    return release.actorName
+  }
+  if (release.actor === 'startup' || release.actor === 'operator') {
+    return t(`shell.studio.releases.actor.${release.actor}`)
+  }
+  return t('shell.studio.releases.actor.unknown')
+}
+
 /** Whether a release is active and the folder compiles to other content than that release. */
 export function folderDiffers(history: StudioReleases): boolean {
   return (
@@ -989,23 +1159,43 @@ export function folderDiffers(history: StudioReleases): boolean {
 }
 
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */
-export function filterResources(items: StudioResourceItem[], search: string): StudioResourceItem[] {
+export function filterResources(items: StudioResourceItem[], search: string, locale = 'en'): StudioResourceItem[] {
   const needle = search.trim().toLowerCase()
   if (needle === '') {
     return items
   }
   return items.filter(
-    (item) => item.id.toLowerCase().includes(needle) || (item.name?.toLowerCase().includes(needle) ?? false),
+    (item) =>
+      item.id.toLowerCase().includes(needle) ||
+      (item.name?.toLowerCase().includes(needle) ?? false) ||
+      resourceTitle(item, locale).toLowerCase().includes(needle),
   )
 }
 
-/** The text a resource shows in the list: its name, or its file when it has none. */
-export function resourceTitle(item: StudioResourceItem): string {
-  return item.name ?? item.file
+/**
+ * Proposed: the text Studio names a resource by: its label in the author's locale, then in English, for a resource that
+ * has one. A text resource is named by its language, in the author's language. A resource with no label, which only
+ * authors see, is named by the name its author gave, or its file.
+ */
+export function resourceTitle(
+  item: Pick<StudioResourceItem, 'file' | 'name' | 'titles' | 'locale'>,
+  locale = 'en',
+): string {
+  if (item.locale) {
+    try {
+      const name = new Intl.DisplayNames([locale], { type: 'language' }).of(item.locale)
+      if (name && name !== item.locale) {
+        return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1)
+      }
+    } catch {
+      // An invalid tag has no name.
+    }
+  }
+  return item.titles?.[locale] ?? item.titles?.en ?? item.name ?? item.file
 }
 
 /** Groups resources by kind. Kinds are sorted ordinally, and each group's items by name, or by file when a resource has no name. */
-export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
+export function groupByKind(items: StudioResourceItem[], locale = 'en'): ResourceGroup[] {
   const groups = new Map<string, StudioResourceItem[]>()
   for (const item of items) {
     const group = groups.get(item.kind)
@@ -1019,7 +1209,9 @@ export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
     .sort(([left], [right]) => compareOrdinal(left, right))
     .map(([kind, members]) => ({
       kind,
-      items: members.toSorted((left, right) => compareOrdinal(resourceTitle(left), resourceTitle(right))),
+      items: members.toSorted((left, right) =>
+        compareOrdinal(resourceTitle(left, locale), resourceTitle(right, locale)),
+      ),
     }))
 }
 
@@ -1073,4 +1265,64 @@ export function moduleResources(names: StudioNames | null, search: string): Modu
 
 function compareOrdinal(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
+}
+
+/** Proposed: a slot of a module, by name, with its label in each locale. */
+export interface StudioCatalogSlot {
+  name: string
+  titles: Record<string, string>
+}
+
+/** Proposed: the modules and packages installed for Studio, from `GET /api/studio/catalog`. */
+export interface StudioCatalog {
+  modules: {
+    id: string
+    label: string
+    versions: string[]
+    roles: StudioCatalogSlot[]
+    connectors: StudioCatalogSlot[]
+  }[]
+  packages: { id: string; label: string | null; versions: string[] }[]
+  /** Proposed: the time zones the server knows, by IANA id, with their offset from UTC in minutes now. */
+  timeZones?: { id: string; offset: number }[]
+}
+
+/** Proposed: loads the modules and packages Studio offers. */
+export async function fetchStudioCatalog(signal?: AbortSignal): Promise<StudioCatalog> {
+  const response = await studioFetch('/api/studio/catalog', { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '/api/studio/catalog' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioCatalog
+}
+
+/** Proposed: relaxed points by module, then by point, each by its words. */
+export function sortRelaxed(
+  points: readonly StudioRelaxedPoint[],
+  locale: string,
+  t: (key: string) => string,
+): StudioRelaxedPoint[] {
+  const collator = new Intl.Collator(document.documentElement.lang || 'en', { sensitivity: 'base', numeric: true })
+  const words = new Map(points.map((point) => [point, relaxedPointWords(point, locale, t)]))
+  return [...points].sort(
+    (a, b) =>
+      collator.compare(words.get(a)!.module, words.get(b)!.module) ||
+      collator.compare(words.get(a)!.title, words.get(b)!.title),
+  )
+}
+
+/** Proposed: the names of the tenant's deployment bindings by kind, never their values, from `GET /api/studio/bindings`. */
+export interface StudioBindingNames {
+  url: string[]
+  secret: string[]
+  storage: string[]
+}
+
+/** Proposed: loads the tenant's binding names. */
+export async function fetchStudioBindings(signal?: AbortSignal): Promise<StudioBindingNames> {
+  const response = await studioFetch('/api/studio/bindings', { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '/api/studio/bindings' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioBindingNames
 }

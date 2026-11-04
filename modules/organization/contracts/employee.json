@@ -7,24 +7,28 @@
   "validations": [
     {
       "name": "notOwnManager",
+      "label": { "textKey": "organization.contract.employee.notOwnManager" },
       "expression": "manager == null or manager != id",
       "message": { "textKey": "organization.employee.notOwnManager" },
       "field": "manager"
     },
     {
       "name": "notOwnDelegate",
+      "label": { "textKey": "organization.contract.employee.notOwnDelegate" },
       "expression": "delegate == null or delegate != id",
       "message": { "textKey": "organization.employee.notOwnDelegate" },
       "field": "delegate"
     },
     {
       "name": "delegateHasDates",
+      "label": { "textKey": "organization.contract.employee.delegateHasDates" },
       "expression": "delegate == null or (delegateFrom != null and delegateUntil != null)",
       "message": { "textKey": "organization.employee.delegateHasDates" },
       "field": "delegateFrom"
     },
     {
       "name": "delegateDatesInOrder",
+      "label": { "textKey": "organization.contract.employee.delegateDatesInOrder" },
       "expression": "delegateFrom == null or delegateUntil == null or delegateUntil >= delegateFrom",
       "message": { "textKey": "organization.employee.delegateDatesInOrder" },
       "field": "delegateUntil"
