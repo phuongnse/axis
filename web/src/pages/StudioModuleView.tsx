@@ -33,7 +33,7 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
 }
 
 /**
- * The view of a module resource, by its kind. An entity, a process, a policy and a text are edited as a layer, and so are the
+ * The view of a module resource, by its kind. An entity, a process, a policy, a text and a form are edited as a layer, and so are the
  * states and transitions that a contract takes from the application. A page has its own read-only view, and any other
  * kind, scenarios included, opens in the read-only JSON view. `diagnostics` are the folder's.
  */
@@ -59,6 +59,7 @@ export function ModuleResourceView({
     case 'process':
     case 'policy':
     case 'text':
+    case 'form':
       return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'contract':
       return (

@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Axis.Administration;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
@@ -38,9 +41,32 @@ namespace Axis.Server.CellApi;
 /// <c>tenant quotas set</c>, naming the keys of the request, or saves neither. The route passes no actor yet, so the record's
 /// <c>actor</c> column stays empty.
 /// </para>
+/// <para>
+/// <c>POST /api/cell/tenants/{id}/suspend</c> and <c>/resume</c> queue a job in <c>platform.jobs</c> and answer <c>202</c> with
+/// <c>{ id, kind, tenantId, state, createdAt }</c> and a <c>Location</c> header of the job. The publisher's job runner changes the
+/// tenant's status later. The jobs insert over the reader role. The job's <c>actor</c> is the operator's id, the subject of the
+/// token or the session. An unknown tenant or a preview tenant answers <c>404</c>. Then the <c>Idempotency-Key</c> header, one
+/// value of 1 to 255 characters, is needed: <c>400</c> without it, and no job is queued. For 24 hours the same key with the same
+/// kind, tenant and body, hashed with SHA-256, answers the first job again, and the same key with any other request answers
+/// <c>422</c>. The key is shared across the cell. A transaction lock on the key serializes parallel retries, so they queue one job.
+/// <c>GET /api/cell/jobs/{id}</c> answers the job with its <c>steps</c> and the <c>error</c> of a failed job, or <c>404</c>.
+/// </para>
 /// </summary>
 internal static class CellEndpoints
 {
+    private const string IdempotencyKeyHeader = "Idempotency-Key";
+
+    private const int MaxIdempotencyKeyLength = 255;
+
+    private static readonly TimeSpan _idempotencyWindow = TimeSpan.FromHours(24);
+
+    // The steps of each kind, as the publisher's job runner defines them, see ProvisioningJobs.Builtin.
+    private static readonly Dictionary<string, string[]> _jobSteps = new(StringComparer.Ordinal)
+    {
+        ["suspend"] = ["status"],
+        ["resume"] = ["status"],
+    };
+
     public static void MapCellEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var cell = endpoints.MapGroup("/api/cell")
@@ -49,6 +75,11 @@ internal static class CellEndpoints
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
+        cell.MapPost("/tenants/{id}/suspend", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
+            QueueJobAsync("suspend", id, http, dataSource, cancellationToken));
+        cell.MapPost("/tenants/{id}/resume", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
+            QueueJobAsync("resume", id, http, dataSource, cancellationToken));
+        cell.MapGet("/jobs/{id:guid}", GetJobAsync);
 
         // Sign-in and sign-out are the only routes that skip the operator policy. They keep the route marker, so the console
         // host serves them and tenant resolution has no second way through.
@@ -174,6 +205,89 @@ internal static class CellEndpoints
         return Results.Ok(new CellQuotasResponse(quotas));
     }
 
+    private static async Task<IResult> QueueJobAsync(
+        string kind,
+        string id,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
+        if (!await platform.Tenants.AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+        }
+
+        var values = httpContext.Request.Headers[IdempotencyKeyHeader];
+        if (values.Count != 1 || string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > MaxIdempotencyKeyLength)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: $"The request must carry an {IdempotencyKeyHeader} header of 1 to {MaxIdempotencyKeyLength} characters.");
+        }
+
+        var key = values[0]!;
+        using var body = new MemoryStream();
+        await httpContext.Request.Body.CopyToAsync(body, cancellationToken);
+        var hash = Convert.ToHexStringLower(SHA256.HashData([.. Encoding.UTF8.GetBytes($"{kind}\n{id}\n"), .. body.ToArray()]));
+
+        // The key index cannot be unique, as a key may be used again after the window, so the lock keeps two parallel retries from both inserting.
+        await platform.Database.ExecuteSqlAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended('axis-job:' || {key}, 0))",
+            cancellationToken);
+        var windowStart = DateTimeOffset.UtcNow - _idempotencyWindow;
+        var first = await platform.Jobs.AsNoTracking()
+            .Where(job => job.IdempotencyKey == key && job.CreatedAt > windowStart)
+            .OrderByDescending(job => job.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (first is not null)
+        {
+            if (first.RequestHash != hash)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    title: $"The {IdempotencyKeyHeader} was used before with another request.");
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return Accepted(first);
+        }
+
+        var job = new JobRow
+        {
+            Id = Guid.CreateVersion7(),
+            Kind = kind,
+            TenantId = id,
+            State = "queued",
+            Steps = JsonSerializer.Serialize(_jobSteps[kind].Select(name => new CellJobStepResponse(name, "pending", null)), JsonSerializerOptions.Web),
+            Actor = httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
+            IdempotencyKey = key,
+            RequestHash = hash,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        platform.Jobs.Add(job);
+        await platform.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Accepted(job);
+    }
+
+    private static IResult Accepted(JobRow job) =>
+        Results.Accepted($"/api/cell/jobs/{job.Id:D}", new CellJobResponse(job.Id, job.Kind, job.TenantId, job.State, job.CreatedAt));
+
+    private static async Task<IResult> GetJobAsync(Guid id, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        var job = await platform.Jobs.AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+        if (job is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No job has this id.");
+        }
+
+        var steps = JsonSerializer.Deserialize<List<CellJobStepResponse>>(job.Steps, JsonSerializerOptions.Web) ?? [];
+        return Results.Ok(new CellJobDetailResponse(job.Id, job.Kind, job.TenantId, job.State, job.CreatedAt, steps, job.Error));
+    }
+
     private static string? ValidateQuotas(CellQuotasRequest? request, Dictionary<string, long?> set, List<string> remove)
     {
         if (request is null || set.Count + remove.Count == 0)
@@ -253,3 +367,19 @@ internal sealed record CellQuotaResponse(long? Value, bool Overridden);
 
 /// <summary>The effective quotas of a tenant, keyed by quota key.</summary>
 internal sealed record CellQuotasResponse(IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
+
+/// <summary>A queued job of the provisioning API.</summary>
+internal sealed record CellJobResponse(Guid Id, string Kind, string TenantId, string State, DateTimeOffset CreatedAt);
+
+/// <summary>One job with its steps, in the order they run, and the <c>Error</c> of a failed job.</summary>
+internal sealed record CellJobDetailResponse(
+    Guid Id,
+    string Kind,
+    string TenantId,
+    string State,
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<CellJobStepResponse> Steps,
+    string? Error);
+
+/// <summary>One step of a job. <c>Error</c> is the refusal of a failed step.</summary>
+internal sealed record CellJobStepResponse(string Name, string State, string? Error);

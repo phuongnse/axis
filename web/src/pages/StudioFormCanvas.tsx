@@ -9,6 +9,7 @@ import { placeholderApi, placeholderId } from '../platform/placeholderApi'
 import { setApiGuard } from '../platform/api'
 import {
   fetchStudioFormMetadata,
+  fetchStudioModuleFormMetadata,
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioFormMetadataAnswer,
@@ -37,7 +38,7 @@ const fieldConditions: ConditionKey[] = ['visibleWhen', 'requiredWhen', 'readOnl
 
 /**
  * Draws the unsaved draft of a form with the site's own form widget. It posts the draft to the draft page metadata
- * route 300 ms after the last edit and redraws from the answer. While it is mounted, the widget's `/api/apps/` calls
+ * route 300 ms after the last edit, or of its module with `module`, and redraws from the answer. While it is mounted, the widget's `/api/apps/` calls
  * get placeholder data in the browser and none goes to the server, and the form opens the placeholder record, so every
  * field holds a placeholder value. A submit on the canvas does nothing, and a click only selects. A form with steps gets a step switch
  * that picks the step the canvas shows. No condition is evaluated, so every field and section shows. An element with
@@ -50,6 +51,7 @@ const fieldConditions: ConditionKey[] = ['visibleWhen', 'requiredWhen', 'readOnl
  */
 export function StudioFormCanvas({
   application,
+  module,
   resourceId,
   draft,
   selected,
@@ -59,6 +61,8 @@ export function StudioFormCanvas({
   aside,
 }: {
   application: string
+  /** The module whose form this is. The draft then goes to the module's draft route, which applies the layer. */
+  module?: string
   resourceId: string
   draft: Record<string, unknown>
   /** The pointer of the selected field, section or step, or null. */
@@ -89,7 +93,11 @@ export function StudioFormCanvas({
   useEffect(() => {
     const controller = new AbortController()
     const timer = setTimeout(() => {
-      fetchStudioFormMetadata(application, resourceId, draft, controller.signal).then(
+      const drawing =
+        module === undefined
+          ? fetchStudioFormMetadata(application, resourceId, draft, controller.signal)
+          : fetchStudioModuleFormMetadata(application, module, resourceId, draft, controller.signal)
+      drawing.then(
         (result) => setAnswer(result),
         (error: unknown) => {
           if (controller.signal.aborted) {
@@ -108,7 +116,7 @@ export function StudioFormCanvas({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [application, resourceId, draft, generation, lost])
+  }, [application, module, resourceId, draft, generation, lost])
 
   // A layout effect, because the widget fetches in passive effects. A child's effect runs before its parent's, so a
   // passive effect here would let the widget's first requests reach the server. Layout effects run before any of them.

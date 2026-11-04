@@ -4,6 +4,7 @@ import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import {
   entityKeyedLists,
+  formKeyedLists,
   layerMarks,
   policyKeyedLists,
   processKeyedLists,
@@ -32,6 +33,7 @@ import { StudioModulePolicy } from './StudioModulePolicy'
 import { TextTable } from './TextTable'
 
 const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
+const LazyStudioFormDesign = lazy(() => import('./StudioFormDesign'))
 
 type Content = Record<string, unknown>
 
@@ -46,10 +48,10 @@ interface Loaded {
 }
 
 /**
- * An editor of a module resource, for the `entity`, `process`, `policy` and `text` kinds. The resource opens with the application's layer applied
+ * An editor of a module resource, for the `entity`, `process`, `policy`, `text` and `form` kinds. The resource opens with the application's layer applied
  * and every input on. Save sends the whole entity to the module save route, which writes only the difference as the
  * layer. When the resource has a layer, a Customized tag and Reset all show, which delete the layer file, and the
- * entity designer, the process designer, the policy grants or the text table marks the elements the layer added, changed or removed, each with Reset to
+ * entity designer, the process designer, the policy grants, the text table or the form designer's outline marks the elements the layer added, changed or removed, each with Reset to
  * module, which undoes that one element on the server. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
  * diagnostics after a save, a Reset all or a Reset to module, with the layer the write added to the folder's list or the
  * id of the layer it removed.
@@ -77,6 +79,7 @@ export function StudioModuleEditor({
   const [resetting, setResetting] = useState(false)
   const [schema, setSchema] = useState<JsonSchema>()
   const [selected, setSelected] = useState<number | null>(null)
+  const [formPath, setFormPath] = useState<string | null>(null)
 
   /** Takes a read as what was loaded. Unless `force`, a draft with unsaved edits stays. */
   function adopt(resource: StudioModuleResource, force: boolean) {
@@ -335,6 +338,19 @@ export function StudioModuleEditor({
             layer={designerLayer({}, textKeyedMaps)}
           />
         )
+      ) : item.kind === 'form' ? (
+        <Suspense fallback={null}>
+          <LazyStudioFormDesign
+            application={application}
+            module={item.module}
+            resourceId={item.id}
+            draft={draft}
+            selected={formPath}
+            onSelect={setFormPath}
+            onChange={change}
+            layer={designerLayer(formKeyedLists(loaded.content))}
+          />
+        </Suspense>
       ) : item.kind === 'policy' ? (
         <StudioModulePolicy value={draft} onChange={change} layer={designerLayer(policyKeyedLists)} />
       ) : (
