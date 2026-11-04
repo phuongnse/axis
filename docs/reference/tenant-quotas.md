@@ -93,6 +93,9 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
   worker's next directory refresh.
 - **`applications`.** Creating an application in Studio is refused when the count would pass the
   quota. Existing applications keep working.
+- **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never refused over
+  the `storage` quota. It writes platform rows and no tenant data, so the operator can raise a quota that a
+  tenant has reached.
 
 ## Work at once
 

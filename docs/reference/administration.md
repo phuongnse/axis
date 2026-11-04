@@ -790,7 +790,8 @@ is set. The behaviour is in [backups in a cell](tenant-backup-and-restore.md#bac
 tenant, compares its row counts and users with the archive, runs the test scenarios of its Studio applications, removes the scratch
 tenant and records the result. It runs only in a cell,
 where `Cell:Id` is set. The behaviour is in
-[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). Its weekly job is _(planned for M31)_.
+[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). The weekly job is the chart's
+[cell restore-check CronJob](installation.md#settings-and-secrets).
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Admin:ConnectionString`, `Cell:BackupKeyFile`,
   `Cell:InternalDomain`, the five `Cell:BackupStorage` settings, the `IdentityProvider` settings, `Studio:ApplicationsPath` when an archive holds

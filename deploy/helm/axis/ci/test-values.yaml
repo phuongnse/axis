@@ -1,5 +1,5 @@
 # Values for the lint, the schema check and the render tests. They name every
-# Secret, the server, identity and PgBouncer certificates, the identity host and every volume, run two server replicas, turn Studio and its test controls on, name the
+# Secret (the admin connection too), the server, identity and PgBouncer certificates, the identity host and every volume, run two server replicas, turn Studio and its test controls on, name the
 # scenario connection Secret, name one proxy and one network and set every cell value, turn the wildcard certificate and PgBouncer on, and set the backup storage with its Secrets, so the checks cover every branch of the templates.
 server:
   replicas: 2
@@ -40,6 +40,8 @@ secrets:
     name: axis-platform
   serverCertificate:
     name: axis-server-tls
+  adminConnection:
+    name: axis-admin-db
   scenarioServerConnection:
     name: axis-scenario
   identityDatabaseUrl:
