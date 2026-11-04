@@ -122,6 +122,10 @@ internal static class TenantStatus
     internal static Task<StatusChange> ResumeChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
         ChangeAsync(connection, id, Suspended, Active, cancellationToken);
 
+    /// <summary>Sets a provisioning tenant active, as the last step of a create job does. A tenant that already left <c>provisioning</c> is <see cref="StatusChange.Unchanged"/>.</summary>
+    internal static Task<StatusChange> ActivateChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
+        ChangeAsync(connection, id, Provisioning, Active, cancellationToken);
+
     public static async Task<int> ListAsync(string connectionString, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
         List<(string Id, string Status, string SchemaVersion, string? PreviewOf)> tenants;

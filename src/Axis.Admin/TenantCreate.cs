@@ -28,7 +28,7 @@ internal sealed class TenantCreate : IAsyncDisposable
     private readonly TenantCreateRequest _request;
     private readonly TenantRealm? _realm;
     private readonly HttpClient _http;
-    private readonly TenantAudit _audit;
+    private readonly TenantAudit? _audit;
     private readonly string _command;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
@@ -43,7 +43,7 @@ internal sealed class TenantCreate : IAsyncDisposable
     private TenantProvisioning? _provisioning;
     private TenantDatabaseSteps? _steps;
 
-    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TenantRealm? realm, HttpClient http, TenantAudit audit, string command, TextWriter output, CancellationToken cancellationToken)
+    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TenantRealm? realm, HttpClient http, TenantAudit? audit, string command, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _request = request;
@@ -60,6 +60,12 @@ internal sealed class TenantCreate : IAsyncDisposable
         _admin = settings.Admin;
         _platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.PlatformConnectionString).Options);
     }
+
+    /// <summary>The reason of the refusal that ended the command before any tenant work, or null. A refusal is no transient error.</summary>
+    public string? Refusal { get; private set; }
+
+    /// <summary>The message of the step that failed, or null.</summary>
+    public string? Failure { get; private set; }
 
     public async Task<int> RunAsync()
     {
@@ -124,7 +130,7 @@ internal sealed class TenantCreate : IAsyncDisposable
             _row = await _platform.Tenants.FirstOrDefaultAsync(tenant => tenant.Id == _id, _cancellationToken);
             if (_row is not null && _row.Status != Provisioning)
             {
-                Failed("entry", "the tenant already exists");
+                Refuse("the tenant already exists");
                 return 1;
             }
 
@@ -133,11 +139,11 @@ internal sealed class TenantCreate : IAsyncDisposable
                 _cancellationToken);
             if (taken)
             {
-                Failed("entry", "a host belongs to another tenant");
+                Refuse("a host belongs to another tenant");
                 return 2;
             }
 
-            if (!await _audit.WriteAsync(_id, _output, _cancellationToken))
+            if (_audit is not null && !await _audit.WriteAsync(_id, _output, _cancellationToken))
             {
                 return 1;
             }
@@ -186,12 +192,12 @@ internal sealed class TenantCreate : IAsyncDisposable
         }
         catch (Exception exception) when (IsPreviewConflict(exception))
         {
-            Failed("entry", "the main tenant already has a preview tenant");
+            Refuse("the main tenant already has a preview tenant");
             return 2;
         }
         catch (Exception exception) when (IsHostConflict(exception))
         {
-            Failed("entry", "a host belongs to another tenant");
+            Refuse("a host belongs to another tenant");
             return 2;
         }
         catch (Exception exception)
@@ -217,12 +223,12 @@ internal sealed class TenantCreate : IAsyncDisposable
     // Saves the secrets and the Oidc block before the realm exists, so a stop between the two never loses a secret.
     private Task RealmAsync() => _realm!.EnsureForTenantAsync(_platform, _row!, _settings.Cipher, _settings.Mail ?? RealmMail.None, _cancellationToken);
 
-    // With an administrator to invite, the tenant stays provisioning until the invitation is out, so a rerun can retry it.
+    // With an administrator to invite, or when the caller finishes the tenant itself, the tenant stays provisioning. A rerun can retry it.
     private async Task ActivateAsync()
     {
         var row = _row!;
         row.SchemaVersion = await Steps.ReadSchemaVersionAsync();
-        if (_request.Administrator is null)
+        if (_request.Administrator is null && !_request.StayProvisioning)
         {
             await SetActiveAsync();
         }
@@ -239,34 +245,10 @@ internal sealed class TenantCreate : IAsyncDisposable
         await _platform.SaveChangesAsync(_cancellationToken);
     }
 
-    // Creates the invited account, or finds the one an earlier run created, gives it the administrator role with the audit
-    // records and has the realm email the link. The audit records never hold the link, and the output never names the email.
+    // The tenant becomes active only after the invitation is out.
     private async Task AdministratorAsync(string email)
     {
-        var access = DirectoryTenantCatalog.RealmUsers(_row!, _settings.Cipher)
-            ?? throw new InvalidOperationException("The tenant has no realm to invite an administrator to.");
-        var realm = new RealmUsers(_http, access);
-        var id = await realm.FindAccountIdByEmailAsync(email, _cancellationToken);
-        var created = id is null;
-        id ??= await realm.CreateInvitedAsync(email, null, null, _cancellationToken);
-
-        var administrator = new GivenRole(null, UserInvitations.AdministratorKind);
-        await using (var connection = await Steps.OpenRuntimeConnectionAsync())
-        {
-            if (created || !(await GivenRoles.ListAsync(connection, id, _cancellationToken)).Contains(administrator))
-            {
-                await using var transaction = await connection.BeginTransactionAsync(_cancellationToken);
-                await UserInvitations.RecordAsync(transaction, _command, id, email, [administrator], _cancellationToken);
-                await transaction.CommitAsync(_cancellationToken);
-            }
-        }
-
-        // A person who has set a password needs no new link. The command names no return address: the realm accepts none yet.
-        if (created || !(await realm.ReadInviteeAsync(id, _cancellationToken)).HasPassword)
-        {
-            await realm.SendInvitationAsync(id, null, _cancellationToken);
-        }
-
+        await TenantAdministratorInvite.InviteAsync(_http, _row!, _settings.Cipher, Steps, email, _command, _cancellationToken);
         await SetActiveAsync();
     }
 
@@ -296,8 +278,15 @@ internal sealed class TenantCreate : IAsyncDisposable
         _output.WriteLine(line);
     }
 
+    private void Refuse(string message)
+    {
+        Refusal = message;
+        Failed("entry", message);
+    }
+
     private void Failed(string step, string message)
     {
+        Failure = message;
         var line = $"{_id} {step} failed: {message}";
         _output.WriteLine(line);
     }
