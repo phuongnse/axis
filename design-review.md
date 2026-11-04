@@ -7,6 +7,20 @@ and D129, with `main` (b2c03324) merged in for module contracts and off-standard
 merge commit e7e2a2c5. Each entry is one agreed change: what the owner asked, in English, and what was built, for the
 docs change at the end of the review.
 
+## Merge of `main` (510fc01e)
+
+`main` is merged in for its latest logic beside the review. In a conflict the prototype stays: the 59 conflicted files
+under `web/` are the prototype's as they stood, and `en.json`, `vi.json` and `StudioEndpoints.cs` keep its side of each
+conflict. The new identity pages of `main`, their tests and `shellSidebar.tsx` are left out, because nothing here uses
+them. `ImportDialog.tsx` has `main`'s quota refusal and the prototype's footer.
+
+Open after the merge:
+
+- The realm sync of `main` replaces the legal links that `scripts/lib/development-legal.mjs` writes, so the sign-in pages
+  lose Privacy and Terms, the terms step is off and Licences points at `https://localhost/licences`.
+- Studio's save and publish show a generic message for a quota refusal, because `studio.ts`, `StudioEditor.tsx` and
+  `StudioPublishing.tsx` stay the prototype's.
+
 ## Carried over from the studio-editors review
 
 - **Off-standard on Releases.** On the Releases list, the Off-standard tag sits beside the release number and opens a

@@ -22,7 +22,7 @@ interface Row {
 
 /** Opens the lookup of the reference field `field`, searches for `name` and picks the row. */
 async function choose(page: Page, field: string, label: string, name: string) {
-  await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose', exact: true }).click()
+  await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose…', exact: true }).click()
   const dialog = await waitForDialog(page)
   await dialog.getByTestId('reference-lookup-search').fill(name)
   await dialog.getByRole('row', { name: new RegExp(name) }).click()

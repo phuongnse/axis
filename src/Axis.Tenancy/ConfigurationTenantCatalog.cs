@@ -1,3 +1,4 @@
+using Axis.Configuration.Resources;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -61,6 +62,7 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
 
             AddRealmProblems(section.GetSection(id), id, settings.PreviewOf, problems);
             AddRealmUsersProblems(section.GetSection(id), id, settings.PreviewOf, problems);
+            AddLegalProblems(section.GetSection(id), id, settings.PreviewOf, problems);
         }
 
         if (!environment.IsDevelopment())
@@ -118,6 +120,79 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
 
         var prefix = $"{TenantOptions.SectionName}:{id}";
         problems.Add($"Tenant '{id}' sets {prefix}:Oidc:UsersClientSecret, so {prefix}:Oidc:Authority must be an http or https address that ends in /realms/<realm>.");
+    }
+
+    // The same checks as `tenant legal set`, so a tenant can move between the sources. A preview tenant takes its main
+    // tenant's block. A message names a setting and never holds a value.
+    private static void AddLegalProblems(IConfigurationSection tenant, string id, string? previewOf, List<string> problems)
+    {
+        var legal = tenant.GetSection("Legal");
+        var prefix = $"{TenantOptions.SectionName}:{id}:Legal";
+        if (!string.IsNullOrWhiteSpace(previewOf))
+        {
+            if (legal.Exists())
+            {
+                problems.Add($"Tenant '{id}' is a preview tenant and has its own Legal block. A preview tenant uses the Legal settings of its main tenant '{previewOf}'.");
+            }
+
+            return;
+        }
+
+        AddAddressProblem(legal["PrivacyUrl"], $"{prefix}:PrivacyUrl", problems);
+        AddAddressProblem(legal["TermsUrl"], $"{prefix}:TermsUrl", problems);
+        var (terms, version) = (Blank(legal["TermsUrl"]), Blank(legal["TermsVersion"]));
+        if (terms is not null && version is null)
+        {
+            problems.Add($"'{prefix}:TermsVersion' is required when '{prefix}:TermsUrl' is set.");
+        }
+        else if (terms is null && version is not null)
+        {
+            problems.Add($"'{prefix}:TermsUrl' is required when '{prefix}:TermsVersion' is set.");
+        }
+
+        foreach (var site in legal.GetSection("Sites").GetChildren())
+        {
+            var sitePrefix = $"{prefix}:Sites:{site.Key}";
+            if (!SitePaths.IsValid(site.Key) || SitePaths.Reserved.Contains(site.Key.ToLowerInvariant()))
+            {
+                problems.Add($"'{sitePrefix}' is not a valid site path, or the platform keeps it.");
+            }
+
+            AddAddressProblem(site["PrivacyUrl"], $"{sitePrefix}:PrivacyUrl", problems);
+            AddAddressProblem(site["TermsUrl"], $"{sitePrefix}:TermsUrl", problems);
+            if (Blank(site["TermsVersion"]) is not null)
+            {
+                problems.Add($"'{sitePrefix}:TermsVersion' is not allowed. A site takes the terms version of its tenant.");
+            }
+        }
+    }
+
+    private static void AddAddressProblem(string? value, string setting, List<string> problems)
+    {
+        if (Blank(value) is { } address && !(Uri.TryCreate(address.Trim(), UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps))
+        {
+            problems.Add($"'{setting}' must be an absolute https address.");
+        }
+    }
+
+    // The tenant's links, or null when it sets none. A site that sets neither address is left out.
+    private static TenantLegal? Legal(IConfigurationSection tenant)
+    {
+        var legal = tenant.GetSection("Legal");
+        var sites = new Dictionary<string, SiteLegal>(StringComparer.OrdinalIgnoreCase);
+        foreach (var site in legal.GetSection("Sites").GetChildren())
+        {
+            var own = new SiteLegal(Blank(site["PrivacyUrl"])?.Trim(), Blank(site["TermsUrl"])?.Trim());
+            if (own.PrivacyUrl is not null || own.TermsUrl is not null)
+            {
+                sites[site.Key.ToLowerInvariant()] = own;
+            }
+        }
+
+        var (privacyUrl, termsUrl, termsVersion) = (Blank(legal["PrivacyUrl"])?.Trim(), Blank(legal["TermsUrl"])?.Trim(), Blank(legal["TermsVersion"])?.Trim());
+        return privacyUrl is null && termsUrl is null && termsVersion is null && sites.Count == 0
+            ? null
+            : new TenantLegal(privacyUrl, termsUrl, termsVersion, sites);
     }
 
     private static TenantRealmUsers? RealmUsers(IConfigurationSection tenant, bool preview)
@@ -188,7 +263,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 tenantSection is null ? null : RealmUsers(tenantSection, main is not null),
                 HostSites: settings.SiteHosts.Count == 0
                     ? null
-                    : new Dictionary<string, string>(settings.SiteHosts.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.ToLowerInvariant())), StringComparer.OrdinalIgnoreCase));
+                    : new Dictionary<string, string>(settings.SiteHosts.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.ToLowerInvariant())), StringComparer.OrdinalIgnoreCase),
+                Legal: tenantSection is null ? null : Legal(main is null ? tenantSection : section!.GetSection(main)));
         });
 
     private static TenantOidc? Oidc(IConfigurationSection? section) =>

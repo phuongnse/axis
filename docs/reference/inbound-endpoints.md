@@ -20,7 +20,7 @@ are an exception to the session and CSRF rules above, as are the
 [service accounts](security.md#service-accounts) of the record API, data source
 rows, process start and process inspection. Under a tenant's `fapi2` profile an endpoint accepts
 only DPoP-bound tokens, sent as `Authorization: DPoP` with a proof, see
-[machine callers under `fapi2`](security.md#fapi-20-profile).
+[machine callers under `fapi2`](fapi2-profile.md).
 
 ## The call
 
@@ -74,11 +74,13 @@ A call is checked in this order, and the first failure is the response:
    `fapi2`, with its proof). It comes before
    the path, so a caller without a valid token cannot learn which
    applications or endpoints exist.
-2. The application and the endpoint, `404`.
-3. The `invoke` grant on the endpoint, `403`.
-4. The content type, `415`.
-5. The body, `400` keyed `/input/…`.
-6. The `Idempotency-Key` header, `400`. A value must be non-empty and at
+2. In a cell, the tenant's [storage quota](tenant-quotas.md#refusals), `403`
+   with `reason: quota-exceeded`. A refused call reads no body.
+3. The application and the endpoint, `404`.
+4. The `invoke` grant on the endpoint, `403`.
+5. The content type, `415`.
+6. The body, `400` keyed `/input/…`.
+7. The `Idempotency-Key` header, `400`. A value must be non-empty and at
    most 255 characters.
 
 One transaction then does the rest:

@@ -10,7 +10,10 @@ using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Keys;
+using Axis.Tenancy.Platform;
+using Axis.Worker;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -137,6 +140,49 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
             maxInputs: 150);
 
         Assert.True(inputs >= 20, $"Only {inputs} fuzzed files were checked.");
+    }
+
+    [Fact]
+    public async Task In_a_cell_a_dry_run_past_concurrentImports_is_rescheduled_and_stays_pending_then_runs_once_the_lease_is_released()
+    {
+        await ResetAsync();
+        var platform = await TestLeasePlatform.CreateAsync(PostgreSqlServer.CreateDatabaseAsync, "import_leases", CancellationToken, TenantA);
+        await using var dataSource = NpgsqlDataSource.Create(PostgreSqlServer.RuntimeConnectionString(platform));
+        var holder = new TenantLeases(dataSource, NullLogger<TenantLeases>.Instance);
+        var worker = new TenantLeases(dataSource, NullLogger<TenantLeases>.Instance);
+        var cell = new CellOptions { Id = "vn-1" };
+        var quotas = new TenantQuotas(
+            cell,
+            QuotaDefaults.Load(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Quotas:Defaults:concurrentImports"] = "1" }).Build(), cell),
+            new EmptyTenantCatalog());
+        var handler = new RecordImportCheckHandler(
+            new ReleaseModelCache(PackageCatalog.Empty),
+            new RecordImportSettings(10000),
+            new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(new ConfigurationBuilder().Build()))),
+            NullLoggerFactory.Instance,
+            NullLogger<RecordImportCheckHandler>.Instance,
+            new CellImportLeases(worker, quotas, NullLogger<CellImportLeases>.Instance));
+        var held = await holder.TryTakeAsync(TenantA, QuotaKeys.ConcurrentImports, 1, CancellationToken);
+        Assert.NotNull(held);
+        var upload = await UploadAsync(fixture.Client, Items, "name,Quantity,price\nDesk,1,10.50\n");
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
+        await connection.OpenAsync(CancellationToken);
+
+        var first = await WorkItemQueue.ClaimAsync(connection, TenantA, [RecordImports.CheckWorkItemKind], TimeSpan.FromMinutes(5), CancellationToken);
+
+        Assert.NotNull(first);
+        Assert.Equal(WorkItemOutcome.Rescheduled, await handler.ExecuteAsync(first, connection, CancellationToken));
+        Assert.Equal("pending", await StateAsync(upload.Id));
+
+        await held.DisposeAsync();
+        ClaimedWorkItem? second = null;
+        await Polling.WaitUntilAsync(
+            async () => (second = await WorkItemQueue.ClaimAsync(connection, TenantA, [RecordImports.CheckWorkItemKind], TimeSpan.FromMinutes(5), CancellationToken)) is not null,
+            "The rescheduled dry run did not become due again.");
+
+        Assert.Equal(WorkItemOutcome.Completed, await handler.ExecuteAsync(second!, connection, CancellationToken));
+        Assert.Equal("checked", await StateAsync(upload.Id));
+        Assert.Equal(0L, (long)(await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_leases", CancellationToken))!);
     }
 
     [Fact]
@@ -828,4 +874,16 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
 
     private async Task<bool> FileClearedAsync(Guid id) =>
         (bool)(await fixture.ScalarAsync(TenantA, $"SELECT file IS NULL FROM axis.record_imports WHERE id = '{id:D}'"))!;
+
+    // A cell's quotas without a tenant row of their own, so the defaults apply.
+    private sealed class EmptyTenantCatalog : ITenantCatalog
+    {
+        public IReadOnlyList<TenantEntry> Tenants => [];
+
+        public TenantEntry? Find(string tenantId) => null;
+
+        public TenantEntry? FindByHost(string host) => null;
+
+        public bool IsUnavailableHost(string host) => false;
+    }
 }

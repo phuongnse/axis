@@ -317,6 +317,9 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             notification.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             notification.HasIndex(n => new { n.ApplicationId, n.RecipientKind, n.Recipient, n.CreatedAt })
                 .HasDatabaseName("ix_notifications_application_id_recipient_created_at");
+            notification.HasIndex(n => new { n.RecipientKind, n.Recipient, n.CreatedAt })
+                .HasFilter("application_id IS NULL")
+                .HasDatabaseName("ix_notifications_tenant_recipient_created_at");
         });
 
         // The notification's key has three columns, so a read mark has no foreign key to it.

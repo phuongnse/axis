@@ -86,7 +86,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=PurchaseRequests`);
 
-    await page.getByRole("button", { name: "New application", exact: true }).click();
+    await page.getByRole("button", { name: "New application…", exact: true }).click();
     const dialog = await waitForDialog(page);
     await dialog.getByRole("textbox", { name: "Name", exact: true }).fill(name);
     await dialog.getByRole("radio", { name: /^Request approval/ }).click();
@@ -161,7 +161,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     };
     expect(list.widgets[0].rowActions[1].parameters).toEqual({ request: "id" });
 
-    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    await page.getByRole("button", { name: "Publish…", exact: true }).click();
     await confirmDialog(page, "Publish");
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",

@@ -91,6 +91,7 @@ public sealed class NotificationRetentionTests(PostgreSqlFixture database) : ICl
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:IdlePollCeiling"] = "00:00:00.05",
             ["Notifications:RetentionDays"] = "30",
             ["Tenants:a:Hosts:0"] = "a.example.test",
             ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenant),

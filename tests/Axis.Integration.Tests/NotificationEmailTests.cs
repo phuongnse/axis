@@ -399,8 +399,9 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     }
 
     [Fact]
-    public async Task Worker_without_a_cell_id_sends_all_three_emails_and_writes_no_daily_counter()
+    public async Task Worker_without_a_cell_id_sends_all_three_emails_and_writes_no_daily_counter_or_notice()
     {
+        await ClearNoticesAsync();
         var address = UniqueAddress();
         var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
         var titles = new List<string>();
@@ -419,6 +420,69 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         Assert.Equal(titles.Select(title => $"Request {title}"), (await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true)).Select(message => message.Subject));
         Assert.All(titles, async title => Assert.Equal("sent", Assert.Single(await EmailsAsync(title)).State));
         Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_daily_counters", CancellationToken));
+        Assert.Empty(await NoticesAsync());
+    }
+
+    [Fact]
+    public async Task Cell_worker_stores_one_notice_for_the_administrators_on_the_first_hold_of_a_UTC_day_and_one_more_on_the_next_day()
+    {
+        await ClearNoticesAsync();
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var titles = new List<string>();
+        for (var i = 0; i < 4; i++)
+        {
+            titles.Add((await StageAsync(releaseId, model, viProfile: false)).Title);
+        }
+
+        var (platform, catalog) = await PlatformAsync();
+        var clock = new ManualClock(DateTimeOffset.UtcNow.AddDays(1));
+        await using var worker = CellWorker(platform, catalog, clock, new LogCollector(), cell: true);
+        var day = clock.Today;
+
+        await RunUntilIdleAsync(worker);
+
+        Assert.Equal(2, (await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true)).Count);
+        var notice = Assert.Single(await NoticesAsync());
+        Assert.Equal(("platformRole", "administrator", true, "2"), (notice.RecipientKind, notice.Recipient, notice.ReleaseIdIsNull, notice.Limit));
+        Assert.Equal(("notices.emailsHeld.subject", "notices.emailsHeld.body", "integer"), (notice.SubjectKey, notice.BodyKey, notice.LimitType));
+        Assert.Equal(1L, await NoticeCounterAsync(platform, day));
+
+        // The next day the two held emails go out, so only the three new ones count against the quota of two.
+        clock.Advance(TimeSpan.FromDays(1));
+        for (var i = 0; i < 3; i++)
+        {
+            await StageAsync(releaseId, model, viProfile: false);
+        }
+
+        await fixture.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE kind = 'notification.email'");
+        await RunUntilIdleAsync(worker);
+
+        Assert.Equal(2, (await NoticesAsync()).Count);
+        Assert.Equal(1L, await NoticeCounterAsync(platform, clock.Today));
+        Assert.Equal(1L, await NoticeCounterAsync(platform, day));
+    }
+
+    [Fact]
+    public async Task Cell_worker_for_a_tenant_with_no_email_limit_sends_every_email_and_stores_no_notice()
+    {
+        await ClearNoticesAsync();
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var titles = new List<string>();
+        for (var i = 0; i < 3; i++)
+        {
+            titles.Add((await StageAsync(releaseId, model, viProfile: false)).Title);
+        }
+
+        var (platform, catalog) = await PlatformAsync(noEmailLimit: true);
+        await using var worker = CellWorker(platform, catalog, new ManualClock(DateTimeOffset.UtcNow.AddDays(1)), new LogCollector(), cell: true);
+
+        await RunUntilIdleAsync(worker);
+
+        Assert.Equal(titles.Select(title => $"Request {title}"), (await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true)).Select(message => message.Subject));
+        Assert.Empty(await NoticesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.tenant_daily_counters WHERE counter = 'emailsHeldNotice'", CancellationToken));
     }
 
     /// <summary>
@@ -430,9 +494,9 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     /// <summary>
     /// The admin connection string of a migrated platform database, which the reader role of the cell grants are applied to, and the
     /// directory catalog loaded from it. Its tenant is the fixture's and has its own mail settings, which point at the Mailpit
-    /// server that needs a password.
+    /// server that needs a password. With <paramref name="noEmailLimit"/> the tenant has its own <c>emailsPerDay</c> quota of no limit.
     /// </summary>
-    private async Task<(string Platform, DirectoryTenantCatalog Catalog)> PlatformAsync()
+    private async Task<(string Platform, DirectoryTenantCatalog Catalog)> PlatformAsync(bool noEmailLimit = false)
     {
         var platform = await fixture.CreateDatabaseAsync("platform");
         var cipher = AdminScenario.Cipher;
@@ -457,6 +521,11 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
                 SmtpPassword = cipher.Encrypt(fixture.Tenant, TenantSecretFields.SmtpPassword, MailpitFixture.AuthPassword),
                 EmailFrom = Sender,
             });
+            if (noEmailLimit)
+            {
+                context.TenantQuotas.Add(new TenantQuotaRow { TenantId = fixture.Tenant, Quota = QuotaKeys.EmailsPerDay, Value = null });
+            }
+
             await context.SaveChangesAsync(CancellationToken);
         }
 
@@ -625,6 +694,37 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
                 CancellationToken),
             System.Globalization.CultureInfo.InvariantCulture);
 
+    private async Task<long> NoticeCounterAsync(string platform, DateOnly day) =>
+        Convert.ToInt64(
+            await PostgreSqlServer.AdminScalarAsync(
+                platform,
+                $"SELECT coalesce(sum(value), 0) FROM platform.tenant_daily_counters WHERE tenant_id = '{fixture.Tenant}' AND day = '{day:yyyy-MM-dd}' AND counter = 'emailsHeldNotice'",
+                CancellationToken),
+            System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>The tenant notices of the shared tenant database, which have no application.</summary>
+    private async Task<IReadOnlyList<TenantNotice>> NoticesAsync()
+    {
+        await using var command = fixture.DataSource.CreateCommand(
+            """
+            SELECT recipient_kind, recipient, release_id IS NULL, subject_key, body_key, "values"->>'limit', value_types->>'limit'
+            FROM axis.notifications
+            WHERE application_id IS NULL
+            ORDER BY created_at
+            """);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new List<TenantNotice>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add(new TenantNotice(reader.GetString(0), reader.GetString(1), reader.GetBoolean(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>The quota-of-two test stores a notice in the shared tenant database too, so each notice test starts with none.</summary>
+    private async Task ClearNoticesAsync() => await fixture.ScalarAsync("DELETE FROM axis.notifications WHERE application_id IS NULL");
+
     private async Task RunUntilIdleAsync(ServiceProvider worker)
     {
         var runner = worker.GetRequiredService<WorkItemRunner>();
@@ -665,6 +765,8 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
 
         return rows;
     }
+
+    private sealed record TenantNotice(string RecipientKind, string Recipient, bool ReleaseIdIsNull, string SubjectKey, string BodyKey, string Limit, string LimitType);
 
     private sealed record StagedEmail(Guid Id, string MessageId, string State, DateTimeOffset? SentAt);
 

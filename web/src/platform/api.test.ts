@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiFetch, setApiGuard, startSignIn } from './api'
+import { accountActionUrl, apiFetch, setApiGuard, startSignIn } from './api'
 import { fetchCurrentUser } from './currentUser'
 import { assignLocation } from './navigation'
 import { isSignInNeeded, subscribeSignInNeeded } from './signInNeeded'
@@ -26,13 +26,16 @@ describe('startSignIn', () => {
     expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2F')
   })
 
-  it.each(['/?signedOut', '/?signedOut=1', '/?signIn=failed&other=1'])('returns to / from %s', (address) => {
-    history.pushState(null, '', address)
+  it.each(['/?signedOut', '/?signedOut=1', '/?signIn=failed&other=1', '/?signIn=declined'])(
+    'returns to / from %s',
+    (address) => {
+      history.pushState(null, '', address)
 
-    startSignIn()
+      startSignIn()
 
-    expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2F')
-  })
+      expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2F')
+    },
+  )
 
   it('keeps another path that has a signIn query parameter', () => {
     history.pushState(null, '', '/e2e/notes?signIn=failed')
@@ -40,6 +43,16 @@ describe('startSignIn', () => {
     startSignIn()
 
     expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2Fe2e%2Fnotes%3FsignIn%3Dfailed')
+  })
+})
+
+describe('accountActionUrl', () => {
+  it.each([
+    ['UPDATE_PASSWORD', '/api/auth/sign-in?returnUrl=%2Faccount&action=UPDATE_PASSWORD'],
+    ['CONFIGURE_TOTP', '/api/auth/sign-in?returnUrl=%2Faccount&action=CONFIGURE_TOTP'],
+    ['delete_credential:a1-B2' as const, '/api/auth/sign-in?returnUrl=%2Faccount&action=delete_credential%3Aa1-B2'],
+  ] as const)('builds the address for %s', (action, expected) => {
+    expect(accountActionUrl('/account', action)).toBe(expected)
   })
 })
 

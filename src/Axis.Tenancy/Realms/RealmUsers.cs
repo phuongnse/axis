@@ -11,10 +11,10 @@ namespace Axis.Tenancy.Realms;
 /// Lists and changes the users of a tenant's realm. It signs in to the realm as <c>axis-users</c> with the client
 /// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
 /// It reads one page of users with the number of all users that match the search, and for each user on the page the
-/// alias of the first federated identity. It also finds one user, disables or enables a user, ends a user's realm
-/// sessions and removes a user's authenticators. It also invites a person: it finds an account by email, creates an account with
+/// alias of the first federated identity. It counts the enabled users. It also finds one user, disables or enables a user, ends a user's realm
+/// sessions or one realm session by its id, lists a user's authenticators and removes them. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
-/// also normalises an email address. An error names the step and the status code, never a response body or a secret.
+/// adds a required action to every user. It also normalises an email address. An error names the step and the status code, never a response body or a secret.
 /// </summary>
 public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 {
@@ -61,6 +61,20 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
                 user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
                 aliases[index]))],
             total);
+    }
+
+    /// <summary>
+    /// Counts the enabled users of the realm, invited and brokered ones included. A service account is not counted, because the
+    /// search of * leaves it out.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<int> CountEnabledAsync(CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await GetAsync(
+            token, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users/count?search=*&enabled=true", cancellationToken);
+        EnsureSuccess(response, "count the users");
+        return await response.Content.ReadFromJsonAsync<int>(cancellationToken);
     }
 
     /// <summary>
@@ -111,6 +125,45 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         EnsureSuccess(written, enabled ? "enable the user" : "disable the user");
     }
 
+    /// <summary>
+    /// Adds the required <paramref name="action"/> to every user of the realm that does not have it, so the next sign-in shows it. A service
+    /// account is not a user here, because the search of * leaves it out. Each user is read in full and written back, because a partial update can clear fields.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task AddRequiredActionAsync(string action, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(action);
+
+        const int pageSize = 100;
+        var token = await TokenAsync(cancellationToken);
+        var usersPath = $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users";
+        for (var first = 0; ; first += pageSize)
+        {
+            using var listed = await GetAsync(token, $"{usersPath}?briefRepresentation=false&search=*&first={first}&max={pageSize}", cancellationToken);
+            EnsureSuccess(listed, "list the users");
+            var users = (await listed.Content.ReadFromJsonAsync<JsonArray>(cancellationToken))!;
+            foreach (var node in users)
+            {
+                var user = node!.AsObject();
+                var actions = user["requiredActions"] as JsonArray ?? [];
+                if (actions.Any(existing => existing?.GetValue<string>() == action))
+                {
+                    continue;
+                }
+
+                actions.Add(action);
+                user["requiredActions"] = actions;
+                using var written = await SendAsync(token, HttpMethod.Put, $"{usersPath}/{Uri.EscapeDataString(user["id"]!.GetValue<string>())}", user, cancellationToken);
+                EnsureSuccess(written, "ask the user to accept the terms");
+            }
+
+            if (users.Count < pageSize)
+            {
+                return;
+            }
+        }
+    }
+
     /// <summary>Ends every session of the user in the realm.</summary>
     /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
     public async Task LogOutAsync(string userId, CancellationToken cancellationToken)
@@ -118,6 +171,22 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         var token = await TokenAsync(cancellationToken);
         using var response = await SendAsync(token, HttpMethod.Post, $"{UserPath(userId)}/logout", null, cancellationToken);
         EnsureSuccess(response, "end the realm sessions of the user");
+    }
+
+    /// <summary>Ends one realm session by its id, the ID token's <c>sid</c>. Returns false when the realm has no such session.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<bool> EndSessionAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await SendAsync(
+            token, HttpMethod.Delete, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/sessions/{Uri.EscapeDataString(sessionId)}", null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        EnsureSuccess(response, "end the realm session");
+        return true;
     }
 
     /// <summary>Removes the user's authenticator app, so the next sign-in asks for a new one.</summary>
@@ -135,6 +204,29 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
                 token, HttpMethod.Delete, $"{path}/credentials/{Uri.EscapeDataString(credential.GetProperty("id").GetString()!)}", null, cancellationToken);
             EnsureSuccess(removed, "remove the authenticator of the user");
         }
+    }
+
+    /// <summary>Lists the user's authenticator apps (the <c>otp</c> credentials), oldest first. A credential without a created date comes last.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<IReadOnlyList<RealmAuthenticator>> ListAuthenticatorsAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var listed = await GetAsync(token, $"{UserPath(userId)}/credentials", cancellationToken);
+        EnsureSuccess(listed, "list the credentials of the user");
+        var credentials = await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return
+        [
+            .. credentials.EnumerateArray()
+                .Where(credential => Text(credential, "type") == "otp")
+                .Select(credential => new RealmAuthenticator(
+                    credential.GetProperty("id").GetString()!,
+                    Text(credential, "userLabel"),
+                    credential.TryGetProperty("createdDate", out var created) && created.ValueKind == JsonValueKind.Number && created.TryGetInt64(out var milliseconds)
+                        ? DateTimeOffset.FromUnixTimeMilliseconds(milliseconds)
+                        : null))
+                .OrderBy(authenticator => authenticator.CreatedAt is null)
+                .ThenBy(authenticator => authenticator.CreatedAt),
+        ];
     }
 
     /// <summary>
@@ -307,6 +399,9 @@ public sealed record RealmUser(string Id, string Username, string? FirstName, st
 
 /// <summary>The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
 public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias);
+
+/// <summary>One authenticator app of a realm account: the credential id, its label and when it was added.</summary>
+public sealed record RealmAuthenticator(string Id, string? Label, DateTimeOffset? CreatedAt);
 
 /// <summary>The fields of an invited user that a resend carries over, and whether the user has set a password.</summary>
 public sealed record RealmInvitee(string? Email, string? FirstName, string? LastName, bool HasPassword);

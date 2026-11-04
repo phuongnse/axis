@@ -166,6 +166,33 @@ describe('FileInput', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('The file could not be uploaded.'))
   })
 
+  it('shows the quota title when an upload is refused past the storage quota', async () => {
+    stubUpload(
+      403,
+      JSON.stringify({
+        title: 'This tenant has reached its storage quota.',
+        status: 403,
+        reason: 'quota-exceeded',
+        quota: 'storage',
+      }),
+    )
+    const changes = renderInput(fileField())
+
+    await userEvent.upload(screen.getByTestId('file-picker-receipt'), pdf())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This tenant has reached its storage quota.')
+    expect(changes).toEqual([])
+  })
+
+  it('keeps the generic message for a 403 without a reason', async () => {
+    stubUpload(403, '{"title":"You may not upload here.","status":403}')
+    renderInput(fileField())
+
+    await userEvent.upload(screen.getByTestId('file-picker-receipt'), pdf())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The file could not be uploaded.')
+  })
+
   it('refuses a file above the limit in the browser without sending it', async () => {
     const fetchMock = stubUpload(201, answered)
     const changes = renderInput(fileField({ maxSize: 4 }))

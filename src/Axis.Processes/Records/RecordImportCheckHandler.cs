@@ -33,14 +33,16 @@ internal sealed record RecordImportSettings(int MaxRows);
 /// from 1. A problem of the header is keyed <c>/columns/{n}</c> and stops the check. More rows than
 /// the limit is one error at <c>/rows</c>, and the rows after the limit are not read. An import that is gone or
 /// no longer pending has nothing left to do, and neither has one whose entity the active release no longer has,
-/// which fails at the empty pointer.
+/// which fails at the empty pointer. In a cell the dry run holds a <c>concurrentImports</c> lease of the tenant until it
+/// has committed. When none is free the work item is due again in one second and the import stays <c>pending</c>.
 /// </summary>
 internal sealed partial class RecordImportCheckHandler(
     ReleaseModelCache models,
     RecordImportSettings settings,
     SensitiveValues sensitive,
     ILoggerFactory loggerFactory,
-    ILogger<RecordImportCheckHandler> logger) : IExternalWorkItemHandler
+    ILogger<RecordImportCheckHandler> logger,
+    IImportLeases? leases = null) : IExternalWorkItemHandler
 {
     public string Kind => RecordImports.CheckWorkItemKind;
 
@@ -61,6 +63,23 @@ internal sealed partial class RecordImportCheckHandler(
         {
             return await CompleteAsync(item, connection, transaction, cancellationToken);
         }
+
+        IAsyncDisposable? lease = null;
+        if (leases is not null && (lease = await leases.TryTakeAsync(item.TenantId, cancellationToken)) is null)
+        {
+            if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, TimeSpan.FromSeconds(1), cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Rescheduled;
+        }
+
+        // Declared after the transaction, so it is released after the work has committed.
+        await using var _ = lease;
 
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
         var release = await StartLock.TakeSharedAsync(transaction, import.ApplicationId, cancellationToken);

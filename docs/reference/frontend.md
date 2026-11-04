@@ -149,9 +149,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   `GET /api/texts/{locale}`. The home page and the app switcher also use `GET /api/sites` (see
   Application sites below) to list the tenant's sites. When it answers `401`,
   the home page starts sign-in at once, see [platform home page](shell.md#platform-home-page).
-  - `GET /api/site` returns the site name, its title key, the locales
-    (default, fallback and available) and the navigation items. Navigation
-    labels are text keys, never literal text. Each navigation item has an `icon`.
+  - `GET /api/site` returns the site name, its title key, the locales (default, fallback and available), the
+    navigation items and `legal`, the tenant's `{ "privacyUrl", "termsUrl" }` or `null`, see
+    [legal settings](legal.md#legal-settings). Navigation labels are text keys, never literal text. Each navigation item has an `icon`.
   - `GET /api/texts/{locale}` returns a flat map from text key to text for
     one locale. A locale without texts gets a 404 problem response.
   - The platform site offers English (`en`, default and fallback) and
@@ -165,8 +165,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Method and path | Response |
   | --- | --- |
-  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "descriptions", "application": { "name", "titles", "descriptions" } } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. `descriptions` holds the text of the `description` for each locale, the site's for its available locales and the application's for each locale it has texts for, or is `null` when there is no description, see [descriptions](shell.md#application-and-site-descriptions). |
-  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath" }`. `icon` is an Axis icon name, or `null` for an entry with none |
+  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "descriptions", "application": { "name", "titles", "descriptions" }, "legal" } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. `descriptions` holds the text of the `description` for each locale, the site's for its available locales and the application's for each locale it has texts for, or is `null` when there is no description, see [descriptions](shell.md#application-and-site-descriptions). |
+  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath", "legal" }`. `icon` is an Axis icon name, or `null` for an entry with none. `legal` is `{ "privacyUrl", "termsUrl" }`, the site's own links or else its tenant's, or `null` when neither sets any, as in the list |
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
   | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below. The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts |
 
@@ -472,8 +472,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Address | Shows |
   | --- | --- |
-  | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it starts sign-in at once and draws no screen first. Only two addresses show a card, and neither starts sign-in until the person clicks its button. `/?signIn=failed` is where the server sends the browser after a refused sign-in. It shows "Sign in" and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/?signedOut` is where the identity provider returns the browser after sign-out. It shows "You have signed out", a message and a "Sign in again" button. A signed-in person who opens either address sees the launcher. |
-  | `/licences` | the [open source licences](legal.md#open-source-licences) page, open without signing in _(planned for M31)_ |
+  | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it starts sign-in at once and draws no screen first. Only three addresses show a card, and none starts sign-in until the person clicks its button. `/?signIn=failed` is where the server sends the browser after a refused sign-in. It shows "Sign in" and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/?signIn=declined` is where the server sends the browser after a person declines the terms step. It shows the same card with the platform text `shell.home.signInDeclined`, which says that signing in needs the terms accepted. `/?signedOut` is where the identity provider returns the browser after sign-out. It shows "You have signed out", a message and a "Sign in again" button. A signed-in person who opens any of them sees the launcher. |
+  | `/licences` | the [open source licences](legal.md#open-source-licences) page, open without signing in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
@@ -889,14 +889,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   The [app switcher](shell.md#app-switcher-and-preferences) reads `studio` and `console` from it.
   - With nobody signed in, it is a **Sign in** button, except on the home page `/`, which starts sign-in or shows a card.
     It sends the browser to `/api/auth/sign-in` with the current path and query string as `returnUrl`, so the person
-    comes back there, but to `/` from the card addresses `/?signIn=failed` and `/?signedOut`.
-  - With someone signed in, it shows their display name, and _(planned for M31)_ their avatar before it and a caret
+    comes back there, but to `/` from the card addresses `/?signIn=failed`, `/?signIn=declined` and `/?signedOut`.
+  - With someone signed in, it shows their display name, with their avatar before it and a caret
     after it. Its menu holds **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
-    ends the session and then sends the browser to the identity provider's sign-out page. _(Planned for M31: the server
-    ends the identity provider's session itself and the browser goes to `/?signedOut`, see
-    [sign-in and the session](security.md#sign-in-and-the-session).)_
+    ends the session. The server ends the identity provider's session itself and the browser goes to `/?signedOut`. Only
+    when that fails does the browser go to the identity provider's sign-out page, see
+    [sign-in and the session](security.md#sign-in-and-the-session).
   - The **sessions screen** at `/account` and the **users page** at `/users` are platform routes beside `/studio`,
-    before the site route, so `account` and `users` are reserved site paths, and so is `licences` _(planned for M31)_. See
+    before the site route, so `account` and `users` are reserved site paths, and so is `licences`. See
     [platform pages](platform-pages.md).
   - A `401` from any API call shows the **sign-in prompt**, a dialog titled "Your session has ended"
     with a short message and a **Sign in** button. It shows when a signed-out person
@@ -911,7 +911,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     Four calls are exempt and never show it. `GET /api/me` answers `401` when
     nobody is signed in, so the header shows the button and no app switcher. The home page's
     `GET /api/sites` answers `401` too. The home page starts sign-in at once when either call does, except at
-    `/?signIn=failed` and `/?signedOut`, where it shows the card. The
+    `/?signIn=failed`, `/?signIn=declined` and `/?signedOut`, where it shows the card. The
     notification bell's calls and Studio's readiness checks stay quiet as well.
   - Its texts are the platform texts `shell.account.signIn`,
     `shell.account.signOut` and `shell.account.label`, the menu's label, and

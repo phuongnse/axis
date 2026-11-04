@@ -8,8 +8,14 @@ public sealed class WorkerOptions
     /// <summary>How long a claim lasts before another worker can claim the item.</summary>
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>How long the worker waits before it polls again when it found no work.</summary>
+    /// <summary>
+    /// The wait between two polls of a tenant that has work, and the first wait of the back-off of a tenant that has none.
+    /// The worker also reads the schema versions and the tenant directory at most this often.
+    /// </summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>The longest wait between two polls of an idle tenant. It must be at least <see cref="PollInterval"/>.</summary>
+    public TimeSpan IdlePollCeiling { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>How often the worker reads each tenant database for the due work item and pending computed field gauges.</summary>
     public TimeSpan MetricsInterval { get; set; } = TimeSpan.FromSeconds(30);

@@ -32,7 +32,8 @@ namespace Axis.Tenancy.Realms;
 /// so <c>axis</c>, <c>axis-activation</c>, <c>axis-users</c> and anything an operator added stay. A removed provider
 /// keeps its users in the realm. An error names the step and the status code, never a response body or a secret. A 409
 /// from the identity provider, which another sync of the same realm at the same time can cause, makes the sync read the
-/// realm again and repeat, up to three attempts.
+/// realm again and repeat, up to three attempts. It also writes the tenant's legal links on every client of the realm, turns the realm's Terms and Conditions
+/// step on while the tenant has a terms address, and asks every user to accept the terms again when the terms version changes (<see cref="SyncLegalAsync"/>).
 /// </summary>
 public sealed class RealmSync(HttpClient http, Uri baseAddress)
 {
@@ -60,6 +61,27 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
 
     /// <summary>The attribute of a site client that holds <c>true</c> when the site allows accounts and <c>false</c> when it does not.</summary>
     public const string AccountsAttribute = "axis.accounts";
+
+    /// <summary>The client attribute that holds the privacy address the client shows: the site's own for a site client, else the tenant's.</summary>
+    public const string PrivacyUrlAttribute = "axis.privacyUrl";
+
+    /// <summary>The client attribute that holds the terms address the client shows: the site's own for a site client, else the tenant's.</summary>
+    public const string TermsUrlAttribute = "axis.termsUrl";
+
+    /// <summary>The client attribute that holds the address of the licences page.</summary>
+    public const string LicencesUrlAttribute = "axis.licencesUrl";
+
+    /// <summary>The client attribute that holds the tenant's own privacy address.</summary>
+    public const string TenantPrivacyUrlAttribute = "axis.tenantPrivacyUrl";
+
+    /// <summary>The client attribute that holds the tenant's own terms address.</summary>
+    public const string TenantTermsUrlAttribute = "axis.tenantTermsUrl";
+
+    /// <summary>The realm attribute that holds the terms version the users were last asked to accept.</summary>
+    public const string TermsVersionAttribute = "axis.termsVersion";
+
+    /// <summary>The id of the realm's required action that asks a person to accept the terms.</summary>
+    public const string TermsAction = "TERMS_AND_CONDITIONS";
 
     private const string PostLogoutRedirectUrisAttribute = "post.logout.redirect.uris";
 
@@ -182,6 +204,168 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         using var updated = await SendAsync(
             token, HttpMethod.Put, $"{clientsPath}/{platform.GetProperty("id").GetString()}", representation, cancellationToken);
         EnsureSuccess(updated, $"update the client '{RealmClientProfile.PlatformClientId}'");
+    }
+
+    /// <summary>
+    /// Writes the tenant's legal settings to the realm. Each client gets <see cref="PrivacyUrlAttribute"/> and <see cref="TermsUrlAttribute"/> (the site's own pair for a
+    /// <c>site-</c> client, else the tenant's), <see cref="LicencesUrlAttribute"/>, <see cref="TenantPrivacyUrlAttribute"/> and <see cref="TenantTermsUrlAttribute"/>. A value that is
+    /// <c>null</c> removes its attribute (an empty text, which Keycloak removes), every other attribute stays, and a client that already holds the values is not written. A bearer-only client never starts a sign-in, so it is left alone. The
+    /// <see cref="TermsAction"/> required action is on, for new users too (<c>defaultAction</c>), while the tenant has a terms address, and off otherwise. When the terms
+    /// version differs from the realm attribute <see cref="TermsVersionAttribute"/>, <paramref name="users"/> adds the action to every user and the version is stored.
+    /// With no terms the stored version is cleared, so terms set later ask every user again. With terms and no <paramref name="users"/>, the version is left alone. It
+    /// signs in as <c>axis-activation</c>. An error names the step and the status code, never a response body or a secret.
+    /// </summary>
+    public async Task SyncLegalAsync(string realm, string activationSecret, RealmLegal legal, RealmUsers? users, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(legal);
+
+        var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
+        var realmPath = $"admin/realms/{Uri.EscapeDataString(realm)}";
+        await SyncLegalClientsAsync(token, realmPath, legal, cancellationToken);
+        var on = legal.Legal?.TermsUrl is not null;
+        await SyncTermsActionAsync(token, realmPath, on, cancellationToken);
+        await SyncTermsVersionAsync(token, realmPath, on ? legal.Legal!.TermsVersion : null, users, cancellationToken);
+    }
+
+    private async Task SyncLegalClientsAsync(string token, string realmPath, RealmLegal legal, CancellationToken cancellationToken)
+    {
+        var clientsPath = $"{realmPath}/clients";
+        using var listed = await SendAsync(token, HttpMethod.Get, $"{clientsPath}?max=1000", null, cancellationToken);
+        EnsureSuccess(listed, "list the clients");
+        var clients = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+        foreach (var client in clients)
+        {
+            // A bearer-only client, such as Keycloak's own realm-management and broker, never starts a sign-in, and Keycloak refuses to update some of them.
+            if (client.TryGetProperty("bearerOnly", out var bearerOnly) && bearerOnly.ValueKind == JsonValueKind.True)
+            {
+                continue;
+            }
+
+            var clientId = client.GetProperty("clientId").GetString()!;
+            var (privacy, terms) = clientId.StartsWith(SiteClientPrefix, StringComparison.Ordinal)
+                ? legal.Legal?.ForSite(clientId[SiteClientPrefix.Length..]) is { } site ? (site.PrivacyUrl, site.TermsUrl) : (null, null)
+                : (legal.Legal?.PrivacyUrl, legal.Legal?.TermsUrl);
+            var wanted = new (string Name, string? Value)[]
+            {
+                (PrivacyUrlAttribute, privacy),
+                (TermsUrlAttribute, terms),
+                (LicencesUrlAttribute, legal.LicencesUrl),
+                (TenantPrivacyUrlAttribute, legal.Legal?.PrivacyUrl),
+                (TenantTermsUrlAttribute, legal.Legal?.TermsUrl),
+            };
+
+            var attributes = RealmClientProfile.ReadAttributes(client);
+            var changed = false;
+            foreach (var (name, value) in wanted)
+            {
+                if (value is null)
+                {
+                    // Keycloak keeps an attribute that an update leaves out and removes one that an update sets to an empty text.
+                    if (attributes.ContainsKey(name))
+                    {
+                        attributes[name] = "";
+                        changed = true;
+                    }
+                }
+                else if (!attributes.TryGetValue(name, out var current) || current != value)
+                {
+                    attributes[name] = value;
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+            {
+                continue;
+            }
+
+            var representation = client.Deserialize<Dictionary<string, JsonElement>>()!;
+            representation.Remove("secret");
+            representation["attributes"] = JsonSerializer.SerializeToElement(attributes);
+            using var updated = await SendAsync(token, HttpMethod.Put, $"{clientsPath}/{client.GetProperty("id").GetString()}", representation, cancellationToken);
+            EnsureSuccess(updated, $"update the legal links of the client '{clientId}'");
+        }
+    }
+
+    private async Task SyncTermsActionAsync(string token, string realmPath, bool on, CancellationToken cancellationToken)
+    {
+        var actionPath = $"{realmPath}/authentication/required-actions/{TermsAction}";
+        var action = await ReadRequiredActionAsync(token, actionPath, cancellationToken);
+        if (action is null)
+        {
+            if (!on)
+            {
+                return;
+            }
+
+            using var registered = await SendAsync(
+                token,
+                HttpMethod.Post,
+                $"{realmPath}/authentication/register-required-action",
+                new { providerId = TermsAction, name = "Terms and Conditions" },
+                cancellationToken);
+            EnsureSuccess(registered, "register the terms and conditions action");
+            action = await ReadRequiredActionAsync(token, actionPath, cancellationToken)
+                ?? throw new InvalidOperationException("The identity provider step 'read the terms and conditions action' found no action.");
+        }
+
+        var representation = action.Value.Deserialize<Dictionary<string, JsonElement>>()!;
+        if (BooleanOf(representation, "enabled") == on && BooleanOf(representation, "defaultAction") == on)
+        {
+            return;
+        }
+
+        representation["enabled"] = JsonSerializer.SerializeToElement(on);
+        representation["defaultAction"] = JsonSerializer.SerializeToElement(on);
+        using var updated = await SendAsync(token, HttpMethod.Put, actionPath, representation, cancellationToken);
+        EnsureSuccess(updated, "update the terms and conditions action");
+    }
+
+    private async Task<JsonElement?> ReadRequiredActionAsync(string token, string actionPath, CancellationToken cancellationToken)
+    {
+        using var response = await SendAsync(token, HttpMethod.Get, actionPath, null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        EnsureSuccess(response, "read the terms and conditions action");
+        return await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+    }
+
+    private static bool BooleanOf(Dictionary<string, JsonElement> representation, string name) =>
+        representation.TryGetValue(name, out var value) && value.ValueKind == JsonValueKind.True;
+
+    private async Task SyncTermsVersionAsync(string token, string realmPath, string? wanted, RealmUsers? users, CancellationToken cancellationToken)
+    {
+        using var read = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
+        EnsureSuccess(read, "read the realm");
+        var attributes = RealmClientProfile.ReadAttributes(await read.Content.ReadFromJsonAsync<JsonElement>(cancellationToken));
+        var stored = attributes.GetValueOrDefault(TermsVersionAttribute) is { Length: > 0 } version ? version : null;
+        if (wanted is null)
+        {
+            if (stored is null)
+            {
+                return;
+            }
+
+            attributes[TermsVersionAttribute] = "";
+        }
+        else
+        {
+            if (users is null || wanted == stored)
+            {
+                return;
+            }
+
+            // The users first: a failure leaves the stored version, so the next sync asks the users again.
+            await users.AddRequiredActionAsync(TermsAction, cancellationToken);
+            attributes[TermsVersionAttribute] = wanted;
+        }
+
+        // Keycloak may remove the attributes that an update leaves out, so the whole map goes back.
+        using var updated = await SendAsync(token, HttpMethod.Put, realmPath, new Dictionary<string, object> { ["attributes"] = attributes }, cancellationToken);
+        EnsureSuccess(updated, "store the terms version");
     }
 
     /// <summary>

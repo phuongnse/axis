@@ -13,6 +13,9 @@ public sealed class TenantDailyCounterStore(NpgsqlDataSource platform)
     /// <summary>The counter of the emails a worker sends.</summary>
     public const string Emails = "emails";
 
+    /// <summary>The counter of the emails-held notice, at most one a day.</summary>
+    public const string EmailsHeldNotice = "emailsHeldNotice";
+
     /// <summary>
     /// Adds one to the counter of the tenant on <paramref name="day"/> and returns <see langword="true"/>, unless the
     /// counter is at <paramref name="limit"/> already. With a <see langword="null"/> limit it always counts. With a limit

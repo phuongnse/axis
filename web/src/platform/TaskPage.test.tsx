@@ -494,10 +494,10 @@ describe('TaskPage', () => {
       [[], []],
       [['claim'], ['Claim']],
       [['release'], ['Release']],
-      [['reassign'], ['Reassign']],
+      [['reassign'], ['Reassign…']],
       [
         ['claim', 'release', 'reassign'],
-        ['Claim', 'Release', 'Reassign'],
+        ['Claim', 'Release', 'Reassign…'],
       ],
     ] as const) {
       stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands } }] })
@@ -506,7 +506,7 @@ describe('TaskPage', () => {
       await screen.findByTestId('field-value-title')
       expect(screen.queryByRole('button', { name: 'Claim' }) !== null).toBe(buttons.includes('Claim' as never))
       expect(screen.queryByRole('button', { name: 'Release' }) !== null).toBe(buttons.includes('Release' as never))
-      expect(screen.queryByRole('button', { name: 'Reassign' }) !== null).toBe(buttons.includes('Reassign' as never))
+      expect(screen.queryByRole('button', { name: 'Reassign…' }) !== null).toBe(buttons.includes('Reassign…' as never))
       expect(screen.getAllByRole('button')).toHaveLength(buttons.length + 3)
       unmount()
     }
@@ -581,7 +581,7 @@ describe('TaskPage', () => {
     }
 
     async function openDialog() {
-      await userEvent.click(await screen.findByRole('button', { name: 'Reassign' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Reassign…' }))
       return screen.findByRole('dialog')
     }
 
@@ -711,7 +711,7 @@ describe('TaskPage', () => {
           'This action is no longer possible. The task was loaded again.',
         )
         await waitFor(() => expect(api.taskReads()).toHaveLength(2))
-        await waitFor(() => expect(screen.queryByRole('button', { name: 'Reassign' })).not.toBeInTheDocument())
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Reassign…' })).not.toBeInTheDocument())
         unmount()
       }
     })

@@ -184,6 +184,7 @@ public sealed class CellStartTests(PostgreSqlFixture database) : IClassFixture<P
             ["Platform:SecretKey"] = TestPlatform.SecretKey,
             ["Health:Urls"] = "http://127.0.0.1:0",
             ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:IdlePollCeiling"] = "00:00:00.05",
         });
         builder.Configuration.AddInMemoryCollection(settings.Select(setting => new KeyValuePair<string, string?>(setting.Key, setting.Value)));
         builder.Services.AddAxisWorker(builder.Configuration, new HostingEnvironment { EnvironmentName = Environments.Development });

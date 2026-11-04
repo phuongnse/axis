@@ -28,6 +28,9 @@ namespace Axis.Processes.Instances;
 /// <c>pending</c>, and nothing more is sent until an operator redelivers the dead letter. In a cell the handler takes a
 /// slot of the tenant's <c>emailsPerDay</c> quota just before the send and gives it back when the send fails. With no
 /// slot left the email is held: the row stays <c>pending</c> and one transaction makes the item due at the next 00:00 UTC.
+/// The first email that is held in a UTC day takes the tenant's <c>emailsHeldNotice</c> counter, and the same transaction
+/// stores one notice for the tenant's administrators. A failed or lost transaction gives the counter back. When the
+/// platform database cannot be reached for the counter, the email is held with no notice and the first such item of a tenant logs one warning.
 /// When the platform database cannot be reached the email is not sent, the item is due again after one lease, and the first
 /// such item of a tenant logs one warning. Outside a cell nothing is counted or held.
 /// </summary>
@@ -42,6 +45,7 @@ internal sealed partial class NotificationEmailHandler(
     private readonly ConcurrentDictionary<string, byte> _warned = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _warnedPlain = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _warnedQuota = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _warnedNotice = new(StringComparer.Ordinal);
 
     public string Kind => ProcessStarts.NotificationEmailWorkItemKind;
 
@@ -109,7 +113,7 @@ internal sealed partial class NotificationEmailHandler(
 
             if (!slot.Value.Taken)
             {
-                return await HoldAsync(item, connection, slot.Value.Day, cancellationToken);
+                return await HoldAsync(item, connection, slot.Value, cancellationToken);
             }
         }
 
@@ -187,24 +191,74 @@ internal sealed partial class NotificationEmailHandler(
     }
 
     /// <summary>
-    /// Holds the email whose tenant has no slot left on <paramref name="day"/>: the row stays <c>pending</c> and one
-    /// transaction makes the item due at 00:00 UTC of the next day. Returns <see cref="WorkItemOutcome.LostClaim"/>
-    /// when another worker holds the item now, so nothing was written.
+    /// Holds the email whose tenant has no slot left on <paramref name="slot"/>'s day: the row stays <c>pending</c> and one
+    /// transaction makes the item due at 00:00 UTC of the next day. The first hold of the day also stores the notice for
+    /// the tenant's administrators in that transaction, once it has taken the day's notice counter. Returns
+    /// <see cref="WorkItemOutcome.LostClaim"/> when another worker holds the item now, so nothing was written.
     /// </summary>
-    private async Task<WorkItemOutcome> HoldAsync(ClaimedWorkItem item, NpgsqlConnection connection, DateOnly day, CancellationToken cancellationToken)
+    private async Task<WorkItemOutcome> HoldAsync(ClaimedWorkItem item, NpgsqlConnection connection, EmailSlot slot, CancellationToken cancellationToken)
     {
-        var dueAt = new DateTimeOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
-        if (!await WorkItemQueue.RescheduleAtAsync(connection, transaction, item, dueAt, cancellationToken))
+        var notice = false;
+        try
         {
-            await transaction.RollbackAsync(cancellationToken);
-            LogLostClaim(item.Id, item.EmailId);
-            return WorkItemOutcome.LostClaim;
+            notice = await quota!.TakeHeldNoticeAsync(item.TenantId, slot.Day, cancellationToken);
+        }
+        catch (NpgsqlException)
+        {
+            // Holding the email is what the quota requires, so a missing notice is the smaller harm.
+            if (_warnedNotice.TryAdd(item.TenantId, 0))
+            {
+                LogNoticeUnavailable(item.TenantId);
+            }
         }
 
-        await transaction.CommitAsync(cancellationToken);
+        var dueAt = new DateTimeOffset(slot.Day.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        try
+        {
+            await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
+            if (!await WorkItemQueue.RescheduleAtAsync(connection, transaction, item, dueAt, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, item.EmailId);
+                if (notice)
+                {
+                    await ReturnNoticeAsync(item.TenantId, slot.Day, cancellationToken);
+                }
+
+                return WorkItemOutcome.LostClaim;
+            }
+
+            if (notice)
+            {
+                await TenantNotices.InsertEmailsHeldAsync(transaction, slot.Limit ?? 0, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch when (notice)
+        {
+            await ReturnNoticeAsync(item.TenantId, slot.Day, CancellationToken.None);
+            throw;
+        }
+
         LogHeld(item.EmailId, item.TenantId, dueAt);
         return WorkItemOutcome.Rescheduled;
+    }
+
+    /// <summary>
+    /// Gives back the notice counter of a hold whose transaction did not commit. When the platform database cannot be
+    /// reached the counter stays taken, which is logged, and that day's notice is lost.
+    /// </summary>
+    private async Task ReturnNoticeAsync(string tenantId, DateOnly day, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await quota!.ReturnHeldNoticeAsync(tenantId, day, cancellationToken);
+        }
+        catch (NpgsqlException exception)
+        {
+            LogNoticeNotReturned(tenantId, exception.GetType().Name);
+        }
     }
 
     /// <summary>
@@ -341,6 +395,12 @@ internal sealed partial class NotificationEmailHandler(
 
     [LoggerMessage(LogLevel.Warning, "The platform database could not be reached to count the emails of tenant {TenantId}, so its emails are not sent and stay queued. This is logged once for the tenant.")]
     private partial void LogQuotaUnavailable(string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "The platform database could not be reached to count the emails-held notice of tenant {TenantId}, so the held email stores no notice. This is logged once for the tenant.")]
+    private partial void LogNoticeUnavailable(string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "The emails-held notice counter of tenant {TenantId} was not given back, because the platform database failed with {Error}.")]
+    private partial void LogNoticeNotReturned(string tenantId, string error);
 
     [LoggerMessage(LogLevel.Warning, "The slot of a failed email of tenant {TenantId} was not given back, because the platform database failed with {Error}.")]
     private partial void LogSlotNotReturned(string tenantId, string error);

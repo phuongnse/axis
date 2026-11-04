@@ -60,7 +60,7 @@ in the application. File names and names can change.
 
 | Method and path | Response |
 | --- | --- |
-| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. Each item also gives `titles` and `descriptions` by locale, from the manifest's `label` and `description` _(planned for M31)_, see [Studio workspace](studio-workspace.md#applications). A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
+| `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. Each item also gives `titles` and `descriptions`, always present and keyed by locale, from the manifest's `label` and `description` text keys looked up in each text resource, see [Studio workspace](studio-workspace.md#applications). Both are empty when nothing resolves, and a locale whose text resource lacks the key is left out. The folder is read as JSON and not compiled, so a folder that does not compile still gives what it can. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
 | `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) |
 | `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, builtIn, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template. Built-in templates come first, then the others, each group sorted by `id`. See [application templates](modules-and-templates.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
@@ -589,7 +589,7 @@ This route has its own order of checks. The first failure is the response:
    - a `name` that does not match `^[A-Za-z][A-Za-z0-9]*$` or is longer than 60
      characters;
    - a `name` whose [kebab-case](#writes) form is longer than 60 characters, or
-     is a reserved site path: `api`, `health`, `assets`, `studio`, `account`, `users` or `licences` _(planned for M31)_;
+     is a reserved site path: `api`, `health`, `assets`, `studio`, `account`, `users` or `licences`;
    - a `template` that is not a string.
 8. An unknown template, `404`. It is an `id` that no installed template has.
 9. A write lock that cannot be taken, `503`. See [Versions](#versions).
@@ -844,7 +844,7 @@ the outcome, see [Studio](studio.md).
 stateDiagram-v2
     [*] --> queued: request stored
     queued --> running: publisher claims it
-    running --> running: lease expired, claimed again
+    running --> running: lease expired or connection lost, claimed again
     running --> succeeded: all steps passed
     running --> failed: a step failed, or third expired claim (AXC0215)
     succeeded --> [*]
@@ -855,7 +855,7 @@ stateDiagram-v2
   reads them.
 - The publisher claims a request with a lease, and renews the lease while the
   request runs, so a long recompute is not claimed twice. A request whose
-  publisher died is claimed again after its lease ran out. It stays `running`.
+  publisher died is claimed again after its lease ran out, and one whose publisher lost its tenant database connection in the next round. It stays `running`.
 - A request that has been claimed three times, and whose lease runs out again,
   ends `failed` with `AXC0215` in place of a fourth claim. A request that
   crashes the publisher cannot block the queue for good.

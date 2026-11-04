@@ -69,7 +69,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
 | [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                              |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
-| [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, the FAPI 2.0 profile, authorization, development users |
+| [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, authorization, development users |
+| [FAPI 2.0 profile](reference/fapi2-profile.md)                         | The FAPI 2.0 Security Profile per tenant: PAR, `private_key_jwt`, DPoP and the client key |
 | [Axis's identity provider](reference/identity-provider.md)           | The identity provider Axis ships: realms, the `identityProvider` resource, sign-in per site, platform sign-in, the Axis theme, installation |
 | [User administration](reference/user-administration.md)              | The administrator role, the users page, accounts and their MFA, disabled users, and the roles an administrator gives |
 | [Security headers and rate limits](reference/headers-and-rate-limits.md) | The headers the server sets on every response, and the rate limits per partition      |
@@ -78,6 +79,9 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [ASVS](reference/asvs.md)                                              | The ASVS 5.0 Level 2 tracking: each requirement, its status and its evidence          |
 | [Fuzz tests](reference/fuzz-tests.md)                                  | The parsers that get fuzz tests, how they are fuzzed and how to replay a failure      |
 | [Threat model](reference/threat-model.md)                              | What can go wrong in Axis's own design, and each threat's status                      |
+| [Threat model: the product](reference/threat-model-product.md) | The server, worker, SPA, Studio, packages, connectors, identity provider and personal data threats |
+| [Threat model: the installation](reference/threat-model-installation.md) | The images, hosts, databases, backups, secrets and the cell console threats of an install |
+| [Threat model: the way Axis is built](reference/threat-model-build.md) | The NexKit, CI and AI agent threats of how Axis is built |
 | [Threat model method](reference/threat-model-method.md)                | How the threat model is filled: the methods, the rows, the ratings and the statuses    |
 | [Log inventory](reference/log-inventory.md)                            | Every log Axis writes: events, format, destination, readers, retention and the security events |
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
@@ -113,8 +117,10 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [E-invoices](reference/e-invoices.md) | Vietnamese e-invoices issued on payment through a provider adapter |
 | [Billing portal](reference/billing-portal.md) | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
+| [Outbound connections](reference/outbound-connections.md) | Every connection the server and the worker open, the setting that names its address and the allowlist |
 | [Several server replicas](reference/several-server-replicas.md)        | Running the server as several replicas behind a TLS proxy: key ring, forwarded headers, Studio volume |
 | [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
+| [Telemetry](reference/telemetry.md)                                            | Correlated logs, metrics and traces, the OTLP export, the Axis spans and what telemetry never holds                                                                |
 
 ## Working on Axis
 

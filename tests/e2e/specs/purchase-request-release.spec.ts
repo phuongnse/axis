@@ -109,7 +109,7 @@ async function writeInStudio(page: Page, serverUrl: string, file: string, pointe
 async function openStudio(page: Page, serverUrl: string) {
   await guardStep(page, test.info(), 'Opening Studio', 60_000, async () => {
     await page.goto(`${serverUrl}/studio?app=PurchaseRequests`)
-    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Publish…', exact: true })).toBeVisible()
   })
 }
 
@@ -131,7 +131,7 @@ async function signInToPreview(browser: Browser, baseURL: string, user: string) 
 
 /** Clicks Publish, fills the dialog's label and confirms. */
 async function publishWithLabel(page: Page, label: string) {
-  await page.getByRole('button', { name: 'Publish', exact: true }).click()
+  await page.getByRole('button', { name: 'Publish…', exact: true }).click()
   const dialog = await waitForDialog(page)
   await dialog.getByRole('textbox', { name: 'Label (optional)', exact: true }).fill(label)
   await confirmDialog(page, 'Publish')

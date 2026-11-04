@@ -10,11 +10,12 @@ namespace Axis.Server.Tests;
 /// <summary>
 /// Each instrument of the <c>Axis</c> meter records only the attribute keys that the
 /// <see href="../../docs/reference/process-execution.md#worker-metrics">worker metrics</see> table lists for it, or the
-/// <see href="../../docs/reference/health-checks.md">health checks</see> section for the server's gauge.
+/// <see href="../../docs/reference/health-checks.md">health checks</see> section for the server's gauge, or the
+/// <see href="../../docs/reference/tenant-backup-and-restore.md#backups-in-a-cell">backups in a cell</see> section for the backup gauge.
 /// </summary>
 public sealed class AxisMetricsTests
 {
-    // The table in docs/reference/process-execution.md and the health checks section of docs/architecture.md, as metric name to the attribute keys it may carry.
+    // The table in docs/reference/process-execution.md and the health checks section of docs/architecture.md and the backups in a cell section of docs/reference/tenant-backup-and-restore.md, as metric name to the attribute keys it may carry.
     private static readonly Dictionary<string, string[]> _allowed = new(StringComparer.Ordinal)
     {
         ["axis.work_items.duration"] = ["axis.tenant", "axis.work_item.kind", "axis.outcome"],
@@ -28,6 +29,10 @@ public sealed class AxisMetricsTests
         ["axis.rate_limits.refused"] = ["axis.partition"],
         ["axis.calls.attempts"] = ["axis.tenant", "axis.application", "axis.connector", "axis.package", "axis.operation", "axis.outcome"],
         ["axis.dead_letters.created"] = ["axis.tenant", "axis.work_item.kind"],
+        ["axis.backup.last_success"] = ["axis.tenant"],
+        ["axis.worker.active_tenants"] = [],
+        ["axis.worker.polls"] = ["axis.poll.found"],
+        ["axis.backup.restore_check"] = ["axis.tenant"],
     };
 
     [Fact]
@@ -51,6 +56,7 @@ public sealed class AxisMetricsTests
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         var tenantDatabases = new TenantDatabaseGauge(services.GetRequiredService<IMeterFactory>());
         var rateLimitRefusals = new RateLimitRefusals(services.GetRequiredService<IMeterFactory>());
+        var workerPolls = new WorkerPollMetrics(services.GetRequiredService<IMeterFactory>());
 
         void Record<T>(Instrument instrument, T measurement, ReadOnlySpan<KeyValuePair<string, object?>> tags, object? state)
             where T : struct
@@ -78,10 +84,15 @@ public sealed class AxisMetricsTests
         AxisMetrics.RecordQueryTimeout("default", "PurchaseRequests");
         AxisMetrics.RecordQueryTimeout("default", null);
         AxisMetrics.RecordDeadLetter("default", "event.deliver");
+        AxisMetrics.RecordBackupLastSuccess("default", DateTimeOffset.UtcNow);
+        AxisMetrics.RecordBackupRestoreCheck("default", true);
 
         gauges.Publish("default", [new WorkItemGauge("process.step", 3, 12.5)], [new PendingFieldsGauge("PurchaseRequests", 2)]);
         tenantDatabases.Record("default", true);
         rateLimitRefusals.Record(Partition.Session);
+        workerPolls.ObserveActiveTenants(() => 2);
+        workerPolls.RecordPoll(true);
+        workerPolls.RecordPoll(false);
         listener.RecordObservableInstruments();
 
         Assert.Equal([.. _allowed.Keys.Order(StringComparer.Ordinal)], [.. published.Order(StringComparer.Ordinal)]);

@@ -7,10 +7,11 @@ namespace Axis.Worker;
 /// Then its turn ends and the next tenant has its turn. A tenant that leaves the list keeps no deficit.
 /// A hand-out counts as running until <see cref="Done"/> or <see cref="Fail"/>. A tenant stays in the list while any of its
 /// items runs, because a running item may queue the next one. When a claim finds nothing due while other items of the tenant run,
-/// the tenant is idle: it is not handed out until one of those items ends. All members are thread-safe, because the loops
+/// the tenant is idle: it is not handed out until one of those items ends. A claim that found a call with no lease free ends the
+/// turn the same way: the tenant stays in the list, idle until one of its items ends or the next poll joins it. All members are thread-safe, because the loops
 /// of the worker share one list.
 /// </summary>
-internal sealed class TenantRounds(int quantum, Func<string, long> weight)
+public sealed class TenantRounds(int quantum, Func<string, long> weight)
 {
     private readonly object _gate = new();
     private readonly LinkedList<Entry> _list = new();
@@ -158,6 +159,36 @@ internal sealed class TenantRounds(int quantum, Func<string, long> weight)
                 else
                 {
                     Wake(node.Value);
+                }
+            }
+
+            UpdateSignal();
+        }
+    }
+
+    /// <summary>
+    /// Ends a hand-out whose claim found a call with no lease free. The tenant's turn ends and it stays in the list, idle until
+    /// one of its items ends or the next poll joins it. Its deficit is cleared, so a tenant that waits across many polls cannot
+    /// save up a burst.
+    /// </summary>
+    public void Wait(string tenantId)
+    {
+        lock (_gate)
+        {
+            var busy = BusyOf(tenantId);
+            if (--busy.Running == 0)
+            {
+                _busy.Remove(tenantId);
+            }
+
+            if (_index.TryGetValue(tenantId, out var node))
+            {
+                node.Value.Deficit = 0;
+                if (!node.Value.Idle)
+                {
+                    node.Value.Idle = true;
+                    node.Value.TurnStarted = false;
+                    _idle++;
                 }
             }
 

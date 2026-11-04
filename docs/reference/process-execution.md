@@ -777,17 +777,16 @@ again with the stored input under the same operation identity.
 
 ## Worker settings
 
-The worker polls every tenant database in the `Tenants` section of its
-configuration (see
-[Tenant configuration](../architecture.md#tenant-configuration)).
-Under `Tenancy:Source=directory`, the worker reads its tenants from the
-[tenant directory](../architecture.md#tenant-directory) instead, over
-`ConnectionStrings:Platform`, and ignores a `Tenants` section. It needs
-`ConnectionStrings:Platform` and `Platform:SecretKey` and stops at start without
-them, and it stops at start when `Tenancy:RefreshInterval` is invalid. It never
-uses `ConnectionStrings:PlatformSchema`. It reads the directory at start. If that
-read fails, it logs the failure once, retries every `Worker:PollInterval` and is
-not ready until a read works.
+The worker polls every tenant database in the `Tenants` section of its configuration (see
+[Tenant configuration](../architecture.md#tenant-configuration)). Under `Tenancy:Source=directory`,
+the worker reads its tenants from the [tenant directory](../architecture.md#tenant-directory)
+instead, over `ConnectionStrings:Platform`, and ignores a `Tenants` section. It needs
+`ConnectionStrings:Platform` and `Platform:SecretKey` and stops at start without them, and it stops
+at start when `Tenancy:RefreshInterval` is invalid. It never uses
+`ConnectionStrings:PlatformSchema`. It reads the directory at start. If that read fails, it logs the
+failure once, retries every `Worker:PollInterval` and is not ready until a read works. Under the
+directory source the worker also listens on `axis_work` over one direct platform connection and
+connects again when it drops, see [waking a tenant](worker-scheduling.md#waking-a-tenant).
 
 Then it reads the directory again every `Tenancy:RefreshInterval`, without a restart. The refresh
 runs in the poll. It pauses the loops and waits for the items already running, not for a tenant's
@@ -834,7 +833,8 @@ work items.
 | Setting                       | Default                 | Meaning                                                                                                                                                                                                                                                                                     |
 | ----------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Worker:LeaseDuration`        | `00:00:30`              | How long a claim lasts before another worker can claim the item.                                                                                                                                                                                                                            |
-| `Worker:PollInterval`         | `00:00:01`              | How long the worker waits between two polls of the tenants.                                                                                                                                                                                                                                 |
+| `Worker:PollInterval`         | `00:00:01`              | The wait between two polls of a tenant that has work, and the first wait of the back-off of an idle one, see [waking a tenant](worker-scheduling.md#waking-a-tenant). It must be positive.                                                                                                |
+| `Worker:IdlePollCeiling`      | `00:00:30`              | The longest wait between two polls of an idle tenant. It must be at least `Worker:PollInterval`, or the worker stops at start.                                                                                                                                                              |
 | `Worker:MetricsInterval`      | `00:00:30`              | How often the worker reads each tenant database for the [due work item and pending computed field gauges](#worker-metrics). It must be positive.                                                                                                                                            |
 | `Worker:Concurrency`          | `4`                     | The loops that run work items at once, see [fair share](worker-scheduling.md#fair-share). It must be at least 1.                                                                                                                                                                            |
 | `Worker:Quantum`              | `10`                    | The work items a tenant of weight 1 runs in one turn, see [fair share](worker-scheduling.md#fair-share). It must be at least 1.                                                                                                                                                             |
@@ -844,7 +844,7 @@ work items.
 | `Health:Urls`                 | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else.                                                                                                                                                                                   |
 
 As environment variables they are `Worker__LeaseDuration`,
-`Worker__PollInterval`, `Worker__Concurrency`, `Worker__Quantum`, `Worker__MetricsInterval`, `Worker__DeliveryAttempts`, `Worker__StatementTimeout`, `Notifications__RetentionDays` and `Health__Urls`. What the health endpoints answer is in [health checks](../architecture.md#health-checks).
+`Worker__PollInterval`, `Worker__IdlePollCeiling`, `Worker__Concurrency`, `Worker__Quantum`, `Worker__MetricsInterval`, `Worker__DeliveryAttempts`, `Worker__StatementTimeout`, `Notifications__RetentionDays` and `Health__Urls`. What the health endpoints answer is in [health checks](../architecture.md#health-checks).
 
 The server migrates the tenant databases, and the worker does not. Before it
 claims work for a tenant, the worker checks that the processes migrations are
@@ -883,18 +883,17 @@ release cannot be loaded is counted without `axis.application` and
 | `axis.queries.timeouts`          | counter    | `{query}`       | `axis.tenant`, `axis.application` when the route has one. An interactive read that ran past `Data:QueryTimeout`, or a write past `Data:WriteTimeout`, see [Errors](record-api.md#errors)           |
 | `axis.dead_letters.created`      | counter    | `{dead_letter}` | `axis.tenant`, `axis.work_item.kind`. See [Dead letters](process-events.md#dead-letters)                                                                                                           |
 | `axis.computed.pending_fields`   | gauge      | fields          | `axis.tenant`, `axis.application`. See [Recomputing computed fields](migrations.md#recomputing-computed-fields)                                                                                    |
+| `axis.worker.active_tenants`     | gauge      | `{tenant}`      | None. The length of the active list, see [metrics](worker-scheduling.md#metrics)                                                                                                                   |
+| `axis.worker.polls`              | counter    | `{poll}`        | `axis.poll.found`: `true` when the poll found work due, otherwise `false`. No tenant attribute                                                                                                     |
 
-The gauges are read every `Worker:MetricsInterval` by a loop that is separate
-from the work loop, so a hung item does not stop it and it does not slow the
-work. A metrics scrape never queries a tenant database. An item counts as due
-once its `due_at` has passed, claimed or not, so a hung item keeps aging. The
-age, the claim delay and the due time use the clock of the claim. The claim delay
-is recorded once per claim, so an item that is claimed again after its lease
-expired records again, and that delay includes the time the first worker held
-the item. Every kind the worker handles
-reports 0 when nothing is due, and so does every application with an active
-release when nothing is pending. A kind with due items that the worker has no
-handler for reports its real count. `axis.computed.pending_fields` adds up the
-pending field names of all pending entities of the application. A tenant whose
-database cannot be read logs a warning and reports no data until a later read
-succeeds.
+The gauges are read every `Worker:MetricsInterval` by a loop that is separate from the work loop, so
+a hung item does not stop it and it does not slow the work. A metrics scrape never queries a tenant
+database. An item counts as due once its `due_at` has passed, claimed or not, so a hung item keeps
+aging. The age, the claim delay and the due time use the clock of the claim. The claim delay is
+recorded once per claim, so an item that is claimed again after its lease expired records again, and
+that delay includes the time the first worker held the item. Every kind the worker handles reports 0
+when nothing is due, and so does every application with an active release when nothing is pending. A
+kind with due items that the worker has no handler for reports its real count.
+`axis.computed.pending_fields` adds up the pending field names of all pending entities of the
+application. A tenant whose database cannot be read logs a warning and reports no data until a later
+read succeeds.

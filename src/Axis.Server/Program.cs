@@ -8,6 +8,7 @@ using Axis.Presentation.Texts;
 using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
+using Axis.Server.CellApi;
 using Axis.Server.Console;
 using Axis.Server.DataSources;
 using Axis.Server.Endpoints;
@@ -58,6 +59,10 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, R
 var cell = CellOptions.Load(builder.Configuration);
 var runtimeAddress = TenantRuntimeAddress.Load(builder.Configuration, cell);
 builder.Services.AddSingleton(cell);
+builder.Services.AddSingleton(new CellHosts(cell));
+
+// A cell with a console or internal host reads the address of the operator realm, so a missing setting stops the start.
+var operatorRealm = CellOperator.Load(builder.Configuration, cell, builder.Environment);
 builder.Services.AddSingleton(QuotaDefaults.Load(builder.Configuration, cell));
 builder.Services.AddSingleton<TenantQuotas>();
 
@@ -153,7 +158,10 @@ builder.Services.AddOptions<KeyManagementOptions>().Configure<PlatformKeyRing>((
 builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
+builder.Services.AddSingleton<TenantUsageStore>();
 builder.Services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>();
+builder.Services.AddSingleton(provider => new TenantLeases(provider.GetRequiredService<NpgsqlDataSource>(), provider.GetRequiredService<ILogger<TenantLeases>>()));
+builder.Services.AddSingleton<QueryLeases>();
 builder.Services.AddSingleton<IStudioFileWriter, StudioFileWriter>();
 builder.Services.AddSingleton<TenantDatabaseGauge>();
 
@@ -201,8 +209,9 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
     .AddSession(plainHttpAllowed)
     .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed)
-    .AddEndpointCallers(oidcTenants, allowHttp: plainHttpAllowed);
-builder.Services.AddRouteAuthorization();
+    .AddEndpointCallers(oidcTenants, allowHttp: plainHttpAllowed)
+    .AddCellOperator(operatorRealm, allowHttp: plainHttpAllowed);
+builder.Services.AddRouteAuthorization(cell.OperatorRole);
 
 // Off unless folders are listed, which is the Production default.
 var startupFolders = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
@@ -243,6 +252,12 @@ app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment()
 
 // Outermost after the security headers, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
+
+// Only the directory source has a platform database to send the wake signal on.
+if (directorySource)
+{
+    app.UseWorkSignals();
+}
 
 // Before tenant resolution, so the forwarded host picks the tenant. The built-in middleware skips the proxy check
 // when a request has no client address, so such a request is kept out of it. Off when no proxy is named.
@@ -313,10 +328,13 @@ sessions.MapUserEndpoints();
 sessions.MapUserCommandEndpoints();
 sessions.MapConsoleEndpoints();
 sessions.MapAboutEndpoints();
+sessions.MapLicenceEndpoints();
 sessions.MapSessionEndpoints();
+sessions.MapAuthenticatorEndpoints();
 sessions.MapUserPickerEndpoints();
 sessions.MapUserIdFieldEndpoints();
 sessions.MapStudioEndpoints();
+sessions.MapCellEndpoints();
 
 // An /api path that matches no route answers a 404 problem, never the SPA's page. GET and HEAD only, as the SPA fallback,
 // so a wrong method on a real route still answers 405.

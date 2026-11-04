@@ -8,7 +8,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// Realms in the test Keycloak that play the company's issuer for a tenant realm that brokers to it, and the browser that signs a
-/// person in through them. The browser follows redirects and submits the self-submitting SAML forms. It deletes every realm it made, and every realm named by <see cref="NewRealmName"/>, when it is disposed.
+/// person in through them. The browser follows redirects and submits the self-submitting SAML forms, whether Keycloak's own theme or the Axis theme draws them. It deletes every realm it made, and every realm named by <see cref="NewRealmName"/>, when it is disposed.
 /// </summary>
 public sealed partial class UpstreamRealms : IDisposable
 {
@@ -213,10 +213,10 @@ public sealed partial class UpstreamRealms : IDisposable
     /// <summary>
     /// Plays a browser that starts at <paramref name="authorize"/>, an address of the tenant realm that sends the person to the
     /// provider, logs in at the <paramref name="upstream"/> realm and follows every redirect until Keycloak sends it to an address
-    /// that starts with <paramref name="callbackPrefix"/>. Returns that address. A page on the way, such as one that offers to link an
-    /// account, fails the test with its HTML.
+    /// that starts with <paramref name="callbackPrefix"/>. Returns that address, or <see langword="null"/> and the HTML of the page
+    /// where the sign-in stopped instead, such as a refusal.
     /// </summary>
-    public async Task<Uri> LogInAsync(Uri authorize, string upstream, string callbackPrefix)
+    public async Task<(Uri? Callback, string Html)> SignInAsync(Uri authorize, string upstream, string callbackPrefix)
     {
         var jar = new List<(string Name, string Path, string Value)>();
         var (page, html) = await FollowAsync(jar, HttpMethod.Get, authorize, null, callbackPrefix);
@@ -230,8 +230,18 @@ public sealed partial class UpstreamRealms : IDisposable
             ["password"] = UpstreamPassword,
             ["credentialId"] = "",
         }, callbackPrefix);
-        Assert.True(stopped is null, stoppedHtml);
-        return new Uri(stoppedHtml);
+        return stopped is null ? (new Uri(stoppedHtml), stoppedHtml) : (null, stoppedHtml);
+    }
+
+    /// <summary>
+    /// Plays the same browser as <see cref="SignInAsync"/> and returns the callback address. A page on the way, such as one that
+    /// offers to link an account, fails the test with its HTML.
+    /// </summary>
+    public async Task<Uri> LogInAsync(Uri authorize, string upstream, string callbackPrefix)
+    {
+        var (callback, html) = await SignInAsync(authorize, upstream, callbackPrefix);
+        Assert.True(callback is not null, html);
+        return callback;
     }
 
     public async Task<JsonElement> GetJsonAsync(string path)
@@ -255,7 +265,7 @@ public sealed partial class UpstreamRealms : IDisposable
 
     /// <summary>
     /// Sends the request and follows each redirect by hand. A page with a form that carries a hidden <c>SAMLRequest</c> or
-    /// <c>SAMLResponse</c> is submitted as a browser does, as a POST of the form's hidden inputs. Returns the address and HTML of the first
+    /// <c>SAMLResponse</c>, or an Axis <c>samlPost</c> context that holds them, is submitted as a browser does, as a POST of the form's fields. Returns the address and HTML of the first
     /// page that is neither, or <see langword="null"/> and the address when the redirects end at the callback.
     /// </summary>
     private async Task<(Uri? Page, string Html)> FollowAsync(
@@ -310,9 +320,17 @@ public sealed partial class UpstreamRealms : IDisposable
         throw new InvalidOperationException("The sign-in redirected more than 20 times.");
     }
 
-    /// <summary>The action and hidden inputs of the form that carries a <c>SAMLRequest</c> or a <c>SAMLResponse</c>, or <see langword="null"/> when the page has none.</summary>
+    /// <summary>
+    /// The action and fields of the form that carries a <c>SAMLRequest</c> or a <c>SAMLResponse</c>, or <see langword="null"/> when the page has none.
+    /// The Axis theme writes them in the <c>samlPost</c> context, Keycloak's own theme as hidden inputs.
+    /// </summary>
     private static (string Action, Dictionary<string, string> Fields)? SamlForm(string html)
     {
+        if (html.Contains("id=\"axis-sign-in-context\"", StringComparison.Ordinal))
+        {
+            return KeycloakSignIn.Page(html) == "samlPost" ? AxisSamlForm(html) : null;
+        }
+
         var fields = new Dictionary<string, string>();
         foreach (Match input in InputPattern().Matches(html))
         {
@@ -333,6 +351,21 @@ public sealed partial class UpstreamRealms : IDisposable
         return action.Success && (fields.ContainsKey("SAMLRequest") || fields.ContainsKey("SAMLResponse"))
             ? (WebUtility.HtmlDecode(action.Groups["action"].Value), fields)
             : null;
+    }
+
+    private static (string Action, Dictionary<string, string> Fields) AxisSamlForm(string html)
+    {
+        var fields = new Dictionary<string, string>();
+        foreach (var (property, name) in new[] { ("samlRequest", "SAMLRequest"), ("samlResponse", "SAMLResponse"), ("relayState", "RelayState") })
+        {
+            var value = KeycloakSignIn.Property(html, property);
+            if (value is not null)
+            {
+                fields[name] = value;
+            }
+        }
+
+        return (KeycloakSignIn.Property(html, "action")!, fields);
     }
 
     /// <summary>

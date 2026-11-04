@@ -159,7 +159,8 @@ and a JSON view, and shows the diagnostics.
   only there. Studio creates the folder the first time it uses it. Another tenant's application, by
   name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
   message names `Studio:Folders` and `Cell:Id`, because the folders would be reached by every tenant.
-  _(planned for M31)_ The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell),
+  The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell) _(built)_, and
+  a restore writes it under the new tenant. _(planned for M31)_ The tenant's folder joins its
   [export and deletion](tenant-lifecycle.md), see [cells](cells.md).
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
@@ -269,7 +270,7 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
 | `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start. |
 | `Platform:PreviousSecretKey` | none | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key). |
-| `ConnectionStrings:Platform` | none | A role that reads the `platform` schema and writes only three things: rows it inserts into `platform.data_protection_keys`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, and rows it inserts and updates in `platform.tenant_daily_counters`. Both hosts need it under `directory`. Outside Development and Testing the server, and the worker under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `ConnectionStrings:Platform` | none | A role that reads the `platform` schema and writes only four things: rows it inserts into `platform.data_protection_keys`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. Both hosts need it under `directory`. Outside Development and Testing the server, and the worker under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 | `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations, under both sources. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. Outside Development and Testing the server refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 
 As environment variables they are `Tenancy__Source`,
@@ -316,10 +317,13 @@ As environment variables they are `Tenancy__Source`,
   hosts for one site stop the start. Under `directory`, `tenant host add --site` gives it. The E2E server
   uses this for its site host.
 
-- **Legal links** _(planned for M31)_. Under `configuration`, `Tenants:{id}:Legal:PrivacyUrl`, `Tenants:{id}:Legal:TermsUrl`
+- **Legal links.** Under `configuration`, `Tenants:{id}:Legal:PrivacyUrl`, `Tenants:{id}:Legal:TermsUrl`
   and `Tenants:{id}:Legal:TermsVersion` give the tenant's [legal links](legal.md#legal-settings), and
   `Tenants:{id}:Legal:Sites:{path}:PrivacyUrl` and `...:TermsUrl` a site's own. Under `directory` the
-  [legal links commands](tenant-setting-commands.md#legal-links) set them.
+  [legal links commands](tenant-setting-commands.md#legal-links) set them. The same checks apply to both. An
+  address that is not an `https` address, a terms address without a version, a version without a terms address, a
+  `TermsVersion` on a site, and a site path that is not valid or is reserved stop the start, and the message names the
+  setting. A preview tenant takes its main tenant's block, and a `Legal` block of its own stops the start.
 - **Tenant keys.** Under `configuration`, `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}`
   give a tenant's data keys and lookup keys, each 32 bytes in base64, as the environment variables
   `Tenants__<id>__DataKeys__<number>` and `Tenants__<id>__LookupKeys__<number>`. A number is an integer of at least 1.
@@ -588,7 +592,7 @@ variables:
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | The endpoint for logs only |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | The OTLP protocol |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Headers sent with every export |
-| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker` |
+| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker`, and to `axis-admin` for `cell backup` and `cell restore-check` |
 | `OTEL_RESOURCE_ATTRIBUTES` | More resource attributes |
 
 With no endpoint, nothing is exported and logs still go to the console. The
@@ -597,6 +601,11 @@ never from a committed file. Docker Compose and `scripts/dev.sh` set no
 endpoint and start no collector. Outside Development every endpoint variable that
 is set must be an absolute `https` URL, or the server and the worker stop at start
 and the error names the variable, never its value. Development accepts `http`.
+
+The admin tool's `cell backup` and `cell restore-check` also read these variables, from their own settings, and export the gauges
+`axis.backup.last_success` and `axis.backup.restore_check` as metrics only, see
+[backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). Outside Development they
+apply the same `https` rule and exit with code `2`, naming the variable, before they upload or change anything.
 
 ## Cell settings
 
@@ -611,7 +620,8 @@ settings at start. With `Cell:Id` set they need `Tenancy:Source=directory`, `Cel
 `Cell:TenantDomain`. The id is the region, a hyphen and a number, such as `vn-1`, and the region
 uses lowercase letters and digits. A wrong value stops the start and the message names the
 setting. `Axis.Admin` refuses every command with exit code 2. The features the settings turn on
-are still planned.
+are still planned, except the read routes of the
+[provisioning API](tenant-lifecycle.md#provisioning-api).
 
 The runtime database address is the exception. Only the server and the worker read and check
 `Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, and only with `Cell:Id` set. A port that is
@@ -629,18 +639,24 @@ does not read `Quotas:Defaults` yet.
 | `Cell:Id` | All hosts | The cell id, such as `vn-1`. Setting it turns on quotas, per-tenant Studio folders and the cell console. |
 | `Cell:Region` | All hosts | The region code, such as `vn`. |
 | `Cell:TenantDomain` | Server, publisher | The domain of the tenant subdomains, such as `vn.example.com`. |
-| `Cell:InternalDomain` | Publisher | A domain no ingress serves, for scratch tenants of the restore check. |
+| `Cell:InternalDomain` | Admin, publisher | A domain no ingress serves, for scratch tenants of the restore check. `cell restore-check` stops with exit code `2` when it is blank. |
 | `Cell:TenantCap` | Server | The measured number of tenants the cell holds, see [cell size](cells.md#cell-size). |
 | `Cell:ConsoleHost` | Server | The host of the [cell console](cell-console.md). |
 | `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
-| `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup` and `tenant restore` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
+| `IdentityProvider:Url` | Server | In a cell with `Cell:ConsoleHost` or `Cell:InternalUrl` set, the server reads the identity provider's address, described in the [admin settings](#admin-settings), and finds the operator realm at `realms/<Cell:OperatorRealm>` under it. A missing or wrong value stops the start, and the message names the setting. |
+| `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup`, `tenant restore`, `cell backup` and `cell restore-check` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
+| `Cell:BackupStorage:ServiceUrl` | Admin | The address of the S3-compatible service that `cell backup` uploads to. Only `cell backup` and `cell restore-check` read the five `Cell:BackupStorage` settings, and they stop with exit code `2` when one is blank, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
+| `Cell:BackupStorage:Region` | Admin | The signing region of that service. |
+| `Cell:BackupStorage:Bucket` | Admin | The bucket that receives `<tenant id>/<yyyy-mm-dd>.axisbak`. |
+| `Cell:BackupStorage:AccessKeyId` | Admin | The access key id of the service. |
+| `Cell:BackupStorage:SecretAccessKey` | Admin | The secret access key of the service. It is never printed. |
 | `Cell:RuntimeDatabaseHost` | Server, worker | The address of every tenant's runtime database connection, such as PgBouncer, see [connections](cells.md#connections). Those connections also take `Maximum Pool Size=5`, `Minimum Pool Size=0`, `Connection Idle Lifetime=60` and `Max Auto Prepare=0`. Without it each connection uses the host of the tenant's directory row. The schema role, the publisher, the worker's `LISTEN` connection and the platform connections never use it. |
 | `Cell:RuntimeDatabasePort` | Server, worker | The port of that address. It defaults to the port of the tenant's directory row. Setting it without `Cell:RuntimeDatabaseHost` stops the start. |
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |
 | `Worker:Concurrency` | Worker | The loops that claim work at once, 4 by default, see [fair share](worker-scheduling.md#fair-share). |
 | `Worker:Quantum` | Worker | The work items a tenant of weight 1 runs in a round, 10 by default. |
-| `Worker:IdlePollCeiling` | Worker | The longest wait between two polls of an idle tenant, 30 seconds by default. |
+| `Worker:IdlePollCeiling` | Worker | The longest wait between two polls of an idle tenant, 30 seconds by default. It must be at least `Worker:PollInterval`, or the worker stops at start. |
 

@@ -37,34 +37,38 @@ test('opening the home page without a session lands on the Keycloak sign-in page
   expect(new URL(page.url()).origin).toBe(new URL(process.env.AXIS_E2E_KEYCLOAK_URL!).origin)
 })
 
-test('after signing out from the header menu, the current user endpoint answers 401 and the signed-out card can sign in again', async ({
+test('after signing out from the header menu, no identity provider page shows, the current user endpoint answers 401 and the signed-out card can sign in again', async ({
   page,
   baseURL,
 }) => {
   await signInAsAnna(page)
   const banner = page.getByRole('banner')
   await banner.getByRole('button', { name: 'Requester User', exact: true }).click()
+  // The server ends the identity provider's session itself, so the browser never visits Keycloak to sign out.
+  const visited: string[] = []
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) {
+      visited.push(frame.url())
+    }
+  })
   await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click()
 
-  // The server keeps no ID token, so Keycloak may ask to confirm the sign-out.
-  const confirm = page.locator('#kc-logout')
   const signedOut = page.getByRole('main').getByText('You have signed out', { exact: true })
-  await expect(confirm.or(signedOut)).toBeVisible()
-  if (await confirm.isVisible()) {
-    await confirm.click()
-  }
-
   await page.waitForURL(`${baseURL}/?signedOut`)
+  const keycloakOrigin = new URL(process.env.AXIS_E2E_KEYCLOAK_URL!).origin
+  expect(visited.filter((url) => new URL(url).origin === keycloakOrigin)).toEqual([])
   expect((await page.request.get('/api/me')).status()).toBe(401)
   await expect(signedOut).toBeVisible()
   await expect(page.getByText('You can close this page, or sign in again.', { exact: true })).toBeVisible()
 
   await page.getByRole('main').getByRole('button', { name: 'Sign in again', exact: true }).click()
   // Keycloak keeps the language of the person who signed out in a cookie, and may show its page in Vietnamese.
-  const english = page.getByRole('link', { name: 'Tiếng Anh (English)', exact: true })
-  await expect(signInUsername(page).or(english)).toBeVisible()
-  if (await english.isVisible()) {
-    await english.click()
+  const gear = page.getByRole('button', { name: 'Ngôn ngữ và giao diện', exact: true })
+  await expect(signInUsername(page).or(gear)).toBeVisible()
+  if (await gear.isVisible()) {
+    await gear.click()
+    await page.getByRole('menuitemradio', { name: 'Tiếng Anh (English)', exact: true }).click()
+    await expect(signInUsername(page)).toBeVisible()
   }
   await logInAtKeycloak(page, 'requester')
 
@@ -72,7 +76,7 @@ test('after signing out from the header menu, the current user endpoint answers 
   await expect(banner.getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()
 })
 
-test('a person who cancels at the Keycloak login page lands on the home page with a message and can sign in again', async ({
+test('a sign-in that the identity provider refuses lands on the home page with a message and can sign in again', async ({
   page,
   baseURL,
 }) => {
@@ -81,8 +85,8 @@ test('a person who cancels at the Keycloak login page lands on the home page wit
   await page.goto('/')
   await signInUsername(page).waitFor()
   const state = new URL(page.url()).searchParams.get('state')
-  // The realm's login form has no cancel button. This is the answer Keycloak sends when a person cancels.
-  await page.goto(`/api/auth/callback?error=access_denied&state=${encodeURIComponent(state!)}`)
+  // This is the answer Keycloak sends when it cannot sign the person in. access_denied is a declined terms step instead.
+  await page.goto(`/api/auth/callback?error=temporarily_unavailable&state=${encodeURIComponent(state!)}`)
 
   await expect(page).toHaveURL(`${baseURL}/?signIn=failed`)
   await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toBeVisible()

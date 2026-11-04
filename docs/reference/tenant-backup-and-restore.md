@@ -20,6 +20,10 @@ takes no key file: it uses the tenant's own backup key, see [backups in a cell](
 | `--backup-key-file <file>` | The backup key: a file that holds 32 bytes in base64, such as the output of `openssl rand -base64 32`. Surrounding white space is ignored. The key is read from the file only, never from the command line or a setting. The operator keeps it outside the installation. Required outside a cell, and refused in a cell. |
 
 The archive holds a tar with two entries, `manifest.json` and `tenant.dump`, and the whole file is encrypted with the backup key.
+A tenant with its own realm may also have a third entry, `realm.json`, right after `manifest.json`, see step 2 below.
+In a cell the tar also holds the tenant's Studio folder, one `studio/<path>` entry for each file of
+`<Studio:ApplicationsPath>/<tenant id>/`, between `manifest.json` and `tenant.dump`, see
+[backups in a cell](#backups-in-a-cell). Outside a cell it has no `studio/` entry.
 It starts with `AXISBAK1` and 8 random bytes. The tar follows in chunks of 1 MiB, each encrypted with AES-256-GCM, so the file
 shows nothing of the dump, the manifest or the tenant id. See [encrypted backups](data-encryption.md#encrypted-backups).
 The manifest holds the tenant's data keys and lookup keys, which is why the archive is encrypted. No database password, OIDC
@@ -32,12 +36,22 @@ can recover them.
    tenant database as its schema role. It reads one consistent snapshot, so the
    tenant keeps running and its hosts keep answering. The tool reads the
    manifest data inside the same snapshot, so a release that is activated during
-   the backup is in both the dump and the manifest or in neither. The schema
+   the backup is in both the dump and the manifest or in neither. The row
+   counts of the manifest are read in that snapshot too. The schema
    role's password goes to `pg_dump` in its environment, never in its
    arguments. The tool holds one transaction open until the dump ends, so
    vacuum on the tenant database waits, and so does an activation that changes
    tables.
-2. `archive`: write the manifest and the dump into `--out`, encrypted with the backup key. The dump is first written to a temporary
+2. `realm`: only for a tenant with its own realm, and only when `IdentityProvider:DatabaseConnectionString` is set, see
+   [settings](administration.md#settings). It builds `realm.json` in memory. The file holds the realm's roles (the realm roles and the roles of the `axis`
+   and `site-` clients), its groups, and its users. Each user comes with its `id`, role mappings, groups, required actions and credentials. It holds no client
+   and no service-account user. Roles come from the identity provider's admin API as the realm's `axis-activation` client, and groups and users as its `axis-users` client.
+   The credentials, which are password hashes and authenticator secrets that the admin API never returns, come from the `credential` table of the identity
+   provider's database, for the users that the admin API returned, through that setting. The field names are those of the identity provider's realm export.
+   The entry is [secret](keys-and-data-protection.md#secret) data: it is written only inside the encrypted archive, and no file, output line or error line
+   holds any part of it. A tenant without its own realm, such as a preview tenant or one that signs in elsewhere, gets no `realm` line. Without the setting, no tenant does.
+   The users and the credentials are two reads, not one snapshot, so a credential added between them can be missing.
+3. `archive`: write the manifest, `realm.json` when there is one, the Studio files in a cell and the dump into `--out`, encrypted with the backup key. The dump is first written to a temporary
    file next to `--out` that only its owner can read. The tool deletes it when the step ends.
 
 A tenant in any status except `provisioning` can be backed up, also a
@@ -56,6 +70,7 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `packages` | Every extension package version that a stored release pins. Each has `id`, `version` and `required`. |
 | `modules` | Every module version that a stored release pins. Each has `id` and `version`. |
 | `keys` | The tenant's data keys and lookup keys. Each has `kind` (`data` or `lookup`), `number` and `key`, the base64 text of its 32 bytes. A restore stores them under its own installation key with the same numbers. An archive with no `keys` gets number 1 of each kind. |
+| `counts` | The row count of each ordinary table of the tenant database outside the system schemas, keyed `schema.table`, read in the dump's snapshot. A restore does not use it, and an archive without `counts` restores as before. |
 
 `directory` holds these fields:
 
@@ -90,12 +105,13 @@ start check `AXC0146` rebuilds, see
 [extension packages](extension-packages.md). Other stored releases are listed
 with `required` set to `false`.
 
-**Failures.** A failed dump or write exits `1` and leaves no partial file. A
+**Failures.** A failed dump, realm read or write exits `1` and leaves no partial file. A failed `realm` step writes `<id> realm failed: <message>`, and the message
+names the identity provider step and its status, or the database error, and never a response body, a host or a secret. A
 `--out` that appears during the backup is never overwritten.
 
-**Exit codes.** `0` when the archive is written. `1` when the dump or the write
+**Exit codes.** `0` when the archive is written. `1` when the dump, the realm read or the write
 failed. `2` for an unknown tenant, a `provisioning` tenant, an `--out` file that
-exists, a missing option, a missing or malformed `--backup-key-file`, a missing tool or a missing setting.
+exists, a missing option, a missing or malformed `--backup-key-file`, a missing tool or a missing setting, and also for an `IdentityProvider:DatabaseConnectionString` that is not a connection string or, outside Development and Testing, does not set `SSL Mode=VerifyFull`.
 In a cell, `2` also covers a `--backup-key-file` (it is refused), a missing or unreadable `Cell:BackupKeyFile` and a tenant that has no backup key.
 A key file problem goes to standard error.
 
@@ -132,6 +148,9 @@ what is missing:
   encrypted, which can no longer be restored. The message is `the archive is not an encrypted backup`.
 - The backup key does not open the archive. The first chunk does not decrypt, so the key is wrong or the file is cut or changed.
   The message is `the backup key does not open the archive`.
+- The archive holds an unsafe Studio path, in a cell or not. A `studio/` entry is unsafe when it is not a regular file, when its
+  path is empty or rooted, holds a backslash or a control character, or has an empty, `.` or `..` segment, or when its name
+  repeats. `tenant backup` never writes one. The message is `the archive holds an unsafe Studio path: <name>`, one line for each.
 - The archive's `schemaVersion` is newer than this build's, or is not the id of
   one of its migrations.
 - The tenant id exists in the directory as `active` or `suspended`.
@@ -144,6 +163,13 @@ what is missing:
 - A package version with `required` set to `true` is not installed under
   `Extensions:Path`. The message lists every missing version, not only the first.
 - The archive's `realm` is `true` and `IdentityProvider:Url` is not set, or the identity provider cannot say whether the realm exists.
+- The tenant gets a new realm and the archive's `realm.json` is larger than 64 MiB, or is not a valid realm document: it is not JSON, or it
+  lacks `realm`, `roles`, `groups` or `users` in the shape that `tenant backup` writes, or a user has no `id` or `username`. The messages are
+  `the archive's realm.json is larger than 64 MiB`, which is decided from the entry's length before anything is read, and
+  `the archive's realm.json is not valid`. Neither shows any content of the file. A restore that keeps the archive's realm never uses the file,
+  so it never refuses it.
+- In a cell, the archive holds Studio files and `Studio:ApplicationsPath` is not set. The message is
+  `the archive holds Studio files and the setting Studio:ApplicationsPath is not set`.
 - The restored tenant keeps the archive's sign-in and `AXIS_OIDC_CLIENT_SECRET` is missing. This one is written to standard error, before any `check` line.
 
 Every failed check is reported, not only the first. Each one is a
@@ -166,7 +192,8 @@ it keeps working without the module installed.
 **Steps, in order.** Each step writes its own line.
 
 1. `check`: read the archive and make every check above. It decrypts the archive only as far as the manifest and the start of
-   `tenant.dump`. It asks the identity provider whether the archive's realm exists.
+   `tenant.dump`. It reads the `studio/` entries before the dump and no other. It also reads `realm.json`, which sits right after the manifest, and keeps it
+   in memory. It asks the identity provider whether the archive's realm exists.
 2. `entry`: write the directory entry with status `provisioning`. It takes the
    new id and hosts, and everything else from `directory` in the manifest. A `--host` that matches a `sites` entry's `host`, ignoring letter case, gets its site. A tenant that gets a new realm has empty sign-in settings until the `realm` step. A
    `secret` binding is restored by name and kind, without a value. A `url` or `storage`
@@ -200,13 +227,26 @@ it keeps working without the module installed.
     the realm in step with the tenant's active releases: a `site-` client for each site, and a brokered provider for each `oidc`
     identity provider. The archive holds no secret value, so a provider whose bindings have no value yet is left out, with a
     `<id> warning ...` line on standard error that names the provider and the binding. The next `activate`, publish or
-    server start adds it once the operator has set those bindings.
-13. `version`: record the schema version and set the entry `suspended`. The step
+    server start adds it once the operator has set those bindings. When the archive holds `realm.json`, the step then imports it into
+    the new realm with the identity provider's partial import, as the master admin client, and skips what already exists. It imports the
+    roles and groups first, then the users in batches of 100. Each user keeps the id, so the `sub` claim and every reference in the tenant
+    database still match, and keeps the password hash and the authenticators, so people sign in as before without an invitation. The old
+    realm's default role, `default-roles-<archive realm name in lower case>`, is mapped to the new realm's default role. A role of a client that the
+    new realm lacks, such as a `site-` client that no active release makes, is dropped from the roles, the composites and the mappings. A
+    failed import fails the step. Users, password changes and authenticators added after the backup are lost, and people deleted since come back.
+    The file holds no link to a brokered provider, so such a person is not linked again. Sessions, brute-force counters and consents are not restored.
+13. `studio`: only in a cell, and only when the archive holds `studio/` entries. Write each of them as a file under
+    `<Studio:ApplicationsPath>/<new id>/`, creating its folders. A file of the same path is overwritten and any other file of
+    the folder stays, so a rerun writes them again. Outside a cell, a restore of an archive with Studio files runs no `studio`
+    step and writes one `<id> warning ...` line on standard error: the files are skipped. An archive without `studio/` entries
+    has no `studio` line and no warning, in a cell or not.
+14. `version`: record the schema version and set the entry `suspended`. The step
     fails unless the database is on the schema of this build, which catches an
     archive whose manifest does not match its dump.
 
 **Running it again.** On a `provisioning` entry, the same command skips every
-step already done and finishes the rest, as `tenant create` does. An entry that already holds the secrets of a new realm goes on with the new realm. A failed
+step already done and finishes the rest, as `tenant create` does. An entry that already holds the secrets of a new realm goes on with the new realm and imports `realm.json` again, which skips what the first run imported, so
+the import can finish after a failure in the middle. A failed
 `restore` step restored nothing, so the rerun restores again, with the same archive or a good copy of it. A rerun also writes the tenant's keys again from the archive. A database that
 already holds tables counts as restored, so the rerun does not restore it a
 second time. On an `active` or `suspended` tenant it is refused.
@@ -221,8 +261,8 @@ option or a missing setting.
    secret from `AXIS_OIDC_CLIENT_SECRET`, and a tenant with a new realm has its client secret already.
 2. Run [`tenant resume <id>`](tenant-status-commands.md#tenant-resume).
 
-A tenant with a new realm has no accounts, because the archive carries no account, credential or role mapping. Its people
-need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
+A tenant with a new realm has the people of `realm.json` when the archive holds one, and they sign in as before. An archive without it gives a realm with no
+accounts but the service accounts, and the people need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
 
 Set each `secret` binding with
 [`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings), see
@@ -263,7 +303,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant, which is built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive and its import by a restore into a new realm, the `cell backup` command with its metric `axis.backup.last_success`, the `cell restore-check` command with its metric `axis.backup.restore_check`, and the chart's CronJob, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -282,37 +322,114 @@ format and the steps above stay, with the changes below.
   `tenant create`, `tenant backup` and `tenant restore` stop with exit code `2` when `Cell:BackupKeyFile`
   is missing or cannot be read. A tenant made in a cell before this key existed has no key, and `tenant backup` refuses it.
   `platform rekey` leaves `platform.tenant_backup_keys` alone, because the installation key does not wrap it.
+- **The Studio folder in the archive** _(built)_. The archive gets one `studio/<path>` entry for each file of
+  `<Studio:ApplicationsPath>/<tenant id>/`, with `/` as separator, in ordinal order of the path and between `manifest.json` and
+  `tenant.dump`. A symbolic link is skipped, so a link cannot pull in a file from outside the folder. A tenant with no folder
+  adds no entry. `tenant backup` and `tenant restore` read `Studio:ApplicationsPath` themselves and resolve a relative path
+  against their working directory. `tenant restore` checks every Studio path in its `check` step, see the refusals above, and
+  its `studio` step writes the files under the new tenant's folder. A cell with no `Studio:ApplicationsPath` refuses an archive
+  that holds Studio files. A restore outside a cell skips them with a warning. An archive without `studio/` entries restores as
+  before.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
   key. Its archives stay in object storage until their lock ends, and nothing can read them. One
   leaked tenant key opens only that tenant's archives.
-- **Daily job.** A Kubernetes CronJob runs `cell backup` at 01:00 in the region's time zone. It backs up
+- **Daily job** _(built)_. In a cell with `backup.bucket` set, the chart's CronJob runs
+  `cell backup` at 01:00 in `backup.timeZone`, never two at once, with no retry and a deadline of
+  6 hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets). The command is _(built)_. It backs up
   every `active` and `suspended` tenant, four at a time, and writes each archive to the region's
-  object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`. It writes a platform audit record and the
-  metric `axis.backup.last_success` for each tenant. A failed tenant is tried again once, and the
-  others go on. The job ends within 6 hours or fails.
+  object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`, where the date is the UTC date when the run starts. A
+  `provisioning` tenant is skipped. Each archive is encrypted with the tenant's own backup key,
+  written to a temporary folder that only its owner can use, uploaded and deleted. The command writes one platform audit
+  record for each tenant, `cell backup`, before the first try, and a retry writes none. A failed tenant is tried again once, at once,
+  and the others go on. The run ends within 6 hours: after that it stops and exits with code `1`.
+  - **Last success** _(built)_. After a tenant's archive is uploaded, the command stores the time of the upload, from the clock of the
+    admin tool, in `platform.tenant_backups`. A tenant that fails keeps the time it had. At the end of the run, also when it
+    stopped at its limit, the command records the gauge `axis.backup.last_success` for each `active` and `suspended` tenant that has a
+    stored time. The value is in Unix seconds and the tag `axis.tenant` names the tenant. A tenant that never succeeded has no
+    point. When `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` is set, the command exports the gauge over
+    OTLP before it exits, see [telemetry export](host-settings.md#telemetry-export). With no endpoint, nothing is exported. An alert
+    on a gauge that is too old is _(planned for M31)_.
+  - **Settings.** `Cell:BackupStorage:ServiceUrl`, `:Region`, `:Bucket`, `:AccessKeyId` and `:SecretAccessKey` name
+    an S3-compatible service, reached with the AWS SDK and path-style addressing, see
+    [host settings](host-settings.md#cell-settings). All five are required. The command also needs `Cell:Id`,
+    `Cell:BackupKeyFile`, the platform database, the installation key and `pg_dump` on `PATH`.
+  - **Output.** Each line starts with the tenant id. A try writes the lines of the `tenant backup` steps,
+    `dump`, `realm` (only with `IdentityProvider:DatabaseConnectionString` set, for a tenant with its own realm) and `archive`, and then `upload ok`. A step that fails writes `<step> failed: <message>`, where the step is
+    `key` (the tenant has no backup key or it does not unwrap), `check` (the tenant cannot be backed up, for example
+    because it is no longer in the directory), `dump`, `realm`, `archive` or `upload`. The message of `upload` is the error code of the service or the
+    name of the error type, never the address or a key. When the time runs out, the last line is
+    `cell backup stopped: the run reached its 6-hour limit`. A tenant whose upload time cannot be stored writes
+    `<tenant id> record failed: <message>` after its upload, counts as failed and is not uploaded again. When the gauge cannot be
+    recorded, the last line is `cell backup metric failed: <message>`, and the command exits `1`. No line holds the secret access key.
+  - **Exit codes.** `0` when every tenant succeeded. `1` when any tenant failed or the time ran out. `2` outside a cell
+    or when a setting or `pg_dump` is missing, or when an OTLP endpoint setting is not an absolute `https` URL outside Development,
+    before anything is uploaded or audited.
 - **Object lock.** The bucket has object lock in compliance mode for 30 days and a lifecycle rule
   that deletes an archive after 30 days. Nobody, the operator included, can delete or change an
   archive before then.
-- **The realm in the archive.** The archive gets a third entry, `realm.json`: the tenant's realm with
+- **The realm in the archive** _(built)_. The archive gets a third entry, `realm.json`: the tenant's realm with
   its users, role mappings, credentials and required actions, as the identity provider's export
-  writes it. The credentials are hashes and authenticator secrets, so the entry is
+  writes it. `tenant backup` writes it when `IdentityProvider:DatabaseConnectionString` is set, see step 2 of [tenant backup](#tenant-backup). The chart and the Compose files do not set that setting yet, so the daily `cell backup` writes no `realm.json` until they do. The credentials are hashes and authenticator secrets, so the entry is
   [secret](keys-and-data-protection.md#secret) data, and the archive's encryption covers it. A
   restore imports it into the new tenant's realm, so its people sign in as before, and needs no new
   invitation. An archive without `realm.json` restores as today.
-- **Counts in the manifest.** The manifest gets `counts`: the row count of each table of the tenant
-  database, read in the dump's snapshot.
+- **Counts in the manifest** _(built)_. The manifest gets `counts`: the row count of each table of the tenant
+  database, read in the dump's snapshot. Every `tenant backup` writes them, also outside a cell.
 
 **Weekly restore check.** Each Sunday at 03:00 in the region's time zone, a job checks that a restore
-works.
+works. The job is _(planned for M31)_. The command `cell restore-check` and its metric are _(built)_ and do
+steps 1 to 5.
 
 1. It picks a tenant at random among those with an archive of the last 2 days, and takes its newest
    archive.
 2. It restores it with `tenant restore` into a scratch tenant, `restore-check-<yyyymmdd>`, with a
    host under `Cell:InternalDomain` that no ingress serves, and a scratch realm.
 3. It compares the row count of each table with `counts` in the manifest, checks that the realm has
-   the archive's number of users, and runs the scenarios of each application of the tenant's Studio
-   folder against the restored releases.
+   the archive's number of users, and runs the scenarios of each application of the scratch tenant's Studio
+   folder. It compiles each application with the cell's extension packages and modules and runs its
+   scenarios, module scenarios included, each in a temporary database.
 4. It deletes the scratch tenant, its realm and its keys at once, with no grace window.
 5. It records the result in the metric `axis.backup.restore_check`, `1` for a pass and `0` for a
-   failure, with the tenant id, and in a platform audit record. The [cell console](cell-console.md#views)
-   shows it.
+   failure, with the tenant id, and in the output of the command. The platform audit record is written
+   once, before the first change, for the source tenant, and names the scratch tenant. It does not hold the
+   result. The [cell console](cell-console.md#views) shows it.
+
+`cell restore-check` _(built)_ runs once and takes no argument. It runs only in a cell.
+
+- **Pick.** It lists the bucket and keeps the archives dated today or yesterday (UTC). It picks at random a tenant that is
+  not a preview, has a backup key and has such an archive, and takes its newest one. A tenant whose id starts with
+  `restore-check-` is never picked, because `cell backup` also backs up a scratch tenant that an earlier run left behind. When no tenant
+  qualifies, the command writes `cell restore-check failed: no tenant has an archive of today or yesterday`, records no
+  point, writes no audit record and exits `1`.
+- **Steps.** It writes the audit record, then removes every `restore-check-*` tenant that an earlier run left behind. It finds them by
+  their directory rows and their `axis_restore-check-*` databases, and always removes today's id. It downloads the archive to a folder
+  that only its owner can use and deletes the folder at the end. It restores the archive with the logic of `tenant restore`, with
+  `--from` the source tenant, the host `restore-check-<yyyymmdd>.<Cell:InternalDomain>` and always a new realm, though the source
+  tenant's realm exists. It does not write the audit record of `tenant restore`.
+- **New user ids.** The users of `realm.json` and their credentials get new ids from the identity provider. The ids of a user and of a
+  credential are unique across all realms, so importing them while the source realm is live would fail. A normal `tenant restore` keeps the ids.
+- **Compare.** It compares the row count of each table in `counts` with the restored database, leaving out `axis.sessions`
+  and the tables that `counts` does not hold. It compares the usernames of the scratch realm with those of `realm.json`, leaving out
+  service accounts. An archive without `realm.json` counts as zero users. An archive without `counts` fails. The migration history
+  and the tables that a migration seeds can differ right after an upgrade, because the restore migrates an archive of an older schema.
+- **Scenarios.** After the comparisons, it finds each application folder under `<Studio:ApplicationsPath>/<scratch id>/`: one that does not
+  start with `.`, is not a symbolic link and holds `application.json`, in ordinal order of name. It compiles each one with the packages of
+  `Extensions:Path` and the modules of `Modules:Path`, and runs its scenarios, then those of its pinned modules, with the logic of the
+  publisher's `test` request. Each scenario runs in its own temporary database on `Scenarios:ServerConnectionString` and is dropped at the end.
+  The scenarios run from the Studio files, not against the restored releases or the restored data. Each application may run for 10 minutes. Every
+  application runs, also after one failed, and they run also when the counts or the users failed, as long as the restore succeeded. A tenant
+  without Studio applications runs nothing and needs no scenario server. A tenant with an application and no scenario server fails with `AXC0217`.
+- **Remove.** Whatever the result, it removes the scratch tenant with its database, roles, realm and Studio folder.
+- **Output.** Each line starts with the tenant id: `<source> download ok|failed: <message>`, the lines of the `tenant restore` steps,
+  `<scratch> counts ok` or `<scratch> counts failed: <schema.table> has <n> rows and the archive <m>`, `<scratch> users ok` or
+  `<scratch> users failed: the realm has <n> users and the archive <m>, <k> differ`, for each application `<scratch> version ok`,
+  `<scratch> scenario <name> passed|failed: <message>` for each scenario and `<scratch> test ok|failed: <message>`, `<scratch> cleanup ok|failed: <message>`,
+  `<scratch> remove ok|failed: <message>` and last `<source> restore-check passed|failed`. No line holds a row or a username.
+- **Result.** Any failure after the pick, also a refused restore, a failed download, a compile error or a failed scenario of an application,
+  or a scratch tenant that cannot be removed, records `0`
+  and exits `1`. A pass records `1` and exits `0`. The gauge `axis.backup.restore_check` has the tag `axis.tenant`, the source
+  tenant, and is exported over OTLP as `axis.backup.last_success` is, see [telemetry export](host-settings.md#telemetry-export).
+- **Exit code 2.** Outside a cell, with arguments, or when `Cell:InternalDomain`, `IdentityProvider:Url`, a `Cell:BackupStorage` setting,
+  `Cell:BackupKeyFile`, the platform database or `pg_restore` on `PATH` is missing, or when `Scenarios:ServerConnectionString` is not a
+  connection string or the folder of `Extensions:Path` or `Modules:Path` does not exist, or when an OTLP endpoint is not an `https` URL outside
+  Development. Nothing changes and no audit record is written. The full list of settings is in [administration](administration.md#cell-restore-check).

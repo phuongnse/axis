@@ -170,7 +170,7 @@ describe('the Axis Helm chart', () => {
     }
     assert.doesNotMatch(
       output,
-      /- name: (ConnectionStrings__|Platform__SecretKey|Admin__ConnectionString|AXIS_OIDC_CLIENT_SECRET|KC_DB_URL|KC_DB_USERNAME|KC_DB_PASSWORD|KC_BOOTSTRAP_ADMIN_CLIENT_SECRET|IdentityProvider__AdminClientSecret)/,
+      /- name: (ConnectionStrings__|Platform__SecretKey|Admin__ConnectionString|AXIS_OIDC_CLIENT_SECRET|KC_DB_URL|KC_DB_USERNAME|KC_DB_PASSWORD|KC_BOOTSTRAP_ADMIN_CLIENT_SECRET|IdentityProvider__AdminClientSecret|Cell__BackupStorage__AccessKeyId|Cell__BackupStorage__SecretAccessKey)/,
     )
 
     const worker = find(output, 'Deployment', 'axis-worker')
@@ -453,6 +453,12 @@ describe('the Axis Helm chart', () => {
     ['secrets.pgbouncerCertificate.name', 'secrets.pgbouncerCertificate.name='],
     ['cell.pgbouncer.databaseHost', 'cell.pgbouncer.databaseHost='],
     ['cell.pgbouncer.authUser', 'cell.pgbouncer.authUser='],
+    ['backup.timeZone', 'backup.timeZone='],
+    ['backup.serviceUrl', 'backup.serviceUrl='],
+    ['backup.region', 'backup.region='],
+    ['secrets.backupStorageAccessKeyId.name', 'secrets.backupStorageAccessKeyId.name='],
+    ['secrets.backupStorageSecretAccessKey.name', 'secrets.backupStorageSecretAccessKey.name='],
+    ['secrets.cellBackupKey.name', 'secrets.cellBackupKey.name='],
   ]) {
     test(`a missing ${value} fails and names it`, () => {
       const result = render('--set', set)
@@ -580,5 +586,72 @@ describe('the Axis Helm chart', () => {
     const result = render('--set', 'cell.pgbouncer.password=leak')
     assert.notEqual(result.status, 0)
     assert.doesNotMatch(result.stdout, /leak/)
+  })
+
+  test('in a cell with a bucket, a CronJob runs cell backup at 01:00 in the time zone, one at a time and with no retry', () => {
+    const job = find(renderOk(), 'CronJob', 'axis-cell-backup')
+    assert.match(job, /schedule: "0 1 \* \* \*"\n/)
+    assert.match(job, /timeZone: "Asia\/Ho_Chi_Minh"\n/)
+    assert.match(job, /concurrencyPolicy: Forbid\n/)
+    assert.match(job, /backoffLimit: 0\n/)
+    assert.match(job, /activeDeadlineSeconds: 22500\n/)
+    assert.match(job, /restartPolicy: Never\n/)
+    assert.match(job, /image: "axis-admin:[^"]+"/)
+    assert.match(job, /args:\n\s+- cell\n\s+- backup\n/)
+    assert.match(job, /- name: Cell__Id\n\s+value: "vn-1"\n/)
+    assert.match(job, /- name: Cell__BackupStorage__Bucket\n\s+value: "axis-backups-vn"\n/)
+    assert.match(job, /- name: Cell__BackupStorage__ServiceUrl\n\s+value: "https:\/\/s3\.vn\.example\.com"\n/)
+    assert.match(job, /- name: Cell__BackupStorage__Region\n\s+value: "vn-hcm"\n/)
+    assert.equal(job.match(/- name: Cell__BackupKeyFile\n/g).length, 1)
+    assert.match(job, /- name: Cell__BackupKeyFile\n\s+value: "\/cell-backup-key\/key"\n/)
+  })
+
+  test('the storage credentials are files from Secret references in the CronJob, and never env entries', () => {
+    const output = renderOk()
+    const job = find(output, 'CronJob', 'axis-cell-backup')
+    for (const file of ['Cell__BackupStorage__AccessKeyId', 'Cell__BackupStorage__SecretAccessKey']) {
+      assert.match(job, new RegExp(`- secret:\\n\\s+name: "axis-backup-storage"\\n\\s+items:\\n\\s+- key: "${file}"\\n\\s+path: ${file}\\n`))
+    }
+    assert.match(job, /path: ConnectionStrings__PlatformSchema\n/)
+    assert.match(job, /path: Platform__SecretKey\n/)
+    assert.doesNotMatch(job, /path: ConnectionStrings__Platform\n/)
+    assert.match(job, /- name: cell-backup-key\n\s+mountPath: \/cell-backup-key\n\s+readOnly: true\n/)
+    assert.match(job, /secretName: "axis-cell-backup-key"\n\s+defaultMode: 292\n\s+items:\n\s+- key: "cell-backup-key"\n\s+path: key\n/)
+    assert.doesNotMatch(output, /- name: Cell__BackupStorage__(AccessKeyId|SecretAccessKey)/)
+  })
+
+  test('no other pod gets the backup storage or the cell backup key', () => {
+    const output = renderOk()
+    for (const document of documents(output).filter((d) => /^kind: (Deployment|Job)$/m.test(d))) {
+      assert.doesNotMatch(document, /Cell__BackupStorage__|axis-cell-backup-key|axis-backup-storage|\/cell-backup-key\//)
+    }
+  })
+
+  test('a value inside a backup storage Secret reference, or an unknown backup value, is rejected and never rendered', () => {
+    for (const path of ['secrets.backupStorageAccessKeyId.value', 'secrets.backupStorageSecretAccessKey.value', 'backup.accessKeyId']) {
+      const result = render('--set', `${path}=leak`)
+      assert.notEqual(result.status, 0, path)
+      assert.doesNotMatch(result.stdout, /leak/, path)
+    }
+  })
+
+  test('outside a cell, or without a bucket, no CronJob renders', () => {
+    assert.doesNotMatch(renderOk('--set', 'backup.bucket='), /^kind: CronJob$/m)
+    const outside = renderOk(
+      '--set',
+      'cell.id=',
+      '--set',
+      'cell.certificate.enabled=false',
+      '--set',
+      'cell.pgbouncer.enabled=false',
+    )
+    assert.doesNotMatch(outside, /^kind: CronJob$/m)
+    assert.doesNotMatch(outside, /Cell__BackupStorage__/)
+  })
+
+  test('in a cell with a bucket, an empty time zone fails and names the value', () => {
+    const result = render('--set', 'backup.timeZone=')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /backup\.timeZone/)
   })
 })

@@ -30,12 +30,15 @@ namespace Axis.Processes.Records;
 /// commit ends. An import that is gone or is no longer <c>checked</c> has nothing left to do, and neither has one
 /// whose entity the active release no longer has, which fails at the empty pointer, and so has one whose file the 24-hour cleanup deleted after the commit was queued,
 /// which fails at the empty pointer and writes nothing. A file with no column for the key fails at <c>/columns</c>.
+/// In a cell the commit holds a <c>concurrentImports</c> lease of the tenant until it has committed. When none is free the
+/// work item is due again in one second and the import stays <c>checked</c>.
 /// </summary>
 internal sealed partial class RecordImportCommitHandler(
     ReleaseModelCache models,
     SensitiveValues sensitive,
     ILoggerFactory loggerFactory,
-    ILogger<RecordImportCommitHandler> logger) : IExternalWorkItemHandler
+    ILogger<RecordImportCommitHandler> logger,
+    IImportLeases? leases = null) : IExternalWorkItemHandler
 {
     private const string RowsSavepoint = "import_rows";
 
@@ -70,6 +73,23 @@ internal sealed partial class RecordImportCommitHandler(
                 cancellationToken);
             return await CompleteAsync(item, connection, transaction, cancellationToken);
         }
+
+        IAsyncDisposable? lease = null;
+        if (leases is not null && (lease = await leases.TryTakeAsync(item.TenantId, cancellationToken)) is null)
+        {
+            if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, TimeSpan.FromSeconds(1), cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Rescheduled;
+        }
+
+        // Declared after the transaction, so it is released after the work has committed.
+        await using var _ = lease;
 
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
         var (created, updated) = (0, 0);

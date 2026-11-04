@@ -1,6 +1,7 @@
 using System.Buffers.Text;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace Axis.Integration.Tests;
@@ -169,6 +170,32 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.Contains("axis-endpoints", Audiences(claims));
         Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
         Assert.Equal(["employee", "requester"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_fapi_client_accepts_an_update_that_its_client_policy_checks()
+    {
+        // The policy of the realm makes Keycloak refuse every update of the client that leaves DPoP-bound tokens off, so the legal sync of a realm that holds it would fail.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var http = new HttpClient { BaseAddress = baseAddress };
+        using var tokenForm = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = KeycloakFixture.AdminClientId,
+            ["client_secret"] = KeycloakFixture.AdminClientSecret,
+        });
+        using var tokenResponse = await http.PostAsync(new Uri("realms/master/protocol/openid-connect/token", UriKind.Relative), tokenForm, cancellationToken);
+        tokenResponse.EnsureSuccessStatusCode();
+        var token = (await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("access_token").GetString();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var clients = await http.GetFromJsonAsync<JsonElement>($"admin/realms/axis/clients?clientId={KeycloakFixture.FapiClientId}", cancellationToken);
+        var client = Assert.Single(clients.EnumerateArray());
+        Assert.Equal("true", client.GetProperty("attributes").GetProperty("dpop.bound.access.tokens").GetString());
+
+        using var updated = await http.PutAsJsonAsync($"admin/realms/axis/clients/{client.GetProperty("id").GetString()}", client, cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
     }
 
     // The password grant gets a token without a login page. Keycloak asks it for the code of a user who has an authenticator.

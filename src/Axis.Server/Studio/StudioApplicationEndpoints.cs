@@ -15,7 +15,7 @@ namespace Axis.Server.Studio;
 /// <summary>
 /// <c>POST /api/studio/apps</c> creates an application folder in <c>Studio:ApplicationsPath</c> from <c>{ name, template? }</c>
 /// and answers 201 with <c>{ name, diagnostics }</c> and a <c>Location</c> header. The order of checks is the session (401),
-/// the author role (403), a set <c>Studio:ApplicationsPath</c> (403), in a cell the tenant's applications quota
+/// in a cell the tenant's storage quota (403 <c>quota-exceeded</c>), the author role (403), a set <c>Studio:ApplicationsPath</c> (403), in a cell the tenant's applications quota
 /// (403 <c>quota-exceeded</c>), the content type (415), the body (400), the template
 /// (404), the write lock (503), then a name or folder that exists (409). The CSRF header is checked by the middleware first.
 /// The problem titles never contain text from the request. The route never activates a release.
@@ -23,7 +23,7 @@ namespace Axis.Server.Studio;
 internal static class StudioApplicationEndpoints
 {
     public static void MapStudioApplicationEndpoints(this IEndpointRouteBuilder endpoints) =>
-        endpoints.MapPost("/api/studio/apps", CreateAsync);
+        endpoints.MapPost("/api/studio/apps", CreateAsync).WithStorageQuota();
 
     private static async Task<IResult> CreateAsync(
         HttpContext httpContext,

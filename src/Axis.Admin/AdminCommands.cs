@@ -42,6 +42,8 @@ internal static partial class AdminCommands
 
     public const string IdentityProviderAdminClientSecretSetting = "IdentityProvider:AdminClientSecret";
 
+    public const string IdentityProviderDatabaseSetting = "IdentityProvider:DatabaseConnectionString";
+
     private const string Provisioning = "provisioning";
 
     private const string ActiveStatus = "active";
@@ -55,6 +57,8 @@ internal static partial class AdminCommands
     public const string SmtpPasswordSetting = "AXIS_SMTP_PASSWORD";
 
     public const string PathSetting = "PATH";
+
+    public const string StudioApplicationsPathSetting = "Studio:ApplicationsPath";
 
     internal const string Usage =
         """
@@ -71,6 +75,8 @@ internal static partial class AdminCommands
                tenant sign-in set <id> --accounts true|false [--provider <name> --type oidc|saml [--issuer <binding>] [--client-id <binding>] [--client-secret <binding>] [--client-key <binding>] [--metadata <binding>] [--claim <name>=<claim>]... [--roles-claim <claim>] [--role <value>=<role>]...]...
                tenant email set <id> --host <host> --from <address> [--port <n>] [--tls true|false] [--user-name <name>] [--password]
                tenant email clear <id>
+               tenant legal set <id> [--privacy-url <url>] [--terms-url <url> --terms-version <text>] [--site <path>]
+               tenant legal clear <id> [--site <path>]
                tenant session end <id> --user <user>
                tenant session end <id> --all
                tenant data-key rotate <id>
@@ -86,6 +92,8 @@ internal static partial class AdminCommands
                tenant host move <host> --to <id>
                platform rekey
                cell operator invite <email>
+               cell backup
+               cell restore-check
                publisher
                version
         """;
@@ -137,7 +145,7 @@ internal static partial class AdminCommands
         var environment = new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production);
         if (DatabaseTlsRequirement.Applies(environment))
         {
-            foreach (var setting in new[] { AdminSetting, PlatformSetting, ScenarioServerSetting })
+            foreach (var setting in new[] { AdminSetting, PlatformSetting, ScenarioServerSetting, IdentityProviderDatabaseSetting })
             {
                 var problem = DatabaseTlsRequirement.Problem(setting, configuration[setting]);
                 if (problem is not null)
@@ -170,7 +178,7 @@ internal static partial class AdminCommands
     internal static IReadOnlyList<AdminCommand> Commands { get; } =
     [
         new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
-        new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.CancellationToken)),
+        new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
@@ -179,6 +187,8 @@ internal static partial class AdminCommands
         new("tenant sign-in set", AuditMark.OnePerTenant, TenantSettings.SignInSetAsync),
         new("tenant email set", AuditMark.OnePerTenant, TenantSettings.EmailSetAsync),
         new("tenant email clear", AuditMark.OnePerTenant, TenantSettings.EmailClearAsync),
+        new("tenant legal set", AuditMark.OnePerTenant, TenantSettings.LegalSetAsync),
+        new("tenant legal clear", AuditMark.OnePerTenant, TenantSettings.LegalClearAsync),
         new("tenant session end", AuditMark.OnePerTenant, TenantSettings.SessionEndAsync),
         new("tenant data-key rotate", AuditMark.OnePerTenant, TenantDataKeyCommands.RotateAsync),
         new("tenant data-key retire", AuditMark.OnePerTenant, TenantDataKeyCommands.RetireAsync),
@@ -193,6 +203,8 @@ internal static partial class AdminCommands
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
+        new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
+        new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
@@ -691,6 +703,7 @@ internal static partial class AdminCommands
         CellOptions cell,
         TextWriter output,
         TextWriter error,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         var request = ParseTenantBackup(args);
@@ -710,6 +723,7 @@ internal static partial class AdminCommands
         byte[]? backupKey;
         if (cell.IsCell)
         {
+            settings = settings with { StudioApplicationsPath = ResolveFolder(configuration[StudioApplicationsPathSetting]) };
             if (request.BackupKeyFile is not null)
             {
                 error.WriteLine("In a cell, tenant backup takes the tenant's backup key from the platform, so --backup-key-file is refused.");
@@ -760,7 +774,7 @@ internal static partial class AdminCommands
 
         return plan is null
             ? 2
-            : await new TenantBackup(settings, plan, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
+            : await new TenantBackup(settings, plan, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken, identityProviderHandler).RunAsync();
     }
 
     /// <summary>
@@ -768,7 +782,7 @@ internal static partial class AdminCommands
     /// database cannot be read, the key does not unwrap, or the tenant has no key. With <paramref name="unknownTenant"/>, a tenant
     /// that is not in the directory gets that message instead of <paramref name="noKey"/>.
     /// </summary>
-    private static async Task<byte[]?> ReadCellBackupKeyAsync(
+    internal static async Task<byte[]?> ReadCellBackupKeyAsync(
         string platformConnection,
         string tenantId,
         TenantSecretCipher cellCipher,
@@ -854,7 +868,12 @@ internal static partial class AdminCommands
             }
 
             // The restored tenant gets a backup key of its own, wrapped by the same cell key.
-            settings = settings with { Create = settings.Create with { CellBackupCipher = cellCipher } };
+            settings = settings with
+            {
+                Create = settings.Create with { CellBackupCipher = cellCipher },
+                InCell = true,
+                StudioApplicationsPath = ResolveFolder(configuration[StudioApplicationsPathSetting]),
+            };
             backupKey = await ReadCellBackupKeyAsync(
                 settings.Create.PlatformConnectionString,
                 request.From!,
@@ -1165,6 +1184,7 @@ internal static partial class AdminCommands
         IReadOnlyList<TenantRow> tenants;
         Dictionary<string, ActivationBindings> bindings;
         Dictionary<string, IReadOnlyDictionary<string, TenantBinding>> realmBindings;
+        Dictionary<string, RealmLegal> realmLegal;
         try
         {
             var tablesProblem = await PlatformTablesProblemAsync(settings.Platform.PlatformConnectionString, cancellationToken);
@@ -1200,6 +1220,7 @@ internal static partial class AdminCommands
 
             bindings = await ReadBindingsAsync(platform, [.. tenants.Select(row => row.Id)], cancellationToken);
             realmBindings = await ReadRealmBindingsAsync(platform, [.. tenants.Select(row => row.Id)], settings.Platform.Cipher, cancellationToken);
+            realmLegal = await ReadRealmLegalAsync(platform, tenants, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -1223,6 +1244,7 @@ internal static partial class AdminCommands
             tenants,
             bindings,
             realmBindings,
+            realmLegal,
             settings.Mail,
             http,
             folder,
@@ -1375,7 +1397,7 @@ internal static partial class AdminCommands
 
     // An empty value is no setting: a test request then fails with AXC0217. A value that is no connection string stops the
     // publisher, and the message names the setting and never its value.
-    private static bool TryReadScenarioServer(IConfiguration configuration, TextWriter error, out string? scenarioServer)
+    internal static bool TryReadScenarioServer(IConfiguration configuration, TextWriter error, out string? scenarioServer)
     {
         scenarioServer = null;
         var value = configuration[ScenarioServerSetting];
@@ -1450,6 +1472,23 @@ internal static partial class AdminCommands
             StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// Reads what the realm sync writes of the legal settings of <paramref name="tenants"/> from the directory: the hosts and the site links, in one query each.
+    /// </summary>
+    internal static async Task<Dictionary<string, RealmLegal>> ReadRealmLegalAsync(
+        PlatformDbContext platform,
+        IReadOnlyCollection<TenantRow> tenants,
+        CancellationToken cancellationToken)
+    {
+        var ids = tenants.Select(row => row.Id).ToList();
+        var hosts = await platform.TenantHosts.AsNoTracking().Where(host => ids.Contains(host.TenantId)).ToListAsync(cancellationToken);
+        var siteRows = await platform.TenantSiteLegalLinks.AsNoTracking().Where(link => ids.Contains(link.TenantId)).ToListAsync(cancellationToken);
+        return tenants.ToDictionary(
+            row => row.Id,
+            row => DirectoryTenantCatalog.RealmLegalOf(row, hosts.Where(host => host.TenantId == row.Id), siteRows.Where(link => link.TenantId == row.Id)),
+            StringComparer.Ordinal);
+    }
+
     private static ActivateRequest? ParseActivate(string[] args)
     {
         string? folder = null;
@@ -1514,7 +1553,7 @@ internal static partial class AdminCommands
     }
 
     // The part of the activate settings that needs no platform database: the catalogs, the inline recompute limit and the activation timeout.
-    private static ReleaseSettings? ReadReleaseSettings(IConfiguration configuration, TextWriter error, out string problem)
+    internal static ReleaseSettings? ReadReleaseSettings(IConfiguration configuration, TextWriter error, out string problem)
     {
         problem = string.Empty;
         var limit = ReleaseActivator.DefaultInlineRecomputeLimit;
@@ -1573,7 +1612,7 @@ internal static partial class AdminCommands
         return new ReleaseSettings(packages, modules, limit, activationTimeout);
     }
 
-    private static string? ResolveFolder(string? setting) =>
+    internal static string? ResolveFolder(string? setting) =>
         string.IsNullOrWhiteSpace(setting) ? null : Path.GetFullPath(setting);
 
     private static MigrateRequest? ParseMigrate(string[] args)
@@ -1603,8 +1642,11 @@ internal static partial class AdminCommands
         return new MigrateRequest(tenant, parallel ?? 1);
     }
 
-    /// <summary><c>tenant backup</c> needs the platform database and the installation key, and <c>PATH</c> to find <c>pg_dump</c>. It needs no admin role and no client secret.</summary>
-    private static BackupSettings? ReadBackupSettings(IConfiguration configuration, out string problem)
+    /// <summary>
+    /// <c>tenant backup</c> needs the platform database and the installation key, and <c>PATH</c> to find <c>pg_dump</c>. It needs no admin role and no client secret.
+    /// It reads <see cref="IdentityProviderDatabaseSetting"/> when it is set, and a value that is given must be a connection string.
+    /// </summary>
+    internal static BackupSettings? ReadBackupSettings(IConfiguration configuration, out string problem)
     {
         var platform = ReadPlatformSettings(configuration, out problem);
         if (platform is null)
@@ -1619,7 +1661,24 @@ internal static partial class AdminCommands
             return null;
         }
 
-        return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path);
+        string? identityProviderDatabase = null;
+        var database = configuration[IdentityProviderDatabaseSetting];
+        if (!string.IsNullOrWhiteSpace(database))
+        {
+            try
+            {
+                _ = new NpgsqlConnectionStringBuilder(database);
+            }
+            catch (Exception exception) when (exception is ArgumentException or FormatException)
+            {
+                problem = $"The setting {IdentityProviderDatabaseSetting} is not a valid connection string.";
+                return null;
+            }
+
+            identityProviderDatabase = database;
+        }
+
+        return new BackupSettings(platform.PlatformConnectionString, platform.Cipher, path, IdentityProviderDatabase: identityProviderDatabase);
     }
 
     /// <summary>
@@ -1628,7 +1687,7 @@ internal static partial class AdminCommands
     /// The identity provider settings are optional here: only an archive of a tenant with its own realm needs them, which the check step finds out.
     /// A value that is given must still be valid.
     /// </summary>
-    private static RestoreSettings? ReadRestoreSettings(IConfiguration configuration, out string problem)
+    internal static RestoreSettings? ReadRestoreSettings(IConfiguration configuration, out string problem)
     {
         var create = ReadCreateSettings(configuration, readClientSecret: true, out problem);
         if (create is null)
@@ -2051,9 +2110,10 @@ internal sealed record TenantBackupRequest(string Id, string Out, string? Backup
 
 /// <summary>
 /// <c>tenant restore</c>. <paramref name="BackupKeyFile"/> is the key file of an installation outside a cell. <paramref name="From"/> is the tenant
-/// of a cell whose backup key opens the archive.
+/// of a cell whose backup key opens the archive. <paramref name="Scratch"/> is set only by <c>cell restore-check</c>: the restored tenant always gets a new
+/// realm, whether or not the realm of the archive exists, and its imported users get new ids.
 /// </summary>
-internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts, string? BackupKeyFile, string? From = null);
+internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts, string? BackupKeyFile, string? From = null, bool Scratch = false);
 
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
@@ -2076,8 +2136,16 @@ internal sealed class AdminEnvironment(string environmentName) : IHostEnvironmen
     public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
-/// <summary>The settings of <c>tenant backup</c>.</summary>
-internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
+/// <summary>
+/// The settings of <c>tenant backup</c>. <paramref name="StudioApplicationsPath"/> is set only in a cell and is the full path of <c>Studio:ApplicationsPath</c>, which may be unset.
+/// <paramref name="IdentityProviderDatabase"/> is <c>IdentityProvider:DatabaseConnectionString</c>, which may be unset: without it the backup writes no <c>realm.json</c>.
+/// </summary>
+internal sealed record BackupSettings(
+    string PlatformConnectionString,
+    TenantSecretCipher Cipher,
+    string SearchPath,
+    string? StudioApplicationsPath = null,
+    string? IdentityProviderDatabase = null);
 
 /// <summary>
 /// The settings of <c>tenant create</c>, which also needs the admin role. <paramref name="OidcClientSecret"/> is for <c>tenant restore</c>.
@@ -2093,5 +2161,8 @@ internal sealed record CreateSettings(
     RealmMail? Mail = null,
     TenantSecretCipher? CellBackupCipher = null);
 
-/// <summary>The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.</summary>
-internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath);
+/// <summary>
+/// The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.
+/// <paramref name="InCell"/> and <paramref name="StudioApplicationsPath"/>, the full path of <c>Studio:ApplicationsPath</c>, are set only in a cell.
+/// </summary>
+internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath, bool InCell = false, string? StudioApplicationsPath = null);

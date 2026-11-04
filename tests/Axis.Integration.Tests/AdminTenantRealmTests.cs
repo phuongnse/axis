@@ -13,8 +13,9 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// <c>tenant create</c> on a real Keycloak: it creates the tenant's realm with its three clients, stores the generated
-/// client secrets encrypted and points the tenant's <c>Oidc</c> block at the realm. The realm uses the Axis login theme, and
-/// a second run sets it again. A preview tenant gets no realm.
+/// client secrets encrypted and points the tenant's <c>Oidc</c> block at the realm. The realm uses the Axis login and email
+/// themes, its account console client is off and <c>manage-account</c> is not among its default roles. A second run sets
+/// all of it again. A preview tenant gets no realm.
 /// </summary>
 public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
@@ -90,6 +91,54 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         // The realm has no display name, so the page names Axis, never the tenant id.
         Assert.True(string.IsNullOrEmpty(await DisplayNameAsync(http, admin, id)));
         Assert.Null(KeycloakSignIn.Property(html, "realmName"));
+    }
+
+    [Fact]
+    public async Task Create_sets_the_axis_email_theme_and_turns_off_the_account_console_and_manage_account()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = NewTenantId(scenario);
+
+        Assert.Equal(0, (await CreateAsync(scenario, id)).Exit);
+
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var admin = await TokenAsync(http, "master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        Assert.Equal(TenantRealm.EmailTheme, await RealmStringAsync(http, admin, id, "emailTheme"));
+        Assert.False(await AccountConsoleEnabledAsync(http, admin, id));
+        var composites = await DefaultAccountRolesAsync(http, admin, id);
+        Assert.DoesNotContain("manage-account", composites);
+        // The role that lets a person read the account stays.
+        Assert.Contains("view-profile", composites);
+    }
+
+    [Fact]
+    public async Task A_rerun_of_create_restores_the_email_theme_the_account_console_and_manage_account_after_a_hand_change()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = NewTenantId(scenario);
+        Assert.Equal(0, (await CreateAsync(scenario, id)).Exit);
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var admin = await TokenAsync(http, "master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        using var theme = await SendAsync(http, admin, HttpMethod.Put, $"admin/realms/{id}", new Dictionary<string, object?> { ["emailTheme"] = "keycloak" });
+        Assert.True(theme.IsSuccessStatusCode);
+        var console = await AccountConsoleAsync(http, admin, id);
+        console["enabled"] = JsonSerializer.SerializeToElement(true);
+        using var turnedOn = await SendAsync(http, admin, HttpMethod.Put, $"admin/realms/{id}/clients/{console["id"].GetString()}", console);
+        Assert.True(turnedOn.IsSuccessStatusCode);
+        var (composites, accountUuid) = await DefaultRoleCompositesAsync(http, admin, id);
+        using var account = await SendAsync(http, admin, HttpMethod.Get, $"admin/realms/{id}/clients/{accountUuid}/roles/manage-account");
+        var manageAccount = await account.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        using var granted = await SendAsync(http, admin, HttpMethod.Post, composites, new[] { manageAccount });
+        Assert.True(granted.IsSuccessStatusCode);
+        Assert.Contains("manage-account", await DefaultAccountRolesAsync(http, admin, id));
+        // A rerun only happens on an entry that is still being set up.
+        await scenario.SetStatusAsync(id, "provisioning");
+
+        Assert.Equal(0, (await CreateAsync(scenario, id)).Exit);
+
+        Assert.Equal(TenantRealm.EmailTheme, await RealmStringAsync(http, admin, id, "emailTheme"));
+        Assert.False(await AccountConsoleEnabledAsync(http, admin, id));
+        Assert.DoesNotContain("manage-account", await DefaultAccountRolesAsync(http, admin, id));
     }
 
     [Fact]
@@ -232,12 +281,46 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<string?> LoginThemeAsync(HttpClient http, string token, string realm)
+    private Task<string?> LoginThemeAsync(HttpClient http, string token, string realm) => RealmStringAsync(http, token, realm, "loginTheme");
+
+    private async Task<string?> RealmStringAsync(HttpClient http, string token, string realm, string property)
     {
         using var response = await SendAsync(http, token, HttpMethod.Get, $"admin/realms/{realm}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
-        return body.GetProperty("loginTheme").GetString();
+        return body.GetProperty(property).GetString();
+    }
+
+    private async Task<Dictionary<string, JsonElement>> AccountConsoleAsync(HttpClient http, string token, string realm)
+    {
+        using var listed = await SendAsync(http, token, HttpMethod.Get, $"admin/realms/{realm}/clients?clientId=account-console");
+        var uuid = (await listed.Content.ReadFromJsonAsync<JsonElement>(CancellationToken))[0].GetProperty("id").GetString();
+        using var response = await SendAsync(http, token, HttpMethod.Get, $"admin/realms/{realm}/clients/{uuid}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<Dictionary<string, JsonElement>>(CancellationToken))!;
+    }
+
+    private async Task<bool> AccountConsoleEnabledAsync(HttpClient http, string token, string realm) =>
+        (await AccountConsoleAsync(http, token, realm))["enabled"].GetBoolean();
+
+    /// <summary>The path of the realm's default role's composites, and the uuid of the <c>account</c> client whose roles it can hold.</summary>
+    private async Task<(string Composites, string Account)> DefaultRoleCompositesAsync(HttpClient http, string token, string realm)
+    {
+        using var realmResponse = await SendAsync(http, token, HttpMethod.Get, $"admin/realms/{realm}");
+        var roleId = (await realmResponse.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("defaultRole").GetProperty("id").GetString();
+        using var clients = await SendAsync(http, token, HttpMethod.Get, $"admin/realms/{realm}/clients?clientId=account");
+        var account = (await clients.Content.ReadFromJsonAsync<JsonElement>(CancellationToken))[0].GetProperty("id").GetString()!;
+        return ($"admin/realms/{realm}/roles-by-id/{roleId}/composites", account);
+    }
+
+    /// <summary>The names of the <c>account</c> client's roles among the composites of the realm's default role.</summary>
+    private async Task<List<string?>> DefaultAccountRolesAsync(HttpClient http, string token, string realm)
+    {
+        var (composites, account) = await DefaultRoleCompositesAsync(http, token, realm);
+        using var response = await SendAsync(http, token, HttpMethod.Get, $"{composites}/clients/{account}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).EnumerateArray()
+            .Select(role => role.GetProperty("name").GetString()).ToList();
     }
 
     private async Task<string?> DisplayNameAsync(HttpClient http, string token, string realm)
@@ -248,13 +331,13 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         return body.TryGetProperty("displayName", out var name) ? name.GetString() : null;
     }
 
-    /// <summary>Opens the realm's sign-in page through its account console, as the platform client has no redirect address yet, and returns its HTML.</summary>
+    /// <summary>Opens the realm's sign-in page through the platform client, at a callback address of the host that <c>tenant create</c> registers, and returns its HTML.</summary>
     private async Task<string> SignInPageAsync(HttpClient http, string realm)
     {
-        var redirect = Uri.EscapeDataString(new Uri(_baseAddress, $"realms/{realm}/account/").ToString());
+        var redirect = Uri.EscapeDataString($"https://{realm}.example.test/api/auth/callback");
         var signIn = new Uri(
             _baseAddress,
-            $"realms/{realm}/protocol/openid-connect/auth?client_id=account-console&response_type=code&scope=openid&redirect_uri={redirect}"
+            $"realms/{realm}/protocol/openid-connect/auth?client_id=axis&response_type=code&scope=openid&redirect_uri={redirect}"
             + $"&code_challenge={new string('a', 43)}&code_challenge_method=S256");
         using var page = await http.GetAsync(signIn, CancellationToken);
         var html = await page.Content.ReadAsStringAsync(CancellationToken);

@@ -264,6 +264,7 @@
       ],
       "attributes": {
         "require.pushed.authorization.requests": "true",
+        "dpop.bound.access.tokens": "true",
         "pkce.code.challenge.method": "S256",
         "token.endpoint.auth.signing.alg": "ES256",
         "use.jwks.url": "false",

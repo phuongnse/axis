@@ -71,7 +71,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   - `Axis.Data` also owns `axis.sessions`, with history in `axis.__data_migrations`. A row is one signed-in session:
     `id_hash` (`bytea`, the primary key, the SHA-256 hash of the session id), `user_id`, `display_name`, `roles`
     (`text[]`), `signed_in_at`, `last_request_at`, `authenticated_at` (nullable, the ID token's `auth_time`),
-    `site_path` (nullable, a site's own host), `identity_provider` (nullable, the provider's alias) and `idp_session_id` (nullable, the ID token's `sid`, _planned for M31_). The server
+    `site_path` (nullable, a site's own host), `identity_provider` (nullable, the provider's alias) and `idp_session_id` (nullable, the ID token's `sid`). The server
     reads, writes and deletes rows, the worker deletes expired ones, and `tenant restore` empties the table, see
     [sign-in and the session](security.md#sign-in-and-the-session).
   - `Axis.Data` also owns `axis.given_roles`, with history in `axis.__data_migrations`. A row is a role that an
@@ -204,8 +204,7 @@ under both tenant sources: the server creates them at start and sets the
 read-only grant. Under both sources the server keeps its data protection keys
 there, see [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 Under `Tenancy:Source=directory` the server also reads the `active` tenants, their hosts and their bindings over
-`ConnectionStrings:Platform`. Both hosts read them again every
-`Tenancy:RefreshInterval`. The server and the worker keep each password, the client
+`ConnectionStrings:Platform`. Both hosts read them again every `Tenancy:RefreshInterval`. The server and the worker keep each password, the client
 secret and each `secret` binding encrypted in memory, and decrypt one only when a
 connection opens, the sign-in client is set up or a binding is resolved. Neither
 reads any `schema_password`. The worker reads the same rows over the same role,
@@ -217,8 +216,7 @@ and creates no tables. See
   start over `ConnectionStrings:PlatformSchema` under both tenant sources, and
   uses that setting for nothing else. `Axis.Admin migrate` applies them too, before it migrates the tenants, so an
   upgrade that runs `migrate` first has every new platform table before the new
-  server starts. `migrate` does not run the reader role's grants. The server
-  does that at its next start.
+  server starts. `migrate` does not run the reader role's grants. The server does that at its next start.
 - **Read-only hosts.** The server reads the directory over
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
   and `SELECT` on its tables, and nothing else. The server sets this in one
@@ -229,8 +227,7 @@ and creates no tables. See
   inherits rights through membership. The `platform.audit_records` table is
   the one exception: the role gets no right on it at all. The same step revokes
   the right that the default privileges would give it on that table.
-- **Write grants.** The same role also gets `INSERT` on `platform.data_protection_keys`, `INSERT`, `UPDATE` and `DELETE` on the [usage](tenant-quotas.md#usage) tables, and `INSERT` and `UPDATE` on `platform.tenant_daily_counters`, and on no other table. Key rotation happens while the server runs, so the server must add keys. It never updates or
-  deletes one. `platform rekey` is the one writer that updates these rows. It
+- **Write grants.** The same role also gets `INSERT` on `platform.data_protection_keys`, `INSERT`, `UPDATE` and `DELETE` on the [usage](tenant-quotas.md#usage) tables and on `platform.tenant_leases`, and `INSERT` and `UPDATE` on `platform.tenant_daily_counters`, and on no other table. Key rotation happens while the server runs, so the server must add keys. It never updates or deletes one. `platform rekey` is the one writer that updates these rows. It
   re-encrypts them with a new installation key, over the schema role, see
   [installation key](tenant-setting-commands.md#installation-key). At start the
   server decrypts every stored key, with `Platform:SecretKey` and then with
@@ -248,15 +245,18 @@ The tables:
 
 | Table                                | Columns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform.tenants`                   | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the service audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`, the sign-in profile (`standard` or `fapi2`), and two encrypted client keys, the current and the previous one, each with its key id, and the encrypted secrets of the realm's activation client and users client, and `platform_accounts`, whether the realm's accounts may sign in to the platform. A previous key needs a current key |
+| `platform.tenants`                   | The tenant `id`, `status` (`provisioning`, `active` or `suspended`), `version`, the database host, port and name, the runtime and schema user names, the encrypted runtime and schema passwords, the OIDC authority, client id and encrypted client secret, the claim names, the endpoint audience, the service audience, the `schema_version` and `preview_of`, the id of the main tenant of a preview tenant, which is unique and refers to `platform.tenants`, the sign-in profile (`standard` or `fapi2`), and two encrypted client keys, the current and the previous one, each with its key id, and the encrypted secrets of the realm's activation client and users client, and `platform_accounts`, whether the realm's accounts may sign in to the platform. A previous key needs a current key, and the tenant's legal links: `privacy_url`, `terms_url` and `terms_version`, each null when not set, where the terms address and the version are set together, see [legal links](tenant-setting-commands.md#legal-links) |
 | `platform.tenant_hosts`              | The tenant id, the host and `site_path`, the lower case path of the site the host belongs to, or null. The host is unique on `lower(host)` across all tenants, and a non-null `site_path` is unique per tenant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `platform.tenant_bindings`           | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `platform.tenant_platform_providers` | The tenant id and the provider `name`, the primary key, the `type` (`oidc` or `saml`), the names of the issuer, client id, client secret, client key and metadata bindings, the claim names for the display name, email and locale, the roles claim and `role_values`, a `jsonb` object that maps a roles claim value to a platform role. It holds no secret. Rows go with their tenant                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `platform.data_protection_keys`      | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. The server only inserts rows and never updates or deletes one. `platform rekey` updates the encrypted XML. Every server replica reads them.                                                                                                                                                     |
 | `platform.tenant_data_keys`          | The tenant id, the `kind` (`data` or `lookup`), the `number` and the encrypted key, the primary key together. The kind is checked, the number is at least 1, and a row goes with its tenant. `platform rekey` updates the encrypted key. See [data encryption](data-encryption.md#tenant-keys).                                                                         |
 | `platform.tenant_backup_keys`        | The tenant id, the primary key, and the tenant's backup key, wrapped by the cell's backup key. A cell's `tenant create` and `tenant restore` write a row and `tenant backup` and `tenant restore` read it. A row goes with its tenant. `platform rekey` does not touch it. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
+| `platform.tenant_backups` | The tenant id, the primary key, and `last_success_at` (`timestamp with time zone`), when the last `cell backup` upload of the tenant succeeded. A tenant that never succeeded has no row, and a failed backup keeps the time it had. A row goes with its tenant. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
+| `platform.tenant_leases` | The `lease_id`, the primary key, the tenant id, the `quota` key, the `holder` (the host and process) and `expires_at` (`timestamp with time zone`). One row is one piece of work that runs under a concurrency quota, see [work at once](tenant-quotas.md#work-at-once). A lease lasts 60 seconds and its holder renews it every 20. The reader role inserts, updates and deletes rows. A row goes with its tenant. |
 | `platform.tenant_daily_counters` | The tenant id, the UTC `day`, the `counter` name and the `value` (`bigint`, at least 0), the primary key being the first three. A cell's worker counts the emails it sends in the counter `emails`, see [emails a day](tenant-quotas.md#emails-a-day). A row goes with its tenant. The reader role inserts and updates rows and never deletes one. |
 | `platform.tenant_quotas` | The tenant id and the `quota` key, the primary key together, the `value` (`bigint`, null means no limit) and `updated_at`. One row is one quota the tenant overrides, and a quota with no row takes the cell's default. The value is null or at least 0, and a row goes with its tenant. Hosts read the rows with the directory, see [tenant quotas](tenant-quotas.md#quotas). |
+| `platform.tenant_site_legal_links` | The tenant id and the lower case `site_path`, the primary key together, and the `privacy_url` and `terms_url` of that site, of which at least one is set. A site does not need to exist, and a row goes with its tenant. See [legal links](tenant-setting-commands.md#legal-links). |
 | `platform.audit_records`             | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 The tenant `version` grows on every change to the tenant, its hosts, its bindings or its platform providers.
@@ -280,7 +280,7 @@ serves a tenant only when this value is the one the host was built for, see [adm
     `platform.tenant_backup_keys`, wrapped by the cell's key (`Cell:BackupKeyFile`) and not by the installation key;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
     `platform.tenants`, with the field name `oidc_client_key` and the key id,
-    see [FAPI 2.0 profile](security.md#fapi-20-profile).
+    see [FAPI 2.0 profile](fapi2-profile.md).
 - **Encrypted format.** An encrypted value is a `bytea` that holds a 12-byte
   nonce, the ciphertext and a 16-byte tag. The cipher is AES-256-GCM with the
   installation key `Platform:SecretKey`, see
@@ -428,7 +428,7 @@ Which connection string each step uses. The server does this today:
 | Release history route of the server: read the release history                                           | `ConnectionString`                 |
 | Publisher: claim and finish a request, compile, store, activate, write the history and the audit record | `SchemaConnectionString`           |
 | Publisher: seed records                                                                                 | `ConnectionString`                 |
-| Publisher, `test` request: create, migrate, run and drop the scenario databases                         | `Scenarios:ServerConnectionString` |
+| Publisher, `test` request, and `cell restore-check`: create, migrate, run and drop the scenario databases | `Scenarios:ServerConnectionString` |
 | Publisher, `test` request: store the status and the outcomes                                            | `SchemaConnectionString`           |
 | Start release check (`AXC0146`) and the runtime database role check, in the server and the worker       | `ConnectionString`                 |
 | Server requests: record API, data sources, process starts, endpoints, tasks, sites                      | `ConnectionString`                 |
@@ -467,7 +467,7 @@ host with one database role:
 | Seeding and schedule trigger state                                                                  | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record | `axis-admin publisher`          | The tenant's schema role           |
 | Seeding of a publish request                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
-| Create, migrate, run and drop the scenario databases of a `test` request                            | `axis-admin publisher`          | `Scenarios:ServerConnectionString` |
+| Create, migrate, run and drop the scenario databases of a `test` request or a restore check          | `axis-admin publisher`, `cell restore-check` | `Scenarios:ServerConnectionString` |
 | Store the status and the outcomes of a `test` request                                               | `axis-admin publisher`          | The tenant's schema role           |
 | Insert and read publish requests                                                                    | Server                          | The tenant's runtime role          |
 | Read the release history                                                                            | Server                          | The tenant's runtime role          |
@@ -860,7 +860,7 @@ An index on `(application_id, status, requested_at, id)` serves the claim.
 - **Claim.** The publisher takes the oldest `queued` `publish`, `validate` or `rollback` row of an application with
   `FOR UPDATE SKIP LOCKED`, sets `running`, `claimed_by`, `lease_until` and
   adds 1 to `claims`. It skips an application that has a `running` row.
-  A `running` row whose `lease_until` has passed is claimed again the same way.
+  A `running` row whose `lease_until` has passed is claimed again the same way. A publisher that lost its connection sets `lease_until` to now.
   A row with `claims` of 3 and an expired lease becomes `failed` with `AXC0215`.
 - **Test requests.** A `test` row has its own queue for each
   application: at most one runs at a time, oldest first, and it does not wait

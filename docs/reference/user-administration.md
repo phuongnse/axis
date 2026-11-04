@@ -73,6 +73,14 @@ seven commands are built. The invite, resend an invitation, disable, enable and 
   the list route (`401`, `403`, `404` for a preview tenant or a tenant without a users client), then answers `404` for a user
   that the realm does not have and for a service account. When the identity provider fails, it answers `502` with a fixed title.
   It only reads, so it accepts any signed-in caller who holds `Users:AdministratorRole`, not only a browser session.
+- **The authenticators route:** `GET /api/me/authenticators` answers `{ account, authenticators: [{ id, label, createdAt }] }` to
+  the signed-in person about themselves. `authenticators` holds the person's authenticator apps, the `otp` credentials of the
+  realm, oldest first, and never a password or another credential type. `label` is the realm's `userLabel` and is `null` when
+  empty, and `createdAt` is an ISO timestamp, or `null` when the realm has no date. `account` is `false` with an empty list for
+  a user of a brokered provider, a realm user that is missing or a service account, a preview tenant and a tenant without a
+  users client. The route takes a session only, so a signed-out caller and a service account's bearer token get `401`. It needs
+  no administrator role and no recent login at the identity provider, because it only reads. When the identity provider
+  fails, it answers `502` with a fixed title.
 - **A user:** clicking a row opens a side panel with the person's roles, one section for each active application and one
   for the platform. Each role shows the "Given" tag when the person has it. A given role that is not declared any more
   has a "Not declared" tag, and its section lists it even when its application is not active. A Give or Remove button
@@ -115,6 +123,11 @@ seven commands are built. The invite, resend an invitation, disable, enable and 
     scheme and host of the request. Resend checks in the same order up to the realm user (`404`, also for a service account)
     and answers `409` for a user of a brokered provider, for a person who has signed in, and for a user with a password, even
     one who never signed in to Axis. It needs no recent login, because it gives no new right.
+  - In a cell, the invite and enable routes also refuse a change that would pass the tenant's `users` quota, see
+    [refusals](tenant-quotas.md#refusals). Invite answers the quota `403` after `401`, `403` and `404` and before it reads
+    the body, so a malformed body gets the quota `403` too. Enable of a disabled user answers it after the realm user
+    lookup. Enabling a user who is already enabled is never refused, and the other commands are not checked. Nothing is
+    changed in the realm. When the identity provider fails while counting, the route answers `502`.
   - Enable and reset an authenticator need no recent login. For a user of a brokered provider, reset an authenticator
     answers `409` and changes nothing.
   - The realm steps run first. When the identity provider fails, the route answers `502` with a fixed title, and the
@@ -165,7 +178,7 @@ asks its development users for a code, because each one has an authenticator, an
   or the account does not exist.
 - **Reset authenticator:** removes the account's authenticator, so its next sign-in asks the person to add one again,
   and ends the person's sessions. A user of a brokered provider has no authenticator in the realm, so the reset does not apply to it.
-- **Self-service** _(planned for M31)_: a person changes their own password and adds or removes their own authenticators
+- **Self-service**: a person changes their own password and adds or removes their own authenticators
   on Axis's [account page](platform-pages.md#account-page), which replaces Keycloak's account console. A user of a
   brokered provider has neither in the realm, so the page offers neither.
 - **Terms** _(planned for M31)_: when the tenant sets terms, a person accepts them after the first sign-in and again on

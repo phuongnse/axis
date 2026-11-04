@@ -382,7 +382,7 @@ bindings work. Status rules and publishing are built too.
   - The session state is in the tenant database, so sign-out revokes it at once
     (D84). A tenant can turn on the FAPI 2.0 profile (D83). See
     [service accounts](reference/security.md#service-accounts) and
-    [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
+    [FAPI 2.0 profile](reference/fapi2-profile.md).
 - **Hardening (D82, D84, D85).**
   - The server sets security headers on every response and rate limits the routes a caller can
     repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
@@ -465,130 +465,7 @@ task API, the worker settings and the tables are in
 
 ## Telemetry
 
-The server and the worker emit correlated logs, metrics and traces with
-OpenTelemetry and W3C trace context. Traces and their stored correlation are
-built. So are the OTLP logs, the log scope, the problem details `traceId`,
-the standard metrics and the work item duration, process instance and call
-attempt metrics and the work item and pending computed field gauges. See
-[D36](decisions/d36-correlated-logs-metrics-and-traces.md).
-
-### Signals and export
-
-Both hosts export traces, logs and metrics over OTLP. The standard `OTEL_*`
-variables set the export, see
-[Telemetry export](reference/host-settings.md#telemetry-export). With no
-endpoint, nothing is exported and logs still go to the console. Docker Compose
-and `scripts/dev.sh` start no collector. The scenario runner, `Axis.Scenarios`,
-is not part of this design.
-
-### Standard instrumentation
-
-- **ASP.NET Core.** Each incoming request is a span. The server follows an
-  incoming `traceparent`, as the standard says, so a caller can choose the
-  trace id stored with its request.
-- **HttpClient.** Each outgoing call is a span, and carries `traceparent`.
-  The purchasing system receives it, so both sides can find a call. An
-  outgoing span never names a bound address: it drops `server.address`,
-  `server.port` and `url.query`. A connector call's `url.full` is the
-  operation's path template with `{idempotencyKey}` left unexpanded. Other
-  outgoing spans, such as a package operation's calls and the sign-in calls to
-  Keycloak, have no `url.full`. A trace processor in each host removes these
-  attributes when the span ends, before any exporter sees it.
-- **Npgsql.** Each command is a span. It keeps the statement text without
-  parameter values. Axis never calls `EnableParameterLogging`, and no
-  connection string sets `Include Error Detail`.
-- **Metrics.** The standard ASP.NET Core, HttpClient, DNS and .NET runtime
-  metric sets. The HttpClient and DNS metrics keep only `error.type`,
-  `http.connection.state`, `http.request.method`, `http.response.status_code`,
-  `network.protocol.version` and `url.scheme`. So `server.address`,
-  `server.port`, `network.peer.address` and `dns.question.name` never reach an
-  exporter. The Axis metrics are in
-  [worker metrics](reference/process-execution.md#worker-metrics). The server's tenant
-  database gauge is in [health checks](#health-checks), and its counter of
-  refused requests, `axis.rate_limits.refused`, is in
-  [rate limits](reference/headers-and-rate-limits.md#rate-limits).
-
-### Axis spans
-
-| Span                     | Where             | Attributes                                                                                    |
-| ------------------------ | ----------------- | --------------------------------------------------------------------------------------------- |
-| `axis.activation`        | server            | `axis.tenant`, `axis.application`                                                             |
-| `axis.work_item.run`     | worker            | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`. A link to the span that queued the item |
-| `axis.process.step`      | server and worker | `axis.tenant`, `axis.application`, `axis.process`, `axis.step`                                |
-| `axis.connector.attempt` | worker            | `axis.tenant`, `axis.application`, `axis.connector`, `axis.operation`, `axis.outcome`         |
-| `axis.connector.lookup`  | worker            | `axis.tenant`, `axis.application`, `axis.connector`, `axis.operation`, `axis.outcome`         |
-| `axis.package.call`      | worker            | `axis.tenant`, `axis.application`, `axis.package`, `axis.operation`, `axis.outcome`           |
-
-- **Outcomes.** A call span's `axis.outcome` is a call outcome class:
-  `succeeded`, `retryable`, `failed` or `unknown`, see
-  [call outcomes](reference/process-execution.md#call-outcomes). A work item run's
-  outcome is `completed`, `failed` or `fenced`.
-- **Links, not children.** A work item stores the trace id and span id of the
-  transaction that queued it. Its run starts a new trace with a link to that
-  span. Instances wait for days, so a child span would join work days apart
-  into one trace. One trace per run stays readable.
-- **Errors.** An Axis span that fails records the exception type only, with no
-  message.
-
-### Logs
-
-The console always gets logs. OTLP gets them too when an endpoint is set. Each
-record carries `TraceId` and `SpanId` in its scope, next to the `TenantId` of
-the [log scope](#request-resolution). The console shows scopes, so an operator
-can go from a reported `traceId` to its logs with no collector.
-
-- **Failed steps.** A step failure logs the step name, the instance id and the
-  same fixed text the step history row stores. It names the error kind, such
-  as `DivisionByZero`, and never a value.
-- **Failed work items.** A failed work item logs its kind, its id and the
-  exception type only. The exception message and its inner exceptions can quote
-  a record value, so the log leaves them out.
-- **Query timeouts.** An interactive read that runs past `Data:QueryTimeout`,
-  or a record write, process start, task complete or inbound endpoint call that
-  runs past `Data:WriteTimeout`, logs a warning with the entity, data source or page name as the route spells
-  it and how long the read ran, never a value or the query string. The counter
-  `axis.queries.timeouts` counts each one by tenant and application, see
-  [Errors](reference/record-api.md#errors).
-- **Skipped trigger starts.** A trigger that skips a start because its `when`
-  or start condition hit a run-time error logs the error kind, never the
-  error message.
-- **Refused bearer tokens.** A refused token logs a warning with the tenant and
-  a reason: a fixed text, or the exception type, never a message or the token.
-- **Refused requests.** A `403` logs a warning with the HTTP method and the
-  route template, never the path or the query string.
-- **Line breaks.** The console formatter indents every line of a message after
-  its first, so a value with a line break cannot start a new log entry. It also
-  starts each entry with a UTC timestamp.
-
-The [log inventory](reference/log-inventory.md) lists every log.
-
-### Correlation
-
-- **Problem details.** Every problem details answer carries
-  a `traceId`, see [Errors](reference/record-api.md#errors).
-- **Stored history.** Step history rows and call attempt rows store the
-  `trace_id` of their run, see [Tables](reference/process-tables.md#tables). A
-  row written with no current span stores null. `traceId` and `trace_id` hold
-  the same value, the 32-hex W3C trace id.
-
-So a user reports a `traceId`, and an operator searches the history for it.
-Finding one user's failed request goes through the stored history, not the
-traces, because telemetry holds no user id.
-
-### What telemetry never holds
-
-- Field values, sensitive or not.
-- Secrets.
-- Binding values.
-- Request and response bodies.
-- User ids.
-- Npgsql parameter values.
-- Exception messages on Axis spans. They hold the type only.
-
-Attributes and log texts name things: the tenant, application, process, step,
-connector, package, operation and work item kind. Expression and step log
-texts are fixed and hold names, not values. Statement text in Npgsql spans
-holds table and column names.
+Moved to [reference/telemetry.md](reference/telemetry.md).
 
 ## Health checks
 
@@ -659,7 +536,7 @@ integration tests, on their Testcontainers PostgreSQL. See
 The integration tests share one Keycloak container with the development realm
 per run. It starts the first time a test needs it, so a run with no such test
 starts none. It is removed when the run ends. A test class never starts its own
-Keycloak. A test that changes realm state must not use the shared container.
+Keycloak. A test that changes realm state must not use the shared container. It keeps its data in a PostgreSQL container of its own, with a read-only role that has `SELECT` on the `credential` table.
 
 The integration tests also share one PostgreSQL 18 container per run. It starts
 the first time a test needs it, so a run with no such test starts none, and it is
@@ -792,6 +669,8 @@ application already has: the `vi` locale and four navigation entries, the last o
 none. The Design tab of a page draws nothing while any file has an error, and the starter `Home` page and its navigation entry have errors until this step, so the journey lays out the two pages afterwards. It builds `TicketDetail` on the page's Design tab: it drops the `Ticket` entity from the data panel onto the canvas, picks a detail widget, which binds itself to the `ticket` parameter, and removes the starter task inbox in the widget tree. It builds `Dashboard` there too: it drops a `columns` widget from the palette, the two `kpi` tiles in a column of 4 and the `chart` in a column of 8 from the three aggregate data sources in the data panel, and the `AllTicketList` table below the columns. It then drags the table into the chart's column by mistake and presses Undo once, which puts the table back below the columns, because a move is one edit. The journey saves the page with the table below the columns. It then adds the open page to `tellRequester`, because the page picker offers only pages that exist, and sets its `ticket` parameter to `id`. It then builds the `DailyOverdueReminder` and `TellLeadTicketDeleted` processes in the process editor, each as a process with parameters whose one `notify` step goes in-app to the `service-desk-lead` role, and the `EveryMorning` schedule trigger and the `TicketDeleted` delete trigger. A new trigger starts with an empty `event`, and Studio removes that key only when the author picks an event and clears it. The sample has no event, so the journey creates a temporary `Placeholder` event first and deletes it after the two triggers, which leaves the built folder equal to the sample. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
 the requester from editing `resolution`, the read grants of the lead on the three aggregate data sources and the lead's `reassign` grant on `TicketHandling`. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the twelve test scenarios in the scenario editor, each with its users, time and steps. A step that expects a notification names the recipient, the channel and the placeholder values, an `advanceTime` step names its `by`, and an `expectTask` step names a user or a role. The late ticket scenario moves time in two steps, `P2D` and `P1D`, so that the weekday reminder runs before the escalation and the escalation's notification is the newest one the lead has. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
 The journey then runs the twelve scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, the requester creates and submits a ticket, pressing Next to reach step 2, the `lead` user assigns it to the `agent` user, who resolves it, and the requester opens the ticket detail page from a row of the requester's bell and confirms it, until the ticket's status is `closed`. The resolution holds the ticket's unique title, so that the bell row is found by it. The journey also opens the bell of the `lead` user and checks that it has no row for that ticket.
+
+`tests/e2e/specs/module-contract-journey.spec.ts` creates a blank application on the journey tenant and writes its pins through the Studio API: the built-in module `organization` and the sample module `department-budgets`. The member and approver slots map to a new `department-manager` role, and the admin and administrator slots to a `department-administrator` role. The application also grants `department-manager` the start of `BudgetApproval`, adds an `Engineering` department seed and a Budgets navigation entry, with their texts. The publish must succeed, and the release must not be off-standard. The `manager` user then creates a budget on the Budgets page, and the budget reads `draft`. The same user gets Studio's forbidden page with no Relax button, and a PATCH that adds a relax entry to `application.json` answers 403.
 
 `tests/e2e/specs/asset-management-journey.spec.ts` builds the `AssetManagement` application on the journey tenant with Studio only, and opens the JSON view only to write the maintenance scenario, because the scenario editor cannot add a child-collection value. It creates the application's `Asia/Ho_Chi_Minh` time zone, its `en` and `vi` texts, the three roles, the `AssetNumber` sequence, the `Category`, `Location`, `Vendor` and `Software` entities, the `Attachment` and `MaintenanceEntry` child entities, the `Asset` entity with its enum status and currency fields, and the `Categories` and `Locations` seeds. Every migration that a save asks is answered, and the built `migrations` folder must be empty at the end, because the sample has none. It then builds the `AssetValueByLocation`, `AssetsByStatus` and `WarrantiesEndingSoon` data sources in the generic data source form, with the filter and the empty `groupBy` of the warranties count written as the service desk journey writes them. It lays out the `AssetEdit` form on the form's Design tab: it adds the five sections with Add section, names them in the Name box and fills them from the field palette. It builds the `AssetForm`, `AssetDetail`, `Assets` and `Dashboard` pages in the page editor, with the required `asset` parameter and the Open, View and New actions of `Assets`. It finishes the site that the blank application already has, with the `vi` locale and two navigation entries, and deletes the starter `Home` page. It then lays out `AssetDetail` and `Dashboard` on the page's Design tab by dropping data from the data panel. The `Dashboard` gets a columns widget of 4 and 8 with the warranties `kpi` and the status `chart`, and the value by location table below it, and after a reload its Design tab must show the three widgets. The built folder must then match `samples/apps/asset-management` in its `application.json`, `roles`, `sequences`, `entities`, `seeds` and `texts` parts, and the Studio diagnostics must show no error for those files. The nine files of the three data sources, the form, the four pages and the site must match the sample too. It then opens the policy matrix and builds `AssetManagerAccess`, `EmployeeAccess` and `AuditorAccess` cell by cell, with `export` and `import` for `asset-manager`, `export` for `auditor`, neither for `employee`, and the employee's `holder == currentUser()` filter on `Asset`. It checks that the `Asset` row shows `export` for `auditor` and `asset-manager`, `import` only for `asset-manager`, and neither for `employee`. It writes the five asset scenarios in the scenario editor, where a money value is a number box that stores a number, and the sixth, `AssetWithMaintenanceAndSoftware`, through the JSON view. Each save must report no error diagnostic for its file. The three policy files and the six scenario files must match the sample too. The journey then builds the `AssetsWithWarrantyEndingSoon` data source in the same form, and the `WarrantyReminder` process in the process editor: a process on `Asset` whose one `notify` step goes in-app to the `asset-manager` role and opens `AssetDetail` with its `asset` parameter set to `id`. It builds the `WarrantyReminderWeekdays` schedule trigger over that data source. A new trigger starts with an empty `event`, and Studio removes that key only when the author picks an event and clears it, so the journey creates a temporary `Placeholder` event first and deletes it after the trigger is saved. The whole built folder must then match `samples/apps/asset-management` with no error diagnostic, and Run tests must pass all six scenarios. The author then publishes release 1, and the release history must show that one row, active. On the `asset-management` site of the journey tenant, the `asset-manager` user registers an asset with its holder `employee`. The asset has an invoice PDF on an attachment row, two software records from the lookup, and a maintenance entry with a date, a vendor and a cost. The Software and Vendor records are made through the record API first, because the sample has no page for them. The asset's detail page must show an `AS-` number, the label `In stock` and the cost with its currency, with the invoice link, both software names and the vendor. The `asset-manager` user then imports `tests/e2e/fixtures/asset-management-import.csv`, which names the category as its display value. The dry run must show no row error, and the register must list both imported assets. The `auditor` user exports the register to CSV and to Excel. The CSV's data rows must equal the `totalCount` that the record API gives the `auditor` user, and the Excel file must have the `.xlsx` name and start with the zip signature. The journey does not read the workbook's cells. The `auditor` user sees the dashboard and has no New or Import button. The `employee` user sees the asset it holds, none of the imported assets, and no Export, Import or New button.
 

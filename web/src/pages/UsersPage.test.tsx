@@ -115,7 +115,7 @@ function posts(fetchMock: ReturnType<typeof stubServer>) {
 /** Opens the invite form, fills it and asks to invite, which opens the confirmation. */
 async function fillInvitation() {
   renderPage()
-  await userEvent.click(await screen.findByRole('button', { name: 'Invite' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
   const form = await confirmation('Invite a person')
   await userEvent.type(within(form).getByLabelText('Email'), 'new@axis.local')
   await userEvent.type(within(form).getByLabelText('Display name'), 'New Person')
@@ -338,7 +338,7 @@ describe('UsersPage', () => {
   it('asks for the fields of the form before it asks to invite', async () => {
     const fetchMock = stubInvitations()
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Invite' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
     const form = await confirmation('Invite a person')
     await userEvent.type(within(form).getByLabelText('Email'), 'not-an-email')
     await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))

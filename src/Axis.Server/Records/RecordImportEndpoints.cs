@@ -16,7 +16,8 @@ namespace Axis.Server.Records;
 /// <summary>
 /// Endpoints for the imports of an entity: the upload of a CSV file or an <c>xlsx</c> workbook, the state of an
 /// upload, and the commit of a checked upload. Only a
-/// signed-in user uses them, never a service account. Every request is checked in order: session (401), then the
+/// signed-in user uses them, never a service account. Every request is checked in order: session (401), then for an
+/// upload and a commit, in a cell, the tenant's storage quota (403 <c>quota-exceeded</c>), then the
 /// path (404), then the user's grant (403), and only then the body. An upload needs the <c>import</c> grant and a
 /// <c>create</c> grant on the entity, and the <c>update</c> grant too when it names a <c>key</c>. A <c>key</c>
 /// that is not the name of a unique field of the entity is a 400 at <c>key</c>. The file is the raw request
@@ -25,7 +26,7 @@ namespace Axis.Server.Records;
 /// body that is not a workbook fails its dry run. The upload stores the import <c>pending</c>, queues the work item that
 /// dry-runs it, and answers 202 with the import and its <c>Location</c>. The worker then checks every row as a
 /// create would, and writes no record. An import is read by the user who uploaded it, and
-/// any other user, or an unknown id, gets a 404. The commit checks the session (401), the path (404), the user's
+/// any other user, or an unknown id, gets a 404. The commit checks the session (401), in a cell the tenant's storage quota (403), the path (404), the user's
 /// current <c>import</c> and <c>create</c> grants (403), then the import (404 for another user's or an unknown
 /// one) and its state: only a <c>checked</c> import with no commit queued is committed, and any other state is a
 /// 409. A <c>checked</c> import whose file was deleted after 24 hours is a 409 too. It queues the work item that writes the rows and answers 202 with the import, still <c>checked</c>.
@@ -38,9 +39,9 @@ internal static class RecordImportEndpoints
         foreach (var pattern in new[] { "/api/apps/{app}/entities/{entity}/imports", "/api/apps/{app}/entities/{module}/{entity}/imports" })
         {
             var imports = endpoints.MapGroup(pattern);
-            imports.MapPost("", UploadAsync);
+            imports.MapPost("", UploadAsync).WithStorageQuota();
             imports.MapGet("/{id}", GetAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
-            imports.MapPost("/{id}/commit", CommitAsync);
+            imports.MapPost("/{id}/commit", CommitAsync).WithStorageQuota();
         }
     }
 

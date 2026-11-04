@@ -44,8 +44,10 @@ so their paths are reserved site paths.
 
 ## Account page
 
-_(planned for M31)_ The sessions screen at `/account` becomes the person's account page, which replaces Keycloak's
-account console, as [D128](../decisions/d128-rules-from-the-studio-review.md) agrees.
+The sessions screen at `/account` is the person's account page, which replaces Keycloak's account console, as
+[D128](../decisions/d128-rules-from-the-studio-review.md) agrees. It also loads `GET /api/me/authenticators`. While
+that call is loading or has failed, the page shows neither action, and a failure shows an error message. When `account`
+is `false`, the person is a user of a brokered provider, and the page shows the sessions only.
 
 - **Change password and Authenticators.** Above the sessions, two actions start the identity provider's own steps, as
   application-initiated actions through a sign-in with `kc_action`: Change password starts `UPDATE_PASSWORD`, and
@@ -54,6 +56,6 @@ account console, as [D128](../decisions/d128-rules-from-the-studio-review.md) ag
   them returns to the account page with nothing changed.
 - **The last authenticator stays.** Remove is off on a person's only authenticator, because every account needs one,
   see [accounts](user-administration.md#accounts).
-- **No account console.** `tenant create` turns off Keycloak's account console client and removes `manage-account`
+- **No account console.** _(planned for M31)_ `tenant create` turns off Keycloak's account console client and removes `manage-account`
   from the realm's default roles, so the account page is the only self-service, see
   [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
