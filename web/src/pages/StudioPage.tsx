@@ -3,6 +3,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'r
 import { Link, useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
+import type { ModuleKind } from '../platform/moduleKinds'
 import { SiteMark } from '../platform/SiteMark'
 import {
   fetchStudioApps,
@@ -12,7 +13,6 @@ import {
   fetchStudioResources,
   filterResources,
   groupByKind,
-  type ModuleResourceItem,
   moduleResources,
   resourceTitle,
   ServerUnreachableError,
@@ -33,10 +33,7 @@ import { PlatformContext } from './context'
 import { useHomeGrid } from './homeGrid'
 import { HomeTileStyle } from './HomeTileStyle'
 import { StudioEditor } from './StudioEditor'
-import { StudioModuleContract } from './StudioModuleContract'
-import { StudioModuleEditor } from './StudioModuleEditor'
-import { StudioModulePage } from './StudioModulePage'
-import { StudioModulePolicy } from './StudioModulePolicy'
+import { ModuleResourceView } from './StudioModuleView'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
@@ -45,57 +42,37 @@ import { hasRelaxEntry } from './relaxEntries'
 import { StudioReferences } from './StudioReferences'
 
 /** The titles and test ids of the module resource groups in the list. */
-const moduleGroupTitles = {
+const moduleGroupTitles: Record<ModuleKind, string> = {
   entity: 'shell.studio.moduleEntities',
-  process: 'shell.studio.moduleProcesses',
-  policy: 'shell.studio.modulePolicies',
-  contract: 'shell.studio.moduleContracts',
+  dataSource: 'shell.studio.moduleDataSources',
+  rule: 'shell.studio.moduleRules',
+  sequence: 'shell.studio.moduleSequences',
+  form: 'shell.studio.moduleForms',
   page: 'shell.studio.modulePages',
-} as const
-const moduleGroupTestIds = {
+  process: 'shell.studio.moduleProcesses',
+  event: 'shell.studio.moduleEvents',
+  text: 'shell.studio.moduleTexts',
+  seed: 'shell.studio.moduleSeeds',
+  policy: 'shell.studio.modulePolicies',
+  trigger: 'shell.studio.moduleTriggers',
+  scenario: 'shell.studio.moduleScenarios',
+  contract: 'shell.studio.moduleContracts',
+}
+const moduleGroupTestIds: Record<ModuleKind, string> = {
   entity: 'studio-group-module-entities',
-  process: 'studio-group-module-processes',
-  policy: 'studio-group-module-policies',
-  contract: 'studio-group-module-contracts',
+  dataSource: 'studio-group-module-data-sources',
+  rule: 'studio-group-module-rules',
+  sequence: 'studio-group-module-sequences',
+  form: 'studio-group-module-forms',
   page: 'studio-group-module-pages',
-} as const
-
-/** The view of a module resource, by its kind. An entity and a process are edited as a layer, and the other kinds are read-only. */
-function ModuleResourceView({
-  application,
-  item,
-  manifest,
-  onModuleWritten,
-  onManifestSaved,
-  onManifestStale,
-}: {
-  application: string
-  item: ModuleResourceItem
-  manifest?: StudioResource
-  onModuleWritten: (diagnostics: StudioDiagnostic[], layer: { added?: StudioResourceItem; removedId?: string }) => void
-  onManifestSaved: (manifest: StudioResource, diagnostics: StudioDiagnostic[]) => void
-  onManifestStale: () => void
-}) {
-  switch (item.kind) {
-    case 'entity':
-    case 'process':
-      return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
-    case 'policy':
-      return <StudioModulePolicy application={application} module={item.module} id={item.id} />
-    case 'contract':
-      return (
-        <StudioModuleContract
-          application={application}
-          module={item.module}
-          id={item.id}
-          manifest={manifest}
-          onManifestSaved={onManifestSaved}
-          onManifestStale={onManifestStale}
-        />
-      )
-    case 'page':
-      return <StudioModulePage application={application} module={item.module} id={item.id} />
-  }
+  process: 'studio-group-module-processes',
+  event: 'studio-group-module-events',
+  text: 'studio-group-module-texts',
+  seed: 'studio-group-module-seeds',
+  policy: 'studio-group-module-policies',
+  trigger: 'studio-group-module-triggers',
+  scenario: 'studio-group-module-scenarios',
+  contract: 'studio-group-module-contracts',
 }
 
 /** The tiles of the applications Studio may edit, in the UI locale with `en` as the fallback. Each opens its application. */

@@ -261,6 +261,7 @@ its marks and resets are on steps. The editors of the other kinds are _(planned 
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.
   Module scenarios stay read-only, and a contract shows read-only with its added states and
   transitions, see [module contracts in Studio](module-contracts.md#in-studio).
+  A kind with no editor yet opens read-only, as its file's content in JSON.
 - **Marks.** An element the layer added shows **Added**, one it changed **Changed**, and the
   editor's header shows that the resource has a layer. A removed element stays listed as **Removed**
   in a muted row.

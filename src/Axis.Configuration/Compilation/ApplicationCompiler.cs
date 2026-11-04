@@ -896,7 +896,7 @@ public static partial class ApplicationCompiler
         var result = new CompilationResult(null, DiagnosticOrder.Sort(diagnostics))
         {
             References = index,
-            Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, moduleResources.Contracts, texts, FindEntity, index),
+            Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, moduleResources.Contracts, texts, allSeeds, moduleResources.Texts, moduleResources.Scenarios, FindEntity, index),
             ModulePins = modules,
             PolicyMatrix = PolicyMatrixBuilder.Build(
                 loaded.Roles,

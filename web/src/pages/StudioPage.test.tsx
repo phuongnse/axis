@@ -165,6 +165,10 @@ const applicationNames = {
   policies: [],
   contracts: [],
   texts: [{ key: 'entity.purchaseRequest', texts: { en: 'Purchase request' }, usedBy: 1 }],
+  seeds: [],
+  triggers: [],
+  scenarios: [],
+  textResources: [],
 }
 
 /** While `down` is set, the entity routes, the names and `/api/me` fail: with no answer when `status` is null, else with `status`. */

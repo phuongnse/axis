@@ -14,14 +14,18 @@ public sealed record DefinedNames(
     IReadOnlyList<DefinedConnector> Connectors,
     IReadOnlyList<DefinedEvent> Events,
     IReadOnlyList<DefinedResource> Roles,
-    IReadOnlyList<DefinedResource> Sequences,
-    IReadOnlyList<DefinedResource> Forms,
+    IReadOnlyList<DefinedModuleResource> Sequences,
+    IReadOnlyList<DefinedModuleResource> Forms,
     IReadOnlyList<DefinedPage> Pages,
     IReadOnlyList<DefinedPolicy> Policies,
     IReadOnlyList<DefinedContract> Contracts,
-    IReadOnlyList<DefinedText> Texts)
+    IReadOnlyList<DefinedText> Texts,
+    IReadOnlyList<DefinedModuleResource> Seeds,
+    IReadOnlyList<DefinedModuleResource> Triggers,
+    IReadOnlyList<DefinedModuleResource> Scenarios,
+    IReadOnlyList<DefinedModuleResource> TextResources)
 {
-    public static DefinedNames Empty { get; } = new([], [], [], [], [], [], [], [], [], [], [], [], [], []);
+    public static DefinedNames Empty { get; } = new([], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []);
 }
 
 /// <summary>An entity and its fields. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
@@ -79,11 +83,18 @@ public sealed record DefinedOperation(string Name);
 /// <summary>
 /// An event with the entity it is about and its payload fields. <paramref name="Entity"/> is written as a process
 /// writes it, so a module event's own-module entity is <c>&lt;module id&gt;/&lt;name&gt;</c>.
+/// <paramref name="Module"/> is the module id, or null for the application's own.
 /// </summary>
-public sealed record DefinedEvent(Guid Id, string Name, string Entity, IReadOnlyList<DefinedTyped> Fields);
+public sealed record DefinedEvent(Guid Id, string Name, string? Module, string Entity, IReadOnlyList<DefinedTyped> Fields);
 
-/// <summary>A role, sequence or form.</summary>
+/// <summary>A role.</summary>
 public sealed record DefinedResource(Guid Id, string Name);
+
+/// <summary>
+/// A sequence, form, seed, trigger, scenario or text resource. <paramref name="Module"/> is the module id, or null
+/// for the application's own. A module resource's <paramref name="Name"/> is <c>&lt;module id&gt;/&lt;name&gt;</c>.
+/// </summary>
+public sealed record DefinedModuleResource(Guid Id, string Name, string? Module);
 
 /// <summary>A page and the parameters it declares. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
 public sealed record DefinedPage(Guid Id, string Name, string? Module, IReadOnlyList<DefinedPageParameter> Parameters);
