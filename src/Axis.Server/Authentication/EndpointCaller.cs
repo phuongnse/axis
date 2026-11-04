@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Axis.Core.Tenancy;
+using Axis.Server.CellApi;
 using Axis.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,7 +26,8 @@ internal static class EndpointCaller
     public const string Scheme = "Axis.EndpointCaller";
 
     /// <summary>
-    /// The default scheme of every request: the bearer token on endpoint paths, the service account's bearer token on a
+    /// The default scheme of every request: the bearer token on endpoint paths, the operator realm's bearer token on a
+    /// route of the provisioning API (see <see cref="CellOperator"/>), the service account's bearer token on a
     /// service account route, and the <see cref="Session"/> everywhere else.
     /// </summary>
     public const string RequestScheme = "Axis.Request";
@@ -104,6 +106,7 @@ internal static class EndpointCaller
         builder.AddPolicyScheme(RequestScheme, displayName: null, options =>
             options.ForwardDefaultSelector = context =>
                 IsEndpointPath(context.Request.Path) ? Scheme
+                : context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null ? CellOperator.Scheme
                 : ServiceAccount.Applies(context) ? ServiceAccount.Scheme
                 : Session.Scheme);
 
@@ -161,7 +164,7 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
     /// <c>at+jwt</c>, <c>application/at+jwt</c> or <c>JWT</c>, and the payload <c>typ</c> claim, when present, must be
     /// <c>Bearer</c> or <c>DPoP</c>. Keycloak marks an ID token <c>ID</c>.
     /// </summary>
-    private static bool IsAccessToken(JsonWebToken token)
+    internal static bool IsAccessToken(JsonWebToken token)
     {
         if (!string.IsNullOrEmpty(token.Typ)
             && !IsOneOf(token.Typ, "at+jwt", "application/at+jwt", "JWT"))
