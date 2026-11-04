@@ -110,15 +110,6 @@ function moveOrder<T>(columns: readonly AxisColumn<T>[]): string[] {
     .map((column) => column.key)
 }
 
-/** Proposed: the rows where a searchable column holds the text, ignoring letter case. */
-export function searchRows<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], text: string): readonly T[] {
-  const needle = text.trim().toLowerCase()
-  const searchable = columns.flatMap((column) => (column.searchText ? [column.searchText] : []))
-  return needle === ''
-    ? rows
-    : rows.filter((row) => searchable.some((read) => read(row)?.toLowerCase().includes(needle)))
-}
-
 const isEmpty = (value: ReactNode) => value == null || (isValidElement(value) && value.type === EmptyDash)
 
 /** A column as wide as its content, never wrapping. */
@@ -178,7 +169,7 @@ export function AxisTable<T extends object>({
   const [movedCount, setMovedCount] = useState(0)
   const [scrolls, setScrolls] = useState(false)
   // With no column moved, a new width changes no state, and the table must still measure itself.
-  const [, measureAgain] = useReducer((count: number) => count + 1, 0)
+  const [measured, measureAgain] = useReducer((count: number) => count + 1, 0)
   const order = moveOrder(columns)
   const moved = new Set(order.slice(0, movedCount))
   const shown = columns.filter((column) => !moved.has(column.key))
@@ -198,7 +189,7 @@ export function AxisTable<T extends object>({
     } else {
       setScrolls(over)
     }
-  })
+  }, [movedCount, order.length, rows, measured])
 
   // A new width starts over, as columns that moved may fit again.
   useEffect(() => {

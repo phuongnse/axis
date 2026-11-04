@@ -3,38 +3,8 @@ import { Button, Checkbox, Flex, Modal, Typography } from 'antd'
 import { useState } from 'react'
 import { AxisButton } from './AxisButton'
 import { dialogWidth } from './dialogButtons'
+import type { ColumnChoice } from './tableControls'
 import { useText } from './texts'
-
-/** Proposed: the columns a person chose: their keys in order, and which of them they hid. */
-export interface ColumnChoice {
-  order: string[]
-  hidden: string[]
-}
-
-/**
- * Proposed: reads a choice from the address, as `order` with a leading `-` on a hidden column. A key the table no longer has
- * is dropped, and a column the address does not name keeps its place at the end, so a new column always shows.
- */
-export function parseColumnChoice(value: string | null, keys: readonly string[]): ColumnChoice {
-  const entries = (value ?? '').split(',').filter(Boolean)
-  const named = entries.map((entry) => entry.replace(/^-/, '')).filter((key) => keys.includes(key))
-  return {
-    order: [...named, ...keys.filter((key) => !named.includes(key))],
-    hidden: entries.filter((entry) => entry.startsWith('-')).map((entry) => entry.slice(1)),
-  }
-}
-
-export const writeColumnChoice = ({ order, hidden }: ColumnChoice) =>
-  order.map((key) => (hidden.includes(key) ? `-${key}` : key)).join(',')
-
-/** Proposed: the columns to draw: the identifying one first, then the others as chosen. */
-export function chosenColumns<T extends { key: string }>(columns: readonly T[], choice: ColumnChoice): T[] {
-  const [first, ...others] = columns
-  const shown = choice.order
-    .filter((key) => key !== first.key && !choice.hidden.includes(key))
-    .flatMap((key) => others.filter((column) => column.key === key))
-  return [first, ...shown]
-}
 
 /**
  * Proposed: a table's Columns… button and its dialog, where a person shows, hides and orders the columns. The identifying

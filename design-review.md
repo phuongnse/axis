@@ -55,7 +55,7 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 - **Search:** a column is searchable when it says so, through `searchText`, as a field marked `searchable` is in the record
   API. Search looks in all of them. A kind's list searches its name, description, module and status, no longer its `id`, and the
   box says Search.
-- **Step 2, built:** `TableFilter` in `web/src/platform/`: Filter… opens a builder of conditions in groups of All or Any, with
+- **Step 2, built:** `TableFilter` and `tableControls` in `web/src/platform/`: Filter… opens a builder of conditions in groups of All or Any, with
   no limit on depth, and every column can be filtered on. Conditions follow the kind of value: text, enum, number and date, each
   with empty and not empty. Apply puts it in force, and a condition with no value is left out. A chip stands for each condition
   and group, with Clear all, and the filter lives in the address. A kind's list filters in the browser. For a record table,

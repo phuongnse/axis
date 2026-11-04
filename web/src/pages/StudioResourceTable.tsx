@@ -1,7 +1,7 @@
 import { Alert, Flex, Tag, Typography } from 'antd'
 import { useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { AxisTable, searchRows, type AxisColumn } from '../platform/AxisTable'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import {
   fetchStudioCatalog,
@@ -14,15 +14,18 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { TableFilterButton, TableFilterChips } from '../platform/TableFilter'
+import { TableColumnsButton } from '../platform/TableColumns'
 import {
+  chosenColumns,
   matchesFilter,
+  parseColumnChoice,
   parseFilter,
-  TableFilterButton,
-  TableFilterChips,
+  searchRows,
+  writeColumnChoice,
   type FilterField,
   type FilterGroup,
-} from '../platform/TableFilter'
-import { chosenColumns, parseColumnChoice, TableColumnsButton, writeColumnChoice } from '../platform/TableColumns'
+} from '../platform/tableControls'
 import { pageSizes, recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'

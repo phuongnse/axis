@@ -3,131 +3,18 @@ import { Button, Flex, Input, Modal, Select, Tag, Typography } from 'antd'
 import { useState } from 'react'
 import { AxisButton } from './AxisButton'
 import { dialogWidth } from './dialogButtons'
+import {
+  countRules,
+  emptyFilter,
+  operatorsOf,
+  pruned,
+  takesNoValue,
+  type FilterField,
+  type FilterGroup,
+  type FilterRule,
+} from './tableControls'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-
-/** Proposed: a column a table filters on, by the kind of value it holds. */
-export interface FilterField {
-  key: string
-  label: string
-  type: 'text' | 'enum' | 'number' | 'date'
-  options?: { value: string; label: string }[]
-}
-
-export type FilterOperator =
-  | 'contains'
-  | 'notContains'
-  | 'is'
-  | 'isNot'
-  | 'anyOf'
-  | 'noneOf'
-  | 'greater'
-  | 'less'
-  | 'before'
-  | 'after'
-  | 'empty'
-  | 'notEmpty'
-
-export interface FilterRule {
-  kind: 'rule'
-  field: string
-  operator: FilterOperator
-  value: string | string[]
-}
-
-/** A group joins what it holds with And or Or. A group may hold groups, to any depth. */
-export interface FilterGroup {
-  kind: 'group'
-  join: 'and' | 'or'
-  items: (FilterRule | FilterGroup)[]
-}
-
-const operatorsOf: Record<FilterField['type'], FilterOperator[]> = {
-  text: ['contains', 'notContains', 'is', 'isNot', 'empty', 'notEmpty'],
-  enum: ['anyOf', 'noneOf', 'empty', 'notEmpty'],
-  number: ['is', 'isNot', 'greater', 'less', 'empty', 'notEmpty'],
-  date: ['before', 'after', 'empty', 'notEmpty'],
-}
-
-export const emptyFilter: FilterGroup = { kind: 'group', join: 'and', items: [] }
-
-const takesNoValue = (operator: FilterOperator) => operator === 'empty' || operator === 'notEmpty'
-
-function isComplete(rule: FilterRule) {
-  return takesNoValue(rule.operator) || (Array.isArray(rule.value) ? rule.value.length > 0 : rule.value !== '')
-}
-
-/** Drops the rules with no value yet and the groups left empty, so the filter holds only what applies. */
-function pruned(group: FilterGroup): FilterGroup {
-  const items = group.items.flatMap<FilterRule | FilterGroup>((item) => {
-    if (item.kind === 'rule') {
-      return isComplete(item) ? [item] : []
-    }
-    const inner = pruned(item)
-    return inner.items.length > 0 ? [inner] : []
-  })
-  return { ...group, items }
-}
-
-function ruleMatches(rule: FilterRule, value: string | number | null) {
-  const empty = value === null || value === ''
-  const text = String(value ?? '').toLowerCase()
-  const wanted = Array.isArray(rule.value) ? rule.value : String(rule.value).toLowerCase()
-  const number = Number(rule.value)
-  const time = (date: string | number | null) => new Date(String(date)).getTime()
-  switch (rule.operator) {
-    case 'empty':
-      return empty
-    case 'notEmpty':
-      return !empty
-    case 'contains':
-      return text.includes(wanted as string)
-    case 'notContains':
-      return !text.includes(wanted as string)
-    case 'is':
-      return text === wanted
-    case 'isNot':
-      return text !== wanted
-    case 'anyOf':
-      return !empty && (wanted as string[]).includes(String(value))
-    case 'noneOf':
-      return empty || !(wanted as string[]).includes(String(value))
-    case 'greater':
-      return !empty && Number(value) > number
-    case 'less':
-      return !empty && Number(value) < number
-    case 'before':
-      return !empty && time(value) < time(String(rule.value))
-    case 'after':
-      return !empty && time(value) > time(String(rule.value))
-  }
-}
-
-/** Proposed: whether a row passes a filter, where `read` gives the row's value of a field. */
-export function matchesFilter(group: FilterGroup, read: (field: string) => string | number | null): boolean {
-  const passes = (item: FilterRule | FilterGroup) =>
-    item.kind === 'group' ? matchesFilter(item, read) : ruleMatches(item, read(item.field))
-  if (group.items.length === 0) {
-    return true
-  }
-  return group.join === 'and' ? group.items.every(passes) : group.items.some(passes)
-}
-
-/** Proposed: reads a filter from the address. One that does not parse is no filter. */
-export function parseFilter(value: string | null): FilterGroup {
-  if (!value) {
-    return emptyFilter
-  }
-  try {
-    const parsed = JSON.parse(value) as FilterGroup
-    return parsed.kind === 'group' && Array.isArray(parsed.items) ? parsed : emptyFilter
-  } catch {
-    return emptyFilter
-  }
-}
-
-const countRules = (group: FilterGroup): number =>
-  group.items.reduce((total, item) => total + (item.kind === 'rule' ? 1 : countRules(item)), 0)
 
 function newRule(fields: readonly FilterField[]): FilterRule {
   const field = fields[0]

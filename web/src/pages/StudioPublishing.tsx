@@ -1,7 +1,7 @@
 import { EllipsisOutlined } from '@ant-design/icons'
 import { Alert, Button, Dropdown, Flex, Input, Modal, Tooltip } from 'antd'
-import { type Ref, useEffect, useImperativeHandle, useLayoutEffect, useReducer, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal, flushSync } from 'react-dom'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
@@ -259,26 +259,25 @@ export function StudioPublishing({
   // Proposed: when the band has too little room, the actions that check fold into one "…" menu. Publish stays. A new
   // width starts over, as they may fit again.
   const [folded, setFolded] = useState(false)
-  const [, measureAgain] = useReducer((count: number) => count + 1, 0)
   const band = actionsSlot?.closest<HTMLElement>('[data-axis-band]') ?? null
   useLayoutEffect(() => {
-    if (band && !folded && band.scrollWidth > band.clientWidth) {
-      setFolded(true)
-    }
-  })
-  useEffect(() => {
     if (!band) {
       return
     }
     let width = band.clientWidth
+    // Unfolded first, as only then the band can say whether all of it fits.
+    const measure = () => {
+      flushSync(() => setFolded(false))
+      setFolded(band.scrollWidth > band.clientWidth)
+    }
     const observer = new ResizeObserver(() => {
       if (band.clientWidth !== width) {
         width = band.clientWidth
-        setFolded(false)
-        measureAgain()
+        measure()
       }
     })
     observer.observe(band)
+    queueMicrotask(measure)
     return () => observer.disconnect()
   }, [band])
 
