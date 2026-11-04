@@ -11,10 +11,11 @@ changes start at the commit of `main` it last merged.
 
 ## Configuration
 
-- **A contract's points have labels.** A contract's states, transitions, core validations and effects take a `label`
-  text reference, so a point reads as words, never as a name pieced together. A ceiling slot uses its module role's
-  label, and the ceiling of the roles mapped to no slot reads "Other roles". Studio reads the words from the module
-  files the release stores, so an old release keeps the words it was published with. See
+- **A contract's points have labels.** A contract's states, transitions, core validations and effects each need a
+  `label` text reference, so a point reads as words, never as a name pieced together. A point without one, or a label
+  whose key no text resource holds, is a compile error. A ceiling slot uses its module role's label, and the ceiling of
+  the roles mapped to no slot reads "Other roles". Studio reads the words from the module files the release stores, so
+  an old release keeps the words it was published with, and a part published before this rule falls back to its name. See
   [named points](../reference/module-contracts.md#named-points).
 - **A package has a label.** An extension package's manifest gains a required `label`, as a module's has, so Studio
   never names a package by its id. Every package adds one. See [manifest](../reference/extension-packages.md#manifest).
@@ -59,7 +60,7 @@ changes start at the commit of `main` it last merged.
 - **Relaxed points in Settings are read-only.** A relax needs the point's context, and each thing is edited in one
   place. See [relaxed points](../reference/studio-resource-form.md#relaxed-points-in-settings).
 - **Form and JSON stay in step.** While the JSON has an error, the form is read-only. The JSON view is a code editor in
-  the tokens, with its own actions. See [form and JSON](../reference/studio-resource-form.md#form-and-json) and
+  the tokens, with its own actions, and the expression editor draws in the same colours. See [form and JSON](../reference/studio-resource-form.md#form-and-json) and
   [JSON view](../reference/studio-resource-form.md#json-view).
 
 ## The platform

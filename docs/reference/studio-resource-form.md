@@ -142,7 +142,8 @@ Save act on both.
 - **Its height.** It reaches down to `spacing-md` above the footer, or above the save bar while that shows, at any
   window height, and scrolls inside. Its least height is 240 px, and the page scrolls then.
 - **Its colours are tokens.** Names are `primaryText`, strings `text`, numbers `infoText`, `true`, `false` and `null`
-  `warningText`, and punctuation `textMuted`. A string stays plain because strings are most of what a person reads.
+  `warningText`, and punctuation `textMuted`. A string stays plain because strings are most of what a person reads. The expression editor draws in the same
+  colours, so no editor shows CodeMirror's own.
 - **Its actions end the tab bar**, so they take no height from it, and show only on the JSON tab.
   - **Problems.** "2 problems", a text button in `dangerText`, shows only while there are any, and moves to the next one.
   - **Find.** An icon, also Ctrl+F or Cmd+F, opens a bar at the top of the view, because the browser's own find cannot
