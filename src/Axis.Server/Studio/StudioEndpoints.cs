@@ -78,8 +78,10 @@ namespace Axis.Server.Studio;
 /// quota (403 <c>quota-exceeded</c>) right after the session, and a delete never does, see
 /// <c>docs/reference/tenant-quotas.md#refusals</c>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
-/// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
-/// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. Each item has
+/// newest first, as <c>{ active, folderContentHash, changes, items }</c>. <c>active</c> is the active release or null, and
+/// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. <c>changes</c>
+/// lists the files that differ from the active release, see <see cref="StudioReleaseChanges"/>, and is null when nothing
+/// is active. Each item has
 /// <c>offStandard</c> and <c>relaxed: [{ module, point, reason }]</c>, read from the <c>application.json</c> stored with
 /// that release. It reads the tenant database and changes nothing.
 /// </summary>
@@ -494,13 +496,17 @@ internal static class StudioEndpoints
         var folderContentHash = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).ContentHash;
         if (applicationId is not { } id)
         {
-            return Results.Ok(new StudioReleaseHistoryResponse(null, folderContentHash, []));
+            return Results.Ok(new StudioReleaseHistoryResponse(null, folderContentHash, null, []));
         }
 
         var cancellationToken = httpContext.RequestAborted;
         var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
         var active = await store.FindByApplicationIdAsync(id, cancellationToken);
         var activations = await store.ListActivationsAsync(id, cancellationToken);
+        var changes = active is not null && await store.GetReleaseAsync(active.ReleaseId, cancellationToken) is { } live
+            ? StudioReleaseChanges.Compare(
+                StudioFolder.Snapshot(folder), [.. live.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content))])
+            : null;
 
         // A release can be in the history more than once, always with one number, so the first row of it has it.
         var activeRelease = active is null
@@ -520,7 +526,7 @@ internal static class StudioEndpoints
                     relaxed.Count > 0, relaxed);
             })
             .ToList();
-        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, items));
+        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, changes, items));
     }
 
     // The relax entries of a stored application.json, in manifest order. A missing manifest has none.
@@ -1032,9 +1038,17 @@ internal sealed record StudioTextWriteResponse(IReadOnlyList<StudioTextVersion> 
 /// <summary>
 /// The release history of an application, newest first. <c>Active</c> is the active release, or null when there
 /// is none, and <c>FolderContentHash</c> is the hash the folder compiles to now, or null when it has errors.
+/// <c>Changes</c> lists the files that differ from the active release, or is null when none is active.
 /// </summary>
 internal sealed record StudioReleaseHistoryResponse(
-    StudioActiveRelease? Active, string? FolderContentHash, IReadOnlyList<StudioReleaseItem> Items);
+    StudioActiveRelease? Active, string? FolderContentHash, IReadOnlyList<StudioReleaseChange>? Changes, IReadOnlyList<StudioReleaseItem> Items);
+
+/// <summary>
+/// A file that differs from the active release. <c>Change</c> is <c>added</c>, <c>changed</c> or <c>removed</c>. The
+/// other fields are set for a removed file only: its kind, its name, its label by locale and, for a text resource, its locale.
+/// </summary>
+internal sealed record StudioReleaseChange(
+    string Path, string Change, string? Kind, string? Name, IReadOnlyDictionary<string, string>? Titles, string? Locale);
 
 /// <summary>The active release: its id, its number and its content hash.</summary>
 internal sealed record StudioActiveRelease(Guid ReleaseId, int Number, string ContentHash);
