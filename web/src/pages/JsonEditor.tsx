@@ -1,18 +1,23 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { json, jsonParseLinter } from '@codemirror/lang-json'
-import { defaultHighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language'
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language'
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
+import { tags } from '@lezer/highlight'
 import Ajv2020, { type ErrorObject, type ValidateFunction } from 'ajv/dist/2020'
-import { useEffect, useMemo, useRef } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { designTokensFor } from '../platform/designTokens'
+import { ShellSidebarContext } from '../platform/shellSidebar'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 
 const external = Annotation.define<boolean>()
+
+/** The least height of the view, in pixels. */
+const minimumHeight = 240
 
 /** The schema's validator, made once a schema. Axis's own `x-axis-*` keywords are annotations, so strict mode is off. */
 const validators = new WeakMap<object, ValidateFunction>()
@@ -123,6 +128,7 @@ export function JsonEditor({
   const t = useText()
   const tokens = useDesignTokens()
   const { mode } = useThemeMode()
+  const bottomGap = useContext(ShellSidebarContext)?.contentPadding ?? tokens.spacing.lg
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const latest = useRef({ onChange, schema, t })
@@ -171,7 +177,6 @@ export function JsonEditor({
         extensions: [
           json(),
           lineNumbers(),
-          syntaxHighlighting(defaultHighlightStyle),
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           linter(schemaLinter, { delay: 300 }),
@@ -199,6 +204,31 @@ export function JsonEditor({
     viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(editorTheme(tokens, mode)) })
   }, [themeCompartment, tokens, mode])
 
+  // Proposed: the view reaches down to spacing-md above the footer, whatever the window's height, as a fixed share of the
+  // window left a band under it that grew with the screen. It never goes under its minimum, and the page scrolls then.
+  useLayoutEffect(() => {
+    const host = hostRef.current!
+    function fit() {
+      if (host.offsetParent === null) {
+        return
+      }
+      const top = host.getBoundingClientRect().top + window.scrollY
+      const footer = document.querySelector('footer')?.offsetHeight ?? 0
+      host.style.setProperty(
+        '--json-view-height',
+        `${Math.max(minimumHeight, window.innerHeight - top - footer - bottomGap)}px`,
+      )
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(host)
+    window.addEventListener('resize', fit)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', fit)
+    }
+  }, [bottomGap])
+
   useEffect(() => {
     const view = viewRef.current
     if (view && view.state.doc.toString() !== value) {
@@ -210,25 +240,41 @@ export function JsonEditor({
 }
 
 function editorTheme({ colour, radius, type }: ReturnType<typeof designTokensFor>, mode: 'light' | 'dark') {
-  return EditorView.theme(
-    {
-      '&': {
-        color: colour.text,
-        backgroundColor: colour.surface,
-        border: `1px solid ${colour.border}`,
-        borderRadius: `${radius.base}px`,
-        fontFamily: type.codeFontFamily,
-        fontSize: `${type.fontSize}px`,
+  return [
+    EditorView.theme(
+      {
+        '&': {
+          height: `var(--json-view-height, ${minimumHeight}px)`,
+          color: colour.text,
+          backgroundColor: colour.surface,
+          border: `1px solid ${colour.border}`,
+          borderRadius: `${radius.base}px`,
+          // Proposed: the gutter's square background stays inside the rounded border, which it cut at the corners.
+          overflow: 'hidden',
+          fontFamily: type.codeFontFamily,
+          fontSize: `${type.fontSize}px`,
+        },
+        '&.cm-focused': { outline: `2px solid ${colour.focusRing}` },
+        '.cm-content': { caretColor: colour.text },
+        '.cm-scroller': { fontFamily: 'inherit', overflow: 'auto' },
+        '.cm-gutters': {
+          backgroundColor: colour.surface,
+          color: colour.textMuted,
+          borderRight: `1px solid ${colour.borderSubtle}`,
+        },
       },
-      '&.cm-focused': { outline: `2px solid ${colour.focusRing}` },
-      '.cm-content': { caretColor: colour.text },
-      '.cm-scroller': { fontFamily: 'inherit', minHeight: '240px', maxHeight: '70vh', overflow: 'auto' },
-      '.cm-gutters': {
-        backgroundColor: colour.surface,
-        color: colour.textMuted,
-        borderRight: `1px solid ${colour.borderSubtle}`,
-      },
-    },
-    { dark: mode === 'dark' },
-  )
+      { dark: mode === 'dark' },
+    ),
+    // Proposed: JSON draws in the Axis tokens, not CodeMirror's own red. A value's text stays plain, because it is most of
+    // what a person reads; the names carry the brand colour, and numbers and literals their own.
+    syntaxHighlighting(
+      HighlightStyle.define([
+        { tag: tags.propertyName, color: colour.primaryText },
+        { tag: tags.string, color: colour.text },
+        { tag: tags.number, color: colour.infoText },
+        { tag: [tags.bool, tags.null], color: colour.warningText },
+        { tag: [tags.separator, tags.brace, tags.squareBracket, tags.punctuation], color: colour.textMuted },
+      ]),
+    ),
+  ]
 }
