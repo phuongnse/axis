@@ -1246,7 +1246,7 @@ describe('StudioPage publishing', () => {
     expect(new Headers(posts[0][1]!.headers).get('Content-Type')).toBe('application/json')
 
     await vi.advanceTimersByTimeAsync(1000)
-    expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'running')
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'running'))
 
     await vi.advanceTimersByTimeAsync(1000)
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))

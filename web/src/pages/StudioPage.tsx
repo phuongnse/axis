@@ -159,7 +159,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
  * Validate and Publish sit at the top of the open application's page, and Publish shows only when `GET /api/me` answers
- * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
+ * `studioPublisher: true`. Under them, the release list shows the application's releases, with an Activate… button
  * for a publisher. A save, a text write or a delete loads the release list again, because the folder may now differ from the
  * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a

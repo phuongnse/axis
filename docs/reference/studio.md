@@ -11,7 +11,7 @@ Studio is where authors edit an application's resources. It uses the
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md)
 agrees. The route, the link, the application row of the sidebar, New application, New resource, a kind's list, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
-the request status and the preview links, the Releases list with Roll back, Run tests,
+the request status and the preview links, the Releases list with Activate…, Run tests,
 Run and the Test results list, the editable module entity and module process and the editable module policy, and the reconnect message are built. Where each sits is in [Studio workspace](studio-workspace.md).
 
 - **Route.** `/studio` is a platform route, outside every site. The header
@@ -200,25 +200,25 @@ Run and the Test results list, the editable module entity and module process and
   - The buttons are off while a request runs and while the reconnect message
     shows.
 - **Releases.** A list under the publishing buttons (the Releases entry of the sidebar, _planned for M31_) shows the
-  open application's release history from `GET .../releases`. Below is what is built; one row per release with
-  Activate… replaces it _(planned for M31)_, see [releases](studio-workspace.md#releases).
-  - Each row is one activation: its release number, label, note, who activated it and when. Rows are sorted by time,
-    newest first.
-  - Exactly one row is marked **Active**. A release that was activated more than once has a row for each activation, and
-    only its newest row is marked.
+  open application's release history from `GET .../releases` on the shared table, see
+  [releases](studio-workspace.md#releases).
+  - One row for each release, the highest number first, on one page. Its label, note, time and publisher are those of
+    its first activation, which is the publish.
+  - The columns are Release, Label, Published, Published by and Note. The Release cell shows the number and the **Live**
+    tag beside the release that runs. Label and Note show the dash when the publish gave none. Published by is a name,
+    "System", "The platform operator" or "Someone no longer known", never an id.
   - An [off-standard release](module-contracts.md#off-standard-releases) shows the **Off-standard**
-    tag with the module, point and reason of each relaxed entry. A standard one shows no tag. _(planned for M31)_: the points move to the [release page](studio-workspace.md#release-page).
-  - **Roll back** shows only when `GET /api/me` answers `studioPublisher: true`. It sits on every row of a release that
-    is not the active one, and is off while a request runs and while the reconnect message shows.
-  - **Roll back** opens a dialog that names the release number and label. Confirming sends `POST
-    .../releases/{id}/rollback`. The status line then shows **queued**, **running** and the outcome, as for Publish. A
-    failed rollback puts its diagnostics in the diagnostics panel, and the list still marks the previous release
-    **Active**.
+    tag in the Release cell with the module, point and reason of each relaxed entry. A standard one shows no tag. _(planned for M31)_: the points move to the [release page](studio-workspace.md#release-page).
+  - **Activate…** shows only when `GET /api/me` answers `studioPublisher: true`. It is an icon button named, for
+    example, "Activate release 6", on every row but the live one, and is off while a request runs and while the
+    reconnect message shows. Its dialog says "Release 1 replaces live release 2." Confirming sends `POST
+    .../releases/{id}/rollback`, because the route keeps its name while
+    [D130](../decisions/d130-activate-a-release-replaces-roll-back.md) is Proposed. The status line then shows
+    **queued**, **running** and the outcome, as for Publish. A failed request puts its diagnostics in the diagnostics
+    panel, and the list still marks the previous release **Live**.
   - A warning shows when the folder's content hash differs from the active release, for example after a save or a
-    rollback. It does not show without an active release, or while the folder has errors, because the server then
-    returns no content hash for the folder.
-  - The list loads when the application is picked, and again after a request ends, after a save, a text write or a
-    delete, and after a reconnect.
+    rollback. It does not show without an active release, or while the folder has errors. The list loads when the
+    application is picked, and again after a request ends, a save, a text write, a delete or a reconnect.
 - **Reconnect.** Under `scripts/dev.sh` a saved file restarts the server.
   Studio shows a reconnect message at the top of the page when a request gets
   no answer, or answers `502`, `503` or `504`. The Vite dev proxy answers `502`

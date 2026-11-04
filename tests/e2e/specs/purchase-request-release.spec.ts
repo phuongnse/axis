@@ -622,14 +622,14 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       const first = page.getByTestId('studio-release-row').filter({ hasText: `First ${stamp}` })
       const number = await first.getAttribute('data-number')
-      await first.getByRole('button', { name: 'Roll back', exact: true }).click()
+      await first.getByRole('button', { name: `Activate release ${number}`, exact: true }).click()
       const dialog = await waitForDialog(page)
-      await expect(dialog).toContainText(`Release ${number} First ${stamp}`)
-      await confirmDialog(page, 'Roll back')
+      await expect(dialog).toContainText(`Release ${number} replaces live release`)
+      await confirmDialog(page, 'Activate')
 
       await expect(status).toContainText('Rolled back', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
-      // The rollback adds a row, without a label, and only that newest row of the release is marked.
+      // The rollback adds an activation, and the release keeps its one row, which is the live one now.
       await expect(
         page.locator(`[data-testid="studio-release-row"][data-number="${number}"][data-active="true"]`),
       ).toHaveCount(1)
@@ -707,8 +707,8 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(rows.and(page.locator('[data-number="2"]'))).toHaveAttribute('data-active', 'true')
 
       const earlier = page.locator('[data-testid="studio-release-row"][data-number="1"]')
-      await earlier.getByRole('button', { name: 'Roll back', exact: true }).click()
-      await confirmDialog(page, 'Roll back')
+      await earlier.getByRole('button', { name: 'Activate release 1', exact: true }).click()
+      await confirmDialog(page, 'Activate')
 
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
         timeout: 60_000,
@@ -815,9 +815,9 @@ test.describe('the active release of the purchase request sample changes', () =>
       await page
         .locator(`[data-testid="studio-release-row"][data-number="${before.number}"]`)
         .first()
-        .getByRole('button', { name: 'Roll back', exact: true })
+        .getByRole('button', { name: `Activate release ${before.number}`, exact: true })
         .click()
-      await confirmDialog(page, 'Roll back')
+      await confirmDialog(page, 'Activate')
       await expect(status).toContainText('Rolled back', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
       await useSession(page, 'requester')
