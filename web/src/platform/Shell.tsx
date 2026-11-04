@@ -27,7 +27,7 @@ interface ShellProps {
   locales: readonly string[]
   locale: string
   onLocaleChange: (locale: string) => void
-  /** Where the notification bell reads, set on an application site. Without it the header has no bell. */
+  /** Where the notification bell reads, set on an application site and, for an administrator, on the platform site. Without it the header has no bell. */
   notifications?: { path: string; sitePath: string }
   /** The privacy and terms links the footer shows, from the site the shell shows. */
   legal?: SiteLegal | null

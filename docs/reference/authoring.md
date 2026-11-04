@@ -67,6 +67,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content, layer, marks, removed }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched. A change to it is saved by the route below. `version` is the hash of the module file. `content` has the application's [customization layer](customization-layers.md) applied, when the file `customizations/<module>/<name>.json` exists. `layer` is `{ id, file, version }`, with the SHA-256 of the layer file as `version`, or `null` when the resource has no layer. `marks` are `{ path, mark }`, a JSON Pointer into `content` with `added` or `changed`, the added ones first. `removed` are `{ list, key, content }`, a module element that the layer removed: the pointer of its list, its key and the module's element. Without a layer, `marks` and `removed` are empty. A module scenario is answered as the module wrote it, with `layer: null` |
 | `PUT /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when the save writes a layer. The body is the edited module resource whole, as `application/json`. It needs `If-Match` with the layer's version, or `If-None-Match: *` when the resource has no layer. `file` and `version` are null, and there is no `ETag`, when no layer is left. See [Module resource saves](module-resource-saves.md) |
+| `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when a layer is left. The body is `{ list, key }` as `application/json`: the pointer of a keyed list and an element's key. It needs `If-Match` with the layer's version. It puts the module's element back, or drops an added one, and rewrites the layer as the difference. `file` and `version` are null, and there is no `ETag`, when no layer is left. *Reset all* is the `DELETE` of the layer resource. See [Element reset](module-resource-saves.md#element-reset) |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `POST /api/studio/apps/{application}/changes` | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
@@ -157,13 +158,12 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The names route, the module resource route, the module resource save, the text write and the expression check are built.
-The five routes use these checks. None of them has check 6 or a later numbered check, except where a line says so:
+The names route, the module resource route, the module resource save and reset, the text write and the expression check are built. The six routes use these checks. None of them has check 6 or a later numbered check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Module resource.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body. Then `404` for a
   module that the application does not pin, and then `404` for a resource that the pinned module version has no file for.
-- **Module resource save.** Checks 1, 2, 3 and 5, then those of [Module resource saves](module-resource-saves.md#order-of-checks).
+- **Module resource save and reset.** Checks 1, 2, 3 and 5, then those of [Module resource saves](module-resource-saves.md#order-of-checks) and of [Element reset](module-resource-saves.md#element-reset).
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
   `application/json`, then `400` for a bad body, then `503` when the
   [write lock](#versions) cannot be taken. Under the lock, it answers `400` when a
@@ -224,7 +224,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Module resource, Module resource save, Create, Patch, Delete, Changes, Diagnostics, Names,
+from the request. The rows for List applications, List resources, Read, Module resource, Module resource save, Module resource reset, Create, Patch, Delete, Changes, Diagnostics, Names,
 Text write, Expression check, Draft page metadata, Module page metadata, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -233,7 +233,7 @@ Text write, Expression check, Draft page metadata, Module page metadata, Resourc
 | List resources | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Read | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Module resource | No session | No author role, or no `Studio:Folders` | Unknown application, module or resource | Not used |
-| Module resource save | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, module or resource | A stale `If-Match` version, or `If-None-Match` over an existing layer |
+| Module resource save, Module resource reset | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, module or resource, or for a reset a list or key that names no element | A stale `If-Match` version, `If-None-Match` over an existing layer, or a reset with no layer |
 | Create | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The `id` or the target file already exists |
 | Patch | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |

@@ -18,7 +18,7 @@ _(planned for M31)_.
 ## Layout
 
 - **Header.** One row, 48 px high, on `surface` with a `borderSubtle` rule below it. From the left: the button that
-  collapses the sidebar, the site's mark, the site's title, then on the right the notification bell, the app switcher,
+  collapses the sidebar, the site's mark, the site's title, then on the right the notification bell (on an application site, and on the platform site for an administrator), the app switcher,
   the language and theme menu and the account button. The account button is the person's avatar, the initials of
   their name on a `primary` circle, then their name and a caret: a circle is a person, as a rounded square
   is an application or a site. The mark is the first letter of the site's title on a

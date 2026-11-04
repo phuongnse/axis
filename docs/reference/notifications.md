@@ -10,7 +10,7 @@ operation and of placeholders, the run of the notify step and of a task
 escalation's `notify`, the storage of in-app notifications, the routes that
 list them and mark them read, their retention, the staging of emails in the
 outbox and their sending over SMTP are built, and so are the dead letter of a
-failed email and the bell in the site shell. The mail settings in the tenant
+failed email and the bell in the site shell and on the platform site. The mail settings in the tenant
 directory are built, and so is the mail server in Docker Compose and
 `scripts/dev.sh`. The design
 follows
@@ -128,7 +128,7 @@ A text value may hold named placeholders, such as
   A tenant notice, which the worker stores for the tenant's administrators, has no application and no release.
   It uses platform text keys and the recipient kind `platformRole`, see
   [D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md). Applications never list it. The
-  [routes](#in-app-notifications) show it to the administrators. The bell that shows it is _(planned for M31)_.
+  [routes](#in-app-notifications) show it to the administrators. The [bell of the platform site](#in-app-notifications) shows it.
 - **Who sees one.** A user sees the notifications addressed to their user id,
   and those addressed to a role they hold that the active release declares,
   checked when read, as a role task is.
@@ -185,8 +185,10 @@ A text value may hold named placeholders, such as
   ready and then every 24 hours.
 - **Site shell.** A bell in the header of an application site shows the
   signed-in user's unread count for that application, and no count when
-  nothing is unread. The platform site has no bell. `GET /api/sites/{path}`
+  nothing is unread. `GET /api/sites/{path}`
   gives the address of the notification routes as `notificationsPath`.
+  - The platform site shows the bell when `GET /api/me` answers `users: true`. It reads `/api/notifications`. A
+    notice has no page, so a row only marks it read. Anyone else, and a visitor who is not signed in, gets no bell.
   - The bell is a button with the accessible name "Notifications, 2 unread", or
     "Notifications" with no count. A polite live region announces a change of
     the count.

@@ -80,7 +80,7 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
 
 - **`storage`.** Once the last sample is at or over the quota, these are refused: a record create
   or update through the record API, an import, an inbound endpoint call that writes, a file upload,
-  a save in Studio and a publish. A delete is never refused. Process steps, task completions,
+  a save or reset in Studio and a publish. A delete is never refused. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
   tenant writes in one sampling interval. A tenant with no sample yet is not refused, and neither is a
   write when the platform database cannot be read: the server logs a warning and the write goes on, because a quota
@@ -159,8 +159,8 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
   warning for the tenant. The notice is a row with no application and no release, whose texts are the
   platform texts `notices.emailsHeld.subject` and `notices.emailsHeld.body` with the value `limit`,
   the tenant's `emailsPerDay`. A tenant with no limit, and a worker outside a cell, store none. The
-  administrators read the notice on the [notification routes](notifications.md#in-app-notifications). The bell is
-  _(planned for M31)_.
+  administrators read the notice on the [notification routes](notifications.md#in-app-notifications). The bell of the
+  [platform site](notifications.md#in-app-notifications) shows it.
 
 ## Usage
 
