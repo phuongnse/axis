@@ -1,5 +1,5 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Modal, Select, Tag, Typography } from 'antd'
+import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Modal, Select, Typography } from 'antd'
 import { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
@@ -346,8 +346,9 @@ function CellValue({
   // Proposed: a module's relaxed points show as the Off-standard tag, as the Releases list marks a release; the points
   // themselves are in its dialog.
   if (control === 'relaxedPoints') {
-    return Array.isArray(value) && value.length > 0 ? (
-      <Tag color="warning">{t('shell.studio.offStandard')}</Tag>
+    const id = (item as Record<string, unknown> | undefined)?.id
+    return Array.isArray(value) && value.length > 0 && typeof id === 'string' ? (
+      <RelaxedPointsCell moduleId={id} />
     ) : (
       <EmptyDash />
     )
@@ -563,13 +564,12 @@ function ListTable({
           <InListDialogContext.Provider value={true}>
             <Flex vertical gap="middle" data-testid="studio-list-dialog">
               {Object.entries(itemSchema.properties ?? {})
-                // Proposed: a module being added has no relaxed points yet, as a point is relaxed on its contract's page
-                // once the module is in the application, so Add module leaves the read-only list out.
+                // Proposed: a dialog holds only what it edits. A module's relaxed points are relaxed and undone on their
+                // contract's page and shown in the Modules table, so neither Add module nor Edit module lists them.
                 .filter(
                   ([name]) =>
-                    !open.isNew ||
                     fieldControls[fieldTextKey(kind, `${itemPointer}/${name}`).replace('shell.studio.field.', '')] !==
-                      'relaxedPoints',
+                    'relaxedPoints',
                 )
                 .map(([name, child]) => (
                   <SchemaNode
@@ -649,17 +649,17 @@ function InlineRows({ node, root, rootValue, pointer, value, onChange, kind }: N
 }
 
 /**
- * Proposed: a module's relaxed points in Settings, read-only: each point in words, as the release page names it, linked
- * to the contract page, the one place a point is relaxed or its relax undone, and its reason. With none, the table
- * says the application follows every contract of the module.
+ * Proposed: a module's relaxed points in its row of the Modules table, the one place Settings shows them: each point in
+ * words with its kind, a link to it on its contract's page, where it is relaxed or undone, with its reason under it. It
+ * wraps as free text does. The module's
+ * dialog has no list of them, as it holds only what it edits.
  */
-function RelaxedPointsView({ pointer, rootValue }: { pointer: string; rootValue: unknown }) {
+function RelaxedPointsCell({ moduleId }: { moduleId: string }) {
   const t = useText()
   const { colour } = useDesignTokens()
   const resource = useContext(LabelTextsContext)
   const locale = document.documentElement.lang || 'en'
   const [points, setPoints] = useState<StudioRelaxedPoint[] | null>(null)
-  const moduleId = getAt(rootValue, `${pointer.slice(0, pointer.lastIndexOf('/'))}/id`)
   const application = resource?.application
   useEffect(() => {
     if (!application) {
@@ -674,47 +674,38 @@ function RelaxedPointsView({ pointer, rootValue }: { pointer: string; rootValue:
     })
     return () => controller.abort()
   }, [application])
+  if (points === null) {
+    return <span style={{ color: colour.textMuted }}>{t('shell.studio.list.loading')}</span>
+  }
   const rows = sortRelaxed(
-    (points ?? []).filter((point) => point.module === moduleId),
+    points.filter((point) => point.module === moduleId),
     locale,
     t,
   )
+  if (rows.length === 0) {
+    return <EmptyDash />
+  }
   return (
-    // Proposed: where a point is relaxed is said by the field's help, so nothing sits between the help and the table.
-    <Flex vertical gap="small">
-      <AxisTable<StudioRelaxedPoint>
-        rows={points === null ? undefined : rows}
-        loading={points === null}
-        rowKey={(point) => point.point}
-        emptyText={t('shell.studio.relaxed.noneForModule')}
-        pagination={false}
-        columns={[
-          {
-            key: 'point',
-            title: t('shell.studio.relaxed.point'),
-            kind: 'text',
-            render: (point) => {
-              const words = relaxedPointWords(point, locale, t)
-              return (
-                <Flex vertical>
-                  {point.contractId && application ? (
-                    <Link
-                      to={`/studio?app=${encodeURIComponent(application)}&resource=${encodeURIComponent(point.contractId)}`}
-                      style={{ color: colour.primaryText }}
-                    >
-                      {words.title}
-                    </Link>
-                  ) : (
-                    <span>{words.title}</span>
-                  )}
-                  {words.kind && <span style={{ color: colour.textMuted }}>{words.kind}</span>}
-                </Flex>
-              )
-            },
-          },
-          { key: 'reason', title: t('shell.studio.relaxed.reason'), kind: 'text', render: (point) => point.reason },
-        ]}
-      />
+    <Flex vertical gap={4} data-testid={`studio-relaxed-${moduleId}`}>
+      {rows.map((point) => {
+        const words = relaxedPointWords(point, locale, t)
+        return (
+          <div key={point.point}>
+            {point.contractId && application ? (
+              <Link
+                to={`/studio?app=${encodeURIComponent(application)}&resource=${encodeURIComponent(point.contractId)}`}
+                style={{ color: colour.primaryText }}
+              >
+                {words.title}
+              </Link>
+            ) : (
+              <span>{words.title}</span>
+            )}
+            {words.kind && <span style={{ color: colour.textMuted }}> · {words.kind}</span>}
+            <div>{point.reason}</div>
+          </div>
+        )
+      })}
     </Flex>
   )
 }
@@ -952,8 +943,6 @@ function SchemaNode({
         onChange={(next) => onChange(pointer, next ?? undefined)}
       />
     )
-  } else if (control === 'relaxedPoints') {
-    input = <RelaxedPointsView pointer={pointer} rootValue={rootValue} />
   } else if (control === 'moduleRoles' || control === 'moduleConnectors') {
     input = (
       <SlotMap

@@ -866,7 +866,7 @@
   "shell.studio.section.application.general": "Thông tin chung",
   "shell.studio.section.application.general.description": "Tên dùng để tham chiếu, những gì mọi người thấy trên trang chủ, và múi giờ cho ngày giờ của ứng dụng.",
   "shell.studio.section.application.modules": "Mô-đun",
-  "shell.studio.section.application.modules.description": "Các mô-đun ứng dụng dựa vào, cách ánh xạ vai trò sang vai trò của chúng và các điểm hợp đồng được nới lỏng.",
+  "shell.studio.section.application.modules.description": "Các mô-đun ứng dụng dựa vào, cách ánh xạ vai trò sang vai trò của chúng và các điểm hợp đồng được nới lỏng. Một điểm được nới lỏng, hoặc bỏ nới lỏng, trên trang hợp đồng của nó.",
   "shell.studio.section.application.packages": "Gói",
   "shell.studio.section.application.packages.description": "Các gói mở rộng có thao tác mà quy trình của ứng dụng gọi tới.",
   "shell.studio.section.application.fileStorage": "Lưu trữ tệp",

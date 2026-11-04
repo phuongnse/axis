@@ -73,11 +73,7 @@ export const fieldControls: Record<
  * Proposed: the list columns whose values have a fixed, short form, such as a version range or a tag, which are as
  * wide as their content, as the table rules have it; every other column shares the width as free text.
  */
-export const fitColumns = new Set([
-  'application.modules.version',
-  'application.modules.relax',
-  'application.packages.version',
-])
+export const fitColumns = new Set(['application.modules.version', 'application.packages.version'])
 
 /**
  * Proposed: the lists that are sets, whose order means nothing to the author, which the form shows by name; every other
