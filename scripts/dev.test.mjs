@@ -53,8 +53,36 @@ function isAlive(pid) {
   }
 }
 
-/** Starts scripts/dev.sh in the copy and collects its output. */
-function startDev(extraEnv = {}) {
+// Picked right before each run: a port picked earlier can be taken by another process before the run binds it.
+async function pickPorts() {
+  ports = {
+    postgres: await freePort(),
+    keycloak: await freePort(),
+    purchasing: await freePort(),
+    mailpitSmtp: await freePort(),
+    mailpitWeb: await freePort(),
+    server: await freePort(),
+    web: await freePort(),
+    workerHealth: await freePort(),
+  }
+  env = {
+    ...process.env,
+    COMPOSE_PROJECT_NAME: project,
+    AXIS_POSTGRES_PORT: String(ports.postgres),
+    AXIS_KEYCLOAK_PORT: String(ports.keycloak),
+    AXIS_PURCHASING_PORT: String(ports.purchasing),
+    AXIS_MAILPIT_SMTP_PORT: String(ports.mailpitSmtp),
+    AXIS_MAILPIT_WEB_PORT: String(ports.mailpitWeb),
+    AXIS_SERVER_PORT: String(ports.server),
+    AXIS_WEB_PORT: String(ports.web),
+    Health__Urls: `http://127.0.0.1:${ports.workerHealth}`,
+    MSBUILDDISABLENODEREUSE: '1',
+  }
+}
+
+/** Starts scripts/dev.sh in the copy with fresh ports and collects its output. */
+async function startDev(extraEnv = {}) {
+  await pickPorts()
   const child = spawn('bash', ['scripts/dev.sh'], {
     cwd: copy,
     env: { ...env, ...extraEnv },
@@ -210,29 +238,6 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       recursive: true,
       filter: (source) => !excluded.has(path.basename(source)),
     })
-    ports = {
-      postgres: await freePort(),
-      keycloak: await freePort(),
-      purchasing: await freePort(),
-      mailpitSmtp: await freePort(),
-      mailpitWeb: await freePort(),
-      server: await freePort(),
-      web: await freePort(),
-      workerHealth: await freePort(),
-    }
-    env = {
-      ...process.env,
-      COMPOSE_PROJECT_NAME: project,
-      AXIS_POSTGRES_PORT: String(ports.postgres),
-      AXIS_KEYCLOAK_PORT: String(ports.keycloak),
-      AXIS_PURCHASING_PORT: String(ports.purchasing),
-      AXIS_MAILPIT_SMTP_PORT: String(ports.mailpitSmtp),
-      AXIS_MAILPIT_WEB_PORT: String(ports.mailpitWeb),
-      AXIS_SERVER_PORT: String(ports.server),
-      AXIS_WEB_PORT: String(ports.web),
-      Health__Urls: `http://127.0.0.1:${ports.workerHealth}`,
-      MSBUILDDISABLENODEREUSE: '1',
-    }
   })
 
   after(() => {
@@ -248,7 +253,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
   })
 
   it('installs the SPA packages, serves the app through Vite, starts the worker and the publisher and stops cleanly on SIGINT', async () => {
-    const run = startDev()
+    const run = await startDev()
     await waitReady(run)
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
 
@@ -365,7 +370,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
   })
 
   it('skips the install on the second run', async () => {
-    const run = startDev()
+    const run = await startDev()
     await waitReady(run)
     assert.doesNotMatch(run.stdout, /Installing SPA packages/)
     interrupt(run)
@@ -373,7 +378,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
   })
 
   it('stops everything when SIGINT arrives while the worker starts', async () => {
-    const run = startDev()
+    const run = await startDev()
     let sent = false
     run.child.stdout.on('data', () => {
       if (!sent && /\[dev\] .*Starting the worker/.test(run.stdout)) {
@@ -398,7 +403,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const original = fs.readFileSync(file, 'utf8')
     // The worker logs the same line for its health address.
     const listening = () => run.stdout.split('\n').filter((line) => /\[server\].*Now listening on/.test(line)).length
-    const run = startDev()
+    const run = await startDev()
     try {
       await waitReady(run)
       assert.equal(listening(), 1)
@@ -433,7 +438,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
         .filter((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))
         .map((p) => p.pid)
 
-    const run = startDev({ ActivateOnStartup__0: appCopy })
+    const run = await startDev({ ActivateOnStartup__0: appCopy })
     await waitReady(run)
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
     assert.equal(activations(), 1, run.stdout)
@@ -468,7 +473,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
 
   it('exits non-zero and stops the SPA when the server exits on its own', async () => {
     const empty = fs.mkdtempSync(path.join(scratch, 'empty-app-'))
-    const run = startDev({ ActivateOnStartup__0: empty })
+    const run = await startDev({ ActivateOnStartup__0: empty })
     const code = await exitsWithin(run, 300_000)
     assert.notEqual(code, 0)
     assert.match(run.stdout, /\[dev\] The server exited/)
@@ -479,7 +484,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
 
   it('exits non-zero and stops the server and the SPA when the worker exits on its own', async () => {
     // The worker does not start with a zero poll interval. The server ignores the setting.
-    const run = startDev({ Worker__PollInterval: '00:00:00' })
+    const run = await startDev({ Worker__PollInterval: '00:00:00' })
     const code = await exitsWithin(run, 300_000)
     assert.notEqual(code, 0)
     assert.match(run.stdout, /\[dev\] The worker exited/)
@@ -507,7 +512,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
   })
 
   it('exits non-zero at once when Docker is not running', async () => {
-    const run = startDev({ DOCKER_HOST: 'unix:///nonexistent/docker.sock' })
+    const run = await startDev({ DOCKER_HOST: 'unix:///nonexistent/docker.sock' })
     const code = await exitsWithin(run, 15_000)
     assert.notEqual(code, 0)
     assert.match(run.stderr, /Docker is not running/)

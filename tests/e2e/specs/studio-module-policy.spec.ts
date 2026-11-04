@@ -11,6 +11,7 @@ import {
   modulesPath,
 } from "../server-settings";
 import { useSession } from "../sessions";
+import { openKind } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -65,6 +66,7 @@ test.describe("Studio edits a module policy as a layer", () => {
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
+    await openKind(page, "policy");
     await page
       .getByTestId("studio-group-module-policies")
       .getByRole("button", { name: "checklists/ChecklistAccess", exact: true })

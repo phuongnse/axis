@@ -14,7 +14,7 @@ import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openTab } from '../studio-resources'
+import { openKind, openTab } from '../studio-resources'
 import { chooseTheme } from '../shell'
 import { logInAtKeycloak } from '../keycloak'
 
@@ -250,6 +250,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     try {
       await useSession(page, 'author')
       await openStudio(page, server.url)
+      await openKind(page, 'contract')
       await page
         .getByTestId('studio-group-module-contracts')
         .getByRole('button', {
@@ -407,6 +408,7 @@ test.describe('the active release of the purchase request sample changes', () =>
           'Ngân sách {name} đã được người quản lý thứ hai duyệt',
         )
         await openStudio(page, server.url)
+        await openKind(page, 'process')
         await page
           .getByTestId('studio-group-module-processes')
           .getByRole('button', {

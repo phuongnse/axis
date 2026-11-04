@@ -6,6 +6,7 @@ import { expect, test } from '../test'
 import { startServer } from '../activate'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
+import { openKind } from '../studio-resources'
 
 const approvalBelowThreshold = '09d75317-fd9e-411e-8322-317778fc1b2b'
 
@@ -93,6 +94,7 @@ test('the test controls do not show when the server has Studio:Tests off', async
     await expect(page.getByRole('button', { name: 'Validate', exact: true })).toBeVisible()
     await expect(page.getByTestId('studio-run-tests')).toHaveCount(0)
 
+    await openKind(page, 'scenario')
     await page.getByTestId(`studio-resource-${approvalBelowThreshold}`).click()
     await expect(page.getByTestId('studio-resource-details')).toContainText('scenarios/approval-below-threshold.json')
     await expect(page.getByTestId('studio-run-scenario')).toHaveCount(0)

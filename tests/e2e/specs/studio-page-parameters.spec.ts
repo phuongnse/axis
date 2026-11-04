@@ -9,7 +9,7 @@ import { confirmDialog, waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
-import { createResource, openFormTab, openNewApplication } from "../studio-resources";
+import { createResource, openFormTab, openKind, openNewApplication } from "../studio-resources";
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it.
 test.setTimeout(240_000);
@@ -126,8 +126,13 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     const myRequests = page
       .getByTestId("studio-group-page")
       .getByRole("button", { name: "MyRequests", exact: true });
+    await openKind(page, "page");
     await myRequests.click();
-    await expect(myRequests).toHaveAttribute("aria-current", "true");
+    await expect(
+      page
+        .getByRole("navigation", { name: "Menu", exact: true })
+        .getByRole("link", { name: "Pages", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
     await openFormTab(page);
     await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "MyRequests",
