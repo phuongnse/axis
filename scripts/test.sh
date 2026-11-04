@@ -62,5 +62,6 @@ node --test tests/e2e/totp.test.ts || status=1
 node --test tests/load/objectives.test.mjs || status=1
 node --test tests/load/totp.test.mjs || status=1
 HELM="$helm" node --test scripts/helm.test.mjs || status=1
+HELM="$helm" node --test scripts/helm-controlplane.test.mjs || status=1
 
 finish_report

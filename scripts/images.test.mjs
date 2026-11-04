@@ -1,4 +1,4 @@
-// Smoke test for the production images: builds axis-server, axis-worker and axis-admin, checks what they
+// Smoke test for the production images: builds axis-server, axis-worker, axis-admin and axis-controlplane, checks what they
 // hold, and runs them read-only with their settings in /run/secrets files. The test PostgreSQL serves TLS with a
 // certificate from an authority made for the run, and the connection strings set SSL Mode=VerifyFull, which the
 // production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
@@ -14,7 +14,7 @@ import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, ve
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const timeout = 20 * 60 * 1000
-const targets = ['axis-server', 'axis-worker', 'axis-admin']
+const targets = ['axis-server', 'axis-worker', 'axis-admin', 'axis-controlplane']
 const suffix = `images-test-${process.pid}`
 const network = `axis-images-${process.pid}`
 const postgres = `axis-images-postgres-${process.pid}`
@@ -143,13 +143,16 @@ test('no image holds samples, development settings or source control metadata', 
       [],
       `${target} holds source control metadata`,
     )
-    assert.deepEqual(
-      paths.filter((path) => /^(extensions|modules)\/./.test(path)),
-      [],
-      `${target} holds a package or module`,
-    )
-    assert.ok(paths.includes('extensions/'), `${target} has no /extensions`)
-    assert.ok(paths.includes('modules/'), `${target} has no /modules`)
+    // The control plane is no host of the platform: it has no mount point for packages or modules.
+    if (target !== 'axis-controlplane') {
+      assert.deepEqual(
+        paths.filter((path) => /^(extensions|modules)\/./.test(path)),
+        [],
+        `${target} holds a package or module`,
+      )
+      assert.ok(paths.includes('extensions/'), `${target} has no /extensions`)
+      assert.ok(paths.includes('modules/'), `${target} has no /modules`)
+    }
     if (target === 'axis-server') assert.ok(paths.includes('app/wwwroot/index.html'), 'the server holds no SPA')
 
     const config = JSON.parse(run(['image', 'inspect', image(target)]))[0].Config
@@ -218,6 +221,20 @@ test('the worker starts read-only with its settings in /run/secrets', { timeout 
     Platform__SecretKey: secretKey,
   })
   await waitLive(startReadOnly('axis-worker', secrets, 5208, ['-e', 'Health__Urls=http://0.0.0.0:5208']))
+})
+
+test('the control plane starts read-only with its connection string in /run/secrets', { timeout }, async () => {
+  const secrets = writeSecrets('controlplane', {
+    ControlPlane__ConnectionString: `Host=${postgres};Database=axis;Username=axis;Password=images-test${verifyFull('/run/test-ca/ca.crt')}`,
+  })
+  await waitLive(
+    startReadOnly('axis-controlplane', secrets, 8080, [
+      '-e',
+      'ControlPlane__Region=vn',
+      '-e',
+      'ControlPlane__TenantDomain=vn.example.com',
+    ]),
+  )
 })
 
 test('the admin tool prints its version and has the PostgreSQL 18 tools', { timeout }, () => {
