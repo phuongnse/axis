@@ -386,8 +386,15 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
         interrupt(run)
       }
     })
+    // The server migrates and activates the sample applications first, which takes minutes on a
+    // slow runner. Only the stop after the interrupt has the short limit.
+    const deadline = Date.now() + 300_000
+    while (!sent && Date.now() < deadline) {
+      assert.equal(run.exitCode, undefined, `dev.sh exited before the worker started.\n${run.stdout}\n${run.stderr}`)
+      await sleep(500)
+    }
+    assert.ok(sent, `dev.sh did not start the worker.\n${run.stdout}\n${run.stderr}`)
     assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
-    assert.ok(sent, run.stdout)
     assert.match(run.stdout, /\[dev\] Stopping/)
     await sleep(500)
     assert.deepEqual(
