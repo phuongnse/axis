@@ -21,7 +21,8 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
-import { FieldHeading, SectionPanel } from './FormSection'
+import { AxisFieldHeading } from '../platform/AxisField'
+import { SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
 import { BindingPicker } from './BindingPicker'
@@ -1133,7 +1134,7 @@ function SchemaNode({
   return (
     <div data-testid={`studio-field-${pointer}`}>
       {showsLabel &&
-        (kind !== null && !item ? <FieldHeading label={title} help={help} helpId={helpId} /> : <div>{name}</div>)}
+        (kind !== null && !item ? <AxisFieldHeading label={title} help={help} helpId={helpId} /> : <div>{name}</div>)}
       {input}
     </div>
   )

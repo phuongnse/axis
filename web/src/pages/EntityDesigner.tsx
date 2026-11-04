@@ -19,6 +19,7 @@ import {
 import dayjs from 'dayjs'
 import { lazy, Suspense, useContext, useState, type HTMLAttributes } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisCheckboxField, AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import { searchRows } from '../platform/tableControls'
@@ -37,7 +38,7 @@ import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
-import { FormField, SectionPanel } from './FormSection'
+import { SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
 import { uniqueStepName } from './processPalette'
@@ -187,7 +188,7 @@ interface EntityParts {
 /**
  * The designer of an entity, on the editor's Form tab, with the JSON tab beside it.
  *
- * Proposed: it is made of the sections the application's Settings has, `SectionPanel` and `FormField`, so every form of
+ * Proposed: it is made of the sections the application's Settings has, `SectionPanel` and `AxisField`, so every form of
  * Studio reads the same way: General, then Fields, Validations and Indexes. General has the entity's name, label,
  * description and display field, one to a row, each with its help text. Fields is the standard table, one row a field,
  * with Add field in its heading, and a field's settings open in a drawer beside it, so the list stays in sight. Every
@@ -271,10 +272,9 @@ function useLabelText(): (value: unknown) => string | null {
   }
 }
 
-/** The help text of `key`, or none when the catalogue lacks it. */
-function helpOf(t: (key: string) => string, key: string): string | null {
-  const help = t(`${key}.help`)
-  return help === `${key}.help` ? null : help
+/** The help text of the field text `key`, which every field has: a test checks the catalogue holds each one. */
+function helpOf(t: (key: string) => string, key: string): string {
+  return t(`${key}.help`)
 }
 
 /**
@@ -297,7 +297,7 @@ function EntityGeneral({
   const label = useContext(LabelTextsContext)
   const texts = names !== undefined && label !== null && !readOnly
   const field = (name: string) => ({
-    pointer: `/${name}`,
+    testId: `studio-field-/${name}`,
     label: t(`shell.studio.field.entity.${name}`),
     help: helpOf(t, `shell.studio.field.entity.${name}`),
   })
@@ -312,30 +312,30 @@ function EntityGeneral({
   )
   return (
     <>
-      <FormField {...field('name')}>
+      <AxisField {...field('name')}>
         <Input
           aria-label={t('shell.studio.field.entity.name')}
           value={text(value.name)}
           onChange={(event) => onChange('/name', event.target.value)}
         />
-      </FormField>
-      <FormField {...field('label')}>
+      </AxisField>
+      <AxisField {...field('label')}>
         {texts ? (
           <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
         ) : (
           textKeyInput(t('shell.studio.labelKey'), '/label', value.label)
         )}
-      </FormField>
+      </AxisField>
       {!readOnly && (
-        <FormField {...field('description')}>
+        <AxisField {...field('description')}>
           {texts ? (
             <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
           ) : (
             textKeyInput(t('shell.studio.field.entity.description'), '/description', value.description)
           )}
-        </FormField>
+        </AxisField>
       )}
-      <FormField {...field('displayField')}>
+      <AxisField {...field('displayField')}>
         <ReferencePicker
           name={t('shell.studio.field.entity.displayField')}
           value={typeof value.displayField === 'string' ? value.displayField : undefined}
@@ -344,7 +344,7 @@ function EntityGeneral({
           block
           onChange={(next) => onChange('/displayField', next)}
         />
-      </FormField>
+      </AxisField>
     </>
   )
 }
@@ -631,8 +631,8 @@ function FieldDrawer({
   const resource = useContext(LabelTextsContext)
   const typesTexts = names !== undefined && resource !== null && !readOnly
   // Proposed: a field's settings have the texts `shell.studio.field.entity.fields.<setting>` and their help, as the schema form names a field.
-  const setting = (name: string) => ({
-    pointer: `${pointer}/${name}`,
+  const setting = (name: string, marked = true) => ({
+    testId: marked ? `studio-field-${pointer}/${name}` : undefined,
     label: t(`shell.studio.field.entity.fields.${name}`),
     help: helpOf(t, `shell.studio.field.entity.fields.${name}`),
   })
@@ -646,14 +646,14 @@ function FieldDrawer({
     >
       {index !== null && (
         <Flex vertical gap="middle">
-          <FormField {...setting('name')}>
+          <AxisField {...setting('name')}>
             <Input
               aria-label={t('shell.studio.field.entity.fields.name')}
               value={text(field.name)}
               onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
             />
-          </FormField>
-          <FormField {...setting('label')} marked={typesTexts}>
+          </AxisField>
+          <AxisField {...setting('label', typesTexts)}>
             {typesTexts ? (
               <LabelTexts pointer={`${pointer}/label`} value={field.label} onChange={onChange} />
             ) : (
@@ -664,8 +664,8 @@ function FieldDrawer({
                 onChange={onChange}
               />
             )}
-          </FormField>
-          <FormField {...setting('type')}>
+          </AxisField>
+          <AxisField {...setting('type')}>
             <Select
               aria-label={t('shell.studio.field.entity.fields.type')}
               showSearch
@@ -676,10 +676,10 @@ function FieldDrawer({
               options={fieldTypes.map((option) => ({ value: option, label: t(`shell.studio.entity.type.${option}`) }))}
               onChange={(next: string) => onChange(pointer, changeFieldType(field, next))}
             />
-          </FormField>
+          </AxisField>
           <FlagRow field={field} setting="required" pointer={`${pointer}/required`} onChange={onChange} />
           <FlagRow field={field} setting="unique" pointer={`${pointer}/unique`} onChange={onChange} />
-          <FormField {...setting('help')} marked={typesTexts}>
+          <AxisField {...setting('help', typesTexts)}>
             {typesTexts ? (
               <LabelTexts pointer={`${pointer}/help`} value={field.help} onChange={onChange} />
             ) : (
@@ -690,7 +690,7 @@ function FieldDrawer({
                 onChange={onChange}
               />
             )}
-          </FormField>
+          </AxisField>
           <Settings index={index} field={field} fields={fields} readOnly={readOnly} onChange={onChange} />
           {warning && (
             <Alert
@@ -709,10 +709,7 @@ function FieldDrawer({
   )
 }
 
-/**
- * Proposed: Required or Unique as a checkbox with its name beside it and its help under the name, in the help's small
- * textMuted text. It shows only when the field's type takes the setting.
- */
+/** Required or Unique, as a yes-or-no field with its help. It shows only when the field's type takes the setting. */
 function FlagRow({
   field,
   setting,
@@ -725,30 +722,18 @@ function FlagRow({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
   if (!fieldSettings(text(field.type)).includes(setting)) {
     return null
   }
   const key = `shell.studio.field.entity.fields.${setting}`
-  const help = helpOf(t, key)
   return (
-    <Flex gap={spacing.xs} align="flex-start" data-testid={`studio-field-${pointer}`}>
-      <Checkbox
-        aria-label={t(key)}
-        aria-describedby={help ? `studio-help-${pointer}` : undefined}
-        checked={field[setting] === true}
-        onChange={(event) => onChange(pointer, event.target.checked)}
-        style={{ marginTop: 2 }}
-      />
-      <div>
-        <div style={{ fontWeight: 500, color: colour.textMuted, lineHeight: '22px' }}>{t(key)}</div>
-        {help && (
-          <div id={`studio-help-${pointer}`} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
-            {help}
-          </div>
-        )}
-      </div>
-    </Flex>
+    <AxisCheckboxField
+      label={t(key)}
+      help={helpOf(t, key)}
+      checked={field[setting] === true}
+      testId={`studio-field-${pointer}`}
+      onChange={(checked) => onChange(pointer, checked)}
+    />
   )
 }
 

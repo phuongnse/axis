@@ -109,7 +109,24 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
   The drawer's name, label, type, Required, Unique and help have help texts, and its label and help are typed as texts, a box
   per locale, as the entity's label is. The other settings are still the old list, for step 2.
 - **Tried and dropped:** tabs for Fields, Validations and Indexes with a header that summed the entity up and an Edit details
-  drawer. The owner wanted the details on the page, and the shared sections keep every form alike.
+  drawer. The owner wanted the details on the page. Sections suit an entity better than tabs while its parts are small;
+  tabs are for parts that are large and apart, as Salesforce's many object parts are. Not every page must be sections.
+- **Inputs, built:** one field component, `AxisField` in `web/src/platform/AxisField.tsx`, for Studio and the console:
+  label, help text, then the input, one to a row, as a group that its help describes. `help` is a required prop, so a screen
+  cannot leave it out. `AxisCheckboxField` is a yes-or-no field with its help under its label, and `AxisFieldRow` puts fields
+  that belong together on one row, stacking below 992 px. The schema form draws `AxisFieldHeading`, the same heading, as its
+  help comes from the text catalogue. The entity designer and the schema form use them, and Add module and Add package now
+  have help for Module, Package, Point and Reason.
+- **Validations and fields:** a validation is a rule on the whole record: its expression may read several fields or count
+  child rows, and its `field` only says where its message shows. As Salesforce's validation rules and Dataverse's and
+  Directus's field constraints do, the file stays as it is and the designer shows it twice: a field's drawer is to have a
+  Validation group with the field's own constraints and the validations shown at it, whose Add rule fills `field`, and the
+  entity's Validations section keeps every rule, with a Field column, for those across fields. To build in step 2.
+- **Help text, for the issue:** every field of the platform's own screens has help text, enforced three ways. `AxisField`
+  requires `help`. A test fails when a `shell.studio.field.*` text has no `.help` in every locale; the texts under that prefix
+  that are not fields, such as `modules.addTitle`, `modules.add`, `modules.empty` and `modules.item`, move out of it. The
+  frontend reference states the rule. An application's own forms keep `help` optional, as their author decides. The 13 other
+  editors that draw their own labels, such as ConnectorEditor, ProcessEditor, PageEditor and FormSteps, move to `AxisField`.
 - **For the issue:** a diagnostic inside a field opens at its row; it is to open the drawer at the setting. Reordering by drag
   is still to come.
 
