@@ -236,6 +236,7 @@ secrets:
   # Scenarios:ServerConnectionString, the connection of a role with CREATEDB that owns no
   # database, which the publisher uses to run test scenarios. Optional, and used by the
   # publisher and the cell restore-check CronJob only. The Secret is mounted only when name is set.
+  # A cell whose tenants have Studio applications needs it set for the weekly restore check to pass.
   # Set studio.tests with it.
   scenarioServerConnection:
     name: ""

@@ -669,7 +669,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `secrets.identityAdminClientSecret` | key `IdentityProvider__AdminClientSecret` | Identity provider and the cell restore-check CronJob. Secret `name` and `key` of the `axis-admin` client secret. Required. |
 | `secrets.identityCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the identity Service. It has no `key`. Rendering fails with a message that names `secrets.identityCertificate.name` when it is missing. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
-| `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
+| `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [On premises](#on-premises). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
@@ -730,8 +730,9 @@ checks at once and never retries, and Kubernetes stops it after 6 hours, so a hu
 next week. It gets the storage settings, credentials, cell backup key and `backup.resources` of the backup job.
 It also gets `secrets.adminConnection`, `secrets.identityAdminClientSecret`, `IdentityProvider:Url` as
 `https://<identity.hostname>/`, `IdentityProvider:AdminClientId` as `axis-admin`, `Cell:InternalDomain`, and
-`secrets.scenarioServerConnection` when set, which the command does not read yet. `Studio:ApplicationsPath` is
-`/studio` on an `emptyDir`, so the scratch tenant's Studio files never touch the server's Studio volume. The admin
+`secrets.scenarioServerConnection` when set. A cell whose tenants have Studio applications needs that Secret set for
+the weekly check to pass, because the scenario step fails with `AXC0217` without a scenario server.
+`Studio:ApplicationsPath` is `/studio` on an `emptyDir`, so the scratch tenant's Studio files never touch the server's Studio volume. The admin
 connection and the client secret are the widest credentials of the chart. The chart passes no OTLP settings, so
 the metric `axis.backup.restore_check` goes only to the job's output until you set an OTLP endpoint.
 
