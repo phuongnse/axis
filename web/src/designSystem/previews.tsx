@@ -314,6 +314,22 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: `/studio?app=${studioApp}&view=kind&kind=entity`,
       frameHeight: 600,
     },
+    // Proposed: a list with filters in force, as the address keeps them.
+    {
+      caption: 'Entities, filtered',
+      draw: () => <ShellPreview />,
+      entry: `/studio?app=${studioApp}&view=kind&kind=entity&filter=${encodeURIComponent(
+        JSON.stringify({
+          kind: 'group',
+          join: 'and',
+          items: [
+            { kind: 'rule', field: 'status', operator: 'anyOf', value: ['published'] },
+            { kind: 'rule', field: 'description', operator: 'contains', value: 'company' },
+          ],
+        }),
+      )}`,
+      frameHeight: 600,
+    },
     { caption: 'Entity', draw: () => <ShellPreview />, entry: studioResource(studioEntity), frameHeight: 600 },
     // Proposed: a band with too little room folds the actions that check into one menu.
     {

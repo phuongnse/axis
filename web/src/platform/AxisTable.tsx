@@ -35,6 +35,11 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'render' | 'onCell' | 'onHe
   kind: ColumnKind
   /** Numbers are right-aligned, with digits of equal width so they line up. */
   numeric?: boolean
+  /**
+   * Proposed: a column is searchable when it says the text of a row to search in, as a field marked `searchable` is. Search
+   * looks in every such column.
+   */
+  searchText?: (row: T) => string | null
   /** Proposed: when the table lacks room, a `low` column moves under its row first and a `high` one last. */
   priority?: 'high' | 'low'
   render: (row: T, index: number) => ReactNode
@@ -101,6 +106,15 @@ function moveOrder<T>(columns: readonly AxisColumn<T>[]): string[] {
     .map((column, index) => ({ key: column.key, index, rank: priorityRank[`${column.priority}`] }))
     .sort((a, b) => a.rank - b.rank || b.index - a.index)
     .map((column) => column.key)
+}
+
+/** Proposed: the rows where a searchable column holds the text, ignoring letter case. */
+export function searchRows<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], text: string): readonly T[] {
+  const needle = text.trim().toLowerCase()
+  const searchable = columns.flatMap((column) => (column.searchText ? [column.searchText] : []))
+  return needle === ''
+    ? rows
+    : rows.filter((row) => searchable.some((read) => read(row)?.toLowerCase().includes(needle)))
 }
 
 const isEmpty = (value: ReactNode) => value == null || (isValidElement(value) && value.type === EmptyDash)
@@ -215,7 +229,7 @@ export function AxisTable<T extends object>({
   const fold = narrow || (rowActions?.count ?? 0) >= foldFrom
 
   const antColumns: TableColumnType<T>[] = shown.map(
-    ({ kind, numeric, priority: _priority, render, ...column }, place) => {
+    ({ kind, numeric, priority: _priority, searchText: _searchText, render, ...column }, place) => {
       const numbers: CSSProperties = numeric ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {}
       const width = kind === 'text' ? share : texts === 0 && column.key === lastKey ? undefined : '1%'
       const cell: CSSProperties = {

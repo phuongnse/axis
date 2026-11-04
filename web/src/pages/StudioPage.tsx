@@ -9,7 +9,6 @@ import {
   fetchStudioNames,
   fetchStudioResource,
   fetchStudioResources,
-  filterResources,
   type ModuleResourceItem,
   moduleResources,
   resourceTitle,
@@ -343,7 +342,7 @@ function StudioWorkspace() {
         : [],
     [loaded, resourceId],
   )
-  const moduleGroups = useMemo(() => moduleResources(names, search), [names, search])
+  const moduleGroups = useMemo(() => moduleResources(names, ''), [names])
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
   const selectedModuleItem =
     resourceId === null || selected !== undefined
@@ -469,7 +468,6 @@ function StudioWorkspace() {
   }
 
   const ofKind = kindView ? resources.filter((item) => item.kind === kindView) : []
-  const listed = filterResources(ofKind, search, locale)
   const navigationView: StudioView =
     selected?.kind === 'application'
       ? { name: 'settings' }
@@ -655,7 +653,8 @@ function StudioWorkspace() {
               <StudioResourceTable
                 application={application}
                 folderRevision={folderRevision}
-                items={listed}
+                items={ofKind}
+                searchText={search}
                 extra={moduleGroups.find((group) => group.kind === view.kind)?.items ?? []}
                 search={
                   <Input.Search

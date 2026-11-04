@@ -1,7 +1,7 @@
-import { Alert, Tag, Typography } from 'antd'
+import { Alert, Flex, Tag, Typography } from 'antd'
 import { useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { AxisTable, searchRows, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import {
   fetchStudioCatalog,
@@ -14,6 +14,14 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import {
+  matchesFilter,
+  parseFilter,
+  TableFilterButton,
+  TableFilterChips,
+  type FilterField,
+  type FilterGroup,
+} from '../platform/TableFilter'
 import { pageSizes, recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -52,6 +60,7 @@ export function StudioResourceTable({
   folderRevision,
   items,
   extra,
+  searchText,
   search,
   main,
   addressOf,
@@ -63,6 +72,8 @@ export function StudioResourceTable({
   folderRevision: number
   items: readonly StudioResourceItem[]
   extra: readonly { id: string; name: string; module: string | null }[]
+  /** The text the search box holds. */
+  searchText: string
   search: ReactNode
   main: ReactNode
   addressOf: (id: string) => string
@@ -161,14 +172,69 @@ export function StudioResourceTable({
   )
   const sortOrderOf = (key: string) =>
     sortKey !== key ? undefined : descending ? ('descend' as const) : ('ascend' as const)
-  const lastPage = Math.max(1, Math.ceil(rows.length / pageSize))
-  const page = Math.min(Math.max(1, Number(params.get('page')) || 1), lastPage)
-
+  const moduleLabel = (row: ResourceRow) =>
+    row.module === null ? null : (catalog?.modules.find((module) => module.id === row.module)?.label ?? row.module)
+  const statusLabel = (row: ResourceRow) => (row.status ? t(`shell.studio.list.status.${row.status}`) : null)
+  const filter = parseFilter(params.get('filter'))
+  const applyFilter = (next: FilterGroup) =>
+    setParams(
+      (current) => {
+        const query = new URLSearchParams(current)
+        query.delete('page')
+        if (next.items.length === 0) {
+          query.delete('filter')
+        } else {
+          query.set('filter', JSON.stringify(next))
+        }
+        return query
+      },
+      { replace: true },
+    )
+  const moduleIds = [...new Set(extra.flatMap((item) => (item.module === null ? [] : [item.module])))]
+  const filterFields: FilterField[] = [
+    { key: 'name', label: t('shell.studio.list.name'), type: 'text' },
+    { key: 'description', label: t('shell.studio.list.description'), type: 'text' },
+    {
+      key: 'module',
+      label: t('shell.studio.list.module'),
+      type: 'enum',
+      options: moduleIds.map((id) => ({
+        value: id,
+        label: catalog?.modules.find((module) => module.id === id)?.label ?? id,
+      })),
+    },
+    {
+      key: 'status',
+      label: t('shell.studio.list.status'),
+      type: 'enum',
+      options: (['new', 'changed', 'published'] as const).map((status) => ({
+        value: status,
+        label: t(`shell.studio.list.status.${status}`),
+      })),
+    },
+    { key: 'lastModifiedBy', label: t('shell.studio.list.lastModifiedBy'), type: 'text' },
+    { key: 'lastModifiedAt', label: t('shell.studio.list.lastModifiedAt'), type: 'date' },
+  ]
+  const read = (row: ResourceRow) => (field: string) => {
+    switch (field) {
+      case 'name':
+        return row.name
+      case 'description':
+        return row.description
+      case 'module':
+        return row.module
+      case 'status':
+        return row.status
+      default:
+        return null
+    }
+  }
   const columns: AxisColumn<ResourceRow>[] = [
     {
       key: 'name',
       kind: 'text',
       title: t('shell.studio.list.name'),
+      searchText: (row) => row.name,
       sorter: true,
       sortOrder: sortOrderOf('name'),
       render: (row) => (
@@ -199,12 +265,14 @@ export function StudioResourceTable({
       key: 'description',
       kind: 'text',
       title: t('shell.studio.list.description'),
+      searchText: (row) => [row.description, moduleLabel(row)].filter(Boolean).join(' '),
       render: (row) => row.description ?? <EmptyDash />,
     },
     {
       key: 'status',
       kind: 'fit',
       title: t('shell.studio.list.status'),
+      searchText: statusLabel,
       sorter: true,
       sortOrder: sortOrderOf('status'),
       render: (row) => {
@@ -225,25 +293,55 @@ export function StudioResourceTable({
       },
     },
     // Nothing records who last changed a resource yet, so these two columns show the dash until that logic is built.
-    { key: 'lastModifiedBy', kind: 'fit', title: t('shell.studio.list.lastModifiedBy'), render: () => <EmptyDash /> },
-    { key: 'lastModifiedAt', kind: 'fit', title: t('shell.studio.list.lastModifiedAt'), render: () => <EmptyDash /> },
+    {
+      key: 'lastModifiedBy',
+      kind: 'fit',
+      title: t('shell.studio.list.lastModifiedBy'),
+      sorter: true,
+      sortOrder: sortOrderOf('lastModifiedBy'),
+      render: () => <EmptyDash />,
+    },
+    {
+      key: 'lastModifiedAt',
+      kind: 'fit',
+      title: t('shell.studio.list.lastModifiedAt'),
+      sorter: true,
+      sortOrder: sortOrderOf('lastModifiedAt'),
+      render: () => <EmptyDash />,
+    },
   ]
+
+  const shown = searchRows(rows, columns, searchText).filter((row) => matchesFilter(filter, read(row)))
+  const lastPage = Math.max(1, Math.ceil(shown.length / pageSize))
+  const page = Math.min(Math.max(1, Number(params.get('page')) || 1), lastPage)
 
   return (
     <AxisTable<ResourceRow>
       testId="studio-resource-table"
-      rows={rows}
+      rows={shown}
       rowKey={(row) => row.id}
       columns={columns}
-      toolbar={{ view: search, refresh: onRefresh, main }}
+      toolbar={{
+        view: (
+          <Flex gap="small" align="center">
+            {search}
+            <TableFilterButton fields={filterFields} filter={filter} onApply={applyFilter} />
+          </Flex>
+        ),
+        refresh: onRefresh,
+        main,
+      }}
       above={
-        activity === null ? (
-          <Alert
-            type="warning"
-            data-testid="studio-resource-activity-error"
-            title={t('shell.studio.list.activityFailed')}
-          />
-        ) : undefined
+        <>
+          {activity === null && (
+            <Alert
+              type="warning"
+              data-testid="studio-resource-activity-error"
+              title={t('shell.studio.list.activityFailed')}
+            />
+          )}
+          <TableFilterChips fields={filterFields} filter={filter} onChange={applyFilter} />
+        </>
       }
       emptyText={t('shell.studio.noResources')}
       pagination={{ current: page, pageSize, pageSizeOptions: pageSizes, showSizeChanger: true }}
