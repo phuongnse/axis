@@ -141,14 +141,15 @@ The lifecycle is a state machine on one field of the entity.
 
 - **State field.** `field` names an `enum` field of the entity that is `required`, not computed and
   not `sensitive`. Lists, filters and policies read the state, so it stays plain.
-- **States.** `states` lists every value of the field's `values`, each once, and nothing else.
+- **States.** `states` lists every value of the field's `values`, each once, and nothing else. A state takes a
+  `label` text reference _(planned for M31)_, see [named points](#named-points).
   - `initial: true` marks a state a record may be created in. At least one state is initial.
   - `deletable: true` marks a state a record may be deleted in. No state is deletable unless it
     says so.
   - `protected: true` marks a state that only the contract's own transitions
     enter, see [extending a lifecycle](customization-layers.md#extending-a-lifecycle).
 - **Transitions.** Each has a `name`, `from`, a non-empty list of states, a `to` state, and an
-  optional `guard` and `message`.
+  optional `guard` and `message`, and takes a `label` text reference _(planned for M31)_.
   - A pair of a `from` state and the `to` state belongs to one transition at most.
   - A `to` state that is also in `from` is a diagnostic. Staying in a state is no transition.
   - A `guard` must be boolean. Without one, the transition is allowed whenever its states match.
@@ -168,7 +169,7 @@ The lifecycle is a state machine on one field of the entity.
 ## Core validations
 
 `validations` holds the module's core validations. Each has a `name`, an `expression`, a `message`
-and a `field`, with the meaning of an [entity validation](resource-files.md#entity-logic), plus
+and a `field`, and takes a `label` text reference _(planned for M31)_, with the meaning of an [entity validation](resource-files.md#entity-logic), plus
 the [`previous`](#previous-values), [`accountableUser`](#the-accountable-user) and
 [`decisionTask`](#the-deciding-task) functions. A core validation reads `id`, the record's own id,
 and on a create that is the id the new record gets, so `parent == null or parent != id` keeps a
@@ -201,7 +202,7 @@ field, is `AXC0346` or the expression's own code.
 
 - **Shape.** `name`, `on`, which names a transition of the same contract, and `create`, with an
   `entity` of the same module, by its plain name, and `values`, a map from field name to an
-  expression.
+  expression. An effect takes a `label` text reference _(planned for M31)_.
 - **Values.** The expressions read the record after the write, so `id` is the record's id, and may
   call `previous`, `accountableUser` and `decisionTask`. They see the record's fields and child rows
   as an entity validation does, and the rules of the module. Each expression's type must fit its
@@ -390,6 +391,13 @@ The list of states and transitions is no point. It never relaxes. A state or tra
 application's [layer](customization-layers.md#extending-a-lifecycle) added is no point either, so
 a relax entry cannot name it.
 
+**Labels** _(planned for M31)_. A point reads as words, never as its technical name, so a person can judge it. A
+contract's states, transitions, core validations and effects each need a `label` text reference, a ceiling slot uses its
+module role's label, and the ceiling of roles mapped to no slot reads "Other roles". A point without a label, or a label
+whose key no text resource holds, is a compile error, so a publish never brings a point without words. Studio reads the
+words from the module files the release stores, so an old release keeps the words it was published with, and a part of
+a release published before this rule falls back to its name as written.
+
 ## Relax entries
 
 An application turns off a named point of a module it declares with a `relax` entry on that
@@ -432,7 +440,8 @@ A release whose application has at least one relax entry is off-standard.
   `offStandard` and `relaxed: [{ module, point, reason }]` for each release, read from the
   `application.json` stored with it.
 - Studio's release history and the operator console's publishing view show an off-standard mark,
-  and the list of points and reasons on the release. Built.
+  and the list of points and reasons on the release. Built. _(planned for M31)_: Studio shows the tag beside the
+  release's number and the points on its [release page](studio-workspace.md#release-page), in words.
 - The module's upgrade promise no longer covers a relaxed point _(planned for M29)_.
 
 ## Contract scenarios
@@ -481,7 +490,8 @@ some of them as contract scenarios.
   authoring API's `PATCH` and `If-Match`, so a write is refused with a conflict when
   `application.json` changed since Studio loaded it, and Studio loads it again.
 - **Mark.** The application's header and its release history show the off-standard mark while any
-  entry is present. The mark beside the application picker is _(built)_. The mark in the release
+  entry is present. _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band), and the tag
+  stays beside a release's number. The mark beside the application picker is _(built)_. The mark in the release
   history is _(built)_: the Off-standard tag, then the module, point and reason of each relaxed entry.
 - **Diagnostics.** A grant past a ceiling, a relax entry for an unknown point and a failing contract
   scenario show where Studio shows other diagnostics and publish results. The contract scenarios of a publish or validate,

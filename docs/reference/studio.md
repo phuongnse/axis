@@ -61,7 +61,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application picker.** The first step picks one of the applications that
   `GET /api/studio/apps` lists. `/studio` with no application open lists them as tiles by title, see
-  [applications](studio-workspace.md#applications). A single application is not picked at once. The picker shows while an application is open. An **Off-standard** tag shows beside it while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio).
+  [applications](studio-workspace.md#applications). A single application is not picked at once. The picker shows while an application is open. An **Off-standard** tag shows beside it while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio). _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band).
 - **Resource list.** The list groups the resources by kind (in the sidebar, see [workspace](studio-workspace.md#workspace), _planned for M31_). The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
@@ -88,7 +88,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     Label texts below. Until the names load, a label shows as a reference picker
     over the application's text keys, and a key that the application does not
     define is tagged unknown.
-  - A JSON view shows the draft as text. A valid edit there updates the form.
+  - A JSON view shows the draft as text. A valid edit there updates the form. _(planned for M31)_: see [JSON view](studio-resource-form.md#json-view).
     Invalid JSON shows an error and turns Save off.
   - Save sends only the changes, as a JSON Patch with the version the editor
     loaded in `If-Match`. It stays off while nothing has changed. An array
@@ -106,7 +106,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     connector editor, the page editor, the endpoint mapping rows, the text
     editor, the process editor's step list, with its decision, end, task, timer and operation
     panels, and the entity designer are built.
-- **Uses and Used by.** Each resource shows a **Uses** list and a **Used by**
+- **Uses and Used by.** _(planned for M31)_: see [references](studio-resource-form.md#references). Each resource shows a **Uses** list and a **Used by**
   list, from the [references routes](authoring.md#references). Each entry shows
   its relation, the other resource, and the file and path of the reference.
   - Selecting a **Uses** entry opens the other resource at its top.
@@ -123,7 +123,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
 - **Text keys.** A text resource's **Uses** list holds its keys, each as an
   entry. Expanding a key lists the labels that use it and the locales that
   define it, as its **Used by** list.
-- **Delete.** The editor has a **Delete** button, which is hidden for the
+- **Delete.** _(planned for M31)_: it moves to the [Danger zone](studio-resource-form.md#danger-zone). The editor has a **Delete** button, which is hidden for the
   application manifest. It always opens a confirm dialog first. When a
   resource's `usedBy` count is above 0, the dialog warns and names the count. The
   author can still confirm. The delete sends the loaded version in `If-Match`. A
@@ -211,7 +211,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - Exactly one row is marked **Active**. A release that was activated more than once has a row for each activation, and
     only its newest row is marked.
   - An [off-standard release](module-contracts.md#off-standard-releases) shows the **Off-standard**
-    tag with the module, point and reason of each relaxed entry. A standard one shows no tag.
+    tag with the module, point and reason of each relaxed entry. A standard one shows no tag. _(planned for M31)_: the points move to the [release page](studio-workspace.md#release-page).
   - **Roll back** shows only when `GET /api/me` answers `studioPublisher: true`. It sits on every row of a release that
     is not the active one, and is off while a request runs and while the reconnect message shows.
   - **Roll back** opens a dialog that names the release number and label. Confirming sends `POST
@@ -271,7 +271,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   - Until the names load, the property shows a text box.
   - The names load with the application. They load again after a save, a text
     write, a delete and a reconnect.
-- **Label texts.** A label is an object whose only property is `textKey`. It
+- **Label texts.** _(planned for M31)_: one box with Translations…, in the resource's one Save, see [labels](studio-resource-form.md#labels). A label is an object whose only property is `textKey`. It
   shows the key and one text box for each locale of the names, in place of the
   key alone. The **Write texts** button writes every locale in one call through
   the [text write route](authoring.md#text-writes). The label shows the texts
@@ -665,8 +665,8 @@ Run and the Test results list, the read-only views of a module entity, a module 
         JSON view.
   - **Connector editor** _(built)_. The Form tab shows the base URL binding, the auth type with its bindings, `timeout`,
     `idempotency`, and the operations as a list. The JSON view stays as a second view of the same draft.
-    - **Bindings.** A binding is a name box, labelled as a URL or a secret binding. It is not a pick from a list,
-      because no route lists a tenant's binding names. No value of a binding is shown or stored: the editor reads and
+    - **Bindings.** A binding is a name box, labelled as a URL or a secret binding. _(planned for M31)_: it is chosen
+      from the tenant's names, see [controls](studio-resource-form.md#controls-that-know-what-they-hold). No value of a binding is shown or stored: the editor reads and
       writes only the resource and schema routes, and the values stay in tenant settings.
     - **Auth.** Choosing a type removes the keys the new type forbids, such as `token` for `header`, and adds the keys
       it requires, with an empty name. Clearing the type removes `auth`. `oauth2` shows a token URL box (a URL binding),
@@ -967,7 +967,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     a save runs. A step ends when the author edits another property or leaves
     the box, and a pick in a dropdown or a button action is always a step of its
     own. The keys also work when nothing has focus, but not when the focus is
-    outside the editor. The other kinds of resource have no undo yet.
+    outside the editor. The other kinds of resource have no undo yet _(planned for M31)_, see [save bar](studio-resource-form.md#save-bar).
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
     `@dnd-kit/utilities`. The four `@dnd-kit` packages,
     `@dnd-kit/accessibility` among them, measure 15.4 KB gzipped together, in the lazy

@@ -39,7 +39,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   widgets, cards, sections and buttons cast none. Type has the body and code fonts and the font size, spacing runs from
   xs to xl, and radius has the base radius. _(planned for M31)_: the size group holds `bar`, 48 px, the height of the
   shell's header, a page's band and Studio's application row, `smallControl`, 24 px, a small icon button and the line of
-  text beside it, and `tableRow`, 40 px, a table's row and header. No size, space, type, radius or colour is a number of
+  text beside it, and `tableRow`, 40 px, a table's row and header. _(planned for M31)_: the dialog sizes `small`, `medium` and `large`, see [dialogs](actions-and-controls.md#dialogs). No size, space, type, radius or colour is a number of
   its own in a component; a layout technique, such as a column's 1 % width, takes its size from a token, see
   [D129](../decisions/d129-rules-from-the-studio-editors-review.md). The body font is IBM Plex Sans, a variable font for
   weights 100 to 700, and the code font is IBM Plex Mono at weight 400. The SPA ships the Google Fonts files from the

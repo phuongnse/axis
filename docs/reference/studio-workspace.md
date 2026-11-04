@@ -1,11 +1,12 @@
 # Studio workspace
 
 Detailed reference for how Studio is laid out: the list of applications, the workspace an open application takes, its
-band, its page headings, its Overview and its Releases list. What each editor, designer and button does is in
-[Studio](studio.md). The conventions of [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
+band, its page headings, its Overview, its Releases list and a release's page. The form that edits a resource is in
+[Studio resource form](studio-resource-form.md). What each editor, designer and button does is in [Studio](studio.md). The conventions of [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
-[D129](../decisions/d129-rules-from-the-studio-editors-review.md). The Applications section is built. The rest of this page is _(planned for M31)_.
+[D129](../decisions/d129-rules-from-the-studio-editors-review.md) and
+[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications section is built. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
@@ -56,7 +57,9 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules c
   in `dangerText` and the warnings in `warningText`, that opens the [problems panel](#problems-panel). After it, in
   `textMuted` and never a link: "Changes not live" when the folder differs from the live release, "Not published yet"
   when there is no live release, "Release 7 is live" when nothing needs attention, so a quiet band never reads as
-  still loading, and "Releases did not load" in `warningText` when the history fails. No state has an icon, as its
+  still loading, and "Releases did not load" in `warningText` when the history fails. A live release that is
+  off-standard reads "Release 3 is live, off-standard", as the Off-standard tag marks a release, never the folder, and
+  stays beside a release's number. No state has an icon, as its
   words already say it. While the history loads, only the problems show.
 - **The actions.** New resource…, Validate, Preview and Run tests are text buttons with no icon, the same gap apart,
   and Publish… is the band's one solid button, see [buttons](actions-and-controls.md#buttons). New resource… heads
@@ -78,7 +81,8 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules c
   Overview says the application's title; another sidebar entry says its name, such as Settings, Entities, Releases or
   Policy matrix; an open resource says its name, see [names](#names); Studio's list of applications says Studio.
 - **A line under it.** An optional line in `textMuted`, at the theme's font size, says more: the application's
-  description on the Overview, or an open resource's file and the path in it, or the module it comes from.
+  description on the Overview, or the module an open resource comes from. It never names a file or a path, which are
+  technical names the JSON view shows to whoever needs them.
 - **The page's actions on its right.** A page's own actions, such as a scenario's Run scenario or the list's New
   application…, sit on the right of its heading.
 
@@ -120,9 +124,7 @@ shows, in one column and in order:
   so a site added since is not there. A tile opens the running site in a new tab, so Studio stays open, and its
   accessible name says so, such as "Purchasing, opens in a new tab". A live release with no site says so.
 - **Changes since the live release**: each file that differs from the live release, from the `changes` of
-  [`GET .../releases`](authoring.md#release-history), in three aligned columns: the resource's name, as the link
-  that opens it; its kind in the singular, such as Entity; and Added, Changed or Removed. A removed file is named from
-  the live release and is not a link, as nothing is left to open. With no change, one line says that everything is
+  [`GET .../releases`](authoring.md#release-history), in the [change list](#change-list). With no change, one line says that everything is
   live; with no live release, one line says that Publish makes the application live. Then a link to every release.
   A row opens the resource as it is now: the diff view of
   [AI authoring in Studio](ai-authoring-in-studio.md#the-diff) is not planned here.
@@ -134,6 +136,18 @@ shows, in one column and in order:
 The Overview lists no problems: the band says how many, and the [problems panel](#problems-panel) lists them on every
 page.
 
+## Change list
+
+Studio has one change list, used by the Overview's changes since the live release and by a release's changes.
+
+- **Three aligned columns.** The resource's name, as the link that opens it; its kind in the singular, such as Entity;
+  and Added, Changed or Removed. A removed file is named from the live release and is not a link, as nothing is left to
+  open. On a [release page](#release-page) a changed resource is text, as the folder may have moved on.
+- **Modules and packages too.** Its rows are the changed resources and the modules and packages that differ, as
+  "Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0" or "Removed, was 1.0.0". With none, one line says so.
+- **Order.** It groups the kinds in the sidebar's order, then sorts by name, see
+  [list order](actions-and-controls.md#list-order).
+
 ## Releases
 
 The Releases entry lists the application's releases from [`GET .../releases`](authoring.md#release-history), on the
@@ -141,11 +155,48 @@ The Releases entry lists the application's releases from [`GET .../releases`](au
 
 - **One row per release,** the highest number first, as a publish gives a release its label and note and activating
   goes to the release one wants.
-- **Columns.** Release, the number, with the Live tag beside the one that runs, as the band says, and the
+- **Columns.** Release, the number, as the link that opens the [release page](#release-page), with the Live tag beside the one that runs, as the band says, and the
   Off-standard tag beside an [off-standard release](module-contracts.md#off-standard-releases); Label; Published, when
   it was published; Published by, who published it, see [names](#names); and Note. Label and Note show the dash when
   the publish gave none. There is no Status column: a release that is not live has no state of its own to name.
 - **Activate….** Every row but the live one has Activate…, an icon button named "Activate release 6", shown to a
   publisher only. It activates the release either way, back to an older release or forward to a newer one, see
   [D130](../decisions/d130-activate-a-release-replaces-roll-back.md). Its dialog says which release replaces the live
-  one.
+  one. It checks first and, when the release [cannot replace the live one](#release-page), titles itself with the same
+  sentence as the page and offers Close alone.
+
+## Release page
+
+A release opens as a page of its own, `&view=release&release=N`, under the Releases entry, because a release can relax
+many points across modules, each with a long reason. A number the history lacks says so in one line, with a link to
+every release. On a page, in order:
+
+- **Heading.** "Release N" and its tags, with Activate… as the page's own action on its right.
+- **Facts.** Label; Status, live since or replaced on; Published; Published by; and Note, on a line of its own.
+- **Relaxed points**, for a release that pins a module: Module, its label; Point, its label with a muted line that says
+  what kind of point it is and on which entity; and Reason. With none, one line says the release follows every contract
+  of its modules. Point labels are in [named points](module-contracts.md#named-points).
+- **Changes**, in the [change list](#change-list). A release that is not live lists what activating it would change,
+  titled "If you activate it, compared with live release 4": Added is what activating adds and Removed what it takes
+  away. The live release lists what it brought, titled "Changes from release 3". The first live release says there is
+  nothing to compare with. The title always names the release it compares with. Choosing any release to compare with,
+  and opening a change as a comparison of the two versions, are left for later.
+- **Modules and packages**: Name, Type and Version.
+- **Activations**: when, by whom, the release it replaced and until when it was live.
+
+**Activate… says up front when it cannot.** An older release that lacks a module the live release pins, or pins it at a
+version without some of its entities or fields, cannot replace the live release, see `AXC0213`. The route runs the same
+module check on the two stored releases, so the page says "Release 1 cannot replace release 2" with each module and the
+rule, and Activate… is off. What depends on the tenant at that moment, such as its bindings, is still checked only on
+activation.
+
+`GET /api/studio/apps/{application}/releases/{number}` answers an author with
+`{ number, previous, previousIsLive, live, changes, partChanges, modules, packages, blockers }`:
+
+- `previous` is the release it compares with: the live one when this one is not live, and `previousIsLive` is then true,
+  else the one just below it, or null for the first.
+- `changes` lists the files that differ from it, as in the [release history](authoring.md#release-history).
+- `partChanges` lists the modules and packages that differ, `{ type, id, label, change, version, previousVersion }`, with
+  `change` `added`, `removed`, `upgraded` or `downgraded`.
+- `modules` and `packages` list what the release pins, each with its `id`, `label`, `version` and `previousVersion`.
+- `blockers` lists the modules that stop it from replacing the live one, `{ module, label, liveVersion, version }`.
