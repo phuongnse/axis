@@ -10,12 +10,15 @@ export function ReferencePicker({
   value,
   required,
   options,
+  block = false,
   onChange,
 }: {
   name: string
   value: string | undefined
   required: boolean
   options: string[]
+  /** Proposed: fills its column, as an input beside it does, rather than its 240 px. */
+  block?: boolean
   onChange: (next: string | undefined) => void
 }) {
   const t = useText()
@@ -44,7 +47,7 @@ export function ReferencePicker({
       showSearch
       virtual={false}
       allowClear={!required}
-      style={{ minWidth: 240 }}
+      style={block ? { width: '100%' } : { minWidth: 240 }}
       value={match ?? current}
       options={choices}
       onChange={(next: string | undefined) => onChange(next ?? (required ? '' : undefined))}

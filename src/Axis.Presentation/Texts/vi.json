@@ -1473,8 +1473,6 @@
   "shell.studio.entity.migration.leaveNulls": "Để trống",
   "shell.studio.entity.migration.enumWarning": "Đổi sang hoặc từ enum không có migration. Validate báo AXC0016.",
   "shell.studio.entity.migration.uniqueWarning": "Thêm unique không có migration. Validate báo AXC0016.",
-  "shell.studio.entity.details": "Chi tiết",
-  "shell.studio.entity.editDetails": "Sửa chi tiết",
   "shell.studio.entity.properties": "Thuộc tính",
   "shell.studio.entity.computed": "Tính toán",
   "shell.studio.entity.unnamedField": "Trường chưa đặt tên",

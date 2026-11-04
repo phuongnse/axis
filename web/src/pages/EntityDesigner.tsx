@@ -25,6 +25,7 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import { searchRows } from '../platform/tableControls'
 import { useDesignTokens } from '../platform/themeMode'
+import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { PlatformContext } from './context'
 import {
   changeFieldType,
@@ -139,6 +140,7 @@ function Picker({
   options,
   value,
   required,
+  block = false,
   onPick,
 }: {
   pointer: string
@@ -147,6 +149,8 @@ function Picker({
   options?: string[]
   value: unknown
   required: boolean
+  /** Fills its column, as in the entity's details. */
+  block?: boolean
   onPick: (next: string | undefined) => void
 }) {
   const names = useContext(StudioNamesContext)
@@ -169,6 +173,7 @@ function Picker({
           value={typeof value === 'string' ? value : undefined}
           required={required}
           options={choices}
+          block={block}
           onChange={onPick}
         />
       )}
@@ -192,7 +197,7 @@ interface EntityParts {
  * its JSON tab after them.
  *
  * Proposed: the entity designer reads as the long-standing table designers do (Salesforce's Object Manager, Dataverse's
- * table designer, Directus's data model): a header that sums up the entity, with Edit details, then one tab for each
+ * table designer, Directus's data model): the entity's details as inputs above its parts, then one tab for each
  * part, Fields, Validations and Indexes, each with its count. Fields is the standard table, one row a field, and a field's
  * settings open in a drawer beside it, so the list stays in sight. Every input keeps its `studio-field-<pointer>` id and
  * each row the id of its field, so a diagnostic opens at the row.
@@ -303,9 +308,10 @@ function entityTabItems(
 }
 
 /**
- * Proposed: the entity's header, under the page's title, which is its label: its description, then its name and display
- * field, with Edit details, which opens them with its label in a drawer. As everywhere in the editor, an edit goes into the
- * draft, and the save bar saves it.
+ * Proposed: the entity's details, under the page's title and above its tabs, as inputs on the page itself, with no
+ * Edit details step: its name and label, then its description and display field, two to a row, one below 992 px. As
+ * everywhere in the editor, an edit goes into the draft, and the save bar saves it. A module's entity shows no
+ * description, as before.
  */
 export function EntityHeader({
   value,
@@ -313,86 +319,58 @@ export function EntityHeader({
   readOnly = false,
 }: Pick<EntityParts, 'value' | 'onChange' | 'readOnly'>) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { spacing } = useDesignTokens()
+  const narrow = useNarrowWidth()
   const names = useContext(StudioNamesContext)
   const label = useContext(LabelTextsContext)
-  const labelText = useLabelText()
-  const [open, setOpen] = useState(false)
-  const fields = Array.isArray(value.fields) ? value.fields.filter(isContent) : []
-  const fieldNames = fields.flatMap((field) =>
+  const fieldNames = (Array.isArray(value.fields) ? value.fields.filter(isContent) : []).flatMap((field) =>
     typeof field.name === 'string' && field.name !== '' ? [field.name] : [],
-  )
-  const display = fields.find((field) => field.name === value.displayField)
-  const description = labelText(value.description)
-  const fact = (name: string, shown: ReactNode, testId: string) => (
-    <span data-testid={testId}>
-      <span style={{ color: colour.textMuted }}>{name}</span>
-      <span style={{ marginInlineStart: spacing.xs }}>{shown}</span>
-    </span>
   )
 
   return (
-    <Flex justify="space-between" align="flex-start" gap={spacing.md} data-testid="studio-entity-header">
-      <Flex vertical gap={spacing.xs}>
-        {description ? <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text> : null}
-        <Flex gap={spacing.lg} wrap>
-          {fact(
-            t('shell.studio.entity.name'),
-            <Typography.Text code>{text(value.name)}</Typography.Text>,
-            'studio-entity-name',
-          )}
-          {fact(
-            t('shell.studio.entity.displayField'),
-            display ? (labelText(display.label) ?? text(display.name)) : <EmptyDash />,
-            'studio-entity-display-field',
-          )}
-        </Flex>
-      </Flex>
-      <AxisButton role="secondary" onClick={() => setOpen(true)}>
-        {t(readOnly ? 'shell.studio.entity.details' : 'shell.studio.entity.editDetails')}
-      </AxisButton>
-      <Drawer
-        open={open}
-        size={560}
-        title={t('shell.studio.entity.details')}
-        onClose={() => setOpen(false)}
-        data-testid="studio-entity-details"
-      >
-        <Flex vertical gap="middle">
-          <div data-testid="studio-field-/name">
-            <div>{t('shell.studio.entity.name')}</div>
+    <div
+      data-testid="studio-entity-header"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: narrow ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
+        columnGap: spacing.lg,
+        rowGap: spacing.md,
+        alignItems: 'start',
+      }}
+    >
+      <div data-testid="studio-field-/name">
+        <div>{t('shell.studio.entity.name')}</div>
+        <Input
+          aria-label={t('shell.studio.entity.name')}
+          value={text(value.name)}
+          onChange={(event) => onChange('/name', event.target.value)}
+        />
+      </div>
+      <div data-testid="studio-field-/label">
+        <div>{t('shell.studio.entity.label')}</div>
+        {names !== undefined && label !== null && !readOnly ? (
+          <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
+        ) : (
+          <div data-testid="studio-field-/label/textKey">
             <Input
-              aria-label={t('shell.studio.entity.name')}
-              value={text(value.name)}
-              onChange={(event) => onChange('/name', event.target.value)}
+              aria-label={t('shell.studio.labelKey')}
+              value={text(isContent(value.label) ? value.label.textKey : undefined)}
+              onChange={(event) => onChange('/label/textKey', event.target.value)}
             />
           </div>
-          <div data-testid="studio-field-/label">
-            <div>{t('shell.studio.entity.label')}</div>
-            {names !== undefined && label !== null && !readOnly ? (
-              <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
-            ) : (
-              <div data-testid="studio-field-/label/textKey">
-                <Input
-                  aria-label={t('shell.studio.labelKey')}
-                  value={text(isContent(value.label) ? value.label.textKey : undefined)}
-                  onChange={(event) => onChange('/label/textKey', event.target.value)}
-                />
-              </div>
-            )}
-          </div>
-          {!readOnly && <ResourceDescription value={value.description} onChange={onChange} />}
-          <Picker
-            pointer="/displayField"
-            label={t('shell.studio.entity.displayField')}
-            options={fieldNames}
-            value={value.displayField}
-            required={false}
-            onPick={(next) => onChange('/displayField', next)}
-          />
-        </Flex>
-      </Drawer>
-    </Flex>
+        )}
+      </div>
+      {!readOnly && <ResourceDescription value={value.description} onChange={onChange} />}
+      <Picker
+        pointer="/displayField"
+        label={t('shell.studio.entity.displayField')}
+        options={fieldNames}
+        value={value.displayField}
+        required={false}
+        block
+        onPick={(next) => onChange('/displayField', next)}
+      />
+    </div>
   )
 }
 

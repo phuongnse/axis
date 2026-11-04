@@ -1473,8 +1473,6 @@
   "shell.studio.entity.migration.leaveNulls": "Leave nulls",
   "shell.studio.entity.migration.enumWarning": "A change to or from enum has no migration. Validate reports AXC0016.",
   "shell.studio.entity.migration.uniqueWarning": "Adding unique has no migration. Validate reports AXC0016.",
-  "shell.studio.entity.details": "Details",
-  "shell.studio.entity.editDetails": "Edit details",
   "shell.studio.entity.properties": "Properties",
   "shell.studio.entity.computed": "Computed",
   "shell.studio.entity.unnamedField": "Unnamed field",

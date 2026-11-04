@@ -902,7 +902,7 @@ export function StudioEditor({
         <LabelTextsContext.Provider value={labelContext}>
           <StudioCatalogContext.Provider value={catalog}>
             <RemovedNoticeContext.Provider value={notifyRemoved}>
-              {/* Proposed: an entity's header sums it up above its tabs. */}
+              {/* Proposed: an entity's details are inputs above its tabs. */}
               {item.kind === 'entity' && schema && (
                 <ConfigProvider componentDisabled={jsonInvalid}>
                   <EntityHeader value={draft} onChange={change} />
