@@ -472,7 +472,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Address | Shows |
   | --- | --- |
-  | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it starts sign-in at once and draws no screen first. Only two addresses show a card, and neither starts sign-in until the person clicks its button. `/?signIn=failed` is where the server sends the browser after a refused sign-in. It shows "Sign in" and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/?signedOut` is where the identity provider returns the browser after sign-out. It shows "You have signed out", a message and a "Sign in again" button. A signed-in person who opens either address sees the launcher. |
+  | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it starts sign-in at once and draws no screen first. Only three addresses show a card, and none starts sign-in until the person clicks its button. `/?signIn=failed` is where the server sends the browser after a refused sign-in. It shows "Sign in" and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/?signIn=declined` is where the server sends the browser after a person declines the terms step. It shows the same card with the platform text `shell.home.signInDeclined`, which says that signing in needs the terms accepted. `/?signedOut` is where the identity provider returns the browser after sign-out. It shows "You have signed out", a message and a "Sign in again" button. A signed-in person who opens any of them sees the launcher. |
   | `/licences` | the [open source licences](legal.md#open-source-licences) page, open without signing in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
@@ -889,7 +889,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   The [app switcher](shell.md#app-switcher-and-preferences) reads `studio` and `console` from it.
   - With nobody signed in, it is a **Sign in** button, except on the home page `/`, which starts sign-in or shows a card.
     It sends the browser to `/api/auth/sign-in` with the current path and query string as `returnUrl`, so the person
-    comes back there, but to `/` from the card addresses `/?signIn=failed` and `/?signedOut`.
+    comes back there, but to `/` from the card addresses `/?signIn=failed`, `/?signIn=declined` and `/?signedOut`.
   - With someone signed in, it shows their display name, with their avatar before it and a caret
     after it. Its menu holds **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
     ends the session. The server ends the identity provider's session itself and the browser goes to `/?signedOut`. Only
@@ -911,7 +911,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     Four calls are exempt and never show it. `GET /api/me` answers `401` when
     nobody is signed in, so the header shows the button and no app switcher. The home page's
     `GET /api/sites` answers `401` too. The home page starts sign-in at once when either call does, except at
-    `/?signIn=failed` and `/?signedOut`, where it shows the card. The
+    `/?signIn=failed`, `/?signIn=declined` and `/?signedOut`, where it shows the card. The
     notification bell's calls and Studio's readiness checks stay quiet as well.
   - Its texts are the platform texts `shell.account.signIn`,
     `shell.account.signOut` and `shell.account.label`, the menu's label, and

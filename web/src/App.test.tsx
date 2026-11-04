@@ -61,6 +61,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.home.signedOut.message': 'You can close this page, or sign in again.',
     'shell.home.signedOut.signIn': 'Sign in again',
     'shell.home.signInFailed': 'Sign-in did not complete. Try again.',
+    'shell.home.signInDeclined': 'Signing in needs the terms accepted. Sign in again to accept them.',
     'shell.account.signIn': 'Sign in',
     'shell.signInPrompt.title': 'Your session has ended',
     'shell.signInPrompt.message': 'Sign in again to continue.',
@@ -892,6 +893,27 @@ describe('App', () => {
     expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/'))
   })
 
+  it('shows the declined card, with the terms warning above one Sign in button, and starts sign-in only on the click', async () => {
+    vi.mocked(assignLocation).mockReset()
+    history.pushState(null, '', '/?signIn=declined')
+    stubServer({ me: null })
+
+    renderApp('/?signIn=declined')
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    const alert = screen.getByTestId('sign-in-declined')
+    expect(alert).toHaveTextContent('Signing in needs the terms accepted. Sign in again to accept them.')
+    expect(alert).toHaveAttribute('role', 'alert')
+    expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
+    const button = screen.getByRole('button', { name: 'Sign in' })
+    expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
+    expect(assignLocation).not.toHaveBeenCalled()
+
+    await userEvent.click(button)
+
+    expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/'))
+  })
+
   it('shows the signed-out card, with its message above one Sign in again button, and starts sign-in only on the click', async () => {
     vi.mocked(assignLocation).mockReset()
     history.pushState(null, '', '/?signedOut')
@@ -948,6 +970,7 @@ describe('App', () => {
   it('has the sign-in card texts in every platform locale and no sign-in explanation', () => {
     for (const texts of [platformEnglish, platformVietnamese]) {
       expect(texts).toHaveProperty(['shell.home.signInFailed'])
+      expect(texts).toHaveProperty(['shell.home.signInDeclined'])
       expect(texts).toHaveProperty(['shell.home.signIn.title'])
       expect(texts).toHaveProperty(['shell.home.signedOut.title'])
       expect(texts).toHaveProperty(['shell.home.signedOut.message'])

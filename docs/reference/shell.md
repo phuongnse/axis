@@ -149,13 +149,18 @@ _(planned for M31)_.
   `tenant create` takes one, see [realms](identity-provider.md#realms). The card is at most 400 px wide, on
   `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl` padding. The header shows no second
   Sign in button there, and nothing starts sign-in until the person clicks the card's button.
-  - **Refused sign-in.** `/?signIn=failed` shows "Sign in", the warning "Sign-in did not complete. Try again." with no
+  - **Refused sign-in.** `/?signIn=failed` is where every failure but a declined terms step goes. It shows "Sign in", the warning "Sign-in did not complete. Try again." with no
     reason, and a full-width Sign in button. Starting sign-in at once there would loop, as the identity provider's
     session is still open.
+  - **Declined terms.** `/?signIn=declined` is where the server sends the browser after a person declines the terms
+    step, see [accepting the terms](legal.md#accepting-the-terms). It shows the same card as a refused sign-in with the
+    warning "Signing in needs the terms accepted. Sign in again to accept them." in place of the sign-in warning. Only an
+    `access_denied` answer whose sign-in state the server could read goes there. Every other failure goes to
+    `/?signIn=failed`.
   - **Signed out.** After sign-out the identity provider returns the browser to `/?signedOut` (the server sends it
     there itself, once it has ended the identity provider's session), which shows "You have
     signed out", "You can close this page, or sign in again." in `textMuted` and a full-width "Sign in again" button.
-  - The button returns to `/` after sign-in, never to either address.
+  - The button returns to `/` after sign-in, never to any of these addresses.
 - **Endpoints.** The page uses these three.
   - `GET /api/sites` gives each site its `application`, `{ "name", "titles", "descriptions" }`, the application's name
     and its title and description per locale it has texts for, from the `label` and `description` in its

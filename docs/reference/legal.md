@@ -59,15 +59,17 @@ lists the licences of what Axis ships, and the step where a person accepts the t
 
 ## Accepting the terms
 
-- **Once, then on each new version** _(planned for M31)_. After a person's first sign-in, and again when the tenant's terms change
+- **Once, then on each new version**. After a person's first sign-in, and again when the tenant's terms change
   version, the identity provider asks them to accept the terms in a step of its own, never as a box on every sign-in.
   It is Keycloak's Terms and Conditions required action, drawn as an Axis page.
-- **The tenant's terms** _(planned for M31)_. The step asks for the tenant's terms and privacy policy, whichever client signs the person
+- **The tenant's terms**. The step asks for the tenant's terms and privacy policy, whichever client signs the person
   in, because the identity provider asks it of the whole realm. A site's own addresses change only its legal line.
-- **One required tick** _(planned for M31)_. The page shows one checkbox that names the Terms of service and the Privacy policy as links,
-  Continue, and Decline and sign out. Continue with the box unticked marks the box with an error. Continue records
-  when the person accepted. Declining ends the sign-in, and Axis's sign-in card says that signing in needs the terms
-  accepted.
+- **One required tick**. The page shows one checkbox that names the Terms of service and the Privacy policy as links,
+  Continue, and Decline and sign out. The links open in a new tab, so the person keeps the step. A tenant that sets
+  terms but no privacy policy gets a label that names only the Terms of service. Continue with the box unticked marks
+  the box with an error and sends nothing. Continue records when the person accepted. Declining ends the sign-in at
+  `/?signIn=declined`, Axis's sign-in card, which says that signing in needs the terms accepted, see
+  [the shell's sign-in card](shell.md#platform-home-page).
 - **On only while there are terms.** The realm sync turns the step on, for new users too, while the tenant sets terms
   and off when it has none, so the page never shows without a link. When the tenant's terms version changes, the
   sync asks it again of every user of the realm, and then stores the version in the realm attribute

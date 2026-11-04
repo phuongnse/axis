@@ -218,6 +218,7 @@
   "shell.home.applications.empty": "No application is active.",
   "shell.home.applications.loadFailed": "The sites could not be loaded.",
   "shell.home.signInFailed": "Sign-in did not complete. Try again.",
+  "shell.home.signInDeclined": "Signing in needs the terms accepted. Sign in again to accept them.",
   "shell.signInPrompt.title": "Your session has ended",
   "shell.signInPrompt.message": "Sign in again to continue.",
   "shell.notFound.title": "Page not found",

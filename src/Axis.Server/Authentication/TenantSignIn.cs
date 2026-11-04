@@ -32,6 +32,12 @@ internal static class TenantSignIn
     /// </summary>
     public const string FailedPath = "/?signIn=failed";
 
+    /// <summary>
+    /// Where the browser goes when the person declines the terms step: the shell's sign-in page, which says that signing in
+    /// needs the terms accepted. Keycloak answers a declined required action with <c>error=access_denied</c>.
+    /// </summary>
+    public const string DeclinedPath = "/?signIn=declined";
+
     public const string SchemePrefix = "oidc-";
 
     /// <summary>
@@ -375,7 +381,10 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 LogRefusalNotRecorded(httpContext.RequestServices.GetRequiredService<ILogger<TenantSignInOptions>>(), exception);
             }
 
-            context.Response.Redirect(TenantSignIn.FailedPath);
+            // Only an access_denied whose state Axis read counts as a decline, so a forged or stale callback does not claim it.
+            var declined = context.Properties is not null
+                && string.Equals(httpContext.Request.Query["error"].ToString(), "access_denied", StringComparison.Ordinal);
+            context.Response.Redirect(declined ? TenantSignIn.DeclinedPath : TenantSignIn.FailedPath);
             context.HandleResponse();
         };
     }

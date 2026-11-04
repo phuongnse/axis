@@ -110,10 +110,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
     creates no session and redirects to the shell's sign-in page, `/?signIn=failed`,
-    for example when the person cancels at the identity provider, or when the
-    ID token has no recent `auth_time`. The page says
+    for example when the ID token has no recent `auth_time`. The page says
     that sign-in did not complete and shows no reason, and the address holds
-    none. See the [home page](frontend.md) and
+    none. A person who declines the terms step makes the identity provider answer
+    `error=access_denied`. When the server could read the sign-in state, that goes to
+    `/?signIn=declined` instead, a card that says signing in needs the terms accepted.
+    Both are recorded as `session.signInRefused` with the reason `providerError`. See the [home page](frontend.md) and
     [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - `POST /api/auth/sign-out` ends the session and returns `200` with
     `{ "signOutUrl" }`. The server first ends the identity provider's session by the stored `sid` through the admin API, as the realm's `axis-users` client (a `404` counts as ended), and answers `/?signedOut`, so the browser visits no identity provider page.

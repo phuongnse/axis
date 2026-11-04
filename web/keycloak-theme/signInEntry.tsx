@@ -10,6 +10,7 @@ import { SamlPostPage } from '../src/identitySignIn/SamlPostPage'
 import { SignInPage } from '../src/identitySignIn/SignInPage'
 import { SignOutPage } from '../src/identitySignIn/SignOutPage'
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
+import { TermsPage } from '../src/identitySignIn/TermsPage'
 import { TwoStepPage } from '../src/identitySignIn/TwoStepPage'
 import { UpdatePasswordPage } from '../src/identitySignIn/UpdatePasswordPage'
 import { UpdateProfilePage } from '../src/identitySignIn/UpdateProfilePage'
@@ -27,6 +28,8 @@ function ThemePage({ context }: { context: IdentityContext }) {
       return <ResetPasswordPage context={context} />
     case 'updatePassword':
       return <UpdatePasswordPage context={context} />
+    case 'terms':
+      return <TermsPage context={context} />
     case 'selectAuthenticator':
       return <SelectAuthenticatorPage context={context} />
     case 'updateProfile':
@@ -47,7 +50,7 @@ function ThemePage({ context }: { context: IdentityContext }) {
   }
 }
 
-/** The theme's page: the shared sign-in, two-step, add-an-authenticator, forgot-password, set-password, method choice, update profile, review profile, sign-out, notice, error, expired, SAML redirect or front-channel sign-out page with the SPA's theme provider, fed Keycloak's context. */
+/** The theme's page: the shared sign-in, two-step, add-an-authenticator, forgot-password, set-password, terms, method choice, update profile, review profile, sign-out, notice, error, expired, SAML redirect or front-channel sign-out page with the SPA's theme provider, fed Keycloak's context. */
 export function SignInEntry({ context }: { context: IdentityContext }) {
   return (
     <StrictMode>

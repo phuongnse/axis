@@ -437,13 +437,43 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     }
 
     [Fact]
-    public async Task A_cancel_at_the_identity_provider_redirects_to_the_sign_in_page_and_is_recorded_as_a_provider_error()
+    public async Task A_declined_terms_step_redirects_to_the_declined_card_and_is_recorded_as_a_provider_error()
     {
         using var client = CreateClient();
         var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in");
         var state = Regex.Match(challenge.Headers.Location!.Query, "[?&]state=(?<state>[^&]+)").Groups["state"].Value;
 
         var callback = await SendAsync(client, HttpMethod.Get, $"/api/auth/callback?error=access_denied&state={state}");
+
+        Assert.Equal(HttpStatusCode.Found, callback.StatusCode);
+        Assert.Equal(TenantSignIn.DeclinedPath, callback.Headers.Location?.OriginalString);
+        if (callback.Headers.TryGetValues("Set-Cookie", out var cookies))
+        {
+            Assert.DoesNotContain(cookies, cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
+        }
+        var record = Assert.Single(await ReadAuditAsync("a", "session.signInRefused"));
+        using var details = JsonDocument.Parse(record.Details);
+        Assert.Equal("providerError", details.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task An_access_denied_callback_with_no_readable_state_redirects_to_the_sign_in_page_not_the_declined_card()
+    {
+        using var client = CreateClient();
+
+        var callback = await SendAsync(client, HttpMethod.Get, "/api/auth/callback?error=access_denied&state=not-a-state");
+
+        AssertRedirectedToSignInPage(callback);
+    }
+
+    [Fact]
+    public async Task Another_provider_error_redirects_to_the_sign_in_page_and_is_recorded_as_a_provider_error()
+    {
+        using var client = CreateClient();
+        var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in");
+        var state = Regex.Match(challenge.Headers.Location!.Query, "[?&]state=(?<state>[^&]+)").Groups["state"].Value;
+
+        var callback = await SendAsync(client, HttpMethod.Get, $"/api/auth/callback?error=temporarily_unavailable&state={state}");
 
         AssertRedirectedToSignInPage(callback);
         var record = Assert.Single(await ReadAuditAsync("a", "session.signInRefused"));

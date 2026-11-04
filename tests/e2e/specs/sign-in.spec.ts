@@ -76,7 +76,7 @@ test('after signing out from the header menu, no identity provider page shows, t
   await expect(banner.getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()
 })
 
-test('a person who cancels at the Keycloak login page lands on the home page with a message and can sign in again', async ({
+test('a sign-in that the identity provider refuses lands on the home page with a message and can sign in again', async ({
   page,
   baseURL,
 }) => {
@@ -85,8 +85,8 @@ test('a person who cancels at the Keycloak login page lands on the home page wit
   await page.goto('/')
   await signInUsername(page).waitFor()
   const state = new URL(page.url()).searchParams.get('state')
-  // The realm's login form has no cancel button. This is the answer Keycloak sends when a person cancels.
-  await page.goto(`/api/auth/callback?error=access_denied&state=${encodeURIComponent(state!)}`)
+  // This is the answer Keycloak sends when it cannot sign the person in. access_denied is a declined terms step instead.
+  await page.goto(`/api/auth/callback?error=temporarily_unavailable&state=${encodeURIComponent(state!)}`)
 
   await expect(page).toHaveURL(`${baseURL}/?signIn=failed`)
   await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toBeVisible()
