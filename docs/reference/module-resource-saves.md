@@ -48,6 +48,8 @@ and the first failure is the response:
 `POST .../modules/{module}/resources/{id}/reset` takes `{ "list": "<JSON Pointer>", "key": "<list key>" }` as
 `application/json`. `list` is the pointer of a keyed list in the resource with the layer applied, and `key` is the key of one
 element, both as the read route reports them in `marks` and `removed`. The body holds these two strings and nothing else.
+`list` may also be `/texts` of a text resource, with a text key as `key`. A text key is matched exactly, with its letter
+case, as a property name is. A changed key gets the module's text back and an added key is dropped.
 
 - **What it does.** A changed element gets the module's version back, in the module's position. An added element is dropped.
   A removed element comes back where the module has it. The server applies this to the resource with the layer applied, and
@@ -59,8 +61,8 @@ element, both as the read route reports them in `marks` and `removed`. The body 
 - **Refused with `400`.** The body is not exactly two strings, a module scenario, a name that two resources of the module
   share, a layer that removes the whole resource or that the difference cannot read back, and a contract reset that would
   leave more than added states and transitions. For the last two the author uses Reset all.
-- **Not found.** A `list` that is not a keyed list of the resource, or a `key` that neither the layer's resource nor the
-  module has in it, is `404`.
+- **Not found.** A `list` that is neither a keyed list of the resource nor `/texts` of a text resource, or a `key` that
+  neither the layer's resource nor the module has in it, is `404`.
 - **Answer.** The same as the save: `200` with `{ file, version, diagnostics }` and an `ETag` header when a layer is left.
   The diagnostics can show that the layer now points at an element that is gone. The route does not refuse this.
 - **Reset all.** It is the existing delete of the layer resource, `DELETE /api/studio/apps/{application}/resources/{layer id}`

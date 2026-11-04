@@ -3,6 +3,7 @@ import type { HTMLAttributes } from 'react'
 import { useState } from 'react'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { useText } from '../platform/texts'
+import { LayerMarkTag, type DesignerLayer } from './LayerMarkViews'
 import type { ChangeHandler } from './SchemaForm'
 
 /** One locale of the table: the `texts` of a text resource, and whether the table edits it. */
@@ -26,16 +27,19 @@ function textOf(column: TextColumn, key: string): string {
  * The text keys of an application as a table: a row per key and a column per locale, in the order of `columns`. Only
  * an editable column takes input, and it edits the draft through `onChange`. A key that a column lacks shows as
  * missing, and typing in an editable cell adds it. The search box keeps the rows whose key or text contains the
- * search, ignoring letter case. `onAdd` writes a new key in every locale and answers how that went.
+ * search, ignoring letter case. `onAdd` writes a new key in every locale and answers how that went. With a `layer`,
+ * each key that the layer changed or added shows its mark and Reset to module after the key.
  */
 export function TextTable({
   columns,
   onChange,
   onAdd,
+  layer,
 }: {
   columns: TextColumn[]
   onChange: ChangeHandler
   onAdd: (key: string, texts: Record<string, string>) => Promise<'added' | 'invalid' | 'failed'>
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const [search, setSearch] = useState('')
@@ -106,6 +110,16 @@ export function TextTable({
               title: t('shell.studio.texts.key'),
               render: (_, row) => <Typography.Text code>{row.key}</Typography.Text>,
             },
+            ...(layer
+              ? [
+                  {
+                    key: 'layer',
+                    render: (_: unknown, row: Row, index: number) => (
+                      <LayerMarkTag layer={layer} list="/texts" index={index} name={row.key} />
+                    ),
+                  },
+                ]
+              : []),
             ...columns.map((column) => ({
               key: column.id,
               title: column.locale,

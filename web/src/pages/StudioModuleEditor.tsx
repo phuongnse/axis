@@ -1,8 +1,8 @@
 import { Alert, Button, Flex, Modal, Tag } from 'antd'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
-import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
-import { entityKeyedLists, layerMarks, processKeyedLists } from '../platform/layerMarks'
+import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
+import { entityKeyedLists, layerMarks, processKeyedLists, textKeyedMaps } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   deleteStudioResource,
@@ -17,10 +17,12 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { isObject } from '../platform/scenarioSteps'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { EntityDesigner } from './EntityDesigner'
 import type { DesignerLayer } from './LayerMarkViews'
+import { TextTable } from './TextTable'
 
 const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
 
@@ -37,11 +39,11 @@ interface Loaded {
 }
 
 /**
- * An editor of a module resource, for the `entity` and `process` kinds. The resource opens with the application's layer applied
+ * An editor of a module resource, for the `entity`, `process` and `text` kinds. The resource opens with the application's layer applied
  * and every input on. Save sends the whole entity to the module save route, which writes only the difference as the
  * layer. When the resource has a layer, a Customized tag and Reset all show, which delete the layer file, and the
- * entity designer or the process designer marks the elements the layer added, changed or removed, each with Reset to module, which undoes that one
- * element on the server. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
+ * entity designer, the process designer or the text table marks the elements the layer added, changed or removed, each with Reset to
+ * module, which undoes that one element on the server. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
  * diagnostics after a save, a Reset all or a Reset to module, with the layer the write added to the folder's list or the
  * id of the layer it removed.
  */
@@ -277,11 +279,11 @@ export function StudioModuleEditor({
   }
 
   /** What the designer needs to mark the layer's elements, or nothing when the resource has no layer. */
-  function designerLayer(keyedLists: Record<string, string>): DesignerLayer | undefined {
+  function designerLayer(keyedLists: Record<string, string>, maps: readonly string[] = []): DesignerLayer | undefined {
     return loaded!.layer === null
       ? undefined
       : {
-          elements: layerMarks(loaded!.content, loaded!.marks, loaded!.removed, keyedLists),
+          elements: layerMarks(loaded!.content, loaded!.marks, loaded!.removed, keyedLists, maps),
           disabled: patch.length > 0 || saving || resetting || reconnecting || conflict,
           onReset: (list, key) => void resetElement(list, key),
         }
@@ -314,6 +316,18 @@ export function StudioModuleEditor({
             layer={designerLayer(processKeyedLists)}
           />
         </Suspense>
+      ) : item.kind === 'text' ? (
+        isObject(draft.texts) && (
+          <TextTable
+            columns={[{ id: item.id, locale: String(draft.locale ?? ''), texts: draft.texts, editable: true }]}
+            onChange={change}
+            onAdd={async (key, texts) => {
+              change(`/texts/${escapePointerSegment(key)}`, texts[String(draft.locale ?? '')] ?? '')
+              return 'added'
+            }}
+            layer={designerLayer({}, textKeyedMaps)}
+          />
+        )
       ) : (
         <EntityDesigner value={draft} onChange={change} layer={designerLayer(entityKeyedLists)} />
       )}

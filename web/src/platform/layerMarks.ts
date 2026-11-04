@@ -1,4 +1,4 @@
-import { getAt } from './jsonPatch'
+import { getAt, unescapePointerSegment } from './jsonPatch'
 import type { StudioModuleResource } from './studio'
 
 /** What a customization layer did to a list element. */
@@ -23,22 +23,35 @@ export const processKeyedLists: Record<string, string> = {
   '/steps': 'name',
 }
 
+/** The maps of a text resource whose keys the layer marks: `/texts`, each text keyed by its property name. */
+export const textKeyedMaps: readonly string[] = ['/texts']
+
 /**
  * The elements that the read route's `marks` and `removed` name. Only a whole element counts, a pointer such as
  * `/fields/1`, and its key is read from `content`, the resource with the layer applied. A pointer to a property
  * of an element or of the root, and a list that is not in `keyedLists`, are left out. The key stays with the
- * element when the author moves it, which a position would not.
+ * element when the author moves it, which a position would not. A map in `maps`, such as `/texts`, has no positions:
+ * a mark on `/texts/<key>` names that key, read from the pointer, when `content` has it.
  */
 export function layerMarks(
   content: unknown,
   marks: StudioModuleResource['marks'],
   removed: StudioModuleResource['removed'],
   keyedLists: Record<string, string>,
+  maps: readonly string[] = [],
 ): LayerElement[] {
   const elements: LayerElement[] = []
   for (const { path, mark } of marks) {
     const slash = path.lastIndexOf('/')
     const list = path.slice(0, slash)
+    if (slash >= 0 && maps.includes(list)) {
+      const key = unescapePointerSegment(path.slice(slash + 1))
+      const map = getAt(content, list)
+      if (typeof map === 'object' && map !== null && Object.hasOwn(map, key)) {
+        elements.push({ list, key, mark })
+      }
+      continue
+    }
     if (slash < 0 || !/^\d+$/.test(path.slice(slash + 1)) || !Object.hasOwn(keyedLists, list)) {
       continue
     }

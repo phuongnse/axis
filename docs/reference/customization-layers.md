@@ -255,7 +255,8 @@ applied, its marks and its removed elements, its [save route](module-resource-sa
 [reset route](module-resource-saves.md#element-reset) takes one element out of it. All three are built. The module entity editor
 and the module process editor are built, with their Customized tag, **Reset all**, the element marks and
 **Reset to module**. The module process opens in the [process designer](process-designer.md), and
-its marks and resets are on steps. The editors of the other kinds are _(planned for M25)_.
+its marks and resets are on steps. A module text opens in the text table with the layer applied, with Added and Changed marks on
+its keys, **Reset to module** and **Reset all**. The editors of the other kinds are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.

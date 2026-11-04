@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { entityKeyedLists, layerMarks, markOf } from './layerMarks'
+import { entityKeyedLists, layerMarks, markOf, textKeyedMaps } from './layerMarks'
 
 const content = {
   name: 'Department',
@@ -68,6 +68,37 @@ describe('layerMarks', () => {
     )
 
     expect(elements).toEqual([{ list: '/fields', key: 'code', mark: 'removed' }])
+  })
+})
+
+describe('layerMarks of a text map', () => {
+  const texts = { texts: { 'a.label': 'Label', 'a/b~c': 'Slash', 'a.new': 'New' } }
+
+  it('maps a mark on /texts/<key> to that key, unescaping ~1 and ~0', () => {
+    const elements = layerMarks(
+      texts,
+      [
+        { path: '/texts/a.label', mark: 'changed' },
+        { path: '/texts/a~1b~0c', mark: 'changed' },
+        { path: '/texts/a.new', mark: 'added' },
+      ],
+      [],
+      {},
+      textKeyedMaps,
+    )
+
+    expect(elements).toEqual([
+      { list: '/texts', key: 'a.label', mark: 'changed' },
+      { list: '/texts', key: 'a/b~c', mark: 'changed' },
+      { list: '/texts', key: 'a.new', mark: 'added' },
+    ])
+  })
+
+  it('ignores a key the content lacks and a mark under a map that was not given', () => {
+    const marks = [{ path: '/texts/a.label', mark: 'changed' as const }]
+
+    expect(layerMarks(texts, [{ path: '/texts/gone', mark: 'added' }], [], {}, textKeyedMaps)).toEqual([])
+    expect(layerMarks(texts, marks, [], {})).toEqual([])
   })
 })
 
