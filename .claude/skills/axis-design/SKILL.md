@@ -1,6 +1,6 @@
 ---
 name: axis-design
-description: Runbook for the owner's local agent session that keeps the Axis Design System artifact in Claude and the repository in step. Use when the owner asks for a design change in words, reviews the design one change at a time, or asks to sync or publish the design system, or after a merged change to the tokens or a widget. Not for agents running inside the NexKit pipeline.
+description: Runbook for the owner's local agent session that keeps the Axis Design System artifact in Claude and the repository in step. Use when the owner asks for a design change in words, reviews the design one change at a time, continues a review or works on a design/ branch, or asks to sync or publish the design system, or after a merged change to the tokens or a widget. Not for agents running inside the NexKit pipeline.
 ---
 
 # Keeping the Axis design system in step
@@ -56,9 +56,7 @@ are under "Several changes are a design review" in Design changes.
 
 ### Start
 
-1. Sync the artifact to `main` first, as [A sync](#a-sync) says, so every
-   difference the owner sees comes from the review.
-2. Agree a short topic with the owner, such as `field-look`. Create the
+1. Agree a short topic with the owner, such as `field-look`. Create the
    prototype branch from `main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says:
    `git switch -c design/<yyyy-mm-dd>-<topic> main`, then
@@ -66,13 +64,16 @@ are under "Several changes are a design review" in Design changes.
    never only in a temporary folder. Never open a pull request from it, and
    never give it a NexKit branch name. CI leaves `design/` branches out, so a
    push starts no run.
-3. Keep the owner's rules, in English, in `design-review.md` at the root
-   of the branch, so the review can go on from another machine.
+2. Keep the owner's rules, in English, in `design-review.md` at the root
+   of the branch, so the review can go on from another machine. Its first
+   lines say that the review follows this skill, so a session that opens the
+   branch finds it.
 
 ### Each change
 
 Take one change at a time, and do not start the next until the owner has
-seen this one.
+seen this one. Build only what the design needs to be seen and agreed: no test
+changes, and logic goes in `design-review.md` for the review's issue.
 
 1. Restate the change in Axis terms: the tokens, the widgets and the
    previews it touches, by their names in
@@ -87,16 +88,14 @@ seen this one.
 4. Run `scripts/design-system.sh`, which writes
    `artifacts/design-system/axis-design-system.js` and checks it.
 5. Check every changed card as the artifact shows it (see below).
-6. Publish the bundle to the artifact, as the Design System type's
-   instructions say. Add a change note of at most 280 characters, the
-   artifact type's limit, that names the review and its branch, such as
-   `Design review 2026-11-02-field-look: required mark and help text`.
-7. Commit the change on the branch with a message that says what it shows,
+6. Commit the change on the branch with a message that says what it shows,
    so the branch history lists the review's changes in order. Push the branch.
-8. Show the owner the card and ask for a verdict. Keep, change or drop the
-   change as they say. Write down each rule they agree, in English as all
-   committed text is, in `design-review.md` for the docs change at the end,
-   then commit and push it.
+7. Show the owner the change on the local stack and ask for a verdict. Keep,
+   change or drop the change as they say. Write down each rule they agree, in
+   English as all committed text is, in `design-review.md` for the docs change
+   at the end, then commit and push it.
+
+The artifact does not change during a review. It is published once, at the end.
 
 ### Checking a card
 
@@ -140,11 +139,10 @@ A check passes only when the card behaves as it will in the artifact.
    the tokens, widgets and previews it changes. Open it once the docs pull
    request is merged, so its links point at `main`. Do not split it: NexKit
    splits it if it needs to.
-4. Add a change note to the artifact that names the issue, as for a requested
-   change.
-5. After the issue is merged, sync the artifact again. The sync keeps the
-   card order and names, which `scripts/design-system.sh` writes as the
-   bundle's first line, `/* @ds-bundle: {...} */`.
+4. After the issue is merged, publish the artifact as [A sync](#a-sync) says,
+   with no need to ask when every difference comes from what merged. The sync
+   keeps the card order and names, which `scripts/design-system.sh` writes as
+   the bundle's first line, `/* @ds-bundle: {...} */`.
 
 ## A sync
 
@@ -160,7 +158,8 @@ asks.
 4. Compare the artifact with the repository. List every other difference the
    sync would overwrite, and every token the artifact has that the code no
    longer defines.
-5. Show that list to the owner. Publish only after they confirm.
+5. Show that list to the owner. Publish only after they confirm, unless the
+   sync ends a review and every difference comes from what merged.
 6. Publish the previews and the tokens to the same artifact, keeping the
    changes of open issues. Add a change note that names the commit you synced
    from (`git rev-parse --short HEAD`) and the open issues you kept.
