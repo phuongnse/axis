@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { entityKeyedLists, layerMarks, markOf } from './layerMarks'
+import { entityKeyedLists, layerMarks, markOf, pageListKey } from './layerMarks'
 
 const content = {
   name: 'Department',
@@ -68,6 +68,63 @@ describe('layerMarks', () => {
     )
 
     expect(elements).toEqual([{ list: '/fields', key: 'code', mark: 'removed' }])
+  })
+})
+
+describe('layerMarks for a page', () => {
+  const page = {
+    widgets: [
+      {
+        type: 'columns',
+        name: 'grid',
+        columns: [
+          { name: 'left', widgets: [] },
+          {
+            name: 'right',
+            widgets: [{ type: 'table', name: 'list', rowActions: [{ name: 'open' }], measures: [{ name: 'm' }] }],
+          },
+        ],
+      },
+    ],
+  }
+
+  it('keys the page lists at any depth by name', () => {
+    const elements = layerMarks(
+      page,
+      [
+        { path: '/widgets/0', mark: 'changed' },
+        { path: '/widgets/0/columns/1', mark: 'changed' },
+        { path: '/widgets/0/columns/1/widgets/0', mark: 'changed' },
+        { path: '/widgets/0/columns/1/widgets/0/rowActions/0', mark: 'added' },
+        { path: '/widgets/0/columns/1/widgets/0/measures/0', mark: 'added' },
+      ],
+      [{ list: '/widgets/0/columns/1/widgets', key: 'old', content: { name: 'old' } }],
+      pageListKey,
+    )
+
+    expect(elements).toEqual([
+      { list: '/widgets', key: 'grid', mark: 'changed' },
+      { list: '/widgets/0/columns', key: 'right', mark: 'changed' },
+      { list: '/widgets/0/columns/1/widgets', key: 'list', mark: 'changed' },
+      { list: '/widgets/0/columns/1/widgets/0/rowActions', key: 'open', mark: 'added' },
+      { list: '/widgets/0/columns/1/widgets', key: 'old', mark: 'removed' },
+    ])
+  })
+})
+
+describe('pageListKey', () => {
+  it('keys the lists of widgets, actions, columns and tabs by name', () => {
+    for (const list of ['widgets', 'actions', 'rowActions', 'toolbarActions', 'columns', 'tabs']) {
+      expect(pageListKey(`/widgets/0/${list}`)).toBe('name')
+    }
+    expect(pageListKey('/widgets')).toBe('name')
+    expect(pageListKey('/widgets/0/columns/1/widgets')).toBe('name')
+  })
+
+  it('leaves the other lists out', () => {
+    expect(pageListKey('/widgets/0/measures')).toBeUndefined()
+    expect(pageListKey('/parameters')).toBeUndefined()
+    expect(pageListKey('/widgets/0')).toBeUndefined()
   })
 })
 
