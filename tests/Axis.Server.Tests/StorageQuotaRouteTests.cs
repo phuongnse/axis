@@ -60,6 +60,9 @@ public sealed class StorageQuotaRouteTests
         "DELETE /api/me/sessions/{id}",
         "POST /api/auth/sign-out",
         "POST /api/cell/auth/sign-out",
+
+        // The provisioning API writes platform rows and no tenant data, so the storage quota does not count it.
+        "PUT /api/cell/tenants/{id}/quotas",
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 

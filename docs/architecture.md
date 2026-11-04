@@ -142,7 +142,7 @@ Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
 Under `Tenancy:Source=directory` there is no `SchemaConnectionString`: the
 server and the worker hold only runtime database roles for tenant databases.
 In those environments the server's `ConnectionStrings:PlatformSchema` also
-uses `axis_schema`, for the platform migrations.
+uses `axis_schema`, for the platform migrations and the quotas write of the provisioning API.
 The server builds none from the directory.
 `appsettings.Development.json` maps `localhost` to tenant `default` on the
 compose database, and `preview.localhost` to its preview tenant `default-preview`

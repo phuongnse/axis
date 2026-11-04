@@ -90,6 +90,9 @@ if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaCo
         "Connection strings 'Platform' and 'PlatformSchema' name the same user. They must be different roles.");
 }
 
+// The provisioning API's writes that need no job open this role's connection for the write alone, see CellPlatformWriter.
+builder.Services.AddSingleton(new CellPlatformWriter(platformSchemaConnectionString));
+
 var cipher = TenantSecretCipher.Load(builder.Configuration);
 builder.Services.AddSingleton(cipher);
 var platformMigration = new PlatformMigrationOptions(platformSchemaConnectionString, readerRole);
