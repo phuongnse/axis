@@ -4,7 +4,7 @@ Detailed reference for the cell console: the web page where the platform operato
 of a [cell](cells.md) and provisions them. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_. The [operator console](operator-console.md) of a
+Everything in this file is _(planned for M31)_, except the [sign-in](#sign-in) of the console host. The [operator console](operator-console.md) of a
 tenant stays as it is: it shows one tenant's failed work in detail, inside that tenant. The
 conventions of [architecture.md](../architecture.md) apply.
 
@@ -31,10 +31,30 @@ conventions of [architecture.md](../architecture.md) apply.
 - **Second factor.** Every sign-in needs a password and a second factor: an authenticator app or a
   passkey. The realm's required action sets one up at the first sign-in, and an account without one
   cannot finish signing in.
-- **Session.** The console uses the BFF session of the server, as the SPA does, with an idle timeout
-  of 15 minutes and an absolute one of 8 hours.
+- **Session.** The console uses a BFF session: the server holds the session and the browser holds
+  only a cookie that names it. The session is a row of `platform.operator_sessions`, because it belongs to no
+  tenant, with an idle timeout of 15 minutes and an absolute one of 8 hours. It holds the operator's id,
+  display name and roles, and no token. A session counts only on `Cell:ConsoleHost`: a tenant's session
+  never counts there, whatever the cookie's name, and the console's session counts on no other host.
+- **Paths.** `GET /api/cell/auth/sign-in?returnUrl=` sends the operator to the operator realm's login
+  page. The `returnUrl` must be a local path. The realm returns to `GET /api/cell/auth/callback`, which creates the
+  session and redirects to the `returnUrl`, and the browser gets only the cookie `__Host-Axis.CellSession`
+  (`Axis.CellSession` in Development and Testing, which run over plain http). A callback that fails creates no session
+  and redirects to `/?signIn=failed`. `POST /api/cell/auth/sign-out` deletes the session and answers `204`. It does not
+  end the operator's session at the identity provider. Like every write under `/api`, it is refused with `403`
+  unless it carries the `X-Axis-Csrf` header. These two routes are the only ones under `/api/cell/` that need no
+  operator role. Sign-in answers `404` on any other host.
+- **Client.** The console signs in as a confidential client of the operator realm, `Cell:ConsoleClientId`
+  (`axis-cell-console` by default) with the secret `Cell:ConsoleClientSecret`, using the code flow with PKCE. The client
+  must accept the redirect `https://<Cell:ConsoleHost>/api/cell/auth/callback`. Without the secret the server offers no
+  console sign-in and `GET /api/cell/auth/sign-in` answers `404`. `Axis.Admin cell operator invite` does not make the client
+  yet, so a cell needs it made by hand.
+- **Roles.** The server reads the operator's roles from the `realm_access.roles` claim of the access
+  token that the token endpoint returns, not from the ID token, and stores them in the session at sign-in.
+  Removing the role in the realm takes effect at the next sign-in, within 8 hours.
 - **Role.** `Cell:OperatorRole`, `cell-operator` by default, is a role of the operator realm. A
-  signed-in person without it gets `403` on every route and a forbidden page.
+  signed-in person without it gets `403` on every route and a forbidden page. A missing, expired or
+  tenant session gets `401`.
 - **Machine callers.** A client of the operator realm with the role in its service account, such as
   the control plane, calls the API with a bearer token, see
   [provisioning API](tenant-lifecycle.md#provisioning-api).

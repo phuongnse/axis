@@ -868,7 +868,7 @@ stateDiagram-v2
 
 ### Release history
 
-This route is built. The publisher writes the rows of a publish and a rollback.
+This route is built. The publisher writes the rows of a publish and a rollback. _(planned for M31)_: `GET .../releases/{number}` gives one release's page, see [release page](studio-workspace.md#release-page), and `GET .../relaxed`, `GET /api/studio/catalog` and `GET /api/studio/bindings` are in [Studio API](studio-resource-form.md#studio-api).
 
 `GET .../releases` answers
 `{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`,
@@ -887,7 +887,7 @@ newest first.
   name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin
   activate`. `relaxed` lists the relax entries of the release's application in manifest order, read from the
   `application.json` stored with that release, and `offStandard` is true when it is not empty, see [off-standard
-  releases](module-contracts.md#off-standard-releases).
+  releases](module-contracts.md#off-standard-releases). _(planned for M31)_: each entry also has `moduleTitle`, `part`, what kind of point it is, `entityTitles` and `titles`, the point's label in each locale, read from the module files the release stores, each null when the release has no words for it.
 - A release gets its `number` the first time it is activated in the tenant: 1, 2, 3… per application. Activating it
   again keeps the number, so the same content can have different numbers in two tenants.
 - Activating the release that is already active adds no row and keeps the number. Otherwise every restart under

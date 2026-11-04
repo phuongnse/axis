@@ -25,7 +25,8 @@ public sealed partial class AuthorizationRouteTests
     // Port 1 on loopback refuses connections immediately, so the database is unreachable.
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
-    // The routes that need no session, as the docs list them: the health probes, the site, the texts, sign-in, sign-out and the SPA's pages.
+    // The routes that need no session, as the docs list them: the health probes, the site, the texts, sign-in, sign-out, the cell
+    // console's sign-in and sign-out, and the SPA's pages.
     private static readonly string[] _openRoutes =
     [
         "* /health/live",
@@ -34,6 +35,8 @@ public sealed partial class AuthorizationRouteTests
         "GET /api/texts/{locale}",
         "GET /api/auth/sign-in",
         "POST /api/auth/sign-out",
+        "GET /api/cell/auth/sign-in",
+        "POST /api/cell/auth/sign-out",
         "GET {*path:nonfile}",
         "HEAD {*path:nonfile}",
     ];

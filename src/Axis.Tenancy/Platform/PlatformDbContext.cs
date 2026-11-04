@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -31,6 +31,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantQuotaRow> TenantQuotas => Set<TenantQuotaRow>();
 
     public DbSet<TenantSiteLegalRow> TenantSiteLegalLinks => Set<TenantSiteLegalRow>();
+
+    public DbSet<OperatorSessionRow> OperatorSessions => Set<OperatorSessionRow>();
 
     public DbSet<TenantUsageLatestRow> TenantUsageLatest => Set<TenantUsageLatestRow>();
 
@@ -316,6 +318,18 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             lease.Property(l => l.Holder).HasColumnName("holder");
             lease.Property(l => l.ExpiresAt).HasColumnName("expires_at").HasColumnType("timestamp with time zone");
             lease.HasIndex(l => new { l.TenantId, l.Quota, l.ExpiresAt }).HasDatabaseName("ix_tenant_leases_tenant_id_quota_expires_at");
+        });
+
+        modelBuilder.Entity<OperatorSessionRow>(session =>
+        {
+            session.ToTable("operator_sessions");
+            session.HasKey(s => s.IdHash).HasName("pk_operator_sessions");
+            session.Property(s => s.IdHash).HasColumnName("id_hash").HasColumnType("bytea").ValueGeneratedNever();
+            session.Property(s => s.OperatorId).HasColumnName("operator_id");
+            session.Property(s => s.DisplayName).HasColumnName("display_name");
+            session.Property(s => s.Roles).HasColumnName("roles").HasColumnType("text[]");
+            session.Property(s => s.SignedInAt).HasColumnName("signed_in_at").HasColumnType("timestamp with time zone");
+            session.Property(s => s.LastRequestAt).HasColumnName("last_request_at").HasColumnType("timestamp with time zone");
         });
 
         modelBuilder.Entity<TenantDailyCounterRow>(counter =>

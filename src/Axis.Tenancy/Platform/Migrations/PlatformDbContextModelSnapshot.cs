@@ -49,6 +49,41 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("data_protection_keys", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.OperatorSessionRow", b =>
+                {
+                    b.Property<byte[]>("IdHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("id_hash");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<DateTimeOffset>("LastRequestAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_request_at");
+
+                    b.Property<string>("OperatorId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("operator_id");
+
+                    b.PrimitiveCollection<string[]>("Roles")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("roles");
+
+                    b.Property<DateTimeOffset>("SignedInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signed_in_at");
+
+                    b.HasKey("IdHash")
+                        .HasName("pk_operator_sessions");
+
+                    b.ToTable("operator_sessions", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.PlatformAuditRecordRow", b =>
                 {
                     b.Property<Guid>("Id")

@@ -27,8 +27,9 @@ internal static class EndpointCaller
 
     /// <summary>
     /// The default scheme of every request: the bearer token on endpoint paths, the operator realm's bearer token on a
-    /// route of the provisioning API (see <see cref="CellOperator"/>), the service account's bearer token on a
-    /// service account route, and the <see cref="Session"/> everywhere else.
+    /// route of the provisioning API (see <see cref="CellOperator"/>) when the request carries a bearer token, the
+    /// console operator's <see cref="CellOperatorSession"/> on such a route otherwise, the service account's bearer token
+    /// on a service account route, and the <see cref="Session"/> everywhere else.
     /// </summary>
     public const string RequestScheme = "Axis.Request";
 
@@ -40,6 +41,15 @@ internal static class EndpointCaller
     public const string SchemePrefix = "endpoint-";
 
     public static string SchemeName(string tenantId) => $"{SchemePrefix}{tenantId}";
+
+    /// <summary>
+    /// The scheme of a route of the provisioning API: the bearer token when the request carries one, so the cookie is not
+    /// read then, and the console operator's session otherwise.
+    /// </summary>
+    private static string CellOperatorScheme(HttpContext context) =>
+        context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? CellOperator.Scheme
+            : CellOperatorSession.Scheme;
 
     /// <summary>Whether the path is under <c>/api/apps/{app}/endpoints</c>, in any case.</summary>
     public static bool IsEndpointPath(PathString path)
@@ -106,7 +116,7 @@ internal static class EndpointCaller
         builder.AddPolicyScheme(RequestScheme, displayName: null, options =>
             options.ForwardDefaultSelector = context =>
                 IsEndpointPath(context.Request.Path) ? Scheme
-                : context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null ? CellOperator.Scheme
+                : context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null ? CellOperatorScheme(context)
                 : ServiceAccount.Applies(context) ? ServiceAccount.Scheme
                 : Session.Scheme);
 

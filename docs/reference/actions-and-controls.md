@@ -69,6 +69,13 @@ shared `ConfigProvider`, so no widget keeps its own copy.
 - **An error border keeps 3:1.** An input, number input, select, date picker, mentions, cascader or tree select with
   an error, and an unticked checkbox or radio in a field with an error, take `dangerText` for their border, the colour
   of the field's message. The `danger` fill stays for fills such as a danger button, whose white text needs it.
+- **A label is above its input, everywhere** _(planned for M31)_, as the form widget has it, never beside it.
+
+## Tab bars
+
+A tab bar sits `spacing-md` under what precedes it _(planned for M31)_. The theme starts a tab's label at the top of its
+bar, with the underline 12 px under the label, for every tab bar, because Ant Design's padding above the label reads as
+a gap too wide.
 
 ## Text
 
@@ -104,8 +111,83 @@ way cannot be kept right, so a lint rule refuses `Table` from `antd` anywhere bu
 - **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as open, delete
   or activate a release, is an icon button; one an author configured keeps its text. From three actions on, or below
   992 px, they fold into one "…" menu of text entries.
+- **Opening a row** _(planned for M31)_. A row opens from its identifying cell, a real link, so a row has no Edit icon,
+  see [opening things](#opening-things).
+- **An empty table keeps its header** _(planned for M31)_, with the [empty state](#showing-what-is-empty) in its body.
 - **Paging and scrolling.** A long table pages, and one narrower than its columns' content scrolls sideways rather
   than squeezing them.
 - **Bulk actions** _(Proposed)_. Selecting rows is for bulk actions alone: a table shows checkboxes only when it has a
   bulk action, and a selection shows an "N selected" bar that holds them.
   [D59](../decisions/d59-table-row-and-toolbar-actions.md) left bulk actions for later.
+
+## Opening things
+
+Three levels, chosen by what the person does, never by taste
+([D132](../decisions/d132-rules-from-the-studio-settings-review.md)) _(planned for M31)_.
+
+- **Opening a record is a page.** Every thing with an identity of its own, such as a record, a Studio resource, a
+  release, a user or a process instance, opens from its table's identifying cell, a real link, as a page with its own
+  address, so a link can be shared, reloaded, gone back to and opened in a new tab, and the page has room to grow.
+- **A side panel goes with a page and never opens a record.** It is for what accompanies the page: the problems panel,
+  filters or help. A quick look would be an addition to the page, with the same content and Open full page, never in its
+  place, and Axis has none for now.
+- **A modal dialog is for a short task that must end before going on:** confirming, such as Activate… or Delete…, asking
+  for a little, such as a reason, a name or an invitation, or choosing one thing. Never a record's detail or a long form,
+  and never a dialog from a dialog. What needs much scrolling, or to be come back to, is a page.
+
+## Dialogs
+
+These rules hold for every dialog, through the shared `ConfigProvider` _(planned for M31)_.
+
+- **Three sizes, by what a dialog holds.** `small`, 400 px, for a confirmation or one question; `medium`, 560 px, for a
+  short form of two to six fields; and `large`, 800 px, for content that needs the width, such as a list to choose from
+  or an import's preview. There is no larger size: what needs more is a page. Below 992 px every dialog takes the width
+  less the page margin. The size is a token that a dialog names, never a width of its own.
+- **Its height.** A dialog is as tall as its content, at most the window less its margins. Its body scrolls while its
+  title and buttons stay.
+- **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside it, so the thin
+  scrollbar runs at the dialog's right edge and a field's focus ring has room at its sides.
+- **It draws on `surface`,** as panels do, so everything inside sits on the colour it was made for, and the mask behind
+  sets it apart from the page.
+
+## Showing what is empty
+
+Information always shows rather than being hidden ([D132](../decisions/d132-rules-from-the-studio-settings-review.md))
+_(planned for M31)_.
+
+- **A field the object always has always shows.** Empty, it reads "Not set" on a form or a detail and the muted dash in
+  a table cell, see [text](#text).
+- **A list that is a standing part of the object always shows.** Empty, it says in one line what that means.
+- **Hide only what does not apply or is not allowed.** A part that does not apply to the object's kind or state, or a
+  field the person may not read, is left out.
+- **Loading and failing are never empty.** A part that is still loading or failed to load says so, never Not set.
+- **One empty state.** `EmptyState` draws every empty table and list: Ant Design's simple picture and one line in
+  `textMuted`. The line is "No data yet." unless the emptiness says something the reader needs. Ant Design's own empty
+  text fails 4.5:1.
+
+## List order
+
+Three rules, chosen by what a list is ([D132](../decisions/d132-rules-from-the-studio-settings-review.md))
+_(planned for M31)_.
+
+- **An order the author gives keeps it.** Process steps, wizard steps, a table's columns, a form's fields and navigation
+  stay as written, and the author moves them. Sorting them would change their meaning.
+- **Records in time are newest first.** Releases, activations and history.
+- **A set sorts by name.** Modules, packages, relaxed points, Uses and Used by and the changes sort by the name a person
+  reads, with the page language's collation, so Đ follows D in Vietnamese. A list that mixes kinds groups them first in
+  the sidebar's order, then by name. Relaxed points sort by module, then by point.
+- **Sorting is for display only.** The file keeps its order, so adding a module adds one line to its diff. Studio's small
+  tables have no sort by column, as their order is already the one to expect. The `table` widget keeps its own rules.
+
+## Undo rather than confirm
+
+These rules follow from what a person can take back
+([D132](../decisions/d132-rules-from-the-studio-settings-review.md)) _(planned for M31)_.
+
+- **What can be taken back is undone, not confirmed.** Removing a row changes only the draft, so it asks nothing. A
+  notice names it, such as "Organization removed.", with Undo, for ten seconds.
+- **Every editor keeps a history.** Undo and Redo, icons in the
+  [save bar](studio-resource-form.md#save-bar) with Ctrl+Z and Ctrl+Shift+Z, step through every change of the draft, a
+  label's texts among them, on every resource kind.
+- **What cannot be taken back is confirmed.** Discard drops every unsaved change at once and no Undo brings them back, so
+  a small dialog asks "Discard all unsaved changes?" with a red Discard. Deleting a resource keeps its dialog.

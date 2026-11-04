@@ -73,6 +73,9 @@ package folder. This example uses an illustrative package,
   `<id>/<operation>`.
 - **`version`.** A SemVer version in plain `major.minor.patch` form, such as
   `1.2.0`. Pre-release versions come later.
+- **`label`** _(planned for M31)_. The package's name for people, 1 to 100
+  characters and required, as a module's is, so Studio never names a package by
+  its id.
 - **`assembly`.** The file name of the package's main assembly, in the
   package folder. _(planned for M22)_ It is optional for a package that holds
   only widgets.

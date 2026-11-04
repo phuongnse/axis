@@ -210,7 +210,14 @@ builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
     .AddSession(plainHttpAllowed)
     .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed)
     .AddEndpointCallers(oidcTenants, allowHttp: plainHttpAllowed)
-    .AddCellOperator(operatorRealm, allowHttp: plainHttpAllowed);
+    .AddCellOperator(operatorRealm, allowHttp: plainHttpAllowed)
+    .AddCellOperatorSession(operatorRealm, plainHttpAllowed)
+    .AddCellConsoleSignIn(
+        operatorRealm,
+        cell,
+        builder.Configuration[CellConsoleSignIn.ClientSecretSetting],
+        sessionCookiePolicy,
+        allowHttp: plainHttpAllowed);
 builder.Services.AddRouteAuthorization(cell.OperatorRole);
 
 // Off unless folders are listed, which is the Production default.
