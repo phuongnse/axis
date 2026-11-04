@@ -6,6 +6,7 @@
   "entity": "signoffs/Request",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "request.main" },
       "fields": [{ "field": "title" }]
     }

@@ -36,7 +36,7 @@ internal sealed record LayerUpgrade(string ModuleId, string FromVersion, string 
 /// In a list where order counts, an added or changed element with <c>after</c> or <c>before</c> then moves
 /// right behind or in front of the element that names, one placement at a time in the layer's order, and the
 /// merged resource does not hold <c>after</c> or <c>before</c>.
-/// Every other value, value lists and lists still pending included, is replaced whole. The root
+/// Every other value, value lists included, is replaced whole. The root
 /// <c>id</c>, <c>kind</c>, <c>name</c> and <c>formatVersion</c>, and the key of an element, never change.
 /// </summary>
 internal static class LayerMerger

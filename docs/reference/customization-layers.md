@@ -115,10 +115,10 @@ Compilation applies each layer to the resource of the pinned module version, bef
   other changes. The key, the anchor, names another element of the same list after the merge, so it
   can be a module element or one that the layer adds. Placements apply one at a time, in the order
   the elements appear in the layer, after all adds and removes, so an author who chains placements
-  writes them in the order they should apply. Order counts in an entity's fields, a form's wizard
-  steps and fields, a page's widgets, actions, row actions, toolbar actions, columns and tabs, and a
+  writes them in the order they should apply. Order counts in an entity's fields, a form's sections,
+  wizard steps and fields, a page's widgets, actions, row actions, toolbar actions, columns and tabs, and a
   process's steps, where the order only sets how Studio lists them, because the steps are a graph.
-  Form sections join when they are keyed. Any other list takes no `after` or `before`: an escalation's
+  Any other list takes no `after` or `before`: an escalation's
   `after` is its duration, and elsewhere the property is an unknown property. The merged resource
   never holds `after` or `before`.
 - **Removing a whole resource.** A layer whose `changes` is exactly `{ "remove": true }` removes the
@@ -187,11 +187,11 @@ same change.
 schemas.
 
 - A key is unique in its list, ignoring letter case. An entity's `validations` and `indexes` require
-  `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A decision's `branches` and a task's `escalations` require `name` as well (`AXC0004` when it is missing) and report a repeated name as `AXC0359`, and a form's `steps` do the same and report it as `AXC0360`. Each of these names is unique in its own list: one decision's branches, one task's escalations or one form's steps. A widget's `name` is unique on its page,
+  `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A decision's `branches` and a task's `escalations` require `name` as well (`AXC0004` when it is missing) and report a repeated name as `AXC0359`, and a form's `steps` do the same and report it as `AXC0360`. A form's `sections` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0227`. Each of these names is unique in its own list: one decision's branches, one task's escalations, one form's steps or one form's sections. A widget's `name` is unique on its page,
   whatever its depth, so a layer finds a widget inside a section or a tab by its name. A repeated name on a page, in a widget's own list of actions, columns or tabs, is `AXC0361`. A page's widgets, actions, row actions, toolbar actions, columns and tabs require `name` (`AXC0004` when it is missing).
 - An element of a list that the table does not name is part of a value list.
-- A list that the table still marks as pending in code, such as a form's `sections`, is a value list
-  until its naming issue keys it. A layer that changes one gives the whole list.
+- A wizard step's `sections` is a list of section names. It merges by the name itself: a layer adds a
+  name to the end of the list, or removes one with `{ "name": "x", "remove": true }`.
 - A text's `texts` is a map, so a layer on a module text changes or adds keys as an object merges.
   A business that wants another label changes the text, never a name.
 

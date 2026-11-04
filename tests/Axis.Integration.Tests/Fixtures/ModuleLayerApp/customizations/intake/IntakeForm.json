@@ -6,8 +6,8 @@
   "changes": {
     "sections": [
       {
-        "title": { "textKey": "intake.intakeForm.title" },
-        "fields": [{ "field": "title" }, { "field": "notes" }]
+        "name": "main",
+        "fields": [{ "field": "notes" }]
       }
     ]
   }

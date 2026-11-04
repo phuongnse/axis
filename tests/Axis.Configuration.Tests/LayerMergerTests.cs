@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
@@ -46,13 +47,10 @@ public sealed class LayerMergerTests
         Assert.Equal([new LayerRemove("b", "/changes/" + property + "/2")], result.Removes);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void A_list_without_a_key_is_replaced_whole(bool pending)
+    [Fact]
+    public void A_list_without_a_key_is_replaced_whole()
     {
-        var mode = pending ? ListKeyMode.Pending : ListKeyMode.Value;
-        var (kind, property) = ListKeys.Entries.First(entry => entry.Value.Mode == mode).Key;
+        var (kind, property) = ListKeys.Entries.First(entry => entry.Value.Mode == ListKeyMode.Value).Key;
         using var module = JsonDocument.Parse($$"""{ "kind": "{{kind}}", "{{property}}": [ { "name": "a", "x": 1 }, { "name": "b", "x": 2 } ] }""");
         var layer = Layer($$"""{ "{{property}}": [ { "name": "c", "x": 3 } ] }""");
 
@@ -60,6 +58,46 @@ public sealed class LayerMergerTests
 
         var list = result.Merged[property]!.AsArray();
         Assert.Equal("c", Assert.Single(list)!["name"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void A_section_field_moves_after_another_by_the_sections_name_and_the_other_sections_stay()
+    {
+        using var module = JsonDocument.Parse("""
+            { "kind": "form", "sections": [
+              { "name": "request", "fields": [ { "field": "title" }, { "field": "amount" }, { "field": "owner" } ] },
+              { "name": "decision", "fields": [ { "field": "comments" } ] } ] }
+            """);
+        var layer = Layer("""{ "sections": [ { "name": "REQUEST", "fields": [ { "field": "owner", "after": "title" } ] } ] }""");
+        var diagnostics = new List<Diagnostic>();
+
+        var result = LayerMerger.Merge("form", module.RootElement, layer, diagnostics);
+
+        Assert.Empty(diagnostics);
+        var sections = result.Merged["sections"]!.AsArray();
+        Assert.Equal(
+            ["title", "owner", "amount"],
+            sections[0]!["fields"]!.AsArray().Select(field => field!["field"]!.GetValue<string>()));
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(module.RootElement.GetProperty("sections")[1].GetRawText()), sections[1]));
+        Assert.DoesNotContain("after", result.Merged.ToJsonString());
+        Assert.Equal("/changes/sections/0/fields/0", result.ChangedPathByMergedPath["/sections/0/fields/1"]);
+    }
+
+    [Fact]
+    public void A_steps_section_names_merge_by_the_name_itself()
+    {
+        using var module = JsonDocument.Parse("""
+            { "kind": "form", "steps": [ { "name": "one", "sections": [ "a", "b" ] } ] }
+            """);
+        var layer = Layer("""{ "steps": [ { "name": "one", "sections": [ "B", "c", { "name": "a", "remove": true } ] } ] }""");
+        var diagnostics = new List<Diagnostic>();
+
+        var result = LayerMerger.Merge("form", module.RootElement, layer, diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(
+            ["b", "c"],
+            result.Merged["steps"]![0]!["sections"]!.AsArray().Select(name => name!.GetValue<string>()));
     }
 
     [Fact]

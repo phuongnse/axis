@@ -164,7 +164,7 @@ internal static class PresentationChecker
 
     /// <summary>
     /// Checks the steps: each name is unique, ignoring letter case, each title is a known text key, each step section names a section of the
-    /// form, no section is in two steps, and, when there are steps, each section has a name and is in
+    /// form, no section is in two steps, and, when there are steps, each section is in
     /// one. A section name matches ignoring letter case.
     /// </summary>
     private static void CheckSteps(
@@ -219,14 +219,7 @@ internal static class PresentationChecker
         for (var index = 0; index < form.Sections.Count; index++)
         {
             var name = form.Sections[index].Name;
-            if (name is null)
-            {
-                report(
-                    DiagnosticCodes.SectionInNoStep,
-                    "The section has no name. When a form has steps, each section needs a name to be in a step.",
-                    $"/sections/{index}");
-            }
-            else if (!firstPathByName.ContainsKey(name))
+            if (name is not null && !firstPathByName.ContainsKey(name))
             {
                 report(
                     DiagnosticCodes.SectionInNoStep,

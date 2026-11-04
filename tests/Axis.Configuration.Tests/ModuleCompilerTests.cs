@@ -62,7 +62,7 @@ public sealed class ModuleCompilerTests
 
     private const string ModuleForm = $$"""
         { "id": "{{FormId}}", "kind": "form", "name": "DepartmentLayout", "formatVersion": 1, "entity": "Department",
-          "sections": [ { "title": { "textKey": "department.main" }, "fields": [ { "field": "name" } ] } ] }
+          "sections": [ { "name": "main", "title": { "textKey": "department.main" }, "fields": [ { "field": "name" } ] } ] }
         """;
 
     private const string DepartmentsPage = """
@@ -1618,7 +1618,7 @@ public sealed class ModuleCompilerTests
 
     private static string FormOver(string entity) => $$"""
         { "id": "88888888-8888-4888-8888-888888888801", "kind": "form", "name": "DepartmentLayout", "formatVersion": 1, "entity": "{{entity}}",
-          "sections": [ { "title": { "textKey": "department.main" }, "fields": [ { "field": "name" } ] } ] }
+          "sections": [ { "name": "main", "title": { "textKey": "department.main" }, "fields": [ { "field": "name" } ] } ] }
         """;
 
     private static string PolicyOver(string entity) => $$"""

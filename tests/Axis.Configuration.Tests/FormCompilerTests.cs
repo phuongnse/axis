@@ -25,8 +25,8 @@ public sealed class FormCompilerTests
         """;
 
     private const string TwoSections = """
-        [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "NUMBER" } ] },
-          { "title": { "textKey": "orderLayout.details" }, "fields": [ { "field": "note", "readOnly": true } ] } ]
+        [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "NUMBER" } ] },
+          { "name": "details", "title": { "textKey": "orderLayout.details" }, "fields": [ { "field": "note", "readOnly": true } ] } ]
         """;
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class FormCompilerTests
     [Fact]
     public void Form_over_an_unknown_entity_is_reported_at_its_entity_and_its_fields_are_not_checked()
     {
-        using var folder = Folder(Form("Invoice", """[ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "missing" } ] } ]"""));
+        using var folder = Folder(Form("Invoice", """[ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "missing" } ] } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -98,7 +98,7 @@ public sealed class FormCompilerTests
     {
         using var folder = Folder(Form(
             "Order",
-            """[ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "total" } ] } ]"""));
+            """[ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "total" } ] } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -116,8 +116,8 @@ public sealed class FormCompilerTests
         using var folder = Folder(Form(
             "Order",
             """
-            [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "note" } ] },
-              { "title": { "textKey": "orderLayout.details" }, "fields": [ { "field": "Number", "readOnly": true } ] } ]
+            [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "note" } ] },
+              { "name": "details", "title": { "textKey": "orderLayout.details" }, "fields": [ { "field": "Number", "readOnly": true } ] } ]
             """));
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -136,8 +136,8 @@ public sealed class FormCompilerTests
         using var folder = Folder(Form(
             "Order",
             """
-            [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" } ] },
-              { "title": { "textKey": "orderLayout.missing" }, "fields": [ { "field": "note" } ] } ]
+            [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" } ] },
+              { "name": "missing", "title": { "textKey": "orderLayout.missing" }, "fields": [ { "field": "note" } ] } ]
             """));
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -152,8 +152,8 @@ public sealed class FormCompilerTests
 
     [Theory]
     [InlineData("""[ { "fields": [ { "field": "number" } ] } ]""", "/sections/0")]
-    [InlineData("""[ { "title": { "textKey": "orderLayout.main" }, "fields": [] } ]""", "/sections/0/fields")]
-    [InlineData("""[ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "readOnly": "yes" } ] } ]""", "/sections/0/fields/0/readOnly")]
+    [InlineData("""[ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [] } ]""", "/sections/0/fields")]
+    [InlineData("""[ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "readOnly": "yes" } ] } ]""", "/sections/0/fields/0/readOnly")]
     [InlineData("[]", "/sections")]
     public void Form_that_breaks_its_schema_is_reported_and_a_widget_naming_it_is_not(string sections, string path)
     {
@@ -173,7 +173,7 @@ public sealed class FormCompilerTests
     [InlineData("1.5")]
     public void Form_field_width_that_is_not_a_whole_number_from_1_to_12_is_reported_and_a_widget_naming_it_is_not(string width)
     {
-        using var folder = Folder(Form("Order", $$"""[ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "width": {{width}} } ] } ]"""))
+        using var folder = Folder(Form("Order", $$"""[ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "width": {{width}} } ] } ]"""))
             .With("pages/order-form.json", FormPage("""{ "name": "form", "type": "form", "form": "OrderLayout" }"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -191,7 +191,7 @@ public sealed class FormCompilerTests
     [InlineData("""{ "field": "number" }""", 12)]
     public void Form_field_width_from_1_to_12_compiles_and_defaults_to_the_whole_row(string field, int width)
     {
-        using var folder = Folder(Form("Order", $$"""[ { "title": { "textKey": "orderLayout.main" }, "fields": [ {{field}} ] } ]"""));
+        using var folder = Folder(Form("Order", $$"""[ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ {{field}} ] } ]"""));
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -241,7 +241,7 @@ public sealed class FormCompilerTests
         using var folder = Folder(Form("Order", TwoSections))
             .With("forms/customer-layout.json", """
                 { "id": "88888888-8888-4888-8888-888888888882", "kind": "form", "name": "CustomerLayout", "formatVersion": 1, "entity": "Customer",
-                  "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "name" } ] } ] }
+                  "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "name" } ] } ] }
                 """)
             .With("pages/order-form.json", FormPage("""{ "name": "form", "type": "form", "form": "CustomerLayout" }"""));
 

@@ -6,6 +6,7 @@
   "entity": "Request",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "requestSettlement.main" },
       "fields": [
         { "field": "amount", "readOnly": true },
@@ -14,6 +15,7 @@
       ]
     },
     {
+      "name": "extra",
       "title": { "textKey": "requestSettlement.extra" },
       "visibleWhen": "amount > 5000",
       "fields": [{ "field": "status" }]

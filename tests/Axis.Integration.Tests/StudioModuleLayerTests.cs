@@ -32,6 +32,10 @@ public sealed class StudioModuleLayerTests(PostgreSqlFixture database) : IClassF
 
     private const string ContractId = "c413e87c-c2c2-43cb-8a39-84c3fc16cdbf";
 
+    private const string FormId = "12dffe7c-7ed8-47c0-9ed5-fa9b4251d85e";
+
+    private const string FormLayerFile = "customizations/department-budgets/BudgetReview.json";
+
     private const string LayerFile = "customizations/department-budgets/BudgetApproval.json";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -284,6 +288,30 @@ public sealed class StudioModuleLayerTests(PostgreSqlFixture database) : IClassF
         Assert.Null(body["version"]);
         Assert.False(response.Headers.Contains("ETag"));
         Assert.False(File.Exists(Path.Combine(folder.Path, LayerFile)));
+    }
+
+    [Fact]
+    public async Task Resetting_a_moved_section_field_deletes_the_layer_file()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        const string layer = """
+            { "id": "b3a7c1d2-5e4f-4a68-8c9d-2f1e0d3c4b5a", "kind": "layer", "formatVersion": 1, "target": "department-budgets/BudgetReview",
+              "changes": { "sections": [ { "name": "main", "fields": [ { "field": "amount", "after": "name" } ] } ] } }
+            """;
+        var path = Path.Combine(folder.Path, FormLayerFile);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, layer, CancellationToken);
+        var version = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+
+        using var response = await ResetAsync(client, FormId, "/sections/0/fields", "amount", ("If-Match", $"\"{version}\""));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = JsonNode.Parse(await response.Content.ReadAsStringAsync(CancellationToken))!;
+        Assert.Null(body["file"]);
+        Assert.False(response.Headers.Contains("ETag"));
+        Assert.False(File.Exists(path));
     }
 
     [Fact]

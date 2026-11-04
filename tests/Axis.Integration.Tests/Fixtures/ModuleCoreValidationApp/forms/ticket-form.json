@@ -6,6 +6,7 @@
   "entity": "stages/Ticket",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "ticket.main" },
       "fields": [{ "field": "title" }]
     }

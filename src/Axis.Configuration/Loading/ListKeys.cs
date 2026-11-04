@@ -11,9 +11,6 @@ internal enum ListKeyMode
 
     /// <summary>A layer replaces the elements as a whole.</summary>
     Value,
-
-    /// <summary>The list will be keyed, but its schema does not require the key yet.</summary>
-    Pending,
 }
 
 /// <summary>
@@ -34,7 +31,6 @@ internal static class ListKeys
     private static readonly ListKey _orderedField = new(ListKeyMode.Keyed, "field", true);
     private static readonly ListKey _id = new(ListKeyMode.Keyed, "id");
     private static readonly ListKey _value = new(ListKeyMode.Value, null);
-    private static readonly ListKey _pending = new(ListKeyMode.Pending, null);
 
     private static readonly FrozenDictionary<(string Kind, string Property), ListKey> _keys =
         new Dictionary<(string Kind, string Property), ListKey>
@@ -57,8 +53,7 @@ internal static class ListKeys
             [(ResourceKinds.Page, "tabs")] = _orderedName,
             [(ResourceKinds.Page, "parameters")] = _value,
             [(ResourceKinds.Page, "measures")] = _value,
-            // Sections become ordered when they are keyed.
-            [(ResourceKinds.Form, "sections")] = _pending,
+            [(ResourceKinds.Form, "sections")] = _orderedName,
             [(ResourceKinds.Form, "steps")] = _orderedName,
             [(ResourceKinds.Form, "fields")] = _orderedField,
             [(ResourceKinds.DataSource, "fields")] = _name,
