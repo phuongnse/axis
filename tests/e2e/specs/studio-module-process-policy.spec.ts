@@ -13,7 +13,7 @@ test.setTimeout(180_000);
 
 // The module app pins the fixture module checklists, which the sample modules folder does not hold. The second server
 // reads a Modules:Path of its own, with the sample modules and checklists, and Studio edits a copy of the module app.
-test.describe("Studio opens a module's processes, policies and contracts read-only", () => {
+test.describe("Studio opens a module's policies and contracts read-only", () => {
   test.describe.configure({ mode: "serial" });
 
   let copy: string;
@@ -41,34 +41,6 @@ test.describe("Studio opens a module's processes, policies and contracts read-on
     if (modules) {
       await rm(modules, { recursive: true, force: true });
     }
-  });
-
-  test("an author sees the graph of checklists/ChecklistReview with no way to change it", async ({
-    page,
-  }) => {
-    await useSession(page, "author");
-    await page.goto(`${server.url}/studio?app=ModuleApp`);
-
-    await page
-      .getByTestId("studio-group-module-processes")
-      .getByRole("button", { name: "checklists/ChecklistReview", exact: true })
-      .click();
-
-    const details = page.getByTestId("studio-resource-details");
-    await expect(page.getByTestId("studio-process-graph")).toBeVisible();
-    await expect(page.locator('[data-testid^="studio-graph-node-"]')).toHaveCount(2);
-    await expect(details.getByRole("alert")).toContainText("read-only");
-    await expect(page.locator('[data-testid^="studio-process-palette"]')).toHaveCount(0);
-    await expect(page.locator(".react-flow__handle.connectable")).toHaveCount(0);
-    await expect(page.locator('[data-testid^="studio-graph-handle-"]:visible')).toHaveCount(0);
-    await expect(page.getByTestId("studio-process-design")).toHaveCount(0);
-    for (const name of ["Save", "Delete", "Remove step", "Remove transition"]) {
-      await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
-    }
-
-    await page.getByTestId("studio-process-graph").focus();
-    await page.keyboard.press("Delete");
-    await expect(page.locator('[data-testid^="studio-graph-node-"]')).toHaveCount(2);
   });
 
   test("an author sees the grants of checklists/ChecklistAccess with no way to change them", async ({

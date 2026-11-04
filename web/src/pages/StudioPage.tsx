@@ -37,7 +37,6 @@ import { StudioModuleContract } from './StudioModuleContract'
 import { StudioModuleEditor } from './StudioModuleEditor'
 import { StudioModulePage } from './StudioModulePage'
 import { StudioModulePolicy } from './StudioModulePolicy'
-import { StudioModuleProcess } from './StudioModuleProcess'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
@@ -61,7 +60,7 @@ const moduleGroupTestIds = {
   page: 'studio-group-module-pages',
 } as const
 
-/** The view of a module resource, by its kind. An entity is edited as a layer, and the other kinds are read-only. */
+/** The view of a module resource, by its kind. An entity and a process are edited as a layer, and the other kinds are read-only. */
 function ModuleResourceView({
   application,
   item,
@@ -79,9 +78,8 @@ function ModuleResourceView({
 }) {
   switch (item.kind) {
     case 'entity':
-      return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'process':
-      return <StudioModuleProcess application={application} module={item.module} id={item.id} />
+      return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'policy':
       return <StudioModulePolicy application={application} module={item.module} id={item.id} />
     case 'contract':
@@ -193,11 +191,11 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
  * Module entities, Module processes, Module policies, Module contracts and Module pages groups under the kinds list those of the modules the application
- * uses, from the names, by their `<module>/<name>`. A module entity opens in the entity designer with the application's
- * layer applied and every input on, with no JSON tab, Delete, migration questions, Uses or Used by lists. Save writes
- * the layer, and a Customized tag with Reset all, which deletes the layer, shows while it has one. The other kinds open
- * read-only, with no editor, no Uses and no Used by lists: a process as its graph alone, a policy as a table of its
- * grants, a contract as its lifecycle in a state diagram with tables of its named points and a page on the page
+ * uses, from the names, by their `<module>/<name>`. A module entity opens in the entity designer, and a module process
+ * in the process designer, each with the application's layer applied and every input on, with no JSON tab, Delete,
+ * migration questions, Uses or Used by lists. Save writes the layer, and a Customized tag with Reset all, which deletes
+ * the layer, shows while it has one. The other kinds open read-only, with no editor, no Uses and no Used by lists: a
+ * policy as a table of its grants, a contract as its lifecycle in a state diagram with tables of its named points and a page on the page
  * canvas with no palette, data panel, widget tree or moves, each under a read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
  * entry open it too, when the id is not one of the folder's. The folder's `application.json` loads with the
  * application and again after a write. An Off-standard tag shows beside the application picker while it has a relax
