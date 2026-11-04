@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -55,13 +56,15 @@ function renderEditor(respond: (url: string, init?: RequestInit) => Response, ed
   vi.stubGlobal('fetch', fetchMock)
   const onWritten = vi.fn()
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
-          <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
-        </StudioConnectionContext.Provider>
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
+            <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
+          </StudioConnectionContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
   return { fetchMock, onWritten }
 }
@@ -398,6 +401,93 @@ describe('StudioModuleEditor', () => {
       const body = JSON.parse(init.body as string)
       expect(body.grants[1].actions).toEqual(['read', 'export'])
       expect(body.grants[0].actions).toEqual(['read'])
+    })
+  })
+  describe('a module form', () => {
+    const form = {
+      id: 'form-id',
+      kind: 'form',
+      name: 'BudgetReview',
+      formatVersion: 1,
+      entity: 'Budget',
+      sections: [
+        {
+          name: 'main',
+          title: { textKey: 'department-budgets.budgetReview.title' },
+          fields: [{ field: 'name' }, { field: 'amount' }, { field: 'department' }, { field: 'year' }],
+        },
+      ],
+    }
+    const formItem: ModuleResourceItem = {
+      id: 'form-id',
+      kind: 'form',
+      name: 'department-budgets/BudgetReview',
+      module: 'department-budgets',
+    }
+    const formPath = '/api/studio/apps/Leave%20Requests/modules/department-budgets/resources/form-id'
+
+    /** Answers the canvas's draft route, and passes every other URL to `respond`. */
+    function renderForm(respond: (url: string, init?: RequestInit) => Response) {
+      return renderEditor(
+        (url, init) =>
+          url.endsWith('/page-metadata')
+            ? new Response(JSON.stringify({ widget: null, diagnostics: [] }))
+            : respond(url, init),
+        formItem,
+      )
+    }
+
+    function resets(fetchMock: ReturnType<typeof vi.fn>) {
+      return calls(fetchMock, 'POST').filter(([url]) => url.endsWith('/reset'))
+    }
+
+    it('opens in the form designer with the layer applied and marks a moved field as changed', async () => {
+      let reset = false
+      const { fetchMock } = renderForm((_url, init) => {
+        if (init?.method === 'POST') {
+          reset = true
+          return new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
+        }
+        return reset ? read(null, form) : read(layer, form, [{ path: '/sections/0/fields/1', mark: 'changed' }])
+      })
+
+      expect(await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })).toBeInTheDocument()
+      expect(screen.getByTestId('studio-module-layer')).toBeInTheDocument()
+      expect(screen.queryByTestId('studio-form-used-on')).toBeNull()
+      expect(screen.getByRole('note', { name: 'Changed amount' })).toBeInTheDocument()
+      expect(screen.queryByRole('note', { name: 'Changed name' })).toBeNull()
+      await userEvent.click(screen.getByRole('button', { name: 'Reset to module amount' }))
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      const [[url, init]] = resets(fetchMock)
+      expect(url).toBe(`${formPath}/reset`)
+      expect(JSON.parse(init.body as string)).toEqual({ list: '/sections/0/fields', key: 'amount' })
+    })
+
+    it('draws the draft through the module draft route', async () => {
+      const { fetchMock } = renderForm(() => read(null, form))
+
+      await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })
+
+      await waitFor(() => expect(calls(fetchMock, 'POST').map(([url]) => url)).toContain(`${formPath}/page-metadata`))
+    })
+
+    it('marks a changed section and lists a removed field as a muted row with Reset to module', async () => {
+      const { fetchMock } = renderForm(() =>
+        read(
+          layer,
+          form,
+          [{ path: '/sections/0', mark: 'changed' }],
+          [{ list: '/sections/0/fields', key: 'code', content: { field: 'code' } }],
+        ),
+      )
+
+      expect(await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'Changed main' })).toBeInTheDocument()
+      const removed = screen.getByTestId('studio-layer-removed-/sections/0/fields/code')
+      expect(within(removed).getByRole('note', { name: 'Removed code' })).toBeInTheDocument()
+      expect(within(removed).getByRole('button', { name: 'Reset to module code' })).toBeEnabled()
+      expect(resets(fetchMock)).toEqual([])
     })
   })
 })
