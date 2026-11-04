@@ -2,12 +2,27 @@ import { expect, type Page } from '@playwright/test'
 import { waitForDialog } from './dialogs'
 import { pickOption } from './select'
 
+/** The sidebar entry of a kind. Its address ends in `&kind=<kind>`, so it is found by that and not by its label. */
+function kindEntry(page: Page, kind: string) {
+  return page.getByRole('navigation', { name: 'Menu', exact: true }).locator(`a[href$="&kind=${kind}"]`)
+}
+
+/** Whether the sidebar has an entry for a kind, which it shows only while the application holds a resource of that kind. */
+export async function hasKind(page: Page, kind: string) {
+  return (await kindEntry(page, kind).count()) > 0
+}
+
+/** Opens a kind's list from its entry in the sidebar, and waits until the address shows the kind. */
+export async function openKind(page: Page, kind: string) {
+  await kindEntry(page, kind).click()
+  await expect(page).toHaveURL(new RegExp(`[?&]kind=${kind}(&|$)`))
+}
+
 /**
- * Creates a resource of the kind `kind` through the New resource dialog. It returns once the dialog is gone and the
- * resource list marks the new resource as the open one. `value` is typed into the dialog. `shownAs` is the name the
- * resource list shows, which differs for a text resource: `Texts` plus the locale, such as `TextsVi`.
+ * Creates a resource of the kind `kind` through the New resource dialog. It returns once the dialog is gone, the
+ * address holds the new resource, and the kind's entry in the sidebar is marked. `value` is typed into the dialog.
  */
-export async function createResource(page: Page, kind: string, value: string, shownAs = value) {
+export async function createResource(page: Page, kind: string, value: string) {
   await page.getByRole('button', { name: 'New resource…', exact: true }).click()
   const dialog = await waitForDialog(page, 'New resource')
   await pickOption(dialog.getByRole('combobox', { name: 'Kind', exact: true }), kind)
@@ -16,9 +31,8 @@ export async function createResource(page: Page, kind: string, value: string, sh
   await expect(create).toBeEnabled()
   await create.click()
   await expect(dialog).toBeHidden()
-  await expect(
-    page.getByTestId(`studio-group-${kind}`).getByRole('button', { name: shownAs, exact: true }),
-  ).toHaveAttribute('aria-current', 'true')
+  await expect(page).toHaveURL(/[?&]resource=/)
+  await expect(kindEntry(page, kind)).toHaveAttribute('aria-current', 'page')
 }
 
 /** Opens the New application… dialog from the application row of the sidebar, on a page that has an application open. */

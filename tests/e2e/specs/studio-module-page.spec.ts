@@ -8,6 +8,7 @@ import { startServer } from "../activate";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { pickOption } from "../select";
 import { useSession } from "../sessions";
+import { openKind } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -49,6 +50,7 @@ test.describe("Studio edits a module page as a layer", () => {
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=PurchaseRequests`);
 
+    await openKind(page, "page");
     await page
       .getByTestId("studio-group-module-pages")
       .getByRole("button", {

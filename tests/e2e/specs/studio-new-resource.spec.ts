@@ -8,7 +8,7 @@ import { waitForDialog } from '../dialogs'
 import { pickOption, pickOptions } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab } from '../studio-resources'
+import { createResource, openFormTab, openKind } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -80,7 +80,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await createResource(page, 'text', 'vi', 'TextsVi')
+    await createResource(page, 'text', 'vi')
     await expect(page).toHaveURL(/resource=/)
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
     await expect(page.getByTestId('studio-editor')).toBeVisible()
@@ -298,6 +298,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await pickOption(row.getByRole('combobox'), 'department-manager')
     const providerDiagnostics = await save(page)
 
+    await openKind(page, 'site')
     await page.getByTestId('studio-group-site').getByRole('button', { name: 'Purchasing', exact: true }).click()
     await openFormTab(page)
     await page.getByRole('button', { name: 'Add provider', exact: true }).click()

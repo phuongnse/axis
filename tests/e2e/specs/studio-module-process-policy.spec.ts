@@ -7,6 +7,7 @@ import { startServer } from "../activate";
 import { checklistsModule, e2eApp, moduleApp, modulesPath } from "../server-settings";
 import { useSession } from "../sessions";
 import { chooseTheme } from "../shell";
+import { openKind } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -48,6 +49,7 @@ test.describe("Studio opens a module's contracts with only added states and tran
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
     const openContract = async () => {
+      await openKind(page, "contract");
       await page
         .getByTestId("studio-group-module-contracts")
         .getByRole("button", { name: "checklists/ChecklistContract", exact: true })
