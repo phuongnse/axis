@@ -99,8 +99,6 @@ node scripts/lib/development-legal.mjs "http://localhost:$keycloak_port" "http:/
 export Tenants__default__Legal__PrivacyUrl="https://example.com/privacy"
 export Tenants__default__Legal__TermsUrl="https://example.com/terms"
 export Tenants__default__Legal__TermsVersion="2026-11-01"
-# Prototype only: the data of the Open source licences page.
-node scripts/licences.mjs
 schema_connection=""
 # Bash cannot export a name with a hyphen, like Tenants__default-preview__ConnectionString. These
 # overrides reach the server and the worker through env instead.
@@ -218,6 +216,9 @@ bash scripts/lib/install-sample-templates.sh
 # the worker's and risk file-lock failures, so it is built here, before the server starts.
 log "Building the publisher"
 dotnet build src/Axis.Admin/Axis.Admin.csproj --nologo -v quiet
+# Prototype only: the lists of the Open source licences page. The SPA serves the public one and the server the one with
+# versions. It reads the NuGet project assets, so it runs after a build, and a first run may not have them all yet.
+node scripts/write-licences.mjs web/public/licences.json || log "The licence lists were not written. /licences stays empty."
 
 # A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
 # between starting a process and saving its pid.

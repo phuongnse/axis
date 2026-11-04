@@ -24,8 +24,9 @@ them. `ImportDialog.tsx` has `main`'s quota refusal and the prototype's footer.
 - `frame.ftl` prefers a client's `http://` address for the licences link, prototype only, because the sync writes
   `https://{host}/licences` and the SPA answers over http on its own port under `scripts/dev.sh`.
 
-Open after the merge: the prototype's licences page reads the versions from `licences.json` for everyone, while on
-`main` `GET /api/licences` gives them only to a person who is signed in.
+- The licences page is `main`'s, so the prototype's expanding rows with each package's licence text are gone. Under
+  `scripts/dev.sh`, `write-licences.mjs` writes the public list into `web/public` and the list with versions beside the
+  server.
 
 ## Carried over from the studio-editors review
 

@@ -33,5 +33,5 @@ src/Axis.Server/licences.json
 deploy/compose/secrets/
 deploy/compose/server-tls/
 
-# Prototype only: the Open source licences data that scripts/licences.mjs writes
+# Prototype only: the public licence list that scripts/dev.sh writes for the SPA
 web/public/licences.json
