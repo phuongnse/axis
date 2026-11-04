@@ -20,6 +20,14 @@ public sealed class StudioModuleLayerTests(PostgreSqlFixture database) : IClassF
 
     private const string ProcessId = "94f1cc25-6a68-435f-9383-36fc43aae860";
 
+    private const string TextId = "b90b32ef-6b04-49d1-a001-88457d552c76";
+
+    private const string TextLayerFile = "customizations/department-budgets/TextsEn.json";
+
+    private const string LabelKey = "department-budgets.budget.label";
+
+    private const string NameKey = "department-budgets.budget.name";
+
     private const string ScenarioId = "771fda08-a104-48da-bb08-65d1a00e26f8";
 
     private const string ContractId = "c413e87c-c2c2-43cb-8a39-84c3fc16cdbf";
@@ -358,6 +366,53 @@ public sealed class StudioModuleLayerTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
         Assert.Equal(before, Snapshot(folder.Path));
+    }
+
+    [Fact]
+    public async Task Resetting_one_changed_text_key_brings_the_modules_text_back_and_keeps_the_other_change()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        var version = await CreateTextLayerAsync(client, folder.Path);
+
+        using var response = await ResetAsync(client, TextId, "/texts", LabelKey, ("If-Match", $"\"{version}\""));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var layer = JsonNode.Parse(File.ReadAllBytes(Path.Combine(folder.Path, TextLayerFile)))!;
+        var expected = JsonNode.Parse($$"""{ "texts": { "{{NameKey}}": "Title" } }""")!;
+        Assert.True(JsonNode.DeepEquals(expected, layer["changes"]), layer["changes"]!.ToJsonString());
+        using var read = await client.GetAsync(new Uri($"{Url}/{TextId}", UriKind.Relative), CancellationToken);
+        var answer = JsonNode.Parse(await read.Content.ReadAsStringAsync(CancellationToken))!;
+        Assert.Equal("Budget", (string?)answer["content"]!["texts"]![LabelKey]);
+        var marks = ((JsonArray)answer["marks"]!).Select(mark => (string?)mark!["path"]).ToList();
+        Assert.Equal([$"/texts/{NameKey}"], marks);
+    }
+
+    [Fact]
+    public async Task Resetting_a_text_key_that_neither_the_layer_nor_the_module_has_answers_404()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        var version = await CreateTextLayerAsync(client, folder.Path);
+        var before = Snapshot(folder.Path);
+
+        using var response = await ResetAsync(client, TextId, "/texts", "department-budgets.missing", ("If-Match", $"\"{version}\""));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(before, Snapshot(folder.Path));
+    }
+
+    // Saves the module text with two changed keys and returns the new layer's version.
+    private static async Task<string> CreateTextLayerAsync(HttpClient client, string folder)
+    {
+        var edited = await ReadModuleAsync(client, TextId);
+        edited["texts"]![LabelKey] = "Budget line";
+        edited["texts"]![NameKey] = "Title";
+        using var response = await PutAsync(client, TextId, edited, ("If-None-Match", "*"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(folder, TextLayerFile))));
     }
 
     // Saves the process with a changed outcome target and returns the new layer's version.

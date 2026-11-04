@@ -285,4 +285,34 @@ describe('StudioModuleEditor', () => {
       await screen.findByRole('button', { name: 'submit · operation · Added' }, { timeout: 5000 }),
     ).toBeInTheDocument()
   })
+
+  it('opens a module text in the text table and resets one key through the reset route', async () => {
+    let reset = false
+    const text = {
+      id: 'text-id',
+      kind: 'text',
+      name: 'TextsEn',
+      locale: 'en',
+      texts: { 'a.label': 'Mine', 'a.name': 'Name' },
+    }
+    const { fetchMock } = renderEditor(
+      (_url, init) => {
+        if (init?.method === 'POST') {
+          reset = true
+          return new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
+        }
+        return reset ? read(null, text) : read(layer, text, [{ path: '/texts/a.label', mark: 'changed' }])
+      },
+      { id: 'text-id', kind: 'text', name: 'checklists/TextsEn', module: 'checklists' },
+    )
+
+    expect(await screen.findByTestId('studio-text-table')).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'Changed a.label' })).toBeInTheDocument()
+    expect(screen.queryByRole('note', { name: 'Changed a.name' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Reset to module a.label' }))
+
+    await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+    const [[, init]] = calls(fetchMock, 'POST')
+    expect(JSON.parse(init.body as string)).toEqual({ list: '/texts', key: 'a.label' })
+  })
 })

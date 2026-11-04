@@ -10,12 +10,13 @@ export function escapePointerSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1')
 }
 
-function unescapeSegment(segment: string): string {
+/** The text of one JSON Pointer segment: `~1` is `/` and `~0` is `~`. The reverse of `escapePointerSegment`. */
+export function unescapePointerSegment(segment: string): string {
   return segment.replaceAll('~1', '/').replaceAll('~0', '~')
 }
 
 function segmentsOf(pointer: string): string[] {
-  return pointer === '' ? [] : pointer.split('/').slice(1).map(unescapeSegment)
+  return pointer === '' ? [] : pointer.split('/').slice(1).map(unescapePointerSegment)
 }
 
 function deepEqual(left: unknown, right: unknown): boolean {

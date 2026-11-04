@@ -83,7 +83,9 @@ internal static class StudioModuleLayers
     /// <summary>
     /// The resource with the layer applied and the element of <paramref name="key"/> in the list at the pointer
     /// <paramref name="list"/> put back as the module has it: a changed element gets the module's version in the
-    /// module's position, an added element is dropped and a removed element comes back. The result is the edit to compare
+    /// module's position, an added element is dropped and a removed element comes back. In a text resource, <paramref name="list"/>
+    /// may be <c>/texts</c> and <paramref name="key"/> a text key: a changed text gets the module's text back and an added
+    /// text is dropped. The result is the edit to compare
     /// with the module for the layer that is left. <paramref name="ifMatch"/> must be the layer's version.
     /// </summary>
     public static StudioModuleReset Reset(
@@ -108,6 +110,11 @@ internal static class StudioModuleLayers
         if (LayerDifference.Compare(found.Kind, found.Root, state.Merged).Refusal is not null)
         {
             return Refused(StudioModuleResetRefusal.Unreadable);
+        }
+
+        if (found.Kind == ResourceKinds.Text && list == "/texts")
+        {
+            return ResetText(found.Root, state.Merged, key);
         }
 
         if (WalkList(found.Kind, found.Root, state.Merged, list) is not { } target)
@@ -144,6 +151,35 @@ internal static class StudioModuleLayers
         }
 
         return new StudioModuleReset(JsonSerializer.SerializeToElement(target.Root), null);
+    }
+
+    // A text's `texts` is a map, not a keyed list. Its keys are matched exactly, as JSON property names are.
+    private static StudioModuleReset ResetText(JsonElement module, JsonElement merged, string key)
+    {
+        var root = JsonNode.Parse(merged.GetRawText());
+        if (root?["texts"] is not JsonObject texts)
+        {
+            return Refused(StudioModuleResetRefusal.NotFound);
+        }
+
+        var moduleHas = module.TryGetProperty("texts", out var moduleTexts)
+            && moduleTexts.ValueKind == JsonValueKind.Object
+            && moduleTexts.TryGetProperty(key, out _);
+        if (!texts.ContainsKey(key) && !moduleHas)
+        {
+            return Refused(StudioModuleResetRefusal.NotFound);
+        }
+
+        if (moduleHas)
+        {
+            texts[key] = JsonNode.Parse(moduleTexts.GetProperty(key).GetRawText());
+        }
+        else
+        {
+            texts.Remove(key);
+        }
+
+        return new StudioModuleReset(JsonSerializer.SerializeToElement(root), null);
     }
 
     private static StudioModuleReset Refused(StudioModuleResetRefusal refusal) => new(null, refusal);
