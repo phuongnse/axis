@@ -1,6 +1,7 @@
 import { Alert, Button, Flex, Input, Modal } from 'antd'
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
@@ -102,7 +103,7 @@ export function StudioPublishing({
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
   const [previewLinks, setPreviewLinks] = useState<string[]>([])
   const [sending, setSending] = useState(false)
-  const [sendFailed, setSendFailed] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [label, setLabel] = useState('')
   const [note, setNote] = useState('')
@@ -178,7 +179,7 @@ export function StudioPublishing({
         }
         console.warn(`Checking the request '${requestId}' failed`, error)
         setRequest(null)
-        setSendFailed(true)
+        setSendError(t('shell.studio.request.sendFailed'))
         setHistoryRevision((value) => value + 1)
       }
     }
@@ -223,11 +224,11 @@ export function StudioPublishing({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [application, requestId, running, generation, lost, previewHost])
+  }, [application, requestId, running, generation, lost, previewHost, t])
 
   async function send(start: () => Promise<StudioRequest>) {
     setSending(true)
-    setSendFailed(false)
+    setSendError(null)
     try {
       const sent = await start()
       setReleaseNumber(null)
@@ -238,7 +239,7 @@ export function StudioPublishing({
         lost()
       } else {
         console.warn(`Sending the request for '${application}' failed`, error)
-        setSendFailed(true)
+        setSendError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.request.sendFailed'))
       }
     } finally {
       setSending(false)
@@ -299,9 +300,7 @@ export function StudioPublishing({
   return (
     <Flex vertical gap="small">
       {actionsSlot ? createPortal(actions, actionsSlot) : actions}
-      {sendFailed && (
-        <Alert data-testid="studio-request-error" type="error" title={t('shell.studio.request.sendFailed')} />
-      )}
+      {sendError !== null && <Alert data-testid="studio-request-error" type="error" title={sendError} />}
       {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
       {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
         <StudioTestResults request={request} onSelect={onOpenScenario} />

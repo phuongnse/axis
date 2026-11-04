@@ -25,6 +25,8 @@ export interface SiteMetadata {
   navigation: NavigationItem[]
   /** The lower-case path of the site whose own host serves the SPA, or `null` or missing when the host belongs to no site. */
   hostSite?: string | null
+  /** The tenant's privacy and terms links, or `null` or missing when it sets neither. */
+  legal?: SiteLegal | null
 }
 
 /** The application of a listed site, with its title and description per locale it has texts for. */
@@ -501,10 +503,4 @@ async function fetchOrNull<T>(url: string, signal?: AbortSignal): Promise<T | nu
     throw new Error(`Loading '${url}' failed with status ${response.status}.`)
   }
   return (await response.json()) as T
-}
-
-/** Prototype only (design review 2026-10-30-studio), not to build: example links so every legal link shows under scripts/dev.sh. */
-export const developmentLegal: SiteLegal = {
-  privacyUrl: 'https://example.com/privacy',
-  termsUrl: 'https://example.com/terms',
 }

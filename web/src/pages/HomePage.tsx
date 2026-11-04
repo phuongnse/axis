@@ -22,21 +22,23 @@ interface Loaded {
   card: SignInCardState | null
 }
 
-type SignInCardState = 'refused' | 'signedOut'
+type SignInCardState = 'refused' | 'declined' | 'signedOut'
 
 /** The card the address asks for. A person who has no session and no card address goes to sign-in instead. */
 function cardOfAddress(pathname: string, search: string): SignInCardState | null {
   if (!isSignInCardAddress(pathname, search)) {
     return null
   }
-  return new URLSearchParams(search).get('signIn') === 'failed' ? 'refused' : 'signedOut'
+  const signIn = new URLSearchParams(search).get('signIn')
+  return signIn === 'failed' ? 'refused' : signIn === 'declined' ? 'declined' : 'signedOut'
 }
 
 /** The card on `/` that replaces the page when nobody is signed in: after a refused sign-in or after sign-out. */
 export function SignInCard({ state }: { state: SignInCardState }) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
-  const refused = state === 'refused'
+  const declined = state === 'declined'
+  const refused = state === 'refused' || declined
 
   return (
     <Flex vertical align="center" gap={spacing.md} style={{ paddingBlock: spacing.xl }}>
@@ -57,11 +59,11 @@ export function SignInCard({ state }: { state: SignInCardState }) {
           </Typography.Title>
           {refused ? (
             <Alert
-              data-testid="sign-in-failed"
+              data-testid={declined ? 'sign-in-declined' : 'sign-in-failed'}
               role="alert"
               type="warning"
               showIcon
-              title={t('shell.home.signInFailed')}
+              title={t(declined ? 'shell.home.signInDeclined' : 'shell.home.signInFailed')}
             />
           ) : (
             <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>

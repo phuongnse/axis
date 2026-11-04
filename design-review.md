@@ -14,12 +14,18 @@ under `web/` are the prototype's as they stood, and `en.json`, `vi.json` and `St
 conflict. The new identity pages of `main`, their tests and `shellSidebar.tsx` are left out, because nothing here uses
 them. `ImportDialog.tsx` has `main`'s quota refusal and the prototype's footer.
 
-Open after the merge:
+`main` is the standard for behaviour, so the prototype follows its logic and `main`'s code is not changed for it:
 
-- The realm sync of `main` replaces the legal links that `scripts/lib/development-legal.mjs` writes, so the sign-in pages
-  lose Privacy and Terms, the terms step is off and Licences points at `https://localhost/licences`.
-- Studio's save and publish show a generic message for a quota refusal, because `studio.ts`, `StudioEditor.tsx` and
-  `StudioPublishing.tsx` stay the prototype's.
+- `scripts/dev.sh` sets the tenant's `Legal` block to example links, and the realm sync writes the links and the terms
+  step. `development-legal.mjs` keeps only the email theme, Mailpit, the company theme and the axis client's address.
+- The shell's footer reads the legal links from the API, and `developmentLegal` is gone.
+- `studio.ts`, `StudioEditor.tsx`, `StudioPublishing.tsx` and `FormWidget.tsx` show the quota title as `main` does.
+- `HomePage.tsx` draws the declined card at `/?signIn=declined`.
+- `frame.ftl` prefers a client's `http://` address for the licences link, prototype only, because the sync writes
+  `https://{host}/licences` and the SPA answers over http on its own port under `scripts/dev.sh`.
+
+Open after the merge: the prototype's licences page reads the versions from `licences.json` for everyone, while on
+`main` `GET /api/licences` gives them only to a person who is signed in.
 
 ## Carried over from the studio-editors review
 

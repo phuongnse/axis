@@ -1,6 +1,7 @@
 import { apiFetch } from './api'
 import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
+import { QuotaRefusedError, quotaRefusalTitle } from './quota'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
@@ -559,7 +560,8 @@ export async function fetchStudioModuleResource(
 
 /**
  * Patches a resource, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
- * and nothing was written. A 401 shows the sign-in prompt and throws, as any other failure does.
+ * and nothing was written. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws,
+ * as any other failure does.
  */
 export async function patchStudioResource(
   application: string,
@@ -575,6 +577,10 @@ export async function patchStudioResource(
   })
   if (response.status === 409) {
     return { status: 'conflict' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
   }
   if (!response.ok) {
     throw new Error(`Patching '${path}' failed with status ${response.status}.`)
@@ -594,7 +600,8 @@ export type ChangesResult =
 
 /**
  * Writes several changes in one call, in list order. A 409 means a patched version is stale or a created id or file
- * exists, and nothing was written. A 401 shows the sign-in prompt and throws, as any other failure does, including a 400.
+ * exists, and nothing was written. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws,
+ * as any other failure does, including a 400.
  */
 export async function saveStudioChanges(application: string, changes: StudioChange[]): Promise<ChangesResult> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/changes`
@@ -605,6 +612,10 @@ export async function saveStudioChanges(application: string, changes: StudioChan
   })
   if (response.status === 409) {
     return { status: 'conflict' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
   }
   if (!response.ok) {
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)
@@ -965,7 +976,7 @@ export async function rollbackStudioRelease(application: string, releaseId: stri
   return (await response.json()) as StudioRequest
 }
 
-/** Sends a publish request. Empty strings are left out of the body. A 401 shows the sign-in prompt and throws, as any other failure does. */
+/** Sends a publish request. Empty strings are left out of the body. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function publishStudioApp(application: string, details: PublishDetails = {}): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/publish`
   const body: PublishDetails = {}
@@ -980,6 +991,10 @@ export async function publishStudioApp(application: string, details: PublishDeta
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
   if (!response.ok) {
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)
   }

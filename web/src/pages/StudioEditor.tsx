@@ -53,6 +53,7 @@ import { SchemaForm } from './SchemaForm'
 import { RemovedNoticeContext, StudioCatalogContext } from './schemaFormSections'
 import { SaveBar } from '../platform/SaveBar'
 import { AxisButton } from '../platform/AxisButton'
+import { QuotaRefusedError } from '../platform/quota'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
 import type { FormUse } from './StudioFormUsedOn'
@@ -230,7 +231,7 @@ export function StudioEditor({
     return () => controller.abort()
   }, [])
   const [saved, setSaved] = useState(false)
-  const [saveFailed, setSaveFailed] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
@@ -278,7 +279,7 @@ export function StudioEditor({
     setJsonInvalid(false)
     setConflict(false)
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
     setHistory(emptyHistory)
     setPendingTexts({})
   }
@@ -297,7 +298,7 @@ export function StudioEditor({
     setPendingTexts(snapshot.pendingTexts ?? {})
     setJsonInvalid(snapshot.jsonText !== null && !isContent(tryParse(snapshot.jsonText)))
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
   }
 
   // Proposed: a removed row is undone from a notice that names it, as mail and documents offer, rather than asked about
@@ -634,7 +635,7 @@ export function StudioEditor({
     setJsonText(null)
     setJsonInvalid(false)
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
   }
 
   function changeJson(text: string) {
@@ -643,7 +644,7 @@ export function StudioEditor({
     }
     setJsonText(text)
     setSaved(false)
-    setSaveFailed(false)
+    setSaveError(null)
     let parsed: unknown
     try {
       parsed = JSON.parse(text)
@@ -688,7 +689,7 @@ export function StudioEditor({
     const texts = Object.entries(pendingTexts)
     if (texts.length > 0) {
       setSaving(true)
-      setSaveFailed(false)
+      setSaveError(null)
       try {
         let diagnostics: StudioDiagnostic[] = []
         for (const [key, entries] of texts) {
@@ -701,7 +702,7 @@ export function StudioEditor({
           lost()
         } else {
           console.warn(`Writing the label texts of '${item.id}' failed`, error)
-          setSaveFailed(true)
+          setSaveError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.saveFailed'))
         }
         setSaving(false)
         return
@@ -719,7 +720,7 @@ export function StudioEditor({
       return
     }
     setSaving(true)
-    setSaveFailed(false)
+    setSaveError(null)
     try {
       let version: string
       let diagnostics: StudioDiagnostic[]
@@ -767,7 +768,7 @@ export function StudioEditor({
         lost()
       } else {
         console.warn(`Saving the resource '${item.id}' failed`, error)
-        setSaveFailed(true)
+        setSaveError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.saveFailed'))
       }
     } finally {
       setSaving(false)
@@ -1073,7 +1074,7 @@ export function StudioEditor({
           action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
         />
       )}
-      {saveFailed && <Alert data-testid="studio-save-error" type="error" title={t('shell.studio.saveFailed')} />}
+      {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
       {deleteFailed && <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />}
       <Flex gap="small" align="center">
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}

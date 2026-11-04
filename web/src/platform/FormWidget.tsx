@@ -149,7 +149,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   const showSaveProblem = (problem: RecordProblem) => {
     if (Object.keys(problem.errors).length === 0) {
       // The record API answers a stale version with a 409 that names no field.
-      if (problem.status === 409 && recordId !== null) {
+      if (problem.status === 403) {
+        setFormErrors([problem.title])
+      } else if (problem.status === 409 && recordId !== null) {
         setConflict(true)
       } else {
         setFormErrors([t('shell.form.saveFailed')])

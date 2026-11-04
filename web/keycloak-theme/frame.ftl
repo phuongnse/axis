@@ -35,7 +35,8 @@
     <#assign privacyUrl = (client.attributes['axis.privacyUrl'])!''>
     <#assign termsUrl = (client.attributes['axis.termsUrl'])!''>
     <#assign baseUrl = ((client.baseUrl)!'')?remove_ending('/')>
-    <#assign licencesUrl = (client.attributes['axis.licencesUrl'])!(baseUrl?starts_with('http')?then(baseUrl + '/licences', ''))>
+    <#-- Prototype only (design review 2026-11-03-studio-settings): only a development client has an http address. -->
+    <#assign licencesUrl = baseUrl?starts_with('http://')?then(baseUrl + '/licences', (client.attributes['axis.licencesUrl'])!(baseUrl?starts_with('http')?then(baseUrl + '/licences', '')))>
     "legal": {
       <#assign links = {}>
       <#if privacyUrl?has_content><#assign links = links + {"privacy": privacyUrl}></#if>

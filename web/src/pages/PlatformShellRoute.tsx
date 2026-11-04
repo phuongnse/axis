@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { storeLocale } from '../platform/locale'
 import { Shell } from '../platform/Shell'
-import { developmentLegal } from '../platform/site'
 import { TextProvider } from '../platform/TextProvider'
 import { fetchTexts } from '../platform/texts'
 import { LocaleLoadFailed } from './LocaleLoadFailed'
@@ -47,7 +46,7 @@ export function PlatformShellRoute({ children }: { children: ReactNode }) {
         locales={site.locales.available}
         locale={current.locale}
         onLocaleChange={changeLocale}
-        legal={development ? developmentLegal : undefined}
+        legal={site.legal}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
         {children}

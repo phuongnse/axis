@@ -91,8 +91,14 @@ AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PUR
 # hold it. A Keycloak container that this script reuses gets the flow here too, and a realm that has it is not changed.
 log "Adding the axis first login flow to the axis realm"
 node scripts/lib/development-realm.mjs "http://localhost:$keycloak_port"
-# Prototype only (design review 2026-10-30-studio): the legal links that the realm sync is to write on each site.
+# Prototype only (design review 2026-10-30-studio): the realm's email theme and mail server, the company realm's theme,
+# and the axis client's address, which frame.ftl uses for the licences link.
 node scripts/lib/development-legal.mjs "http://localhost:$keycloak_port" "http://localhost:$web_port"
+# Prototype only (design review 2026-11-03-studio-settings): example legal links, so every link and the terms step show.
+# The realm sync writes them. The publisher reads no appsettings file and syncs too, so they are exported.
+export Tenants__default__Legal__PrivacyUrl="https://example.com/privacy"
+export Tenants__default__Legal__TermsUrl="https://example.com/terms"
+export Tenants__default__Legal__TermsVersion="2026-11-01"
 # Prototype only: the data of the Open source licences page.
 node scripts/licences.mjs
 schema_connection=""
