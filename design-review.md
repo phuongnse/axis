@@ -292,6 +292,11 @@ its settings UI beside `settings.json` and Azure a JSON view beside its forms, a
   syntax error ("This is not valid JSON here.") and every place the content breaks the kind's schema, in words ("Add
   version.", "colour is not a field of this resource."), checked with Ajv, which moves from the dev dependencies to
   the dependencies.
+- **The JSON view looks like a part of Axis.** The owner found it ugly: a thin, broken border, a wide gap below and
+  red text. Agreed: its border is a field's, `border` at 1 px with `radius-base`, and the gutter stays inside it. It
+  reaches down to `spacing-md` above the footer at any window height, at least 240 px, and scrolls inside. Its text keeps
+  `spacing-sm` from the border. Its colours are tokens, never CodeMirror's: names `primaryText`, strings `text`, numbers
+  `infoText`, `true`, `false` and `null` `warningText`, punctuation `textMuted`.
 - **A tab bar sits spacing-md under what precedes it.** The owner found the gap between a page's heading and its tabs
   too wide: Ant Design pads a tab's label 12 px above it. The theme starts a tab's label at the top of its bar, the
   underline keeping its 12 px under it, for every tab bar.
