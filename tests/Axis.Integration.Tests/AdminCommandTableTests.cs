@@ -39,6 +39,7 @@ public sealed class AdminCommandTableTests
                 ["platform rekey"] = AuditMark.OnePerRun,
                 ["cell operator invite"] = AuditMark.OnePerRun,
                 ["cell backup"] = AuditMark.OnePerTenant,
+                ["cell restore-check"] = AuditMark.OnePerTenant,
                 ["tenant list"] = AuditMark.None,
                 ["tenant binding list"] = AuditMark.None,
                 ["version"] = AuditMark.None,

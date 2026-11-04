@@ -303,7 +303,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive and its import by a restore into a new realm, the `cell backup` command with its metric `axis.backup.last_success`, and the chart's CronJob, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive and its import by a restore into a new realm, the `cell backup` command with its metric `axis.backup.last_success`, the `cell restore-check` command with its metric `axis.backup.restore_check`, and the chart's CronJob, which are built. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -377,7 +377,8 @@ format and the steps above stay, with the changes below.
   database, read in the dump's snapshot. Every `tenant backup` writes them, also outside a cell.
 
 **Weekly restore check.** Each Sunday at 03:00 in the region's time zone, a job checks that a restore
-works.
+works. The job and the scenarios of step 3 are _(planned for M31)_. The command `cell restore-check`
+and its metric are _(built)_ and do steps 1 to 5 except the scenarios.
 
 1. It picks a tenant at random among those with an archive of the last 2 days, and takes its newest
    archive.
@@ -388,5 +389,36 @@ works.
    folder against the restored releases.
 4. It deletes the scratch tenant, its realm and its keys at once, with no grace window.
 5. It records the result in the metric `axis.backup.restore_check`, `1` for a pass and `0` for a
-   failure, with the tenant id, and in a platform audit record. The [cell console](cell-console.md#views)
-   shows it.
+   failure, with the tenant id, and in the output of the command. The platform audit record is written
+   once, before the first change, for the source tenant, and names the scratch tenant. It does not hold the
+   result. The [cell console](cell-console.md#views) shows it.
+
+`cell restore-check` _(built)_ runs once and takes no argument. It runs only in a cell.
+
+- **Pick.** It lists the bucket and keeps the archives dated today or yesterday (UTC). It picks at random a tenant that is
+  not a preview, has a backup key and has such an archive, and takes its newest one. A tenant whose id starts with
+  `restore-check-` is never picked, because `cell backup` also backs up a scratch tenant that an earlier run left behind. When no tenant
+  qualifies, the command writes `cell restore-check failed: no tenant has an archive of today or yesterday`, records no
+  point, writes no audit record and exits `1`.
+- **Steps.** It writes the audit record, then removes every `restore-check-*` tenant that an earlier run left behind. It finds them by
+  their directory rows and their `axis_restore-check-*` databases, and always removes today's id. It downloads the archive to a folder
+  that only its owner can use and deletes the folder at the end. It restores the archive with the logic of `tenant restore`, with
+  `--from` the source tenant, the host `restore-check-<yyyymmdd>.<Cell:InternalDomain>` and always a new realm, though the source
+  tenant's realm exists. It does not write the audit record of `tenant restore`.
+- **New user ids.** The users of `realm.json` and their credentials get new ids from the identity provider. The ids of a user and of a
+  credential are unique across all realms, so importing them while the source realm is live would fail. A normal `tenant restore` keeps the ids.
+- **Compare.** It compares the row count of each table in `counts` with the restored database, leaving out `axis.sessions`
+  and the tables that `counts` does not hold. It compares the usernames of the scratch realm with those of `realm.json`, leaving out
+  service accounts. An archive without `realm.json` counts as zero users. An archive without `counts` fails. The migration history
+  and the tables that a migration seeds can differ right after an upgrade, because the restore migrates an archive of an older schema.
+- **Remove.** Whatever the result, it removes the scratch tenant with its database, roles, realm and Studio folder.
+- **Output.** Each line starts with the tenant id: `<source> download ok|failed: <message>`, the lines of the `tenant restore` steps,
+  `<scratch> counts ok` or `<scratch> counts failed: <schema.table> has <n> rows and the archive <m>`, `<scratch> users ok` or
+  `<scratch> users failed: the realm has <n> users and the archive <m>, <k> differ`, `<scratch> cleanup ok|failed: <message>`,
+  `<scratch> remove ok|failed: <message>` and last `<source> restore-check passed|failed`. No line holds a row or a username.
+- **Result.** Any failure after the pick, also a refused restore, a failed download or a scratch tenant that cannot be removed, records `0`
+  and exits `1`. A pass records `1` and exits `0`. The gauge `axis.backup.restore_check` has the tag `axis.tenant`, the source
+  tenant, and is exported over OTLP as `axis.backup.last_success` is, see [telemetry export](host-settings.md#telemetry-export).
+- **Exit code 2.** Outside a cell, with arguments, or when `Cell:InternalDomain`, `IdentityProvider:Url`, a `Cell:BackupStorage` setting,
+  `Cell:BackupKeyFile`, the platform database or `pg_restore` on `PATH` is missing, or when an OTLP endpoint is not an `https` URL outside
+  Development. Nothing changes and no audit record is written. The full list of settings is in [administration](administration.md#cell-restore-check).

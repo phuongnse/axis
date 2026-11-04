@@ -57,7 +57,7 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     private readonly CreateSettings _settings;
     private readonly RestorePlan _plan;
-    private readonly TenantAudit _audit;
+    private readonly TenantAudit? _audit;
     private readonly TenantRealm? _realm;
     private readonly HttpClient _http;
     private readonly TextWriter _output;
@@ -78,7 +78,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         RestorePlan plan,
         TenantRealm? realm,
         HttpClient http,
-        TenantAudit audit,
+        TenantAudit? audit,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken)
@@ -148,7 +148,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         try
         {
             var manifest = _plan.Manifest;
-            if (!await _audit.WriteAsync(_id, _output, _cancellationToken))
+            if (_audit is not null && !await _audit.WriteAsync(_id, _output, _cancellationToken))
             {
                 return 1;
             }
@@ -314,18 +314,23 @@ internal sealed class TenantRestore : IAsyncDisposable
         }
 
         // A tenant that signed in through its own realm gets a new one where that realm does not exist. Any other archive keeps its sign-in.
+        // A restore check restores beside its live source, whose realm exists, and its scratch tenant always gets a new one.
         var newRealm = false;
-        if (trusted && !preview && manifest!.Directory.Realm)
+        if (trusted && !preview && (request.Scratch || manifest!.Directory.Realm))
         {
             if (realm is null)
             {
                 problems.Add($"the setting {AdminCommands.IdentityProviderUrlSetting} is required, to find out whether the realm of the archive exists");
             }
+            else if (request.Scratch)
+            {
+                newRealm = true;
+            }
             else
             {
                 try
                 {
-                    newRealm = !await RealmExistsAsync(realm, manifest, cancellationToken);
+                    newRealm = !await RealmExistsAsync(realm, manifest!, cancellationToken);
                 }
                 catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or JsonException
                     || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
@@ -380,7 +385,7 @@ internal sealed class TenantRestore : IAsyncDisposable
     }
 
     // Text from the archive goes into a message, so a control character cannot start a fake output line.
-    private static string Printable(string text) =>
+    internal static string Printable(string text) =>
         string.Create(text.Length, text, (span, source) =>
         {
             for (var i = 0; i < source.Length; i++)
@@ -867,7 +872,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         // The realm is named after the tenant id, as EnsureForTenantAsync makes it.
         if (_plan.Realm is { } document)
         {
-            await new TenantRealmImport(_realm!).ImportAsync(_id, document, _cancellationToken);
+            await new TenantRealmImport(_realm!).ImportAsync(_id, document, newIds: _plan.Request.Scratch, _cancellationToken);
         }
     }
 

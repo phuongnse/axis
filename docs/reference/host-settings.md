@@ -592,7 +592,7 @@ variables:
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | The endpoint for logs only |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | The OTLP protocol |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Headers sent with every export |
-| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker`, and to `axis-admin` for `cell backup` |
+| `OTEL_SERVICE_NAME` | The service name. It defaults to `axis-server` or `axis-worker`, and to `axis-admin` for `cell backup` and `cell restore-check` |
 | `OTEL_RESOURCE_ATTRIBUTES` | More resource attributes |
 
 With no endpoint, nothing is exported and logs still go to the console. The
@@ -602,10 +602,10 @@ endpoint and start no collector. Outside Development every endpoint variable tha
 is set must be an absolute `https` URL, or the server and the worker stop at start
 and the error names the variable, never its value. Development accepts `http`.
 
-The admin tool's `cell backup` also reads these variables, from its own settings, and exports the gauge
-`axis.backup.last_success` as metrics only, see
-[backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). Outside Development it
-applies the same `https` rule and exits with code `2`, naming the variable, before it uploads anything.
+The admin tool's `cell backup` and `cell restore-check` also read these variables, from their own settings, and export the gauges
+`axis.backup.last_success` and `axis.backup.restore_check` as metrics only, see
+[backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). Outside Development they
+apply the same `https` rule and exit with code `2`, naming the variable, before they upload or change anything.
 
 ## Cell settings
 
@@ -638,15 +638,15 @@ does not read `Quotas:Defaults` yet.
 | `Cell:Id` | All hosts | The cell id, such as `vn-1`. Setting it turns on quotas, per-tenant Studio folders and the cell console. |
 | `Cell:Region` | All hosts | The region code, such as `vn`. |
 | `Cell:TenantDomain` | Server, publisher | The domain of the tenant subdomains, such as `vn.example.com`. |
-| `Cell:InternalDomain` | Publisher | A domain no ingress serves, for scratch tenants of the restore check. |
+| `Cell:InternalDomain` | Admin, publisher | A domain no ingress serves, for scratch tenants of the restore check. `cell restore-check` stops with exit code `2` when it is blank. |
 | `Cell:TenantCap` | Server | The measured number of tenants the cell holds, see [cell size](cells.md#cell-size). |
 | `Cell:ConsoleHost` | Server | The host of the [cell console](cell-console.md). |
 | `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
-| `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup` and `tenant restore` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
-| `Cell:BackupStorage:ServiceUrl` | Admin | The address of the S3-compatible service that `cell backup` uploads to. Only `cell backup` reads the five `Cell:BackupStorage` settings, and it stops with exit code `2` when one is blank, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
+| `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup`, `tenant restore`, `cell backup` and `cell restore-check` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
+| `Cell:BackupStorage:ServiceUrl` | Admin | The address of the S3-compatible service that `cell backup` uploads to. Only `cell backup` and `cell restore-check` read the five `Cell:BackupStorage` settings, and they stop with exit code `2` when one is blank, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
 | `Cell:BackupStorage:Region` | Admin | The signing region of that service. |
 | `Cell:BackupStorage:Bucket` | Admin | The bucket that receives `<tenant id>/<yyyy-mm-dd>.axisbak`. |
 | `Cell:BackupStorage:AccessKeyId` | Admin | The access key id of the service. |
