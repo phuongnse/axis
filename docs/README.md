@@ -120,6 +120,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Outbound connections](reference/outbound-connections.md) | Every connection the server and the worker open, the setting that names its address and the allowlist |
 | [Several server replicas](reference/several-server-replicas.md)        | Running the server as several replicas behind a TLS proxy: key ring, forwarded headers, Studio volume |
 | [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
+| [Telemetry](reference/telemetry.md)                                            | Correlated logs, metrics and traces, the OTLP export, the Axis spans and what telemetry never holds                                                                |
 
 ## Working on Axis
 
