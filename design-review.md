@@ -299,6 +299,11 @@ its settings UI beside `settings.json` and Azure a JSON view beside its forms, a
   `infoText`, `true`, `false` and `null` `warningText`, punctuation `textMuted`.
 - **JSON that does not parse is an unsaved change.** The save bar shows while it lasts, with Undo and Discard, and Save
   is off. A change that leaves the data as it was, such as a space or Format, shows no bar, because nothing can be saved.
+- **The JSON view has its own actions.** They end the tab bar, so they take no height from it, and show only on the JSON
+  tab. Find, Format and Copy are icons. Find, also Ctrl+F, opens a bar at the top of the view, because the browser's own
+  find cannot see lines a code editor has not drawn: it counts the matches, Enter and Shift+Enter move between them and
+  Escape closes it. Format is off while the text is not JSON. Copy says so. "2 problems", in `dangerText`, shows only
+  while there are any, and moves to the next one. The view stops `spacing-md` above the save bar while that shows.
 - **A tab bar sits spacing-md under what precedes it.** The owner found the gap between a page's heading and its tabs
   too wide: Ant Design pads a tab's label 12 px above it. The theme starts a tab's label at the top of its bar, the
   underline keeping its 12 px under it, for every tab bar.
