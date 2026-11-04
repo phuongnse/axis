@@ -606,7 +606,7 @@ function StudioWorkspace() {
                     </section>
                   ))}
                 </Flex>
-                <div data-testid="studio-resource-details" style={{ flex: 1 }}>
+                <div data-testid="studio-resource-details" style={{ flex: 1, minWidth: 0 }}>
                   {selected ? (
                     <Flex vertical gap="middle">
                       <Descriptions
