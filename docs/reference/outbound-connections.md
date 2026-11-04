@@ -5,7 +5,7 @@ names its address. The TLS rule of each is under [TLS](installation.md#tls).
 
 | Host | Destination | Named by | TLS |
 | --- | --- | --- | --- |
-| server, worker | The platform database | `ConnectionStrings:Platform`. The server also uses `ConnectionStrings:PlatformSchema`, only at start | [PostgreSQL](installation.md#tls) |
+| server, worker | The platform database | `ConnectionStrings:Platform`. The server also uses `ConnectionStrings:PlatformSchema`, at start and for the unpooled write connection of `PUT /api/cell/tenants/{id}/quotas` | [PostgreSQL](installation.md#tls) |
 | server, worker | Each tenant's database | The [tenant directory](../architecture.md#tenant-directory), with the platform connection's TLS settings | [PostgreSQL](installation.md#tls) |
 | server | Each tenant's identity provider: discovery, signing keys and the token endpoint, with DPoP and pushed authorization requests under `fapi2` | The tenant's OIDC `Authority` in the tenant directory | [Identity provider](installation.md#tls) |
 | server, worker | The telemetry collector | `OTEL_EXPORTER_OTLP_*`, see [telemetry export](host-settings.md#telemetry-export) | [Telemetry export](installation.md#tls) |

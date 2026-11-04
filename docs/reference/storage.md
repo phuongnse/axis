@@ -214,7 +214,7 @@ and creates no tables. See
 - **The `platform` schema.** Its EF Core migrations ship with Axis, with their
   history in `platform.__platform_migrations`. The server applies them at
   start over `ConnectionStrings:PlatformSchema` under both tenant sources, and
-  uses that setting for nothing else. `Axis.Admin migrate` applies them too, before it migrates the tenants, so an
+  otherwise only for the quotas write of the provisioning API. `Axis.Admin migrate` applies them too, before it migrates the tenants, so an
   upgrade that runs `migrate` first has every new platform table before the new
   server starts. `migrate` does not run the reader role's grants. The server does that at its next start.
 - **Read-only hosts.** The server reads the directory over `ConnectionStrings:Platform`. Its role
@@ -461,7 +461,7 @@ host with one database role:
 | Directory writes                                                                                    | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
 | Platform migrations, at start, under both tenant sources                                            | Server                          | `ConnectionStrings:PlatformSchema` |
 | Platform migrations, before the tenants are migrated                                                | `Axis.Admin migrate`            | `ConnectionStrings:PlatformSchema` |
-| Platform audit records                                                                              | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
+| Platform audit records                                                                              | `Axis.Admin`, server (quotas)   | `ConnectionStrings:PlatformSchema` |
 | Grants, EF Core migrations, compile, store and activate                                             | `Axis.Admin`                    | The tenant's schema role           |
 | Seeding and schedule trigger state                                                                  | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record | `axis-admin publisher`          | The tenant's schema role           |
@@ -484,8 +484,8 @@ publisher` runs it with the tenant's schema role.
   server and give it no inbound network. It has no HTTP endpoint, see
   [publisher](administration.md#publisher).
 - **Platform schema.** The server still holds `ConnectionStrings:PlatformSchema`
-  at start, for the platform migrations. So "no schema connection" means no
-  tenant schema connection.
+  at start for the platform migrations, and for the quotas write of the provisioning API. So "no
+  schema connection" means no tenant schema connection.
 - **Tenant schema version.** Each tenant database migrates on its own, with
   `Axis.Admin migrate`, which records the version in the directory. A host
   serves a tenant only when the tenant's schema version is the host's own, see
