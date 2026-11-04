@@ -528,9 +528,8 @@ An application that declares it maps both slots to roles of its own:
   unknown-name code.
 - **Studio.** The policy matrix lists a module policy's grants in the row of the
   role its slot maps to, read-only and tagged with the module, without an Open policy
-  link. Studio shows a module's processes, policies and pages read-only _(built)_, as it shows
-  module entities: a process as its graph, a policy as a table of its grants and a page
-  drawn on the page canvas. Studio never edits a module.
+  link. Studio shows a module's pages read-only _(built)_, drawn on the page canvas. A module entity opens in
+  the entity designer, a module process in the process designer and a module policy in the module editor as its grants, and an author's edit is saved as a customization layer. Studio never edits the module's own files.
 - **Upgrades.** A module upgrade must still be additive for its entities
   (`AXC0213`). Adding a process, page or policy is additive, and a version that adds a process
   file is accepted.

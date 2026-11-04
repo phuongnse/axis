@@ -27,6 +27,8 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
 
     private const string BudgetApprovalId = "94f1cc25-6a68-435f-9383-36fc43aae860";
 
+    private const string BudgetReviewId = "12dffe7c-7ed8-47c0-9ed5-fa9b4251d85e";
+
     private const string BudgetLayerFile = "customizations/department-budgets/BudgetApproval.json";
 
     private readonly TemporaryFolder _leaveRequests = new();
@@ -135,6 +137,29 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
         Assert.Equal("reject", removed.GetProperty("key").GetString());
         Assert.Equal("reject", removed.GetProperty("content").GetProperty("name").GetString());
         Assert.Equal("markRejected", removed.GetProperty("content").GetProperty("next").GetString());
+    }
+
+    [Fact]
+    public async Task An_author_reads_a_module_form_with_a_moved_section_field_marked_as_changed()
+    {
+        const string layer = """
+            { "id": "b3a7c1d2-5e4f-4a68-8c9d-2f1e0d3c4b5a", "kind": "layer", "formatVersion": 1, "target": "department-budgets/BudgetReview",
+              "changes": { "sections": [ { "name": "main", "fields": [ { "field": "amount", "after": "name" } ] } ] } }
+            """;
+        var path = Path.Combine(_purchaseRequests.Path, "customizations/department-budgets/BudgetReview.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, layer, CancellationToken);
+
+        using var client = _factory.CreateClient().SignedInAs("author");
+        using var response = await client.SendAsync(Request("PurchaseRequests", "department-budgets", BudgetReviewId), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken)).RootElement;
+        Assert.Equal(
+            ["name", "amount", "department", "year"],
+            body.GetProperty("content").GetProperty("sections")[0].GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("field").GetString()));
+        var marks = body.GetProperty("marks").EnumerateArray().Select(mark => (mark.GetProperty("path").GetString(), mark.GetProperty("mark").GetString())).ToList();
+        Assert.Contains(("/sections/0/fields/1", "changed"), marks);
     }
 
     [Fact]

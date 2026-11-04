@@ -6,6 +6,7 @@
   "entity": "Request",
   "sections": [
     {
+      "name": "request",
       "title": { "textKey": "approvals.requestForm.request" },
       "fields": [{ "field": "type" }, { "field": "title" }, { "field": "description" }, { "field": "amount" }, { "field": "status", "readOnly": true }]
     }

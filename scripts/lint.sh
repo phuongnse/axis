@@ -32,13 +32,14 @@ fi
 node scripts/check-links.mjs
 node scripts/check-docs.mjs
 
-# The Helm chart: lint, then validate the rendered manifests against the Kubernetes and cert-manager
+# The Helm charts: lint, then validate the rendered manifests against the Kubernetes and cert-manager
 # schemas that scripts/setup.sh downloads. No schema is missing-ignored, so a new kind needs its
 # schema file.
 source scripts/lib/tools.sh
-chart=deploy/helm/axis
-"$helm" lint "$chart" --strict -f "$chart/ci/test-values.yaml"
-"$helm" template axis "$chart" -f "$chart/ci/test-values.yaml" |
-  "$kubeconform" -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
-    -schema-location "$kubernetes_schemas/{{ .ResourceKind }}{{ .KindSuffix }}.json" \
-    -schema-location "$crd_schemas/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json"
+for chart in deploy/helm/axis deploy/helm/axis-controlplane; do
+  "$helm" lint "$chart" --strict -f "$chart/ci/test-values.yaml"
+  "$helm" template "$(basename "$chart")" "$chart" -f "$chart/ci/test-values.yaml" |
+    "$kubeconform" -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+      -schema-location "$kubernetes_schemas/{{ .ResourceKind }}{{ .KindSuffix }}.json" \
+      -schema-location "$crd_schemas/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json"
+done

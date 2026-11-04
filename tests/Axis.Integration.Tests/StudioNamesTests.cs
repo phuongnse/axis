@@ -26,6 +26,8 @@ public sealed class StudioNamesTests : IAsyncLifetime
 
     private readonly TemporaryFolder _broken = new();
 
+    private readonly TemporaryFolder _modules = new();
+
     private WebApplicationFactory<Program> _factory = null!;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -44,6 +46,12 @@ public sealed class StudioNamesTests : IAsyncLifetime
         AddPageWithParameter(Path.Combine(_broken.Path, "pages", "request-detail.json"));
         AddGroupField(Path.Combine(_broken.Path, "data-sources", "requests-by-department.json"), "missingField");
 
+        // No shipped module holds a seed or a trigger, so the names test adds them to a copy of the modules.
+        CopyDirectory(SampleModules.Path, _modules.Path);
+        var budgets = Path.Combine(_modules.Path, "department-budgets", "1.2.0");
+        AddBudgetSeed(Path.Combine(budgets, "seeds", "budgets.json"));
+        AddBudgetTrigger(Path.Combine(budgets, "triggers", "review-new-budgets.json"));
+
         var connectionString = await _database.CreateDatabaseAsync("studio_names", CancellationToken);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -54,7 +62,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
             builder.UseSetting($"Tenants:{Tenant}:SchemaConnectionString", connectionString);
             builder.UseTestOidc(Tenant);
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
-            builder.UseSetting("Modules:Path", SampleModules.Path);
+            builder.UseSetting("Modules:Path", _modules.Path);
             builder.UseSetting("Studio:Folders:0", _purchaseRequests.Path);
             builder.UseSetting("Studio:Folders:1", _leaveRequests.Path);
             builder.UseSetting("Studio:Folders:2", _broken.Path);
@@ -71,6 +79,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         _purchaseRequests.Dispose();
         _leaveRequests.Dispose();
         _broken.Dispose();
+        _modules.Dispose();
         await _database.DisposeAsync();
     }
 
@@ -185,6 +194,29 @@ public sealed class StudioNamesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Names_list_the_forms_texts_seeds_triggers_and_scenarios_of_a_module()
+    {
+        var names = await NamesAsync("PurchaseRequests");
+
+        var scenario = JsonNode.Parse(File.ReadAllText(Path.Combine(
+            SampleModules.Path, "department-budgets", "1.2.0", "scenarios", "approval-records-decision.json")))!["name"]!.GetValue<string>();
+        foreach (var (list, name) in new[]
+        {
+            ("forms", "department-budgets/BudgetReview"),
+            ("textResources", "department-budgets/TextsEn"),
+            ("seeds", "department-budgets/Budgets"),
+            ("triggers", "department-budgets/ReviewNewBudgets"),
+            ("scenarios", $"department-budgets/{scenario}"),
+        })
+        {
+            Assert.Equal("department-budgets", Named(names, list, name).GetProperty("module").GetString());
+        }
+
+        var ownForm = names.GetProperty("forms").EnumerateArray().First(form => !form.GetProperty("name").GetString()!.Contains('/'));
+        Assert.Equal(JsonValueKind.Null, ownForm.GetProperty("module").ValueKind);
+    }
+
+    [Fact]
     public async Task Names_answer_what_resolved_when_a_process_file_has_errors()
     {
         var names = await NamesAsync("BrokenRequests");
@@ -291,6 +323,49 @@ public sealed class StudioNamesTests : IAsyncLifetime
         };
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, @event.ToJsonString());
+    }
+
+    private static void AddBudgetSeed(string file)
+    {
+        var seed = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["kind"] = "seed",
+            ["name"] = "Budgets",
+            ["formatVersion"] = 1,
+            ["entity"] = "Budget",
+            ["records"] = new JsonArray(new JsonObject
+            {
+                ["id"] = Guid.NewGuid().ToString(),
+                ["values"] = new JsonObject
+                {
+                    ["name"] = "Marketing 2026",
+                    ["department"] = Guid.NewGuid().ToString(),
+                    ["year"] = 2026,
+                    ["amount"] = 1000,
+                    ["status"] = "draft",
+                },
+            }),
+        };
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, seed.ToJsonString());
+    }
+
+    private static void AddBudgetTrigger(string file)
+    {
+        var trigger = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["kind"] = "trigger",
+            ["name"] = "ReviewNewBudgets",
+            ["formatVersion"] = 1,
+            ["type"] = "dataChange",
+            ["entity"] = "Budget",
+            ["on"] = new JsonArray("create"),
+            ["process"] = "BudgetApproval",
+        };
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, trigger.ToJsonString());
     }
 
     private static void AddGroupField(string file, string field)

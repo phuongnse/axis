@@ -1,5 +1,6 @@
 using Axis.ControlPlane;
 using Axis.ControlPlane.Health;
+using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.Storage;
 using Axis.ControlPlane.Telemetry;
 using Axis.Server.Http;
@@ -17,6 +18,10 @@ builder.Services.AddSingleton(options);
 // The first hosted service: it migrates in StartingAsync, so a database that cannot be reached stops the start.
 builder.Services.AddHostedService<ControlPlaneMigrationStart>();
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(options.ConnectionString!));
+
+// After the migration start, whose StartingAsync runs before any hosted service starts. With no job handler the runner is idle.
+builder.Services.AddSingleton(new JobRunnerOptions());
+builder.Services.AddHostedService<JobRunner>();
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);

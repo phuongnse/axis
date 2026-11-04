@@ -5,6 +5,7 @@ import type { StudioNames } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { type DesignerLayer, LayerMarkTag } from './LayerMarkViews'
 import { MappingRows } from './MappingRows'
 import { NotifyFields } from './NotifyFields'
 import { OperationPanel } from './OperationPanel'
@@ -242,6 +243,7 @@ export function ProcessStepPanel({
   onChange,
   onMove,
   onRemove,
+  layer,
 }: {
   schema: JsonSchema
   value: Content
@@ -249,6 +251,7 @@ export function ProcessStepPanel({
   onChange: ChangeHandler
   onMove: (offset: number) => void
   onRemove: () => void
+  layer?: DesignerLayer
 }) {
   const steps = Array.isArray(value.steps) ? value.steps : []
   const step = steps[index]
@@ -264,6 +267,7 @@ export function ProcessStepPanel({
       onMove={onMove}
       onRemove={onRemove}
       onChange={onChange}
+      layer={layer}
     />
   )
 }
@@ -278,6 +282,7 @@ function Step({
   onMove,
   onRemove,
   onChange,
+  layer,
 }: {
   schema: JsonSchema
   index: number
@@ -288,6 +293,7 @@ function Step({
   onMove: (offset: number) => void
   onRemove: () => void
   onChange: ChangeHandler
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const pointer = `/steps/${index}`
@@ -314,6 +320,7 @@ function Step({
         }
       >
         <Flex vertical gap="small">
+          {layer && <LayerMarkTag layer={layer} list="/steps" index={index} name={text(step.name)} />}
           <div data-testid={`studio-field-${pointer}/name`}>
             <div>{t('shell.studio.process.stepName')}</div>
             <Input

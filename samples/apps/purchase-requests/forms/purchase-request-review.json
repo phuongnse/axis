@@ -6,6 +6,7 @@
   "entity": "PurchaseRequest",
   "sections": [
     {
+      "name": "request",
       "title": { "textKey": "purchaseRequest.sections.request" },
       "fields": [
         { "field": "number", "readOnly": true },
@@ -21,6 +22,7 @@
       ]
     },
     {
+      "name": "decision",
       "title": { "textKey": "purchaseRequest.sections.decision" },
       "fields": [{ "field": "decisionComments" }]
     }

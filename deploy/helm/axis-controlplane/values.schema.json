@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "definitions": {
+    "secretReference": {
+      "type": "object",
+      "description": "A reference to a key of an existing Kubernetes Secret. It never holds a value.",
+      "properties": {
+        "name": { "type": "string" },
+        "key": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "tlsSecretReference": {
+      "type": "object",
+      "description": "A reference to an existing Kubernetes TLS Secret, with the keys tls.crt and tls.key. It never holds a value.",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry": { "type": "string" },
+        "repository": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "pullSecrets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "replicas": { "type": "integer", "minimum": 0 },
+    "resources": { "type": "object" },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "controlPlane": {
+      "type": "object",
+      "properties": {
+        "region": { "type": "string" },
+        "tenantDomain": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "connectionString": { "$ref": "#/definitions/secretReference" },
+        "certificate": { "$ref": "#/definitions/tlsSecretReference" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

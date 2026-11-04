@@ -1,5 +1,5 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, Layout, Typography } from 'antd'
+import { Button, ConfigProvider, Flex, Layout, Typography, type ThemeConfig } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -20,6 +20,10 @@ import { UserMenu } from './UserMenu'
 import { useNarrowWidth } from './useNarrowWidth'
 
 const headerHeight = sizeTokens.bar
+
+// Never undefined: Ant Design wraps its children only when a theme is given, so a switch would remount the page.
+const claimedTheme: ThemeConfig = { components: { Menu: { itemHeight: 32 } } }
+const siteTheme: ThemeConfig = {}
 
 interface ShellProps {
   titleKey: string
@@ -59,7 +63,9 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * A footer runs across the bottom, with the copyright at the start and the legal links at the end. Ant Design components and dayjs follow the locale. At narrow width, below
+ * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
+ * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
+ * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header.
  */
@@ -131,10 +137,7 @@ export function Shell({
   // own navigation there. It inherits the rest of the theme from the provider in theme.tsx.
   return (
     <div data-theme-mode={mode} style={{ colorScheme: mode }}>
-      <ConfigProvider
-        locale={antLocaleFor(locale)}
-        theme={claimed ? { components: { Menu: { itemHeight: 32 } } } : undefined}
-      >
+      <ConfigProvider locale={antLocaleFor(locale)} theme={claimed ? claimedTheme : siteTheme}>
         {/* A design-system frame sets --shell-min-height to its own height, so its states fit their card. */}
         <Layout style={{ minHeight: 'var(--shell-min-height, 100vh)' }}>
           <Layout.Header
@@ -234,11 +237,14 @@ export function Shell({
                 </nav>
               </Layout.Sider>
             )}
-            <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
-              <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
-            </Layout.Content>
+            <Layout>
+              <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
+                <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
+              </Layout.Content>
+              {sidebar && <ShellFooter legal={legal} />}
+            </Layout>
           </Layout>
-          <ShellFooter legal={legal} />
+          {!sidebar && <ShellFooter legal={legal} />}
         </Layout>
       </ConfigProvider>
     </div>

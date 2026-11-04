@@ -1,86 +1,113 @@
-import { Alert, Descriptions, Flex, Table } from 'antd'
-import { useMemo } from 'react'
+import { Button, Checkbox, Descriptions, Flex, Tag, Typography } from 'antd'
 import { useText } from '../platform/texts'
-import { StudioModuleReadOnly } from './StudioModuleReadOnly'
-import { useStudioModuleContent } from './useStudioModuleContent'
+import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
+import { targetActions } from './policyMatrixDraft'
 
 const targetKinds = ['entity', 'dataSource', 'process', 'endpoint'] as const
 
-interface GrantRow {
-  key: number
-  target: string
-  actions: string
-  filter: string
-  fields: string[]
-}
+type Grant = Record<string, unknown>
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 }
 
-function grantRows(content: Record<string, unknown>): GrantRow[] {
-  const grants: unknown[] = Array.isArray(content.grants) ? content.grants : []
-  return grants.map((grant, index) => {
-    const entry = (typeof grant === 'object' && grant !== null ? grant : {}) as Record<string, unknown>
-    const kind = targetKinds.find((candidate) => typeof entry[candidate] === 'string')
-    return {
-      key: index,
-      target: kind ? `${kind} ${entry[kind] as string}` : '',
-      actions: strings(entry.actions).join(', '),
-      filter: typeof entry.filter === 'string' ? entry.filter : '',
-      fields: strings(entry.fields),
-    }
-  })
+function asGrant(value: unknown): Grant {
+  return typeof value === 'object' && value !== null ? (value as Grant) : {}
 }
 
 /**
- * A policy of a module the application uses, read from the module version the application pins and shown as its role
- * slots and a table of its grants: the target, the actions, the filter and the fields. It has no input and no button,
- * because the module owns the file.
+ * The editor of a policy of a module the application uses, with the application's layer applied: its role slots and its
+ * grants, each with the target, a checkbox for each action the target takes, the filter and the fields. An author ticks
+ * actions and removes grants, and the filter and the fields are read-only. A grant the layer added, changed or removed
+ * carries a mark with Reset to module. The parent owns the draft and the save.
  */
-export function StudioModulePolicy({ application, module, id }: { application: string; module: string; id: string }) {
+export function StudioModulePolicy({
+  value,
+  onChange,
+  layer,
+}: {
+  value: Record<string, unknown>
+  onChange: (pointer: string, next: unknown) => void
+  layer?: DesignerLayer
+}) {
   const t = useText()
-  const { content, loadFailed } = useStudioModuleContent(application, module, id)
-  const rows = useMemo(() => (content ? grantRows(content) : []), [content])
-
-  if (loadFailed) {
-    return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
-  }
-  if (!content) {
-    return null
-  }
+  const grants: unknown[] = Array.isArray(value.grants) ? value.grants : []
 
   return (
     <Flex vertical gap="middle">
-      <StudioModuleReadOnly />
       <Descriptions
         column={1}
         items={[
           {
             key: 'roles',
             label: t('shell.studio.moduleRoles'),
-            children: strings(content.roles).join(', ') || t('shell.studio.moduleGrants.none'),
+            children: strings(value.roles).join(', ') || t('shell.studio.moduleGrants.none'),
           },
         ]}
       />
-      <Table<GrantRow>
-        data-testid="studio-module-policy-grants"
-        size="small"
-        pagination={false}
-        dataSource={rows}
-        columns={[
-          { key: 'target', title: t('shell.studio.moduleGrants.target'), dataIndex: 'target' },
-          { key: 'actions', title: t('shell.studio.moduleGrants.actions'), dataIndex: 'actions' },
-          { key: 'filter', title: t('shell.studio.moduleGrants.filter'), dataIndex: 'filter' },
-          {
-            key: 'fields',
-            title: t('shell.studio.moduleGrants.fields'),
-            dataIndex: 'fields',
-            render: (fields: string[]) =>
-              fields.length === 0 ? t('shell.studio.moduleGrants.allFields') : fields.join(', '),
-          },
-        ]}
-      />
+      <Flex vertical gap="small" data-testid="studio-module-policy-grants">
+        {grants.map((item, index) => {
+          const grant = asGrant(item)
+          const kind = targetKinds.find((candidate) => typeof grant[candidate] === 'string')
+          const accepted = kind ? targetActions(kind) : []
+          const actions = strings(grant.actions)
+          const unaccepted = actions.filter((action) => !accepted.includes(action))
+          const fields = strings(grant.fields)
+          return (
+            <Flex key={index} vertical gap={4} data-testid={`studio-module-policy-grant-${index}`}>
+              <Flex gap="small" align="center" wrap>
+                {typeof grant.name === 'string' && <Typography.Text code>{grant.name}</Typography.Text>}
+                <span>{kind ? `${kind} ${grant[kind] as string}` : ''}</span>
+                {layer !== undefined && typeof grant.name === 'string' && (
+                  <LayerMarkTag layer={layer} list="/grants" index={index} name={grant.name} />
+                )}
+              </Flex>
+              <Flex gap="small" align="center" wrap>
+                <Checkbox.Group
+                  options={accepted}
+                  value={actions.filter((action) => accepted.includes(action))}
+                  onChange={(ticked) =>
+                    onChange(`/grants/${index}/actions`, [
+                      ...accepted.filter((action) => ticked.includes(action)),
+                      ...unaccepted,
+                    ])
+                  }
+                />
+                {unaccepted.map((action) => (
+                  <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
+                    {t('shell.studio.matrix.unacceptedAction')} {action}
+                  </Tag>
+                ))}
+                <Button
+                  size="small"
+                  disabled={grants.length === 1}
+                  onClick={() =>
+                    onChange(
+                      '/grants',
+                      grants.filter((_, position) => position !== index),
+                    )
+                  }
+                >
+                  {t('shell.studio.matrix.removeGrant')}
+                </Button>
+              </Flex>
+              <Flex gap="small" align="center" wrap>
+                {typeof grant.filter === 'string' && grant.filter !== '' ? (
+                  <Typography.Text code>{grant.filter}</Typography.Text>
+                ) : (
+                  <Typography.Text type="secondary">{t('shell.studio.matrix.noFilter')}</Typography.Text>
+                )}
+                {fields.length === 0 ? (
+                  <Typography.Text type="secondary">{t('shell.studio.matrix.allFields')}</Typography.Text>
+                ) : (
+                  fields.map((field) => <Tag key={field}>{field}</Tag>)
+                )}
+              </Flex>
+            </Flex>
+          )
+        })}
+      </Flex>
+      <RemovedRows layer={layer} list="/grants" />
     </Flex>
   )
 }

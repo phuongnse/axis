@@ -258,7 +258,7 @@ flowchart LR
      listed fields (`AXC0225`). `visibleWhen` is not allowed on a required
      field (`AXC0226`). A section name is used once (`AXC0227`) and a step name once (`AXC0360`). A step names
      a known section (`AXC0228`) that is in no other step (`AXC0229`), and
-     when there are steps, every section has a name and is in one step
+     when there are steps, every section is in one step
      (`AXC0230`).
    - **Seeds.** A seed's `entity` must name a loaded entity, `Entity` or `module/Entity`, ignoring
      letter case, otherwise it is `AXC0032` at `/entity`. A name whose entity file

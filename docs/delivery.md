@@ -66,7 +66,7 @@ with the reasons. What each one does is in NexKit's
   marked *blocked by* every other issue of the milestone, with no reason line
   for each. At most three issues run at once, with `max_parallel` at 3, as
   [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md)
-  agrees. Each round of checks takes eight runner jobs, of the twenty that
+  agrees. Each round of checks takes ten runner jobs, of the twenty that
   GitHub Free runs at once.
 - **NexKit merges a pull request once it passes,** with
   [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
@@ -109,30 +109,32 @@ with the reasons. What each one does is in NexKit's
   rejecting leaves a warning on the run and does not fail it, so that run waits
   for the next sweep. A CI run on `main` always finishes: a
   newer run replaces only one that is still waiting to start. On any other branch a newer push stops the older
-  run. CI runs the lint and unit tests, the smoke tests, the integration
-  tests and three shards of the E2E tests as six parallel jobs, so a run takes
-  as long as its slowest job.
+  run. CI runs the lint and unit tests, the smoke tests, three shards of the
+  integration tests and three shards of the E2E tests as eight parallel jobs,
+  so a run takes as long as its slowest job.
 - **The slow checks run in full only in NexKit's checks.** The smoke, integration
   and E2E checks are marked `slow`. The test, smoke, integration and E2E checks name
   their `results`: `artifacts/test-results`, and for E2E also `artifacts/logs`
   and the Playwright traces in `tests/e2e/test-results`. NexKit's
   [`evidence`][nexkit-evidence] setting names the CI workflow's
-  `test-results-e2e-1` to `test-results-e2e-3`, `test-results-integration`,
-  `test-results-smoke` and `test-results-unit` artifacts, which hold the Playwright traces and
+  `test-results-e2e-1` to `test-results-e2e-3`, `test-results-integration-1`
+  to `test-results-integration-3`, `test-results-smoke` and `test-results-unit` artifacts, which hold the Playwright traces and
   `error-context.md` files, and the performance workflow's
   `test-results-performance`.
 - **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
-  checks in seven jobs at once, with `parallel_checks` on: the build and lint
-  in one job, the group `build-lint`, and the unit tests, the smoke tests, the
-  integration tests and each of three E2E shards in their own. A check round
+  checks in nine jobs at once, with `parallel_checks` on: the build and lint
+  in one job, the group `build-lint`, and the unit tests, the smoke tests and
+  each of three integration shards and three E2E shards in their own. A check round
   then takes about as long as its slowest job, instead of all of them in a
   row, which took 20 to 50 minutes. A check gets a job of its own when
   sharing one made that job the slowest: the smoke tests after the build,
   lint and unit tests took about 25 minutes, the whole E2E suite in one job
-  about 20, and the unit tests after the build and lint about 12. The checks
-  `e2e-1` to `e2e-3` run the same commands as the CI workflow's three E2E
-  shards, so NexKit matches a failed check with the shard that failed on
-  `main`.
+  about 20, the unit tests after the build and lint about 12, and the whole
+  integration suite in one job 28 minutes or more, so on a slow runner it
+  passed the check's 30-minute limit with no test failed. The checks `e2e-1` to
+  `e2e-3` and `integration-1` to `integration-3` run the same commands as the
+  CI workflow's E2E and integration shards, so NexKit matches a failed check
+  with the shard that failed on `main`.
   A suite that no file changed since NexKit's commit can affect is skipped,
   and any doubt runs it. The commit is the one on which that check last
   passed with its current command and setup (`NEXKIT_CHECK_VERIFIED_SHA`),

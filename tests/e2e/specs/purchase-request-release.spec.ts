@@ -6,6 +6,8 @@ import { expect, test } from '../test'
 import type { Browser, Page, TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
 import { csrfHeaders } from '../csrf'
+import { chooseDepartment } from '../department-budgets'
+import { dragTo } from '../design-drag'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { guardStep } from '../hang-guard'
@@ -111,6 +113,15 @@ async function openStudio(page: Page, serverUrl: string) {
     await page.goto(`${serverUrl}/studio?app=PurchaseRequests`)
     await expect(page.getByRole('button', { name: 'Publish…', exact: true })).toBeVisible()
   })
+}
+
+/** Sets the en and vi texts of the key `key` through Studio's text route, as the signed-in author. */
+async function writeTextKey(page: Page, serverUrl: string, key: string, en: string, vi: string) {
+  const response = await page.request.put(`${serverUrl}/api/studio/apps/PurchaseRequests/texts/${key}`, {
+    headers: csrfHeaders,
+    data: { texts: { en, vi } },
+  })
+  expect(response.status(), await response.text()).toBe(200)
 }
 
 /**
@@ -355,6 +366,220 @@ test.describe('the active release of the purchase request sample changes', () =>
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
       await expect(page.getByRole('columnheader', { name: new RegExp(heading) })).toHaveCount(0)
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('an author adds a notify step to a module process and it runs on a new budget, and a start change that breaks the module contract is refused', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(300_000)
+    const { server } = await studioServer(testInfo)
+    const stamp = Date.now().toString(36)
+    const labelA = `Notify ${stamp}`
+    const labelB = `Refused ${stamp}`
+    const name = `Plan ${stamp}`
+    const resources = `${server.url}/api/studio/apps/PurchaseRequests/resources`
+    const moduleResource = `${server.url}/api/studio/apps/PurchaseRequests/modules/department-budgets/resources/94f1cc25-6a68-435f-9383-36fc43aae860`
+    const contract = 'department-budgets/ApprovalRecordsDecision'
+    const status = page.getByTestId('studio-request-status')
+    const failedScenario = (mode: 'light' | 'dark') =>
+      page
+        .locator(`[data-theme-mode="${mode}"] [data-testid="studio-test-result"][data-outcome="failed"]`)
+        .filter({ hasText: contract })
+    try {
+      await test.step('the author adds a notify step after review and publishes it', async () => {
+        await useSession(page, 'author')
+        // The designer's card takes text keys only, so the texts of the keys are written before it opens.
+        await writeTextKey(
+          page,
+          server.url,
+          'notify.budgetApproved.subject',
+          'Budget {name} approved',
+          'Ngân sách {name} đã được duyệt',
+        )
+        await writeTextKey(
+          page,
+          server.url,
+          'notify.budgetApproved.body',
+          'Budget {name} was approved by a second manager',
+          'Ngân sách {name} đã được người quản lý thứ hai duyệt',
+        )
+        await openStudio(page, server.url)
+        await page
+          .getByTestId('studio-group-module-processes')
+          .getByRole('button', {
+            name: 'department-budgets/BudgetApproval',
+            exact: true,
+          })
+          .click()
+        await dragTo(
+          page,
+          'studio-process-design',
+          page.getByTestId('studio-process-palette-notify'),
+          page.getByTestId('studio-process-edge-drop-/steps/0/outcomes/0'),
+        )
+        await expect(page.getByTestId('studio-process-announcement')).toHaveText('Step notify1 added after review')
+
+        await page
+          .getByTestId('studio-field-/steps/4/to')
+          .getByRole('button', { name: 'Add recipient', exact: true })
+          .click()
+        await page
+          .getByTestId('studio-field-/steps/4/to/0/user')
+          .getByRole('textbox', { name: 'User', exact: true })
+          .fill('requester')
+        await page
+          .getByTestId('studio-field-/steps/4/channels')
+          .getByRole('checkbox', { name: 'In-app', exact: true })
+          .check()
+        await page
+          .getByTestId('studio-field-/steps/4/message/subject')
+          .getByRole('textbox', { name: 'Text key', exact: true })
+          .fill('notify.budgetApproved.subject')
+        await page
+          .getByTestId('studio-field-/steps/4/message/body')
+          .getByRole('textbox', { name: 'Text key', exact: true })
+          .fill('notify.budgetApproved.body')
+        const values = page.getByTestId('studio-field-/steps/4/message/values')
+        await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+        await values.getByRole('textbox', { name: 'Placeholder', exact: true }).fill('name')
+        await page
+          .getByTestId('studio-field-/steps/4/message/values/name')
+          .getByRole('textbox', { name: 'Expression', exact: true })
+          .fill('name')
+
+        await page.getByTestId('studio-save').click()
+        await expect(page.getByTestId('studio-saved')).toBeVisible()
+        await expect(page.getByTestId('studio-module-layer')).toBeVisible()
+
+        // The layer holds only the added step and the review step's changed next, and nothing else of the module.
+        const list = (await (await page.request.get(resources)).json()) as {
+          items: { id: string; file: string }[]
+        }
+        const layer = list.items.find((item) => item.file === 'customizations/department-budgets/BudgetApproval.json')!
+        const { content } = (await (await page.request.get(`${resources}/${layer.id}`)).json()) as {
+          content: { changes: Record<string, any> }
+        }
+        expect(Object.keys(content.changes)).toEqual(['steps'])
+        const steps = content.changes.steps as { name: string }[]
+        expect(steps.map((step) => step.name).sort()).toEqual(['notify1', 'review'])
+        expect(steps.find((step) => step.name === 'review')).toEqual({
+          name: 'review',
+          outcomes: [{ name: 'approve', next: 'notify1' }],
+        })
+        expect(steps.find((step) => step.name === 'notify1')).toMatchObject({
+          type: 'operation',
+          operation: 'notify',
+          next: 'markApproved',
+        })
+
+        await publishWithLabel(page, labelA)
+        await expect(status).toHaveAttribute('data-status', 'succeeded', {
+          timeout: 120_000,
+        })
+        await expect(page.getByTestId('studio-release-row').filter({ hasText: labelA })).toHaveAttribute(
+          'data-active',
+          'true',
+        )
+      })
+
+      await test.step('a manager submits a new budget, a second manager approves it and the requester is notified', async () => {
+        await useSession(page, 'manager')
+        await page.goto('/purchasing/purchaserequests')
+        await page.getByRole('menuitem', { name: 'Budgets', exact: true }).click()
+        await expect(page).toHaveURL(/\/purchasing\/department-budgets\/budgets$/)
+        await page.getByRole('button', { name: 'New', exact: true }).click()
+        await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+        await page.getByLabel(fieldLabel('Year')).fill('2027')
+        await page.getByLabel(fieldLabel('Amount')).fill('1500.00')
+        await chooseDepartment(page, 'Engineering')
+        await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+        const row = page.getByRole('row', { name: new RegExp(name) })
+        await expect(row).toBeVisible()
+        const started = page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            response.url().endsWith('/processes/department-budgets/BudgetApproval/instances'),
+        )
+        await row.getByRole('button', { name: 'Submit for approval', exact: true }).click()
+        expect((await started).status()).toBe(201)
+
+        await useSession(page, 'manager-2')
+        await expect(async () => {
+          await page.goto('/purchasing/mytasks?pageSize=100')
+          await expect(page.getByRole('row', { name: new RegExp(name) })).toBeVisible({ timeout: 1_000 })
+        }).toPass({ timeout: 30_000 })
+        await page
+          .getByRole('row', { name: new RegExp(name) })
+          .getByRole('link', { name: 'Review the budget', exact: true })
+          .click()
+        await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
+        await page.getByRole('button', { name: 'Approve', exact: true }).click()
+        await expect(page).toHaveURL(/\/purchasing\/mytasks$/)
+
+        await useSession(page, 'manager')
+        await expect(async () => {
+          await page.goto('/purchasing/department-budgets/budgets')
+          await expect(
+            page.getByRole('row', {
+              name: new RegExp(`${name}.*approved`, 'i'),
+            }),
+          ).toBeVisible({
+            timeout: 1_000,
+          })
+        }).toPass({ timeout: 30_000 })
+        // The notify step sends the message to the requester, who started the process as this manager.
+        await expect(async () => {
+          const response = await page.request.get('/api/apps/PurchaseRequests/notifications?pageSize=100')
+          expect(response.status()).toBe(200)
+          const { items } = (await response.json()) as {
+            items: { subject: string }[]
+          }
+          expect(items.some((item) => item.subject.includes(name))).toBe(true)
+        }).toPass({ timeout: 30_000 })
+      })
+
+      await test.step('the author saves a start change that sets the budget approved, and the publish is refused', async () => {
+        await useSession(page, 'author')
+        const response = await page.request.get(moduleResource)
+        expect(response.status()).toBe(200)
+        const { content, layer } = (await response.json()) as {
+          content: { start: string; steps: unknown[] }
+          layer: { version: string }
+        }
+        content.steps.push({
+          name: 'approveAtOnce',
+          type: 'operation',
+          operation: 'updateRecord',
+          set: { status: "'approved'" },
+          next: 'review',
+        })
+        content.start = 'approveAtOnce'
+        // The process designer has no control for the start step, so the change goes through the module save route.
+        const saved = await page.request.put(moduleResource, {
+          headers: { ...csrfHeaders, 'If-Match': `"${layer.version}"` },
+          data: content,
+        })
+        expect(saved.status(), await saved.text()).toBe(200)
+
+        await openStudio(page, server.url)
+        await publishWithLabel(page, labelB)
+        await expect(status).toHaveAttribute('data-status', 'failed', {
+          timeout: 120_000,
+        })
+        await expect(failedScenario('light')).toBeVisible()
+        await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0342')
+        await expect(page.getByTestId('studio-release-row').filter({ hasText: labelB })).toHaveCount(0)
+        await expect(page.getByTestId('studio-release-row').filter({ hasText: labelA })).toHaveAttribute(
+          'data-active',
+          'true',
+        )
+        await chooseTheme(page, 'Dark')
+        await expect(failedScenario('dark')).toBeVisible()
+      })
     } finally {
       await server.stop()
     }

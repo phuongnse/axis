@@ -38,7 +38,7 @@
   "form": {
     "content": {
       "entity": "",
-      "sections": [{ "title": { "textKey": "" }, "fields": [{ "field": "" }] }]
+      "sections": [{ "name": "section1", "title": { "textKey": "" }, "fields": [{ "field": "" }] }]
     },
     "emptyReferences": ["/entity", "/sections/0/title/textKey", "/sections/0/fields/0/field"]
   },

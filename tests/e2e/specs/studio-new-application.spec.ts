@@ -8,6 +8,7 @@ import { startServer } from '../activate'
 import { waitForDialog } from '../dialogs'
 import { e2eApp, templatesPath } from '../server-settings'
 import { useSession } from '../sessions'
+import { openNewApplication } from '../studio-resources'
 import { chooseTheme } from '../shell'
 
 // A second server starts in beforeAll, which takes a few seconds.
@@ -89,7 +90,7 @@ test.describe('Studio creates an application', () => {
   }
 
   async function createApplication(page: Page, name: string, template?: string) {
-    await page.getByRole('button', { name: 'New application…', exact: true }).click()
+    await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     if (template !== undefined) {
@@ -127,7 +128,7 @@ test.describe('Studio creates an application', () => {
     const before = await readdir(applications)
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await page.getByRole('button', { name: 'New application…', exact: true }).click()
+    await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('PurchaseRequests')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
@@ -150,7 +151,7 @@ test.describe('Studio creates an application', () => {
   })
 
   async function expectBuiltInTemplateFirst(page: Page) {
-    await page.getByRole('button', { name: 'New application…', exact: true }).click()
+    await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await expect(dialog.getByRole('radio').nth(1)).toHaveAccessibleName(/^Tracker test.*Built in/)
     await expect(dialog.getByRole('radio').nth(2)).toHaveAccessibleName(/^Request approval/)

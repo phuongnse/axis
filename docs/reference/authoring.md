@@ -12,8 +12,7 @@ in git. The application list, application create, resource list, read, patch, cr
 references, names, policy matrix, module resource, module resource save, expression check and draft page metadata routes are built. It is agreed in
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md). Its edit routes never activate a release.
 Under `scripts/dev.sh`, a saved file restarts the server, which activates the folder, as a hand edit does today.
-A write takes a lock in the platform database, see [Versions](#versions). Reads
-and diagnostics touch no database. Going live from Studio is
+A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch no database. Going live from Studio is
 [Publishing](#publishing). `validate`, `publish`, `preview`, `rollback` and the release history are built. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
@@ -67,7 +66,7 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content, layer, marks, removed }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched. A change to it is saved by the route below. `version` is the hash of the module file. `content` has the application's [customization layer](customization-layers.md) applied, when the file `customizations/<module>/<name>.json` exists. `layer` is `{ id, file, version }`, with the SHA-256 of the layer file as `version`, or `null` when the resource has no layer. `marks` are `{ path, mark }`, a JSON Pointer into `content` with `added` or `changed`, the added ones first. `removed` are `{ list, key, content }`, a module element that the layer removed: the pointer of its list, its key and the module's element. Without a layer, `marks` and `removed` are empty. A module scenario is answered as the module wrote it, with `layer: null` |
 | `PUT /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when the save writes a layer. The body is the edited module resource whole, as `application/json`. It needs `If-Match` with the layer's version, or `If-None-Match: *` when the resource has no layer. `file` and `version` are null, and there is no `ETag`, when no layer is left. See [Module resource saves](module-resource-saves.md) |
-| `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when a layer is left. The body is `{ list, key }` as `application/json`: the pointer of a keyed list and an element's key. It needs `If-Match` with the layer's version. It puts the module's element back, or drops an added one, and rewrites the layer as the difference. `file` and `version` are null, and there is no `ETag`, when no layer is left. *Reset all* is the `DELETE` of the layer resource. See [Element reset](module-resource-saves.md#element-reset) |
+| `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when a layer is left. The body is `{ list, key }` as `application/json`: the pointer of a keyed list, or `/texts` of a text resource, and an element's key. It needs `If-Match` with the layer's version. It puts the module's element back, or drops an added one, and rewrites the layer as the difference. `file` and `version` are null, and there is no `ETag`, when no layer is left. *Reset all* is the `DELETE` of the layer resource. See [Element reset](module-resource-saves.md#element-reset) |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `POST /api/studio/apps/{application}/changes` | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
@@ -81,6 +80,7 @@ in the application. File names and names can change.
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [Draft page metadata](draft-page-metadata.md) |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [Draft page metadata](draft-page-metadata.md) |
+| `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ widget, diagnostics }` for a draft form of the module version that the application pins. The body is the whole edited form as `application/json`, see [Draft page metadata](draft-page-metadata.md) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -316,9 +316,9 @@ agrees it. The answer is:
   dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
   processes: [{ id, name, module, entity, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
-  connectors: [{ id, name, operations: [{ name }] }],
-  events: [{ id, name, entity, fields: [{ name, type }] }],
-  roles, sequences, forms: [{ id, name }],
+  connectors: [{ id, name, operations: [{ name }] }], roles: [{ id, name }],
+  events: [{ id, name, module, entity, fields: [{ name, type }] }],
+  sequences, forms, seeds, triggers, scenarios, textResources: [{ id, name, module }],
   pages: [{ id, name, module, parameters: [{ name, type, required }] }],
   policies: [{ id, name, module }], contracts: [{ id, name, module }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
@@ -327,9 +327,8 @@ agrees it. The answer is:
 - **`name`.** It is written as a reference writes it. A module entity, data
   source, process, page or policy is `<module id>/<name>`, and a module rule
   is `<module id>:<name>`. `module` is the module id, or null for the application's own.
-- **Module names.** Events, sequences and forms of a module are listed under
-  `<module id>/<name>` too. Only entities, data sources, rules, processes, pages
-  and policies carry `module`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
+- **Module names.** Events, sequences, forms, seeds and triggers of a module are listed under `<module id>/<name>` too. Every list carries `module` except `roles`, `connectors` and `texts`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
+- **Module texts and scenarios.** A module's text files are in `textResources` and its scenarios in `scenarios`, each as `<module id>/<name>` with its module id, though the files keep the plain name. The application's own are listed too, with `module` null. `texts` stays the list of text keys.
 - **Event `entity`.** It is the entity the event is about, written as a process
   writes its `entity`. A module event that names its own module's entity without
   a slash is listed with the entity qualified, as `<module id>/<name>`. Studio's

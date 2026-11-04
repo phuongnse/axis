@@ -35,8 +35,8 @@ namespace Axis.Server.CellApi;
 /// does not name stays as it is. It applies at once with no job and answers <c>200</c> with the tenant's quotas. An unknown key,
 /// a negative value, a key both set and removed, or a request that names no key answers <c>400</c> and writes nothing. It writes
 /// over the schema role, see <see cref="CellPlatformWriter"/>, and saves the rows with one platform audit record, command
-/// <c>tenant quotas set</c>, naming the keys of the request, or saves neither. The record carries no operator, as
-/// <c>platform.audit_records</c> has no such column yet.
+/// <c>tenant quotas set</c>, naming the keys of the request, or saves neither. The route passes no actor yet, so the record's
+/// <c>actor</c> column stays empty.
 /// </para>
 /// </summary>
 internal static class CellEndpoints

@@ -48,6 +48,7 @@ image, `axis-package-host`, runs the
 `package-host` container beside the worker. Compose and the Helm chart give
 that container no tenant settings, a read-only root file system, CPU and
 memory limits, and a network that reaches only the worker.
+`axis-controlplane` is the Axis SaaS control plane image, not part of an installation, see [control-plane.md](control-plane.md#image-and-chart).
 
 Build one from the repository root with
 `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.

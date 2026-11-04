@@ -30,6 +30,7 @@ import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
@@ -182,7 +183,11 @@ function Picker({
  * add, remove or move a field or a validation. With `origins`, the loaded name of each row of the fields table or
  * `null` for a row added in this session, Add field, Remove and Move report the origins that follow through
  * `onOriginsChange`, and Remove also reports the origin of the removed row as touched. With `warnings`, the row
- * numbers of fields whose change no migration follows, a warning shows in the settings column of that row.
+ * numbers of fields whose change no migration follows, a warning shows in the settings column of that row. With `layer`,
+ * as for a module entity that has a customization layer, a field, an index or a validation that the layer added or
+ * changed shows an Added or Changed tag, found by its name and not by its position. The layer's removed ones show as
+ * muted Removed rows under their list. Each has Reset to module, which calls `onReset` with the list and the name, and is
+ * off while `layer.disabled`.
  */
 export function EntityDesigner({
   value,
@@ -191,6 +196,7 @@ export function EntityDesigner({
   origins,
   warnings,
   onOriginsChange,
+  layer,
 }: {
   value: Content
   onChange: ChangeHandler
@@ -198,6 +204,7 @@ export function EntityDesigner({
   origins?: FieldOrigin[]
   warnings?: Map<number, FieldWarning>
   onOriginsChange?: (next: FieldOrigin[], touched?: string) => void
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
@@ -245,10 +252,17 @@ export function EntityDesigner({
         origins={origins}
         warnings={warnings}
         onOriginsChange={onOriginsChange}
+        layer={layer}
         onChange={onChange}
       />
-      <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} onChange={onChange} />
-      <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />
+      <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} layer={layer} onChange={onChange} />
+      <Validations
+        validations={value.validations}
+        fieldNames={fieldNames}
+        readOnly={readOnly}
+        layer={layer}
+        onChange={onChange}
+      />
     </Flex>
   )
 
@@ -262,6 +276,7 @@ function Fields({
   origins,
   warnings,
   onOriginsChange,
+  layer,
   onChange,
 }: {
   fields: unknown[] | undefined
@@ -269,6 +284,7 @@ function Fields({
   origins: FieldOrigin[] | undefined
   warnings: Map<number, FieldWarning> | undefined
   onOriginsChange: ((next: FieldOrigin[], touched?: string) => void) | undefined
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -329,15 +345,21 @@ function Fields({
           columns={[
             {
               title: t('shell.studio.entity.fieldName'),
-              render: (_, field, index) => (
-                <div data-testid={`studio-field-/fields/${index}/name`}>
-                  <Input
-                    aria-label={t('shell.studio.entity.fieldName')}
-                    value={text(isContent(field) ? field.name : undefined)}
-                    onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
-                  />
-                </div>
-              ),
+              render: (_, field, index) => {
+                const name = text(isContent(field) ? field.name : undefined)
+                return (
+                  <Flex vertical gap="small">
+                    <div data-testid={`studio-field-/fields/${index}/name`}>
+                      <Input
+                        aria-label={t('shell.studio.entity.fieldName')}
+                        value={name}
+                        onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
+                      />
+                    </div>
+                    {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
+                  </Flex>
+                )
+              },
             },
             {
               title: t('shell.studio.entity.fieldLabel'),
@@ -439,6 +461,7 @@ function Fields({
             <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/fields" />
       </Flex>
     </div>
   )
@@ -871,11 +894,13 @@ function Indexes({
   indexes,
   fields,
   readOnly,
+  layer,
   onChange,
 }: {
   indexes: unknown
   fields: unknown[]
   readOnly: boolean
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -920,6 +945,7 @@ function Indexes({
               <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
                 {text(content.name)}
               </Typography.Text>
+              {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{t('shell.studio.entity.indexFields')}</div>
                 <Select
@@ -964,6 +990,7 @@ function Indexes({
             </Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/indexes" />
       </Flex>
     </div>
   )
@@ -974,11 +1001,13 @@ function Validations({
   validations,
   fieldNames,
   readOnly,
+  layer,
   onChange,
 }: {
   validations: unknown
   fieldNames: string[]
   readOnly: boolean
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -1005,6 +1034,7 @@ function Validations({
               <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
                 {text(content.name)}
               </Typography.Text>
+              {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/expression`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{name}</div>
                 <Expression
@@ -1054,6 +1084,7 @@ function Validations({
             </Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/validations" />
       </Flex>
     </div>
   )

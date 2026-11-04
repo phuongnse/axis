@@ -314,7 +314,7 @@ public sealed class ModuleProcessTests
                 """)
             .With("departments/1.0.0/forms/DepartmentForm.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c33", "kind": "form", "name": "DepartmentForm", "formatVersion": 1, "entity": "Department",
-                  "sections": [ { "title": { "textKey": "departments.department" }, "fields": [ { "field": "name" } ] } ] }
+                  "sections": [ { "name": "department", "title": { "textKey": "departments.department" }, "fields": [ { "field": "name" } ] } ] }
                 """)
             .With("departments/1.0.0/TextsEn.json", """
                 { "id": "d9f3a5b7-4c6e-4a81-8d1c-2e3f4a5b6c7d", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
@@ -330,7 +330,7 @@ public sealed class ModuleProcessTests
                 """)
             .With("approvals/1.0.0/forms/ApprovalForm.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c24", "kind": "form", "name": "ApprovalForm", "formatVersion": 1, "entity": "Approval",
-                  "sections": [ { "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
+                  "sections": [ { "name": "approval", "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
                 """)
             .With("approvals/1.0.0/processes/Review.json", Process())
             .With("approvals/1.0.0/TextsEn.json", """
@@ -354,6 +354,6 @@ public sealed class ModuleProcessTests
                 """)
             .With("forms/InvoiceForm.json", """
                 { "id": "44444444-4444-4444-8444-444444444412", "kind": "form", "name": "InvoiceForm", "formatVersion": 1, "entity": "Invoice",
-                  "sections": [ { "title": { "textKey": "invoice.title" }, "fields": [ { "field": "number" } ] } ] }
+                  "sections": [ { "name": "title", "title": { "textKey": "invoice.title" }, "fields": [ { "field": "number" } ] } ] }
                 """);
 }

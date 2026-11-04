@@ -295,7 +295,7 @@ public sealed class TaskEscalationCompilerTests
                 """)
             .With("forms/ticket-form.json", $$"""
                 { "id": "{{FormId}}", "kind": "form", "name": "TicketForm", "formatVersion": 1, "entity": "Ticket",
-                  "sections": [ { "title": { "textKey": "ticket.title" }, "fields": [ { "field": "number" } ] } ] }
+                  "sections": [ { "name": "title", "title": { "textKey": "ticket.title" }, "fields": [ { "field": "number" } ] } ] }
                 """)
             .With("processes/ticket-task.json", process);
     }

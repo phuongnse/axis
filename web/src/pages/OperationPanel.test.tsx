@@ -70,6 +70,7 @@ const names: StudioNames = {
     {
       id: '3',
       name: 'PurchaseRequestApproved',
+      module: null,
       entity: 'PurchaseRequest',
       fields: [
         { name: 'reason', type: 'text' },
@@ -84,6 +85,10 @@ const names: StudioNames = {
   policies: [],
   contracts: [],
   texts: [],
+  seeds: [],
+  triggers: [],
+  scenarios: [],
+  textResources: [],
 }
 
 const process = {

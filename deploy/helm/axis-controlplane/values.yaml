@@ -1,0 +1,40 @@
+# Values of the Axis control plane chart. See docs/reference/control-plane.md.
+# PostgreSQL and the source of secrets are external.
+
+image:
+  # Registry prefix of the image, such as "registry.example.com/axis".
+  # Empty uses the repository name as it is.
+  registry: ""
+  repository: axis-controlplane
+  # The tag of the image. Empty uses the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+  # Names of image pull Secrets, as a list of strings.
+  pullSecrets: []
+
+replicas: 1
+# A Kubernetes resources block: requests and limits.
+resources: {}
+
+service:
+  type: ClusterIP
+  # The port of the Service. It forwards to the HTTPS port of the control plane, 8443.
+  port: 443
+
+controlPlane:
+  # ControlPlane:Region, the region code, such as "vn": lowercase letters and digits only. Required.
+  region: ""
+  # ControlPlane:TenantDomain, the domain of the tenant subdomains of the region, such as "vn.example.com". Required.
+  tenantDomain: ""
+
+secrets:
+  # ControlPlane:ConnectionString, the connection string of the control plane database. It must set
+  # SSL Mode=VerifyFull. Required. The chart mounts it as the file /run/secrets/ControlPlane__ConnectionString.
+  connectionString:
+    name: ""
+    key: ControlPlane__ConnectionString
+  # The control plane's HTTPS endpoint: a Kubernetes TLS Secret with tls.crt and tls.key, issued for the
+  # DNS name of the Service. Required, because the control plane listens on HTTPS only. The keys
+  # are fixed, so the reference holds only the name.
+  certificate:
+    name: ""

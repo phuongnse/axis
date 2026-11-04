@@ -32,9 +32,19 @@ panel are _(built)_.
   edge, or pressing Enter on it, selects that edge and the step it leaves. The
   selected edge is drawn in the primary colour. The selected step and edge are
   not written to the URL. The palette and the transitions edit the canvas
-  _(built)_. A module's process shows the same graph
-  read-only, with no palette, connect handle, step panel or delete, because the
-  module owns the file.
+  _(built)_.
+- **Module processes** _(built)_. A module process, such as
+  `checklists/ChecklistReview`, opens in this designer with the application's
+  [customization layer](customization-layers.md#in-studio) applied, through the
+  module editor that module entities use. It shows only the Design view, with no
+  Form tab, JSON tab, Undo, Delete, Uses or Used by, and Undo does not apply to
+  it. A step the layer added or changed is marked Added or Changed on its
+  graph node, in the node's accessible name and on its card, which also has
+  Reset to module. A step the layer removed is a muted row under the graph,
+  marked Removed, with Reset to module. Reset to module is off while the draft
+  has unsaved edits. A change inside a branch, outcome or escalation marks the
+  step that holds it as Changed. Save writes the layer file, and then a
+  Customized tag and Reset all show in the header.
 - **Palette** _(built)_. It sits at the top of the panel beside the canvas and
   lists the step types and operations that `process.schema.json` defines today:
   `decision`, `task`, the operations `updateRecord`, `callConnector`,
@@ -177,7 +187,7 @@ panel are _(built)_.
 - **Undo** _(built)_. The undo and redo of
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by
-  a reload.
+  a reload. They do not apply to a module process, which has no Undo.
 - **Keyboard** _(built)_. Edges and then nodes are reached with Tab, because the
   edges come first in the page. Enter selects a node's step and opens its
   card. Enter or Space on an edge selects that edge. Delete or Backspace
