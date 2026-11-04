@@ -48,6 +48,10 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.Equal(startupItem.GetProperty("releaseId").GetGuid(), startup.GetProperty("active").GetProperty("releaseId").GetGuid());
         Assert.Equal(startupItem.GetProperty("contentHash").GetString(), startup.GetProperty("folderContentHash").GetString());
 
+        // A folder identical to the live release has no changes.
+        Assert.Equal(JsonValueKind.Array, startup.GetProperty("changes").ValueKind);
+        Assert.Equal(0, startup.GetProperty("changes").GetArrayLength());
+
         await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
         var requestId = Guid.NewGuid();
         await ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Spring", "Teams rename", requestId));
@@ -79,6 +83,67 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         using var anonymous = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Forbidden, (await requester.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_changes_name_the_files_added_changed_and_removed_since_the_live_release_and_the_removed_role_keeps_its_labels()
+    {
+        using var folder = new TemporaryFolder();
+        var sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
+        CopyDirectory(sample, folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_changes", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        await File.WriteAllTextAsync(
+            Path.Combine(folder.Path, "roles", "auditor.json"),
+            $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "role", "name": "auditor", "formatVersion": 1, "label": { "textKey": "role.operator" } }""",
+            CancellationToken);
+        await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
+        File.Delete(Path.Combine(folder.Path, "roles", "operator.json"));
+
+        var history = await GetAsync(author, ReleasesUrl);
+
+        // The policy still names the removed role, so the folder has errors, and its changes are still listed.
+        Assert.Equal(JsonValueKind.Null, history.GetProperty("folderContentHash").ValueKind);
+        var changes = history.GetProperty("changes").EnumerateArray().ToList();
+        Assert.Equal(
+            [("roles/auditor.json", "added"), ("roles/operator.json", "removed"), ("texts/en.json", "changed")],
+            changes.Select(change => (change.GetProperty("path").GetString()!, change.GetProperty("change").GetString()!)));
+        var removed = changes[1];
+        Assert.Equal(("role", "operator"), (removed.GetProperty("kind").GetString(), removed.GetProperty("name").GetString()));
+        Assert.Equal(JsonValueKind.Null, removed.GetProperty("locale").ValueKind);
+        var titles = removed.GetProperty("titles");
+        using var vietnamese = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(sample, "texts", "vi.json"), CancellationToken));
+        Assert.Equal(
+            ("Operator", vietnamese.RootElement.GetProperty("texts").GetProperty("role.operator").GetString()),
+            (titles.GetProperty("en").GetString(), titles.GetProperty("vi").GetString()));
+        foreach (var change in new[] { changes[0], changes[2] })
+        {
+            Assert.All(["kind", "name", "titles", "locale"], name => Assert.Equal(JsonValueKind.Null, change.GetProperty(name).ValueKind));
+        }
+
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Forbidden, (await requester.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_server_with_no_live_release_answers_no_active_release_and_no_changes()
+    {
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_none", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path);
+
+        // Creating a client starts the server, which activates the folder. Removing the active row leaves no live release.
+        using var author = factory.CreateClient().SignedInAs("author");
+        await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.active_releases", CancellationToken);
+
+        var history = await GetAsync(author, ReleasesUrl);
+
+        Assert.Equal(JsonValueKind.Null, history.GetProperty("active").ValueKind);
+        Assert.Equal(JsonValueKind.Null, history.GetProperty("changes").ValueKind);
     }
 
     [Fact]
