@@ -622,6 +622,48 @@ export async function saveStudioModuleResource(
 }
 
 /**
+ * Resets one element of a keyed list of a module resource to the module's version, and keeps the rest of the layer. The
+ * layer's version goes in `If-Match`. A 409 means the layer changed since, and a 400 or a 404 means the server refuses the
+ * reset. Nothing is written for either. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt
+ * and throws, as any other failure does.
+ */
+export async function resetStudioModuleElement(
+  application: string,
+  module: string,
+  id: string,
+  layerVersion: string,
+  list: string,
+  key: string,
+): Promise<ModuleSaveResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}/reset`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'If-Match': `"${layerVersion}"` },
+    body: JSON.stringify({ list, key }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const quota = await quotaRefusalTitle(response)
+  if (quota !== null) {
+    throw new QuotaRefusedError(quota)
+  }
+  if (response.status === 400 || response.status === 404) {
+    const problem = (await response.json().catch(() => null)) as { title?: unknown } | null
+    return { status: 'refused', title: typeof problem?.title === 'string' ? problem.title : '' }
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as {
+    file: string | null
+    version: string | null
+    diagnostics: StudioDiagnostic[]
+  }
+  return { status: 'saved', file: body.file, version: body.version, diagnostics: body.diagnostics }
+}
+
+/**
  * Patches a resource, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
  * and nothing was written. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws,
  * as any other failure does.

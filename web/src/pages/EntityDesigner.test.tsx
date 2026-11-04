@@ -12,6 +12,7 @@ import {
   type FieldSetting,
 } from '../platform/entityFields'
 import { setAt } from '../platform/jsonPatch'
+import type { LayerElement } from '../platform/layerMarks'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -810,5 +811,66 @@ describe('EntityDesigner', () => {
     expect(within(screen.getByTestId('studio-field-/validations/0/message/textKey')).getByRole('textbox')).toHaveValue(
       'v',
     )
+  })
+})
+
+describe('EntityDesigner with a customization layer', () => {
+  function renderLayered(value: Record<string, unknown>, elements: LayerElement[], disabled = false) {
+    const onReset = vi.fn()
+    render(
+      <Providers loaded={names}>
+        <EntityDesigner value={value} onChange={vi.fn()} layer={{ elements, disabled, onReset }} />
+      </Providers>,
+    )
+    return onReset
+  }
+
+  it('names each mark and each Reset to module after the element', async () => {
+    const onReset = renderLayered(
+      entity({
+        validations: [
+          { name: 'positive', expression: 'true', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+        indexes: [{ name: 'byCode', fields: ['code'] }],
+      }),
+      [
+        { list: '/fields', key: 'note', mark: 'added' },
+        { list: '/validations', key: 'positive', mark: 'changed' },
+        { list: '/indexes', key: 'byCode', mark: 'added' },
+      ],
+    )
+
+    expect(screen.getByRole('note', { name: 'Added note' })).toHaveTextContent('Added')
+    expect(screen.getByRole('note', { name: 'Changed positive' })).toHaveTextContent('Changed')
+    expect(screen.getByRole('note', { name: 'Added byCode' })).toBeInTheDocument()
+    expect(screen.getByTestId('studio-layer-mark-/fields/2')).toBeInTheDocument()
+    expect(screen.queryByRole('note', { name: /total/ })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Reset to module/ })).toHaveLength(3)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reset to module note' }))
+
+    expect(onReset).toHaveBeenCalledWith('/fields', 'note')
+  })
+
+  it('shows a removed field as a muted row with its name and Reset to module', async () => {
+    const onReset = renderLayered(entity({ fields: [{ name: 'total', type: 'decimal' }] }), [
+      { list: '/fields', key: 'code', mark: 'removed' },
+    ])
+
+    const row = screen.getByTestId('studio-layer-removed-/fields/code')
+    expect(row).toHaveTextContent('code')
+    expect(row).toHaveAttribute('data-muted')
+    expect(within(row).getByRole('note', { name: 'Removed code' })).toBeInTheDocument()
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Reset to module code' }))
+
+    expect(onReset).toHaveBeenCalledWith('/fields', 'code')
+  })
+
+  it('shows a removed index although the entity has none, and turns Reset to module off when disabled', () => {
+    renderLayered(entity(), [{ list: '/indexes', key: 'byCode', mark: 'removed' }], true)
+
+    expect(screen.getByTestId('studio-layer-removed-/indexes/byCode')).toHaveTextContent('byCode')
+    expect(screen.getByRole('button', { name: 'Reset to module byCode' })).toBeDisabled()
   })
 })

@@ -10,6 +10,7 @@ import {
   Select,
   Switch,
   Table,
+  Tag,
   Typography,
   DatePicker,
 } from 'antd'
@@ -24,6 +25,7 @@ import {
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
+import { markOf, type LayerElement } from '../platform/layerMarks'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -74,6 +76,91 @@ function text(value: unknown): string {
 function JsonOnly() {
   const t = useText()
   return <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+}
+
+/** What the designer needs to show a customization layer: its marked elements, and Reset to module for each. */
+export interface DesignerLayer {
+  elements: LayerElement[]
+  disabled: boolean
+  onReset: (list: string, key: string) => void
+}
+
+/**
+ * The tag of what the layer did to the element `key` of `list`, with Reset to module, or nothing when the layer left it
+ * alone. The tag and the button carry the element's name, so each has a name of its own.
+ */
+function LayerMarkTag({
+  layer,
+  list,
+  index,
+  name,
+}: {
+  layer: DesignerLayer
+  list: string
+  index: number
+  name: string
+}) {
+  const t = useText()
+  const mark = markOf(layer.elements, list, name)
+  if (mark === undefined || mark === 'removed') {
+    return null
+  }
+  return (
+    <Flex gap="small" align="center" wrap>
+      <Tag
+        role="note"
+        aria-label={`${t(`shell.studio.module.${mark}`)} ${name}`}
+        data-testid={`studio-layer-mark-${list}/${index}`}
+      >
+        {t(`shell.studio.module.${mark}`)}
+      </Tag>
+      <ResetElement layer={layer} list={list} name={name} />
+    </Flex>
+  )
+}
+
+/** The Reset to module button of one element, named after the element. */
+function ResetElement({ layer, list, name }: { layer: DesignerLayer; list: string; name: string }) {
+  const t = useText()
+  return (
+    <Button
+      size="small"
+      aria-label={`${t('shell.studio.module.resetElement')} ${name}`}
+      disabled={layer.disabled}
+      onClick={() => layer.onReset(list, name)}
+    >
+      {t('shell.studio.module.resetElement')}
+    </Button>
+  )
+}
+
+/** The elements of `list` that the layer removed, as muted rows with Reset to module. They are not rows of the draft. */
+function RemovedRows({ layer, list }: { layer: DesignerLayer | undefined; list: string }) {
+  const t = useText()
+  const removed = (layer?.elements ?? []).filter((element) => element.list === list && element.mark === 'removed')
+  if (layer === undefined || removed.length === 0) {
+    return null
+  }
+  return (
+    <Flex vertical gap="small">
+      {removed.map((element) => (
+        <Flex
+          key={element.key}
+          gap="small"
+          align="center"
+          wrap
+          data-muted
+          data-testid={`studio-layer-removed-${list}/${element.key}`}
+        >
+          <Typography.Text type="secondary">{element.key}</Typography.Text>
+          <Tag role="note" aria-label={`${t('shell.studio.module.removed')} ${element.key}`}>
+            {t('shell.studio.module.removed')}
+          </Tag>
+          <ResetElement layer={layer} list={list} name={element.key} />
+        </Flex>
+      ))}
+    </Flex>
+  )
 }
 
 /** The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. */
@@ -182,7 +269,11 @@ function Picker({
  * add, remove or move a field or a validation. With `origins`, the loaded name of each row of the fields table or
  * `null` for a row added in this session, Add field, Remove and Move report the origins that follow through
  * `onOriginsChange`, and Remove also reports the origin of the removed row as touched. With `warnings`, the row
- * numbers of fields whose change no migration follows, a warning shows in the settings column of that row.
+ * numbers of fields whose change no migration follows, a warning shows in the settings column of that row. With `layer`,
+ * as for a module entity that has a customization layer, a field, an index or a validation that the layer added or
+ * changed shows an Added or Changed tag, found by its name and not by its position. The layer's removed ones show as
+ * muted Removed rows under their list. Each has Reset to module, which calls `onReset` with the list and the name, and is
+ * off while `layer.disabled`.
  */
 export function EntityDesigner({
   value,
@@ -191,6 +282,7 @@ export function EntityDesigner({
   origins,
   warnings,
   onOriginsChange,
+  layer,
 }: {
   value: Content
   onChange: ChangeHandler
@@ -198,6 +290,7 @@ export function EntityDesigner({
   origins?: FieldOrigin[]
   warnings?: Map<number, FieldWarning>
   onOriginsChange?: (next: FieldOrigin[], touched?: string) => void
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
@@ -245,10 +338,17 @@ export function EntityDesigner({
         origins={origins}
         warnings={warnings}
         onOriginsChange={onOriginsChange}
+        layer={layer}
         onChange={onChange}
       />
-      <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} onChange={onChange} />
-      <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />
+      <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} layer={layer} onChange={onChange} />
+      <Validations
+        validations={value.validations}
+        fieldNames={fieldNames}
+        readOnly={readOnly}
+        layer={layer}
+        onChange={onChange}
+      />
     </Flex>
   )
 
@@ -262,6 +362,7 @@ function Fields({
   origins,
   warnings,
   onOriginsChange,
+  layer,
   onChange,
 }: {
   fields: unknown[] | undefined
@@ -269,6 +370,7 @@ function Fields({
   origins: FieldOrigin[] | undefined
   warnings: Map<number, FieldWarning> | undefined
   onOriginsChange: ((next: FieldOrigin[], touched?: string) => void) | undefined
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -329,15 +431,21 @@ function Fields({
           columns={[
             {
               title: t('shell.studio.entity.fieldName'),
-              render: (_, field, index) => (
-                <div data-testid={`studio-field-/fields/${index}/name`}>
-                  <Input
-                    aria-label={t('shell.studio.entity.fieldName')}
-                    value={text(isContent(field) ? field.name : undefined)}
-                    onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
-                  />
-                </div>
-              ),
+              render: (_, field, index) => {
+                const name = text(isContent(field) ? field.name : undefined)
+                return (
+                  <Flex vertical gap="small">
+                    <div data-testid={`studio-field-/fields/${index}/name`}>
+                      <Input
+                        aria-label={t('shell.studio.entity.fieldName')}
+                        value={name}
+                        onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
+                      />
+                    </div>
+                    {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
+                  </Flex>
+                )
+              },
             },
             {
               title: t('shell.studio.entity.fieldLabel'),
@@ -439,6 +547,7 @@ function Fields({
             <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/fields" />
       </Flex>
     </div>
   )
@@ -871,11 +980,13 @@ function Indexes({
   indexes,
   fields,
   readOnly,
+  layer,
   onChange,
 }: {
   indexes: unknown
   fields: unknown[]
   readOnly: boolean
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -920,6 +1031,7 @@ function Indexes({
               <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
                 {text(content.name)}
               </Typography.Text>
+              {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{t('shell.studio.entity.indexFields')}</div>
                 <Select
@@ -964,6 +1076,7 @@ function Indexes({
             </Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/indexes" />
       </Flex>
     </div>
   )
@@ -974,11 +1087,13 @@ function Validations({
   validations,
   fieldNames,
   readOnly,
+  layer,
   onChange,
 }: {
   validations: unknown
   fieldNames: string[]
   readOnly: boolean
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -1005,6 +1120,7 @@ function Validations({
               <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
                 {text(content.name)}
               </Typography.Text>
+              {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/expression`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{name}</div>
                 <Expression
@@ -1054,6 +1170,7 @@ function Validations({
             </Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/validations" />
       </Flex>
     </div>
   )

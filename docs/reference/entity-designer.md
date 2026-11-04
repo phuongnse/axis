@@ -89,6 +89,10 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     draft differs from what was loaded. A save refused by the server shows the server's reason, and a `409` shows the
     conflict alert with Reload. When the entity has a layer, a Customized tag and a Reset all button show in the
     header. Reset all asks first, then deletes the layer file, and the designer shows the module's version again.
+    A field, an index or a validation that the layer added or changed shows **Added** or **Changed**, found by its
+    name. One that the layer removed shows in a muted **Removed** row under its list. Each has **Reset to module**,
+    which calls the [element reset](module-resource-saves.md#element-reset) route and reloads the entity. It is off
+    while the draft has unsaved edits.
     There is no JSON tab, no Delete, no migration questions and no Uses or Used by lists. A save that adds a field
     may need a migration, which Validate or Publish reports. An expression and a label show as plain text inputs, because the
     module resource is not one of the folder's.
