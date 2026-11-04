@@ -535,22 +535,90 @@ export async function fetchStudioResource(
   return (await response.json()) as StudioResource
 }
 
+/** The customization layer of a module resource: the layer file's resource id, its file and its version. */
+export interface StudioModuleLayer {
+  id: string
+  file: string
+  version: string
+}
+
+/** A module resource with the application's layer applied, as `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` answers. */
+export interface StudioModuleResource extends StudioResource {
+  layer: StudioModuleLayer | null
+  marks: { path: string; mark: 'added' | 'changed' }[]
+  removed: { list: string; key: string; content: unknown }[]
+}
+
 /**
- * Loads one file of the module version that the application pins, with its content. The file is read-only, and its
- * `file` is `modules/<module>/<path>`. A 401 shows the sign-in prompt and throws, as any other failure does.
+ * Loads one file of the module version that the application pins, with the application's layer applied and the layer
+ * itself, or `layer: null` when there is none. Its `file` is `modules/<module>/<path>`. A 401 shows the sign-in prompt
+ * and throws, as any other failure does.
  */
 export async function fetchStudioModuleResource(
   application: string,
   module: string,
   id: string,
   signal?: AbortSignal,
-): Promise<StudioResource> {
+): Promise<StudioModuleResource> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}`
   const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
-  return (await response.json()) as StudioResource
+  return (await response.json()) as StudioModuleResource
+}
+
+/**
+ * What a module resource save answers: the layer's file and version, both `null` when no layer is left, and the folder's
+ * diagnostics. `refused` carries the server's reason for an edit that a layer cannot express.
+ */
+export type ModuleSaveResult =
+  | { status: 'saved'; file: string | null; version: string | null; diagnostics: StudioDiagnostic[] }
+  | { status: 'conflict' }
+  | { status: 'refused'; title: string }
+
+/**
+ * Saves the whole edited module resource, which the server writes as a layer holding only the difference. The layer's
+ * version goes in `If-Match`, or `If-None-Match: *` when the resource has no layer. A 409 means the layer changed since,
+ * and a 400 means the edit cannot be a layer. Nothing is written for either. A quota refusal throws a
+ * {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function saveStudioModuleResource(
+  application: string,
+  module: string,
+  id: string,
+  layerVersion: string | null,
+  content: Record<string, unknown>,
+): Promise<ModuleSaveResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}`
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(layerVersion === null ? { 'If-None-Match': '*' } : { 'If-Match': `"${layerVersion}"` }),
+    },
+    body: JSON.stringify(content),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const quota = await quotaRefusalTitle(response)
+  if (quota !== null) {
+    throw new QuotaRefusedError(quota)
+  }
+  if (response.status === 400) {
+    const problem = (await response.json().catch(() => null)) as { title?: unknown } | null
+    return { status: 'refused', title: typeof problem?.title === 'string' ? problem.title : '' }
+  }
+  if (!response.ok) {
+    throw new Error(`Saving '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as {
+    file: string | null
+    version: string | null
+    diagnostics: StudioDiagnostic[]
+  }
+  return { status: 'saved', file: body.file, version: body.version, diagnostics: body.diagnostics }
 }
 
 /**
