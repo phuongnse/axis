@@ -355,6 +355,7 @@ flowchart LR
 | P58 | A module brings in roles or policies. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `ModuleCompilerTests` reports a role file in a module as an error. A module policy names only role slots of its module, which the application maps, and grants only on its own module. See [modules](modules-and-templates.md#processes-pages-policies-and-dependencies). |
 | P59 | An untrusted module or template is installed. | Modules and templates | Tampering | High | **Delegated** | The operator chooses what sits in `Modules:Path` and `Templates:Path`. See [modules](modules-and-templates.md#modules). |
 | P60 | A template brings a wide policy into a new application. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `StudioCreateApplicationTests` copies a template as a new application. `StudioPublishTests` shows that an author without the publisher role cannot publish it. |
+| P115 | An author reads the names of a tenant's bindings through `GET /api/studio/bindings` _(planned for M31)_. | Studio and the authoring API | Information disclosure | Low | **Accepted** | A binding's name is not a secret, and an author needs it to choose a binding. The route answers names by kind, never a value, and only to an author. The owner accepted this on 2026-11-04. See [D132](../decisions/d132-rules-from-the-studio-settings-review.md). |
 
 ### Identity provider
 

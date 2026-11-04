@@ -392,10 +392,11 @@ application's [layer](customization-layers.md#extending-a-lifecycle) added is no
 a relax entry cannot name it.
 
 **Labels** _(planned for M31)_. A point reads as words, never as its technical name, so a person can judge it. A
-contract's states, transitions, core validations and effects take a `label` text reference, a ceiling slot uses its
-module role's label, and the ceiling of roles mapped to no slot reads "Other roles". Studio reads the words from the
-module files the release stores, so an old release keeps the words it was published with. A part with no words falls
-back to its name as written.
+contract's states, transitions, core validations and effects each need a `label` text reference, a ceiling slot uses its
+module role's label, and the ceiling of roles mapped to no slot reads "Other roles". A point without a label, or a label
+whose key no text resource holds, is a compile error, so a publish never brings a point without words. Studio reads the
+words from the module files the release stores, so an old release keeps the words it was published with, and a part of
+a release published before this rule falls back to its name as written.
 
 ## Relax entries
 
