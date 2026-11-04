@@ -82,6 +82,14 @@ public static class WorkItemQueue
         GROUP BY kind
         """;
 
+    // The filter of the claim without its due time, so the read and the claim agree on which items count.
+    internal const string ReadNextDueSql = $"""
+        SELECT extract(epoch FROM min(due_at) - {SqlTranslator.NowSql})::double precision
+        FROM axis.process_work_items
+        WHERE tenant_id = @tenant AND kind = ANY(@kinds)
+          AND (lease_expires_at IS NULL OR lease_expires_at <= now())
+        """;
+
     /// <summary>
     /// Adds a ready work item and returns its id. <paramref name="processInstanceId"/> names the
     /// process instance the item runs a step or a connector call of, when it does,
@@ -308,6 +316,25 @@ public static class WorkItemQueue
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Reads how long it is until the earliest due time of the tenant's items of one of the kinds that no live lease holds, as
+    /// <see cref="ClaimAsync"/> filters them. It is zero or negative when an item is due now, and <see langword="null"/> when there is
+    /// none. Time is the transaction time, as it is for a claim.
+    /// </summary>
+    public static async Task<TimeSpan?> ReadNextDueAsync(
+        NpgsqlConnection connection,
+        string tenantId,
+        IReadOnlyCollection<string> kinds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(kinds);
+        await using var command = new NpgsqlCommand(ReadNextDueSql, connection);
+        command.Parameters.AddWithValue("tenant", tenantId);
+        command.Parameters.AddWithValue("kinds", NpgsqlDbType.Array | NpgsqlDbType.Text, kinds.ToArray());
+        return await command.ExecuteScalarAsync(cancellationToken) is double seconds ? TimeSpan.FromSeconds(seconds) : null;
     }
 
     /// <summary>The span that queued an item, or <see langword="null"/> when the item stores none or an id that is not hex of the right length.</summary>

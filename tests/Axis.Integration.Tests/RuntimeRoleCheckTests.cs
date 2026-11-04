@@ -220,6 +220,7 @@ public sealed class RuntimeRoleCheckTests(PostgreSqlFixture database) : IClassFi
             ["Tenants:a:Hosts:0"] = TenantHost,
             ["Tenants:a:ConnectionString"] = RuntimeConnectionString(schemaConnection, role),
             ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:IdlePollCeiling"] = "00:00:00.05",
         });
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
