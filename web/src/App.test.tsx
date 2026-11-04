@@ -64,6 +64,10 @@ const texts: Record<string, Record<string, string>> = {
     'shell.account.signIn': 'Sign in',
     'shell.signInPrompt.title': 'Your session has ended',
     'shell.signInPrompt.message': 'Sign in again to continue.',
+    'shell.licences.title': 'Open source licences',
+    'shell.licences.axis': 'Axis is free software under the AGPL.',
+    'shell.licences.npm': 'npm packages',
+    'shell.licences.nuget': 'NuGet packages',
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
@@ -379,6 +383,14 @@ function stubServer({
   const fetchMock = vi.fn(async (input: string) => {
     if (input === '/api/me') {
       return me === null ? json({ title: 'Sign in to continue.', status: 401 }, 401) : json(me)
+    }
+    if (input === '/api/licences') {
+      return me === null
+        ? json({ title: 'Sign in to read or write this data.', status: 401 }, 401)
+        : json({ npm: [{ name: 'react', version: '19.0.0', licence: 'MIT' }], nuget: [] })
+    }
+    if (input === '/licences.json') {
+      return json({ npm: [{ name: 'react', licence: 'MIT' }], nuget: [{ name: 'Npgsql', licence: 'PostgreSQL' }] })
     }
     if (input === '/api/site') {
       return json(siteStatus === 200 ? { ...site, hostSite } : {}, siteStatus)
@@ -841,6 +853,20 @@ describe('App', () => {
     await waitFor(() => expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/')))
     expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Applications' })).not.toBeInTheDocument()
+  })
+
+  it('opens /licences with nobody signed in, without the sign-in prompt', async () => {
+    vi.mocked(assignLocation).mockReset()
+    stubServer({ me: null })
+
+    renderApp('/licences')
+
+    expect(await screen.findByRole('heading', { name: 'Open source licences' })).toBeInTheDocument()
+    expect(await screen.findByText('Npgsql')).toBeInTheDocument()
+    expect(screen.getByText('react')).toBeInTheDocument()
+    expect(screen.queryByText('19.0.0')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Your session has ended' })).not.toBeInTheDocument()
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 
   it('shows the sign-in card, with a warning above one Sign in button, and starts sign-in only on the click', async () => {

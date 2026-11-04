@@ -473,7 +473,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | Address | Shows |
   | --- | --- |
   | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it starts sign-in at once and draws no screen first. Only two addresses show a card, and neither starts sign-in until the person clicks its button. `/?signIn=failed` is where the server sends the browser after a refused sign-in. It shows "Sign in" and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/?signedOut` is where the identity provider returns the browser after sign-out. It shows "You have signed out", a message and a "Sign in again" button. A signed-in person who opens either address sees the launcher. |
-  | `/licences` | the [open source licences](legal.md#open-source-licences) page, open without signing in _(planned for M31)_ |
+  | `/licences` | the [open source licences](legal.md#open-source-licences) page, open without signing in |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
@@ -896,7 +896,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     when that fails does the browser go to the identity provider's sign-out page, see
     [sign-in and the session](security.md#sign-in-and-the-session).
   - The **sessions screen** at `/account` and the **users page** at `/users` are platform routes beside `/studio`,
-    before the site route, so `account` and `users` are reserved site paths, and so is `licences` _(planned for M31)_. See
+    before the site route, so `account` and `users` are reserved site paths, and so is `licences`. See
     [platform pages](platform-pages.md).
   - A `401` from any API call shows the **sign-in prompt**, a dialog titled "Your session has ended"
     with a short message and a **Sign in** button. It shows when a signed-out person

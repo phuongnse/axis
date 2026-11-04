@@ -4,6 +4,7 @@ import { AccountPage } from './pages/AccountPage'
 import { ConsoleInstancePage } from './pages/ConsoleInstancePage'
 import { ConsolePage } from './pages/ConsolePage'
 import { HomePage } from './pages/HomePage'
+import { LicencesPage } from './pages/LicencesPage'
 import { ShellError } from './pages/LocaleLoadFailed'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PageRoute } from './pages/PageRoute'
@@ -142,6 +143,14 @@ function PlatformRoutes() {
         element={
           <PlatformShellRoute>
             <UsersPage />
+          </PlatformShellRoute>
+        }
+      />
+      <Route
+        path="licences"
+        element={
+          <PlatformShellRoute>
+            <LicencesPage />
           </PlatformShellRoute>
         }
       />
