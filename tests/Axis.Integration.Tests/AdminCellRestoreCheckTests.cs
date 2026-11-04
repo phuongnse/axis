@@ -17,6 +17,7 @@ using Axis.Core.Telemetry;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -24,7 +25,9 @@ namespace Axis.Integration.Tests;
 /// <c>cell restore-check</c> on real PostgreSQL, MinIO and Keycloak. A good archive restores into the scratch tenant, which has the
 /// counts and the users of the archive, is removed with its database, roles and realm, and records 1. An archive whose counts do not match its
 /// data records 0, exits 1 and still removes the scratch tenant. The command writes one platform audit record for the source tenant, before its
-/// first change. A missing <c>Cell:InternalDomain</c> makes it exit 2 and write no audit record.
+/// first change. A missing <c>Cell:InternalDomain</c> makes it exit 2 and write no audit record. The test scenarios of an application in the
+/// source tenant's Studio folder run against the scratch tenant's copy of it: a passing scenario records 1, and a failing one records 0, exits 1
+/// and still removes the scratch tenant and its Studio folder.
 /// </summary>
 [Collection(ScratchTenantCollection)]
 public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, PostgreSqlFixture database, MinioFixture minio) : IClassFixture<PostgreSqlFixture>, IClassFixture<MinioFixture>, IAsyncLifetime
@@ -161,6 +164,105 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         Assert.False(await scenario.DatabaseExistsAsync(ScratchId()));
     }
 
+    [Fact]
+    public async Task A_passing_scenario_of_a_restored_application_is_reported_and_the_check_records_1()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var s3 = minio.NewClient();
+        using var studio = new TemporaryFolder();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = await ScenarioCellSettingsAsync(bucket, studio);
+        var source = await CreateSourceAsync(scenario, cell);
+        WriteApplication(studio, source, "Creates", quantity: 3, expected: 3);
+        await UploadBackupAsync(scenario, s3, bucket, source, cell);
+        var scratch = ScratchId();
+
+        using var gauge = new GaugeCapture(source);
+        var result = await scenario.RunAsync(["cell", "restore-check"], path: _tools.PathSetting, identityProvider: _handler, extra: cell);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Contains($"{scratch} counts ok", result.Output);
+        Assert.Contains($"{scratch} users ok", result.Output);
+        Assert.Contains($"{scratch} scenario Creates passed", result.Output);
+        Assert.Contains($"{scratch} test ok", result.Output);
+        Assert.Contains($"{scratch} remove ok", result.Output);
+        Assert.Equal($"{source} restore-check passed", result.Output[^1]);
+        Assert.Equal(1, gauge.Points[source]);
+        await AssertScratchGoneAsync(scenario, scratch);
+        Assert.False(Directory.Exists(Path.Combine(studio.Path, scratch)));
+    }
+
+    [Fact]
+    public async Task A_failing_scenario_of_a_restored_application_fails_the_check_exits_1_and_still_removes_the_scratch_tenant()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var s3 = minio.NewClient();
+        using var studio = new TemporaryFolder();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = await ScenarioCellSettingsAsync(bucket, studio);
+        var source = await CreateSourceAsync(scenario, cell);
+        WriteApplication(studio, source, "Miscounts", quantity: 3, expected: 4);
+        await UploadBackupAsync(scenario, s3, bucket, source, cell);
+        var scratch = ScratchId();
+
+        using var gauge = new GaugeCapture(source);
+        var result = await scenario.RunAsync(["cell", "restore-check"], path: _tools.PathSetting, identityProvider: _handler, extra: cell);
+
+        Assert.Equal(1, result.Exit);
+        Assert.Contains(result.Output, line => line.StartsWith($"{scratch} scenario Miscounts failed", StringComparison.Ordinal));
+        Assert.Contains($"{scratch} test failed: 1 of 1 scenarios failed.", result.Output);
+        Assert.Contains($"{scratch} remove ok", result.Output);
+        Assert.Equal($"{source} restore-check failed", result.Output[^1]);
+        Assert.Equal(0, gauge.Points[source]);
+        await AssertScratchGoneAsync(scenario, scratch);
+        Assert.False(Directory.Exists(Path.Combine(studio.Path, scratch)));
+        Assert.Equal(1, await CountTenantsAsync(scenario, source));
+    }
+
+    [Fact]
+    public async Task A_restored_application_without_a_scenario_server_fails_the_check_with_AXC0217()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var s3 = minio.NewClient();
+        using var studio = new TemporaryFolder();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = CellSettings(bucket, studio);
+        var source = await CreateSourceAsync(scenario, cell);
+        WriteApplication(studio, source, "Creates", quantity: 3, expected: 3);
+        await UploadBackupAsync(scenario, s3, bucket, source, cell);
+        var scratch = ScratchId();
+
+        using var gauge = new GaugeCapture(source);
+        var result = await scenario.RunAsync(["cell", "restore-check"], path: _tools.PathSetting, identityProvider: _handler, extra: cell);
+
+        Assert.Equal(1, result.Exit);
+        Assert.Contains(result.Output, line => line.StartsWith($"{scratch} test failed", StringComparison.Ordinal) && line.Contains("AXC0217", StringComparison.Ordinal));
+        Assert.Equal(0, gauge.Points[source]);
+        await AssertScratchGoneAsync(scenario, scratch);
+        Assert.False(Directory.Exists(Path.Combine(studio.Path, scratch)));
+    }
+
+    [Fact]
+    public async Task A_scenario_server_that_is_not_a_connection_string_makes_the_command_exit_2_and_writes_no_audit_record()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var s3 = minio.NewClient();
+        using var studio = new TemporaryFolder();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = new Dictionary<string, string?>(CellSettings(bucket, studio)) { ["Scenarios:ServerConnectionString"] = "not a connection string" };
+
+        var result = await scenario.RunAsync(["cell", "restore-check"], path: _tools.PathSetting, identityProvider: _handler, extra: cell);
+
+        Assert.Equal(2, result.Exit);
+        Assert.Equal(["The setting Scenarios:ServerConnectionString is not a valid connection string."], result.Error);
+        Assert.Empty(result.Output);
+        Assert.Empty(await scenario.AuditRecordsAsync());
+    }
+
     private static string Today() => DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static string ScratchId() => $"restore-check-{DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}";
@@ -183,6 +285,47 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         ["IdentityProvider:AdminClientId"] = KeycloakFixture.AdminClientId,
         ["IdentityProvider:AdminClientSecret"] = KeycloakFixture.AdminClientSecret,
     };
+
+    // The scenario databases of these tests must not belong to the axis_scenario role: the tests of the "Test scenario runs" collection
+    // count and drop the databases of that role while they run.
+    private async Task<Dictionary<string, string?>> ScenarioCellSettingsAsync(string bucket, TemporaryFolder studio) =>
+        new(CellSettings(bucket, studio))
+        {
+            ["Scenarios:ServerConnectionString"] = new NpgsqlConnectionStringBuilder(await PostgreSqlServer.AdminConnectionStringAsync()) { Database = "postgres" }.ConnectionString,
+        };
+
+    // The ScenarioApp fixture in the source tenant's Studio folder, with one scenario that creates a note of the given quantity and expects another.
+    private static void WriteApplication(TemporaryFolder studio, string tenant, string name, int quantity, int expected)
+    {
+        var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ScenarioApp");
+        foreach (var file in Directory.EnumerateFiles(fixture, "*", SearchOption.AllDirectories))
+        {
+            studio.With(Path.Combine(tenant, "notes", Path.GetRelativePath(fixture, file)), File.ReadAllText(file));
+        }
+
+        studio.With(Path.Combine(tenant, "notes", "scenarios", $"{name}.json"), $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "scenario",
+              "name": "{{name}}",
+              "formatVersion": 1,
+              "users": { "requester": ["clerk"] },
+              "steps": [
+                { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "quantity": {{quantity}} } },
+                { "type": "expectRecord", "record": "note", "values": { "title": "Desk", "quantity": {{expected}} } }
+              ]
+            }
+            """);
+    }
+
+    // Backs the source tenant up, Studio folder included, and uploads the archive as today's archive of the cell.
+    private async Task UploadBackupAsync(AdminScenario scenario, IAmazonS3 s3, string bucket, string source, Dictionary<string, string?> cell)
+    {
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.axisbak");
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: _tools.PathSetting, identityProvider: _handler, extra: cell)).Exit);
+        await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = $"{source}/{Today()}.axisbak", FilePath = file }, CancellationToken);
+    }
 
     private byte[] WriteCellKey()
     {
