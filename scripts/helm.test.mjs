@@ -252,7 +252,9 @@ describe('the Axis Helm chart', () => {
       '--set',
       'studio.tests=false',
     )
-    assert.doesNotMatch(output, /\/studio|Studio__|- name: studio\n/)
+    // The restore-check CronJob always has a throwaway Studio folder, which is not the server's volume.
+    const rest = documents(output).filter((document) => !/^  name: axis-cell-restore-check$/m.test(document))
+    assert.doesNotMatch(rest.join('\n'), /\/studio|Studio__|- name: studio\n/)
   })
 
   test('the chart renders no Ingress and the server Service is ClusterIP', () => {
@@ -313,7 +315,7 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(service, /port: 9000|targetPort: management/)
   })
 
-  test('the identity secret files and certificate are mounted in the identity pod only, and in no env entry', () => {
+  test('the identity secret files and certificate are mounted in the identity pod, and the restore-check CronJob gets the client secret as a file', () => {
     const output = renderOk()
     const identity = find(output, 'Deployment', 'axis-identity')
     for (const file of ['KC_DB_URL', 'KC_DB_USERNAME', 'KC_DB_PASSWORD', 'IdentityProvider__AdminClientSecret']) {
@@ -331,6 +333,14 @@ describe('the Axis Helm chart', () => {
       ['Job', 'axis-migrate'],
     ]) {
       assert.doesNotMatch(find(output, kind, name), /identity-tls|axis-identity|KC_DB_|IdentityProvider__AdminClientSecret/)
+    }
+    assert.doesNotMatch(find(output, 'CronJob', 'axis-cell-backup'), /identity-tls|axis-identity|KC_DB_|IdentityProvider__AdminClientSecret/)
+    const restoreCheck = find(output, 'CronJob', 'axis-cell-restore-check')
+    assert.match(restoreCheck, /- key: "IdentityProvider__AdminClientSecret"\n\s+path: IdentityProvider__AdminClientSecret\n/)
+    assert.doesNotMatch(restoreCheck, /identity-tls|KC_DB_/)
+    assert.doesNotMatch(output, /- name: IdentityProvider__AdminClientSecret\n/)
+    for (const document of documents(output).filter((d) => /^kind: (Deployment|Job)$/m.test(d))) {
+      assert.doesNotMatch(document, /Admin__ConnectionString|axis-admin-db/)
     }
   })
 
@@ -459,6 +469,8 @@ describe('the Axis Helm chart', () => {
     ['secrets.backupStorageAccessKeyId.name', 'secrets.backupStorageAccessKeyId.name='],
     ['secrets.backupStorageSecretAccessKey.name', 'secrets.backupStorageSecretAccessKey.name='],
     ['secrets.cellBackupKey.name', 'secrets.cellBackupKey.name='],
+    ['secrets.adminConnection.name', 'secrets.adminConnection.name='],
+    ['cell.internalDomain', 'cell.internalDomain='],
   ]) {
     test(`a missing ${value} fails and names it`, () => {
       const result = render('--set', set)
@@ -620,6 +632,52 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(output, /- name: Cell__BackupStorage__(AccessKeyId|SecretAccessKey)/)
   })
 
+  test('in a cell with a bucket, a CronJob runs cell restore-check on Sundays at 03:00 in the time zone, one at a time and with no retry', () => {
+    const output = renderOk()
+    const job = find(output, 'CronJob', 'axis-cell-restore-check')
+    assert.match(job, /schedule: "0 3 \* \* 0"\n/)
+    assert.match(job, /timeZone: "Asia\/Ho_Chi_Minh"\n/)
+    assert.match(job, /concurrencyPolicy: Forbid\n/)
+    assert.match(job, /backoffLimit: 0\n/)
+    assert.match(job, /activeDeadlineSeconds: 21600\n/)
+    assert.match(job, /restartPolicy: Never\n/)
+    assert.match(job, /image: "axis-admin:[^"]+"/)
+    assert.match(job, /args:\n\s+- cell\n\s+- restore-check\n/)
+    assert.match(job, /- name: Cell__Id\n\s+value: "vn-1"\n/)
+    assert.match(job, /- name: Cell__InternalDomain\n\s+value: "internal\.example\.com"\n/)
+    assert.match(job, /- name: IdentityProvider__Url\n\s+value: "https:\/\/id\.example\.com\/"\n/)
+    assert.match(job, /- name: IdentityProvider__AdminClientId\n\s+value: axis-admin\n/)
+    assert.match(job, /- name: Studio__ApplicationsPath\n\s+value: \/studio\n/)
+    assert.match(job, /- name: studio\n\s+mountPath: \/studio\n/)
+    assert.match(job, /- name: studio\n\s+emptyDir: \{\}\n/)
+    assert.equal(job.match(/- name: tmp\n\s+emptyDir/g).length, 1)
+    assert.equal(job.match(/- name: Cell__BackupKeyFile\n/g).length, 1)
+    assert.match(job, /- name: Cell__BackupKeyFile\n\s+value: "\/cell-backup-key\/key"\n/)
+    assert.match(job, /- name: Cell__BackupStorage__Bucket\n\s+value: "axis-backups-vn"\n/)
+    assert.match(job, /- name: cell-backup-key\n\s+mountPath: \/cell-backup-key\n\s+readOnly: true\n/)
+    assert.match(job, /secretName: "axis-cell-backup-key"\n\s+defaultMode: 292\n\s+items:\n\s+- key: "cell-backup-key"\n\s+path: key\n/)
+  })
+
+  test('the restore-check CronJob gets the admin, client secret, storage and scenario secrets as files, and never env entries', () => {
+    const job = find(renderOk(), 'CronJob', 'axis-cell-restore-check')
+    for (const [secret, file] of [
+      ['axis-admin-db', 'Admin__ConnectionString'],
+      ['axis-identity', 'IdentityProvider__AdminClientSecret'],
+      ['axis-backup-storage', 'Cell__BackupStorage__AccessKeyId'],
+      ['axis-backup-storage', 'Cell__BackupStorage__SecretAccessKey'],
+      ['axis-platform', 'ConnectionStrings__PlatformSchema'],
+      ['axis-platform', 'Platform__SecretKey'],
+      ['axis-scenario', 'Scenarios__ServerConnectionString'],
+    ]) {
+      assert.match(job, new RegExp(`- secret:\\n\\s+name: "${secret}"\\n\\s+items:\\n\\s+- key: "${file}"\\n\\s+path: ${file}\\n`), file)
+      assert.doesNotMatch(job, new RegExp(`- name: ${file}\\n`), file)
+    }
+    assert.doesNotMatch(job, /path: ConnectionStrings__Platform\n/)
+
+    const without = find(renderOk('--set', 'secrets.scenarioServerConnection.name='), 'CronJob', 'axis-cell-restore-check')
+    assert.doesNotMatch(without, /Scenarios__|axis-scenario/)
+  })
+
   test('no other pod gets the backup storage or the cell backup key', () => {
     const output = renderOk()
     for (const document of documents(output).filter((d) => /^kind: (Deployment|Job)$/m.test(d))) {
@@ -636,7 +694,9 @@ describe('the Axis Helm chart', () => {
   })
 
   test('outside a cell, or without a bucket, no CronJob renders', () => {
-    assert.doesNotMatch(renderOk('--set', 'backup.bucket='), /^kind: CronJob$/m)
+    const withoutBucket = renderOk('--set', 'backup.bucket=')
+    assert.doesNotMatch(withoutBucket, /^kind: CronJob$/m)
+    assert.doesNotMatch(withoutBucket, /axis-cell-restore-check/)
     const outside = renderOk(
       '--set',
       'cell.id=',
@@ -646,7 +706,7 @@ describe('the Axis Helm chart', () => {
       'cell.pgbouncer.enabled=false',
     )
     assert.doesNotMatch(outside, /^kind: CronJob$/m)
-    assert.doesNotMatch(outside, /Cell__BackupStorage__/)
+    assert.doesNotMatch(outside, /Cell__BackupStorage__|axis-cell-restore-check/)
   })
 
   test('in a cell with a bucket, an empty time zone fails and names the value', () => {
