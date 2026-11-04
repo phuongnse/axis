@@ -21,8 +21,8 @@ type Direction = 'uses' | 'usedBy'
 export type OpenResource = (id: string, path: string | null) => void
 
 /**
- * The Uses and Used by lists of a selected resource. A load failure shows an alert in their place. An entry
- * expands one more step, and its own lists load once.
+ * The Uses and Used by lists of a selected resource, each entry a name that opens it. A load failure shows an alert in
+ * their place.
  */
 export function StudioReferences({
   application,

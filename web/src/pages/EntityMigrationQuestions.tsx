@@ -1,7 +1,8 @@
-import { Button, Flex, Input, Modal, Typography } from 'antd'
+import { Flex, Input, Modal, Typography } from 'antd'
 import { useState } from 'react'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
 import { useText } from '../platform/texts'
+import { ActionRow, AxisButton } from '../platform/AxisButton'
 import { dialogWidth } from '../platform/dialogButtons'
 
 /** The answers so far, with a `skip` for each question that the earlier answers make unnecessary. */
@@ -59,18 +60,19 @@ export function EntityMigrationQuestions({
       onCancel={onCancel}
       footer={
         <Flex gap="small" justify="end">
-          {/* Proposed: beside the solid button, the other actions are text buttons. */}
-          {rename && (
-            <Button type="text" onClick={onCancel}>
-              {t('shell.studio.cancel')}
-            </Button>
-          )}
-          <Button type="text" danger onClick={() => answer('drop')}>
-            {t('shell.studio.entity.migration.dropData')}
-          </Button>
-          <Button type="primary" onClick={() => answer('keep')}>
-            {t(rename ? 'shell.studio.entity.migration.keepData' : 'shell.studio.entity.migration.keepField')}
-          </Button>
+          <ActionRow finish>
+            {rename && (
+              <AxisButton role="secondary" onClick={onCancel}>
+                {t('shell.studio.cancel')}
+              </AxisButton>
+            )}
+            <AxisButton role="destructive" onClick={() => answer('drop')}>
+              {t('shell.studio.entity.migration.dropData')}
+            </AxisButton>
+            <AxisButton role="finish" onClick={() => answer('keep')}>
+              {t(rename ? 'shell.studio.entity.migration.keepData' : 'shell.studio.entity.migration.keepField')}
+            </AxisButton>
+          </ActionRow>
         </Flex>
       }
     >
@@ -118,15 +120,17 @@ function ExpressionQuestion({
       onCancel={onCancel}
       footer={
         <Flex gap="small" justify="end">
-          <Button type="text" onClick={onCancel}>
-            {t('shell.studio.cancel')}
-          </Button>
-          <Button type="text" onClick={() => onAnswer('skip')}>
-            {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
-          </Button>
-          <Button type="primary" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>
-            {t(convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls')}
-          </Button>
+          <ActionRow finish>
+            <AxisButton role="secondary" onClick={onCancel}>
+              {t('shell.studio.cancel')}
+            </AxisButton>
+            <AxisButton role="secondary" onClick={() => onAnswer('skip')}>
+              {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
+            </AxisButton>
+            <AxisButton role="finish" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>
+              {t(convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls')}
+            </AxisButton>
+          </ActionRow>
         </Flex>
       }
     >

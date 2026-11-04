@@ -24,6 +24,8 @@ function Icon({ name }: { name: string }) {
   return createElement(navigationIcon(name), { 'aria-hidden': true })
 }
 
+const compactMenu = { components: { Menu: { itemHeight: 32, itemMarginBlock: 2, groupTitleLineHeight: 1.4 } } }
+
 /**
  * Proposed: Studio's navigation, in the shell's sidebar. The open application heads it, as a menu that switches to
  * another application or creates one. Under it: Overview and Settings, the application's resources by group with how
@@ -193,9 +195,7 @@ export function StudioNavigation({
         <StudioNewApplication onCreated={onApplicationCreated} trigger={switcher} />
       </div>
       {/* Proposed: a workspace's navigation is compact, with 32 px entries. */}
-      <ConfigProvider
-        theme={{ components: { Menu: { itemHeight: 32, itemMarginBlock: 2, groupTitleLineHeight: 1.4 } } }}
-      >
+      <ConfigProvider theme={compactMenu}>
         <Menu
           mode="inline"
           inlineCollapsed={collapsed}

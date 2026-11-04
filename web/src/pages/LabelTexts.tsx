@@ -54,6 +54,14 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
   // first when it lacks that one, as content tools edit one language at a time. Translations…, an icon beside it, opens
   // every language of the label in a medium dialog, and a muted line under it names the languages it still lacks.
   // Many labels at once are translated in the text resources' table. Its key is Studio's own and never shown.
+  // Proposed: an application with no text resource has no language to write a label in yet, so the field says so.
+  if (resource.setPending && names.locales.length === 0) {
+    return (
+      <Typography.Text type="secondary" data-testid="studio-label-no-locales">
+        {t('shell.studio.label.noLocales')}
+      </Typography.Text>
+    )
+  }
   if (resource.setPending) {
     const setPending = resource.setPending
     const shown = resource.pending?.[key] ?? textsOf(names, key)

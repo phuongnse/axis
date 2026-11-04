@@ -146,7 +146,7 @@ function matchesOf(state: EditorState, text: string): { index: number; count: nu
  */
 function JsonFindBar({ view }: { view: EditorView }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { colour, spacing, type } = useDesignTokens()
   const input = useRef<InputRef>(null)
   // Each letter searches again from where the bar opened, so typing never walks past the first match.
   const start = useRef(view.state.selection.main.from)
@@ -194,7 +194,7 @@ function JsonFindBar({ view }: { view: EditorView }) {
       data-testid="studio-json-find"
       align="center"
       gap={spacing.xs}
-      style={{ padding: `${spacing.xs}px ${spacing.sm}px`, fontFamily: 'initial' }}
+      style={{ padding: `${spacing.xs}px ${spacing.sm}px`, fontFamily: type.fontFamily }}
     >
       <Input
         ref={input}

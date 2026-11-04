@@ -3,6 +3,8 @@ import { dialogButtons } from '../platform/dialogButtons'
 import { fieldErrors } from '../platform/fieldErrors'
 import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { antThemeFor } from '../platform/antTheme'
+import { choiceAlignment } from '../platform/choiceAlignment'
+import { choiceErrorStyles } from '../platform/choiceErrors'
 import { designTokensFor, pageTokenPropertyNames, type PageTokenValues } from '../platform/designTokens'
 import { ThemeModeContext, type ThemeMode } from '../platform/themeMode'
 import { useReducedMotion } from '../platform/useReducedMotion'
@@ -52,10 +54,19 @@ export function PageTheme({ children }: { children: ReactNode }) {
   )
   const reducedMotion = useReducedMotion()
   const config = useMemo(() => antThemeFor(mode, values, reducedMotion), [mode, values, reducedMotion])
+  const choices = useMemo(() => choiceAlignment(config), [config])
+  const choiceErrors = useMemo(() => choiceErrorStyles(designTokensFor(mode, values).colour.dangerText), [mode, values])
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider theme={config} modal={dialogButtons} form={fieldErrors}>
+      <ConfigProvider
+        theme={config}
+        modal={dialogButtons}
+        form={fieldErrors}
+        checkbox={choices.checkbox}
+        radio={choices.radio}
+      >
+        <style>{choiceErrors}</style>
         {children}
       </ConfigProvider>
     </ThemeModeContext.Provider>
