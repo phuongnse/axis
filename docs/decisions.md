@@ -142,3 +142,4 @@ files agree, title and status included.
 | [D129](decisions/d129-rules-from-the-studio-editors-review.md) | Rules from the Studio editors review | **Agreed** |
 | [D130](decisions/d130-activate-a-release-replaces-roll-back.md) | "Activate a release" replaces "roll back" | **Proposed** |
 | [D131](decisions/d131-tenant-notices-live-in-axisnotifications.md) | Tenant notices live in axis.notifications | **Proposed** |
+| [D132](decisions/d132-rules-from-the-studio-settings-review.md) | Rules from the Studio settings review | **Agreed** |
