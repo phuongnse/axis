@@ -70,7 +70,7 @@ export interface AxisRowAction {
  */
 export interface AxisTableToolbar {
   view?: ReactNode
-  /** Proposed: the Columns… control, before Refresh. */
+  /** Proposed: the Columns control, before Refresh. */
   columns?: ReactNode
   refresh?: () => void
   secondary?: ReactNode

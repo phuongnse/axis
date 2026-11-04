@@ -7,7 +7,7 @@ import type { ColumnChoice } from './tableControls'
 import { useText } from './texts'
 
 /**
- * Proposed: a table's Columns… button and its dialog, where a person shows, hides and orders the columns. The identifying
+ * Proposed: a table's Columns button and its dialog, where a person shows, hides and orders the columns. The identifying
  * column stays first and always shows, so a row can still be told and opened.
  */
 export function TableColumnsButton({

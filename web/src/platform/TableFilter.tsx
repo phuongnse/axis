@@ -179,7 +179,7 @@ function GroupEditor({
 }
 
 /**
- * Proposed: a table's Filter… button and its dialog, a builder of conditions in groups of And or Or, to any depth. Any column
+ * Proposed: a table's Filter button and its dialog, a builder of conditions in groups of And or Or, to any depth. Any column
  * can be filtered on. Apply puts the filter in force, and a condition with no value yet is left out.
  */
 export function TableFilterButton({

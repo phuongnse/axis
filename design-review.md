@@ -55,13 +55,13 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 - **Search:** a column is searchable when it says so, through `searchText`, as a field marked `searchable` is in the record
   API. Search looks in all of them. A kind's list searches its name, description, module and status, no longer its `id`, and the
   box says Search.
-- **Step 2, built:** `TableFilter` and `tableControls` in `web/src/platform/`: Filter… opens a builder of conditions in groups of All or Any, with
+- **Step 2, built:** `TableFilter` and `tableControls` in `web/src/platform/`: Filter opens a builder of conditions in groups of All or Any, with
   no limit on depth, and every column can be filtered on, so the module, a tag and not a column, is not a filter. Conditions follow the kind of value: text, enum, number and date, each
   with empty and not empty. Apply puts it in force, and a condition with no value is left out. A chip stands for each condition
   and group, with Clear all, and the filter lives in the address. A kind's list filters in the browser. For a record table,
   filtering is logic for the issue: the record API needs a filter, which refuses a field the person may not read.
 
-- **Step 3, built:** `TableColumns` in `web/src/platform/`: Columns… opens a dialog that shows, hides and orders the columns, with
+- **Step 3, built:** `TableColumns` in `web/src/platform/`: Columns opens a dialog that shows, hides and orders the columns, with
   Reset. The identifying column stays first and always shows. The choice lives in the address, and a hidden column is still
   searched and filtered on. Keeping the choice for each person is logic, for the issue.
 
@@ -69,6 +69,8 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
   New entity… moves to the page's heading, as New application… and a release's Activate… do, since it acts on the application.
   This changes D129's "on a kind's list" and the toolbar's main action on Studio's lists. The `table` widget keeps its toolbar
   actions, which an author configures.
+- **Tooltip:** a tooltip names the control with no "…", so Filter and Columns, in place of Filter… and Columns…. The "…" stays
+  on a button whose words show and that opens a dialog, such as New entity….
 
 ### A table with too little room
 
