@@ -281,21 +281,20 @@ owner.
 - **Several changes are a design review.** When the owner reviews the design
   in words, one change at a time, the session runs a design review. Each
   change is prototyped in the real widget code on a
-  `design/<yyyy-mm-dd>-<topic>` branch
-  and published to the artifact, so the owner sees the real widgets. The
-  branch is pushed, so the review can go on from any machine, and is never
+  `design/<yyyy-mm-dd>-<topic>` branch,
+  which holds only what the design needs, and the owner sees it on the local
+  stack. The branch is pushed, so the review can go on from any machine, and is never
   merged. CI leaves `design/` branches out, because a prototype changes the
   widgets without their tests. Before the review's issue its last
   commit gets a `design-review/<yyyy-mm-dd>-<topic>` tag with the same date
   and topic, and the tag is pushed: it starts no CI run, and it is never
   deleted, so the links to the prototype never break. The branch is then
   deleted, locally and on GitHub.
-- **The design runs ahead of the repository only by open issues and an open
-  review.** While a design issue is open, the artifact holds its change and its
-  last change note names the issue. While a review is open, the artifact may
-  also differ by the review's changes, and its last change note names the
-  review and its branch. Nothing else in the artifact differs from the
-  repository.
+- **The design runs ahead of the repository only by open issues.** While a
+  design issue is open, the artifact holds its change and its last change note
+  names the issue. A review does not change the artifact: it is published once
+  the review's issue is merged, so nothing else in the artifact differs from
+  the repository.
 - **A review ends in one docs change and one issue.** When the owner has
   agreed the changes, one hand-made docs pull request records the rules and
   any decision, including every change to configuration, an API or a decision.
