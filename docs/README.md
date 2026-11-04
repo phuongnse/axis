@@ -92,6 +92,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Legal links and terms](reference/legal.md)                            | Privacy and terms links per tenant and site, the legal line, `/licences` and accepting the terms |
 | [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
 | [Studio workspace](reference/studio-workspace.md)                      | Studio's list of applications, an open application's sidebar, band and Overview       |
+| [Studio resource form](reference/studio-resource-form.md)              | The form that edits a resource, its save bar, its references and its JSON view        |
 | [Entity designer](reference/entity-designer.md)                        | The Form tab of the entity editor: fields, settings, indexes, validations                 |
 | [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |
 | [Process designer](reference/process-designer.md)                      | The Design tab of the process editor: palette, transitions, removes, keyboard         |
