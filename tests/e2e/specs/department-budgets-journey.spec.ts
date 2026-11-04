@@ -1,6 +1,5 @@
 import { expect, test } from '../test'
-import type { Page } from '@playwright/test'
-import { waitForDialog } from '../dialogs'
+import { chooseDepartment } from '../department-budgets'
 import { fieldLabel } from '../fields'
 import { appPath } from '../purchase-requests'
 import { useSession } from '../sessions'
@@ -89,12 +88,3 @@ test('a manager creates and submits a budget of the module, a second manager app
   expect(((await tasks.json()) as { items: TaskItem[] }).items.some((item) => item.subject.id === budgetId)).toBe(false)
   expect((await page.request.get(`${appPath}/tasks/${taskId}`)).status()).toBe(403)
 })
-
-/** Opens the lookup of the Department field and picks the row named `department`. */
-async function chooseDepartment(page: Page, department: string) {
-  await page.getByTestId('reference-department').getByRole('button', { name: 'Choose…', exact: true }).click()
-  const dialog = await waitForDialog(page)
-  await dialog.getByRole('row', { name: new RegExp(department) }).click()
-  await expect(dialog).toBeHidden()
-  await expect(page.getByLabel(fieldLabel('Department'))).toHaveValue(department)
-}

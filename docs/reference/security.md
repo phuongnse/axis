@@ -428,7 +428,7 @@ file, and the realm accepts a code more than once. See [development realm and us
 | ------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `requester`         | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
 | `employee`          | `employee`              | Purchase request, leave request and asset management samples (holds assets); E2E journeys                                                     |
-| `manager`           | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `manager`           | `department-manager`    | Purchase request and leave request samples; E2E journeys, E2E module contract journey                                                         |
 | `manager-2`         | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
 | `finance-reviewer`  | `finance-reviewer`      | Purchase request and leave request sample seeds; E2E journeys                                                                                 |
 | `operator`          | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |

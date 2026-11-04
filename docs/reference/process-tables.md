@@ -237,15 +237,17 @@ database, with history in `axis.__processes_migrations` (see
   (`id`, `recipient_kind`, `recipient`), so the rows of one step run share the
   `id`. Times use the database clock. An index on (`application_id`,
   `recipient_kind`, `recipient`, `created_at`) finds a recipient's
-  notifications.
+  notifications. A filtered index of the same columns without `application_id`,
+  `ix_notifications_tenant_recipient_created_at`, finds the tenant notices, which have no
+  application ([D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md)).
 
   | Column | Type | Meaning |
   | --- | --- | --- |
   | `id` | `uuid` | A version 7 UUID, the notification's id. Every recipient's row has it |
-  | `application_id` | `uuid` | The application |
-  | `release_id` | `uuid` | The release the notifying instance is pinned to. It resolves the text keys and the page |
-  | `recipient_kind` | `text` | `user` or `role` |
-  | `recipient` | `text` | The user id or the role name |
+  | `application_id` | `uuid`, null | The application. Null for a tenant notice |
+  | `release_id` | `uuid`, null | The release the notifying instance is pinned to. It resolves the text keys and the page. Null for a tenant notice, whose text keys are platform texts |
+  | `recipient_kind` | `text` | `user` or `role`. A tenant notice uses `platformRole` |
+  | `recipient` | `text` | The user id or the role name. For `platformRole`, the platform role kind, `administrator` |
   | `subject_key` | `text` | The text key of the subject |
   | `body_key` | `text` | The text key of the body |
   | `values` | `jsonb` | The raw evaluated placeholder values, keyed by the placeholders' names. Dates are ISO text, as in an event payload. They are formatted when read |
