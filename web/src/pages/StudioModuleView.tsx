@@ -59,6 +59,7 @@ export function ModuleResourceView({
     case 'policy':
     case 'text':
     case 'form':
+    case 'page':
       return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'contract':
       return (
