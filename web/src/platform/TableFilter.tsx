@@ -1,5 +1,5 @@
-import { CloseOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Flex, Input, Modal, Select, Tag, Typography } from 'antd'
+import { CloseOutlined, DeleteOutlined, FilterOutlined, PlusOutlined } from '@ant-design/icons'
+import { Badge, Button, Flex, Input, Modal, Select, Tag, Typography } from 'antd'
 import { useState } from 'react'
 import { AxisButton } from './AxisButton'
 import { dialogWidth } from './dialogButtons'
@@ -192,16 +192,22 @@ export function TableFilterButton({
   onApply: (filter: FilterGroup) => void
 }) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const [draft, setDraft] = useState<FilterGroup>()
   const count = countRules(filter)
   return (
     <>
-      <Button
-        data-testid="table-filter"
-        onClick={() => setDraft(filter.items.length > 0 ? filter : { ...emptyFilter, items: [newRule(fields)] })}
-      >
-        {count > 0 ? t('shell.filter.buttonCount').replace('{count}', String(count)) : t('shell.filter.button')}
-      </Button>
+      {/* Proposed: a small toolbar action is an icon, as Refresh is, with the count of conditions in force on it. */}
+      <Badge count={count} size="small" color={colour.primary}>
+        <AxisButton
+          role="icon"
+          nameKey="shell.filter.button"
+          nameSuffix={count > 0 ? t('shell.filter.buttonCount').replace('{count}', String(count)) : undefined}
+          icon={<FilterOutlined />}
+          data-testid="table-filter"
+          onClick={() => setDraft(filter.items.length > 0 ? filter : { ...emptyFilter, items: [newRule(fields)] })}
+        />
+      </Badge>
       <Modal
         open={draft !== undefined}
         width={dialogWidth('large')}

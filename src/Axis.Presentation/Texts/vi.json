@@ -253,7 +253,7 @@
   "shell.table.loadFailed": "Không thể tải bản ghi.",
   "shell.table.search": "Tìm kiếm",
   "shell.filter.button": "Bộ lọc…",
-  "shell.filter.buttonCount": "Bộ lọc… ({count})",
+  "shell.filter.buttonCount": "{count} điều kiện đang áp dụng",
   "shell.filter.title": "Bộ lọc",
   "shell.filter.apply": "Áp dụng",
   "shell.filter.field": "Trường",

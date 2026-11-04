@@ -253,7 +253,7 @@
   "shell.table.loadFailed": "The records could not be loaded.",
   "shell.table.search": "Search",
   "shell.filter.button": "Filter…",
-  "shell.filter.buttonCount": "Filter… ({count})",
+  "shell.filter.buttonCount": "{count} conditions in force",
   "shell.filter.title": "Filter",
   "shell.filter.apply": "Apply",
   "shell.filter.field": "Field",

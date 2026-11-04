@@ -65,6 +65,11 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
   Reset. The identifying column stays first and always shows. The choice lives in the address, and a hidden column is still
   searched and filtered on. Keeping the choice for each person is logic, for the issue.
 
+- **Toolbar:** Filter and Columns are icons with tooltips, as Refresh is, and Filter carries the count of conditions in force.
+  New entity… moves to the page's heading, as New application… and a release's Activate… do, since it acts on the application.
+  This changes D129's "on a kind's list" and the toolbar's main action on Studio's lists. The `table` widget keeps its toolbar
+  actions, which an author configures.
+
 ### A table with too little room
 
 - **Asked:** one rule for every table, in place of the sideways scroll that hid columns such as Status.

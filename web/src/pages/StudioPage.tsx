@@ -527,6 +527,9 @@ function StudioWorkspace() {
             >
               {t('shell.studio.runScenario')}
             </Button>
+          ) : view.name === 'kind' && !selected && loaded && 'resources' in loaded ? (
+            // Proposed: New entity… acts on the application, not on the table, so it sits on the page's heading.
+            <StudioNewResource application={application} resources={resources} kind={view.kind} onCreated={onCreated} />
           ) : view.name === 'release' && !selected ? (
             <div ref={setHeadingSlot} style={{ display: 'contents' }} />
           ) : undefined
@@ -664,14 +667,6 @@ function StudioWorkspace() {
                     style={{ maxWidth: 360 }}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                  />
-                }
-                main={
-                  <StudioNewResource
-                    application={application}
-                    resources={resources}
-                    kind={view.kind}
-                    onCreated={onCreated}
                   />
                 }
                 addressOf={(id) => `/studio?${new URLSearchParams({ app: application, resource: id })}`}

@@ -66,7 +66,6 @@ export function StudioResourceTable({
   extra,
   searchText,
   search,
-  main,
   addressOf,
   onOpen,
   onRefresh,
@@ -79,7 +78,6 @@ export function StudioResourceTable({
   /** The text the search box holds. */
   searchText: string
   search: ReactNode
-  main: ReactNode
   addressOf: (id: string) => string
   onOpen: (id: string) => void
   /** Loads the list and the activity again. */
@@ -357,7 +355,6 @@ export function StudioResourceTable({
           />
         ),
         refresh: onRefresh,
-        main,
       }}
       above={
         <>

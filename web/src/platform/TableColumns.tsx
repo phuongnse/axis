@@ -1,4 +1,4 @@
-import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons'
+import { ArrowDownOutlined, ArrowUpOutlined, TableOutlined } from '@ant-design/icons'
 import { Button, Checkbox, Flex, Modal, Typography } from 'antd'
 import { useState } from 'react'
 import { AxisButton } from './AxisButton'
@@ -32,9 +32,13 @@ export function TableColumnsButton({
   }
   return (
     <>
-      <Button data-testid="table-columns" onClick={() => setDraft(choice)}>
-        {t('shell.table.columns')}
-      </Button>
+      <AxisButton
+        role="icon"
+        nameKey="shell.table.columns"
+        icon={<TableOutlined />}
+        data-testid="table-columns"
+        onClick={() => setDraft(choice)}
+      />
       <Modal
         open={draft !== undefined}
         width={dialogWidth('small')}
