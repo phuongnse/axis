@@ -319,6 +319,7 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
             ["Platform:SecretKey"] = TestSecretKey,
             ["Health:Urls"] = "http://127.0.0.1:0",
             ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:IdlePollCeiling"] = "00:00:00.05",
         };
         foreach (var (key, value) in extraSettings)
         {

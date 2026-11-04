@@ -49,6 +49,12 @@ public static class AxisMetrics
     /// <summary>When each tenant's backup last succeeded, in Unix seconds, by tenant. A tenant that never succeeded has no point.</summary>
     public const string BackupLastSuccess = "axis.backup.last_success";
 
+    /// <summary>The tenants in the active list of the worker, the ones that have work due. It has no attributes.</summary>
+    public const string WorkerActiveTenants = "axis.worker.active_tenants";
+
+    /// <summary>The polls of a tenant by the worker, by whether the poll found work due.</summary>
+    public const string WorkerPolls = "axis.worker.polls";
+
     /// <summary>Whether the last restore check of a tenant's archive passed, 1 or 0, by the source tenant.</summary>
     public const string BackupRestoreCheck = "axis.backup.restore_check";
 

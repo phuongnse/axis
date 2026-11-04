@@ -30,6 +30,40 @@ public sealed class WorkerOptionsTests
         Assert.Contains("Worker:MetricsInterval", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void An_idle_poll_ceiling_below_the_poll_interval_stops_the_worker_at_startup_naming_the_setting()
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Worker:PollInterval"] = "00:00:05",
+            ["Worker:IdlePollCeiling"] = "00:00:02",
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("Worker:IdlePollCeiling", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_idle_poll_ceiling_equal_to_the_poll_interval_builds_the_worker()
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Worker:PollInterval"] = "00:00:05",
+            ["Worker:IdlePollCeiling"] = "00:00:05",
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+    }
+
     [Theory]
     [InlineData("OTEL_EXPORTER_OTLP_ENDPOINT")]
     [InlineData("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")]

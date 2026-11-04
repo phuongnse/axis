@@ -398,6 +398,32 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         Assert.DoesNotContain(logs.Entries.Skip(loggedAfterGrants), entry => entry.StartsWith("Error", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task A_timer_due_in_three_seconds_runs_within_a_second_of_its_due_time_with_a_five_second_poll_interval()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_timer");
+
+        // Queued before the worker starts: under the configuration source no signal tells a running worker about a new item.
+        var due = DateTimeOffset.UtcNow.AddSeconds(3);
+        await EnqueueAsync(tenantA, "a", RecordKind, due);
+        var settings = new Dictionary<string, string?>
+        {
+            ["Worker:PollInterval"] = "00:00:05",
+            ["Worker:IdlePollCeiling"] = "00:00:30",
+        };
+        var logs = new LogCollector();
+        using var host = BuildHost("worker", logs, settings, ("a", tenantA));
+
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await CountAsync(tenantA, "test_runs") == 1, "The timer did not run.", TimeSpan.FromSeconds(10));
+        await host.StopAsync(CancellationToken);
+
+        var ranAt = new DateTimeOffset((DateTime)(await ScalarAsync(tenantA, "SELECT ran_at FROM test_runs"))!, TimeSpan.Zero);
+        var late = ranAt - due;
+        Assert.True(late < TimeSpan.FromSeconds(1), $"The timer ran {late.TotalSeconds:0.00} s after its due time.");
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
     private static IHost BuildHost(string worker, LogCollector logs, params (string TenantId, string ConnectionString)[] tenants) =>
         BuildHost(worker, logs, [], tenants);
 
@@ -410,6 +436,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
         var settings = new Dictionary<string, string?>(extraSettings);
         settings.TryAdd("Worker:PollInterval", "00:00:00.05");
+        settings.TryAdd("Worker:IdlePollCeiling", settings["Worker:PollInterval"]);
         foreach (var (tenantId, connectionString) in tenants)
         {
             settings[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";

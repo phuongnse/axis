@@ -90,6 +90,7 @@ public sealed class WorkerHealthTests(PostgreSqlFixture database) : IClassFixtur
         {
             ["Health:Urls"] = "http://127.0.0.1:0",
             ["Worker:PollInterval"] = "00:00:00.05",
+            ["Worker:IdlePollCeiling"] = "00:00:00.05",
             ["Tenants:a:Hosts:0"] = "a.example.test",
             ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
         };
