@@ -257,7 +257,7 @@ permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies. Dependencies (the `modules` list with the slot maps), resolving the graph, one
-copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios are built. Module policy grants on the module's processes are _(planned for M24)_.
+copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios are built. Module policy grants on the module's processes are built.
 
 ```json
 {
@@ -474,8 +474,7 @@ An application that declares it maps both slots to roles of its own:
   application as compiled. A module's scenarios run after the application's own,
   in pin order and then by file path, in Studio and with `Axis.Scenarios`. A result
   is named `<module id>/<scenario name>`. The scenario files stay out of the
-  release and its content hash. A module marks some as contract scenarios
-  _(planned for M24)_, which run on every publish, see
+  release and its content hash. A module marks some as contract scenarios, which run on every publish, see
   [contract scenarios](module-contracts.md#contract-scenarios).
 - **Dependencies.** _(built)_ `module.json` has an optional `modules`, with the `id` and
   `version` entries of an application's `modules`. A bad entry is `AXC0203`,
