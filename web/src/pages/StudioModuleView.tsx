@@ -3,7 +3,6 @@ import type { ModuleResourceItem, StudioDiagnostic, StudioResource, StudioResour
 import { useText } from '../platform/texts'
 import { StudioModuleContract } from './StudioModuleContract'
 import { StudioModuleEditor } from './StudioModuleEditor'
-import { StudioModulePolicy } from './StudioModulePolicy'
 import { StudioModuleReadOnly } from './StudioModuleReadOnly'
 import { useStudioModuleContent } from './useStudioModuleContent'
 
@@ -33,13 +32,15 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
 }
 
 /**
- * The view of a module resource, by its kind. An entity, a process and a page are edited as a layer, a policy and a contract
- * have their own read-only view, and any other kind, scenarios included, opens in the read-only JSON view.
+ * The view of a module resource, by its kind. An entity, a process, a policy, a text, a form and a page are edited as a
+ * layer, and so are the states and transitions that a contract takes from the application. Any other kind, scenarios
+ * included, opens in the read-only JSON view. `diagnostics` are the folder's.
  */
 export function ModuleResourceView({
   application,
   item,
   manifest,
+  diagnostics,
   onModuleWritten,
   onManifestSaved,
   onManifestStale,
@@ -47,6 +48,7 @@ export function ModuleResourceView({
   application: string
   item: ModuleResourceItem
   manifest?: StudioResource
+  diagnostics: StudioDiagnostic[]
   onModuleWritten: (diagnostics: StudioDiagnostic[], layer: { added?: StudioResourceItem; removedId?: string }) => void
   onManifestSaved: (manifest: StudioResource, diagnostics: StudioDiagnostic[]) => void
   onManifestStale: () => void
@@ -54,10 +56,10 @@ export function ModuleResourceView({
   switch (item.kind) {
     case 'entity':
     case 'process':
-    case 'page':
-      return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'policy':
-      return <StudioModulePolicy application={application} module={item.module} id={item.id} />
+    case 'text':
+    case 'form':
+      return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'contract':
       return (
         <StudioModuleContract
@@ -65,6 +67,8 @@ export function ModuleResourceView({
           module={item.module}
           id={item.id}
           manifest={manifest}
+          diagnostics={diagnostics}
+          onWritten={onModuleWritten}
           onManifestSaved={onManifestSaved}
           onManifestStale={onManifestStale}
         />

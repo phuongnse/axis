@@ -2,9 +2,11 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Axis.Admin;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -279,6 +281,212 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
         Assert.Equal(0, await CountAsync("platform.tenant_quotas"));
         Assert.Equal(0, await CountAsync("platform.audit_records"));
+    }
+
+    [Fact]
+    public async Task Suspend_and_resume_queue_jobs_that_the_runner_finishes_with_one_audit_record_naming_the_operator()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var suspend = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "suspend-b");
+        Assert.Equal(HttpStatusCode.Accepted, suspend.StatusCode);
+        var suspendJob = await suspend.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("suspend", suspendJob.GetProperty("kind").GetString());
+        Assert.Equal("b", suspendJob.GetProperty("tenantId").GetString());
+        Assert.Equal("queued", suspendJob.GetProperty("state").GetString());
+        var suspendId = suspendJob.GetProperty("id").GetGuid();
+        Assert.Equal($"/api/cell/jobs/{suspendId:D}", suspend.Headers.Location?.OriginalString);
+        Assert.True(await RunJobAsync());
+
+        using var resume = await PostJobAsync(client, "/api/cell/tenants/c/resume", token, "resume-c");
+        Assert.Equal(HttpStatusCode.Accepted, resume.StatusCode);
+        var resumeId = (await resume.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid();
+        Assert.True(await RunJobAsync());
+
+        using var tenantB = await GetAsync(client, "/api/cell/tenants/b", token);
+        using var tenantC = await GetAsync(client, "/api/cell/tenants/c", token);
+        Assert.Equal("suspended", (await tenantB.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+        Assert.Equal("active", (await tenantC.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+
+        var operatorId = new JsonWebToken(token).Subject;
+        foreach (var (id, kind, tenant) in new[] { (suspendId, "suspend", "b"), (resumeId, "resume", "c") })
+        {
+            using var read = await GetAsync(client, $"/api/cell/jobs/{id:D}", token);
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+            var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal(kind, job.GetProperty("kind").GetString());
+            Assert.Equal(tenant, job.GetProperty("tenantId").GetString());
+            Assert.Equal("succeeded", job.GetProperty("state").GetString());
+            Assert.Equal(JsonValueKind.Null, job.GetProperty("error").ValueKind);
+            var step = Assert.Single(job.GetProperty("steps").EnumerateArray());
+            Assert.Equal("status", step.GetProperty("name").GetString());
+            Assert.Equal("succeeded", step.GetProperty("state").GetString());
+            Assert.Equal(JsonValueKind.Null, step.GetProperty("error").ValueKind);
+
+            await using var connection = new NpgsqlConnection(_platform);
+            await connection.OpenAsync(CancellationToken);
+            await using var command = new NpgsqlCommand(
+                "SELECT command, tenant_id, actor FROM platform.audit_records WHERE changed = ARRAY[@changed]", connection);
+            command.Parameters.AddWithValue("changed", $"job:{id:D}");
+            await using var records = await command.ExecuteReaderAsync(CancellationToken);
+            Assert.True(await records.ReadAsync(CancellationToken));
+            Assert.Equal(($"tenant {kind}", tenant, operatorId), (records.GetString(0), records.GetString(1), records.GetString(2)));
+            Assert.False(await records.ReadAsync(CancellationToken));
+        }
+    }
+
+    [Fact]
+    public async Task The_same_key_and_body_answer_the_first_job_and_any_other_request_with_that_key_answers_422()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "key-1", "{}");
+        using var again = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "key-1", "{}");
+        using var otherBody = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "key-1", "{\"x\":1}");
+        using var otherKind = await PostJobAsync(client, "/api/cell/tenants/b/resume", token, "key-1", "{}");
+        using var otherTenant = await PostJobAsync(client, "/api/cell/tenants/c/suspend", token, "key-1", "{}");
+        using var noKey = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, key: null);
+        using var longKey = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, new string('k', 256));
+        using var blankKey = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, " ");
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid(),
+            (await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        foreach (var response in new[] { otherBody, otherKind, otherTenant })
+        {
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+
+        foreach (var response in new[] { noKey, longKey, blankKey })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task Parallel_retries_with_one_key_queue_one_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8)
+            .Select(_ => PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "parallel")));
+
+        try
+        {
+            Assert.All(responses, response => Assert.Equal(HttpStatusCode.Accepted, response.StatusCode));
+            Assert.Equal(1, await CountAsync("platform.jobs"));
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_key_whose_job_is_older_than_24_hours_queues_a_new_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "old-key", "{}");
+        await using (var connection = new NpgsqlConnection(_platform))
+        {
+            await connection.OpenAsync(CancellationToken);
+            await using var age = new NpgsqlCommand("UPDATE platform.jobs SET created_at = now() - interval '25 hours'", connection);
+            await age.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        using var second = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "old-key", "{}");
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
+        Assert.NotEqual(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid(),
+            (await second.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        Assert.Equal(2, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task The_job_routes_answer_401_without_a_token_403_without_the_role_and_404_for_an_unknown_tenant_job_or_tenant_host()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        using var tenantHostClient = CreateClient(factory, _tenantHost);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        foreach (var kind in new[] { "suspend", "resume" })
+        {
+            using var none = await PostJobAsync(client, $"/api/cell/tenants/b/{kind}", token: null, "k");
+            using var noRole = await PostJobAsync(client, $"/api/cell/tenants/b/{kind}", noRoleToken, "k");
+            using var unknown = await PostJobAsync(client, $"/api/cell/tenants/nobody/{kind}", operatorToken, "k");
+            using var preview = await PostJobAsync(client, $"/api/cell/tenants/a-preview/{kind}", operatorToken, "k");
+            using var tenantHost = await PostJobAsync(tenantHostClient, $"/api/cell/tenants/b/{kind}", operatorToken, "k");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, tenantHost.StatusCode);
+        }
+
+        var jobId = Guid.NewGuid();
+        using var noJob = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", operatorToken);
+        using var noToken = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", token: null);
+        using var noRoleJob = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", noRoleToken);
+        using var tenantHostJob = await GetAsync(tenantHostClient, $"/api/cell/jobs/{jobId:D}", operatorToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, noJob.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, noToken.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRoleJob.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, tenantHostJob.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+    }
+
+    private async Task<bool> RunJobAsync() =>
+        await new ProvisioningJobs(_platform, ProvisioningJobs.Builtin(_platform), TimeSpan.FromMinutes(5))
+            .RunNextAsync(TextWriter.Null, CancellationToken);
+
+    // A bearer call needs no CSRF header, so a request with a token never sets it.
+    private static async Task<HttpResponseMessage> PostJobAsync(HttpClient client, string path, string? token, string? key, string? body = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+        if (body is not null)
+        {
+            request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        }
+
+        if (key is not null)
+        {
+            request.Headers.Add("Idempotency-Key", key);
+        }
+
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        else
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
     }
 
     private static void AssertQuota(JsonElement quotas, string key, long? value, bool overridden)

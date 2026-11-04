@@ -63,6 +63,8 @@ public sealed class StorageQuotaRouteTests
         "POST /api/cell/auth/sign-out",
 
         // The provisioning API writes platform rows and no tenant data, so the storage quota does not count it.
+        "POST /api/cell/tenants/{id}/resume",
+        "POST /api/cell/tenants/{id}/suspend",
         "PUT /api/cell/tenants/{id}/quotas",
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
@@ -113,6 +115,7 @@ public sealed class StorageQuotaRouteTests
 
         // The expression check and the page metadata compile in memory and write nothing.
         "POST /api/studio/apps/{application}/expressions/check",
+        "POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata",
         "POST /api/studio/apps/{application}/resources/{id}/page-metadata",
     };
 

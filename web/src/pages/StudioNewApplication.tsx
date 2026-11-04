@@ -16,12 +16,25 @@ type Problem = 'exists' | 'invalid' | 'failed'
  * name breaks the API's rule. A `409` shows that the name is taken, and a `400` that it is refused, and the dialog stays
  * open in both cases. When the template list does not load, the dialog offers only Blank. `onCreated` gets the new
  * application's name once the create succeeds.
+ * Given `open` and `onOpenChange`, the dialog is controlled by its parent and draws no button, so another control can open it.
  */
-export function StudioNewApplication({ onCreated, primary }: { onCreated: (name: string) => void; primary?: boolean }) {
+export function StudioNewApplication({
+  onCreated,
+  primary,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  onCreated: (name: string) => void
+  primary?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
   const t = useText()
   const { lost } = useStudioConnection()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const [open, setOpen] = useState(false)
+  const [ownOpen, setOwnOpen] = useState(false)
+  const controlled = controlledOpen !== undefined
+  const open = controlled ? controlledOpen : ownOpen
   const [value, setValue] = useState('')
   const [template, setTemplate] = useState('')
   const [templates, setTemplates] = useState<StudioTemplate[] | 'failed'>()
@@ -29,6 +42,14 @@ export function StudioNewApplication({ onCreated, primary }: { onCreated: (name:
   const [creating, setCreating] = useState(false)
   const entered = value.trim()
   const nameInvalid = entered !== '' && !isApplicationName(entered)
+
+  function setOpen(next: boolean) {
+    if (controlled) {
+      onOpenChange?.(next)
+    } else {
+      setOwnOpen(next)
+    }
+  }
 
   useEffect(() => {
     if (!open) {
@@ -48,14 +69,6 @@ export function StudioNewApplication({ onCreated, primary }: { onCreated: (name:
     })
     return () => controller.abort()
   }, [open, lost])
-
-  function show() {
-    setValue('')
-    setTemplate('')
-    setTemplates(undefined)
-    setProblem(undefined)
-    setOpen(true)
-  }
 
   async function create() {
     if (!isApplicationName(entered)) {
@@ -91,9 +104,11 @@ export function StudioNewApplication({ onCreated, primary }: { onCreated: (name:
 
   return (
     <>
-      <Button type={primary ? 'primary' : 'default'} onClick={show}>
-        {t('shell.studio.newApplication.button')}
-      </Button>
+      {!controlled && (
+        <Button type={primary ? 'primary' : 'default'} onClick={() => setOpen(true)}>
+          {t('shell.studio.newApplication.button')}
+        </Button>
+      )}
       <Modal
         open={open}
         title={t('shell.studio.newApplication.title')}
@@ -103,6 +118,12 @@ export function StudioNewApplication({ onCreated, primary }: { onCreated: (name:
         confirmLoading={creating}
         onOk={create}
         onCancel={() => setOpen(false)}
+        afterClose={() => {
+          setValue('')
+          setTemplate('')
+          setTemplates(undefined)
+          setProblem(undefined)
+        }}
       >
         <Form layout="vertical">
           <Form.Item

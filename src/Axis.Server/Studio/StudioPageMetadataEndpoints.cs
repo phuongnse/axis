@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Compilation;
@@ -34,6 +35,15 @@ namespace Axis.Server.Studio;
 /// widget carries <c>path</c>. The page is null when the application's compile has any error. <c>diagnostics</c> are those of
 /// the page's file. The checks run as above: session (401), author role (403), then 404 for an unknown application, a module
 /// the application does not pin, an unknown resource and a resource that is not a page.
+/// <c>POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata</c> answers <c>{ widget, diagnostics }</c>
+/// for an unsaved draft of a form of that module version, as the application form draft does. The body is the whole edited form,
+/// whose <c>id</c> and <c>kind</c> must equal those of the module's file. The route compares the draft with the module file as a
+/// save does, builds the application's layer in memory, in place of any saved layer, and compiles. Nothing is written. The widget
+/// is null when the compile has any error. <c>diagnostics</c> are those of the module's form file and of the layer file. The
+/// checks run as the module page and save routes do: session (401), author role (403), 404 for an unknown application, module or
+/// resource, then 404 for a resource that is not a form, 415 for a content type other than <c>application/json</c>, and 400 for
+/// a body that is not an object, whose <c>id</c> or <c>kind</c> differs, that cannot be saved as a layer, or for a form whose name
+/// another resource of the module also has.
 /// </summary>
 internal static partial class StudioPageMetadataEndpoints
 {
@@ -44,6 +54,96 @@ internal static partial class StudioPageMetadataEndpoints
     {
         endpoints.MapPost("/api/studio/apps/{application}/resources/{id}/page-metadata", PageMetadataAsync);
         endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata", ModulePageMetadataAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata", ModuleFormMetadataAsync);
+    }
+
+    private static async Task<IResult> ModuleFormMetadataAsync(
+        string application,
+        string module,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var (found, notFound) = StudioEndpoints.FindModuleFile(
+            ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules), modules, module, id);
+        if (found is null)
+        {
+            return notFound!;
+        }
+
+        if (found.Kind != "form")
+        {
+            return StudioEndpoints.NotFound("The resource is not a form.");
+        }
+
+        var request = httpContext.Request;
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        JsonObject? draft;
+        try
+        {
+            draft = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted) as JsonObject;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            draft = null;
+        }
+
+        if (draft is null || JsonNode.Parse(found.Text) is not JsonObject saved || !SameIdentity(draft, saved))
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid draft form.");
+        }
+
+        if (found.Name is null)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "A layer cannot change this resource.");
+        }
+
+        if (LayerChecker.KindsByName(found.Module)[found.Name].Distinct(StringComparer.Ordinal).Count() > 1)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The module has more than one resource with this name.");
+        }
+
+        var difference = LayerDifference.Compare(found.Kind, found.Root, JsonSerializer.SerializeToElement(draft));
+        if (difference.Refusal is not null)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The edit cannot be saved as a layer.");
+        }
+
+        // The files of the folder with the layer a save would leave: none when the draft equals the module's file.
+        var (resources, files) = StudioFolder.ListWithContent(folder);
+        var existing = StudioWrites.FindLayer(resources, module, found.Name);
+        var layerPath = existing?.File.File ?? $"customizations/{module}/{found.Name}.json";
+        var edited = files.Where(file => !string.Equals(file.Path, layerPath, StringComparison.Ordinal)).ToList();
+        if (difference.Changes is not null)
+        {
+            var layer = StudioWrites.LayerObject(
+                existing?.File.Id ?? Guid.NewGuid(), existing?.Target ?? $"{module}/{found.Name}", difference.Changes);
+            edited.Add(new ResourceContent(layerPath, layer.ToJsonString()));
+        }
+
+        var compiled = ApplicationCompiler.CompileFiles(edited, packages.Versions, modules.Modules);
+        var moduleFile = $"modules/{module}/{found.Path}";
+        var diagnostics = compiled.Diagnostics
+            .Where(diagnostic => string.Equals(diagnostic.File, moduleFile, StringComparison.Ordinal)
+                || string.Equals(diagnostic.File, layerPath, StringComparison.Ordinal))
+            .Select(StudioDiagnostics.Map)
+            .ToList();
+        var formName = $"{module}/{found.Name}";
+        return Results.Ok(new StudioFormMetadataResponse(
+            DrawForm(compiled, form => string.Equals(form.Name, formName, StringComparison.Ordinal)), diagnostics));
     }
 
     private static async Task<IResult> ModulePageMetadataAsync(
@@ -147,7 +247,7 @@ internal static partial class StudioPageMetadataEndpoints
                 .Where(diagnostic => diagnostic.ResourceId == pageId)
                 .Select(StudioDiagnostics.Map)
                 .ToList();
-            return Results.Ok(new StudioFormMetadataResponse(DrawForm(compiled, pageId), formDiagnostics));
+            return Results.Ok(new StudioFormMetadataResponse(DrawForm(compiled, candidate => candidate.Id == pageId), formDiagnostics));
         }
 
         var first = Compile(folderFiles, found.File, draft, packages, modules);
@@ -164,15 +264,17 @@ internal static partial class StudioPageMetadataEndpoints
     {
         try
         {
-            return JsonNode.Parse(saved.Bytes) is JsonObject file
-                && StringOf(draft, "id") is { } id && string.Equals(id, StringOf(file, "id"), StringComparison.Ordinal)
-                && StringOf(draft, "kind") is { } kind && string.Equals(kind, StringOf(file, "kind"), StringComparison.Ordinal);
+            return JsonNode.Parse(saved.Bytes) is JsonObject file && SameIdentity(draft, file);
         }
         catch (System.Text.Json.JsonException)
         {
             return false;
         }
     }
+
+    private static bool SameIdentity(JsonObject draft, JsonObject saved) =>
+        StringOf(draft, "id") is { } id && string.Equals(id, StringOf(saved, "id"), StringComparison.Ordinal)
+        && StringOf(draft, "kind") is { } kind && string.Equals(kind, StringOf(saved, "kind"), StringComparison.Ordinal);
 
     private static string? StringOf(JsonObject node, string name) =>
         node[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
@@ -191,10 +293,10 @@ internal static partial class StudioPageMetadataEndpoints
 
     // The metadata of a form widget that names the draft form, or null when the compile has any error. Without errors the
     // model keeps the order of the draft, so the position of each section, field and step is its JSON Pointer.
-    private static WidgetMetadata? DrawForm(CompilationResult result, Guid formId)
+    private static WidgetMetadata? DrawForm(CompilationResult result, Func<FormModel, bool> isForm)
     {
         if (HasErrors(result) || result.Model is not { } model
-            || model.Forms.FirstOrDefault(candidate => candidate.Id == formId) is not { } form)
+            || model.Forms.FirstOrDefault(isForm) is not { } form)
         {
             return null;
         }

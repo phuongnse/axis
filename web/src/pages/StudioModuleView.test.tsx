@@ -19,6 +19,7 @@ function renderView(item: ModuleResourceItem, response: Response) {
         <ModuleResourceView
           application="Checklist App"
           item={item}
+          diagnostics={[]}
           onModuleWritten={vi.fn()}
           onManifestSaved={vi.fn()}
           onManifestStale={vi.fn()}

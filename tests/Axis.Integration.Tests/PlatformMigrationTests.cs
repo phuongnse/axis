@@ -51,7 +51,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task The_platform_reader_role_can_insert_data_protection_keys_write_the_lease_and_usage_tables_and_insert_and_update_the_daily_counters_but_nothing_else_is_writable(bool directory)
+    public async Task The_platform_reader_role_can_insert_data_protection_keys_write_the_lease_and_usage_tables_and_insert_jobs_and_insert_and_update_the_daily_counters_but_nothing_else_is_writable(bool directory)
     {
         var platform = await StartServerAsync(directory);
         var reader = PostgreSqlServer.RuntimeConnectionString(platform);
@@ -81,13 +81,21 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
                 (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.tenant_daily_counters', 'UPDATE')"))!,
                 (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.tenant_daily_counters', 'DELETE')"))!,
                 (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.tenant_daily_counters', 'TRUNCATE')"))!));
+        // The jobs can be inserted, and never updated, deleted or truncated.
+        Assert.Equal(
+            (true, false, false, false),
+            (
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.jobs', 'INSERT')"))!,
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.jobs', 'UPDATE')"))!,
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.jobs', 'DELETE')"))!,
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.jobs', 'TRUNCATE')"))!));
         Assert.Equal(
             0L,
             await ScalarAsync(
                 platform,
                 $"""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'platform' AND c.relkind IN ('r', 'p') AND c.relname NOT IN ('data_protection_keys', 'operator_sessions', 'tenant_daily_counters', 'tenant_leases', 'tenant_usage', 'tenant_usage_latest')
+                WHERE n.nspname = 'platform' AND c.relkind IN ('r', 'p') AND c.relname NOT IN ('data_protection_keys', 'jobs', 'operator_sessions', 'tenant_daily_counters', 'tenant_leases', 'tenant_usage', 'tenant_usage_latest')
                 AND has_table_privilege('{readerRole}', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE')
                 """));
     }

@@ -631,7 +631,7 @@ public sealed class ReferenceIndexTests
             """)
         .With("forms/order-entry.json", """
             { "id": "88888888-8888-4888-8888-888888888881", "kind": "form", "name": "OrderEntry", "formatVersion": 1, "entity": "Order",
-              "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "quantity" } ] } ] }
+              "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "quantity" } ] } ] }
             """)
         .With("processes/order-review.json", """
             { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "formatVersion": 1,
@@ -754,7 +754,7 @@ public sealed class ReferenceIndexTests
                 """)
             .With("forms/order-entry.json", """
                 { "id": "88888888-8888-4888-8888-888888888881", "kind": "form", "name": "OrderEntry", "formatVersion": 1, "entity": "Order",
-                  "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "quantity" } ] } ] }
+                  "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "quantity" } ] } ] }
                 """)
             .With("data-sources/large-orders.json", DataSource("LargeOrders", "IsLarge(quantity)"))
             .With("processes/order-review.json", """

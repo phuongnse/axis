@@ -18,6 +18,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     "entity": "PurchaseRequest",
     "sections": [
       {
+        "name": "request",
         "title": { "textKey": "purchaseRequest.sections.request" },
         "fields": [
           { "field": "title", "readOnly": true },
@@ -28,6 +29,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
         ]
       },
       {
+        "name": "decision",
         "title": { "textKey": "purchaseRequest.sections.decision" },
         "fields": [{ "field": "decisionComments" }]
       }
@@ -35,7 +37,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   }
   ```
 
-  - Each section has a `title` label and its `fields`, in the order shown.
+  - Each section has a `name`, a `title` label and its `fields`, in the order shown. A
+    [customization layer](customization-layers.md#list-keys) finds a section by its `name`.
     Each entry names a `field` of the entity. `readOnly` is optional and
     `false` by default.
   - **Fields in columns**. A field entry may have `width`, a whole
@@ -59,7 +62,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     enforces it: completing a task rejects a value for a field the form does
     not make editable (see [Task API](task-api.md)).
   - A section's `fields` and the form's `sections` hold at least one entry,
-    and a section without a `title` breaks the schema (`AXC0004`).
+    and a section without a `name` or a `title` breaks the schema (`AXC0004`).
   - Compile checks: an `entity` that names no loaded entity is `AXC0074`. A
     `field` the entity does not have is `AXC0075`. A field listed again, in
     any section and ignoring letter case, is `AXC0076`. A section title key
@@ -362,7 +365,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - `form` also holds `visibleWhen` on each field and section, as `true`
       when it has a condition and `false` otherwise. It holds `steps`, each
       with a `titleKey` and its section names, and `[]` when the form has
-      none. Each section has a `name`, which is `null` when it has none. It
+      none. Each section has a `name`. It
       holds no expressions, because they stay on the server. A user who may
       not read any field of a section gets no such section, and its name is
       left out of the steps. A step left with no section is left out.

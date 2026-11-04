@@ -21,6 +21,12 @@ export async function createResource(page: Page, kind: string, value: string, sh
   ).toHaveAttribute('aria-current', 'true')
 }
 
+/** Opens the New application… dialog from the application row of the sidebar, on a page that has an application open. */
+export async function openNewApplication(page: Page) {
+  await page.getByTestId('studio-application-row').click()
+  await page.getByRole('menuitem', { name: 'New application…', exact: true }).click()
+}
+
 /**
  * Selects a tab of the open resource and waits until it is selected. It clicks again when the click did not select the
  * tab. The layout can shift just before or during the click, as the web font arrives or as the release history above

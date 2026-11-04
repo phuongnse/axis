@@ -115,10 +115,10 @@ Compilation applies each layer to the resource of the pinned module version, bef
   other changes. The key, the anchor, names another element of the same list after the merge, so it
   can be a module element or one that the layer adds. Placements apply one at a time, in the order
   the elements appear in the layer, after all adds and removes, so an author who chains placements
-  writes them in the order they should apply. Order counts in an entity's fields, a form's wizard
-  steps and fields, a page's widgets, actions, row actions, toolbar actions, columns and tabs, and a
+  writes them in the order they should apply. Order counts in an entity's fields, a form's sections,
+  wizard steps and fields, a page's widgets, actions, row actions, toolbar actions, columns and tabs, and a
   process's steps, where the order only sets how Studio lists them, because the steps are a graph.
-  Form sections join when they are keyed. Any other list takes no `after` or `before`: an escalation's
+  Any other list takes no `after` or `before`: an escalation's
   `after` is its duration, and elsewhere the property is an unknown property. The merged resource
   never holds `after` or `before`.
 - **Removing a whole resource.** A layer whose `changes` is exactly `{ "remove": true }` removes the
@@ -187,11 +187,11 @@ same change.
 schemas.
 
 - A key is unique in its list, ignoring letter case. An entity's `validations` and `indexes` require
-  `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A decision's `branches` and a task's `escalations` require `name` as well (`AXC0004` when it is missing) and report a repeated name as `AXC0359`, and a form's `steps` do the same and report it as `AXC0360`. Each of these names is unique in its own list: one decision's branches, one task's escalations or one form's steps. A widget's `name` is unique on its page,
+  `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A decision's `branches` and a task's `escalations` require `name` as well (`AXC0004` when it is missing) and report a repeated name as `AXC0359`, and a form's `steps` do the same and report it as `AXC0360`. A form's `sections` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0227`. Each of these names is unique in its own list: one decision's branches, one task's escalations, one form's steps or one form's sections. A widget's `name` is unique on its page,
   whatever its depth, so a layer finds a widget inside a section or a tab by its name. A repeated name on a page, in a widget's own list of actions, columns or tabs, is `AXC0361`. A page's widgets, actions, row actions, toolbar actions, columns and tabs require `name` (`AXC0004` when it is missing).
 - An element of a list that the table does not name is part of a value list.
-- A list that the table still marks as pending in code, such as a form's `sections`, is a value list
-  until its naming issue keys it. A layer that changes one gives the whole list.
+- A wizard step's `sections` is a list of section names. It merges by the name itself: a layer adds a
+  name to the end of the list, or removes one with `{ "name": "x", "remove": true }`.
 - A text's `texts` is a map, so a layer on a module text changes or adds keys as an object merges.
   A business that wants another label changes the text, never a name.
 
@@ -255,14 +255,21 @@ applied, its marks and its removed elements, its [save route](module-resource-sa
 [reset route](module-resource-saves.md#element-reset) takes one element out of it. All three are built. The module entity editor,
 the module process editor and the module page editor are built, with their Customized tag, **Reset all**, the element marks and
 **Reset to module**. The module process opens in the [process designer](process-designer.md), and
-its marks and resets are on steps. The module page opens in the [page designer](studio.md), and its marks
+its marks and resets are on steps. A module text opens in the text table with the layer applied, with Added and Changed marks on
+its keys, **Reset to module** and **Reset all**. A module policy opens in the module editor, built with the policy matrix's
+action checkboxes, and its marks and resets are on grants, keyed by `name`. It edits a grant's actions and removes grants, and
+shows a grant's filter and fields read-only, and there is no way yet to add a grant. A grant past the module contract's ceiling
+(`AXC0334`) shows in the diagnostics panel after the save. A module form opens in the [form designer](form-designer.md) with the layer applied. Its marks and resets are
+on sections and steps, keyed by `name`, and on a section's fields, keyed by `field`, all in the outline. A module contract opens in its contract editor, where the author adds and removes
+the application's own states and transitions, marked **Added**, and **Save** writes the contract's layer. The module page opens in the [page designer](studio.md), and its marks
 and resets are on widgets, actions, row actions, toolbar actions, columns and tabs. The canvas draws the saved page
 with the layer, so it changes after a save or a reset. The editors of the other kinds are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.
-  Module scenarios stay read-only, and a contract shows read-only with its added states and
-  transitions, see [module contracts in Studio](module-contracts.md#in-studio).
+  Module scenarios stay read-only. A contract opens in its editor: the author adds and removes the
+  application's own states and transitions, marked **Added**, and the module's own stay read-only. **Save**
+  writes the contract's layer, see [module contracts in Studio](module-contracts.md#in-studio).
   A kind with no editor yet opens read-only, as its file's content in JSON.
 - **Marks.** An element the layer added shows **Added**, one it changed **Changed**, and the
   editor's header shows that the resource has a layer. A removed element stays listed as **Removed**
@@ -285,6 +292,9 @@ with the layer, so it changes after a save or a reset. The editors of the other 
   Studio. A save is refused when it changes `id`, `kind`, `name` or `formatVersion`, drops a
   property of the module, leaves a keyed element without a key, repeats a key or changes only the
   letter case of one.
+- **Drawing a draft form.** For the form designer's canvas, the authoring API turns an unsaved module form into
+  the layer in memory and answers its widget without writing anything, see
+  [a module form draft](draft-page-metadata.md).
 - **Refused changes.** A save is checked like any save. A change that breaks the contract, such as
   a step that moves a request to `approved` past its guard, publishes as a failed contract scenario
   or a refused write, and a change that adds a transition into a protected state is a diagnostic in

@@ -1,7 +1,7 @@
 # Draft page metadata
 
 Detailed reference for the routes that answer the page metadata Studio draws on its page canvas: the
-draft page and form route, and the module page route. The rest of the authoring API is in
+draft page and form route, the module page route and the module form draft route. The rest of the authoring API is in
 [authoring.md](authoring.md). The conventions of [architecture.md](../architecture.md) apply, and Dn
 refers to [decisions.md](../decisions.md).
 
@@ -46,6 +46,25 @@ The `{id}` names the saved page.
   A caller with no session gets `401` and one with no author role gets `403`.
   An unknown application, a module that the application does not pin, an
   unknown resource and a resource that is not a page get `404`.
+- **A module form draft.** `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata`
+  answers `{ widget, diagnostics }` for an unsaved form of the module version
+  that the application pins, so the form designer can draw it. The `{id}` is
+  the id written in the module's file, as in the module resource route. The
+  body is the whole edited form with the module file's `id` and `kind`, or the
+  answer is `400`. The server compares the draft with the module's file as the
+  [module resource save](module-resource-saves.md) does and builds the
+  application's layer in memory, in place of any saved layer. A draft equal to
+  the module's file has no layer. It compiles the folder with that layer, so
+  nothing is written, locked or read from the database. `widget` has the shape
+  of a draft form above, with the form named `<module>/<name>`, and each
+  section, field and step carries `path` in the draft. It is null when the
+  compile has any error. `diagnostics` are those of the module's form file and
+  of the layer file. The answer is `400` for a body that is not an object, an
+  `id` or `kind` that differs, an edit that cannot be saved as a layer, and a
+  form whose name another resource of the module also has. A resource that is
+  not a form, an unknown application, an unknown module that the application
+  does not pin and an unknown resource get `404`. A caller with no session gets
+  `401` and one with no author role gets `403`.
 - **Widget paths.** Each widget also carries `path`, its JSON Pointer in the
   draft, such as `/widgets/0/columns/1/widgets/0`.
 - **Diagnostics.** Only those whose `resourceId` is the page, shaped as in

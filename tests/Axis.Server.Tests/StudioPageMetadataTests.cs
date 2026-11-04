@@ -26,6 +26,12 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
 
     private const string EntityId = "d9ccbf89-5004-4d52-8885-2ee377b7caa5";
 
+    private const string BudgetReviewId = "12dffe7c-7ed8-47c0-9ed5-fa9b4251d85e";
+
+    private const string BudgetApprovalId = "94f1cc25-6a68-435f-9383-36fc43aae860";
+
+    private const string BudgetsPageId = "f7e6e78e-2ef4-49f4-9d38-c9db95fc2ba2";
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"axis-studio-page-{Guid.NewGuid():N}");
 
     private string Folder => Path.Combine(_root, "purchase-requests");
@@ -416,6 +422,132 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         Assert.Equal(before, Snapshot());
     }
 
+    [Fact]
+    public async Task Module_form_draft_with_a_field_moved_answers_the_fields_in_the_new_order_with_their_paths()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("author");
+        var form = BudgetReview();
+        var fields = (JsonArray)form["sections"]![0]!["fields"]!;
+        var amount = fields[3]!.DeepClone();
+        fields.RemoveAt(3);
+        fields.Insert(0, amount);
+
+        var response = await PostModule(client, form.ToJsonString());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Empty(body.RootElement.GetProperty("diagnostics").EnumerateArray());
+        var widget = body.RootElement.GetProperty("widget");
+        Assert.Equal("form", widget.GetProperty("type").GetString());
+        var drawn = widget.GetProperty("form");
+        Assert.Equal("department-budgets/BudgetReview", drawn.GetProperty("name").GetString());
+        var section = drawn.GetProperty("sections")[0];
+        Assert.Equal("/sections/0", section.GetProperty("path").GetString());
+        var drawnFields = section.GetProperty("fields").EnumerateArray().ToArray();
+        Assert.Equal(["amount", "name", "department", "year"], drawnFields.Select(field => field.GetProperty("name").GetString()).ToArray());
+        Assert.Equal(
+            ["/sections/0/fields/0", "/sections/0/fields/1", "/sections/0/fields/2", "/sections/0/fields/3"],
+            drawnFields.Select(field => field.GetProperty("path").GetString()).ToArray());
+    }
+
+    [Fact]
+    public async Task Module_form_draft_equal_to_the_module_file_answers_the_form_with_no_diagnostics()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        var response = await PostModule(client, BudgetReview().ToJsonString());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Empty(body.RootElement.GetProperty("diagnostics").EnumerateArray());
+        var fields = body.RootElement.GetProperty("widget").GetProperty("form").GetProperty("sections")[0].GetProperty("fields");
+        Assert.Equal(
+            ["name", "department", "year", "amount"],
+            fields.EnumerateArray().Select(field => field.GetProperty("name").GetString()).ToArray());
+    }
+
+    [Fact]
+    public async Task Module_form_draft_with_an_unknown_field_answers_no_widget_and_the_diagnostics()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("author");
+        var form = BudgetReview();
+        ((JsonArray)form["sections"]![0]!["fields"]!).Add(new JsonObject { ["field"] = "noSuchField" });
+
+        var response = await PostModule(client, form.ToJsonString());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("widget").ValueKind);
+        Assert.NotEmpty(body.RootElement.GetProperty("diagnostics").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Module_form_route_refuses_a_wrong_identity_and_a_resource_that_is_not_a_form_and_unknown_targets()
+    {
+        await using var factory = CreateFactory();
+        using var author = factory.CreateClient().SignedInAs("author");
+        var json = BudgetReview().ToJsonString();
+
+        var otherId = BudgetReview();
+        otherId["id"] = Guid.NewGuid().ToString("D");
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostModule(author, otherId.ToJsonString())).StatusCode);
+        var otherKind = BudgetReview();
+        otherKind["kind"] = "page";
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostModule(author, otherKind.ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostModule(author, "[]")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostModule(author, "{")).StatusCode);
+        var notALayer = BudgetReview();
+        notALayer["name"] = "Renamed";
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostModule(author, notALayer.ToJsonString())).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await PostModule(author, json, id: BudgetApprovalId)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostModule(author, json, id: BudgetsPageId)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostModule(author, json, id: Guid.NewGuid().ToString("D"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostModule(author, json, id: "not-a-guid")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostModule(author, json, module: "no-such-module")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostModule(author, json, application: "Unknown")).StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await PostModule(author, json, contentType: "text/plain")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Module_form_route_needs_a_session_the_author_role_and_the_csrf_header()
+    {
+        await using var factory = CreateFactory();
+        using var anonymous = factory.CreateClient();
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var author = factory.CreateClient().SignedInAs("author");
+        var json = BudgetReview().ToJsonString();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostModule(anonymous, json)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostModule(requester, json)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostModule(author, json, csrf: false)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Module_form_route_writes_no_file()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("author");
+        var moved = BudgetReview();
+        var fields = (JsonArray)moved["sections"]![0]!["fields"]!;
+        var amount = fields[3]!.DeepClone();
+        fields.RemoveAt(3);
+        fields.Insert(0, amount);
+        var otherId = BudgetReview();
+        otherId["id"] = Guid.NewGuid().ToString("D");
+        var before = Snapshot();
+
+        Assert.Equal(HttpStatusCode.OK, (await PostModule(client, moved.ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostModule(client, BudgetReview().ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostModule(client, otherId.ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostModule(client, moved.ToJsonString(), id: BudgetApprovalId)).StatusCode);
+
+        Assert.Equal(before, Snapshot());
+    }
+
     private static JsonObject ValidChart() => new()
     {
         ["type"] = "chart",
@@ -439,6 +571,13 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     }
 
     private JsonObject SavedPage() => (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, PageFile)))!;
+
+    // The form of the department-budgets module as the installed module file has it.
+    private static JsonObject BudgetReview()
+    {
+        var file = Directory.EnumerateFiles(SampleModules.Path, "budget-review.json", SearchOption.AllDirectories).Single();
+        return (JsonObject)JsonNode.Parse(File.ReadAllBytes(file))!;
+    }
 
     private JsonObject SavedForm() => (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, FormFile)))!;
 
@@ -478,6 +617,29 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         bool csrf = true)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/api/studio/apps/{application}/resources/{id}/page-metadata", UriKind.Relative))
+        {
+            Content = new StringContent(body, Encoding.UTF8, contentType),
+        };
+        if (csrf)
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private static async Task<HttpResponseMessage> PostModule(
+        HttpClient client,
+        string body,
+        string application = "PurchaseRequests",
+        string module = "department-budgets",
+        string id = BudgetReviewId,
+        string contentType = "application/json",
+        bool csrf = true)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            new Uri($"/api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata", UriKind.Relative))
         {
             Content = new StringContent(body, Encoding.UTF8, contentType),
         };

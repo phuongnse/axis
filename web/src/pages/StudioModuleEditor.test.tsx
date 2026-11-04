@@ -60,15 +60,15 @@ function renderEditor(respond: (url: string, init?: RequestInit) => Response, ed
   vi.stubGlobal('fetch', fetchMock)
   const onWritten = vi.fn()
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
-          <MemoryRouter>
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
             <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
-          </MemoryRouter>
-        </StudioConnectionContext.Provider>
-      </TextProvider>
-    </ThemeModeProvider>,
+          </StudioConnectionContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
   return { fetchMock, onWritten }
 }
@@ -334,6 +334,208 @@ describe('StudioModuleEditor', () => {
     expect(JSON.parse(calls(fetchMock, 'POST')[0][1].body as string)).toEqual({
       list: '/widgets/0/widgets',
       key: 'old',
+    })
+  })
+
+  it('opens a module text in the text table and resets one key through the reset route', async () => {
+    let reset = false
+    const text = {
+      id: 'text-id',
+      kind: 'text',
+      name: 'TextsEn',
+      locale: 'en',
+      texts: { 'a.label': 'Mine', 'a.name': 'Name' },
+    }
+    const { fetchMock } = renderEditor(
+      (_url, init) => {
+        if (init?.method === 'POST') {
+          reset = true
+          return new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
+        }
+        return reset ? read(null, text) : read(layer, text, [{ path: '/texts/a.label', mark: 'changed' }])
+      },
+      { id: 'text-id', kind: 'text', name: 'checklists/TextsEn', module: 'checklists' },
+    )
+
+    expect(await screen.findByTestId('studio-text-table')).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'Changed a.label' })).toBeInTheDocument()
+    expect(screen.queryByRole('note', { name: 'Changed a.name' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Reset to module a.label' }))
+
+    await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+    const [[, init]] = calls(fetchMock, 'POST')
+    expect(JSON.parse(init.body as string)).toEqual({ list: '/texts', key: 'a.label' })
+  })
+
+  describe('a module policy', () => {
+    const policy = {
+      id: 'policy-id',
+      kind: 'policy',
+      name: 'ChecklistAccess',
+      roles: ['reviewer'],
+      grants: [
+        { name: 'checklistRead', entity: 'Checklist', actions: ['read'] },
+        { name: 'checklistsRead', dataSource: 'Checklists', actions: ['read'] },
+      ],
+    }
+    const policyItem: ModuleResourceItem = {
+      id: 'policy-id',
+      kind: 'policy',
+      name: 'checklists/ChecklistAccess',
+      module: 'checklists',
+    }
+    const policyPath = '/api/studio/apps/Leave%20Requests/modules/checklists/resources/policy-id'
+    const removedGrant = { name: 'checklistsExport', dataSource: 'Checklists', actions: ['read'] }
+
+    it('marks an added grant and lists a removed grant as a muted row with Reset to module', async () => {
+      renderEditor(
+        () =>
+          read(
+            layer,
+            policy,
+            [{ path: '/grants/1', mark: 'added' }],
+            [{ list: '/grants', key: 'checklistsExport', content: removedGrant }],
+          ),
+        policyItem,
+      )
+
+      expect(await screen.findByTestId('studio-module-policy-grant-1')).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'Added checklistsRead' })).toBeInTheDocument()
+      expect(screen.queryByRole('note', { name: 'Added checklistRead' })).toBeNull()
+      const removed = screen.getByTestId('studio-layer-removed-/grants/checklistsExport')
+      expect(within(removed).getByRole('note', { name: 'Removed checklistsExport' })).toBeInTheDocument()
+      expect(within(removed).getByRole('button', { name: 'Reset to module checklistsExport' })).toBeEnabled()
+    })
+
+    it('resets a removed grant through the reset route', async () => {
+      let reset = false
+      const { fetchMock } = renderEditor((_url, init) => {
+        if (init?.method === 'POST') {
+          reset = true
+          return new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
+        }
+        return reset
+          ? read(null, policy)
+          : read(layer, policy, [], [{ list: '/grants', key: 'checklistsExport', content: removedGrant }])
+      }, policyItem)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Reset to module checklistsExport' }))
+
+      await waitFor(() => expect(screen.queryByTestId('studio-layer-removed-/grants/checklistsExport')).toBeNull())
+      const [[url, init]] = calls(fetchMock, 'POST')
+      expect(url).toBe(`${policyPath}/reset`)
+      expect(JSON.parse(init.body as string)).toEqual({ list: '/grants', key: 'checklistsExport' })
+    })
+
+    it('saves a ticked action through the module save route', async () => {
+      let written = false
+      const { fetchMock } = renderEditor((_url, init) => {
+        if (init?.method === 'PUT') {
+          written = true
+          return new Response(
+            JSON.stringify({ file: 'customizations/checklists/ChecklistAccess.json', version: 'v1', diagnostics: [] }),
+          )
+        }
+        return read(written ? layer : null, policy)
+      }, policyItem)
+
+      const grant = await screen.findByTestId('studio-module-policy-grant-1')
+      await userEvent.click(within(grant).getByRole('checkbox', { name: 'export' }))
+      await userEvent.click(screen.getByTestId('studio-save'))
+
+      expect(await screen.findByTestId('studio-saved')).toBeInTheDocument()
+      const [[url, init]] = calls(fetchMock, 'PUT')
+      expect(url).toBe(policyPath)
+      const body = JSON.parse(init.body as string)
+      expect(body.grants[1].actions).toEqual(['read', 'export'])
+      expect(body.grants[0].actions).toEqual(['read'])
+    })
+  })
+  describe('a module form', () => {
+    const form = {
+      id: 'form-id',
+      kind: 'form',
+      name: 'BudgetReview',
+      formatVersion: 1,
+      entity: 'Budget',
+      sections: [
+        {
+          name: 'main',
+          title: { textKey: 'department-budgets.budgetReview.title' },
+          fields: [{ field: 'name' }, { field: 'amount' }, { field: 'department' }, { field: 'year' }],
+        },
+      ],
+    }
+    const formItem: ModuleResourceItem = {
+      id: 'form-id',
+      kind: 'form',
+      name: 'department-budgets/BudgetReview',
+      module: 'department-budgets',
+    }
+    const formPath = '/api/studio/apps/Leave%20Requests/modules/department-budgets/resources/form-id'
+
+    /** Answers the canvas's draft route, and passes every other URL to `respond`. */
+    function renderForm(respond: (url: string, init?: RequestInit) => Response) {
+      return renderEditor(
+        (url, init) =>
+          url.endsWith('/page-metadata')
+            ? new Response(JSON.stringify({ widget: null, diagnostics: [] }))
+            : respond(url, init),
+        formItem,
+      )
+    }
+
+    function resets(fetchMock: ReturnType<typeof vi.fn>) {
+      return calls(fetchMock, 'POST').filter(([url]) => url.endsWith('/reset'))
+    }
+
+    it('opens in the form designer with the layer applied and marks a moved field as changed', async () => {
+      let reset = false
+      const { fetchMock } = renderForm((_url, init) => {
+        if (init?.method === 'POST') {
+          reset = true
+          return new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
+        }
+        return reset ? read(null, form) : read(layer, form, [{ path: '/sections/0/fields/1', mark: 'changed' }])
+      })
+
+      expect(await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })).toBeInTheDocument()
+      expect(screen.getByTestId('studio-module-layer')).toBeInTheDocument()
+      expect(screen.queryByTestId('studio-form-used-on')).toBeNull()
+      expect(screen.getByRole('note', { name: 'Changed amount' })).toBeInTheDocument()
+      expect(screen.queryByRole('note', { name: 'Changed name' })).toBeNull()
+      await userEvent.click(screen.getByRole('button', { name: 'Reset to module amount' }))
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      const [[url, init]] = resets(fetchMock)
+      expect(url).toBe(`${formPath}/reset`)
+      expect(JSON.parse(init.body as string)).toEqual({ list: '/sections/0/fields', key: 'amount' })
+    })
+
+    it('draws the draft through the module draft route', async () => {
+      const { fetchMock } = renderForm(() => read(null, form))
+
+      await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })
+
+      await waitFor(() => expect(calls(fetchMock, 'POST').map(([url]) => url)).toContain(`${formPath}/page-metadata`))
+    })
+
+    it('marks a changed section and lists a removed field as a muted row with Reset to module', async () => {
+      const { fetchMock } = renderForm(() =>
+        read(
+          layer,
+          form,
+          [{ path: '/sections/0', mark: 'changed' }],
+          [{ list: '/sections/0/fields', key: 'code', content: { field: 'code' } }],
+        ),
+      )
+
+      expect(await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'Changed main' })).toBeInTheDocument()
+      const removed = screen.getByTestId('studio-layer-removed-/sections/0/fields/code')
+      expect(within(removed).getByRole('note', { name: 'Removed code' })).toBeInTheDocument()
+      expect(within(removed).getByRole('button', { name: 'Reset to module code' })).toBeEnabled()
+      expect(resets(fetchMock)).toEqual([])
     })
   })
 })

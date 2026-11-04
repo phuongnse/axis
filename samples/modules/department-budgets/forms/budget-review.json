@@ -6,6 +6,7 @@
   "entity": "Budget",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "department-budgets.budgetReview.title" },
       "fields": [{ "field": "name" }, { "field": "department" }, { "field": "year" }, { "field": "amount" }]
     }

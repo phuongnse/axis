@@ -6,6 +6,7 @@
   "entity": "Note",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "noteReview.main" },
       "fields": [{ "field": "title", "readOnly": true }, { "field": "priority" }]
     }

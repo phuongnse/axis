@@ -6,6 +6,7 @@
   "entity": "ledgers/Claim",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "claim.main" },
       "fields": [{ "field": "status" }]
     }

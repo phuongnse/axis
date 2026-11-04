@@ -83,9 +83,15 @@ public sealed class AdminScratchTenantRemovalTests(KeycloakFixture keycloak, Pos
         await removal.RemoveAsync(ScratchId, CancellationToken);
         var before = await SnapshotAsync(scenario, studio, source);
 
+        // Stands in for a realm that another test creates in the shared Keycloak while this one runs.
+        var bystander = $"t{Guid.NewGuid():N}"[..16];
+        _realms.Add(bystander);
+        await CreateRealmAsync(bystander);
+
         await removal.RemoveAsync(ScratchId, CancellationToken);
 
         Assert.Equal(before, await SnapshotAsync(scenario, studio, source));
+        Assert.True(await RealmExistsAsync(bystander));
         await AssertScratchGoneAsync(scenario, studio);
     }
 
@@ -185,15 +191,16 @@ public sealed class AdminScratchTenantRemovalTests(KeycloakFixture keycloak, Pos
         Assert.False(Directory.Exists(Path.Combine(studio.Path, ScratchId)));
     }
 
-    // Everything a removal may touch, to compare before and after a second removal.
+    // Everything a removal may touch, to compare before and after a second removal. The Keycloak is shared with tests that run in
+    // parallel and create their own realms, so the snapshot records the realms a removal could wrongly touch, not every realm.
     private async Task<string> SnapshotAsync(AdminScenario scenario, TemporaryFolder studio, string source)
     {
-        using var http = new HttpClient(_handler, disposeHandler: false);
-        using var response = await SendAsync(http, await TokenAsync(http), HttpMethod.Get, "admin/realms", null);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var realms = (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).EnumerateArray()
-            .Select(realm => realm.GetProperty("realm").GetString()!)
-            .Order(StringComparer.Ordinal);
+        var realms = new List<string>();
+        foreach (var realm in new[] { "axis", "company", "master", source, ScratchId })
+        {
+            realms.Add($"{realm}={await RealmExistsAsync(realm)}");
+        }
+
         var files = Directory.EnumerateFileSystemEntries(studio.Path, "*", SearchOption.AllDirectories)
             .Select(path => Path.GetRelativePath(studio.Path, path))
             .Order(StringComparer.Ordinal);
@@ -242,6 +249,13 @@ public sealed class AdminScratchTenantRemovalTests(KeycloakFixture keycloak, Pos
         using var http = new HttpClient(_handler, disposeHandler: false);
         using var response = await SendAsync(http, await TokenAsync(http), HttpMethod.Delete, $"admin/realms/{realm}", null);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    private async Task CreateRealmAsync(string realm)
+    {
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        using var response = await SendAsync(http, await TokenAsync(http), HttpMethod.Post, "admin/realms", new { realm, enabled = true });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     private async Task<bool> RealmExistsAsync(string realm)

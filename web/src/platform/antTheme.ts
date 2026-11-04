@@ -1,5 +1,5 @@
 import { theme, type ConfigProviderProps, type ThemeConfig } from 'antd'
-import { colourTokens, designTokensFor, type ColourName, type PageTokenValues } from './designTokens'
+import { colourTokens, designTokensFor, type ColourName, type DesignTokens, type PageTokenValues } from './designTokens'
 import type { ThemeMode } from './themeMode'
 
 // The only file that names Ant Design tokens. It maps the Axis tokens to Ant Design's theme.
@@ -158,3 +158,12 @@ export function selectedItemTint(mode: ThemeMode): string {
 
 /** Table cells hold form items that need no space below them, as the table rows already space the inputs. */
 export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } }
+
+/**
+ * The cell padding of a table (D129). A row is `spacing-xs` above and below a line of the `smallControl` size, which a
+ * line of text and a small icon button both fill, and `spacing-lg` on each side keeps columns apart. A table applies it
+ * through a nested ConfigProvider, so tables that are not yet on `AxisTable` keep their look.
+ */
+export function tableTheme(tokens: DesignTokens): ThemeConfig {
+  return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }
+}

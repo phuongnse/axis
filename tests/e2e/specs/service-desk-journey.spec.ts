@@ -688,6 +688,7 @@ test.describe('the author builds the service desk with Studio only', () => {
             .last()
             .click()
         }
+        await page.getByTestId(`studio-field-/sections/${sectionIndex}/name`).getByRole('textbox').fill(section.name!)
         const titleKey = section.title.textKey
         await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, titleKey, en[titleKey])
         for (const [fieldIndex, field] of section.fields.entries()) {
@@ -1113,7 +1114,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   test('the author lays out the Dashboard on the Design tab with two tiles, a chart and the ticket table', async ({ page }) => {
     // A tall, wide window keeps the palette, the data panel and the canvas in view together, away from the edges where a
-    // drag scrolls. A table makes the canvas wider than a narrow window, which pushes the panel out of sight of the mouse.
+    // drag scrolls.
     await page.setViewportSize({ width: 1920, height: 1000 })
     await useJourneySession(page, 'author')
     // The names load with the application, so the new data sources and AllTickets are offered below.

@@ -6,6 +6,7 @@
   "entity": "Ticket",
   "sections": [
     {
+      "name": "ticket",
       "title": {
         "textKey": "ticket.sections.ticket"
       },
@@ -33,6 +34,7 @@
       ]
     },
     {
+      "name": "triage",
       "title": {
         "textKey": "ticket.sections.triage"
       },
