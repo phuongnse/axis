@@ -372,7 +372,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         {
             job.ToTable("jobs", table =>
             {
-                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume')");
+                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create')");
                 table.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
             });
             job.HasKey(j => j.Id).HasName("pk_jobs");
@@ -382,6 +382,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             job.Property(j => j.State).HasColumnName("state");
             job.Property(j => j.Steps).HasColumnName("steps").HasColumnType("jsonb");
             job.Property(j => j.Error).HasColumnName("error");
+            job.Property(j => j.Input).HasColumnName("input").HasColumnType("jsonb");
             job.Property(j => j.IdempotencyKey).HasColumnName("idempotency_key");
             job.Property(j => j.RequestHash).HasColumnName("request_hash");
             job.Property(j => j.Actor).HasColumnName("actor");

@@ -1,13 +1,16 @@
+using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Administration;
+using Axis.Configuration.Templates;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace Axis.Server.CellApi;
@@ -51,6 +54,15 @@ namespace Axis.Server.CellApi;
 /// <c>422</c>. The key is shared across the cell. A transaction lock on the key serializes parallel retries, so they queue one job.
 /// <c>GET /api/cell/jobs/{id}</c> answers the job with its <c>steps</c> and the <c>error</c> of a failed job, or <c>404</c>.
 /// </para>
+/// <para>
+/// <c>POST /api/cell/tenants</c> takes <c>{ "id", "application", "administrator" }</c> and queues a <c>create</c> job with the five
+/// steps <c>tenant</c>, <c>application</c>, <c>activate</c>, <c>invite</c> and <c>resume</c>, all <c>pending</c>, and answers <c>202</c>
+/// as the suspend route does. The checks run in this order: the <c>Idempotency-Key</c> header (<c>400</c>), the replay of the first job
+/// or <c>422</c>, the body (<c>400</c>: the id by the rule of <c>tenant create</c>, an application that is not an installed template, an
+/// administrator that is not an email), then under a cell-wide advisory lock an id that a directory row or an unfinished create job
+/// holds (<c>409</c>) and the cell's <see cref="CellOptions.TenantCap"/> (<c>409</c>, "This cell is full."). The job's <c>input</c> holds the
+/// application and the administrator and the job read never returns it.
+/// </para>
 /// </summary>
 internal static class CellEndpoints
 {
@@ -65,7 +77,10 @@ internal static class CellEndpoints
     {
         ["suspend"] = ["status"],
         ["resume"] = ["status"],
+        ["create"] = ["tenant", "application", "activate", "invite", "resume"],
     };
+
+    private const int MaxTenantIdLength = 50;
 
     public static void MapCellEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -75,6 +90,7 @@ internal static class CellEndpoints
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
+        cell.MapPost("/tenants", CreateTenantAsync);
         cell.MapPost("/tenants/{id}/suspend", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("suspend", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/resume", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
@@ -219,19 +235,158 @@ internal static class CellEndpoints
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
         }
 
-        var values = httpContext.Request.Headers[IdempotencyKeyHeader];
-        if (values.Count != 1 || string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > MaxIdempotencyKeyLength)
+        if (ReadIdempotencyKey(httpContext) is not { } key)
         {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: $"The request must carry an {IdempotencyKeyHeader} header of 1 to {MaxIdempotencyKeyLength} characters.");
+            return MissingKey();
         }
 
-        var key = values[0]!;
+        var hash = HashRequest(kind, id, await ReadBodyAsync(httpContext, cancellationToken));
+        if (await ReplayAsync(platform, transaction, key, hash, cancellationToken) is { } replay)
+        {
+            return replay;
+        }
+
+        var job = NewJob(kind, id, httpContext, key, hash, null);
+        platform.Jobs.Add(job);
+        await platform.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Accepted(job);
+    }
+
+    private static async Task<IResult> CreateTenantAsync(
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        TemplateCatalog templates,
+        CellOptions cell,
+        CancellationToken cancellationToken)
+    {
+        if (ReadIdempotencyKey(httpContext) is not { } key)
+        {
+            return MissingKey();
+        }
+
+        var body = await ReadBodyAsync(httpContext, cancellationToken);
+        var hash = HashRequest("create", "", body);
+        await using var platform = Open(dataSource);
+        await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
+
+        // The replay comes before every check that a later change can flip, such as the tenant it created or a removed template.
+        if (await ReplayAsync(platform, transaction, key, hash, cancellationToken) is { } replay)
+        {
+            return replay;
+        }
+
+        var request = ReadCreateRequest(body);
+        var problem = ValidateCreate(request, templates);
+        if (problem is not null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: problem);
+        }
+
+        var id = request!.Id!;
+
+        // One lock for the whole cell covers the id check and the cap check, so two creates cannot both pass. It comes after the
+        // key lock in every request, which is one fixed order.
+        await platform.Database.ExecuteSqlAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended('axis-tenant-create', 0))",
+            cancellationToken);
+        var unfinished = platform.Jobs.AsNoTracking().Where(job => job.Kind == "create" && (job.State == "queued" || job.State == "running"));
+        if (await platform.Tenants.AnyAsync(tenant => tenant.Id == id, cancellationToken)
+            || await unfinished.AnyAsync(job => job.TenantId == id, cancellationToken))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "A tenant of the cell already has this id.");
+        }
+
+        if (cell.TenantCap is { } cap)
+        {
+            var count = await platform.Tenants.CountAsync(cancellationToken)
+                + await unfinished.CountAsync(job => !platform.Tenants.Any(tenant => tenant.Id == job.TenantId), cancellationToken);
+            if (count >= cap)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This cell is full.");
+            }
+        }
+
+        var input = JsonSerializer.Serialize(new { request.Application, request.Administrator }, JsonSerializerOptions.Web);
+        var job = NewJob("create", id, httpContext, key, hash, input);
+        platform.Jobs.Add(job);
+        await platform.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Accepted(job);
+    }
+
+    private static CellCreateTenantRequest? ReadCreateRequest(byte[] body)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<CellCreateTenantRequest>(body, JsonSerializerOptions.Web);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? ValidateCreate(CellCreateTenantRequest? request, TemplateCatalog templates)
+    {
+        if (request is null)
+        {
+            return "The request must be a JSON object with an id, an application and an administrator.";
+        }
+
+        if (request.Id is not { } id
+            || !TenantOptionsValidator.IsValidTenantId(id)
+            || id.Length > MaxTenantIdLength
+            || id == "master")
+        {
+            return $"The tenant id must have 1 to {MaxTenantIdLength} lowercase letters, digits and hyphens, and must not be 'master'.";
+        }
+
+        if (request.Application is not { } application
+            || !templates.Newest.Any(template => string.Equals(template.Manifest.Id, application, StringComparison.Ordinal)))
+        {
+            return "The application must be the id of an installed application template.";
+        }
+
+        return request.Administrator is { } administrator
+            && MailAddress.TryCreate(administrator, out var address)
+            && address.Address == administrator
+            ? null
+            : "The administrator must be an email address.";
+    }
+
+    private static string? ReadIdempotencyKey(HttpContext httpContext)
+    {
+        var values = httpContext.Request.Headers[IdempotencyKeyHeader];
+        return values.Count != 1 || string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > MaxIdempotencyKeyLength
+            ? null
+            : values[0];
+    }
+
+    private static IResult MissingKey() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: $"The request must carry an {IdempotencyKeyHeader} header of 1 to {MaxIdempotencyKeyLength} characters.");
+
+    private static async Task<byte[]> ReadBodyAsync(HttpContext httpContext, CancellationToken cancellationToken)
+    {
         using var body = new MemoryStream();
         await httpContext.Request.Body.CopyToAsync(body, cancellationToken);
-        var hash = Convert.ToHexStringLower(SHA256.HashData([.. Encoding.UTF8.GetBytes($"{kind}\n{id}\n"), .. body.ToArray()]));
+        return body.ToArray();
+    }
 
+    // The tenant segment is empty for a request that names no tenant in its path, such as create.
+    private static string HashRequest(string kind, string tenantSegment, byte[] body) =>
+        Convert.ToHexStringLower(SHA256.HashData([.. Encoding.UTF8.GetBytes($"{kind}\n{tenantSegment}\n"), .. body]));
+
+    // Answers the first job again, or 422 when the key was used with another request, or null when the key is new.
+    private static async Task<IResult?> ReplayAsync(
+        PlatformDbContext platform,
+        IDbContextTransaction transaction,
+        string key,
+        string hash,
+        CancellationToken cancellationToken)
+    {
         // The key index cannot be unique, as a key may be used again after the window, so the lock keeps two parallel retries from both inserting.
         await platform.Database.ExecuteSqlAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended('axis-job:' || {key}, 0))",
@@ -241,36 +396,36 @@ internal static class CellEndpoints
             .Where(job => job.IdempotencyKey == key && job.CreatedAt > windowStart)
             .OrderByDescending(job => job.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
-        if (first is not null)
+        if (first is null)
         {
-            if (first.RequestHash != hash)
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status422UnprocessableEntity,
-                    title: $"The {IdempotencyKeyHeader} was used before with another request.");
-            }
-
-            await transaction.CommitAsync(cancellationToken);
-            return Accepted(first);
+            return null;
         }
 
-        var job = new JobRow
+        if (first.RequestHash != hash)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                title: $"The {IdempotencyKeyHeader} was used before with another request.");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return Accepted(first);
+    }
+
+    private static JobRow NewJob(string kind, string tenantId, HttpContext httpContext, string key, string hash, string? input) =>
+        new()
         {
             Id = Guid.CreateVersion7(),
             Kind = kind,
-            TenantId = id,
+            TenantId = tenantId,
             State = "queued",
             Steps = JsonSerializer.Serialize(_jobSteps[kind].Select(name => new CellJobStepResponse(name, "pending", null)), JsonSerializerOptions.Web),
+            Input = input,
             Actor = httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
             IdempotencyKey = key,
             RequestHash = hash,
             CreatedAt = DateTimeOffset.UtcNow,
         };
-        platform.Jobs.Add(job);
-        await platform.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return Accepted(job);
-    }
 
     private static IResult Accepted(JobRow job) =>
         Results.Accepted($"/api/cell/jobs/{job.Id:D}", new CellJobResponse(job.Id, job.Kind, job.TenantId, job.State, job.CreatedAt));
@@ -367,6 +522,9 @@ internal sealed record CellQuotaResponse(long? Value, bool Overridden);
 
 /// <summary>The effective quotas of a tenant, keyed by quota key.</summary>
 internal sealed record CellQuotasResponse(IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
+
+/// <summary>The body of the create route. A missing or wrongly typed member is null and answers <c>400</c>.</summary>
+internal sealed record CellCreateTenantRequest(string? Id, string? Application, string? Administrator);
 
 /// <summary>A queued job of the provisioning API.</summary>
 internal sealed record CellJobResponse(Guid Id, string Kind, string TenantId, string State, DateTimeOffset CreatedAt);

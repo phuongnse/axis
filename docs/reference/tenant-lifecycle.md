@@ -4,7 +4,7 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes and the job read of the
+Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, and the job read of the
 [provisioning API](#provisioning-api), the job runner for suspend and resume described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
@@ -44,8 +44,10 @@ implementation.
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
   The `suspend` and `resume` routes and the job read are built: the server only queues the job, over the platform reader role,
   which may insert into `platform.jobs` and nothing else there, and answers `202` with a `Location` header of `/api/cell/jobs/{id}`.
-  The job's actor is the operator's id, the subject of the token or the session. The routes for the other kinds and the run again of a
-  failed job are _(planned for M31)_.
+  The job's actor is the operator's id, the subject of the token or the session. The create route is built too: it queues a `create` job with the five steps of
+  [creating a tenant](#creating-a-tenant), all `pending`, and keeps the request's `application` and `administrator` in the job's
+  `input`, which the job read never returns. The runner for `create` is _(planned for M31)_, so until it exists the publisher fails a
+  queued create job as a kind it does not know. The routes for the other kinds and the run again of a failed job are _(planned for M31)_.
 - **Idempotency.** Each `POST` that queues a job needs an `Idempotency-Key` header of 1 to 255 characters, and the answer is `400`
   without one, with no job queued. The same key with the same request answers the first job again for 24 hours. The request is the kind,
   the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.
@@ -81,12 +83,21 @@ implementation.
 an optional `quotas`, which the `tenant` step writes as the tenant's quota rows, so a tenant of the
 [sign-up](sign-up.md#provisioning) never runs with the cell's defaults.
 
-- `id` follows the rule of [`tenant create`](administration.md#tenant-create). An id that a tenant
-  of the cell has, or that a deleted tenant had, answers `409`.
+- `id` follows the rule of [`tenant create`](administration.md#tenant-create): 1 to 50 lowercase letters,
+  digits and hyphens, and not `master`. A bad id answers `400`. An id that a directory row holds, in any
+  status and a preview tenant's included, or that a `queued` or `running` create job holds, answers `409`.
+  An id that a deleted tenant had answers `409` too _(planned for M31, once deletion adds `platform.deleted_tenants`)_.
 - `application` names a built-in application installed in the cell _(planned for M26)_. Until M26 it
-  names an [application template](modules-and-templates.md#application-templates).
-- `administrator` is the email of the person invited as the tenant's first administrator.
+  names an [application template](modules-and-templates.md#application-templates), and an id that is not
+  an installed template answers `400`. The job keeps the id, and its `application` step takes the newest version.
+- `administrator` is the email of the person invited as the tenant's first administrator. A value that is
+  not an email answers `400`.
 - A cell at its cap answers `409`, see [cell size](cells.md#cell-size).
+- The route needs an `Idempotency-Key` header, see [idempotency](#provisioning-api). The checks run in this
+  order: the header (`400`), the replay of the first job or `422`, the body (`400`), then the id and the
+  cap (`409`). A retry with the same key and body answers the first job again, even after the tenant exists.
+  A cell-wide advisory lock covers the id check and the cap check, so two parallel creates cannot both pass.
+  `Axis.Admin tenant create` does not take that lock.
 
 The job's steps, in order:
 

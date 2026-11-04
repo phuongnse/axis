@@ -106,7 +106,8 @@ cell puts PgBouncer in front of it.
   the identity provider holds fewer than 1,000 realms, the cap is the number it holds, and each
   tenant still keeps its own realm, as D123 agrees.
 - **Counting.** Every tenant in the directory counts, suspended ones and those waiting to be deleted
-  included. Preview tenants count too, because they hold a database.
+  included. Preview tenants count too, because they hold a database. A `create` job that is `queued` or
+  `running` and has no directory row yet counts too, so queued creates cannot pass the cap together.
 - **Watching it.** The [cell console](cell-console.md#views) shows the count against the cap.
   `Cell:TenantCap` holds the measured cap, and the provisioning API refuses a new tenant past it
   with `409` problem details titled "This cell is full.".
