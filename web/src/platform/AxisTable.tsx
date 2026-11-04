@@ -1,6 +1,6 @@
 import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Dropdown, Flex, Table, type TableColumnType, type TableProps } from 'antd'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
@@ -8,6 +8,7 @@ import { markCurrentPage } from './pagination'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
+import { visuallyHidden } from './visuallyHidden'
 
 /**
  * How wide a column is (D129).
@@ -39,6 +40,8 @@ export interface AxisRowAction {
   icon?: ReactNode
   destructive?: boolean
   disabled?: boolean
+  /** Appended to the accessible name of an icon button only, such as a row number. The tooltip stays the name. */
+  nameSuffix?: string
   onClick: () => void
   /** Attributes for the button, such as the canvas's selection. */
   attributes?: object
@@ -61,7 +64,8 @@ export interface AxisTableProps<T> {
   dataSource?: readonly T[]
   loading: boolean
   emptyText: string
-  pagination: { current: number; pageSize: number; total: number; pageSizeOptions: number[] }
+  /** The paging, or `false` for a table that lists every row on one page. */
+  pagination: { current: number; pageSize: number; total: number; pageSizeOptions: number[] } | false
   onChange?: TableProps<T>['onChange']
   toolbar: AxisTableToolbar
   /** What sits between the toolbar and the rows, such as a filter bar, messages and dialogs. */
@@ -75,6 +79,8 @@ export interface AxisTableProps<T> {
   rowActions?: { configured: number; actions: (row: T) => AxisRowAction[] | null }
   /** Whether a row is a group row: its empty cells stay blank instead of showing the em dash. */
   blankRow?: (row: T) => boolean
+  /** Attributes for the row's element, such as test ids and data attributes. */
+  rowAttributes?: (row: T) => HTMLAttributes<HTMLElement>
 }
 
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
@@ -107,7 +113,9 @@ export function AxisTable<T extends object>({
   failure,
   rowActions,
   blankRow,
+  rowAttributes,
 }: AxisTableProps<T>) {
+  const t = useText()
   const tokens = useDesignTokens()
   const narrow = useNarrowWidth()
   const freeTexts = columns.filter((column) => column.kind === 'freeText').length
@@ -150,6 +158,8 @@ export function AxisTable<T extends object>({
     const cell = { style: { width: fitContent, whiteSpace: 'nowrap', ...line } satisfies CSSProperties }
     antColumns.push({
       key: actionsKey,
+      // A header without text fails the accessibility check, so the column is named for screen readers only.
+      title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
       onHeaderCell: () => cell,
       onCell: () => cell,
       render: (_value: unknown, row: T) => <RowActions actions={rowActions.actions(row)} fold={fold} />,
@@ -192,7 +202,14 @@ export function AxisTable<T extends object>({
             dataSource={dataSource as T[] | undefined}
             loading={loading}
             locale={{ emptyText }}
-            pagination={{ ...pagination, showSizeChanger: true, itemRender: markCurrentPage(pagination.current) }}
+            pagination={
+              pagination && {
+                ...pagination,
+                showSizeChanger: true,
+                itemRender: markCurrentPage(pagination.current),
+              }
+            }
+            onRow={rowAttributes}
             onChange={onChange}
             styles={{ header: { row }, body: { row } }}
           />
@@ -239,6 +256,7 @@ function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: 
             nameKey={action.labelKey}
             destructive={action.destructive}
             icon={action.icon}
+            nameSuffix={action.nameSuffix}
             disabled={action.disabled}
             onClick={action.onClick}
             {...action.attributes}

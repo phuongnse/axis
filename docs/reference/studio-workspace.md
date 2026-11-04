@@ -6,7 +6,7 @@ band, its page headings, its Overview, its Releases list and a release's page. T
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
 [D129](../decisions/d129-rules-from-the-studio-editors-review.md) and
-[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications and Workspace sections are built. The rest of this page is _(planned for M31)_.
+[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace and Releases sections are built, except where marked. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
@@ -155,7 +155,7 @@ The Releases entry lists the application's releases from [`GET .../releases`](au
 
 - **One row per release,** the highest number first, as a publish gives a release its label and note and activating
   goes to the release one wants.
-- **Columns.** Release, the number, as the link that opens the [release page](#release-page), with the Live tag beside the one that runs, as the band says, and the
+- **Columns.** Release, the number, as the link that opens the [release page](#release-page) _(planned for M31)_, with the Live tag beside the one that runs, as the band says, and the
   Off-standard tag beside an [off-standard release](module-contracts.md#off-standard-releases); Label; Published, when
   it was published; Published by, who published it, see [names](#names); and Note. Label and Note show the dash when
   the publish gave none. There is no Status column: a release that is not live has no state of its own to name.
@@ -163,7 +163,7 @@ The Releases entry lists the application's releases from [`GET .../releases`](au
   publisher only. It activates the release either way, back to an older release or forward to a newer one, see
   [D130](../decisions/d130-activate-a-release-replaces-roll-back.md). Its dialog says which release replaces the live
   one. It checks first and, when the release [cannot replace the live one](#release-page), titles itself with the same
-  sentence as the page and offers Close alone.
+  sentence as the page and offers Close alone _(planned for M31)_. Until then it sends the existing rollback route.
 
 ## Release page
 
