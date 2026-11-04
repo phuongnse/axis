@@ -143,7 +143,7 @@ internal static partial class CellRestoreCheck
             run.Error.WriteLine("The command was canceled before any tenant work.");
             return 1;
         }
-        catch (Exception exception) when (exception is AmazonClientException or NpgsqlException or InvalidOperationException)
+        catch (Exception exception) when (exception is AmazonServiceException or AmazonClientException or HttpRequestException or NpgsqlException or InvalidOperationException)
         {
             output.WriteLine($"cell restore-check failed: the archives could not be listed: {CellBackup.SafeUpload(exception)}");
             return 1;
