@@ -16,6 +16,8 @@ for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.E
 done
 run_suite PaymentReferences.Tests samples/packages/PaymentReferences.Tests dotnet test --project samples/packages/PaymentReferences.Tests -c Release \
   --report-xunit-junit --report-xunit-junit-filename PaymentReferences.Tests.xml --results-directory "$results_dir"
+run_suite Axis.ControlPlane.Tests controlplane/tests/Axis.ControlPlane.Tests dotnet test --project controlplane/tests/Axis.ControlPlane.Tests -c Release \
+  --report-xunit-junit --report-xunit-junit-filename Axis.ControlPlane.Tests.xml --results-directory "$results_dir"
 run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 

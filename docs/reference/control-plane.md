@@ -5,8 +5,10 @@ Detailed reference for the control plane: the service that runs Axis's own busin
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md),
 [D126](../decisions/d126-sign-up-trials-and-the-control-plane.md) and
 [D127](../decisions/d127-plans-payments-and-invoices.md). Everything in this file is _(planned for
-M33)_, except the parts that billing adds, _(planned for M34)_. The conventions of
-[architecture.md](../architecture.md) apply.
+M33)_, except the parts that billing adds, _(planned for M34)_, and except the service itself, its
+settings and its health, which are built: `controlplane/src/Axis.ControlPlane` starts, checks its
+`ControlPlane:` settings, applies its own migrations and answers `/health/live` and `/health/ready`. The
+conventions of [architecture.md](../architecture.md) apply.
 
 ## What it is
 
@@ -72,9 +74,25 @@ M33)_, except the parts that billing adds, _(planned for M34)_. The conventions 
   the mail settings, the [plans](plans.md) and the providers' non-secret values. Secrets are
   Kubernetes Secrets.
 
+The service reads three settings at start, and the rest are _(planned for M33)_. Every one is required.
+A missing or wrong value stops the start, and the message names the setting and never its value. The
+connection string may also come from the key-per-file secret `/run/secrets/ControlPlane__ConnectionString`.
+
+| Setting | Meaning | Start check |
+| --- | --- | --- |
+| `ControlPlane:Region` | The region code, such as `vn` | Lowercase letters and digits only |
+| `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
+| `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
+
+At start the service applies its migrations to the `control_plane` schema, with the history table
+`control_plane.__control_plane_migrations`. A failed migration stops the start. One database role runs
+the migrations and the queries for now.
+
 ## Health and telemetry
 
-- **Health.** `/health/live` and `/health/ready`, as the platform's hosts answer them. Ready checks
-  its database, the directory and the mail relay.
-- **Telemetry.** Logs, metrics and traces as the platform's hosts write them. A log never holds a
+- **Health.** `/health/live` and `/health/ready`, as the platform's hosts answer them. Live runs no
+  check. Ready checks its database, which must answer `SELECT 1`, and answers 503 `Unhealthy` when it
+  does not. The directory and the mail relay _(planned for M33)_ join the ready check when they exist.
+- **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
+  `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.

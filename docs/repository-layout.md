@@ -35,6 +35,10 @@ tests/
     fixtures/e2e-app/     generic test application the E2E server activates
     fixtures/release-app/ application a spec activates during the run, to test releases
     fixtures/subprocess-app/ parent and child sub-process the E2E server activates, for the inspector journey
+controlplane/
+  src/Axis.ControlPlane/  the control plane service: its settings, its own schema and migrations, health and telemetry
+  tests/Axis.ControlPlane.Tests/ unit tests of the control plane that need no Docker
+  tests/Axis.ControlPlane.Integration.Tests/ control plane tests on PostgreSQL (Testcontainers)
 modules/
   organization/           built-in module, as configuration, installed with Axis: departments, employees, the IsDelegating rule, contracts, policies and contract scenarios
 samples/
@@ -55,7 +59,7 @@ checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
 `Axis.Presentation` (the platform site, its texts and the shapes of application site metadata), `Axis.Processes` (work items, the
 `decision`, `task`, `operation`, `end` and `timer` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
-`PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
+`PaymentReferences` with its `PaymentReferences.Tests`, the control plane service `Axis.ControlPlane` under `controlplane/` with `Axis.ControlPlane.Tests` and `Axis.ControlPlane.Integration.Tests`, and `web/`.
 
 ## Module rules
 
