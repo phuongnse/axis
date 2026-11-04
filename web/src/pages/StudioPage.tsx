@@ -26,6 +26,7 @@ import {
   waitForServer,
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
+import { kindName, kindSingular } from '../platform/studioKinds'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -39,7 +40,7 @@ import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { hasRelaxEntry } from './relaxEntries'
-import { kindName, studioActiveEntry, studioNavigation } from './studioNavigation'
+import { studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioReferences } from './StudioReferences'
 import { StudioSidebar } from './StudioSidebar'
 
@@ -365,8 +366,11 @@ function StudioWorkspace() {
     [loaded, resourceId],
   )
   const groups = useMemo(
-    () => (kind === null ? [] : groupByKind(resources).filter((group) => group.kind === kind)),
-    [resources, kind],
+    () =>
+      kind === null
+        ? []
+        : groupByKind(resources, (item) => resourceTitle(item, locale, t)).filter((group) => group.kind === kind),
+    [resources, kind, locale, t],
   )
   const allModuleGroups = useMemo(() => moduleResources(names, ''), [names])
   const moduleGroups = useMemo(
@@ -562,7 +566,7 @@ function StudioWorkspace() {
                   <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
                     <Flex vertical gap="middle">
                       <Descriptions
-                        title={resourceTitle(selected)}
+                        title={resourceTitle(selected, locale, t)}
                         column={1}
                         extra={
                           canTest && selected.kind === 'scenario' && selected.name ? (
@@ -576,7 +580,7 @@ function StudioWorkspace() {
                           ) : undefined
                         }
                         items={[
-                          { key: 'kind', label: t('shell.studio.kind'), children: selected.kind },
+                          { key: 'kind', label: t('shell.studio.kind'), children: kindSingular(selected.kind, t) },
                           { key: 'id', label: t('shell.studio.id'), children: selected.id },
                           { key: 'file', label: t('shell.studio.file'), children: selected.file },
                           ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
@@ -629,7 +633,11 @@ function StudioWorkspace() {
                         title={selectedModuleItem.name}
                         column={1}
                         items={[
-                          { key: 'kind', label: t('shell.studio.kind'), children: selectedModuleItem.kind },
+                          {
+                            key: 'kind',
+                            label: t('shell.studio.kind'),
+                            children: kindSingular(selectedModuleItem.kind, t),
+                          },
                           { key: 'id', label: t('shell.studio.id'), children: selectedModuleItem.id },
                           { key: 'module', label: t('shell.studio.module'), children: selectedModuleItem.module },
                         ]}
@@ -665,7 +673,7 @@ function StudioWorkspace() {
                               data-testid={`studio-resource-${item.id}`}
                               onClick={() => selectResource(item.id)}
                             >
-                              {resourceTitle(item)}
+                              {resourceTitle(item, locale, t)}
                             </Button>
                           ))}
                         </Flex>

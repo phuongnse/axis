@@ -8,6 +8,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { kindGroupNames, kindSingular, studioKinds } from '../platform/studioKinds'
 import { createStarter, starterKinds, textResourceName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
 
@@ -18,9 +19,9 @@ const fallbackLocale = 'en'
 type Problem = 'exists' | 'invalid' | 'failed'
 
 /**
- * The New resource button of the open application, and its dialog. The dialog asks for a kind and a name, or for a
- * locale when the kind is `text`, and creates the resource from the kind's starter with an id from
- * `crypto.randomUUID()`. A new text resource is named after its locale, such as `TextsVi`, and copies every key and
+ * The New resource button of the open application, and its dialog. The dialog asks for a kind, listed by its singular
+ * name under the sidebar's groups, and a name, or for a locale when the kind is `text`. It creates the resource from
+ * the kind's starter with an id from `crypto.randomUUID()`. A new text resource is named after its locale, such as `TextsVi`, and copies every key and
  * text of the default locale of the first site in file order, or of `en` when there is no site, so every label still
  * resolves. A `409` or a `400` shows under the field, and the dialog stays open. `onCreated` gets the new resource and
  * the folder's diagnostics after the write.
@@ -42,6 +43,13 @@ export function StudioNewResource({
   const [problem, setProblem] = useState<Problem>()
   const [creating, setCreating] = useState(false)
   const isText = kind === 'text'
+  const kindOptions = kindGroupNames.flatMap((group) => {
+    const options = studioKinds
+      .filter((entry) => entry.group === group && starterKinds.includes(entry.kind))
+      .map((entry) => ({ value: entry.kind, label: kindSingular(entry.kind, t) }))
+    const title = t(`shell.studio.nav.group.${group}`)
+    return options.length === 0 ? [] : [{ label: title, title, options }]
+  })
   const label = t(isText ? 'shell.studio.newResource.locale' : 'shell.studio.newResource.name')
 
   function show() {
@@ -71,7 +79,7 @@ export function StudioNewResource({
       const result = await createStudioResource(application, body)
       if (result.status === 'created') {
         setOpen(false)
-        onCreated(result.item, result.diagnostics)
+        onCreated({ ...result.item, titles: {}, locale: kind === 'text' ? entered : null }, result.diagnostics)
       } else {
         setProblem(result.status === 'conflict' ? 'exists' : 'invalid')
       }
@@ -109,7 +117,7 @@ export function StudioNewResource({
               showSearch
               optionFilterProp="label"
               virtual={false}
-              options={starterKinds.map((starterKind) => ({ value: starterKind, label: starterKind }))}
+              options={kindOptions}
               onChange={(next) => {
                 setKind(next)
                 setProblem(undefined)

@@ -201,9 +201,10 @@ test.describe('the author builds the asset management application with Studio on
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
-  async function openPage(page: Page, name: string) {
+  // The list names a page by its title, so a page with a title in English takes it as `title`.
+  async function openPage(page: Page, name: string, title = name) {
     await openKind(page, 'page')
-    await page.getByTestId('studio-group-page').getByRole('button', { name, exact: true }).click()
+    await page.getByTestId('studio-group-page').getByRole('button', { name: title, exact: true }).click()
     await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
@@ -814,7 +815,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    await openPage(page, 'AssetDetail')
+    await openPage(page, 'AssetDetail', 'Asset details')
     // The Asset entity dropped on the starter widget binds a detail widget to the required asset parameter. The starter
     // task inbox is not in the sample, so the author removes it from the widget tree.
     await openDesign(page)

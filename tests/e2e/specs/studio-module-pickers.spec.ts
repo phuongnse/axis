@@ -56,7 +56,7 @@ test.describe("Studio's pickers offer the pages and processes of a module", () =
     await openKind(page, "site");
     await page
       .getByTestId("studio-group-site")
-      .getByRole("button", { name: "ModuleSite", exact: true })
+      .getByRole("button", { name: "Module app", exact: true })
       .click();
     await openFormTab(page);
     await pickOption(

@@ -153,9 +153,18 @@ internal static class StudioEndpoints
             .OfType<ResourceNode>()
             .GroupBy(node => node.Id)
             .ToDictionary(group => group.Key, group => group.Count());
-        var items = StudioFolder.List(folder)
+        var files = StudioFolder.List(folder);
+        var titles = StudioResourceTitles.Read(files);
+        var items = files
             .Select(file => new StudioResourceItem(
-                file.Id.ToString("D"), file.Kind, file.Name, file.File, file.Version, usedBy.GetValueOrDefault(file.Id)))
+                file.Id.ToString("D"),
+                file.Kind,
+                file.Name,
+                file.File,
+                file.Version,
+                usedBy.GetValueOrDefault(file.Id),
+                titles[file.Id].Titles,
+                titles[file.Id].Locale))
             .ToList();
         return Results.Ok(new StudioResourceListResponse(items));
     }
@@ -1097,9 +1106,19 @@ internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceIt
 
 /// <summary>
 /// One resource in the list. <c>Version</c> is the lower-case SHA-256 hex of the file's bytes, and <c>UsedBy</c>
-/// is the number of references that point at the resource.
+/// is the number of references that point at the resource. <c>Titles</c> is the resource's label or title text by
+/// locale, empty when its kind has none or no text resource gives the key. <c>Locale</c> is the locale of a text
+/// resource, else null.
 /// </summary>
-internal sealed record StudioResourceItem(string Id, string Kind, string? Name, string File, string Version, int UsedBy);
+internal sealed record StudioResourceItem(
+    string Id,
+    string Kind,
+    string? Name,
+    string File,
+    string Version,
+    int UsedBy,
+    IReadOnlyDictionary<string, string> Titles,
+    string? Locale);
 
 /// <summary>One resource with its JSON content.</summary>
 internal sealed record StudioResourceResponse(string Id, string Kind, string? Name, string File, string Version, JsonElement Content);
