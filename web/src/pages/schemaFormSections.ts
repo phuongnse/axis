@@ -98,3 +98,6 @@ export const usesShownByForm: Record<string, ReadonlySet<string>> = {
 
 /** Proposed: the kinds nothing can refer to, which have no Used by, as it never applies to them. */
 export const neverUsed = new Set(['application'])
+
+/** Proposed: the right side of the heading of the section a node sits in. */
+export const SectionActionSlot = createContext<HTMLElement | null>(null)

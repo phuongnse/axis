@@ -89,6 +89,30 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 - **Built:** the band measures itself. When its actions do not fit, Validate, Preview and Run tests fold into one "…" menu, in
   that order, and New resource… and Publish… stay. They unfold when the room comes back.
 
+### The entity designer, step by step
+
+- **Asked:** the entity designer rendered every setting of every field inside its table row, so a field of many settings
+  stood about 400 px high and an entity of 13 fields about 7,200 px. The owner asked how long-standing products do it.
+  Salesforce's Object Manager, Dataverse's table designer, Mendix, Strapi and Directus all show a compact list of fields,
+  one row a field, and open one field's settings beside the list.
+- **Rules the owner set:**
+  - Every Studio form is built from the shared parts the application's Settings uses, `SectionPanel` and `FormField`,
+    now in `web/src/pages/FormSection.tsx`. A form does not lay its fields out on its own.
+  - Every field has its help text under its label. In an application builder, help text is not optional.
+  - One field to a row. Two fields share a row only when they truly belong together, such as a range's minimum and maximum.
+  - The details are inputs on the page, with no Edit details step.
+- **Step 1, built:** the Form tab is sections: General (name, label, description and display field, each with its help),
+  Fields, Validations and Indexes, with Uses, Used by and the Danger zone after them as before. Fields is `AxisTable`, in the
+  file's order, with Name, Label, Type ("Reference → Supplier", "Enum 3 values"), Required, Unique and Properties (tags for
+  Sequence, Creator, Computed, Default, Searchable and Sensitive), a search, Add field in the section's heading, and Move up,
+  Move down and Remove in each row's menu. A field's name opens its settings in a 560 px drawer, with the table still in sight.
+  The drawer's name, label, type, Required, Unique and help have help texts, and its label and help are typed as texts, a box
+  per locale, as the entity's label is. The other settings are still the old list, for step 2.
+- **Tried and dropped:** tabs for Fields, Validations and Indexes with a header that summed the entity up and an Edit details
+  drawer. The owner wanted the details on the page, and the shared sections keep every form alike.
+- **For the issue:** a diagnostic inside a field opens at its row; it is to open the drawer at the setting. Reordering by drag
+  is still to come.
+
 ### Lost in merges
 
 `main` stays the standard for behaviour, so what keeping the prototype lost is back in the prototype's files:

@@ -1,6 +1,6 @@
 import { DeleteOutlined } from '@ant-design/icons'
 import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Modal, Select, Tag, Typography } from 'antd'
-import { createContext, lazy, Suspense, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
@@ -21,6 +21,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
+import { FieldHeading, SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
 import { BindingPicker } from './BindingPicker'
@@ -34,6 +35,7 @@ import {
   identityProperties,
   SchemaFormKindContext,
   schemaFormSections,
+  SectionActionSlot,
   StudioCatalogContext,
 } from './schemaFormSections'
 import { StudioResourceTitle } from './studioResourceTitle'
@@ -165,73 +167,9 @@ function SectionedForm({
   )
 }
 
-function SectionPanel({
-  title,
-  description,
-  testId,
-  children,
-}: {
-  title: string | null
-  description: string | null
-  testId: string
-  children: ReactNode
-}) {
-  const { colour, radius, spacing } = useDesignTokens()
-  const [slot, setSlot] = useState<HTMLDivElement | null>(null)
-  return (
-    <section
-      data-testid={`studio-form-section-${testId || 'more'}`}
-      style={{
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-        padding: spacing.lg,
-      }}
-    >
-      <Flex vertical gap={spacing.md}>
-        {(title || description) && (
-          // Proposed: a section's main action, such as Add module…, sits on the right of its heading.
-          <Flex align="center" gap={spacing.md}>
-            <Flex vertical gap={4} style={{ flex: 1 }}>
-              {title && (
-                <Typography.Title level={5} style={{ margin: 0 }}>
-                  {title}
-                </Typography.Title>
-              )}
-              {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
-            </Flex>
-            <div ref={setSlot} />
-          </Flex>
-        )}
-        <SectionActionSlot.Provider value={slot}>{children}</SectionActionSlot.Provider>
-      </Flex>
-    </section>
-  )
-}
-
 function textOrNull(t: (key: string) => string, key: string): string | null {
   const text = t(key)
   return text === key ? null : text
-}
-
-/**
- * Proposed: a field's label and help text, as the form widget draws them: the label in medium weight and textMuted,
- * the help in small textMuted text between the label and the input.
- */
-function FieldHeading({ label, help, helpId }: { label: string; help: string | null; helpId: string }) {
-  const { colour, type } = useDesignTokens()
-  return (
-    <div style={{ marginBottom: 6 }}>
-      <div style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
-        {label}
-      </div>
-      {help && (
-        <div id={helpId} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
-          {help}
-        </div>
-      )}
-    </div>
-  )
 }
 
 /** Proposed: a version range split into its version and how it takes updates: `^` compatible, `~` fixes, or exact. */
@@ -340,9 +278,6 @@ function timeZoneLabel(zone: { id: string; offset: number }): string {
   const offset = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
   return `(UTC${sign}${offset}) ${zone.id.replace(/_/g, ' ')}`
 }
-
-/** Proposed: the right side of the heading of the section a node sits in. */
-const SectionActionSlot = createContext<HTMLElement | null>(null)
 
 /** Proposed: whether a node is drawn inside a list's dialog, where a nested list is rows of inputs, never a dialog. */
 const InListDialogContext = createContext(false)
