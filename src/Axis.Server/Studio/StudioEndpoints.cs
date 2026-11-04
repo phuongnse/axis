@@ -50,6 +50,13 @@ namespace Axis.Server.Studio;
 /// 415 for another content type, 400 for a body that is not an object, a module scenario, an ambiguous name, an edit that
 /// cannot be a layer and a contract edit beyond added states and transitions, 409 for a stale version and 503 when the
 /// write lock cannot be taken.
+/// <c>POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset</c> takes <c>{ list, key }</c> and puts one
+/// element of the module resource back as the module has it, or drops it when the layer added it, and rewrites the layer as
+/// the difference that is left. It needs <c>If-Match</c> with the layer's version and answers like the save. After the lookup
+/// above it answers 428 without <c>If-Match</c>, 415 for another content type, 400 for a body that is not exactly two string
+/// properties <c>list</c> and <c>key</c>, a module scenario and an ambiguous name, 409 for a stale version or no layer, 400 for
+/// a layer that removes the whole resource or that cannot be read back, 404 for a list or key that names no element and 503 when
+/// the write lock cannot be taken. "Reset all" is the delete of the layer resource below.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -74,7 +81,7 @@ namespace Axis.Server.Studio;
 /// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
 /// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
-/// In a cell, the create, patch, <c>changes</c>, module resource save and text write routes check the tenant's storage
+/// In a cell, the create, patch, <c>changes</c>, module resource save, module resource reset and text write routes check the tenant's storage
 /// quota (403 <c>quota-exceeded</c>) right after the session, and a delete never does, see
 /// <c>docs/reference/tenant-quotas.md#refusals</c>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
@@ -92,6 +99,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceAsync);
         endpoints.MapPut("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceSaveAsync).WithStorageQuota();
+        endpoints.MapPost("/api/studio/apps/{application}/modules/{module}/resources/{id}/reset", ModuleResourceResetAsync).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync).WithStorageQuota();
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
@@ -370,22 +378,9 @@ internal static class StudioEndpoints
                 return Problem(StatusCodes.Status400BadRequest, "The edit cannot be saved as a layer.");
             }
 
-            if (found.Kind == ResourceKinds.Contract && difference.Changes is not null)
+            if (!LayerAllowed(found, module, difference.Changes))
             {
-                var layer = new LayerResource
-                {
-                    Id = Guid.Empty,
-                    Kind = "layer",
-                    FormatVersion = 1,
-                    Target = $"{module}/{found.Name}",
-                    Changes = JsonSerializer.SerializeToElement(difference.Changes),
-                };
-                var problems = new List<Diagnostic>();
-                ContractLayerChecker.CheckAdditions(found.Root, layer, problems);
-                if (problems.Any(problem => problem.Code == DiagnosticCodes.ContractLayerNotAddition))
-                {
-                    return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
-                }
+                return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
             }
 
             // A tag other than * in If-None-Match matches no state of the layer, so the save is stale.
@@ -403,24 +398,144 @@ internal static class StudioEndpoints
                 hasIfMatch ? request.Headers.IfMatch.ToString() : null,
                 hasIfNoneMatch,
                 httpContext.RequestAborted);
-            switch (outcome.Refusal)
-            {
-                case StudioWriteRefusal.Unavailable:
-                    return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
-                case StudioWriteRefusal.UnsafePath:
-                    return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
-                case not null:
-                    return Problem(StatusCodes.Status409Conflict, StaleLayer);
-            }
-
-            if (outcome.Version is not null)
-            {
-                httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
-            }
-
-            return Results.Ok(new StudioModuleSaveResponse(
-                outcome.File, outcome.Version, StudioDiagnostics.Compile(folder, packages, modules)));
+            return LayerAnswer(httpContext, folder, packages, modules, outcome);
         }
+    }
+
+    // A layer on a contract only adds states and transitions, so any other change is refused before it is written.
+    private static bool LayerAllowed(ModuleFile found, string module, JsonObject? changes)
+    {
+        if (found.Kind != ResourceKinds.Contract || changes is null)
+        {
+            return true;
+        }
+
+        var layer = new LayerResource
+        {
+            Id = Guid.Empty,
+            Kind = "layer",
+            FormatVersion = 1,
+            Target = $"{module}/{found.Name}",
+            Changes = JsonSerializer.SerializeToElement(changes),
+        };
+        var problems = new List<Diagnostic>();
+        ContractLayerChecker.CheckAdditions(found.Root, layer, problems);
+        return !problems.Any(problem => problem.Code == DiagnosticCodes.ContractLayerNotAddition);
+    }
+
+    // The answer of a layer write, a save or a reset: the refusal of the write, or the new file and version with the diagnostics.
+    private static IResult LayerAnswer(
+        HttpContext httpContext, string folder, PackageCatalog packages, ModuleCatalog modules, StudioLayerOutcome outcome)
+    {
+        switch (outcome.Refusal)
+        {
+            case StudioWriteRefusal.Unavailable:
+                return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
+            case StudioWriteRefusal.UnsafePath:
+                return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
+            case not null:
+                return Problem(StatusCodes.Status409Conflict, StaleLayer);
+        }
+
+        if (outcome.Version is not null)
+        {
+            httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+        }
+
+        return Results.Ok(new StudioModuleSaveResponse(
+            outcome.File, outcome.Version, StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private static async Task<IResult> ModuleResourceResetAsync(
+        string application,
+        string module,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var (found, notFound) = FindModuleFile(
+            ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules), modules, module, id);
+        if (found is null)
+        {
+            return notFound!;
+        }
+
+        var request = httpContext.Request;
+        if (request.Headers.IfMatch.Count == 0)
+        {
+            return Problem(StatusCodes.Status428PreconditionRequired, "The reset needs the layer's version in If-Match.");
+        }
+
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        JsonNode? body;
+        try
+        {
+            body = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted);
+        }
+        catch (JsonException)
+        {
+            body = null;
+        }
+
+        if (body is not JsonObject { Count: 2 } fields
+            || fields["list"] is not JsonValue listValue || !listValue.TryGetValue<string>(out var list)
+            || fields["key"] is not JsonValue keyValue || !keyValue.TryGetValue<string>(out var key))
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The body must be { list, key } with two strings.");
+        }
+
+        if (found.Kind == ResourceKinds.Scenario || found.Name is null)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "A layer cannot change this resource.");
+        }
+
+        if (LayerChecker.KindsByName(found.Module)[found.Name].Distinct(StringComparer.Ordinal).Count() > 1)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The module has more than one resource with this name.");
+        }
+
+        var ifMatch = request.Headers.IfMatch.ToString();
+        var reset = StudioModuleLayers.Reset(folder, module, found, list, key, ifMatch);
+        switch (reset.Refusal)
+        {
+            case StudioModuleResetRefusal.Stale:
+                return Problem(StatusCodes.Status409Conflict, StaleLayer);
+            case StudioModuleResetRefusal.WholeResource:
+                return Problem(StatusCodes.Status400BadRequest, "The layer removes the whole resource. Use Reset all.");
+            case StudioModuleResetRefusal.Unreadable:
+                return Problem(StatusCodes.Status400BadRequest, "The layer cannot be read back as a difference. Use Reset all.");
+            case StudioModuleResetRefusal.NotFound:
+                return NotFound("The resource has no element with this key in this list.");
+        }
+
+        var difference = LayerDifference.Compare(found.Kind, found.Root, reset.Edited!.Value);
+        if (difference.Refusal is not null)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The reset cannot be saved as a layer.");
+        }
+
+        if (!LayerAllowed(found, module, difference.Changes))
+        {
+            return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
+        }
+
+        var outcome = await StudioWrites.WriteLayerAsync(
+            writeLock, folder, module, found.Name, difference.Changes, ifMatch, ifNoneMatch: false, httpContext.RequestAborted);
+        return LayerAnswer(httpContext, folder, packages, modules, outcome);
     }
 
     private const string StaleLayer = "The layer has changed since this version, or it exists already. Read it again.";

@@ -37,6 +37,7 @@ public sealed class StorageQuotaRouteTests
         "PATCH /api/studio/apps/{application}/resources/{id}",
         "POST /api/studio/apps",
         "POST /api/studio/apps/{application}/changes",
+        "POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset",
         "POST /api/studio/apps/{application}/publish",
         "POST /api/studio/apps/{application}/resources",
         "PUT /api/studio/apps/{application}/modules/{module}/resources/{id}",

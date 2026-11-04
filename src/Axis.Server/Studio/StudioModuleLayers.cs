@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
@@ -12,7 +13,8 @@ namespace Axis.Server.Studio;
 /// The application's customization layer on one module resource, for a Studio read: the module resource with the layer
 /// applied, which layer applied, and what it added, changed and removed. The marks and the removed elements come from
 /// <see cref="LayerDifference"/>, the code that saving will use, so they agree with the layer that is saved. A layer with
-/// errors of its own is applied as far as the merge gets, and no diagnostics are reported here.
+/// errors of its own is applied as far as the merge gets, and no diagnostics are reported here. <see cref="Reset"/> puts
+/// one element of the layer's resource back as the module has it.
 /// </summary>
 internal static class StudioModuleLayers
 {
@@ -23,22 +25,18 @@ internal static class StudioModuleLayers
     {
         var file = $"modules/{module}/{found.Path}";
         var version = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(found.Text)));
-        if (FindLayer(folder, module, found) is not { } layerFile
-            || ReadLayer(layerFile) is not { } layer)
+        if (Resolve(folder, module, found) is not { } state)
         {
             return Answer(found, file, version, found.Root, null, [], []);
         }
 
-        var layerInfo = new StudioModuleLayer(layerFile.Id.ToString("D"), layerFile.File, layerFile.Version);
-        if (layer.Changes.ValueKind == JsonValueKind.Object
-            && layer.Changes.TryGetProperty(LayerMerger.RemoveProperty, out var remove)
-            && remove.ValueKind == JsonValueKind.True)
+        var layerInfo = new StudioModuleLayer(state.File.Id.ToString("D"), state.File.File, state.File.Version);
+        if (state.RemovesResource)
         {
             return Answer(found, file, version, found.Root, layerInfo, [], []);
         }
 
-        var result = LayerMerger.Merge(found.Kind, found.Root, layer, new List<Diagnostic>());
-        var merged = JsonSerializer.SerializeToElement(result.Merged);
+        var merged = state.Merged;
         var difference = LayerDifference.Compare(found.Kind, found.Root, merged);
         if (difference.Refusal is not null)
         {
@@ -58,6 +56,162 @@ internal static class StudioModuleLayers
         }
 
         return Answer(found, file, version, merged, layerInfo, marks, removed);
+    }
+
+    // The layer of the resource and the resource with it applied. Null when the resource has no layer, or its file cannot
+    // be read as one. A layer that removes the whole resource leaves the module's resource as the merged one.
+    private static LayerState? Resolve(string folder, string module, StudioEndpoints.ModuleFile found)
+    {
+        if (FindLayer(folder, module, found) is not { } layerFile || ReadLayer(layerFile) is not { } layer)
+        {
+            return null;
+        }
+
+        if (layer.Changes.ValueKind == JsonValueKind.Object
+            && layer.Changes.TryGetProperty(LayerMerger.RemoveProperty, out var remove)
+            && remove.ValueKind == JsonValueKind.True)
+        {
+            return new LayerState(layerFile, true, found.Root);
+        }
+
+        var result = LayerMerger.Merge(found.Kind, found.Root, layer, new List<Diagnostic>());
+        return new LayerState(layerFile, false, JsonSerializer.SerializeToElement(result.Merged));
+    }
+
+    private sealed record LayerState(StudioFile File, bool RemovesResource, JsonElement Merged);
+
+    /// <summary>
+    /// The resource with the layer applied and the element of <paramref name="key"/> in the list at the pointer
+    /// <paramref name="list"/> put back as the module has it: a changed element gets the module's version in the
+    /// module's position, an added element is dropped and a removed element comes back. The result is the edit to compare
+    /// with the module for the layer that is left. <paramref name="ifMatch"/> must be the layer's version.
+    /// </summary>
+    public static StudioModuleReset Reset(
+        string folder, string module, StudioEndpoints.ModuleFile found, string list, string key, string ifMatch)
+    {
+        if (FindLayer(folder, module, found) is not { } layerFile
+            || !string.Equals(StudioWrites.Unquote(ifMatch), layerFile.Version, StringComparison.Ordinal))
+        {
+            return Refused(StudioModuleResetRefusal.Stale);
+        }
+
+        if (Resolve(folder, module, found) is not { } state)
+        {
+            return Refused(StudioModuleResetRefusal.Unreadable);
+        }
+
+        if (state.RemovesResource)
+        {
+            return Refused(StudioModuleResetRefusal.WholeResource);
+        }
+
+        if (LayerDifference.Compare(found.Kind, found.Root, state.Merged).Refusal is not null)
+        {
+            return Refused(StudioModuleResetRefusal.Unreadable);
+        }
+
+        if (WalkList(found.Kind, found.Root, state.Merged, list) is not { } target)
+        {
+            return Refused(StudioModuleResetRefusal.NotFound);
+        }
+
+        var keyProperty = target.KeyProperty;
+        var moduleKeys = target.ModuleList is { } moduleList
+            ? moduleList.EnumerateArray().Select(element => LayerMerger.KeyOf(element, keyProperty)).ToList()
+            : [];
+        var moduleIndex = moduleKeys.FindIndex(moduleKey => Same(moduleKey, key));
+        var mergedIndex = IndexOf(target.MergedList, keyProperty, key);
+        if (mergedIndex < 0 && moduleIndex < 0)
+        {
+            return Refused(StudioModuleResetRefusal.NotFound);
+        }
+
+        if (mergedIndex >= 0)
+        {
+            target.MergedList.RemoveAt(mergedIndex);
+        }
+
+        if (moduleIndex >= 0)
+        {
+            // After the merged element whose key is the nearest earlier key of the module that is still there.
+            var position = 0;
+            for (var earlier = moduleIndex - 1; earlier >= 0 && position == 0; earlier--)
+            {
+                position = IndexOf(target.MergedList, keyProperty, moduleKeys[earlier]) + 1;
+            }
+
+            target.MergedList.Insert(position, JsonNode.Parse(target.ModuleList!.Value[moduleIndex].GetRawText()));
+        }
+
+        return new StudioModuleReset(JsonSerializer.SerializeToElement(target.Root), null);
+    }
+
+    private static StudioModuleReset Refused(StudioModuleResetRefusal refusal) => new(null, refusal);
+
+    private static int IndexOf(JsonArray list, string keyProperty, string? key) =>
+        list.ToList().FindIndex(element => Same(KeyOf(element, keyProperty), key));
+
+    private static bool Same(string? left, string? right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+
+    private static string? KeyOf(JsonNode? node, string keyProperty) => node switch
+    {
+        JsonValue value when value.TryGetValue<string>(out var text) => text,
+        JsonObject obj when obj[keyProperty] is JsonValue key && key.TryGetValue<string>(out var text) => text,
+        _ => null,
+    };
+
+    private sealed record ListTarget(JsonNode Root, JsonArray MergedList, JsonElement? ModuleList, string KeyProperty);
+
+    // Walks the list's pointer over a copy of the merged resource and the module's together, as ModuleElement does. The
+    // pointer must end at a keyed list. A module list that cannot be reached, such as one under an added element, is empty.
+    private static ListTarget? WalkList(string kind, JsonElement module, JsonElement merged, string list)
+    {
+        var root = JsonNode.Parse(merged.GetRawText());
+        var current = root;
+        JsonElement? currentModule = module;
+        string? property = null;
+        foreach (var raw in list.Split('/').Skip(1))
+        {
+            var segment = raw.Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal);
+            if (current is JsonObject obj)
+            {
+                if (!obj.TryGetPropertyValue(segment, out current) || current is null)
+                {
+                    return null;
+                }
+
+                currentModule = currentModule is { ValueKind: JsonValueKind.Object } parent && parent.TryGetProperty(segment, out var child)
+                    ? child
+                    : null;
+                property = segment;
+            }
+            else if (current is JsonArray array
+                && property is not null
+                && int.TryParse(segment, out var index)
+                && index >= 0
+                && index < array.Count
+                && ListKeys.TryGet(kind, property, out var listKey)
+                && listKey.Key is not null
+                && KeyOf(array[index], listKey.Key) is { } key)
+            {
+                current = array[index];
+                currentModule = currentModule is { ValueKind: JsonValueKind.Array } moduleArray
+                    ? ByKey(moduleArray, listKey.Key, key)
+                    : null;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        return root is not null
+            && current is JsonArray mergedList
+            && property is not null
+            && ListKeys.TryGet(kind, property, out var last)
+            && last.Key is not null
+            ? new ListTarget(root, mergedList, currentModule is { ValueKind: JsonValueKind.Array } ? currentModule : null, last.Key)
+            : null;
     }
 
     private static StudioModuleResourceResponse Answer(
@@ -178,3 +332,15 @@ internal static class StudioModuleLayers
         return null;
     }
 }
+
+/// <summary>Why a reset of one element cannot go ahead: the layer's version is stale or there is no layer, the layer removes the whole resource, the layer cannot be read back, or no element has the key.</summary>
+internal enum StudioModuleResetRefusal
+{
+    Stale,
+    WholeResource,
+    Unreadable,
+    NotFound,
+}
+
+/// <summary>The resource with the element put back, or why that cannot be done.</summary>
+internal sealed record StudioModuleReset(JsonElement? Edited, StudioModuleResetRefusal? Refusal);
