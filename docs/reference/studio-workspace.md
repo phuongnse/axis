@@ -45,6 +45,9 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules c
   tooltip. Collapsed, a group's title gives way to a thin rule.
 - **A resource belongs to its kind.** A resource open in the editor marks its kind's entry, and the address keeps the
   view, as in `/studio?app=PurchaseRequests&resource=<id>`.
+- **A kind's entry opens its list.** The entry opens `&kind=<kind>`, with a level-4 heading of the kind's name and its
+  resources. For a kind that modules hold, the module group follows. An open resource shows alone, and the Overview
+  lists no resources.
 
 
 ## Band

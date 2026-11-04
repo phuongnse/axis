@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Flex, Input, Result, Tag, Typography } from 'antd'
+import { Alert, Button, Descriptions, Flex, Result, Tag, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -12,7 +12,6 @@ import {
   fetchStudioNames,
   fetchStudioResource,
   fetchStudioResources,
-  filterResources,
   groupByKind,
   moduleResources,
   resourceTitle,
@@ -40,7 +39,7 @@ import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { hasRelaxEntry } from './relaxEntries'
-import { studioActiveEntry, studioNavigation } from './studioNavigation'
+import { kindName, studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioReferences } from './StudioReferences'
 import { StudioSidebar } from './StudioSidebar'
 
@@ -147,14 +146,16 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * application's entries under it.
  * With no application open, it lists the applications as tiles in up to three columns, each with its mark, its title
  * and its description in the UI locale (`en` as the fallback, then the name), and a solid New application… button
- * beside the heading. A tile opens its application, and a single application is not opened by itself. The resources are grouped by kind, and a search narrows them
- * by name or id. The diagnostics panel lists the folder's diagnostics, loaded when the application is
- * picked. A diagnostic that names a resource selects it, clears the search, and opens it at the diagnostic's path,
- * as a Used by entry does. A selected resource opens in an editor below its details, with its Uses and Used by
+ * beside the heading. A tile opens its application, and a single application is not opened by itself.
+ * The Overview shows the application's title as a heading, and no resources. A kind's sidebar entry, as `&kind=<kind>`,
+ * shows that kind's list under a heading with its name, then the module group of that kind when modules hold one.
+ * A resource opens alone in the content: its details, its editor, and its Uses and Used by lists. The diagnostics panel
+ * lists the folder's diagnostics, loaded when the application is picked. A diagnostic that names a resource selects it,
+ * and opens it at the diagnostic's path, as a Used by entry does. A selected resource opens in an editor below its details, with its Uses and Used by
  * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
  * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
- * list. A New resource button above the search box creates a resource of any kind from its starter. The new resource
- * joins the list, the diagnostics panel shows the diagnostics of the create, and the editor opens the resource.
+ * folder, and Studio shows the Overview. A New resource button above the content creates a resource of any kind from its starter. The new resource
+ * joins its kind's list, the diagnostics panel shows the diagnostics of the create, and the editor opens the resource.
  * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
  * Validate and Publish sit at the top of the open application's page, and Publish shows only when `GET /api/me` answers
@@ -166,15 +167,14 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * and expression completion offer load with the application too, and again after a save, a text write, a delete and a
  * reconnect. A text write, which a label's Write texts button sends, updates the diagnostics panel and loads the names
  * and the release list again, as a save does. The sidebar's Policy matrix entry shows the policy matrix, kept in the address
- * as `&view=policies`. The matrix shows in place of the resource list and the details, and
+ * as `&view=policies`. The matrix shows in place of the content, and
  * its Open policy link opens the policy in the Resources view. The diagnostics panel shows in the resource view and in the matrix view.
- * `&view=releases` shows only the publishing block, and `&kind=<kind>` limits the resource list to that kind.
+ * `&view=releases` shows only the publishing block.
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
- * Module entities, Module processes, Module policies, Module contracts and Module pages groups under the kinds list those of the modules the application
- * uses, from the names, by their `<module>/<name>`. A module entity opens in the entity designer, and a module process
+ * A kind's list shows the module resources of that kind that the application uses, from the names, by their `<module>/<name>`. A module entity opens in the entity designer, and a module process
  * in the process designer, each with the application's layer applied and every input on, with no JSON tab, Delete,
  * migration questions, Uses or Used by lists. Save writes the layer, and a Customized tag with Reset all, which deletes
  * the layer, shows while it has one. The other kinds open read-only, with no editor, no Uses and no Used by lists: a
@@ -216,6 +216,7 @@ export function StudioPage() {
 
 function StudioWorkspace() {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { generation, reconnecting, lost } = useStudioConnection()
   const [params, setParams] = useSearchParams()
   const application = params.get('app')
@@ -226,7 +227,6 @@ function StudioWorkspace() {
   const releasesView = params.get('view') === 'releases'
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
-  const [search, setSearch] = useState('')
   const [canPublish, setCanPublish] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
   const [canTest, setCanTest] = useState(false)
@@ -365,13 +365,13 @@ function StudioWorkspace() {
     [loaded, resourceId],
   )
   const groups = useMemo(
-    () => groupByKind(filterResources(resources, search)).filter((group) => kind === null || group.kind === kind),
-    [resources, search, kind],
+    () => (kind === null ? [] : groupByKind(resources).filter((group) => group.kind === kind)),
+    [resources, kind],
   )
   const allModuleGroups = useMemo(() => moduleResources(names, ''), [names])
   const moduleGroups = useMemo(
-    () => moduleResources(names, search).filter((group) => kind === null || group.kind === kind),
-    [names, search, kind],
+    () => (kind === null ? [] : allModuleGroups.filter((group) => group.kind === kind)),
+    [allModuleGroups, kind],
   )
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
   const selectedModuleItem =
@@ -382,12 +382,11 @@ function StudioWorkspace() {
           .find((item) => item.id.toLowerCase() === resourceId.toLowerCase())
 
   function pickApplication(name: string) {
-    setSearch('')
     setParams({ app: name })
   }
 
   function selectResource(id: string) {
-    setParams({ app: application!, ...(kind === null ? {} : { kind }), resource: id })
+    setParams({ app: application!, resource: id })
   }
 
   function onCreated(item: StudioResourceItem, diagnostics: StudioDiagnostic[]) {
@@ -397,7 +396,6 @@ function StudioWorkspace() {
         : current,
     )
     setFolderRevision((value) => value + 1)
-    setSearch('')
     setParams({ app: application!, resource: item.id })
   }
 
@@ -446,7 +444,6 @@ function StudioWorkspace() {
   }
 
   function selectDiagnostic(id: string, diagnosticPath: string) {
-    setSearch('')
     openReference(id, diagnosticPath)
   }
 
@@ -490,6 +487,7 @@ function StudioWorkspace() {
     )
   }
 
+  const overviewApp = apps.find((item) => item.name === application)
   const entries = studioNavigation(application, resources, allModuleGroups, t)
   const activeKey = studioActiveEntry(
     params,
@@ -556,58 +554,12 @@ function StudioWorkspace() {
                 onWritten={onWritten}
               />
             ) : (
-              <Flex gap="large" align="flex-start">
-                <Flex vertical gap="small" style={{ width: 320, flex: 'none' }}>
+              <Flex vertical gap="large">
+                <Flex>
                   <StudioNewResource application={application!} resources={resources} onCreated={onCreated} />
-                  <Input.Search
-                    aria-label={t('shell.studio.search')}
-                    placeholder={t('shell.studio.search')}
-                    allowClear
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                  />
-                  {groups.length === 0 && moduleGroups.length === 0 && (
-                    <Typography.Text type="secondary">{t('shell.studio.noResources')}</Typography.Text>
-                  )}
-                  {groups.map((group) => (
-                    <section key={group.kind} data-testid={`studio-group-${group.kind}`}>
-                      <Typography.Title level={5}>{group.kind}</Typography.Title>
-                      <Flex vertical align="flex-start">
-                        {group.items.map((item) => (
-                          <Button
-                            key={item.id}
-                            type={item.id === selected?.id ? 'primary' : 'text'}
-                            data-testid={`studio-resource-${item.id}`}
-                            aria-current={item.id === selected?.id ? 'true' : undefined}
-                            onClick={() => selectResource(item.id)}
-                          >
-                            {resourceTitle(item)}
-                          </Button>
-                        ))}
-                      </Flex>
-                    </section>
-                  ))}
-                  {moduleGroups.map((group) => (
-                    <section key={group.kind} data-testid={moduleGroupTestIds[group.kind]}>
-                      <Typography.Title level={5}>{t(moduleGroupTitles[group.kind])}</Typography.Title>
-                      <Flex vertical align="flex-start">
-                        {group.items.map((item) => (
-                          <Button
-                            key={item.id}
-                            type={item.id === selectedModuleItem?.id ? 'primary' : 'text'}
-                            data-testid={`studio-module-resource-${item.id}`}
-                            aria-current={item.id === selectedModuleItem?.id ? 'true' : undefined}
-                            onClick={() => selectResource(item.id)}
-                          >
-                            {item.name}
-                          </Button>
-                        ))}
-                      </Flex>
-                    </section>
-                  ))}
                 </Flex>
-                <div data-testid="studio-resource-details" style={{ flex: 1, minWidth: 0 }}>
-                  {selected ? (
+                {selected ? (
+                  <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
                     <Flex vertical gap="middle">
                       <Descriptions
                         title={resourceTitle(selected)}
@@ -669,7 +621,9 @@ function StudioWorkspace() {
                         onOpen={openReference}
                       />
                     </Flex>
-                  ) : selectedModuleItem ? (
+                  </div>
+                ) : selectedModuleItem ? (
+                  <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
                     <Flex vertical gap="middle">
                       <Descriptions
                         title={selectedModuleItem.name}
@@ -693,10 +647,53 @@ function StudioWorkspace() {
                         />
                       </StudioNamesContext.Provider>
                     </Flex>
-                  ) : (
+                  </div>
+                ) : resourceId !== null ? (
+                  <div data-testid="studio-resource-details">
                     <Typography.Text type="secondary">{t('shell.studio.selectResource')}</Typography.Text>
-                  )}
-                </div>
+                  </div>
+                ) : kind !== null ? (
+                  <Flex vertical gap="small">
+                    <Typography.Title level={4}>{kindName(kind, t)}</Typography.Title>
+                    {groups.map((group) => (
+                      <section key={group.kind} data-testid={`studio-group-${group.kind}`}>
+                        <Flex vertical align="flex-start">
+                          {group.items.map((item) => (
+                            <Button
+                              key={item.id}
+                              type="text"
+                              data-testid={`studio-resource-${item.id}`}
+                              onClick={() => selectResource(item.id)}
+                            >
+                              {resourceTitle(item)}
+                            </Button>
+                          ))}
+                        </Flex>
+                      </section>
+                    ))}
+                    {moduleGroups.map((group) => (
+                      <section key={group.kind} data-testid={moduleGroupTestIds[group.kind]}>
+                        <Typography.Title level={5}>{t(moduleGroupTitles[group.kind])}</Typography.Title>
+                        <Flex vertical align="flex-start">
+                          {group.items.map((item) => (
+                            <Button
+                              key={item.id}
+                              type="text"
+                              data-testid={`studio-module-resource-${item.id}`}
+                              onClick={() => selectResource(item.id)}
+                            >
+                              {item.name}
+                            </Button>
+                          ))}
+                        </Flex>
+                      </section>
+                    ))}
+                  </Flex>
+                ) : (
+                  <Typography.Title level={4}>
+                    {overviewApp === undefined ? application : studioAppTitle(overviewApp, locale)}
+                  </Typography.Title>
+                )}
               </Flex>
             )}
             <section data-testid="studio-diagnostics">

@@ -9,8 +9,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md)
-agrees. The route, the link, the application row of the sidebar, New application, New resource, the resource list with its
-search, the editor, the reference pickers, the Uses and Used by lists, the delete
+agrees. The route, the link, the application row of the sidebar, New application, New resource, a kind's list, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, Run tests,
 Run and the Test results list, the editable module entity and module process and the editable module policy, and the reconnect message are built. Where each sits is in [Studio workspace](studio-workspace.md).
@@ -23,7 +22,7 @@ Run and the Test results list, the editable module entity and module process and
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`. The id of a module entity, process or policy opens it too, as `&resource=<id>`,
-  when the id is not one of the folder's own resources. `&view=releases` shows only the publishing block, `&kind=<kind>` limits the resource list to one kind, and `&view=policies` shows the policy matrix.
+  when the id is not one of the folder's own resources. `&view=releases` shows only the publishing block, `&kind=<kind>` shows that kind's list, and `&view=policies` shows the policy matrix. Picking a resource from a list opens it as `&resource=<id>`, without the kind.
 - **New application.** A **New application…** button shows on the list of applications, as its main button, and in the menu of the
   sidebar's application row when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
   lists no application. The dialog asks for a name and checks it with the API's
@@ -34,7 +33,7 @@ Run and the Test results list, the editable module entity and module process and
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **New resource.** A **New resource** button above the search box (New resource… in the band, starting with the list's kind, _planned for M31_) opens a
+- **New resource.** A **New resource** button above the content (New resource… in the band, starting with the list's kind, _planned for M31_) opens a
   dialog that asks for the kind and the name, or the locale for a `text`
   resource. The kind picker lists the 20 kinds the create route accepts: every
   kind except the manifest. The author can type to narrow it. A new
@@ -61,12 +60,10 @@ Run and the Test results list, the editable module entity and module process and
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application row.** The sidebar's first row, 48 px and sticky, names the open application. Its menu lists the applications that `GET /api/studio/apps` lists, marks the open one, and picking one opens it. It ends in **New application…** for a creator.
   `/studio` with no application open lists them as tiles by title, see [applications](studio-workspace.md#applications). An **Off-standard** tag shows beside **Validate** and **Publish** while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio). _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band).
-- **Resource list.** The list groups the resources by kind, as the sidebar's entries do, see [workspace](studio-workspace.md#workspace). The kind shows as
-  written in the files, such as `entity`, without translation. A search box
-  filters it by name and `id`, ignoring letter case. Selecting a resource shows
-  its name, kind, `id` and file, and opens it in the editor below. One **Module** group for each kind a module may hold (entities, data sources, rules,
-  sequences, forms, pages, processes, events, texts, seeds, policies, triggers, scenarios and contracts) below the kinds list those of the modules the application uses, by `<module>/<name>`, from
-  the application's names. A group shows only when it has a resource, and the search box filters them all. A module entity opens in the [entity designer](entity-designer.md) with the application's layer applied and every input on, and Save writes the layer. A module process opens in the [process designer](process-designer.md) with the layer applied, with Added and Changed marks on its steps, Reset to module and Reset all, and Save writes the layer. A module text opens in the text table with the layer applied, with Added and Changed marks on its keys, Reset to module and Reset all, and Save writes the layer. A module policy opens in the module editor with the layer applied, with an action checkbox and a Remove button on each grant, its filter and fields read-only, Added and Changed marks and Removed rows on its grants, Reset to module and Reset all, and Save writes the layer. A grant past the module contract's ceiling shows in the diagnostics panel after the save.
+- **Kind's list.** A kind's sidebar entry opens its list: a heading with the kind's plural name, then its resources, see [workspace](studio-workspace.md#workspace). Picking a resource opens it alone, with its name, kind, `id` and file, and its editor below. The kind shows as
+  written in the files, such as `entity`, without translation, in those details. One **Module** group for each kind a module may hold (entities, data sources, rules,
+  sequences, forms, pages, processes, events, texts, seeds, policies, triggers, scenarios and contracts) shows under that kind's list, for the modules the application uses, by `<module>/<name>`, from
+  the application's names. A group shows only when it has a resource. A module entity opens in the [entity designer](entity-designer.md) with the application's layer applied and every input on, and Save writes the layer. A module process opens in the [process designer](process-designer.md) with the layer applied, with Added and Changed marks on its steps, Reset to module and Reset all, and Save writes the layer. A module text opens in the text table with the layer applied, with Added and Changed marks on its keys, Reset to module and Reset all, and Save writes the layer. A module policy opens in the module editor with the layer applied, with an action checkbox and a Remove button on each grant, its filter and fields read-only, Added and Changed marks and Removed rows on its grants, Reset to module and Reset all, and Save writes the layer. A grant past the module contract's ceiling shows in the diagnostics panel after the save.
   A module contract as its lifecycle in a state diagram (initial and deletable states marked, each arrow labelled with its transition's name and whether it has a guard) with tables of its states, transitions, core validations, effects and ceiling entries, each row with its [named point](module-contracts.md#named-points). A module contract is edited only for the states and transitions the application adds: **Add state**, **Add transition**, **Remove** on an added row and **Save**, which writes the contract's layer. Its notice says so and is not the read-only one. A module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. A module resource of any other kind, scenarios included, opens in a read-only view of the notice and the file's content as formatted JSON, until its editor is built. Each of these views, a contract excepted, shows its read-only notice with the alert role. In a module contract, when `application.json` declares the module directly, each named point also has a **Relax** button, which opens a dialog for a reason of 1 to 500 characters, and a relaxed point shows its reason and an **Undo relax** button. Both write `application.json` with `If-Match`, see [in Studio](module-contracts.md#in-studio).
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
@@ -137,11 +134,11 @@ Run and the Test results list, the editable module entity and module process and
   each one's code, severity, message, file and `path`. It loads them from
   `GET /api/studio/apps/{application}/diagnostics` when an application is
   picked. After a save, it shows the diagnostics that the save answered
-  instead. A diagnostic that names a resource selects it, clears the search, and
+  instead. A diagnostic that names a resource selects it, and
   opens the resource at the diagnostic's `path`, as a Used by entry does. A
   diagnostic with an empty path opens the resource at its top. A diagnostic that
   names no resource cannot be selected. A diagnostic never blocks a save.
-- **Publishing.** Up to three buttons sit above the resource list (in the band, see [band](studio-workspace.md#band), _planned for M31_). They use the
+- **Publishing.** Up to three buttons sit above the content (in the band, see [band](studio-workspace.md#band), _planned for M31_). They use the
   [publishing routes](authoring.md#publishing).
   - **Validate** sends a validate request. **Publish** opens a dialog with an
     optional label, up to 100 characters, and an optional note, up to 2000.
@@ -228,7 +225,7 @@ Run and the Test results list, the editable module entity and module process and
   while the server is down.
   - Studio then calls `GET /api/me` with a back-off of 0.5, 1, 2 and then 4
     seconds, with no limit, until the server answers with any other status.
-  - Then the resource list, the diagnostics, the open resource and its Uses
+  - Then the resources, the diagnostics, the open resource and its Uses
     and Used by lists load again, and the message goes away. The names load again
     too.
   - An unsaved draft stays on screen, with the version it was based on. If the

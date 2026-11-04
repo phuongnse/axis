@@ -9,7 +9,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource, openFormTab } from '../studio-resources'
+import { createResource, openFormTab, openKind } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -68,6 +68,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   // The Form tab stays mounted while the Design tab shows, and repeats its test ids. A Design step passes the design
   // panel as `scope`, so that only the panel's field matches.
   async function openPage(page: Page, name: string) {
+    await openKind(page, 'page')
     await page.getByTestId('studio-group-page').getByRole('button', { name, exact: true }).click()
     await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
@@ -196,6 +197,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   // The Categories seed gets new record ids in the journey, so each sample id maps to the id the grid shows.
   async function shownCategoryIds(page: Page): Promise<Map<string, string>> {
+    await openKind(page, 'seed')
     await page.getByTestId('studio-group-seed').getByRole('button', { name: 'Categories', exact: true }).click()
     await expectForm(page)
     const rows = page.getByTestId('studio-seed-row')
@@ -293,7 +295,10 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await page.getByTestId('studio-group-application').getByRole('button').click()
+    await page
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('link', { name: 'Settings', exact: true })
+      .click()
     await expectForm(page)
     await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
     await save(page)
@@ -304,6 +309,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const starter = page.getByTestId('studio-group-text')
+    await openKind(page, 'text')
     await starter.getByRole('button').click()
     await expectForm(page)
 
@@ -311,11 +317,11 @@ test.describe('the author builds the service desk with Studio only', () => {
     await confirmDialog(page, 'Delete')
     await expect(starter.getByRole('button')).toHaveCount(0)
 
-    await createResource(page, 'text', 'en', 'TextsEn')
+    await createResource(page, 'text', 'en')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/en.json')
     await expectForm(page)
 
-    await createResource(page, 'text', 'vi', 'TextsVi')
+    await createResource(page, 'text', 'vi')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
     await expectForm(page)
 
@@ -339,7 +345,10 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
-    await page.getByTestId('studio-group-application').getByRole('button').click()
+    await page
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('link', { name: 'Settings', exact: true })
+      .click()
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', 'application.title', en['application.title'])
     await writeLabel(page, 'studio-field-/description', 'application.description', en['application.description'])
@@ -504,6 +513,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     // The designer wrote a migration for the starter rename. The sample has none, so the author deletes it.
     const migrations = page.getByTestId('studio-group-migration')
+    await openKind(page, 'migration')
     await migrations.getByRole('button').click()
     await expectForm(page)
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
@@ -517,6 +527,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
+    await openKind(page, 'entity')
     await page.getByTestId('studio-group-entity').getByRole('button', { name: 'Ticket', exact: true }).click()
     await expectForm(page)
     const values = page.getByTestId('studio-field-/fields/7/values')
@@ -526,6 +537,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(values.getByText('reopened', { exact: true })).toHaveCount(0)
     await save(page, [['status', 'Add convert', "'draft'"]])
     await expectForm(page)
+    await openKind(page, 'migration')
     await expect(page.getByTestId('studio-group-migration').getByRole('button')).toHaveCount(1)
   })
 
@@ -1024,6 +1036,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
+    await openKind(page, 'site')
     await page.getByTestId('studio-group-site').getByRole('button').click()
     await expectForm(page)
 
@@ -1054,6 +1067,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     // The sample has no Home page, and nothing points to it now.
     const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
+    await openKind(page, 'page')
     await home.click()
     await openFormTab(page)
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
@@ -1091,6 +1105,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     // The page picker offers only pages that exist, so this step waited for TicketDetail.
+    await openKind(page, 'process')
     await page.getByTestId('studio-group-process').getByRole('button', { name: 'TicketHandling', exact: true }).click()
     await openFormTab(page)
     await expect(page.getByTestId('studio-step-5')).toContainText('tellRequester')
@@ -1341,6 +1356,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
     await save(page)
 
+    await openKind(page, 'event')
     await page.getByTestId('studio-group-event').getByRole('button', { name: 'Placeholder', exact: true }).click()
     await page.getByRole('button', { name: 'Delete', exact: true }).click()
     await confirmDialog(page, 'Delete')

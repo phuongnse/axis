@@ -7,6 +7,7 @@ import { startServer } from "../activate";
 import { confirmDialog, waitForDialog } from "../dialogs";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
+import { openKind } from "../studio-resources";
 
 // Each journey starts a second server and publishes once, which takes a while.
 test.setTimeout(240_000);
@@ -71,6 +72,7 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
         timeout: 60_000,
       },
     );
+    await openKind(page, "entity");
     await page.getByTestId(`studio-resource-${orderId}`).click();
     await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
   } catch (error) {
