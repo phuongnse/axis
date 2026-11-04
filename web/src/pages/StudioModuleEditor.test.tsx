@@ -315,4 +315,89 @@ describe('StudioModuleEditor', () => {
     const [[, init]] = calls(fetchMock, 'POST')
     expect(JSON.parse(init.body as string)).toEqual({ list: '/texts', key: 'a.label' })
   })
+
+  describe('a module policy', () => {
+    const policy = {
+      id: 'policy-id',
+      kind: 'policy',
+      name: 'ChecklistAccess',
+      roles: ['reviewer'],
+      grants: [
+        { name: 'checklistRead', entity: 'Checklist', actions: ['read'] },
+        { name: 'checklistsRead', dataSource: 'Checklists', actions: ['read'] },
+      ],
+    }
+    const policyItem: ModuleResourceItem = {
+      id: 'policy-id',
+      kind: 'policy',
+      name: 'checklists/ChecklistAccess',
+      module: 'checklists',
+    }
+    const policyPath = '/api/studio/apps/Leave%20Requests/modules/checklists/resources/policy-id'
+    const removedGrant = { name: 'checklistsExport', dataSource: 'Checklists', actions: ['read'] }
+
+    it('marks an added grant and lists a removed grant as a muted row with Reset to module', async () => {
+      renderEditor(
+        () =>
+          read(
+            layer,
+            policy,
+            [{ path: '/grants/1', mark: 'added' }],
+            [{ list: '/grants', key: 'checklistsExport', content: removedGrant }],
+          ),
+        policyItem,
+      )
+
+      expect(await screen.findByTestId('studio-module-policy-grant-1')).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'Added checklistsRead' })).toBeInTheDocument()
+      expect(screen.queryByRole('note', { name: 'Added checklistRead' })).toBeNull()
+      const removed = screen.getByTestId('studio-layer-removed-/grants/checklistsExport')
+      expect(within(removed).getByRole('note', { name: 'Removed checklistsExport' })).toBeInTheDocument()
+      expect(within(removed).getByRole('button', { name: 'Reset to module checklistsExport' })).toBeEnabled()
+    })
+
+    it('resets a removed grant through the reset route', async () => {
+      let reset = false
+      const { fetchMock } = renderEditor((_url, init) => {
+        if (init?.method === 'POST') {
+          reset = true
+          return new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
+        }
+        return reset
+          ? read(null, policy)
+          : read(layer, policy, [], [{ list: '/grants', key: 'checklistsExport', content: removedGrant }])
+      }, policyItem)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Reset to module checklistsExport' }))
+
+      await waitFor(() => expect(screen.queryByTestId('studio-layer-removed-/grants/checklistsExport')).toBeNull())
+      const [[url, init]] = calls(fetchMock, 'POST')
+      expect(url).toBe(`${policyPath}/reset`)
+      expect(JSON.parse(init.body as string)).toEqual({ list: '/grants', key: 'checklistsExport' })
+    })
+
+    it('saves a ticked action through the module save route', async () => {
+      let written = false
+      const { fetchMock } = renderEditor((_url, init) => {
+        if (init?.method === 'PUT') {
+          written = true
+          return new Response(
+            JSON.stringify({ file: 'customizations/checklists/ChecklistAccess.json', version: 'v1', diagnostics: [] }),
+          )
+        }
+        return read(written ? layer : null, policy)
+      }, policyItem)
+
+      const grant = await screen.findByTestId('studio-module-policy-grant-1')
+      await userEvent.click(within(grant).getByRole('checkbox', { name: 'export' }))
+      await userEvent.click(screen.getByTestId('studio-save'))
+
+      expect(await screen.findByTestId('studio-saved')).toBeInTheDocument()
+      const [[url, init]] = calls(fetchMock, 'PUT')
+      expect(url).toBe(policyPath)
+      const body = JSON.parse(init.body as string)
+      expect(body.grants[1].actions).toEqual(['read', 'export'])
+      expect(body.grants[0].actions).toEqual(['read'])
+    })
+  })
 })

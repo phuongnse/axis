@@ -18,8 +18,8 @@ import { useSession } from "../sessions";
 test.setTimeout(180_000);
 
 // The module app pins the fixture module checklists, which the sample modules folder does not hold. The second server
-// reads a Modules:Path of its own, and Studio edits a copy of the module app, so the serial policy and contract specs
-// never see a layer file.
+// reads a Modules:Path of its own, and Studio edits a copy of the module app, so the serial contract spec
+// never sees a layer file.
 const reviewId = "06bf5c2d-df18-4d48-9dc6-66396e30f300";
 
 test.describe("Studio edits a module process as a layer", () => {
