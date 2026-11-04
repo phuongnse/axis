@@ -303,7 +303,7 @@ users, so its people sign in as before once the hosts move.
 In a [cell](cells.md), every tenant is backed up each day, as
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) agree.
-Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive and its import by a restore into a new realm, the `cell backup` command with its metric `axis.backup.last_success`, the `cell restore-check` command with its metric `axis.backup.restore_check`, and the chart's CronJob, which are built. The archive
+Everything in this section is _(planned for M31)_ except the backup key for each tenant, the counts in the manifest, the Studio folder in the archive, the `realm.json` entry of the archive and its import by a restore into a new realm, the `cell backup` command with its metric `axis.backup.last_success`, the `cell restore-check` command with its metric `axis.backup.restore_check`, and the chart's two CronJobs, which are built, except the scenarios of the restore check. The archive
 format and the steps above stay, with the changes below.
 
 - **Two layers.** The managed PostgreSQL keeps point-in-time recovery of the whole cluster for 7 days,
@@ -377,8 +377,8 @@ format and the steps above stay, with the changes below.
   database, read in the dump's snapshot. Every `tenant backup` writes them, also outside a cell.
 
 **Weekly restore check.** Each Sunday at 03:00 in the region's time zone, a job checks that a restore
-works. The job and the scenarios of step 3 are _(planned for M31)_. The command `cell restore-check`
-and its metric are _(built)_ and do steps 1 to 5 except the scenarios.
+works. The scenarios of step 3 are _(planned for M31)_. The command `cell restore-check`, its metric and
+[the chart's CronJob](installation.md#settings-and-secrets) are _(built)_ and do steps 1 to 5 except the scenarios.
 
 1. It picks a tenant at random among those with an archive of the last 2 days, and takes its newest
    archive.

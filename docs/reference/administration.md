@@ -789,7 +789,8 @@ is set. The behaviour is in [backups in a cell](tenant-backup-and-restore.md#bac
 `cell restore-check` checks once that a recent archive restores: it restores the newest archive of a random tenant into a scratch
 tenant, compares its row counts and users with the archive, removes the scratch tenant and records the result. It runs only in a cell,
 where `Cell:Id` is set. The behaviour is in
-[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). The scenario runs of that check and its weekly job are
+[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). The weekly job is the chart's
+[cell restore-check CronJob](installation.md#settings-and-secrets). The scenario runs of that check are
 _(planned for M31)_.
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Admin:ConnectionString`, `Cell:BackupKeyFile`,

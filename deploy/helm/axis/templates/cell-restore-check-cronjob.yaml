@@ -1,0 +1,92 @@
+{{- if and .Values.cell.id .Values.backup.bucket }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-cell-restore-check
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cell-restore-check
+spec:
+  # Every Sunday at 03:00 in the time zone of the region.
+  schedule: "0 3 * * 0"
+  timeZone: {{ required "backup.timeZone is required when backup.bucket is set in a cell: the IANA time zone of the region" .Values.backup.timeZone | quote }}
+  # Never two restore checks at once.
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # A failed check is not retried. The operator looks, and the next week's run goes on.
+      backoffLimit: 0
+      # A hung run ends after 6 hours, so it does not block every later weekly run. The next run removes
+      # the scratch tenant that a stopped run left behind.
+      activeDeadlineSeconds: 21600
+      template:
+        metadata:
+          labels:
+            {{- include "axis.labels" . | nindent 12 }}
+            app.kubernetes.io/component: cell-restore-check
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- range . }}
+            - name: {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          securityContext:
+            {{- include "axis.podSecurityContext" . | nindent 12 }}
+          containers:
+            - name: cell-restore-check
+              image: {{ include "axis.image" (dict "root" . "repository" .Values.migrate.repository) | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - cell
+                - restore-check
+              securityContext:
+                {{- include "axis.containerSecurityContext" . | nindent 16 }}
+              {{- with .Values.backup.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              env:
+                {{- /* The scratch tenant's host is under the internal domain of the cell. */}}
+                {{- $_ := required "cell.internalDomain is required when backup.bucket is set in a cell: the domain of the restore check's scratch tenant" .Values.cell.internalDomain }}
+                {{- /* The job reads the cell's backup key from its own mount, not from cell.backupKeyFile. */}}
+                {{- $values := mergeOverwrite (deepCopy .Values) (dict "cell" (dict "backupKeyFile" "/cell-backup-key/key")) }}
+                {{- include "axis.hostEnv" (dict "Values" $values) | nindent 16 }}
+                - name: Cell__BackupStorage__Bucket
+                  value: {{ .Values.backup.bucket | quote }}
+                - name: Cell__BackupStorage__ServiceUrl
+                  value: {{ required "backup.serviceUrl is required when backup.bucket is set in a cell: the endpoint of the object storage" .Values.backup.serviceUrl | quote }}
+                - name: Cell__BackupStorage__Region
+                  value: {{ required "backup.region is required when backup.bucket is set in a cell: the region of the object storage" .Values.backup.region | quote }}
+                - name: IdentityProvider__Url
+                  value: {{ printf "https://%s/" (required "identity.hostname is required: the host name of the identity provider" .Values.identity.hostname) | quote }}
+                - name: IdentityProvider__AdminClientId
+                  value: axis-admin
+                # The scratch tenant's Studio files are throwaway, so they never touch the Studio volume of the server.
+                - name: Studio__ApplicationsPath
+                  value: /studio
+              volumeMounts:
+                {{- include "axis.volumeMounts" . | nindent 16 }}
+                - name: cell-backup-key
+                  mountPath: /cell-backup-key
+                  readOnly: true
+                - name: studio
+                  mountPath: /studio
+          volumes:
+            {{- $entries := list "platformSchemaConnection" "platformSecretKey" "adminConnection" "identityAdminClientSecret" "backupStorageAccessKeyId" "backupStorageSecretAccessKey" }}
+            {{- if .Values.secrets.scenarioServerConnection.name }}
+            {{- $entries = append $entries "scenarioServerConnection" }}
+            {{- end }}
+            {{- include "axis.volumes" (dict "root" . "entries" $entries) | nindent 12 }}
+            - name: cell-backup-key
+              secret:
+                secretName: {{ required "secrets.cellBackupKey.name is required: the Kubernetes Secret that holds the cell's backup key" .Values.secrets.cellBackupKey.name | quote }}
+                defaultMode: 292
+                items:
+                  - key: {{ .Values.secrets.cellBackupKey.key | default "cell-backup-key" | quote }}
+                    path: key
+            - name: studio
+              emptyDir: {}
+{{- end }}
