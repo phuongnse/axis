@@ -11,7 +11,7 @@ namespace Axis.Server.Authentication;
 /// The open list and the authorization fallback (D111). A route that is not on the open list needs an authenticated
 /// caller: a session, or a service account or machine caller token. A request without one is refused before the route runs,
 /// so it never opens a tenant database. The open routes are the two health probes, <c>GET /api/site</c>,
-/// <c>GET /api/texts/{locale}</c>, sign-in, sign-out and the SPA's pages. The policy names no scheme, because
+/// <c>GET /api/texts/{locale}</c>, sign-in, sign-out, the cell console's sign-in and sign-out and the SPA's pages. The policy names no scheme, because
 /// <see cref="EndpointCaller.RequestScheme"/> already picks one for each request.
 /// </summary>
 internal static class RouteAuthorization

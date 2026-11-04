@@ -633,11 +633,13 @@ only requires an authenticated user, because the request's scheme already picks
 the session, the service account or the endpoint caller. It follows
 [D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
 
-- **The open list.** Seven routes need no session: `/health/live`,
+- **The open list.** Nine routes need no session: `/health/live`,
   `/health/ready`, `GET /api/site`, `GET /api/texts/{locale}`,
-  `GET /api/auth/sign-in`, `POST /api/auth/sign-out` and the SPA's pages. The
-  static files stay public. The OIDC handler answers the sign-in callback inside
-  authentication, so it is outside the routes.
+  `GET /api/auth/sign-in`, `POST /api/auth/sign-out`,
+  `GET /api/cell/auth/sign-in`, `POST /api/cell/auth/sign-out` and the SPA's pages.
+  The last two are the [cell console](cell-console.md#sign-in)'s, and they answer only on its host.
+  The static files stay public. The OIDC handlers answer the sign-in callbacks inside
+  authentication, so they are outside the routes.
 - **The answers.** A session route answers `401` with the title "Sign in to read
   or write this data.". A service account route keeps its bearer answer. An
   inbound endpoint route keeps its `WWW-Authenticate: Bearer` challenge and its

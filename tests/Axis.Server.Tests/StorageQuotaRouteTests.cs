@@ -59,6 +59,7 @@ public sealed class StorageQuotaRouteTests
         "DELETE /api/me/sessions",
         "DELETE /api/me/sessions/{id}",
         "POST /api/auth/sign-out",
+        "POST /api/cell/auth/sign-out",
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.RateLimiting;
 using Axis.Core.Tenancy;
 using Axis.Server.Authentication;
+using Axis.Server.CellApi;
 using Axis.Server.Telemetry;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -33,9 +34,10 @@ internal static class RateLimits
 
     private const string UnknownAddress = "unknown";
 
-    /// <summary>Whether the request is the sign-in callback, which the OIDC handler answers inside authentication.</summary>
+    /// <summary>Whether the request is a sign-in callback, a tenant's or the console's, which the OIDC handler answers inside authentication.</summary>
     public static bool IsCallback(HttpContext context) =>
-        context.Request.Path.Equals(TenantSignIn.CallbackPath, StringComparison.OrdinalIgnoreCase);
+        context.Request.Path.Equals(TenantSignIn.CallbackPath, StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.Equals(CellConsoleSignIn.CallbackPath, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Counts a session caller of the route in <paramref name="session"/>.</summary>
     public static TBuilder WithRateLimit<TBuilder>(this TBuilder builder, Partition session)

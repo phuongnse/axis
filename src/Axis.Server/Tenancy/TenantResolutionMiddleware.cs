@@ -6,7 +6,7 @@ namespace Axis.Server.Tenancy;
 
 /// <summary>
 /// Resolves the tenant from the request host for every request except the health endpoints. A platform host of a cell,
-/// see <see cref="CellHosts"/>, resolves no tenant and serves only the routes of the provisioning API. A tenant host
+/// see <see cref="CellHosts"/>, resolves no tenant and serves only the routes of the provisioning API and the console's sign-in callback. A tenant host
 /// answers <c>404</c> for every path under <c>/api/cell</c>. A host without <see cref="CellHosts"/> registered has no
 /// platform host.
 /// </summary>
@@ -29,7 +29,9 @@ internal sealed class TenantResolutionMiddleware(
         // A platform host of a cell belongs to no tenant. It serves only the routes of the provisioning API.
         if (cellHosts?.IsPlatformHost(context.Request.Host.Host) == true)
         {
-            if (context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null)
+            // The console's sign-in callback has no route: the OIDC handler answers it inside authentication.
+            if (context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null
+                || context.Request.Path.Equals(CellConsoleSignIn.CallbackPath, StringComparison.OrdinalIgnoreCase))
             {
                 await next(context);
                 return;
