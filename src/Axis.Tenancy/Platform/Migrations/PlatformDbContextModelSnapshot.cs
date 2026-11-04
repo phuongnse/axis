@@ -88,6 +88,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("idempotency_key");
 
+                    b.Property<string>("Input")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("input");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("text")
@@ -131,7 +135,7 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("jobs", "platform", t =>
                         {
-                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume')");
+                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create')");
 
                             t.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
                         });
