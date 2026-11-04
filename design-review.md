@@ -67,3 +67,10 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 
 The web tests are `main`'s and about 100 of them fail on this prototype, as a prototype changes widgets without their
 tests. The issue brings them to the agreed design. Nothing in this review touches a test.
+
+Two changes to how tests run go with the issue, as the review found them and they are not design:
+
+- Vitest sets its workers from the memory free when it starts, one for each GB less 1 GB for the machine, from 2 to 6. A
+  worker holds about 1 GB, so one per core swaps on a machine that also runs the stack: the full suite took 1030 s with 99
+  false timeouts, against 333 s and none with 4 workers.
+- `scripts/integration.sh` leaves out the `*PerformanceTests` classes with a filter too, as it does without one.
