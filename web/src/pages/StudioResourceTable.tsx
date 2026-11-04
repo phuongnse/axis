@@ -1,6 +1,6 @@
 import { Alert, Tag, Typography } from 'antd'
 import { useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import {
@@ -14,6 +14,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { pageSizes, recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
@@ -25,9 +26,13 @@ interface ResourceRow {
   name: string
   description: string | null
   module: string | null
+  status: StudioResourceActivity['status'] | null
 }
 
 // Proposed: a status tag's words take the text tokens, as the tag's own colours fall under 4.5:1 in light mode.
+/** Proposed: the order the Status column sorts in: what needs a publish first. */
+const statusOrder = { new: 0, changed: 1, published: 2 } as const
+
 const statusColours = {
   new: { tag: 'blue', text: 'infoText' },
   changed: { tag: 'gold', text: 'warningText' },
@@ -37,7 +42,8 @@ const statusColours = {
 /**
  * Proposed: the list of one kind, the same five columns for every kind: Name, a real link that opens the resource,
  * with a neutral tag of its module on a module's resource, Description, Status, Last modified by and Last modified at. A column always shows, and a cell with no value
- * shows the dash. A set sorts by name (D132). The status comes from the resource activity route, loaded apart from the
+ * shows the dash. A set sorts by name (D132), and Name and Status sort by their header. Search, sort and page live in the
+ * address. The status comes from the resource activity route, loaded apart from the
  * list, so the rows show and open at once: while it loads the cell says so, and when it fails it says it is unavailable
  * rather than empty.
  */
@@ -50,6 +56,7 @@ export function StudioResourceTable({
   main,
   addressOf,
   onOpen,
+  onRefresh,
 }: {
   application: string
   /** Goes up after a write, which loads the activity again. */
@@ -60,12 +67,20 @@ export function StudioResourceTable({
   main: ReactNode
   addressOf: (id: string) => string
   onOpen: (id: string) => void
+  /** Loads the list and the activity again. */
+  onRefresh: () => void
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, spacing } = useDesignTokens()
   const { lost } = useStudioConnection()
   const [catalog, setCatalog] = useState<StudioCatalog>()
+  const [params, setParams] = useSearchParams()
+  const sort = params.get('sort')
+  const sortKey = sort?.replace(/^-/, '')
+  const descending = sort?.startsWith('-') ?? false
+  const pageSizeParam = Number(params.get('pageSize'))
+  const pageSize = pageSizes.includes(pageSizeParam) ? pageSizeParam : recordPageSize
   // What the route answered for an application, or null when it failed. After a write the rows stay until the new answer.
   const [loaded, setLoaded] = useState<{
     application: string
@@ -114,6 +129,7 @@ export function StudioResourceTable({
       name: resourceTitle(item, locale),
       description: resourceDescription(item, locale),
       module: null,
+      status: activity?.get(item.id)?.status ?? null,
     }))
     // A module's resource is named `<module>/<name>`. A person reads its label, from the activity, or else the name.
     const fromModules = extra.map((item): ResourceRow => {
@@ -126,10 +142,16 @@ export function StudioResourceTable({
         ...item,
         name: entry?.titles?.[locale] ?? entry?.titles?.en ?? name,
         description: entry ? resourceDescription(entry, locale) : null,
+        status: entry?.status ?? null,
       }
     })
-    return [...own, ...fromModules].sort((a, b) => collator.compare(a.name, b.name))
-  }, [items, extra, locale, activity])
+    const byName = (a: ResourceRow, b: ResourceRow) => collator.compare(a.name, b.name)
+    const rank = (row: ResourceRow) => (row.status === null ? 3 : statusOrder[row.status])
+    const compare =
+      sortKey === 'status' ? (a: ResourceRow, b: ResourceRow) => rank(a) - rank(b) || byName(a, b) : byName
+    const sorted = [...own, ...fromModules].sort(compare)
+    return descending ? sorted.reverse() : sorted
+  }, [items, extra, locale, activity, sortKey, descending])
 
   const unavailable = (
     <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.list.unavailable')}</Typography.Text>
@@ -137,11 +159,18 @@ export function StudioResourceTable({
   const loading = (
     <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.list.loading')}</Typography.Text>
   )
+  const sortOrderOf = (key: string) =>
+    sortKey !== key ? undefined : descending ? ('descend' as const) : ('ascend' as const)
+  const lastPage = Math.max(1, Math.ceil(rows.length / pageSize))
+  const page = Math.min(Math.max(1, Number(params.get('page')) || 1), lastPage)
+
   const columns: AxisColumn<ResourceRow>[] = [
     {
       key: 'name',
       kind: 'text',
       title: t('shell.studio.list.name'),
+      sorter: true,
+      sortOrder: sortOrderOf('name'),
       render: (row) => (
         <>
           <Link
@@ -176,6 +205,8 @@ export function StudioResourceTable({
       key: 'status',
       kind: 'fit',
       title: t('shell.studio.list.status'),
+      sorter: true,
+      sortOrder: sortOrderOf('status'),
       render: (row) => {
         if (activity === undefined) {
           return loading
@@ -204,7 +235,7 @@ export function StudioResourceTable({
       rows={rows}
       rowKey={(row) => row.id}
       columns={columns}
-      toolbar={{ view: search, main }}
+      toolbar={{ view: search, refresh: onRefresh, main }}
       above={
         activity === null ? (
           <Alert
@@ -215,7 +246,22 @@ export function StudioResourceTable({
         ) : undefined
       }
       emptyText={t('shell.studio.noResources')}
-      pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
+      pagination={{ current: page, pageSize, pageSizeOptions: pageSizes, showSizeChanger: true }}
+      onChange={(next, _filters, sorter) => {
+        const column = Array.isArray(sorter) ? sorter[0] : sorter
+        setParams(
+          (current) => {
+            const query = new URLSearchParams(current)
+            const write = (name: string, value: string | null) =>
+              value === null ? query.delete(name) : query.set(name, value)
+            write('sort', column.order ? `${column.order === 'descend' ? '-' : ''}${String(column.columnKey)}` : null)
+            write('page', next.current && next.current > 1 ? String(next.current) : null)
+            write('pageSize', next.pageSize === recordPageSize ? null : String(next.pageSize))
+            return query
+          },
+          { replace: true },
+        )
+      }}
     />
   )
 }

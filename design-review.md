@@ -41,6 +41,15 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
 - **To change in the docs:** D39 (the list shows `usedBy`, which it no longer does; the API still answers it),
   "Reads and diagnostics touch no database" in the authoring API, the resource file formats, and D132's rule on sorting if a paged list is to have a sort by column.
 
+### The standard table, step by step
+
+- **Agreed direction:** one `AxisTable` with every control, and each view turns on what it needs. Filters have two levels: a
+  simple one with chips, and a builder of two levels of And and Or groups. There is one place to filter, so a column header only
+  sorts. Search, filter, sort and page live in the address. Saved views and per-person columns are logic, for the issue.
+- **Step 1, built:** a paged table says what it shows of how many, as "1–20 of 143". A kind's list has Refresh, page sizes of
+  10, 20, 50 and 100, sorts by Name and Status from their headers, with Status in the order New, Changed, Published, and keeps its
+  search, sort and page in the address. This changes D132's rule that Studio's small tables have no sort by column.
+
 ### A table with too little room
 
 - **Asked:** one rule for every table, in place of the sideways scroll that hid columns such as Status.

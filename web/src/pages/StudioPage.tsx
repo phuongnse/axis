@@ -186,7 +186,23 @@ function StudioWorkspace() {
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
-  const [search, setSearch] = useState('')
+  // Proposed: a kind's list keeps its search in the address, as its sort and page, so a reload and a shared link keep them.
+  const search = params.get('search') ?? ''
+  const setSearch = (value: string) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        next.delete('page')
+        if (value === '') {
+          next.delete('search')
+        } else {
+          next.set('search', value)
+        }
+        return next
+      },
+      { replace: true },
+    )
+  const [listReloads, setListReloads] = useState(0)
   const [canPublish, setCanPublish] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
   const [canTest, setCanTest] = useState(false)
@@ -261,7 +277,7 @@ function StudioWorkspace() {
       },
     )
     return () => controller.abort()
-  }, [application, generation, lost])
+  }, [application, generation, listReloads, lost])
 
   useEffect(() => {
     if (application === null) {
@@ -337,7 +353,6 @@ function StudioWorkspace() {
           .find((item) => item.id.toLowerCase() === resourceId.toLowerCase())
 
   function pickApplication(name: string) {
-    setSearch('')
     setParams({ app: name })
   }
 
@@ -352,7 +367,6 @@ function StudioWorkspace() {
         : current,
     )
     setFolderRevision((value) => value + 1)
-    setSearch('')
     setParams({ app: application!, resource: item.id })
   }
 
@@ -380,7 +394,6 @@ function StudioWorkspace() {
   }
 
   function selectDiagnostic(id: string, diagnosticPath: string) {
-    setSearch('')
     openReference(id, diagnosticPath)
   }
 
@@ -483,7 +496,6 @@ function StudioWorkspace() {
           onPickApplication={pickApplication}
           onApplicationCreated={onApplicationCreated}
           onView={(next) => {
-            setSearch('')
             if (next.name === 'settings') {
               const settings = resources.find((item) => item.kind === 'application')
               setParams(settings ? { app: application, resource: settings.id } : { app: application })
@@ -664,6 +676,10 @@ function StudioWorkspace() {
                   />
                 }
                 addressOf={(id) => `/studio?${new URLSearchParams({ app: application, resource: id })}`}
+                onRefresh={() => {
+                  setListReloads((value) => value + 1)
+                  setFolderRevision((value) => value + 1)
+                }}
                 onOpen={selectResource}
               />
             ) : view.name === 'overview' ? (

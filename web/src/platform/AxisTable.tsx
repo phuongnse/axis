@@ -155,6 +155,7 @@ export function AxisTable<T extends object>({
   /** What shows in place of the rows, such as a message that they did not load. The toolbar stays. */
   instead?: ReactNode
 }) {
+  const t = useText()
   const narrow = useNarrowWidth()
   const { colour, spacing } = useDesignTokens()
   const host = useRef<HTMLDivElement>(null)
@@ -312,7 +313,21 @@ export function AxisTable<T extends object>({
             // Proposed: an empty table keeps its header and says so in its body in textMuted. Ant Design draws the text
             // at a quarter of the text colour, 1.8:1 on surface, which fails the 4.5:1 that text needs.
             locale={{ emptyText: <EmptyState text={emptyText || undefined} /> }}
-            pagination={pagination}
+            pagination={
+              pagination === false
+                ? false
+                : {
+                    // Proposed: every paged table says what it shows of how many.
+                    showTotal: (total, [start, end]) =>
+                      total === 0
+                        ? ''
+                        : t('shell.table.range')
+                            .replace('{start}', String(start))
+                            .replace('{end}', String(end))
+                            .replace('{total}', String(total)),
+                    ...pagination,
+                  }
+            }
             onChange={onChange}
             onRow={onRow}
           />
