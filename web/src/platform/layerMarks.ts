@@ -18,6 +18,9 @@ export const entityKeyedLists: Record<string, string> = {
   '/indexes': 'name',
 }
 
+/** The keyed list of a policy: its grants, each keyed by name. */
+export const policyKeyedLists: Record<string, string> = { '/grants': 'name' }
+
 /** The keyed list of a process: its steps, each keyed by name. */
 export const processKeyedLists: Record<string, string> = {
   '/steps': 'name',
