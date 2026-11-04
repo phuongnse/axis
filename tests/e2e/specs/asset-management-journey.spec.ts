@@ -1346,6 +1346,8 @@ test.describe('the author builds the asset management application with Studio on
       const downloading = page.waitForEvent('download')
       await page.getByRole('button', { name: /Export$/ }).click()
       await page.getByRole('menuitem', { name: format, exact: true }).click()
+      // The menu item ends over the table header once the menu closes, and the header's sort tooltip would cover Export.
+      await page.mouse.move(0, 0)
       return downloading
     }
 

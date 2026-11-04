@@ -559,7 +559,7 @@ function StudioWorkspace() {
                   <StudioNewResource application={application!} resources={resources} onCreated={onCreated} />
                 </Flex>
                 {selected ? (
-                  <div data-testid="studio-resource-details">
+                  <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
                     <Flex vertical gap="middle">
                       <Descriptions
                         title={resourceTitle(selected)}
@@ -623,7 +623,7 @@ function StudioWorkspace() {
                     </Flex>
                   </div>
                 ) : selectedModuleItem ? (
-                  <div data-testid="studio-resource-details">
+                  <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
                     <Flex vertical gap="middle">
                       <Descriptions
                         title={selectedModuleItem.name}

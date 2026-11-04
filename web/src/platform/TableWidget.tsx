@@ -1,19 +1,9 @@
-import { DeleteOutlined, EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Dropdown,
-  Flex,
-  Input,
-  Modal,
-  Table,
-  Tooltip,
-  type TableColumnsType,
-  type TableProps,
-} from 'antd'
+import { DeleteOutlined } from '@ant-design/icons'
+import { Alert, Dropdown, Input, Modal, type TableProps } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { AxisButton } from './AxisButton'
+import { AxisTable, type AxisColumn, type AxisRowAction } from './AxisTable'
 import { useCanvasActions } from './canvasActions'
 import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
@@ -23,12 +13,12 @@ import { formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
-import { markCurrentPage } from './pagination'
 import { newIdempotencyKey, startProcess } from './processes'
 import {
   deleteRecord,
   fetchRecords,
   isFileValue,
+  type FileValue,
   RecordQueryProblem,
   type RecordItem,
   type RecordPage,
@@ -39,7 +29,6 @@ import type {
   DataSourceParameter,
   DeleteAction,
   FieldMetadata,
-  RowAction,
   StartProcessAction,
   WidgetMetadata,
 } from './site'
@@ -53,7 +42,6 @@ import {
   type TableSort,
 } from './tableQuery'
 import { useText } from './texts'
-import { useNarrowWidth } from './useNarrowWidth'
 import { isVisible } from './visibleWhen'
 import { setOwn } from './ownProperty'
 
@@ -80,9 +68,6 @@ interface LoadState {
 /** A table row: a record, a data source row, or a group of a grouped data source, which has no id. */
 type TableRow = Omit<RecordItem, 'id'> & { id: string | null }
 
-// Field names start with a letter, so this key never names a field column.
-const actionsColumnKey = '$actions'
-
 function sameSort(a: TableSort | null, b: TableSort | null): boolean {
   return a?.field === b?.field && a?.descending === b?.descending
 }
@@ -101,10 +86,8 @@ interface TableSource {
   searchable: boolean
 }
 
-// A text, enum or reference cell is at most this wide, in px, and wraps.
-const cellMaxWidth = 320
-// A table folds a row's other actions into one menu from this many on.
-const foldFrom = 3
+// The types whose values are free text. Every other column fits its content.
+const freeTextTypes: readonly string[] = ['text', 'reference', 'file']
 
 function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
   if (dataSource) {
@@ -162,7 +145,10 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
  * as a trash icon. Three or more configured ones, or any number below 992 px, fold into one "Actions" menu. The
  * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
- * Export and the toolbar actions, with the first toolbar action last. Text, enum and reference cells wrap at 320 px.
+ * Export and the toolbar actions, with the first toolbar action last. The table is drawn on `AxisTable`, which owns the
+ * toolbar order, the column widths, the 40 px rows, the folding of row actions, the paging and the em dash of an empty
+ * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at 320 px.
+ * Every other column, an enum too, fits its content.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
  * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
@@ -173,7 +159,6 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
-  const narrow = useNarrowWidth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { rowActions, toolbarActions } = widget
@@ -436,10 +421,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     [rowActions, openIndex],
   )
 
-  const columns = useMemo<TableColumnsType<TableRow>>(() => {
+  const columns = useMemo<AxisColumn<TableRow>[]>(() => {
     const sortOrder = (field: string) =>
       query.sort?.field === field ? (query.sort.descending ? 'descend' : 'ascend') : null
-    const top = () => ({ style: { verticalAlign: 'top' } })
     // The link of the identifying cell. A cell with no id, or with no address the SPA can build, is plain text.
     const openLink = (shown: ReactNode, text: string, record: TableRow): ReactNode => {
       const action = rowActions[openIndex]
@@ -487,153 +471,66 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         </a>
       )
     }
-    const fieldColumns: TableColumnsType<TableRow> = fields.map((field, column) => ({
+    return fields.map((field, column): AxisColumn<TableRow> => ({
       key: field.name,
       dataIndex: ['values', field.name],
       title: field.labelKey ? t(field.labelKey) : field.name,
+      kind: freeTextTypes.includes(field.type) ? 'freeText' : 'fixed',
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',
       sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
       align: isNumeric(field.type) ? 'right' : undefined,
       // Digits of equal width line up in a column.
-      onCell: () => ({
-        style: { verticalAlign: 'top', ...(isNumeric(field.type) ? { fontVariantNumeric: 'tabular-nums' } : {}) },
-      }),
-      render: (value: RecordValue, record: TableRow) => {
-        const wrap = (shown: ReactNode) =>
-          field.type === 'text' || field.type === 'enum' || field.type === 'reference' ? (
-            <div style={{ maxWidth: cellMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{shown}</div>
-          ) : (
-            shown
-          )
-        // A group row of a data source has no id and stays blank.
+      onCell: () => (isNumeric(field.type) ? { style: { fontVariantNumeric: 'tabular-nums' } } : {}),
+      render: (value: unknown, record: TableRow) => {
+        // A group row of a data source has no id and stays blank. The table draws the dash of any other empty cell.
         if (value === null || value === undefined) {
-          if (record.id === null) {
-            return null
-          }
-          return wrap(column === 0 ? openLink(<EmptyDash />, '', record) : <EmptyDash />)
+          return column === 0 && record.id !== null ? openLink(<EmptyDash />, '', record) : null
         }
-        if (field.type === 'file' && 'downloadPath' in field && isFileValue(value)) {
-          return <FileLink field={field} value={value} />
+        if (field.type === 'file' && 'downloadPath' in field && isFileValue(value as RecordValue)) {
+          return <FileLink field={field} value={value as FileValue} />
         }
-        const text = formatValue(field, value, record.labels, { locale, text: t }, record.values)
-        return wrap(column === 0 ? openLink(text, text, record) : text)
+        const text = formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
+        return column === 0 ? openLink(text, text, record) : text
       },
     }))
-    const result = [...fieldColumns]
-    if (otherIndexes.length > 0) {
-      const fold = narrow || otherIndexes.length >= foldFrom
-      result.push({
-        key: actionsColumnKey,
-        onCell: top,
-        render: (_value: unknown, record: TableRow) => {
-          // A group row has no id and no buttons.
-          if (record.id === null) {
-            return null
-          }
-          const scope = { id: record.id, values: record.values }
-          // A start action runs for the row. A delete action asks for confirmation first. A navigate action opens its page, or is dropped when its path is unknown.
-          // An action whose visibleWhen is not plainly true is dropped.
-          const list = otherIndexes.flatMap((index): { action: RowAction; index: number; run: () => void }[] => {
-            const action = rowActions[index]
-            // The canvas draws every action, also one that the site would hide.
-            if (canvas.active) {
-              return [{ action, index, run: () => {} }]
-            }
-            if (!isVisible(action.visibleWhen, scope)) {
-              return []
-            }
-            if (action.type === 'startProcess') {
-              return [{ action, index, run: () => void runStart(action, record.id!) }]
-            }
-            if (action.type === 'delete') {
-              return [{ action, index, run: () => setConfirming({ action, rowId: record.id! }) }]
-            }
-            const open = navigateTarget(sitePath, action, scope)
-            return open ? [{ action, index, run: () => void runNavigate(open) }] : []
-          })
-          if (list.length === 0) {
-            return null
-          }
-          const disabled = (action: RowAction) => action.type !== 'navigate' && (starting || deleting)
-          if (fold) {
-            return (
-              <Dropdown
-                trigger={['click']}
-                autoFocus
-                menu={{
-                  items: list.map(({ action, index, run }) => ({
-                    key: String(index),
-                    label: t(action.labelKey),
-                    danger: action.type === 'delete',
-                    disabled: disabled(action),
-                    onClick: run,
-                  })),
-                  'aria-label': t('shell.table.rowActions'),
-                }}
-              >
-                <Tooltip title={t('shell.table.rowActions')} trigger={['hover', 'focus']}>
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<EllipsisOutlined />}
-                    aria-label={t('shell.table.rowActions')}
-                  />
-                </Tooltip>
-              </Dropdown>
-            )
-          }
-          return (
-            <Flex gap="small">
-              {list.map(({ action, index, run }) =>
-                action.type === 'delete' ? (
-                  <AxisButton
-                    key={index}
-                    role="icon"
-                    nameKey={action.labelKey}
-                    destructive
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    disabled={disabled(action)}
-                    onClick={run}
-                    {...canvas.props(`rowActions/${index}`)}
-                  />
-                ) : (
-                  <Button
-                    key={index}
-                    type="text"
-                    size="small"
-                    disabled={disabled(action)}
-                    onClick={run}
-                    {...canvas.props(`rowActions/${index}`)}
-                  >
-                    {t(action.labelKey)}
-                  </Button>
-                ),
-              )}
-            </Flex>
-          )
-        },
-      })
+  }, [fields, locale, query.sort, rowActions, openIndex, runNavigate, sitePath, from, t, canvas])
+
+  // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
+  // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen
+  // is not plainly true is dropped. A group row has no id and no actions.
+  const actionsOf = (record: TableRow): AxisRowAction[] | null => {
+    if (record.id === null) {
+      return null
     }
-    return result
-  }, [
-    fields,
-    locale,
-    narrow,
-    query.sort,
-    rowActions,
-    openIndex,
-    otherIndexes,
-    runNavigate,
-    runStart,
-    sitePath,
-    from,
-    starting,
-    deleting,
-    t,
-    canvas,
-  ])
+    const scope = { id: record.id, values: record.values }
+    return otherIndexes.flatMap((index): AxisRowAction[] => {
+      const action = rowActions[index]
+      const base = {
+        key: String(index),
+        labelKey: action.labelKey,
+        disabled: action.type !== 'navigate' && (starting || deleting),
+        attributes: canvas.props(`rowActions/${index}`),
+        // The platform knows what a delete means, so it is a red trash icon. A configured action keeps its text.
+        ...(action.type === 'delete' ? { icon: <DeleteOutlined />, destructive: true } : {}),
+      }
+      // The canvas draws every action, also one that the site would hide.
+      if (canvas.active) {
+        return [{ ...base, onClick: () => {} }]
+      }
+      if (!isVisible(action.visibleWhen, scope)) {
+        return []
+      }
+      if (action.type === 'startProcess') {
+        return [{ ...base, onClick: () => void runStart(action, record.id!) }]
+      }
+      if (action.type === 'delete') {
+        return [{ ...base, onClick: () => setConfirming({ action, rowId: record.id! }) }]
+      }
+      const open = navigateTarget(sitePath, action, scope)
+      return open ? [{ ...base, onClick: () => void runNavigate(open) }] : []
+    })
+  }
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
@@ -693,10 +590,37 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   // A table whose access lists export offers a file of what it shows. The canvas draws the button and exports nothing.
   const canExport = widget.access?.actions.includes('export') === true
 
+  // The first shown toolbar action is the main action, so it comes last, after the secondary ones.
+  const toolbarButton = ({ action, path, index }: (typeof toolbarButtons)[number]) => (
+    <AxisButton
+      key={index}
+      role={index === toolbarButtons[0]?.index ? 'main' : 'secondary'}
+      onClick={() => navigate(path, { state: { from } })}
+      {...canvas.props(`toolbarActions/${index}`)}
+    >
+      {t(action.labelKey)}
+    </AxisButton>
+  )
+
   return (
-    <Flex vertical gap="middle" aria-busy={loading}>
-      <Flex justify="space-between" align="center" gap="small" wrap>
-        {searchable && (
+    <AxisTable<TableRow>
+      // The group values are unique per group row.
+      rowKey={(row) => row.id ?? JSON.stringify(row.values)}
+      columns={columns}
+      dataSource={parameterErrors ? [] : state.page?.items}
+      loading={loading}
+      emptyText={t('shell.table.empty')}
+      pagination={{
+        current: query.page,
+        pageSize: query.pageSize,
+        total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
+        pageSizeOptions: sizes,
+      }}
+      onChange={onChange}
+      rowActions={{ configured: otherIndexes.length, actions: actionsOf }}
+      blankRow={(row) => row.id === null}
+      toolbar={{
+        view: searchable ? (
           <Input.Search
             allowClear
             maxLength={200}
@@ -707,115 +631,88 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             onChange={(event) => setDraft(event.target.value)}
             onSearch={onSearch}
           />
-        )}
-        <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
-          <AxisButton
-            role="icon"
-            nameKey="shell.table.refresh"
-            icon={<ReloadOutlined />}
-            onClick={() => {
-              if (!canvas.active) {
-                // The same URL is requested again, so the table shows busy meanwhile.
-                setState((current) => ({ ...current, url: undefined }))
-                setReloads((count) => count + 1)
-              }
-            }}
-          />
-          {canImport && (
-            <AxisButton role="secondary" onClick={() => !canvas.active && setImporting(true)}>
-              {t('shell.table.import')}
-            </AxisButton>
-          )}
-          {canExport && (
-            <Dropdown
-              trigger={['click']}
-              menu={{
-                items: [
-                  { key: 'csv', label: t('shell.table.exportCsv') },
-                  { key: 'xlsx', label: t('shell.table.exportXlsx') },
-                ],
-                onClick: ({ key }) => !canvas.active && void runExport(key as ExportFormat),
-              }}
-            >
-              <AxisButton role="secondary" loading={exporting}>
-                {t('shell.table.export')}
-              </AxisButton>
-            </Dropdown>
-          )}
-          {/* The first shown toolbar action is the main action, so it comes last. */}
-          {[...toolbarButtons.slice(1), ...toolbarButtons.slice(0, 1)].map(({ action, path, index }) => (
-            <AxisButton
-              key={index}
-              role={index === toolbarButtons[0]?.index ? 'main' : 'secondary'}
-              onClick={() => navigate(path, { state: { from } })}
-              {...canvas.props(`toolbarActions/${index}`)}
-            >
-              {t(action.labelKey)}
-            </AxisButton>
-          ))}
-        </Flex>
-      </Flex>
-      {parameters.length > 0 && (
-        <FilterBar
-          parameters={parameters}
-          values={query.parameters ?? {}}
-          errors={parameterErrors ?? {}}
-          onChange={onFilter}
-          locale={locale}
-        />
-      )}
-      {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}
-      {actionDone !== null && <Alert data-testid="table-action-done" type="success" title={actionDone} />}
-      {exportTruncated && (
-        <Alert data-testid="table-export-truncated" type="warning" title={t('shell.table.exportTruncated')} />
-      )}
-      {importing && (
-        <ImportDialog
-          importsPath={importsPath(path)}
-          fields={widget.entity?.fields ?? []}
-          onClose={() => setImporting(false)}
-          onCommitted={() => {
-            setImporting(false)
-            setActionError(null)
-            setActionDone(t('shell.table.imported'))
+        ) : undefined,
+        onRefresh: () => {
+          if (!canvas.active) {
+            // The same URL is requested again, so the table shows busy meanwhile.
+            setState((current) => ({ ...current, url: undefined }))
             setReloads((count) => count + 1)
-          }}
-        />
-      )}
-      {confirming !== null && (
-        <Modal
-          open
-          title={t('shell.table.deleteConfirm')}
-          okText={t('shell.table.delete')}
-          okButtonProps={{ danger: true }}
-          cancelText={t('shell.form.cancel')}
-          confirmLoading={deleting}
-          onOk={() => void runDelete()}
-          onCancel={() => setConfirming(null)}
-        />
-      )}
-      {failed ? (
-        <Alert data-testid="records-error" type="error" title={t('shell.table.loadFailed')} />
-      ) : (
-        <Table<TableRow>
-          // The group values are unique per group row.
-          rowKey={(row) => row.id ?? JSON.stringify(row.values)}
-          columns={columns}
-          scroll={{ x: 'max-content' }}
-          dataSource={parameterErrors ? [] : state.page?.items}
-          loading={loading}
-          locale={{ emptyText: t('shell.table.empty') }}
-          pagination={{
-            current: query.page,
-            pageSize: query.pageSize,
-            total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
-            pageSizeOptions: sizes,
-            showSizeChanger: true,
-            itemRender: markCurrentPage(query.page),
-          }}
-          onChange={onChange}
-        />
-      )}
-    </Flex>
+          }
+        },
+        secondary: (
+          <>
+            {canImport && (
+              <AxisButton role="secondary" onClick={() => !canvas.active && setImporting(true)}>
+                {t('shell.table.import')}
+              </AxisButton>
+            )}
+            {canExport && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    { key: 'csv', label: t('shell.table.exportCsv') },
+                    { key: 'xlsx', label: t('shell.table.exportXlsx') },
+                  ],
+                  onClick: ({ key }) => !canvas.active && void runExport(key as ExportFormat),
+                }}
+              >
+                <AxisButton role="secondary" loading={exporting}>
+                  {t('shell.table.export')}
+                </AxisButton>
+              </Dropdown>
+            )}
+            {toolbarButtons.slice(1).map(toolbarButton)}
+          </>
+        ),
+        main: toolbarButtons[0] ? toolbarButton(toolbarButtons[0]) : undefined,
+      }}
+      below={
+        <>
+          {parameters.length > 0 && (
+            <FilterBar
+              parameters={parameters}
+              values={query.parameters ?? {}}
+              errors={parameterErrors ?? {}}
+              onChange={onFilter}
+              locale={locale}
+            />
+          )}
+          {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}
+          {actionDone !== null && <Alert data-testid="table-action-done" type="success" title={actionDone} />}
+          {exportTruncated && (
+            <Alert data-testid="table-export-truncated" type="warning" title={t('shell.table.exportTruncated')} />
+          )}
+          {importing && (
+            <ImportDialog
+              importsPath={importsPath(path)}
+              fields={widget.entity?.fields ?? []}
+              onClose={() => setImporting(false)}
+              onCommitted={() => {
+                setImporting(false)
+                setActionError(null)
+                setActionDone(t('shell.table.imported'))
+                setReloads((count) => count + 1)
+              }}
+            />
+          )}
+          {confirming !== null && (
+            <Modal
+              open
+              title={t('shell.table.deleteConfirm')}
+              okText={t('shell.table.delete')}
+              okButtonProps={{ danger: true }}
+              cancelText={t('shell.form.cancel')}
+              confirmLoading={deleting}
+              onOk={() => void runDelete()}
+              onCancel={() => setConfirming(null)}
+            />
+          )}
+        </>
+      }
+      failure={
+        failed ? <Alert data-testid="records-error" type="error" title={t('shell.table.loadFailed')} /> : undefined
+      }
+    />
   )
 }
