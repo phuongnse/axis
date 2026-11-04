@@ -251,8 +251,9 @@ the module's.
 
 Studio shows each module resource with the application's layer applied, and an author changes it
 as they change any resource of their own. The [authoring API](authoring.md) reads the resource with the layer
-applied, its marks and its removed elements, and its [save route](module-resource-saves.md) writes the layer.
-Both are built. The editor and **Reset to module** are _(planned for M25)_.
+applied, its marks and its removed elements, its [save route](module-resource-saves.md) writes the layer, and its
+[reset route](module-resource-saves.md#element-reset) takes one element out of it. All three are built. The editor and the
+**Reset to module** and **Reset all** buttons are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.
@@ -262,7 +263,9 @@ Both are built. The editor and **Reset to module** are _(planned for M25)_.
   editor's header shows that the resource has a layer. A removed element stays listed as **Removed**
   in a muted row.
 - **Reset.** Each added, changed or removed element has **Reset to module**, which takes it out of
-  the layer. The resource's header has **Reset all**, which deletes the layer file.
+  the layer with the [reset route](module-resource-saves.md#element-reset) and keeps the rest of the layer.
+  The resource's header has **Reset all**, which deletes the layer file with the
+  [delete of the layer resource](authoring.md#routes).
 - **Saving writes the difference.** Studio sends the edited resource whole. The authoring API
   compares it with the pinned module version, by the list keys, and writes the layer that holds
   only the difference: changed properties, added elements with their place, and removes. A save

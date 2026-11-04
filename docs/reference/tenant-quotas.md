@@ -80,7 +80,7 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
 
 - **`storage`.** Once the last sample is at or over the quota, these are refused: a record create
   or update through the record API, an import, an inbound endpoint call that writes, a file upload,
-  a save in Studio and a publish. A delete is never refused. Process steps, task completions,
+  a save or reset in Studio and a publish. A delete is never refused. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
   tenant writes in one sampling interval. A tenant with no sample yet is not refused, and neither is a
   write when the platform database cannot be read: the server logs a warning and the write goes on, because a quota

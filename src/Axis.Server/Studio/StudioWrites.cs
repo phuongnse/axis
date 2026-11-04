@@ -554,7 +554,7 @@ internal static class StudioWrites
         && string.Equals(oldValue, newValue, StringComparison.Ordinal);
 
     // The quoted ETag or the bare hex version. Anything else, such as * or a weak tag, matches no version.
-    private static string Unquote(string value) =>
+    internal static string Unquote(string value) =>
         value.Length >= 2 && value[0] == '"' && value[^1] == '"' ? value[1..^1] : value;
 
     internal static byte[] Serialize(JsonObject content)
