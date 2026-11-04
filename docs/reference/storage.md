@@ -428,7 +428,7 @@ Which connection string each step uses. The server does this today:
 | Release history route of the server: read the release history                                           | `ConnectionString`                 |
 | Publisher: claim and finish a request, compile, store, activate, write the history and the audit record | `SchemaConnectionString`           |
 | Publisher: seed records                                                                                 | `ConnectionString`                 |
-| Publisher, `test` request: create, migrate, run and drop the scenario databases                         | `Scenarios:ServerConnectionString` |
+| Publisher, `test` request, and `cell restore-check`: create, migrate, run and drop the scenario databases | `Scenarios:ServerConnectionString` |
 | Publisher, `test` request: store the status and the outcomes                                            | `SchemaConnectionString`           |
 | Start release check (`AXC0146`) and the runtime database role check, in the server and the worker       | `ConnectionString`                 |
 | Server requests: record API, data sources, process starts, endpoints, tasks, sites                      | `ConnectionString`                 |
@@ -467,7 +467,7 @@ host with one database role:
 | Seeding and schedule trigger state                                                                  | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record | `axis-admin publisher`          | The tenant's schema role           |
 | Seeding of a publish request                                                                        | `axis-admin publisher`          | The tenant's runtime role          |
-| Create, migrate, run and drop the scenario databases of a `test` request                            | `axis-admin publisher`          | `Scenarios:ServerConnectionString` |
+| Create, migrate, run and drop the scenario databases of a `test` request or a restore check          | `axis-admin publisher`, `cell restore-check` | `Scenarios:ServerConnectionString` |
 | Store the status and the outcomes of a `test` request                                               | `axis-admin publisher`          | The tenant's schema role           |
 | Insert and read publish requests                                                                    | Server                          | The tenant's runtime role          |
 | Read the release history                                                                            | Server                          | The tenant's runtime role          |

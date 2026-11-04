@@ -1397,7 +1397,7 @@ internal static partial class AdminCommands
 
     // An empty value is no setting: a test request then fails with AXC0217. A value that is no connection string stops the
     // publisher, and the message names the setting and never its value.
-    private static bool TryReadScenarioServer(IConfiguration configuration, TextWriter error, out string? scenarioServer)
+    internal static bool TryReadScenarioServer(IConfiguration configuration, TextWriter error, out string? scenarioServer)
     {
         scenarioServer = null;
         var value = configuration[ScenarioServerSetting];
@@ -1553,7 +1553,7 @@ internal static partial class AdminCommands
     }
 
     // The part of the activate settings that needs no platform database: the catalogs, the inline recompute limit and the activation timeout.
-    private static ReleaseSettings? ReadReleaseSettings(IConfiguration configuration, TextWriter error, out string problem)
+    internal static ReleaseSettings? ReadReleaseSettings(IConfiguration configuration, TextWriter error, out string problem)
     {
         problem = string.Empty;
         var limit = ReleaseActivator.DefaultInlineRecomputeLimit;

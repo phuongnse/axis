@@ -6,8 +6,13 @@ using System.Text.RegularExpressions;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
+using Axis.Configuration.Releases;
 using Axis.Core.Telemetry;
+using Axis.Data.Records;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -24,11 +29,15 @@ namespace Axis.Admin;
 /// the ids of the live source realm cannot be imported a second time. It then compares the row count of each table with the manifest's
 /// <c>counts</c>, leaving out <c>axis.sessions</c> and the tables that <c>counts</c> does not hold, and the users of the realm with those of
 /// <c>realm.json</c>, leaving out service accounts. An archive without <c>realm.json</c> counts as zero users, and one without <c>counts</c> fails.
-/// A message names a table or a number, never a row or a username. The scratch tenant is removed at the end, whatever the result, with
+/// Then it compiles each application folder that the restore wrote under <c>Studio:ApplicationsPath</c>/&lt;scratch id&gt; with the cell's extension packages
+/// and modules (<c>Extensions:Path</c>, <c>Modules:Path</c>) and runs its test scenarios, module scenarios included, with the logic of the publisher's test step. Each scenario
+/// runs in its own temporary database on <c>Scenarios:ServerConnectionString</c>, for at most the publisher's test limit for each application, and writes a
+/// <c>scenario &lt;name&gt; passed</c> or <c>failed</c> line. A compile error or a failed scenario fails the check, and a tenant with an application but no
+/// scenario server fails it with <c>AXC0217</c>. A tenant without Studio applications needs no scenario server. A message names a table or a number, never a row or a username. The scratch tenant is removed at the end, whatever the result, with
 /// <see cref="ScratchTenantRemoval"/>, and the archive folder is deleted. The result goes to <see cref="AxisMetrics.BackupRestoreCheck"/>, tagged with
 /// the source tenant and exported over OTLP when an OTLP endpoint is set, and to the output. Exit 0 means that the check passed, 1 that any step after
 /// the pick failed or that no tenant has an archive of today or yesterday, and 2 that nothing ran: arguments, outside a cell, or a missing setting or
-/// <c>pg_restore</c>, or an OTLP endpoint that is not <c>https</c> outside Development.
+/// <c>pg_restore</c>, an invalid release or scenario server setting, or an OTLP endpoint that is not <c>https</c> outside Development.
 /// </summary>
 internal static partial class CellRestoreCheck
 {
@@ -78,6 +87,18 @@ internal static partial class CellRestoreCheck
         if (settings.Create.IdentityProvider is null)
         {
             run.Error.WriteLine($"The setting {AdminCommands.IdentityProviderUrlSetting} is required.");
+            return 2;
+        }
+
+        var release = AdminCommands.ReadReleaseSettings(run.Configuration, run.Error, out problem);
+        if (release is null)
+        {
+            run.Error.WriteLine(problem);
+            return 2;
+        }
+
+        if (!AdminCommands.TryReadScenarioServer(run.Configuration, run.Error, out var scenarioServer))
+        {
             return 2;
         }
 
@@ -171,7 +192,7 @@ internal static partial class CellRestoreCheck
         var passed = false;
         try
         {
-            passed = await CheckAsync(run, settings, cellCipher, pgRestore, client, storage.Bucket, source, scratch, realm, http, removal);
+            passed = await CheckAsync(run, settings, release, scenarioServer, cellCipher, pgRestore, client, storage.Bucket, source, scratch, realm, http, removal);
         }
         catch (OperationCanceledException)
         {
@@ -247,10 +268,12 @@ internal static partial class CellRestoreCheck
         return (tenant, $"{tenant}/{newest[tenant]}.axisbak");
     }
 
-    // Everything from the removal of leftovers to the comparisons. It returns true when the restore, the counts and the users all passed.
+    // Everything from the removal of leftovers to the scenarios. It returns true when the restore, the counts, the users and the scenarios all passed.
     private static async Task<bool> CheckAsync(
         AdminRun run,
         RestoreSettings settings,
+        ReleaseSettings release,
+        string? scenarioServer,
         TenantSecretCipher cellCipher,
         string pgRestore,
         IAmazonS3 client,
@@ -324,10 +347,17 @@ internal static partial class CellRestoreCheck
                 return false;
             }
 
-            // Both comparisons run, so one line each tells what was wrong.
-            var counts = await CompareCountsAsync(create, scratch, plan.Manifest.Counts, output, cancellationToken);
+            TenantRow row;
+            await using (var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(create.PlatformConnectionString).Options))
+            {
+                row = await platform.Tenants.AsNoTracking().SingleAsync(tenant => tenant.Id == scratch, cancellationToken);
+            }
+
+            // The comparisons and the scenarios all run, so one line each tells what was wrong.
+            var counts = await CompareCountsAsync(create, row, plan.Manifest.Counts, output, cancellationToken);
             var users = await CompareUsersAsync(realm, scratch, plan.Realm, output, cancellationToken);
-            return counts && users;
+            var scenarios = await RunScenariosAsync(run, settings, release, scenarioServer, scratch, row.SchemaVersion);
+            return counts && users && scenarios;
         }
         finally
         {
@@ -389,21 +419,16 @@ internal static partial class CellRestoreCheck
     // The row count of every table that the manifest lists, except the sessions, against the restored database. A table the restore lacks counts as 0.
     private static async Task<bool> CompareCountsAsync(
         CreateSettings create,
-        string scratch,
+        TenantRow row,
         IReadOnlyDictionary<string, long>? expected,
         TextWriter output,
         CancellationToken cancellationToken)
     {
+        var scratch = row.Id;
         if (expected is null)
         {
             output.WriteLine($"{scratch} counts failed: the archive has no counts");
             return false;
-        }
-
-        TenantRow row;
-        await using (var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(create.PlatformConnectionString).Options))
-        {
-            row = await platform.Tenants.AsNoTracking().SingleAsync(tenant => tenant.Id == scratch, cancellationToken);
         }
 
         await using var steps = new TenantDatabaseSteps(create.Cipher, row, create.Admin.Host!, create.Admin.Port, TenantDatabaseTls.From(create.Admin.ConnectionString), cancellationToken);
@@ -432,6 +457,99 @@ internal static partial class CellRestoreCheck
         }
 
         return equal;
+    }
+
+    // The test scenarios of each application that the restore wrote to the scratch tenant's Studio folder, with the publisher's test step. They run in
+    // temporary databases built from the Studio files, not against the restored releases. Every application runs, also after one failed.
+    private static async Task<bool> RunScenariosAsync(
+        AdminRun run, RestoreSettings settings, ReleaseSettings release, string? scenarioServer, string scratch, string schemaVersion)
+    {
+        if (settings.StudioApplicationsPath is not { } root)
+        {
+            return true;
+        }
+
+        var tenantFolder = Path.Combine(root, scratch);
+        if (!Directory.Exists(tenantFolder))
+        {
+            return true;
+        }
+
+        var activation = new TenantReleaseActivation(
+            release.InlineRecomputeLimit,
+            release.ActivationTimeout,
+            new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(run.Configuration))),
+            run.Output,
+            run.Error,
+            run.CancellationToken);
+        var passed = true;
+        foreach (var folder in ApplicationFolders(tenantFolder))
+        {
+            var test = await activation.TestAsync(
+                scratch,
+                schemaVersion,
+                scenarioServer,
+                ReadFiles(folder),
+                null,
+                release.Packages,
+                release.Modules,
+                new List<Diagnostic>(),
+                run.PublisherTestLimit,
+                run.CancellationToken);
+            passed &= test.Succeeded;
+        }
+
+        return passed;
+    }
+
+    // The folders that Studio would list: not hidden, not a link and holding a manifest, in ordinal order of name.
+    private static List<string> ApplicationFolders(string tenantFolder)
+    {
+        string[] subfolders;
+        try
+        {
+            subfolders = Directory.GetDirectories(tenantFolder);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+
+        Array.Sort(subfolders, (left, right) => string.CompareOrdinal(Path.GetFileName(left), Path.GetFileName(right)));
+        return [.. subfolders.Where(folder =>
+            !Path.GetFileName(folder).StartsWith('.')
+            && !IsLink(folder)
+            && File.Exists(Path.Combine(folder, ApplicationLoader.ManifestFileName)))];
+    }
+
+    private static bool IsLink(string folder)
+    {
+        try
+        {
+            return new DirectoryInfo(folder).Attributes.HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    // The JSON files of an application folder, as the application loader lists them. Null means that the folder cannot be read.
+    private static List<ResourceContent>? ReadFiles(string folder)
+    {
+        try
+        {
+            var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = false };
+            return Directory.EnumerateFiles(folder, "*.json", options)
+                .Select(path => Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/'))
+                .Order(StringComparer.Ordinal)
+                .Select(file => new ResourceContent(file, File.ReadAllText(Path.Combine(folder, file))))
+                .ToList();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     // The usernames of the scratch realm against those of realm.json. A service account is no user of the archive. A username is never printed.

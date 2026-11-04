@@ -377,16 +377,17 @@ format and the steps above stay, with the changes below.
   database, read in the dump's snapshot. Every `tenant backup` writes them, also outside a cell.
 
 **Weekly restore check.** Each Sunday at 03:00 in the region's time zone, a job checks that a restore
-works. The job and the scenarios of step 3 are _(planned for M31)_. The command `cell restore-check`
-and its metric are _(built)_ and do steps 1 to 5 except the scenarios.
+works. The job is _(planned for M31)_. The command `cell restore-check` and its metric are _(built)_ and do
+steps 1 to 5.
 
 1. It picks a tenant at random among those with an archive of the last 2 days, and takes its newest
    archive.
 2. It restores it with `tenant restore` into a scratch tenant, `restore-check-<yyyymmdd>`, with a
    host under `Cell:InternalDomain` that no ingress serves, and a scratch realm.
 3. It compares the row count of each table with `counts` in the manifest, checks that the realm has
-   the archive's number of users, and runs the scenarios of each application of the tenant's Studio
-   folder against the restored releases.
+   the archive's number of users, and runs the scenarios of each application of the scratch tenant's Studio
+   folder. It compiles each application with the cell's extension packages and modules and runs its
+   scenarios, module scenarios included, each in a temporary database.
 4. It deletes the scratch tenant, its realm and its keys at once, with no grace window.
 5. It records the result in the metric `axis.backup.restore_check`, `1` for a pass and `0` for a
    failure, with the tenant id, and in the output of the command. The platform audit record is written
@@ -411,14 +412,24 @@ and its metric are _(built)_ and do steps 1 to 5 except the scenarios.
   and the tables that `counts` does not hold. It compares the usernames of the scratch realm with those of `realm.json`, leaving out
   service accounts. An archive without `realm.json` counts as zero users. An archive without `counts` fails. The migration history
   and the tables that a migration seeds can differ right after an upgrade, because the restore migrates an archive of an older schema.
+- **Scenarios.** After the comparisons, it finds each application folder under `<Studio:ApplicationsPath>/<scratch id>/`: one that does not
+  start with `.`, is not a symbolic link and holds `application.json`, in ordinal order of name. It compiles each one with the packages of
+  `Extensions:Path` and the modules of `Modules:Path`, and runs its scenarios, then those of its pinned modules, with the logic of the
+  publisher's `test` request. Each scenario runs in its own temporary database on `Scenarios:ServerConnectionString` and is dropped at the end.
+  The scenarios run from the Studio files, not against the restored releases or the restored data. Each application may run for 10 minutes. Every
+  application runs, also after one failed, and they run also when the counts or the users failed, as long as the restore succeeded. A tenant
+  without Studio applications runs nothing and needs no scenario server. A tenant with an application and no scenario server fails with `AXC0217`.
 - **Remove.** Whatever the result, it removes the scratch tenant with its database, roles, realm and Studio folder.
 - **Output.** Each line starts with the tenant id: `<source> download ok|failed: <message>`, the lines of the `tenant restore` steps,
   `<scratch> counts ok` or `<scratch> counts failed: <schema.table> has <n> rows and the archive <m>`, `<scratch> users ok` or
-  `<scratch> users failed: the realm has <n> users and the archive <m>, <k> differ`, `<scratch> cleanup ok|failed: <message>`,
+  `<scratch> users failed: the realm has <n> users and the archive <m>, <k> differ`, for each application `<scratch> version ok`,
+  `<scratch> scenario <name> passed|failed: <message>` for each scenario and `<scratch> test ok|failed: <message>`, `<scratch> cleanup ok|failed: <message>`,
   `<scratch> remove ok|failed: <message>` and last `<source> restore-check passed|failed`. No line holds a row or a username.
-- **Result.** Any failure after the pick, also a refused restore, a failed download or a scratch tenant that cannot be removed, records `0`
+- **Result.** Any failure after the pick, also a refused restore, a failed download, a compile error or a failed scenario of an application,
+  or a scratch tenant that cannot be removed, records `0`
   and exits `1`. A pass records `1` and exits `0`. The gauge `axis.backup.restore_check` has the tag `axis.tenant`, the source
   tenant, and is exported over OTLP as `axis.backup.last_success` is, see [telemetry export](host-settings.md#telemetry-export).
 - **Exit code 2.** Outside a cell, with arguments, or when `Cell:InternalDomain`, `IdentityProvider:Url`, a `Cell:BackupStorage` setting,
-  `Cell:BackupKeyFile`, the platform database or `pg_restore` on `PATH` is missing, or when an OTLP endpoint is not an `https` URL outside
+  `Cell:BackupKeyFile`, the platform database or `pg_restore` on `PATH` is missing, or when `Scenarios:ServerConnectionString` is not a
+  connection string or the folder of `Extensions:Path` or `Modules:Path` does not exist, or when an OTLP endpoint is not an `https` URL outside
   Development. Nothing changes and no audit record is written. The full list of settings is in [administration](administration.md#cell-restore-check).

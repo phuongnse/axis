@@ -787,18 +787,20 @@ is set. The behaviour is in [backups in a cell](tenant-backup-and-restore.md#bac
 ## Cell restore check
 
 `cell restore-check` checks once that a recent archive restores: it restores the newest archive of a random tenant into a scratch
-tenant, compares its row counts and users with the archive, removes the scratch tenant and records the result. It runs only in a cell,
+tenant, compares its row counts and users with the archive, runs the test scenarios of its Studio applications, removes the scratch
+tenant and records the result. It runs only in a cell,
 where `Cell:Id` is set. The behaviour is in
-[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). The scenario runs of that check and its weekly job are
-_(planned for M31)_.
+[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). Its weekly job is _(planned for M31)_.
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Admin:ConnectionString`, `Cell:BackupKeyFile`,
   `Cell:InternalDomain`, the five `Cell:BackupStorage` settings, the `IdentityProvider` settings, `Studio:ApplicationsPath` when an archive holds
-  Studio files, and `PATH`, to find `pg_restore`.
+  Studio files, `Scenarios:ServerConnectionString`, which a tenant with a Studio application needs, `Extensions:Path` and `Modules:Path`, and
+  `PATH`, to find `pg_restore`.
 - **Output.** Each line starts with a tenant id, then the step and `ok` or `failed: <message>`. The last line is
   `<source tenant> restore-check passed` or `failed`. A table or a number is named, never a row or a username.
 - **Exit codes.** `0` when the check passed, `1` when any step after the pick failed or no tenant has an archive of today or
-  yesterday, and `2` outside a cell, with an argument, for a missing setting or `pg_restore`, or for an OTLP endpoint setting that is not an
+  yesterday, and `2` outside a cell, with an argument, for a missing setting or `pg_restore`, for a `Scenarios:ServerConnectionString` that is not a connection string or an `Extensions:Path` or
+  `Modules:Path` folder that does not exist, or for an OTLP endpoint setting that is not an
   `https` URL outside Development, with nothing changed.
 - **Metric.** The gauge `axis.backup.restore_check` is `1` for a pass and `0` for a failure, tagged with the source tenant. When an OTLP
   endpoint is set the command exports it, see [host settings](host-settings.md#telemetry-export).
