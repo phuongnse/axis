@@ -1,6 +1,7 @@
 import { apiFetch } from './api'
 import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
+import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
@@ -307,10 +308,20 @@ export interface StudioNameStep {
   outcomes: string[]
 }
 
-/** A named resource in `GET .../names`, such as a role, sequence or form. */
+/** A named resource in `GET .../names`, such as a role. */
 export interface StudioNameResource {
   id: string
   name: string
+}
+
+/**
+ * A resource in `GET .../names` that a module may hold: a sequence, form, seed, trigger, scenario or text resource.
+ * `module` is the module id, or `null` for the application's own. A module resource's `name` is `<module>/<name>`.
+ */
+export interface StudioNameModuleResource {
+  id: string
+  name: string
+  module: string | null
 }
 
 /** A page in `GET .../names`, with the parameters it declares. `module` is the module id, or `null` for the application's own. */
@@ -356,14 +367,24 @@ export interface StudioNames {
     resultType: string
   }[]
   connectors: { id: string; name: string; operations: { name: string }[] }[]
-  events: { id: string; name: string; entity: string; fields: { name: string; type: string }[] }[]
+  events: {
+    id: string
+    name: string
+    module: string | null
+    entity: string
+    fields: { name: string; type: string }[]
+  }[]
   roles: StudioNameResource[]
-  sequences: StudioNameResource[]
-  forms: StudioNameResource[]
+  sequences: StudioNameModuleResource[]
+  forms: StudioNameModuleResource[]
   pages: StudioNamePage[]
   policies: StudioNamePolicy[]
   contracts: { id: string; name: string; module: string }[]
   texts: StudioNameText[]
+  seeds: StudioNameModuleResource[]
+  triggers: StudioNameModuleResource[]
+  scenarios: StudioNameModuleResource[]
+  textResources: StudioNameModuleResource[]
 }
 
 /**
@@ -1133,10 +1154,10 @@ export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
     }))
 }
 
-/** The kind of a module resource that Studio lists and opens read-only. */
-export type ModuleResourceKind = 'entity' | 'process' | 'policy' | 'contract' | 'page'
+/** The kind of a module resource that Studio lists. Every kind a module may hold is one. */
+export type ModuleResourceKind = ModuleKind
 
-/** An entity, process, policy, contract or page of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
+/** A resource of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
 export interface ModuleResourceItem {
   id: string
   kind: ModuleResourceKind
@@ -1150,27 +1171,40 @@ export interface ModuleResourceGroup {
   items: ModuleResourceItem[]
 }
 
+type ModuleNameItem = { id: string; name: string; module: string | null }
+
+/** Where the names list the resources of each module kind. */
+const moduleNameLists: Record<ModuleKind, (names: StudioNames) => ModuleNameItem[]> = {
+  entity: (names) => names.entities,
+  dataSource: (names) => names.dataSources,
+  rule: (names) => names.rules,
+  sequence: (names) => names.sequences,
+  form: (names) => names.forms,
+  page: (names) => names.pages,
+  process: (names) => names.processes,
+  event: (names) => names.events,
+  text: (names) => names.textResources,
+  seed: (names) => names.seeds,
+  policy: (names) => names.policies,
+  trigger: (names) => names.triggers,
+  scenario: (names) => names.scenarios,
+  contract: (names) => names.contracts,
+}
+
 /**
- * The module entities, processes, policies, contracts and pages in the names, in that order, with the application's own left out.
- * An item stays when its name or id contains `search`, ignoring letter case and surrounding spaces. A kind with no
- * item has no group.
+ * The module resources in the names, one group for each kind that has some, in the order of `moduleKinds`, with the
+ * application's own left out. An item stays when its name or id contains `search`, ignoring letter case and
+ * surrounding spaces. A kind with no item has no group.
  */
 export function moduleResources(names: StudioNames | null, search: string): ModuleResourceGroup[] {
   if (names === null) {
     return []
   }
   const needle = search.trim().toLowerCase()
-  const sources: [ModuleResourceKind, { id: string; name: string; module: string | null }[]][] = [
-    ['entity', names.entities],
-    ['process', names.processes],
-    ['policy', names.policies],
-    ['contract', names.contracts],
-    ['page', names.pages],
-  ]
-  return sources
-    .map(([kind, source]) => ({
+  return moduleKinds
+    .map((kind) => ({
       kind,
-      items: source
+      items: moduleNameLists[kind](names)
         .filter(
           (item) =>
             item.module !== null &&

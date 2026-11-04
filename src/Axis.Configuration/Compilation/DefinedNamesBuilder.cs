@@ -18,6 +18,9 @@ internal static class DefinedNamesBuilder
         IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> moduleRules,
         IReadOnlyList<ModuleContract> contracts,
         IReadOnlyList<TextResource> texts,
+        IReadOnlyList<SeedResource> seeds,
+        IReadOnlyList<ModuleText> moduleTexts,
+        IReadOnlyList<ModuleScenario> moduleScenarios,
         Func<string, EntityResource?> findEntity,
         ReferenceIndex index)
     {
@@ -50,11 +53,12 @@ internal static class DefinedNamesBuilder
             [.. events.Select(@event => new DefinedEvent(
                 @event.Id,
                 @event.Name,
+                ModuleOf(@event),
                 ModuleOf(@event) is { } module && !@event.Entity.Contains('/') ? $"{module}/{@event.Entity}" : @event.Entity,
                 [.. @event.Fields.Select(field => new DefinedTyped(field.Name, field.Type))]))],
             [.. loaded.Roles.Select(role => new DefinedResource(role.Id, role.Name))],
-            [.. sequences.Select(sequence => new DefinedResource(sequence.Id, sequence.Name))],
-            [.. loaded.Forms.Select(form => new DefinedResource(form.Id, form.Name))],
+            [.. sequences.Select(Qualified)],
+            [.. loaded.Forms.Select(Qualified)],
             [.. loaded.Pages.Select(page => new DefinedPage(
                 page.Id,
                 page.Name,
@@ -63,8 +67,20 @@ internal static class DefinedNamesBuilder
                     parameter.Name, parameter.Type, parameter.Required ?? false))]))],
             [.. loaded.Policies.Select(policy => new DefinedPolicy(policy.Id, policy.Name, ModuleOf(policy)))],
             [.. contracts.Select(entry => new DefinedContract(entry.Contract.Id, entry.Contract.Name, entry.ModuleId))],
-            Texts(texts, index));
+            Texts(texts, index),
+            [.. seeds.Select(Qualified)],
+            [.. loaded.Triggers.Select(Qualified)],
+            [
+                .. moduleScenarios.Select(entry => new DefinedModuleResource(entry.Scenario.Id, $"{entry.ModuleId}/{entry.Scenario.Name}", entry.ModuleId)),
+                .. loaded.Scenarios.Select(scenario => new DefinedModuleResource(scenario.Id, scenario.Name, null)),
+            ],
+            [
+                .. moduleTexts.Select(entry => new DefinedModuleResource(entry.Text.Id, $"{entry.ModuleId}/{entry.Text.Name}", entry.ModuleId)),
+                .. loaded.Texts.Select(text => new DefinedModuleResource(text.Id, text.Name, null)),
+            ]);
     }
+
+    private static DefinedModuleResource Qualified(Resource resource) => new(resource.Id, resource.Name, ModuleOf(resource));
 
     internal static string? ModuleOf(Resource resource) =>
         ApplicationCompiler.IsModuleResource(resource) ? resource.Name[..resource.Name.IndexOf('/')] : null;

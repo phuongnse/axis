@@ -57,6 +57,10 @@ const names: StudioNames = {
   policies: [],
   contracts: [],
   texts: [],
+  seeds: [],
+  triggers: [],
+  scenarios: [],
+  textResources: [],
 }
 
 // A grant names its entity at `/grants/<n>/entity`, so a field of a grant reads the entity two levels up.

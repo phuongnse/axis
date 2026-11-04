@@ -316,9 +316,9 @@ agrees it. The answer is:
   dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
   processes: [{ id, name, module, entity, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
-  connectors: [{ id, name, operations: [{ name }] }],
-  events: [{ id, name, entity, fields: [{ name, type }] }],
-  roles, sequences, forms: [{ id, name }],
+  connectors: [{ id, name, operations: [{ name }] }], roles: [{ id, name }],
+  events: [{ id, name, module, entity, fields: [{ name, type }] }],
+  sequences, forms, seeds, triggers, scenarios, textResources: [{ id, name, module }],
   pages: [{ id, name, module, parameters: [{ name, type, required }] }],
   policies: [{ id, name, module }], contracts: [{ id, name, module }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
@@ -327,9 +327,8 @@ agrees it. The answer is:
 - **`name`.** It is written as a reference writes it. A module entity, data
   source, process, page or policy is `<module id>/<name>`, and a module rule
   is `<module id>:<name>`. `module` is the module id, or null for the application's own.
-- **Module names.** Events, sequences and forms of a module are listed under
-  `<module id>/<name>` too. Only entities, data sources, rules, processes, pages
-  and policies carry `module`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
+- **Module names.** Events, sequences, forms, seeds and triggers of a module are listed under `<module id>/<name>` too. Every list carries `module` except `roles`, `connectors` and `texts`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
+- **Module texts and scenarios.** A module's text files are in `textResources` and its scenarios in `scenarios`, each as `<module id>/<name>` with its module id, though the files keep the plain name. The application's own are listed too, with `module` null. `texts` stays the list of text keys.
 - **Event `entity`.** It is the entity the event is about, written as a process
   writes its `entity`. A module event that names its own module's entity without
   a slash is listed with the entity qualified, as `<module id>/<name>`. Studio's
