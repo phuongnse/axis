@@ -620,7 +620,8 @@ settings at start. With `Cell:Id` set they need `Tenancy:Source=directory`, `Cel
 `Cell:TenantDomain`. The id is the region, a hyphen and a number, such as `vn-1`, and the region
 uses lowercase letters and digits. A wrong value stops the start and the message names the
 setting. `Axis.Admin` refuses every command with exit code 2. The features the settings turn on
-are still planned.
+are still planned, except the read routes of the
+[provisioning API](tenant-lifecycle.md#provisioning-api).
 
 The runtime database address is the exception. Only the server and the worker read and check
 `Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, and only with `Cell:Id` set. A port that is
@@ -645,6 +646,7 @@ does not read `Quotas:Defaults` yet.
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
+| `IdentityProvider:Url` | Server | In a cell with `Cell:ConsoleHost` or `Cell:InternalUrl` set, the server reads the identity provider's address, described in the [admin settings](#admin-settings), and finds the operator realm at `realms/<Cell:OperatorRealm>` under it. A missing or wrong value stops the start, and the message names the setting. |
 | `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup`, `tenant restore`, `cell backup` and `cell restore-check` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
 | `Cell:BackupStorage:ServiceUrl` | Admin | The address of the S3-compatible service that `cell backup` uploads to. Only `cell backup` and `cell restore-check` read the five `Cell:BackupStorage` settings, and they stop with exit code `2` when one is blank, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
 | `Cell:BackupStorage:Region` | Admin | The signing region of that service. |

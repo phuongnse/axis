@@ -17,11 +17,14 @@ import {
  * use the users page without it. It reads the tenant
  * directory when it starts, so it serves every tenant that `tenant create` has made by then. It shares the platform
  * database with the other E2E servers. Returns once the server is ready. `stop` ends it, see `runServer`.
+ *
+ * Playwright runs specs in parallel, so two specs that start this server at once need two ports. Each spec passes its
+ * own `portOffset`, which is added to `AXIS_E2E_TENANT_HTTPS_PORT`. The browser maps the host on port 443 to the
+ * returned `httpsPort`, so the offset does not show in any address.
  */
-export async function startDirectoryServer(): Promise<{ httpsPort: number; stop(): Promise<void> }> {
-  const httpsPort = Number(
-    required('AXIS_E2E_TENANT_HTTPS_PORT', 'the https port of the server of a created tenant'),
-  )
+export async function startDirectoryServer(portOffset = 0): Promise<{ httpsPort: number; stop(): Promise<void> }> {
+  const httpsPort =
+    Number(required('AXIS_E2E_TENANT_HTTPS_PORT', 'the https port of the server of a created tenant')) + portOffset
   const httpUrl = `http://127.0.0.1:${await sparePort()}`
   const { stop } = await runServer(httpUrl, {
     ASPNETCORE_URLS: `${httpUrl};https://127.0.0.1:${httpsPort}`,

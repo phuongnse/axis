@@ -313,6 +313,35 @@ describe('the Keycloak theme entry', () => {
     location.mockRestore()
   })
 
+  it('draws the terms page with one form for Continue and one for Decline', () => {
+    const { page: _page, title: _title, ...frame } = identityUpdatePasswordContext
+    writeContextBlock({
+      ...frame,
+      page: 'terms',
+      title: 'Accept the terms',
+      loginAction: '/terms?code=1',
+      termsUrl: 'https://contoso.test/terms',
+      texts: {
+        title: 'Accept the terms',
+        accept: 'I accept the {terms} and the {privacy}.',
+        acceptTermsOnly: 'I accept the {terms}.',
+        termsOfService: 'Terms of service',
+        privacyPolicy: 'Privacy policy',
+        required: 'Accept the terms to continue.',
+        continue: 'Continue',
+        decline: 'Decline and sign out',
+      },
+    })
+    const { container } = render(<SignInEntry context={readSignInContext(document)} />)
+    const forms = container.querySelectorAll('form')
+
+    expect(screen.getByRole('checkbox')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Terms of service' })).toHaveAttribute('href', 'https://contoso.test/terms')
+    expect(forms).toHaveLength(2)
+    expect(forms[0]).toHaveAttribute('action', '/terms?code=1')
+    expect(forms[1].querySelector('input[name="cancel"]')).toHaveValue('true')
+  })
+
   it('fails with a clear error when the sign-in context is missing', () => {
     expect(() => readSignInContext(document)).toThrow('The sign-in context #axis-sign-in-context is missing.')
   })

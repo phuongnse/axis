@@ -20,6 +20,7 @@ function copyThemeFiles(): Plugin {
         'login-config-totp.ftl',
         'login-reset-password.ftl',
         'login-update-password.ftl',
+        'terms.ftl',
         'select-authenticator.ftl',
         'login-update-profile.ftl',
         'idp-review-user-profile.ftl',
