@@ -10,16 +10,15 @@ import {
   InputNumber,
   Radio,
   Select,
-  Switch,
   Tag,
   Tooltip,
   Typography,
   DatePicker,
 } from 'antd'
 import dayjs from 'dayjs'
-import { lazy, Suspense, useContext, useState, type HTMLAttributes } from 'react'
+import { Fragment, lazy, Suspense, useContext, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
-import { AxisCheckboxField, AxisField } from '../platform/AxisField'
+import { AxisCheckboxField, AxisField, AxisFieldGroup, AxisFieldRow } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import { searchRows } from '../platform/tableControls'
@@ -49,29 +48,6 @@ import { setOwn } from '../platform/ownProperty'
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
-
-/** The settings that the settings column shows, in the order it shows them. `required` and `unique` have columns. */
-const settingColumns: FieldSetting[] = [
-  'maxLength',
-  'minLength',
-  'min',
-  'max',
-  'precision',
-  'scale',
-  'maxSize',
-  'accept',
-  'target',
-  'currency',
-  'values',
-  'valueLabels',
-  'expression',
-  'default',
-  'sequence',
-  'creator',
-  'searchable',
-  'sensitive',
-  'exactLookup',
-]
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -131,13 +107,14 @@ function Expression({
  * A picker over `options`, or over the application's names of `kind` when `options` is not given. It is a plain box
  * while the application's names have not loaded and `options` is not given.
  */
-function Picker({
+function PickerControl({
   pointer,
   label,
   kind,
   options,
   value,
   required,
+  block = false,
   onPick,
 }: {
   pointer: string
@@ -146,31 +123,39 @@ function Picker({
   options?: string[]
   value: unknown
   required: boolean
+  /** Fills its row, as a field of a drawer does. */
+  block?: boolean
   onPick: (next: string | undefined) => void
 }) {
   const names = useContext(StudioNamesContext)
   const choices =
     options ??
     (names === undefined || kind === undefined ? undefined : referenceOptions(names, kind, undefined, pointer))
+  return choices === undefined ? (
+    <Input
+      aria-label={label}
+      aria-required={required || undefined}
+      value={text(value)}
+      onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
+    />
+  ) : (
+    <ReferencePicker
+      name={label}
+      value={typeof value === 'string' ? value : undefined}
+      required={required}
+      options={choices}
+      block={block}
+      onChange={onPick}
+    />
+  )
+}
 
+/** A {@link PickerControl} with its plain label above it, as a row of the Validations list has. */
+function Picker(props: Parameters<typeof PickerControl>[0]) {
   return (
-    <div data-testid={`studio-field-${pointer}`}>
-      <div>{label}</div>
-      {choices === undefined ? (
-        <Input
-          aria-label={label}
-          value={text(value)}
-          onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
-        />
-      ) : (
-        <ReferencePicker
-          name={label}
-          value={typeof value === 'string' ? value : undefined}
-          required={required}
-          options={choices}
-          onChange={onPick}
-        />
-      )}
+    <div data-testid={`studio-field-${props.pointer}`}>
+      <div>{props.label}</div>
+      <PickerControl {...props} />
     </div>
   )
 }
@@ -233,6 +218,7 @@ export function EntityDesigner(props: EntityParts) {
       >
         <EntityFields
           fields={fields}
+          validations={value.validations}
           readOnly={readOnly}
           origins={props.origins}
           warnings={props.warnings}
@@ -401,6 +387,7 @@ function Yes({ name }: { name: string }) {
  */
 function EntityFields({
   fields,
+  validations,
   readOnly,
   origins,
   warnings,
@@ -410,6 +397,7 @@ function EntityFields({
   onOpen,
 }: {
   fields: unknown[] | undefined
+  validations: unknown
   readOnly: boolean
   origins: FieldOrigin[] | undefined
   warnings: Map<number, FieldWarning> | undefined
@@ -594,6 +582,7 @@ function EntityFields({
       <FieldDrawer
         index={open}
         fields={fields}
+        validations={validations}
         readOnly={readOnly}
         warning={open === null ? undefined : warnings?.get(open)}
         onChange={onChange}
@@ -610,6 +599,7 @@ function EntityFields({
 function FieldDrawer({
   index,
   fields,
+  validations,
   readOnly,
   warning,
   onChange,
@@ -617,12 +607,15 @@ function FieldDrawer({
 }: {
   index: number | null
   fields: unknown[]
+  /** The entity's validations, of which the drawer shows those at this field. */
+  validations: unknown
   readOnly: boolean
   warning: FieldWarning | undefined
   onChange: ChangeHandler
   onClose: () => void
 }) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const labelText = useLabelText()
   const field = index === null ? {} : isContent(fields[index]) ? (fields[index] as Content) : {}
   const pointer = `/fields/${index}`
@@ -646,55 +639,7 @@ function FieldDrawer({
       data-testid="studio-entity-field-drawer"
     >
       {index !== null && (
-        <Flex vertical gap="middle">
-          <AxisField {...setting('name')} required>
-            <Input
-              aria-label={t('shell.studio.field.entity.fields.name')}
-              aria-required
-              value={text(field.name)}
-              onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
-            />
-          </AxisField>
-          <AxisField {...setting('label', typesTexts)}>
-            {typesTexts ? (
-              <LabelTexts pointer={`${pointer}/label`} value={field.label} onChange={onChange} />
-            ) : (
-              <FieldLabel
-                name={t('shell.studio.field.entity.fields.label')}
-                pointer={`${pointer}/label`}
-                value={field.label}
-                onChange={onChange}
-              />
-            )}
-          </AxisField>
-          <AxisField {...setting('type')} required>
-            <Select
-              aria-label={t('shell.studio.field.entity.fields.type')}
-              aria-required
-              showSearch
-              optionFilterProp="label"
-              virtual={false}
-              style={{ width: '100%' }}
-              value={typeof field.type === 'string' ? field.type : undefined}
-              options={fieldTypes.map((option) => ({ value: option, label: t(`shell.studio.entity.type.${option}`) }))}
-              onChange={(next: string) => onChange(pointer, changeFieldType(field, next))}
-            />
-          </AxisField>
-          <FlagRow field={field} setting="required" pointer={`${pointer}/required`} onChange={onChange} />
-          <FlagRow field={field} setting="unique" pointer={`${pointer}/unique`} onChange={onChange} />
-          <AxisField {...setting('help', typesTexts)}>
-            {typesTexts ? (
-              <LabelTexts pointer={`${pointer}/help`} value={field.help} onChange={onChange} />
-            ) : (
-              <FieldLabel
-                name={t('shell.studio.field.entity.fields.help')}
-                pointer={`${pointer}/help`}
-                value={field.help}
-                onChange={onChange}
-              />
-            )}
-          </AxisField>
-          <Settings index={index} field={field} fields={fields} readOnly={readOnly} onChange={onChange} />
+        <Flex vertical gap={spacing.lg}>
           {warning && (
             <Alert
               type="warning"
@@ -706,9 +651,405 @@ function FieldDrawer({
               )}
             />
           )}
+          <AxisFieldGroup title={t('shell.studio.entity.group.general')} first testId="studio-field-group-general">
+            <AxisField {...setting('name')} required>
+              <Input
+                aria-label={t('shell.studio.field.entity.fields.name')}
+                aria-required
+                value={text(field.name)}
+                onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
+              />
+            </AxisField>
+            <AxisField {...setting('label', typesTexts)}>
+              {typesTexts ? (
+                <LabelTexts pointer={`${pointer}/label`} value={field.label} onChange={onChange} />
+              ) : (
+                <FieldLabel
+                  name={t('shell.studio.field.entity.fields.label')}
+                  pointer={`${pointer}/label`}
+                  value={field.label}
+                  onChange={onChange}
+                />
+              )}
+            </AxisField>
+            <AxisField {...setting('type')} required>
+              <Select
+                aria-label={t('shell.studio.field.entity.fields.type')}
+                aria-required
+                showSearch
+                optionFilterProp="label"
+                virtual={false}
+                style={{ width: '100%' }}
+                value={typeof field.type === 'string' ? field.type : undefined}
+                options={fieldTypes.map((option) => ({
+                  value: option,
+                  label: t(`shell.studio.entity.type.${option}`),
+                }))}
+                onChange={(next: string) => onChange(pointer, changeFieldType(field, next))}
+              />
+            </AxisField>
+            <AxisField {...setting('help', typesTexts)}>
+              {typesTexts ? (
+                <LabelTexts pointer={`${pointer}/help`} value={field.help} onChange={onChange} />
+              ) : (
+                <FieldLabel
+                  name={t('shell.studio.field.entity.fields.help')}
+                  pointer={`${pointer}/help`}
+                  value={field.help}
+                  onChange={onChange}
+                />
+              )}
+            </AxisField>
+          </AxisFieldGroup>
+          <FieldGroups
+            index={index}
+            field={field}
+            fields={fields}
+            validations={validations}
+            readOnly={readOnly}
+            onChange={onChange}
+          />
         </Flex>
       )}
     </Drawer>
+  )
+}
+
+/**
+ * Proposed: a field's settings after General, in groups, each setting with its help, one to a row, and only those its
+ * type takes, so a group with none is left out:
+ * - the type's settings: the target entity, the values and their labels, the currency, and precision with scale;
+ * - Validation: Required, Unique, the length and the range, each pair on one row, a file's size and media types, then the
+ *   rules whose message shows at this field;
+ * - Value: the default, the expression that computes it, the sequence that numbers it and Creator;
+ * - Search and privacy: Searchable, Sensitive and Exact lookup.
+ */
+function FieldGroups({
+  index,
+  field,
+  fields,
+  validations,
+  readOnly,
+  onChange,
+}: {
+  index: number
+  field: Content
+  fields: unknown[]
+  validations: unknown
+  readOnly: boolean
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const pointer = `/fields/${index}`
+  const taken = editableSettings(field)
+  const has = (setting: FieldSetting) => taken.includes(setting)
+  const key = (setting: string) => `shell.studio.field.entity.fields.${setting}`
+  const label = (setting: string) => t(key(setting))
+  const about = (setting: FieldSetting, required = false) => ({
+    label: label(setting),
+    help: helpOf(t, key(setting)),
+    required,
+    testId: `studio-field-${pointer}/${setting}`,
+  })
+  const number = (setting: 'maxLength' | 'minLength' | 'precision' | 'scale' | 'maxSize') => (
+    <AxisField {...about(setting)}>
+      <InputNumber
+        aria-label={label(setting)}
+        precision={0}
+        min={setting === 'maxSize' || setting === 'minLength' ? 1 : 0}
+        style={{ width: '100%' }}
+        value={typeof field[setting] === 'number' ? field[setting] : null}
+        onChange={(next) => onChange(`${pointer}/${setting}`, typeof next === 'number' ? next : undefined)}
+      />
+    </AxisField>
+  )
+  const limit = (setting: 'min' | 'max') => (
+    <AxisField {...about(setting)}>
+      <Limit
+        type={text(field.type)}
+        value={field[setting]}
+        label={label(setting)}
+        onChange={(next) => onChange(`${pointer}/${setting}`, next)}
+      />
+    </AxisField>
+  )
+  // A false creator or sensitive is written, as before; Searchable and Exact lookup are removed when off, as even a
+  // false exactLookup is refused on a field that is not sensitive.
+  const flag = (setting: 'creator' | 'sensitive' | 'exactLookup' | 'searchable') => (
+    <AxisCheckboxField
+      label={label(setting)}
+      help={helpOf(t, key(setting))}
+      checked={field[setting] === true}
+      testId={`studio-field-${pointer}/${setting}`}
+      onChange={(checked) =>
+        onChange(
+          `${pointer}/${setting}`,
+          (setting === 'exactLookup' || setting === 'searchable') && !checked ? undefined : checked,
+        )
+      }
+    />
+  )
+  const tags = (setting: 'values' | 'accept') => (
+    <AxisField {...about(setting, setting === 'values')}>
+      <Select
+        mode="tags"
+        aria-label={label(setting)}
+        virtual={false}
+        style={{ width: '100%' }}
+        value={
+          Array.isArray(field[setting]) ? (field[setting] as unknown[]).filter((item) => typeof item === 'string') : []
+        }
+        onChange={(next: string[]) => onChange(`${pointer}/${setting}`, next.length === 0 ? undefined : next)}
+      />
+    </AxisField>
+  )
+  const pair = (left: ReactNode, right: ReactNode) =>
+    left && right ? (
+      <AxisFieldRow>
+        {left}
+        {right}
+      </AxisFieldRow>
+    ) : (
+      (left ?? right)
+    )
+  const typeName = t(`shell.studio.entity.type.${text(field.type)}`)
+  const typeSettings = [
+    has('target') && (
+      <AxisField key="target" {...about('target', true)}>
+        <PickerControl
+          pointer={`${pointer}/target`}
+          label={label('target')}
+          kind="entity"
+          value={field.target}
+          required
+          block
+          onPick={(next) => onChange(`${pointer}/target`, next ?? '')}
+        />
+      </AxisField>
+    ),
+    has('values') && <Fragment key="values">{tags('values')}</Fragment>,
+    has('valueLabels') && (
+      <AxisField key="valueLabels" {...about('valueLabels')}>
+        <ValueLabels pointer={`${pointer}/valueLabels`} field={field} onChange={onChange} />
+      </AxisField>
+    ),
+    has('currency') && (
+      <CurrencySource
+        key="currency"
+        pointer={pointer}
+        field={field}
+        currencyFields={fields.flatMap((other, position) =>
+          position !== index &&
+          isContent(other) &&
+          (other.type === 'enum' || other.type === 'text') &&
+          typeof other.name === 'string' &&
+          other.name !== ''
+            ? [other.name]
+            : [],
+        )}
+        onChange={onChange}
+      />
+    ),
+    (has('precision') || has('scale')) && (
+      <Fragment key="precision">
+        {pair(has('precision') ? number('precision') : null, has('scale') ? number('scale') : null)}
+      </Fragment>
+    ),
+  ].filter(Boolean)
+  const valueSettings = [
+    has('default') && (
+      <AxisField key="default" {...about('default')}>
+        <Expression
+          pointer={`${pointer}/default`}
+          name={label('default')}
+          value={text(field.default)}
+          required={false}
+          readOnly={readOnly}
+          onChange={onChange}
+        />
+      </AxisField>
+    ),
+    has('expression') && (
+      <AxisField key="expression" {...about('expression')}>
+        <Expression
+          pointer={`${pointer}/expression`}
+          name={label('expression')}
+          value={text(field.expression)}
+          required={false}
+          readOnly={readOnly}
+          onChange={onChange}
+        />
+      </AxisField>
+    ),
+    has('sequence') && (
+      <AxisField key="sequence" {...about('sequence')}>
+        <PickerControl
+          pointer={`${pointer}/sequence`}
+          label={label('sequence')}
+          kind="sequence"
+          value={field.sequence}
+          required={false}
+          block
+          onPick={(next) => onChange(`${pointer}/sequence`, next)}
+        />
+      </AxisField>
+    ),
+    has('creator') && <Fragment key="creator">{flag('creator')}</Fragment>,
+  ].filter(Boolean)
+  // Proposed: Exact lookup shows once the field is sensitive, as it needs that, or while the file still has it.
+  const searchSettings = (['searchable', 'sensitive', 'exactLookup'] as const)
+    .filter((setting) => has(setting))
+    .filter((setting) => setting !== 'exactLookup' || field.sensitive === true || field.exactLookup !== undefined)
+    .map((setting) => <Fragment key={setting}>{flag(setting)}</Fragment>)
+
+  return (
+    <>
+      {typeSettings.length > 0 && (
+        <AxisFieldGroup
+          title={t('shell.studio.entity.group.type').replace('{type}', typeName)}
+          testId="studio-field-group-type"
+        >
+          {typeSettings}
+        </AxisFieldGroup>
+      )}
+      <AxisFieldGroup title={t('shell.studio.entity.group.validation')} testId="studio-field-group-validation">
+        <FlagRow field={field} setting="required" pointer={`${pointer}/required`} onChange={onChange} />
+        <FlagRow field={field} setting="unique" pointer={`${pointer}/unique`} onChange={onChange} />
+        {pair(has('minLength') ? number('minLength') : null, has('maxLength') ? number('maxLength') : null)}
+        {pair(has('min') ? limit('min') : null, has('max') ? limit('max') : null)}
+        {has('maxSize') && number('maxSize')}
+        {has('accept') && tags('accept')}
+        <FieldRules fieldName={text(field.name)} validations={validations} readOnly={readOnly} onChange={onChange} />
+      </AxisFieldGroup>
+      {valueSettings.length > 0 && (
+        <AxisFieldGroup title={t('shell.studio.entity.group.value')} testId="studio-field-group-value">
+          {valueSettings}
+        </AxisFieldGroup>
+      )}
+      {searchSettings.length > 0 && (
+        <AxisFieldGroup title={t('shell.studio.entity.group.search')} testId="studio-field-group-search">
+          {searchSettings}
+        </AxisFieldGroup>
+      )}
+    </>
+  )
+}
+
+/**
+ * Proposed: the rules whose message shows at this field, the entity's validations with this `field`, each in a box with
+ * its name, its condition, the expression that must be true for a record to save, and its message, typed as texts as a
+ * label is. Add rule adds one at this field, named as Add validation names it, and Remove rule removes it. A rule may read
+ * any field, so the entity's Validations section lists every rule too.
+ */
+function FieldRules({
+  fieldName,
+  validations,
+  readOnly,
+  onChange,
+}: {
+  fieldName: string
+  validations: unknown
+  readOnly: boolean
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const { colour, radius, spacing } = useDesignTokens()
+  const names = useContext(StudioNamesContext)
+  const resource = useContext(LabelTextsContext)
+  const typesTexts = names !== undefined && resource !== null && !readOnly
+  if (validations !== undefined && !Array.isArray(validations)) {
+    return null
+  }
+  const list: unknown[] = validations ?? []
+  const here = list.flatMap((rule, position) =>
+    isContent(rule) && fieldName !== '' && rule.field === fieldName ? [{ rule, position }] : [],
+  )
+  const key = (name: string) => `shell.studio.field.entity.validations.${name}`
+  return (
+    <AxisField label={t(key('rules'))} help={helpOf(t, key('rules'))} testId="studio-field-rules">
+      <Flex vertical gap={spacing.sm}>
+        {here.map(({ rule, position }) => {
+          const pointer = `/validations/${position}`
+          return (
+            <Flex
+              key={position}
+              vertical
+              gap={spacing.md}
+              data-testid={`studio-field-${pointer}`}
+              style={{ border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base, padding: spacing.md }}
+            >
+              <Flex justify="space-between" align="center">
+                <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+                  {text(rule.name)}
+                </Typography.Text>
+                {readOnly ? null : (
+                  <AxisButton
+                    role="icon"
+                    icon={<DeleteOutlined />}
+                    nameKey="shell.studio.entity.removeRule"
+                    destructive
+                    onClick={() => onChange(pointer, undefined)}
+                  />
+                )}
+              </Flex>
+              <AxisField
+                label={t(key('expression'))}
+                help={helpOf(t, key('expression'))}
+                required
+                testId={`studio-field-${pointer}/expression`}
+              >
+                <Expression
+                  pointer={`${pointer}/expression`}
+                  name={t(key('expression'))}
+                  value={text(rule.expression)}
+                  required
+                  readOnly={readOnly}
+                  onChange={onChange}
+                />
+              </AxisField>
+              <AxisField
+                label={t(key('message'))}
+                help={helpOf(t, key('message'))}
+                required
+                testId={typesTexts ? `studio-field-${pointer}/message` : undefined}
+              >
+                {typesTexts ? (
+                  <LabelTexts pointer={`${pointer}/message`} value={rule.message} onChange={onChange} />
+                ) : (
+                  <FieldLabel
+                    name={t(key('message'))}
+                    pointer={`${pointer}/message`}
+                    value={rule.message}
+                    onChange={onChange}
+                  />
+                )}
+              </AxisField>
+            </Flex>
+          )
+        })}
+        {readOnly ? null : (
+          <div>
+            <AxisButton
+              role="secondary"
+              disabled={fieldName === ''}
+              onClick={() =>
+                onChange('/validations', [
+                  ...list,
+                  {
+                    name: uniqueStepName(list, 'validation'),
+                    expression: '',
+                    message: { textKey: '' },
+                    field: fieldName,
+                  },
+                ])
+              }
+            >
+              {t('shell.studio.entity.addRule')}
+            </AxisButton>
+          </div>
+        )}
+      </Flex>
+    </AxisField>
   )
 }
 
@@ -782,176 +1123,6 @@ function FieldLabel({
   )
 }
 
-/** The settings of one field that its type takes, each with its own input and id. */
-function Settings({
-  index,
-  field,
-  fields,
-  readOnly,
-  onChange,
-}: {
-  index: number
-  field: Content
-  fields: unknown[]
-  readOnly: boolean
-  onChange: ChangeHandler
-}) {
-  const t = useText()
-  const pointer = `/fields/${index}`
-  const taken = editableSettings(field)
-  const shown = settingColumns.filter((setting) => taken.includes(setting))
-
-  const labelOf = (setting: FieldSetting) => t(`shell.studio.entity.${setting}`)
-
-  function number(setting: 'maxLength' | 'minLength' | 'precision' | 'scale' | 'maxSize') {
-    return (
-      <InputNumber
-        aria-label={labelOf(setting)}
-        precision={0}
-        min={setting === 'maxSize' || setting === 'minLength' ? 1 : 0}
-        value={typeof field[setting] === 'number' ? field[setting] : null}
-        onChange={(next) => onChange(`${pointer}/${setting}`, typeof next === 'number' ? next : undefined)}
-      />
-    )
-  }
-
-  function flag(setting: 'creator' | 'sensitive' | 'exactLookup') {
-    return (
-      <Checkbox
-        aria-label={labelOf(setting)}
-        checked={field[setting] === true}
-        // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it.
-        onChange={(event) =>
-          onChange(
-            `${pointer}/${setting}`,
-            setting === 'exactLookup' && !event.target.checked ? undefined : event.target.checked,
-          )
-        }
-      />
-    )
-  }
-
-  function input(setting: FieldSetting) {
-    switch (setting) {
-      case 'maxLength':
-      case 'minLength':
-      case 'precision':
-      case 'scale':
-      case 'maxSize':
-        return number(setting)
-      case 'creator':
-      case 'sensitive':
-      case 'exactLookup':
-        return flag(setting)
-      case 'searchable':
-        return (
-          <Switch
-            aria-label={labelOf(setting)}
-            checked={field.searchable === true}
-            onChange={(checked) => onChange(`${pointer}/searchable`, checked ? true : undefined)}
-          />
-        )
-      case 'min':
-      case 'max':
-        return (
-          <Limit
-            type={text(field.type)}
-            value={field[setting]}
-            label={labelOf(setting)}
-            onChange={(next) => onChange(`${pointer}/${setting}`, next)}
-          />
-        )
-      case 'default':
-        return (
-          <Expression
-            pointer={`${pointer}/default`}
-            name={labelOf(setting)}
-            value={text(field.default)}
-            required={false}
-            readOnly={readOnly}
-            onChange={onChange}
-          />
-        )
-      case 'values':
-        return (
-          <Select
-            mode="tags"
-            aria-label={labelOf(setting)}
-            virtual={false}
-            style={{ minWidth: 200 }}
-            value={Array.isArray(field.values) ? field.values.filter((item) => typeof item === 'string') : []}
-            onChange={(next: string[]) => onChange(`${pointer}/values`, next.length === 0 ? undefined : next)}
-          />
-        )
-      case 'accept':
-        return (
-          <Select
-            mode="tags"
-            aria-label={labelOf(setting)}
-            virtual={false}
-            style={{ minWidth: 200 }}
-            value={Array.isArray(field.accept) ? field.accept.filter((item) => typeof item === 'string') : []}
-            onChange={(next: string[]) => onChange(`${pointer}/accept`, next.length === 0 ? undefined : next)}
-          />
-        )
-      case 'valueLabels':
-        return <ValueLabels pointer={`${pointer}/valueLabels`} field={field} onChange={onChange} />
-      case 'expression':
-        return (
-          <Expression
-            pointer={`${pointer}/expression`}
-            name={labelOf(setting)}
-            value={text(field.expression)}
-            required={false}
-            readOnly={readOnly}
-            onChange={onChange}
-          />
-        )
-      default:
-        return null
-    }
-  }
-
-  return (
-    <Flex vertical gap="small" style={{ minWidth: 240 }}>
-      {shown.map((setting) =>
-        setting === 'currency' ? (
-          <CurrencySource
-            key={setting}
-            pointer={pointer}
-            field={field}
-            currencyFields={fields.flatMap((other, position) =>
-              position !== index &&
-              isContent(other) &&
-              (other.type === 'enum' || other.type === 'text') &&
-              typeof other.name === 'string' &&
-              other.name !== ''
-                ? [other.name]
-                : [],
-            )}
-            onChange={onChange}
-          />
-        ) : setting === 'target' || setting === 'sequence' ? (
-          <Picker
-            key={setting}
-            pointer={`${pointer}/${setting}`}
-            label={labelOf(setting)}
-            kind={setting === 'target' ? 'entity' : 'sequence'}
-            value={field[setting]}
-            required={setting === 'target'}
-            onPick={(next) => onChange(`${pointer}/${setting}`, next ?? (setting === 'target' ? '' : undefined))}
-          />
-        ) : (
-          <div key={setting} data-testid={`studio-field-${pointer}/${setting}`}>
-            <div>{labelOf(setting)}</div>
-            {input(setting)}
-          </div>
-        ),
-      )}
-    </Flex>
-  )
-}
-
 /**
  * The `min` or `max` of a field, in the format of its type: a number for integer, decimal and money, a date written
  * `yyyy-MM-dd` and a date-time written as an RFC 3339 UTC string. Clearing it writes undefined.
@@ -971,6 +1142,7 @@ function Limit({
     return (
       <DatePicker
         aria-label={label}
+        style={{ width: '100%' }}
         value={typeof value === 'string' && dayjs(value).isValid() ? dayjs(value) : null}
         onChange={(date) => onChange(date ? date.format('YYYY-MM-DD') : undefined)}
       />
@@ -980,6 +1152,7 @@ function Limit({
     return (
       <DatePicker
         aria-label={label}
+        style={{ width: '100%' }}
         showTime
         format="YYYY-MM-DD HH:mm:ss"
         value={typeof value === 'string' && dayjs(value).isValid() ? dayjs(value) : null}
@@ -993,6 +1166,7 @@ function Limit({
   return (
     <InputNumber
       aria-label={label}
+      style={{ width: '100%' }}
       precision={type === 'integer' ? 0 : undefined}
       value={typeof value === 'number' ? value : null}
       onChange={(next) => onChange(typeof next === 'number' ? next : undefined)}
@@ -1001,8 +1175,9 @@ function Limit({
 }
 
 /**
- * The currency of a money field: a fixed code or the name of a field that holds it. The field's keys say which, so
- * the field holds `currencyField` or `currency`, never both. A typed code is turned into upper case.
+ * Proposed: where a money field's currency comes from, as a choice between a fixed code and another field of the record,
+ * then the code or the field. The field holds only the one chosen: Field writes an empty `currencyField` and removes
+ * `currency`, and Fixed code removes `currencyField`. A typed code is turned into upper case.
  */
 function CurrencySource({
   pointer,
@@ -1017,15 +1192,15 @@ function CurrencySource({
 }) {
   const t = useText()
   const fromField = Object.hasOwn(field, 'currencyField')
-
+  const key = (setting: string) => `shell.studio.field.entity.fields.${setting}`
   function switchTo(next: 'code' | 'field') {
     if ((next === 'field') === fromField) {
       return
     }
     const rebuilt: Content = {}
-    for (const [key, value] of Object.entries(field)) {
-      if (key !== 'currency' && key !== 'currencyField') {
-        setOwn(rebuilt, key, value)
+    for (const [name, value] of Object.entries(field)) {
+      if (name !== 'currency' && name !== 'currencyField') {
+        setOwn(rebuilt, name, value)
       }
     }
     if (next === 'field') {
@@ -1033,43 +1208,52 @@ function CurrencySource({
     }
     onChange(pointer, rebuilt)
   }
-
   return (
-    <Flex vertical gap="small">
-      <div>
-        <div>{t('shell.studio.entity.currencySource')}</div>
+    <>
+      <AxisField label={t(key('currencySource'))} help={helpOf(t, key('currencySource'))}>
         <Radio.Group
           role="radiogroup"
-          aria-label={t('shell.studio.entity.currencySource')}
+          aria-label={t(key('currencySource'))}
           value={fromField ? 'field' : 'code'}
           onChange={(event) => switchTo(event.target.value)}
         >
           <Radio value="code">{t('shell.studio.entity.currencyFixed')}</Radio>
           <Radio value="field">{t('shell.studio.entity.currencyFromField')}</Radio>
         </Radio.Group>
-      </div>
+      </AxisField>
       {fromField ? (
-        <Picker
-          pointer={`${pointer}/currencyField`}
-          label={t('shell.studio.entity.currencyField')}
-          options={currencyFields}
-          value={field.currencyField}
+        <AxisField
+          label={t(key('currencyField'))}
+          help={helpOf(t, key('currencyField'))}
           required
-          onPick={(next) => onChange(`${pointer}/currencyField`, next ?? '')}
-        />
+          testId={`studio-field-${pointer}/currencyField`}
+        >
+          <PickerControl
+            pointer={`${pointer}/currencyField`}
+            label={t(key('currencyField'))}
+            options={currencyFields}
+            value={field.currencyField}
+            required
+            block
+            onPick={(next) => onChange(`${pointer}/currencyField`, next ?? '')}
+          />
+        </AxisField>
       ) : (
-        <div data-testid={`studio-field-${pointer}/currency`}>
-          <div>{t('shell.studio.entity.currency')}</div>
+        <AxisField
+          label={t(key('currency'))}
+          help={helpOf(t, key('currency'))}
+          testId={`studio-field-${pointer}/currency`}
+        >
           <Input
-            aria-label={t('shell.studio.entity.currency')}
+            aria-label={t(key('currency'))}
             value={text(field.currency)}
             onChange={(event) =>
               onChange(`${pointer}/currency`, event.target.value === '' ? undefined : event.target.value.toUpperCase())
             }
           />
-        </div>
+        </AxisField>
       )}
-    </Flex>
+    </>
   )
 }
 
@@ -1079,7 +1263,10 @@ function CurrencySource({
  */
 function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Content; onChange: ChangeHandler }) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext)
+  const resource = useContext(LabelTextsContext)
+  const readOnly = ConfigProvider.useConfig().componentDisabled ?? false
   const values = Array.isArray(field.values) ? field.values.filter((item) => typeof item === 'string') : []
   const labels = isContent(field.valueLabels) ? field.valueLabels : {}
 
@@ -1097,6 +1284,34 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
       }
     }
     onChange(pointer, Object.keys(ordered).length === 0 ? undefined : ordered)
+  }
+
+  // Proposed: with the folder's names, each value is a row of the value as stored and its label typed as texts, a box per
+  // locale, as every label of the designer is. Without them, each value has a picker of text keys.
+  if (names !== undefined && resource !== null && !readOnly) {
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'max-content minmax(0, 1fr)',
+          columnGap: spacing.md,
+          rowGap: spacing.xs,
+          alignItems: 'start',
+        }}
+      >
+        {values.map((value) => {
+          const at = `${pointer}/${escapePointerSegment(value)}`
+          return [
+            <Typography.Text key={`${value}/value`} code style={{ marginTop: 5 }}>
+              {value}
+            </Typography.Text>,
+            <div key={`${value}/label`} data-testid={`studio-field-${at}`}>
+              <LabelTexts pointer={at} value={labels[value]} onChange={onChange} />
+            </div>,
+          ]
+        })}
+      </div>
+    )
   }
 
   return (

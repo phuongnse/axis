@@ -138,6 +138,17 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
   Directus's field constraints do, the file stays as it is and the designer shows it twice: a field's drawer is to have a
   Validation group with the field's own constraints and the validations shown at it, whose Add rule fills `field`, and the
   entity's Validations section keeps every rule, with a Field column, for those across fields. To build in step 2.
+- **Step 2, built:** a field's drawer is in groups, `AxisFieldGroup`, each setting an `AxisField` with its help, and only
+  what the field's type takes, so a group with none is left out: General (name, label, type, help text), the type's
+  settings, titled "Reference settings" and so on (target entity, values with their labels, currency, precision and scale),
+  Validation (Required, Unique, minimum and maximum length, minimum and maximum, a file's size and media types, then the
+  rules at this field), Value (default, computed from, sequence, Creator) and Search and privacy (Searchable, Sensitive, and
+  Exact lookup once the field is sensitive). Pairs that belong together share a row: minimum with maximum length, minimum with
+  maximum, and precision with scale. A rule at the field is a box with its name, Remove rule, its condition and its message,
+  typed as texts; Add rule adds one at this field. Value labels are rows of a value and its label typed as texts. The
+  migration warning moves to the top of the drawer.
+- **Found, for the issue:** an empty condition, as a new validation or rule has, is sent to `expressions/check`, which
+  answers `400`; `main` does it too. The editor is to wait until there is text to check.
 - **Help text, for the issue:** every field of the platform's own screens has help text, enforced three ways. `AxisField`
   requires `help`. A test fails when a `shell.studio.field.*` text has no `.help` in every locale; the texts under that prefix
   that are not fields, such as `modules.addTitle`, `modules.add`, `modules.empty` and `modules.item`, move out of it. The

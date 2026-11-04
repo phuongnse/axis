@@ -127,3 +127,34 @@ export function AxisFieldRow({ children }: { children: ReactNode }) {
     </div>
   )
 }
+
+/**
+ * Proposed: a group of fields under a heading, as a drawer or a long form splits its fields, such as a field's General,
+ * Validation and Value. The heading is a small title in `text`; groups after the first have a line above them, spacing-lg
+ * from it, and the fields are spacing-md apart, as in a section.
+ */
+export function AxisFieldGroup({
+  title,
+  first = false,
+  testId,
+  children,
+}: {
+  title: string
+  first?: boolean
+  testId?: string
+  children: ReactNode
+}) {
+  const { colour, spacing, type } = useDesignTokens()
+  return (
+    <section
+      aria-label={title}
+      data-testid={testId}
+      style={first ? undefined : { borderTop: `1px solid ${colour.borderSubtle}`, paddingTop: spacing.lg }}
+    >
+      <Flex vertical gap={spacing.md}>
+        <div style={{ fontWeight: 600, fontSize: type.fontSize, lineHeight: '22px' }}>{title}</div>
+        {children}
+      </Flex>
+    </section>
+  )
+}
