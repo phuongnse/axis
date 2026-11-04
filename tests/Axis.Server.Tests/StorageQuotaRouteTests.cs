@@ -66,6 +66,8 @@ public sealed class StorageQuotaRouteTests
         // Notifications.
         "POST /api/apps/{app}/notifications/read-all",
         "POST /api/apps/{app}/notifications/{id}/read",
+        "POST /api/notifications/read-all",
+        "POST /api/notifications/{id}/read",
 
         // A process start writes its instance, and task and instance work goes on over the quota.
         "POST /api/apps/{app}/processes/{module}/{process}/instances",

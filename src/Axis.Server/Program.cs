@@ -330,6 +330,7 @@ sessions.MapProcessOperatorEndpoints();
 sessions.MapDeadLetterEndpoints();
 sessions.MapTaskEndpoints();
 sessions.MapNotificationEndpoints();
+sessions.MapTenantNoticeEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
 sessions.MapUserCommandEndpoints();

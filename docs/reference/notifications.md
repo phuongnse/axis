@@ -127,8 +127,8 @@ A text value may hold named placeholders, such as
   numbers are still formatted and its text shows as written. A step with only the `email` channel stores no row.
   A tenant notice, which the worker stores for the tenant's administrators, has no application and no release.
   It uses platform text keys and the recipient kind `platformRole`, see
-  [D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md). Applications never list it. The routes
-  and the bell that show it are _(planned for M31)_.
+  [D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md). Applications never list it. The
+  [routes](#in-app-notifications) show it to the administrators. The bell that shows it is _(planned for M31)_.
 - **Who sees one.** A user sees the notifications addressed to their user id,
   and those addressed to a role they hold that the active release declares,
   checked when read, as a role task is.
@@ -165,6 +165,19 @@ A text value may hold named placeholders, such as
     user does not see, or that does not exist, is a 404.
   - Nobody deletes a notification. The routes need a session (401), and the
     POSTs follow the CSRF rule.
+  - `GET /api/notifications?page=&pageSize=&unread=`,
+    `POST /api/notifications/{id}/read` and `POST /api/notifications/read-all`
+    list and mark read the [tenant notices](../decisions/d131-tenant-notices-live-in-axisnotifications.md).
+    They answer in the same shape as the application routes, with `releaseId`
+    and `open` always null. A user sees a notice for the `administrator` kind
+    only while they hold the role that `Users:AdministratorRole` names. Anyone
+    else gets an empty list with zero counts, a 404 when marking a notice read,
+    and read-all writes nothing for them. The texts are platform texts in the
+    user's profile locale, matched by the whole tag ignoring letter case, with
+    `en` as the fallback, so `vi-VN` shows `en`. Numbers are formatted in the
+    profile locale, and a `date-time` shows in UTC, because a notice has no
+    release time zone. The routes are served on the tenant's platform host only,
+    and need a session (401). The POSTs follow the CSRF rule.
 - **Kept for.** `Notifications:RetentionDays`, default 90, a whole number of at
   least 1. The worker reads and checks it at start. It deletes the notifications
   whose `created_at` is older than that by its own clock, with their
