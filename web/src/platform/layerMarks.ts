@@ -1,4 +1,5 @@
 import { getAt, unescapePointerSegment } from './jsonPatch'
+import { setOwn } from './ownProperty'
 import type { StudioModuleResource } from './studio'
 
 /** What a customization layer did to a list element. */
@@ -24,6 +25,23 @@ export const policyKeyedLists: Record<string, string> = { '/grants': 'name' }
 /** The keyed list of a process: its steps, each keyed by name. */
 export const processKeyedLists: Record<string, string> = {
   '/steps': 'name',
+}
+
+/**
+ * The keyed lists of a form: its sections and steps, each keyed by name, and the fields of each section of `content`,
+ * keyed by `field`. The read route names a field's mark by the section's position in the form with the layer applied,
+ * so there is one list for each section.
+ */
+export function formKeyedLists(content: unknown): Record<string, string> {
+  const sections =
+    typeof content === 'object' && content !== null ? (content as { sections?: unknown }).sections : undefined
+  const lists: Record<string, string> = { '/sections': 'name', '/steps': 'name' }
+  if (Array.isArray(sections)) {
+    sections.forEach((_, index) => {
+      setOwn(lists, `/sections/${index}/fields`, 'field')
+    })
+  }
+  return lists
 }
 
 /** The maps of a text resource whose keys the layer marks: `/texts`, each text keyed by its property name. */

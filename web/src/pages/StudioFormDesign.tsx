@@ -17,11 +17,12 @@ import { FormPalette } from './FormPalette'
 import { dropOnForm } from './formPaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 import { StudioFormCanvas } from './StudioFormCanvas'
+import type { DesignerLayer } from './LayerMarkViews'
 import { type FormUse, StudioFormUsedOn } from './StudioFormUsedOn'
 import type { OpenResource } from './StudioReferences'
 
 /**
- * The Design tab of a form: the list of its uses, the canvas, and beside the canvas the field palette, the layout
+ * The Design tab of a form: the list of its uses (a module form has none), the canvas, and beside the canvas the field palette, the layout
  * outline and the properties. A palette field that is dragged with the pointer onto a section or a field of the
  * outline is inserted there: at the end of the section, or after the field. The innermost target wins, and the new
  * field is selected. A field row of the outline moves by pointer drag onto another field row or an empty section, or by
@@ -30,10 +31,12 @@ import type { OpenResource } from './StudioReferences'
  * place of, or onto a step's heading or a step's entry in the step switch, which takes it at the end of the step. On a form with steps, `sections` then
  * follows the order of the steps. The section stays selected, and one undo reverses the move. For all of them, the
  * live region names the element, its section or step and its position. The canvas, the palette, the outline and the drag
- * library are one lazy chunk, which loads when the tab opens.
+ * library are one lazy chunk, which loads when the tab opens. With `layer`, the outline rows carry the layer's marks and
+ * Reset to module.
  */
 export default function StudioFormDesign({
   application,
+  module,
   resourceId,
   draft,
   selected,
@@ -41,16 +44,22 @@ export default function StudioFormDesign({
   onChange,
   usedOn,
   onOpen,
+  layer,
 }: {
   application: string
+  /** Set for a form of a module: the canvas then draws it through the module's draft route. */
+  module?: string
   resourceId: string
   draft: Record<string, unknown>
   /** The pointer of the selected field, section or step, or null. */
   selected: string | null
   onSelect: (pointer: string | null) => void
   onChange: ChangeHandler
-  usedOn: FormUse[] | 'failed' | undefined
-  onOpen: OpenResource
+  /** The list of uses. A module form has none. */
+  usedOn?: FormUse[] | 'failed' | undefined
+  onOpen?: OpenResource
+  /** The application's layer on a module form: its marks go on the outline rows. */
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const [announcement, setAnnouncement] = useState('')
@@ -82,9 +91,10 @@ export default function StudioFormDesign({
     >
       <div data-testid="studio-form-design">
         <Flex vertical gap="middle">
-          <StudioFormUsedOn entries={usedOn} onOpen={onOpen} />
+          {onOpen && <StudioFormUsedOn entries={usedOn} onOpen={onOpen} />}
           <StudioFormCanvas
             application={application}
+            module={module}
             resourceId={resourceId}
             draft={draft}
             selected={selected}
@@ -101,7 +111,7 @@ export default function StudioFormDesign({
                   onSelect={onSelect}
                   onChange={onChange}
                 />
-                <FormOutline draft={draft} selected={selected} onSelect={onSelect} />
+                <FormOutline draft={draft} selected={selected} onSelect={onSelect} layer={layer} />
               </Flex>
             }
           />

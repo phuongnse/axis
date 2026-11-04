@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { entityKeyedLists, layerMarks, markOf, textKeyedMaps } from './layerMarks'
+import { entityKeyedLists, formKeyedLists, layerMarks, markOf, textKeyedMaps } from './layerMarks'
 
 const content = {
   name: 'Department',
@@ -99,6 +99,52 @@ describe('layerMarks of a text map', () => {
 
     expect(layerMarks(texts, [{ path: '/texts/gone', mark: 'added' }], [], {}, textKeyedMaps)).toEqual([])
     expect(layerMarks(texts, marks, [], {})).toEqual([])
+  })
+})
+
+describe('layerMarks of a form', () => {
+  const form = {
+    steps: [{ name: 'first', sections: ['basics'] }],
+    sections: [
+      { name: 'basics', fields: [{ field: 'name' }, { field: 'amount' }] },
+      { name: 'extra', fields: [{ field: 'note' }] },
+    ],
+  }
+
+  it('lists the sections, the steps and the fields of each section', () => {
+    expect(formKeyedLists(form)).toEqual({
+      '/sections': 'name',
+      '/steps': 'name',
+      '/sections/0/fields': 'field',
+      '/sections/1/fields': 'field',
+    })
+    expect(formKeyedLists(undefined)).toEqual({ '/sections': 'name', '/steps': 'name' })
+  })
+
+  it('turns marks and removed elements into section, step and section-field elements', () => {
+    const elements = layerMarks(
+      form,
+      [
+        { path: '/sections/1', mark: 'added' },
+        { path: '/steps/0', mark: 'changed' },
+        { path: '/sections/0/fields/1', mark: 'changed' },
+        { path: '/sections/1/fields/0', mark: 'added' },
+      ],
+      [
+        { list: '/sections/0/fields', key: 'year', content: { field: 'year' } },
+        { list: '/steps', key: 'last', content: { name: 'last' } },
+      ],
+      formKeyedLists(form),
+    )
+
+    expect(elements).toEqual([
+      { list: '/sections', key: 'extra', mark: 'added' },
+      { list: '/steps', key: 'first', mark: 'changed' },
+      { list: '/sections/0/fields', key: 'amount', mark: 'changed' },
+      { list: '/sections/1/fields', key: 'note', mark: 'added' },
+      { list: '/sections/0/fields', key: 'year', mark: 'removed' },
+      { list: '/steps', key: 'last', mark: 'removed' },
+    ])
   })
 })
 

@@ -234,6 +234,30 @@ export async function fetchStudioFormMetadata(
   return (await postDraftMetadata(application, id, draft, signal)) as StudioFormMetadataAnswer
 }
 
+/**
+ * Asks for the form widget an unsaved form of a module would have, with the application's layer on it. The draft goes to
+ * the module's draft page metadata route. Any status other than 200 throws, as does a server that does not answer.
+ */
+export async function fetchStudioModuleFormMetadata(
+  application: string,
+  module: string,
+  id: string,
+  draft: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<StudioFormMetadataAnswer> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}/page-metadata`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+    signal,
+  })
+  if (response.status !== 200) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioFormMetadataAnswer
+}
+
 /** A compile diagnostic of a Studio folder. `resourceId` is `null` when it belongs to no resource. */
 export interface StudioDiagnostic {
   code: string
