@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { moduleKinds } from './moduleKinds'
 import { assignLocation } from './navigation'
 import {
   checkStudioExpression,
@@ -227,56 +228,56 @@ describe('groupByKind', () => {
 })
 
 describe('moduleResources', () => {
-  const names = {
-    entities: [
-      { id: 'own-entity', name: 'Request', module: null },
-      { id: 'checklists-entity', name: 'checklists/Checklist', module: 'checklists' },
-    ],
-    processes: [
-      { id: 'own-process', name: 'Approve', module: null },
-      { id: 'checklists-process', name: 'checklists/ChecklistReview', module: 'checklists' },
-    ],
-    policies: [
-      { id: 'own-policy', name: 'Access', module: null },
-      { id: 'checklists-policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
-    ],
-    contracts: [{ id: 'checklists-contract', name: 'checklists/ChecklistContract', module: 'checklists' }],
-    pages: [
-      { id: 'own-page', name: 'Home', module: null, parameters: [] },
-      { id: 'checklists-page', name: 'checklists/Checklists', module: 'checklists', parameters: [] },
-    ],
-  } as unknown as StudioNames
+  const lists = {
+    entity: 'entities',
+    dataSource: 'dataSources',
+    rule: 'rules',
+    sequence: 'sequences',
+    form: 'forms',
+    page: 'pages',
+    process: 'processes',
+    event: 'events',
+    text: 'textResources',
+    seed: 'seeds',
+    policy: 'policies',
+    trigger: 'triggers',
+    scenario: 'scenarios',
+    contract: 'contracts',
+  } as const
+  // One module item and one own item for each kind.
+  const names = Object.fromEntries(
+    moduleKinds.map((kind) => [
+      lists[kind],
+      [
+        { id: `own-${kind}`, name: `Own${kind}`, module: null },
+        { id: `checklists-${kind}`, name: `checklists/${kind}`, module: 'checklists' },
+      ],
+    ]),
+  ) as unknown as StudioNames
 
-  it('returns the entities, processes, policies, contracts and pages of modules with their module id', () => {
+  it('returns one group for each module kind, in the order of the kind list, with the module id', () => {
     const groups = moduleResources(names, '')
 
-    expect(groups.map((group) => group.kind)).toEqual(['entity', 'process', 'policy', 'contract', 'page'])
-    expect(groups.flatMap((group) => group.items)).toEqual([
-      { id: 'checklists-entity', kind: 'entity', name: 'checklists/Checklist', module: 'checklists' },
-      { id: 'checklists-process', kind: 'process', name: 'checklists/ChecklistReview', module: 'checklists' },
-      { id: 'checklists-policy', kind: 'policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
-      { id: 'checklists-contract', kind: 'contract', name: 'checklists/ChecklistContract', module: 'checklists' },
-      { id: 'checklists-page', kind: 'page', name: 'checklists/Checklists', module: 'checklists' },
-    ])
+    expect(groups.map((group) => group.kind)).toEqual([...moduleKinds])
+    expect(groups.flatMap((group) => group.items)).toEqual(
+      moduleKinds.map((kind) => ({ id: `checklists-${kind}`, kind, name: `checklists/${kind}`, module: 'checklists' })),
+    )
   })
 
   it('leaves out the application own resources', () => {
     const ids = moduleResources(names, '').flatMap((group) => group.items.map((item) => item.id))
 
-    expect(ids).not.toContain('own-entity')
-    expect(ids).not.toContain('own-process')
-    expect(ids).not.toContain('own-policy')
-    expect(ids).not.toContain('own-page')
-    expect(ids).toContain('checklists-contract')
+    expect(ids).toHaveLength(moduleKinds.length)
+    expect(ids.filter((id) => id.startsWith('own-'))).toEqual([])
   })
 
   it('applies the search to the name and the id, ignoring letter case and spaces, and drops empty groups', () => {
-    expect(moduleResources(names, '  REVIEW ').map((group) => group.items.map((item) => item.id))).toEqual([
+    expect(moduleResources(names, '  CHECKLISTS/PROCESS ').map((group) => group.items.map((item) => item.id))).toEqual([
       ['checklists-process'],
     ])
     expect(moduleResources(names, 'CHECKLISTS-POLICY').map((group) => group.kind)).toEqual(['policy'])
-    expect(moduleResources(names, 'checklistcontract').map((group) => group.kind)).toEqual(['contract'])
-    expect(moduleResources(names, ' CHECKLISTS-CONTRACT ').map((group) => group.kind)).toEqual(['contract'])
+    expect(moduleResources(names, ' CHECKLISTS-SEED ').map((group) => group.kind)).toEqual(['seed'])
+    expect(moduleResources(names, 'checklists/scenario').map((group) => group.kind)).toEqual(['scenario'])
     expect(moduleResources(names, 'nothing')).toEqual([])
   })
 

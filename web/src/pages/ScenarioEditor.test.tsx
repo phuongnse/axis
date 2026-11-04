@@ -71,6 +71,10 @@ const names: StudioNames = {
   policies: [],
   contracts: [],
   texts: [],
+  seeds: [],
+  triggers: [],
+  scenarios: [],
+  textResources: [],
 }
 
 const fixtures: Record<StepType, Step> = {

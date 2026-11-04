@@ -3,9 +3,9 @@
 # network access to build images and for the first SPA install). Each runs alone, in this order:
 # - dev-script: scripts/dev.test.mjs starts scripts/dev.sh in a copy of the repository and stops it.
 # - compose: scripts/compose.test.mjs builds the image and runs the Compose stack on free ports.
-# - images: scripts/images.test.mjs builds the production images axis-server, axis-worker and axis-admin,
-#   each up to three times with a wait of 15 and 30 seconds, and runs them read-only against a throwaway
-#   PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings.
+# - images: scripts/images.test.mjs builds the production images axis-server, axis-worker, axis-admin and
+#   axis-controlplane, each up to three times with a wait of 15 and 30 seconds, and runs them read-only
+#   against a throwaway PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings.
 # - onprem: scripts/onprem.test.mjs installs deploy/compose/compose.yaml from the production images as
 #   docs/reference/installation.md says, against a test PostgreSQL over TLS and the example's own identity
 #   provider, which the TLS proxy serves on a host of its own. Every
