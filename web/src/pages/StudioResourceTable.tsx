@@ -192,19 +192,9 @@ export function StudioResourceTable({
       },
       { replace: true },
     )
-  const moduleIds = [...new Set(extra.flatMap((item) => (item.module === null ? [] : [item.module])))]
   const filterFields: FilterField[] = [
     { key: 'name', label: t('shell.studio.list.name'), type: 'text' },
     { key: 'description', label: t('shell.studio.list.description'), type: 'text' },
-    {
-      key: 'module',
-      label: t('shell.studio.list.module'),
-      type: 'enum',
-      options: moduleIds.map((id) => ({
-        value: id,
-        label: catalog?.modules.find((module) => module.id === id)?.label ?? id,
-      })),
-    },
     {
       key: 'status',
       label: t('shell.studio.list.status'),
@@ -223,8 +213,6 @@ export function StudioResourceTable({
         return row.name
       case 'description':
         return row.description
-      case 'module':
-        return row.module
       case 'status':
         return row.status
       default:
