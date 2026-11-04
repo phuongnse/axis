@@ -200,6 +200,34 @@ export interface UpdatePasswordContext extends IdentityFrameContext {
   texts: UpdatePasswordTexts
 }
 
+/** The texts of the terms page. `accept` holds `{terms}` and `{privacy}` placeholders for the links, and `acceptTermsOnly` holds `{terms}`, for a tenant with no privacy policy. */
+export interface TermsTexts {
+  title: string
+  accept: string
+  acceptTermsOnly: string
+  termsOfService: string
+  privacyPolicy: string
+  /** The error under the checkbox when Continue is pressed with the box unticked. */
+  required: string
+  continue: string
+  decline: string
+}
+
+/** What the terms page draws: one required checkbox that names the tenant's Terms of service and Privacy policy, Continue and Decline. */
+export interface TermsContext extends IdentityFrameContext {
+  page: 'terms'
+  title: string
+  /** The message to show above the form. No error means no alert. */
+  error?: string
+  /** Where the form posts `accept`, and where Decline posts `cancel`. */
+  loginAction: string
+  /** The tenant's Terms of service, from the client attribute `axis.tenantTermsUrl`. Absent when not set. */
+  termsUrl?: string
+  /** The tenant's Privacy policy, from the client attribute `axis.tenantPrivacyUrl`. Absent when not set. */
+  privacyUrl?: string
+  texts: TermsTexts
+}
+
 /** The texts of the page that offers the ways to sign in, which "Try another way" opens. */
 export interface SelectAuthenticatorTexts {
   title: string
@@ -339,6 +367,7 @@ export type IdentityContext =
   | AddAuthenticatorContext
   | ResetPasswordContext
   | UpdatePasswordContext
+  | TermsContext
   | SelectAuthenticatorContext
   | UpdateProfileContext
   | SignOutContext

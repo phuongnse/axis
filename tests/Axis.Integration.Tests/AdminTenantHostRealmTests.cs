@@ -116,16 +116,16 @@ public sealed class AdminTenantHostRealmTests(KeycloakFixture keycloak, PostgreS
         var preview = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.RunAsync(AdminScenario.PreviewArgs(preview, main, $"{preview}.example.test"), identityProvider: _handler, extra: Settings())).Exit);
         await scenario.PointSignInAsync(outside, new Uri("https://idp.outside.test/realms/x"), "axis");
-        var mainBefore = (await PlatformClientAsync(main)).GetRawText();
-        var outsideBefore = (await PlatformClientAsync(outside)).GetRawText();
+        var mainBefore = Canonical(await PlatformClientAsync(main));
+        var outsideBefore = Canonical(await PlatformClientAsync(outside));
 
         var onPreview = await HostAsync(scenario, "add", preview, $"p2-{preview}.example.test");
         var onOutside = await HostAsync(scenario, "add", outside, $"p3-{outside}.example.test");
 
         Assert.Equal(0, onPreview.Exit);
         Assert.Equal(0, onOutside.Exit);
-        Assert.Equal(mainBefore, (await PlatformClientAsync(main)).GetRawText());
-        Assert.Equal(outsideBefore, (await PlatformClientAsync(outside)).GetRawText());
+        Assert.Equal(mainBefore, Canonical(await PlatformClientAsync(main)));
+        Assert.Equal(outsideBefore, Canonical(await PlatformClientAsync(outside)));
     }
 
     // The settings that the commands need: the directory source and the real identity provider.
@@ -165,6 +165,42 @@ public sealed class AdminTenantHostRealmTests(KeycloakFixture keycloak, PostgreS
         string[] Read(string name) => [.. client.GetProperty(name).EnumerateArray().Select(item => item.GetString()!).Order(StringComparer.Ordinal)];
         var postLogout = RealmClientProfile.ReadAttributes(client).GetValueOrDefault("post.logout.redirect.uris", "");
         return (Read("redirectUris"), Read("webOrigins"), [.. postLogout.Split("##", StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal)]);
+    }
+
+    // The client as text with every list of strings sorted: Keycloak lists the client scopes in a different order on each read.
+    private static string Canonical(JsonElement client)
+    {
+        var node = JsonNode.Parse(client.GetRawText())!;
+        Sort(node);
+        return node.ToJsonString();
+
+        static void Sort(JsonNode? node)
+        {
+            switch (node)
+            {
+                case JsonObject obj:
+                    foreach (var item in obj)
+                    {
+                        Sort(item.Value);
+                    }
+
+                    break;
+                case JsonArray array:
+                    foreach (var item in array)
+                    {
+                        Sort(item);
+                    }
+
+                    var sorted = array.Select(item => item!.DeepClone()).OrderBy(item => item.ToJsonString(), StringComparer.Ordinal).ToList();
+                    array.Clear();
+                    foreach (var item in sorted)
+                    {
+                        array.Add(item);
+                    }
+
+                    break;
+            }
+        }
     }
 
     private Task<JsonElement> PlatformClientAsync(string realm) => ClientAsync(realm, RealmClientProfile.PlatformClientId);

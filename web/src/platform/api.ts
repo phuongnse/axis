@@ -45,16 +45,20 @@ export function accountActionUrl(returnUrl: string, action: AccountAction): stri
 /** The shell's sign-in card, where the server sends the browser after a refused sign-in. */
 export const signInFailedPath = '/?signIn=failed'
 
+/** The shell's sign-in card, where the server sends the browser after the person declined the terms step. */
+export const signInDeclinedPath = '/?signIn=declined'
+
 /** The shell's signed-out card, where the identity provider sends the browser after sign-out. */
 export const signedOutPath = '/?signedOut'
 
-/** Whether the address is one of the two cards on `/`: a refused sign-in or a signed-out person. */
+/** Whether the address is one of the three cards on `/`: a refused sign-in, a declined terms step or a signed-out person. */
 export function isSignInCardAddress(pathname: string, search: string): boolean {
   if (pathname !== '/') {
     return false
   }
   const params = new URLSearchParams(search)
-  return params.get('signIn') === 'failed' || params.has('signedOut')
+  const signIn = params.get('signIn')
+  return signIn === 'failed' || signIn === 'declined' || params.has('signedOut')
 }
 
 /**
