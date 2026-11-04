@@ -6,9 +6,11 @@ Detailed reference for the control plane: the service that runs Axis's own busin
 [D126](../decisions/d126-sign-up-trials-and-the-control-plane.md) and
 [D127](../decisions/d127-plans-payments-and-invoices.md). Everything in this file is _(planned for
 M33)_, except the parts that billing adds, _(planned for M34)_, and except the service itself, its
-settings, its health, its image and its Helm chart, which are built: `controlplane/src/Axis.ControlPlane`
-starts, checks its `ControlPlane:` settings, applies its own migrations and answers `/health/live` and
-`/health/ready`, the `axis-controlplane` image packs it, and `deploy/helm/axis-controlplane` installs it. The
+settings, its health, its [durable jobs](#its-own-work), its audit records, its image and its Helm chart, which
+are built: `controlplane/src/Axis.ControlPlane` starts, checks its `ControlPlane:` settings, applies its own
+migrations, runs its job queue and answers `/health/live` and `/health/ready`, the `axis-controlplane` image
+packs it, and `deploy/helm/axis-controlplane` installs it. No job kind exists yet, so the job runner is idle
+until the issues that add provisioning, the subscription clock and emails register their handlers. The
 conventions of [architecture.md](../architecture.md) apply.
 
 ## What it is
@@ -53,9 +55,34 @@ conventions of [architecture.md](../architecture.md) apply.
 ## Its own work
 
 - **Durable jobs.** Provisioning a tenant, the subscription clock, emails, invoice issuing and the
-  daily reconciliation run as work items in the control plane's database, claimed with a lease as the
-  [publisher](administration.md#publisher) claims its requests. A restart loses nothing, and a failed
-  item is retried with a back-off, up to 10 attempts, then alerts the operator.
+  daily reconciliation run as jobs in the control plane's database. They are built on the queue
+  below, which follows the [publisher](administration.md#publisher) in claiming with a lease.
+  - **The `control_plane.jobs` table.** `id`, `kind`, `payload` (JSON), `state` (`queued`,
+    `running`, `succeeded` or `failed`), `attempts`, `next_attempt_at`, `lease_owner`,
+    `lease_until`, `last_error`, `created_at` and `finished_at`. Code enqueues a job of a kind with
+    a payload, and may do it in the transaction of the change that needs it. A job that ends
+    `succeeded` or `failed` stays in the table with its last error.
+  - **Claim.** Each replica runs one job runner, which runs one job at a time. It claims the
+    oldest due job with `FOR UPDATE SKIP LOCKED`, and only a kind it has a handler for, so an older
+    replica never claims a kind it cannot run. A job is due when it is `queued` and its
+    `next_attempt_at` has passed, or when it is `running` and its lease has ended. Times are the
+    database clock's. A claim counts one attempt, so a runner that stops in the middle of a job still
+    uses up an attempt.
+  - **Lease.** The lease lasts 5 minutes. The runner renews it every third of its length while the
+    handler runs, on a connection of its own. Every update after the claim names the attempt count,
+    so a runner that lost its claim changes nothing. A job whose runner stopped is claimed again
+    once its lease has ended, and the runner polls every second when nothing is due.
+  - **Retries.** A handler that throws gets the job queued again after 30 s × 2^(attempt − 1), at
+    most 1 hour, with no jitter. After 10 failed attempts the job is `failed`. An error log
+    `Job {JobId} of kind {JobKind} failed after {Attempts} attempts.` names it, and the counter
+    `axis.controlplane.jobs.failed` counts it. A job claimed an 11th time, because its runner
+    stopped on the 10th attempt, is `failed` the same way without running. These timings are code
+    defaults and not `ControlPlane:` settings.
+  - **At-least-once.** A runner that stops after the handler's side effect but before it marks the
+    job done causes a second run, so a handler must be idempotent. The cell's `Idempotency-Key`
+    makes the calls to a cell safe.
+  - **No payload in a record of failure.** `last_error` holds the exception type and the start of
+    its message, never the payload.
 - **Emails.** The control plane sends its own emails, from a mail domain of its own,
   `ControlPlane:MailFrom`, with SPF, DKIM and DMARC. It never uses a cell's mail domain, so one
   tenant's sending never touches a sign-up or a payment reminder. Every email is in `en` and `vi`,
@@ -63,6 +90,14 @@ conventions of [architecture.md](../architecture.md) apply.
 - **Audit.** Every change to a subscription, a payment, an invoice or an account writes an
   append-only audit record with its actor: a person of the [billing portal](billing-portal.md), a
   provider's webhook, a job, or an operator.
+  - **The `control_plane.audit_records` table.** `id`, `occurred_at`, `actor_kind` (`account`,
+    `webhook`, `job` or `operator`), `actor`, `action` and `subject`. The database rejects every
+    update, delete and truncate with `restrict_violation`, raw SQL included, and the control plane's
+    code has only an append and a read.
+  - **Who writes it.** The handler or the command that makes the change appends the record in the
+    same transaction as the change. A job's record has the actor kind `job` and the job id as the
+    actor. The job runner writes none itself: claiming and retrying are bookkeeping and not a
+    business change.
 
 ## Operators
 
@@ -119,3 +154,8 @@ the migrations and the queries for now.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.
+- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed`.
+
+  | Metric | Instrument | Unit | Attributes |
+  | --- | --- | --- | --- |
+  | `axis.controlplane.jobs.failed` | counter | `{job}` | `axis.job.kind`. Never the job id |

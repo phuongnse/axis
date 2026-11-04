@@ -36,7 +36,7 @@ tests/
     fixtures/release-app/ application a spec activates during the run, to test releases
     fixtures/subprocess-app/ parent and child sub-process the E2E server activates, for the inspector journey
 controlplane/
-  src/Axis.ControlPlane/  the control plane service: its settings, its own schema and migrations, health and telemetry
+  src/Axis.ControlPlane/  the control plane service: its settings, its own schema and migrations, its job queue and audit records, health and telemetry
   tests/Axis.ControlPlane.Tests/ unit tests of the control plane that need no Docker
   tests/Axis.ControlPlane.Integration.Tests/ control plane tests on PostgreSQL (Testcontainers)
 modules/
