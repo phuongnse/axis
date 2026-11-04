@@ -83,18 +83,19 @@ internal static class NotificationEndpoints
         var items = new List<NotificationListItem>(result.Items.Count);
         foreach (var item in result.Items)
         {
-            if (!releases.TryGetValue(item.ReleaseId, out var stored))
+            var releaseId = item.ReleaseId ?? throw new InvalidOperationException($"The notification '{item.Id}' of an application names no release.");
+            if (!releases.TryGetValue(releaseId, out var stored))
             {
-                var release = await resolver.GetReleaseModelAsync(item.ReleaseId, cancellationToken);
+                var release = await resolver.GetReleaseModelAsync(releaseId, cancellationToken);
                 stored = (release, NotificationTexts.ChooseTexts(release, locale));
-                releases[item.ReleaseId] = stored;
+                releases[releaseId] = stored;
             }
 
             var (storedRelease, resource) = stored;
             var values = NotificationValues.Format(item.Values, item.ValueTypes, locale ?? resource?.Locale, storedRelease.TimeZone);
             items.Add(new NotificationListItem(
                 item.Id,
-                item.ReleaseId,
+                releaseId,
                 NotificationTexts.Render(resource, item.SubjectKey, values),
                 NotificationTexts.Render(resource, item.BodyKey, values),
                 item.OpenPage is { } openPage
@@ -170,20 +171,23 @@ internal static class NotificationEndpoints
     private static IResult ApplicationNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No application is active under this name.");
 
-    private static IResult NotificationNotFound() =>
+    internal static IResult NotificationNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No notification exists with this id.");
 
-    private static bool TryParseId(string id, out Guid notificationId) =>
+    internal static bool TryParseId(string id, out Guid notificationId) =>
         Guid.TryParseExact(id, "D", out notificationId) && id.Length == 36;
 }
 
 /// <summary>One page of the notifications the user sees, with the number of them on every page and the number unread.</summary>
 internal sealed record NotificationListResponse(IReadOnlyList<NotificationListItem> Items, int Page, int PageSize, long TotalCount, long UnreadCount);
 
-/// <summary>A notification as a list shows it, with the texts rendered from <see cref="ReleaseId"/>. <see cref="Open"/> is null when the notification opens no page.</summary>
+/// <summary>
+/// A notification as a list shows it, with the texts rendered from <see cref="ReleaseId"/>. <see cref="ReleaseId"/> is null for a
+/// tenant notice, which has platform texts. <see cref="Open"/> is null when the notification opens no page.
+/// </summary>
 internal sealed record NotificationListItem(
     Guid Id,
-    Guid ReleaseId,
+    Guid? ReleaseId,
     string Subject,
     string Body,
     NotificationOpen? Open,

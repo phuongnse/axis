@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Server.Tests;
+using Microsoft.AspNetCore.Mvc.Testing;
 using static Axis.Integration.Tests.TaskApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -14,6 +15,7 @@ namespace Axis.Integration.Tests;
 public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFixture<TaskApiFixture>
 {
     private const string Notifications = "/api/apps/StepApp/notifications";
+    private const string TenantNotices = "/api/notifications";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -314,6 +316,149 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         }
 
         Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads"));
+    }
+
+    [Fact]
+    public async Task An_administrator_lists_a_tenant_notice_in_the_profile_locale_and_marks_it_read()
+    {
+        await ClearAsync();
+        await fixture.InsertProfileAsync(TenantA, "maria", "Maria", "vi");
+        var id = await InsertTenantNoticeAsync();
+        await using var factory = AdministratorFactory();
+        using var maria = factory.CreateClient().SignedInAs("maria");
+
+        using (var list = await GetJsonAsync(maria, TenantNotices))
+        {
+            var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(id, item.GetProperty("id").GetGuid());
+            Assert.Equal("Email được giữ đến ngày mai", item.GetProperty("subject").GetString());
+            Assert.Equal(
+                "Tenant này đã gửi đủ 2 email trong hôm nay. Các email còn lại sẽ chờ đến 00:00 UTC.",
+                item.GetProperty("body").GetString());
+            Assert.Equal(JsonValueKind.Null, item.GetProperty("releaseId").ValueKind);
+            Assert.Equal(JsonValueKind.Null, item.GetProperty("open").ValueKind);
+            Assert.False(item.GetProperty("read").GetBoolean());
+            Assert.Equal(1, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(1, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var marked = await PostAsync(maria, $"{TenantNotices}/{id:D}/read"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, marked.StatusCode);
+        }
+
+        using (var after = await GetJsonAsync(maria, TenantNotices))
+        {
+            Assert.True(Assert.Single(after.RootElement.GetProperty("items").EnumerateArray()).GetProperty("read").GetBoolean());
+            Assert.Equal(0, after.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using var inApplication = await GetJsonAsync(maria, Notifications);
+        Assert.Empty(inApplication.RootElement.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_tenant_notice_shows_in_english_when_the_profile_locale_has_no_platform_texts()
+    {
+        await ClearAsync();
+        await fixture.InsertProfileAsync(TenantA, "fiona", "Fiona", "fr");
+        await InsertTenantNoticeAsync();
+        await using var factory = AdministratorFactory();
+        using var fiona = factory.CreateClient().SignedInAs("fiona");
+
+        using var list = await GetJsonAsync(fiona, TenantNotices);
+
+        var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal("Emails are held until tomorrow", item.GetProperty("subject").GetString());
+        Assert.Equal("This tenant has sent its 2 emails for today. The other emails wait until 00:00 UTC.", item.GetProperty("body").GetString());
+    }
+
+    [Fact]
+    public async Task A_user_without_the_administrator_role_lists_no_tenant_notice_and_cannot_mark_one_read()
+    {
+        await ClearAsync();
+        var id = await InsertTenantNoticeAsync();
+        await using var factory = AdministratorFactory();
+        using var otto = factory.CreateClient().SignedInAs("otto");
+
+        using (var list = await GetJsonAsync(otto, TenantNotices))
+        {
+            Assert.Empty(list.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(0, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(0, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var denied = await PostAsync(otto, $"{TenantNotices}/{id:D}/read"))
+        {
+            using var problem = await RecordApiFixture.ReadProblemAsync(denied, HttpStatusCode.NotFound);
+            Assert.Equal("No notification exists with this id.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        using (var all = await PostAsync(otto, $"{TenantNotices}/read-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads WHERE user_id = 'otto'"));
+
+        // Without the setting nobody is an administrator, so maria sees none either.
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var none = await GetJsonAsync(maria, TenantNotices);
+        Assert.Empty(none.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(0, none.RootElement.GetProperty("unreadCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task The_tenant_notice_routes_need_a_session_and_the_posts_need_the_csrf_header()
+    {
+        await ClearAsync();
+        var id = await InsertTenantNoticeAsync();
+        await using var factory = AdministratorFactory();
+        using var anonymous = factory.CreateClient();
+
+        using (var list = await SendAsync(anonymous, TenantNotices))
+        {
+            using var problem = await RecordApiFixture.ReadProblemAsync(list, HttpStatusCode.Unauthorized);
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        foreach (var path in new[] { $"{TenantNotices}/{id:D}/read", $"{TenantNotices}/read-all" })
+        {
+            using var response = await PostAsync(anonymous, path);
+            using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Unauthorized);
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        using var maria = factory.CreateClient().SignedInAs("maria");
+        foreach (var path in new[] { $"{TenantNotices}/{id:D}/read", $"{TenantNotices}/read-all" })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+            request.Headers.Host = Host(TenantA);
+            using var response = await maria.SendAsync(request, CancellationToken);
+            using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Forbidden);
+            Assert.Equal("The request must carry the X-Axis-Csrf header.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads"));
+    }
+
+    private WebApplicationFactory<Program> AdministratorFactory() =>
+        fixture.Factory.WithWebHostBuilder(builder => builder.UseSetting("Users:AdministratorRole", "finance"));
+
+    // The notice the worker stores when the tenant has used its emails of the day, for the administrators.
+    private async Task<Guid> InsertTenantNoticeAsync()
+    {
+        var id = Guid.NewGuid();
+        await fixture.ExecuteAsync(
+            TenantA,
+            """
+            INSERT INTO axis.notifications
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, created_at)
+            VALUES (@id, NULL, NULL, 'platformRole', 'administrator', 'notices.emailsHeld.subject', 'notices.emailsHeld.body',
+                    '{"limit":2}'::jsonb, '{"limit":"integer"}'::jsonb, now())
+            """,
+            ("id", id));
+        return id;
     }
 
     private async Task ClearAsync() =>
