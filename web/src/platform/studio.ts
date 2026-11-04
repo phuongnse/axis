@@ -3,6 +3,7 @@ import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
 import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
+import { kindSingular } from './studioKinds'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
@@ -152,6 +153,13 @@ export interface StudioResourceItem {
   file: string
   version: string
   usedBy: number
+  /**
+   * The resource's label or title text by locale. It is empty for a kind that has none, and absent on a resource that
+   * the client created, since the create route does not answer it.
+   */
+  titles?: Record<string, string>
+  /** The locale of a text resource, else `null`. Absent on a resource that the client created. */
+  locale?: string | null
 }
 
 /** A resource with its content, as `GET /api/studio/apps/{application}/resources/{id}` answers. */
@@ -1203,13 +1211,37 @@ export function filterResources(items: StudioResourceItem[], search: string): St
   )
 }
 
-/** The text a resource shows in the list: its name, or its file when it has none. */
-export function resourceTitle(item: StudioResourceItem): string {
-  return item.name ?? item.file
+/**
+ * The text a resource shows: a text resource by its language in `locale`, such as "Vietnamese", else its label in
+ * `locale`, then in `en`, then the name its author gave, then its kind's singular name. A file name never shows.
+ */
+export function resourceTitle(item: StudioResourceItem, locale: string, t: (key: string) => string): string {
+  if (item.kind === 'text' && typeof item.locale === 'string') {
+    return languageName(item.locale, locale)
+  }
+  const titles = item.titles ?? {}
+  return titles[locale] ?? titles.en ?? item.name ?? kindSingular(item.kind, t)
 }
 
-/** Groups resources by kind. Kinds are sorted ordinally, and each group's items by name, or by file when a resource has no name. */
-export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
+function languageName(tag: string, locale: string): string {
+  try {
+    return new Intl.DisplayNames([locale], { type: 'language' }).of(tag) ?? tag
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return tag
+    }
+    throw error
+  }
+}
+
+/**
+ * Groups resources by kind. Kinds are sorted ordinally, and each group's items by the shown name, or by name, or by
+ * file when `title` is not given.
+ */
+export function groupByKind(
+  items: StudioResourceItem[],
+  title?: (item: StudioResourceItem) => string,
+): ResourceGroup[] {
   const groups = new Map<string, StudioResourceItem[]>()
   for (const item of items) {
     const group = groups.get(item.kind)
@@ -1219,12 +1251,13 @@ export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
       groups.set(item.kind, [item])
     }
   }
+  const compare = title
+    ? (left: StudioResourceItem, right: StudioResourceItem) => title(left).localeCompare(title(right))
+    : (left: StudioResourceItem, right: StudioResourceItem) =>
+        compareOrdinal(left.name ?? left.file, right.name ?? right.file)
   return [...groups.entries()]
     .sort(([left], [right]) => compareOrdinal(left, right))
-    .map(([kind, members]) => ({
-      kind,
-      items: members.toSorted((left, right) => compareOrdinal(resourceTitle(left), resourceTitle(right))),
-    }))
+    .map(([kind, members]) => ({ kind, items: members.toSorted(compare) }))
 }
 
 /** The kind of a module resource that Studio lists. Every kind a module may hold is one. */

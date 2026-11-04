@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { moduleKinds } from './moduleKinds'
 import { assignLocation } from './navigation'
 import {
@@ -13,6 +14,7 @@ import {
   putStudioTexts,
   releaseList,
   releasePublisher,
+  resourceTitle,
   ServerUnreachableError,
   studioAppDescription,
   studioAppTitle,
@@ -26,6 +28,9 @@ import {
 vi.mock('./navigation')
 
 afterEach(() => vi.unstubAllGlobals())
+
+const english = platformEnglish as Record<string, string>
+const t = (key: string) => english[key] ?? key
 
 function resource(id: string, kind: string, name: string | null, file: string): StudioResourceItem {
   return { id, kind, name, file, version: 'v', usedBy: 0 }
@@ -181,6 +186,38 @@ const items = [
   resource('dddd0004-0000-4000-8000-000000000000', 'application', null, 'application.json'),
 ]
 
+describe('resourceTitle', () => {
+  const entity = {
+    ...resource('1', 'entity', 'PurchaseRequest', 'entities/purchase-request.json'),
+    titles: { en: 'Purchase request', vi: 'Yêu cầu mua hàng' },
+  }
+
+  it('names a resource by its label in the UI locale', () => {
+    expect(resourceTitle(entity, 'vi', t)).toBe('Yêu cầu mua hàng')
+  })
+
+  it('falls back to the en label when the UI locale has no label', () => {
+    expect(resourceTitle(entity, 'fr', t)).toBe('Purchase request')
+  })
+
+  it('names a text resource by its language in the UI locale', () => {
+    const text = { ...resource('2', 'text', 'TextsVi', 'texts/vi.json'), locale: 'vi' }
+
+    expect(resourceTitle(text, 'en', t)).toBe('Vietnamese')
+  })
+
+  it('names a text resource by its tag when the browser cannot name the language', () => {
+    const text = { ...resource('2', 'text', 'TextsX', 'texts/x.json'), locale: 'not a tag' }
+
+    expect(resourceTitle(text, 'en', t)).toBe('not a tag')
+  })
+
+  it('names a resource without titles by its name, then by its kind, never by its file', () => {
+    expect(resourceTitle(resource('3', 'form', 'ReviewForm', 'forms/review.json'), 'en', t)).toBe('ReviewForm')
+    expect(resourceTitle(resource('4', 'form', null, 'forms/review.json'), 'en', t)).toBe('Form')
+  })
+})
+
 describe('filterResources', () => {
   it('keeps every resource for an empty or blank search', () => {
     expect(filterResources(items, '')).toEqual(items)
@@ -221,6 +258,15 @@ describe('groupByKind', () => {
     ])
 
     expect(groups[0].items.map((item) => item.id)).toEqual(['3', '1', '2'])
+  })
+
+  it('sorts the items by the shown name when it is given', () => {
+    const groups = groupByKind(
+      [resource('1', 'entity', 'A', 'entities/a.json'), resource('2', 'entity', 'B', 'entities/b.json')],
+      (item) => (item.id === '1' ? 'Zeta' : 'Alpha'),
+    )
+
+    expect(groups[0].items.map((item) => item.id)).toEqual(['2', '1'])
   })
 
   it('returns no group for no resources', () => {

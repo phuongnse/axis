@@ -366,6 +366,40 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId('studio-off-standard')).not.toBeInTheDocument()
   })
 
+  describe('names', () => {
+    const textId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'
+    const named: StudioResourceItem[] = [
+      ...resources.map((item) =>
+        item.id === entityId ? { ...item, titles: { en: 'Purchase request', vi: 'Yêu cầu mua hàng' } } : item,
+      ),
+      { id: textId, kind: 'text', name: 'TextsVi', file: 'texts/vi.json', version: 'e', usedBy: 0, locale: 'vi' },
+    ]
+
+    function stubNamed() {
+      const fetchMock = stubServer()
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+        input === `${folder}/resources` ? json({ items: named }) : base(input, init),
+      )
+    }
+
+    it('lists an entity by its label in the UI locale, not by its name', async () => {
+      stubNamed()
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      expect(await screen.findByRole('button', { name: 'Purchase request' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'PurchaseRequest' })).not.toBeInTheDocument()
+    })
+
+    it('lists a text resource by its language, not by its file', async () => {
+      stubNamed()
+      renderPage('/studio?app=PurchaseRequests&kind=text')
+
+      expect(await screen.findByRole('button', { name: 'Vietnamese' })).toBeInTheDocument()
+      expect(screen.queryByText('texts/vi.json')).not.toBeInTheDocument()
+    })
+  })
+
   it('shows the details of a resource and keeps it in the address without its kind', async () => {
     stubServer()
     renderPage('/studio?app=PurchaseRequests&kind=entity')
@@ -374,7 +408,7 @@ describe('StudioPage', () => {
 
     const details = screen.getByTestId('studio-resource-details')
     expect(details).toHaveTextContent('PurchaseRequest')
-    expect(details).toHaveTextContent('entity')
+    expect(details).toHaveTextContent('Entity')
     expect(details).toHaveTextContent(entityId)
     expect(details).toHaveTextContent('entities/purchase-request.json')
     expect(screen.getByTestId('location')).toHaveTextContent(`/studio?app=PurchaseRequests&resource=${entityId}`)
@@ -1507,8 +1541,8 @@ describe('StudioPage publishing', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'New resource…' }))
       await userEvent.type(screen.getByRole('combobox', { name: 'Kind' }), 'proc')
 
-      expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['process'])
-      await userEvent.click(screen.getByRole('option', { name: 'process' }))
+      expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Process'])
+      await userEvent.click(screen.getByRole('option', { name: 'Process' }))
       const create = screen.getByRole('button', { name: 'Create' })
       expect(create).toBeDisabled()
       await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Approval')
@@ -1519,7 +1553,7 @@ describe('StudioPage publishing', () => {
       const fetchMock = stubCreate(201)
       renderPage()
 
-      await fillDialog('text', 'de', 'Locale')
+      await fillDialog('Text', 'de', 'Locale')
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
@@ -1540,7 +1574,7 @@ describe('StudioPage publishing', () => {
       const fetchMock = stubCreate(201)
       renderPage()
 
-      await fillDialog('webhook', 'NoteClosedChat', 'Name')
+      await fillDialog('Webhook', 'NoteClosedChat', 'Name')
 
       await waitFor(() => expect(fetchMock.mock.calls.some(([, call]) => call?.method === 'POST')).toBe(true))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
@@ -1566,7 +1600,7 @@ describe('StudioPage publishing', () => {
       )
       renderPage()
 
-      await fillDialog('text', 'vi', 'Locale')
+      await fillDialog('Text', 'vi', 'Locale')
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
@@ -1580,7 +1614,7 @@ describe('StudioPage publishing', () => {
       stubCreate(409)
       renderPage()
 
-      await fillDialog('entity', 'CostCentre', 'Name')
+      await fillDialog('Entity', 'CostCentre', 'Name')
 
       expect(await screen.findByText('A resource with this name or locale already exists.')).toBeInTheDocument()
       expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
@@ -1591,7 +1625,7 @@ describe('StudioPage publishing', () => {
       stubCreate(400)
       renderPage()
 
-      await fillDialog('entity', 'Cost Centre', 'Name')
+      await fillDialog('Entity', 'Cost Centre', 'Name')
 
       expect(await screen.findByText(/This name or locale is not allowed/)).toBeInTheDocument()
     })

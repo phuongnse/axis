@@ -18,6 +18,30 @@ export async function openKind(page: Page, kind: string) {
   await expect(page).toHaveURL(new RegExp(`[?&]kind=${kind}(&|$)`))
 }
 
+/** The English singular name of each kind, as the New resource dialog lists it. */
+const kindNames: Record<string, string> = {
+  entity: 'Entity',
+  seed: 'Seed',
+  sequence: 'Sequence',
+  dataSource: 'Data source',
+  migration: 'Migration',
+  site: 'Site',
+  page: 'Page',
+  form: 'Form',
+  process: 'Process',
+  rule: 'Rule',
+  event: 'Event',
+  trigger: 'Trigger',
+  role: 'Role',
+  policy: 'Policy',
+  identityProvider: 'Identity provider',
+  connector: 'Connector',
+  endpoint: 'Endpoint',
+  webhook: 'Webhook',
+  text: 'Text',
+  scenario: 'Scenario',
+}
+
 /**
  * Creates a resource of the kind `kind` through the New resource dialog. It returns once the dialog is gone, the
  * address holds the new resource, and the kind's entry in the sidebar is marked. `value` is typed into the dialog.
@@ -25,7 +49,7 @@ export async function openKind(page: Page, kind: string) {
 export async function createResource(page: Page, kind: string, value: string) {
   await page.getByRole('button', { name: 'New resource…', exact: true }).click()
   const dialog = await waitForDialog(page, 'New resource')
-  await pickOption(dialog.getByRole('combobox', { name: 'Kind', exact: true }), kind)
+  await pickOption(dialog.getByRole('combobox', { name: 'Kind', exact: true }), kindNames[kind] ?? kind)
   await dialog.getByRole('textbox', { name: kind === 'text' ? 'Locale' : 'Name', exact: true }).fill(value)
   const create = dialog.getByRole('button', { name: 'Create', exact: true })
   await expect(create).toBeEnabled()

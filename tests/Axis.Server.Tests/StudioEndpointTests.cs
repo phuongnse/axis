@@ -73,6 +73,28 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Author_lists_the_titles_of_each_resource_and_the_locale_of_a_text_resource()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/resources", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var items = body.RootElement.GetProperty("items").EnumerateArray().ToDictionary(item => item.GetProperty("file").GetString()!);
+        var entity = items[EntityFile];
+        Assert.Equal("Purchase request", entity.GetProperty("titles").GetProperty("en").GetString());
+        Assert.Equal("Yêu cầu mua hàng", entity.GetProperty("titles").GetProperty("vi").GetString());
+        Assert.Equal(JsonValueKind.Null, entity.GetProperty("locale").ValueKind);
+        Assert.Equal("Purchasing", items["sites/purchasing.json"].GetProperty("titles").GetProperty("en").GetString());
+        Assert.Equal("vi", items["texts/vi.json"].GetProperty("locale").GetString());
+        var dataSource = items["data-sources/purchase-request-list.json"];
+        Assert.Empty(dataSource.GetProperty("titles").EnumerateObject());
+        Assert.Equal(JsonValueKind.Null, dataSource.GetProperty("locale").ValueKind);
+    }
+
+    [Fact]
     public async Task Author_lists_the_applications_of_the_folders()
     {
         await using var factory = CreateFactory();

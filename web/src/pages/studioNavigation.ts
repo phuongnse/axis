@@ -1,48 +1,6 @@
 import type { ShellNavigationEntry, ShellNavigationGroup } from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceItem, StudioResourceItem } from '../platform/studio'
-
-/** The Axis icon of each kind, from the closed list in navigationIcons. A null icon shows the page icon. */
-const kindIcons: Readonly<Record<string, string | null>> = {
-  entity: 'folder',
-  seed: 'inbox',
-  sequence: 'list',
-  dataSource: 'device',
-  migration: 'tool',
-  site: 'home',
-  page: 'document',
-  form: 'form',
-  process: 'process',
-  rule: 'tasks',
-  event: 'calendar',
-  trigger: 'clock',
-  role: 'people',
-  policy: 'tasks',
-  identityProvider: 'person',
-  connector: 'support',
-  endpoint: 'device',
-  webhook: 'mail',
-  text: 'document',
-  scenario: 'tasks',
-  contract: null,
-  layer: null,
-}
-
-const kindGroups: readonly (readonly [string, readonly string[]])[] = [
-  ['data', ['entity', 'seed', 'sequence', 'dataSource', 'migration']],
-  ['pages', ['site', 'page', 'form']],
-  ['logic', ['process', 'rule', 'event', 'trigger']],
-  ['access', ['role', 'policy', 'identityProvider']],
-  ['integration', ['connector', 'endpoint', 'webhook']],
-  ['texts', ['text']],
-  ['tests', ['scenario']],
-]
-
-const groupedKinds = new Set(kindGroups.flatMap(([, kinds]) => kinds))
-
-/** The plural name of a kind in the UI locale, or the kind itself when the kind has no name. */
-export function kindName(kind: string, t: (key: string) => string): string {
-  return Object.hasOwn(kindIcons, kind) ? t(`shell.studio.nav.kind.${kind}`) : kind
-}
+import { kindGroup, kindGroupNames, kindName, studioKind, studioKinds } from '../platform/studioKinds'
 
 /**
  * The sidebar entries of an open application, in the order that docs/reference/studio-workspace.md#workspace gives.
@@ -62,7 +20,7 @@ export function studioNavigation(
   const kindEntry = (kind: string): ShellNavigationEntry => ({
     key: `kind:${kind}`,
     path: path({ kind }),
-    icon: Object.hasOwn(kindIcons, kind) ? kindIcons[kind] : null,
+    icon: studioKind(kind)?.icon ?? null,
     label: kindName(kind, t),
   })
   const policyMatrix: ShellNavigationEntry = {
@@ -85,8 +43,10 @@ export function studioNavigation(
     })
   }
 
-  for (const [name, members] of kindGroups) {
-    const groupEntries = members.filter((kind) => kinds.has(kind)).map(kindEntry)
+  for (const name of kindGroupNames.filter((group) => group !== 'other')) {
+    const groupEntries = studioKinds
+      .filter((entry) => entry.group === name && kinds.has(entry.kind))
+      .map((entry) => kindEntry(entry.kind))
     if (name === 'access') {
       groupEntries.push(policyMatrix)
     }
@@ -95,7 +55,7 @@ export function studioNavigation(
     }
   }
 
-  const other = [...kinds].filter((kind) => kind !== 'application' && !groupedKinds.has(kind)).sort()
+  const other = [...kinds].filter((kind) => kind !== 'application' && kindGroup(kind) === 'other').sort()
   if (other.length > 0) {
     entries.push({ key: 'group:other', label: t('shell.studio.nav.group.other'), entries: other.map(kindEntry) })
   }
