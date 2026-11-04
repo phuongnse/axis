@@ -4,7 +4,7 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the two read routes and the quotas route of the
+Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes and the job read of the
 [provisioning API](#provisioning-api), the job runner for suspend and resume described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
@@ -34,7 +34,7 @@ implementation.
   counts only on the console host, and a tenant's session never counts there. Every write through a session
   needs the CSRF header, as the other session routes do. A write with a bearer token needs none, because a browser cannot
   attach a bearer token on its own.
-- **Jobs.** _(planned for M31)_ A route that changes a tenant answers `202` with a job: `{ "id", "kind", "tenantId",
+- **Jobs.** A route that changes a tenant answers `202` with a job: `{ "id", "kind", "tenantId",
   "state", "createdAt" }`. The [publisher](administration.md#publisher) runs the job with the same
   code as the `Axis.Admin` command, over the schema role. `GET /api/cell/jobs/{id}` answers the job,
   with `state` `queued`, `running`, `succeeded` or `failed`, its steps, and the error of a failed
@@ -42,9 +42,14 @@ implementation.
   The `platform.jobs` table and the runner in the publisher are built for the `suspend` and `resume` kinds, each with one
   `status` step. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
-  The routes that queue a job, the other kinds and the run again of a failed job are _(planned for M31)_.
-- **Idempotency.** _(planned for M31)_ Each `POST` needs an `Idempotency-Key` header. The same key with the same body
-  answers the first job again for 24 hours. The same key with another body answers `422`.
+  The `suspend` and `resume` routes and the job read are built: the server only queues the job, over the platform reader role,
+  which may insert into `platform.jobs` and nothing else there, and answers `202` with a `Location` header of `/api/cell/jobs/{id}`.
+  The job's actor is the operator's id, the subject of the token or the session. The routes for the other kinds and the run again of a
+  failed job are _(planned for M31)_.
+- **Idempotency.** Each `POST` that queues a job needs an `Idempotency-Key` header of 1 to 255 characters, and the answer is `400`
+  without one, with no job queued. The same key with the same request answers the first job again for 24 hours. The request is the kind,
+  the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.
+  A key is shared across the cell, not kept for each caller. A lock on the key keeps two parallel retries from queuing two jobs.
 - **Audit.** Each job writes one platform audit record when it ends, with the operator or the
   machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend` and `resume` is built: it writes the
   record in the same transaction as the job's final state, whether the job succeeded or failed, with the command name of the
@@ -58,8 +63,8 @@ implementation.
 | `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application` and `hosts`, read from the platform tables. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. Usage, quotas and failed work counts, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
 | `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
-| `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does. |
-| `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does. |
+| `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does, through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`. |
+| `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does, through a job. It answers as `suspend` does. |
 | `POST /api/cell/tenants/{id}/read-only` | _(planned for M33)_ Makes a tenant read-only, as [`tenant read-only`](tenant-status-commands.md#tenant-read-only) does. `resume` ends it. |
 | `GET /api/cell/tenants/{id}/administrators` | _(planned for M33)_ Lists the accounts that hold the [administrator role](user-administration.md#the-administrator-role) in the tenant's realm: email, display name and language. The [control plane](control-plane.md) mails them. |
 | `PUT /api/cell/tenants/{id}/quotas` | Sets or clears the tenant's quota rows, see [quotas](tenant-quotas.md#quotas). The body is `{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }`. A set value of `null` is no limit, a removed key goes back to the cell's default, and a key the body does not name stays as it is. It applies at once, with no job, and answers `200` with the tenant's `quotas` as the tenant read does. An unknown key, a negative value, a key both set and removed, or a body that names no key answers `400` and writes nothing. An unknown tenant id or a preview tenant's id answers `404`. It writes the rows and one [platform audit record](tenant-setting-commands.md#platform-audit-records), `tenant quotas set`, in one transaction, over the schema role: the server opens a connection for the write alone and keeps none in a pool. The hosts apply the new values at their next `Tenancy:RefreshInterval`. |
@@ -68,7 +73,7 @@ implementation.
 | `GET /api/cell/tenants/{id}/exports/{exportId}` | Answers the export, and its download while it is kept. |
 | `DELETE /api/cell/tenants/{id}` | Schedules the deletion, see [deleting a tenant](#deleting-a-tenant). |
 | `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window. |
-| `GET /api/cell/jobs/{id}` | Answers a job. |
+| `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
 ## Creating a tenant
 
