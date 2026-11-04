@@ -20,7 +20,7 @@ interface ResourceItem {
   version: string
 }
 
-test.describe('an author publishes a module application on the journey tenant and a manager is refused its contract', () => {
+test.describe('an author publishes a module application on the journey tenant, a manager is refused its contract, and a relaxed release approves the next budget', () => {
   test.describe.configure({ mode: 'serial' })
 
   // The Engineering record of the sample seeds, which the department-budgets contract scenarios name.
@@ -276,5 +276,67 @@ test.describe('an author publishes a module application on the journey tenant an
       ]),
     })
     expect(response.status(), await response.text()).toBe(403)
+  })
+
+  test('an author relaxes the approve point and publishes, and Studio and the console mark the release off-standard', async ({
+    page,
+  }) => {
+    const stamp = Date.now().toString(36)
+    const label = `Relaxed ${stamp}`
+    const point = 'Budget/transitions/approve'
+    const reason = `Approvers decide alone ${stamp}`
+
+    await useJourneySession(page, 'author')
+    await page.goto(`${journeyURL}/studio?app=${name}`)
+    await page
+      .getByTestId('studio-group-module-contracts')
+      .getByRole('button', { name: 'department-budgets/BudgetContract', exact: true })
+      .click()
+    await page.getByTestId(`studio-contract-relax-${point}`).click()
+    const dialog = await waitForDialog(page)
+    await dialog.getByRole('textbox', { name: 'Reason', exact: true }).fill(reason)
+    await confirmDialog(page, 'Relax')
+    await expect(page.getByTestId(`studio-contract-relaxed-${point}`)).toBeVisible()
+
+    await publishWithLabel(page, label)
+    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+      timeout: 120_000,
+    })
+    const row = page.getByTestId('studio-release-row').filter({ hasText: label })
+    await expect(row).toHaveAttribute('data-off-standard', 'true')
+    await expect(row.getByTestId('release-off-standard')).toHaveText('Off-standard')
+    await expect(row.getByTestId('release-relaxed-point')).toContainText('department-budgets')
+    await expect(row.getByTestId('release-relaxed-point')).toContainText(point)
+    await expect(row.getByTestId('release-relaxed-point')).toContainText(reason)
+    await expect(page.locator('[data-theme-mode="light"]').first()).toBeVisible()
+
+    await useJourneySession(page, 'platform-operator')
+    await page.goto(`${journeyURL}/console`)
+    const publishing = page.getByTestId('console-publishing')
+    await publishing.getByRole('combobox', { name: 'Application', exact: true }).click()
+    // A selected application shares its title with the option, and the dropdown renders last.
+    await page.getByTitle(name, { exact: true }).last().click()
+    await expect(publishing.getByTestId('console-publishing-releases')).toContainText('#')
+    const consoleRow = page.getByTestId('console-publishing-releases').getByRole('row').filter({ hasText: label })
+    await expect(consoleRow.getByTestId('release-off-standard')).toHaveText('Off-standard')
+    await expect(consoleRow.getByTestId('release-relaxed-point')).toContainText('department-budgets')
+    await expect(consoleRow.getByTestId('release-relaxed-point')).toContainText(point)
+    await expect(consoleRow.getByTestId('release-relaxed-point')).toContainText(reason)
+    await expect(page.locator('[data-theme-mode="light"]').first()).toBeVisible()
+  })
+
+  test('a manager starts the approval on a new budget after the relaxed release, and the budget reads approved', async ({
+    page,
+  }) => {
+    await useJourneySession(page, 'manager')
+    const { budget, id } = await createBudget(page)
+    await start(page, id)
+
+    await expect(async () => {
+      await page.goto(`${journeyURL}/${sitePath}/department-budgets/budgets`)
+      await expect(page.getByRole('row', { name: new RegExp(`${budget}.*approved`, 'i') })).toBeVisible({
+        timeout: 2_000,
+      })
+    }).toPass({ timeout: 30_000 })
   })
 })
