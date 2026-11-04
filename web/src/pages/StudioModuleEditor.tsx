@@ -2,10 +2,12 @@ import { Alert, Button, Flex, Modal, Tag } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
+import { entityKeyedLists, layerMarks } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   deleteStudioResource,
   fetchStudioModuleResource,
+  resetStudioModuleElement,
   saveStudioModuleResource,
   ServerUnreachableError,
   type ModuleResourceItem,
@@ -24,14 +26,18 @@ type Content = Record<string, unknown>
 interface Loaded {
   content: Content
   layer: StudioModuleLayer | null
+  marks: StudioModuleResource['marks']
+  removed: StudioModuleResource['removed']
 }
 
 /**
  * An editor of a module resource, for the `entity` kind now. The resource opens with the application's layer applied
  * and every input on. Save sends the whole entity to the module save route, which writes only the difference as the
- * layer. When the resource has a layer, a Customized tag and Reset all show, which delete the layer file. There is no
- * JSON view, no Delete and no migration questions. `onWritten` reports the folder's diagnostics after a save or a Reset
- * all, with the layer the write added to the folder's list or the id of the layer it removed.
+ * layer. When the resource has a layer, a Customized tag and Reset all show, which delete the layer file, and the
+ * designer marks the elements the layer added, changed or removed, each with Reset to module, which undoes that one
+ * element on the server. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
+ * diagnostics after a save, a Reset all or a Reset to module, with the layer the write added to the folder's list or the
+ * id of the layer it removed.
  */
 export function StudioModuleEditor({
   application,
@@ -58,7 +64,12 @@ export function StudioModuleEditor({
   /** Takes a read as what was loaded. Unless `force`, a draft with unsaved edits stays. */
   function adopt(resource: StudioModuleResource, force: boolean) {
     const previous = loadedRef.current
-    const next = { content: resource.content, layer: resource.layer }
+    const next = {
+      content: resource.content,
+      layer: resource.layer,
+      marks: resource.marks,
+      removed: resource.removed,
+    }
     loadedRef.current = next
     setLoaded(next)
     setLoadFailed(false)
@@ -204,6 +215,40 @@ export function StudioModuleEditor({
     }
   }
 
+  /** Undoes the layer's change to one element on the server, keeps the rest of the layer and reads the resource again. */
+  async function resetElement(list: string, key: string) {
+    const layer = loaded!.layer
+    if (layer === null) {
+      return
+    }
+    setResetting(true)
+    setSaveError(null)
+    try {
+      const result = await resetStudioModuleElement(application, item.module, item.id, layer.version, list, key)
+      if (result.status === 'conflict') {
+        setConflict(true)
+        return
+      }
+      if (result.status === 'refused') {
+        setSaveError(result.title !== '' ? result.title : t('shell.studio.saveFailed'))
+        return
+      }
+      setSaved(false)
+      if (await reload()) {
+        onWritten(result.diagnostics, result.file === null ? { removedId: layer.id } : {})
+      }
+    } catch (error) {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+      } else {
+        console.warn(`Resetting an element of the module resource '${item.id}' failed`, error)
+        setSaveError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.saveFailed'))
+      }
+    } finally {
+      setResetting(false)
+    }
+  }
+
   return (
     <Flex vertical gap="middle">
       {loaded.layer !== null && (
@@ -219,7 +264,19 @@ export function StudioModuleEditor({
           </AxisButton>
         </Flex>
       )}
-      <EntityDesigner value={draft} onChange={change} />
+      <EntityDesigner
+        value={draft}
+        onChange={change}
+        layer={
+          loaded.layer === null
+            ? undefined
+            : {
+                elements: layerMarks(loaded.content, loaded.marks, loaded.removed, entityKeyedLists),
+                disabled: patch.length > 0 || saving || resetting || reconnecting || conflict,
+                onReset: (list, key) => void resetElement(list, key),
+              }
+        }
+      />
       {conflict && (
         <Alert
           data-testid="studio-conflict"

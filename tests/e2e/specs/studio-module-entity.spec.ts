@@ -80,6 +80,47 @@ test.describe("Studio edits a module entity as a layer", () => {
     );
   });
 
+  test("an author adds a field, sees it marked Added, and Reset to module removes it and the layer", async ({
+    page,
+  }) => {
+    const layerFile = path.join(
+      copy,
+      "customizations",
+      "organization",
+      "Department.json",
+    );
+    await useSession(page, "author");
+    await page.goto(`${server.url}/studio?app=LeaveRequests`);
+
+    await page
+      .getByTestId("studio-group-module-entities")
+      .getByRole("button", { name: "organization/Department", exact: true })
+      .click();
+    await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
+
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
+    await page
+      .getByTestId("studio-field-/fields/5/name")
+      .getByRole("textbox")
+      .fill("costCentre");
+    await page.getByTestId("studio-save").click();
+
+    await expect(page.getByTestId("studio-saved")).toBeVisible();
+    await expect(
+      page.getByRole("note", { name: "Added costCentre", exact: true }),
+    ).toBeVisible();
+
+    await page
+      .getByRole("button", { name: "Reset to module costCentre", exact: true })
+      .click();
+
+    await expect(page.getByTestId("studio-field-/fields/5")).toHaveCount(0);
+    await expect(page.getByTestId("studio-module-layer")).toHaveCount(0);
+    await expect(access(layerFile)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   test("a requester sees the forbidden page and cannot write a module resource", async ({
     page,
   }) => {
