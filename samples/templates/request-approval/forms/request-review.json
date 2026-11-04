@@ -6,6 +6,7 @@
   "entity": "Request",
   "sections": [
     {
+      "name": "request",
       "title": {
         "textKey": "request.sections.request"
       },
@@ -33,6 +34,7 @@
       ]
     },
     {
+      "name": "decision",
       "title": {
         "textKey": "request.sections.decision"
       },

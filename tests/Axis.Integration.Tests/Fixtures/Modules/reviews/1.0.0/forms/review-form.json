@@ -4,5 +4,5 @@
   "name": "ReviewForm",
   "formatVersion": 1,
   "entity": "Review",
-  "sections": [{ "title": { "textKey": "reviews.review" }, "fields": [{ "field": "title" }] }]
+  "sections": [{ "name": "review", "title": { "textKey": "reviews.review" }, "fields": [{ "field": "title" }] }]
 }

@@ -120,7 +120,7 @@ public sealed class ModuleTaskAssigneeTests
                 """)
             .With("approvals/1.0.0/forms/ApprovalForm.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c24", "kind": "form", "name": "ApprovalForm", "formatVersion": 1, "entity": "Approval",
-                  "sections": [ { "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
+                  "sections": [ { "name": "approval", "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
                 """)
             .With("approvals/1.0.0/processes/Review.json", $$"""
                 { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "formatVersion": 1,
@@ -157,7 +157,7 @@ public sealed class ModuleTaskAssigneeTests
                 """)
             .With("forms/InvoiceForm.json", """
                 { "id": "44444444-4444-4444-8444-444444444412", "kind": "form", "name": "InvoiceForm", "formatVersion": 1, "entity": "Invoice",
-                  "sections": [ { "title": { "textKey": "invoice.title" }, "fields": [ { "field": "number" } ] } ] }
+                  "sections": [ { "name": "title", "title": { "textKey": "invoice.title" }, "fields": [ { "field": "number" } ] } ] }
                 """);
     }
 }

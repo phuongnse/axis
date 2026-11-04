@@ -178,7 +178,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
                 """)
             .With("forms/workstation-setup.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "form", "name": "WorkstationSetup", "formatVersion": 1, "entity": "Workstation",
-                  "sections": [ { "title": { "textKey": "setup.main" }, "fields": [ { "field": "name", "readOnly": true }, { "field": "software", "readOnly": true }, { "field": "note", "visibleWhen": "count(software) > 0" } ] } ] }
+                  "sections": [ { "name": "main", "title": { "textKey": "setup.main" }, "fields": [ { "field": "name", "readOnly": true }, { "field": "software", "readOnly": true }, { "field": "note", "visibleWhen": "count(software) > 0" } ] } ] }
                 """)
             .With("processes/setup.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "process", "name": "Setup", "formatVersion": 1, "entity": "Workstation",

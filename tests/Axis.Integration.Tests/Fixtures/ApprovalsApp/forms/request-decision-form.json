@@ -6,6 +6,7 @@
   "entity": "approvals/Request",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "decide.main" },
       "fields": [{ "field": "title" }]
     }

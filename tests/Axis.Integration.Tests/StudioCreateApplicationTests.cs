@@ -435,7 +435,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                   "name": "Broken",
                   "formatVersion": 1,
                   "entity": "NoSuchEntity",
-                  "sections": [{ "title": { "textKey": "pages.home.title" }, "fields": [{ "field": "title" }] }]
+                  "sections": [{ "name": "title", "title": { "textKey": "pages.home.title" }, "fields": [{ "field": "title" }] }]
                 }
                 """);
         }

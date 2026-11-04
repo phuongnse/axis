@@ -6,6 +6,7 @@
   "entity": "Request",
   "sections": [
     {
+      "name": "request",
       "title": { "textKey": "approvals.requestDetail.request" },
       "fields": [
         { "field": "number", "readOnly": true },
@@ -18,6 +19,7 @@
       ]
     },
     {
+      "name": "approvalPath",
       "title": { "textKey": "approvals.requestDetail.approvalPath" },
       "fields": [
         { "field": "stepsRequired", "readOnly": true },

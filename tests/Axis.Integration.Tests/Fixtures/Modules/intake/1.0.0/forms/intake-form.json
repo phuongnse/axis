@@ -6,6 +6,7 @@
   "entity": "Intake",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "intake.intakeForm.title" },
       "fields": [{ "field": "title" }]
     }

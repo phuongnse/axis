@@ -89,7 +89,7 @@ public sealed class FormConditionCompilerTests
     public void Field_condition_that_is_not_boolean_is_reported_at_the_condition(string condition)
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" },
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" },
               "fields": [ { "field": "number" }, { "field": "quantity", "{{condition}}": "number" } ] } ]
             """);
 
@@ -106,7 +106,7 @@ public sealed class FormConditionCompilerTests
     public void Section_condition_that_names_an_unknown_field_is_reported_at_the_condition()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" }, "visibleWhen": "total > 0",
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "visibleWhen": "total > 0",
               "fields": [ { "field": "number" } ] } ]
             """);
 
@@ -123,7 +123,7 @@ public sealed class FormConditionCompilerTests
     public void Condition_that_does_not_parse_is_reported_at_the_condition()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" },
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" },
               "fields": [ { "field": "number", "requiredWhen": "quantity >" } ] } ]
             """);
 
@@ -143,7 +143,7 @@ public sealed class FormConditionCompilerTests
     public void Condition_that_reads_a_field_the_form_does_not_list_is_reported_at_the_condition(string field, string path, string quoted)
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ {{field}} ] } ]
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ {{field}} ] } ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -158,7 +158,7 @@ public sealed class FormConditionCompilerTests
     public void Condition_that_reads_an_unlisted_field_through_outer_is_reported_at_the_condition()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" },
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" },
               "fields": [ { "field": "number", "requiredWhen": "count(lines, amount > outer.quantity) > 0" }, { "field": "lines" } ] } ]
             """);
 
@@ -176,7 +176,7 @@ public sealed class FormConditionCompilerTests
     public void Condition_may_read_a_listed_field_through_outer_and_the_child_row_fields_unlisted()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" },
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" },
               "fields": [ { "field": "number", "requiredWhen": "count(lines, amount > outer.quantity) > 0" },
                           { "field": "lines" }, { "field": "quantity" } ] } ]
             """);
@@ -192,8 +192,8 @@ public sealed class FormConditionCompilerTests
     {
         using var folder = Folder($$"""
             "sections": [
-              { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "lines" } ] },
-              { "title": { "textKey": "orderLayout.details" }, "visibleWhen": "sum(lines, amount) > 1 and number is not null",
+              { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "lines" } ] },
+              { "name": "details", "title": { "textKey": "orderLayout.details" }, "visibleWhen": "sum(lines, amount) > 1 and number is not null",
                 "fields": [ { "field": "note", "requiredWhen": "count(lines) > 0" } ] } ]
             """);
 
@@ -207,7 +207,7 @@ public sealed class FormConditionCompilerTests
     public void Visible_when_on_a_field_the_entity_requires_is_reported_at_the_condition()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" },
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" },
               "fields": [ { "field": "NUMBER", "visibleWhen": "quantity > 0" }, { "field": "quantity", "visibleWhen": "number is not null" } ] } ]
             """);
 
@@ -225,7 +225,7 @@ public sealed class FormConditionCompilerTests
     public void Required_when_and_read_only_when_are_allowed_on_a_field_the_entity_requires()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" },
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" },
               "fields": [ { "field": "number", "requiredWhen": "number is null", "readOnlyWhen": "number is not null" } ] } ]
             """);
 
@@ -326,13 +326,13 @@ public sealed class FormConditionCompilerTests
     }
 
     [Fact]
-    public void Section_in_no_step_and_an_unnamed_section_are_reported_at_the_section_when_steps_exist()
+    public void Sections_in_no_step_are_reported_at_the_section_when_steps_exist()
     {
         using var folder = Folder($$"""
             "sections": [
               {{MainSection}},
               {{DetailsSection}},
-              { "title": { "textKey": "orderLayout.second" }, "fields": [ { "field": "lines" } ] } ],
+              { "name": "second", "title": { "textKey": "orderLayout.second" }, "fields": [ { "field": "lines" } ] } ],
             "steps": [ { "name": "step1", "title": { "textKey": "orderLayout.first" }, "sections": [ "main" ] } ]
             """);
 
@@ -346,15 +346,18 @@ public sealed class FormConditionCompilerTests
     }
 
     [Fact]
-    public void Unnamed_sections_are_fine_without_steps()
+    public void A_section_without_a_name_is_a_schema_violation_at_its_section()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" } ] } ]
+            "sections": [ {{MainSection}},
+              { "title": { "textKey": "orderLayout.details" }, "fields": [ { "field": "note" } ] } ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
-        Assert.Empty(result.Diagnostics);
+        Assert.Contains(result.Diagnostics, diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path) == (DiagnosticCodes.SchemaViolation, FormFile, "/sections/1"));
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Null(result.Model);
     }
 
     [Fact]
@@ -394,7 +397,7 @@ public sealed class FormConditionCompilerTests
     public void Empty_condition_breaks_the_schema()
     {
         using var folder = Folder($$"""
-            "sections": [ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "requiredWhen": "" } ] } ]
+            "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "requiredWhen": "" } ] } ]
             """);
 
         var result = ApplicationCompiler.Compile(folder.Path);

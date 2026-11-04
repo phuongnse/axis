@@ -62,7 +62,7 @@
     "section": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["title", "fields"],
+      "required": ["name", "title", "fields"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "title": { "$ref": "#/$defs/textReference" },

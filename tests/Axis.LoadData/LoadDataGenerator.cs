@@ -223,6 +223,7 @@ public static class LoadDataGenerator
                     {
                         new
                         {
+                            name = "main",
                             title = Label($"entity{i:D2}.section"),
                             fields = new[]
                             {

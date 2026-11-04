@@ -688,6 +688,7 @@ test.describe('the author builds the service desk with Studio only', () => {
             .last()
             .click()
         }
+        await page.getByTestId(`studio-field-/sections/${sectionIndex}/name`).getByRole('textbox').fill(section.name!)
         const titleKey = section.title.textKey
         await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, titleKey, en[titleKey])
         for (const [fieldIndex, field] of section.fields.entries()) {

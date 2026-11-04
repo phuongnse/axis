@@ -6,10 +6,12 @@
   "entity": "Note",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "noteSections.main" },
       "fields": [{ "field": "title", "width": 8 }, { "field": "code", "readOnly": true, "width": 4 }]
     },
     {
+      "name": "details",
       "title": { "textKey": "noteSections.details" },
       "fields": [{ "field": "priority" }]
     }

@@ -17,8 +17,6 @@ public sealed class ListKeyTests
     // No layer targets an application or a scenario.
     private static readonly string[] _untargeted = [ResourceKinds.Application, ResourceKinds.Scenario];
 
-    private static readonly string[] _pendingKinds = [ResourceKinds.Form];
-
     [Fact]
     public void Every_object_list_in_the_schemas_agrees_with_the_table()
     {
@@ -69,49 +67,6 @@ public sealed class ListKeyTests
         var problems = Problems(ResourceKinds.Entity, schema, Keyed("name"));
 
         Assert.Equal(["entity: things is keyed by name, but an object item does not require it"], problems);
-    }
-
-    [Fact]
-    public void A_pending_entry_in_a_kind_other_than_form_is_reported()
-    {
-        var schema = Parse("""
-            {
-              "type": "object",
-              "properties": { "things": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" } } } } }
-            }
-            """);
-
-        var problems = Problems(ResourceKinds.Page, schema, Pending);
-
-        Assert.Equal(["page: things is pending, which only a form list may be"], problems);
-    }
-
-    [Fact]
-    public void A_pending_entry_whose_object_items_already_require_the_key_is_reported()
-    {
-        var schema = Parse("""
-            {
-              "type": "object",
-              "properties": { "things": { "type": "array", "items": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } } } }
-            }
-            """);
-
-        var problems = Problems(ResourceKinds.Form, schema, Pending);
-
-        Assert.Equal(["form: things is pending, but its items already require name, so key it"], problems);
-    }
-
-    [Fact]
-    public void A_pending_entry_is_accepted_while_an_object_item_does_not_require_the_key()
-    {
-        var schema = Parse("""
-            {
-              "type": "object",
-              "properties": { "things": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" } } } } }
-            }
-            """);
-
-        Assert.Empty(Problems(ResourceKinds.Form, schema, Pending));
     }
 
     [Fact]
@@ -179,6 +134,9 @@ public sealed class ListKeyTests
 
         Assert.True(ListKeys.TryGet(ResourceKinds.Process, "escalations", out var escalations));
         Assert.Equal(new ListKey(ListKeyMode.Keyed, "name"), escalations);
+
+        Assert.True(ListKeys.TryGet(ResourceKinds.Form, "sections", out var sections));
+        Assert.Equal(new ListKey(ListKeyMode.Keyed, "name", true), sections);
     }
 
     [Fact]
@@ -195,8 +153,6 @@ public sealed class ListKeyTests
 
     private static Func<string, string, ListKey?> Keyed(string key) =>
         (_, _) => new ListKey(ListKeyMode.Keyed, key);
-
-    private static ListKey? Pending(string kind, string property) => new ListKey(ListKeyMode.Pending, null);
 
     /// <summary>Walks a schema and lists where its object lists and the table disagree.</summary>
     private static List<string> Problems(string kind, JsonElement root, Func<string, string, ListKey?> lookup)
@@ -284,17 +240,6 @@ public sealed class ListKeyTests
                     if (objectItems.Any(item => !Requires(item, entry.Key!)))
                     {
                         problems.Add($"{kind}: {property} is keyed by {entry.Key}, but an object item does not require it");
-                    }
-
-                    break;
-                case ListKeyMode.Pending:
-                    if (!_pendingKinds.Contains(kind))
-                    {
-                        problems.Add($"{kind}: {property} is pending, which only a form list may be");
-                    }
-                    else if (objectItems.All(item => Requires(item, "name")))
-                    {
-                        problems.Add($"{kind}: {property} is pending, but its items already require name, so key it");
                     }
 
                     break;
