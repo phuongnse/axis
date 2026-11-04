@@ -13,6 +13,32 @@ of the review.
 In a merge of `main`, a conflict keeps the prototype. `main` is still the standard for behaviour, so its logic is never
 changed to suit the prototype, and any of it that keeping the prototype loses is brought into the prototype's files.
 
+## State and how to continue
+
+Last updated 2026-11-04. The review is open; the owner is reviewing it one step at a time.
+
+- **Done:** the kind lists (one table, standard table steps 1 to 3, a table with too little room); the entity designer's
+  sections, `AxisField` with required help, the required mark, the Publish dialog's fields, the relaxed points in the Modules
+  table, and step 2, the field drawer in groups with the rules at the field. The last commit before this note is 09b31849.
+- **Waiting:** the owner's verdict on step 2, the field drawer.
+- **Next, in order:**
+  1. Step 3: Add field opens a choice of type first, a grid of the types, each with an icon and one line, then the drawer.
+  2. Step 4: the entity's Validations section as `AxisField` boxes like the drawer's rules, with a Field column or label,
+     and Indexes the same way.
+  3. Then the review's End, as the `axis-design` skill says: one docs change, the tag, one NexKit issue.
+- **To pick it up on another machine:**
+  - `git fetch && git switch design/2026-11-04-entities`, then `scripts/setup.sh` once and `scripts/dev.sh`.
+  - A Keycloak container made before #2794 refuses the realm sync (`axis-fapi`, "DPoP token is disabled") and the server
+    stops at start: run `docker compose up -d --force-recreate keycloak` once.
+  - A change to `src/Axis.Presentation/Texts/*.json` needs a restart of `scripts/dev.sh`: `dotnet watch` does not embed it
+    again.
+  - Studio's development user is `author`, password `axis`, and a code from the `otp` secret of `author` in
+    `samples/keycloak/axis-realm.json`.
+  - To see a relaxed point, relax one on a contract's page; it rewrites the sample's `application.json`, which is never
+    committed: `git checkout samples/apps/purchase-requests/application.json` afterwards.
+  - The text files have some duplicate keys from an earlier merge, such as `shell.licences.axis`; edit them as lines, as a
+    JSON round trip drops the duplicates.
+
 ## Agreed changes
 
 ### One list for every kind
