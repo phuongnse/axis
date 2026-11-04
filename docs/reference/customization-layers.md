@@ -256,12 +256,14 @@ applied, its marks and its removed elements, its [save route](module-resource-sa
 and the module process editor are built, with their Customized tag, **Reset all**, the element marks and
 **Reset to module**. The module process opens in the [process designer](process-designer.md), and
 its marks and resets are on steps. A module text opens in the text table with the layer applied, with Added and Changed marks on
-its keys, **Reset to module** and **Reset all**. The editors of the other kinds are _(planned for M25)_.
+its keys, **Reset to module** and **Reset all**. A module contract opens in its contract editor, where the author adds and removes
+the application's own states and transitions, marked **Added**, and **Save** writes the contract's layer. The editors of the other kinds are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.
-  Module scenarios stay read-only, and a contract shows read-only with its added states and
-  transitions, see [module contracts in Studio](module-contracts.md#in-studio).
+  Module scenarios stay read-only. A contract opens in its editor: the author adds and removes the
+  application's own states and transitions, marked **Added**, and the module's own stay read-only. **Save**
+  writes the contract's layer, see [module contracts in Studio](module-contracts.md#in-studio).
   A kind with no editor yet opens read-only, as its file's content in JSON.
 - **Marks.** An element the layer added shows **Added**, one it changed **Changed**, and the
   editor's header shows that the resource has a layer. A removed element stays listed as **Removed**

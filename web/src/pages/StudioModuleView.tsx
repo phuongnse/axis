@@ -34,13 +34,15 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
 }
 
 /**
- * The view of a module resource, by its kind. An entity, a process and a text are edited as a layer, a policy, contract and page
- * have their own read-only view, and any other kind, scenarios included, opens in the read-only JSON view.
+ * The view of a module resource, by its kind. An entity, a process and a text are edited as a layer, and so are the
+ * states and transitions that a contract takes from the application. A policy and a page have their own read-only view,
+ * and any other kind, scenarios included, opens in the read-only JSON view. `diagnostics` are the folder's.
  */
 export function ModuleResourceView({
   application,
   item,
   manifest,
+  diagnostics,
   onModuleWritten,
   onManifestSaved,
   onManifestStale,
@@ -48,6 +50,7 @@ export function ModuleResourceView({
   application: string
   item: ModuleResourceItem
   manifest?: StudioResource
+  diagnostics: StudioDiagnostic[]
   onModuleWritten: (diagnostics: StudioDiagnostic[], layer: { added?: StudioResourceItem; removedId?: string }) => void
   onManifestSaved: (manifest: StudioResource, diagnostics: StudioDiagnostic[]) => void
   onManifestStale: () => void
@@ -66,6 +69,8 @@ export function ModuleResourceView({
           module={item.module}
           id={item.id}
           manifest={manifest}
+          diagnostics={diagnostics}
+          onWritten={onModuleWritten}
           onManifestSaved={onManifestSaved}
           onManifestStale={onManifestStale}
         />
