@@ -25,6 +25,8 @@ export interface SiteMetadata {
   navigation: NavigationItem[]
   /** The lower-case path of the site whose own host serves the SPA, or `null` or missing when the host belongs to no site. */
   hostSite?: string | null
+  /** The tenant's privacy and terms links, or `null` or missing when it sets neither. */
+  legal?: SiteLegal | null
 }
 
 /** The application of a listed site, with its title and description per locale it has texts for. */
@@ -76,6 +78,8 @@ export interface ApplicationSite {
   navigation: { page: string; labelKey: string; icon?: string | null }[]
   /** The address of the application's notification routes. */
   notificationsPath?: string | null
+  /** The site's own links, or else its tenant's, or `null` or missing when neither sets any. */
+  legal?: SiteLegal | null
 }
 
 /** A field type as written in entity files. */

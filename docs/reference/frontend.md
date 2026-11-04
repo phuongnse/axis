@@ -149,9 +149,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   `GET /api/texts/{locale}`. The home page and the app switcher also use `GET /api/sites` (see
   Application sites below) to list the tenant's sites. When it answers `401`,
   the home page starts sign-in at once, see [platform home page](shell.md#platform-home-page).
-  - `GET /api/site` returns the site name, its title key, the locales
-    (default, fallback and available) and the navigation items. Navigation
-    labels are text keys, never literal text. Each navigation item has an `icon`.
+  - `GET /api/site` returns the site name, its title key, the locales (default, fallback and available), the
+    navigation items and `legal`, the tenant's `{ "privacyUrl", "termsUrl" }` or `null`, see
+    [legal settings](legal.md#legal-settings). Navigation labels are text keys, never literal text. Each navigation item has an `icon`.
   - `GET /api/texts/{locale}` returns a flat map from text key to text for
     one locale. A locale without texts gets a 404 problem response.
   - The platform site offers English (`en`, default and fallback) and
@@ -165,8 +165,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Method and path | Response |
   | --- | --- |
-  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "descriptions", "application": { "name", "titles", "descriptions" } } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. `descriptions` holds the text of the `description` for each locale, the site's for its available locales and the application's for each locale it has texts for, or is `null` when there is no description, see [descriptions](shell.md#application-and-site-descriptions). |
-  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath" }`. `icon` is an Axis icon name, or `null` for an entry with none |
+  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "descriptions", "application": { "name", "titles", "descriptions" }, "legal" } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. `descriptions` holds the text of the `description` for each locale, the site's for its available locales and the application's for each locale it has texts for, or is `null` when there is no description, see [descriptions](shell.md#application-and-site-descriptions). |
+  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath", "legal" }`. `icon` is an Axis icon name, or `null` for an entry with none. `legal` is `{ "privacyUrl", "termsUrl" }`, the site's own links or else its tenant's, or `null` when neither sets any, as in the list |
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
   | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below. The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts |
 

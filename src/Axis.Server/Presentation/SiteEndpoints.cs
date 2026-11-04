@@ -17,7 +17,7 @@ namespace Axis.Server.Presentation;
 /// metadata lists only the fields, actions and access the user's grants allow. A session that came through a provider the
 /// site does not allow answers 401 on the site, its texts and its pages, after the 401 for no session and before any 404.
 /// A tenant without site clients checks nothing. The list of sites holds only the sites that allow that provider, and gives each
-/// its privacy and terms links as <c>legal</c>: the site's own, else the tenant's, else null. The texts endpoint
+/// its privacy and terms links as <c>legal</c>: the site's own, else the tenant's, else null. A single site gives the same <c>legal</c>. The texts endpoint
 /// answers the texts of the active release, or of any stored release of the site's application when
 /// it is given a <c>release</c> id, so a task page can show the texts of the release it started on.
 /// A page of a module is written <c>{module id}/{page name}</c>, as two path segments, for example
@@ -50,7 +50,7 @@ internal static class SiteEndpoints
             return Results.Ok(new SiteList(items));
         });
 
-        sites.MapGet("/{path}", async (HttpContext context, string path, ActiveApplicationResolver resolver, SiteSignIn signIn, ITenantContextAccessor tenants, CancellationToken cancellationToken) =>
+        sites.MapGet("/{path}", async (HttpContext context, string path, ActiveApplicationResolver resolver, SiteSignIn signIn, ITenantContextAccessor tenants, ITenantCatalog catalog, CancellationToken cancellationToken) =>
         {
             if (await CurrentUsers.FindAsync(context) is not { } user)
             {
@@ -74,7 +74,9 @@ internal static class SiteEndpoints
                 .Where(entry => PageAccess.CanRead(active.Application, user.RolesIn(active.Application), active.Application.Pages.First(page => page.Id == entry.Page.Id)))
                 .Select(entry => entry.Page.Name)
                 .ToHashSet(StringComparer.Ordinal);
-            return Results.Ok(site with { Navigation = [.. site.Navigation.Where(item => readable.Contains(item.Page))] });
+            var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");
+            var legal = catalog.Find(tenant.TenantId)?.Legal?.ForSite(site.Path) is { } links ? new SiteListLegal(links.PrivacyUrl, links.TermsUrl) : null;
+            return Results.Ok(site with { Navigation = [.. site.Navigation.Where(item => readable.Contains(item.Page))], Legal = legal });
         });
 
         sites.MapGet("/{path}/texts/{locale}", async (HttpContext context, string path, string locale, string? release, ActiveApplicationResolver resolver, SiteSignIn signIn, ITenantContextAccessor tenants, CancellationToken cancellationToken) =>

@@ -58,7 +58,8 @@ _(planned for M31)_.
   [D129](../decisions/d129-rules-from-the-studio-editors-review.md). On the left it reads "© <year> Axis", then " · v<version>" for a
   signed-in person only, as in "© 2026 Axis · v0.1.0". It shows no server status, and a page that cannot reach the
   server says so where it fails. The legal links take the right,
-  as the [legal line](legal.md#legal-line) says. An anonymous visitor
+  as the [legal line](legal.md#legal-line) says. They come from the `legal` of the site the shell shows: the tenant's on
+  a platform page, and an application site's own or else its tenant's. Licences links to `/licences` every time. An anonymous visitor
   never sees the version, because it tells an attacker which known weaknesses to try. The footer
   has `spacing-xs` padding above and below and `spacing-lg` at its sides. Its text is in `textMuted`. In a design system preview, each state's
   frame shows the whole shell, from the header to the footer.
