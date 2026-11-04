@@ -169,6 +169,10 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:SchemaConnectionString", ConnectionString(TenantA));
             builder.UseSetting("Tenants:a:Bindings:Files:Kind", "storage");
             builder.UseSetting("Tenants:a:Bindings:Files:Value", "database");
+            builder.UseSetting("Tenants:a:Legal:PrivacyUrl", "https://a.example.test/privacy");
+            builder.UseSetting("Tenants:a:Legal:TermsUrl", "https://a.example.test/terms");
+            builder.UseSetting("Tenants:a:Legal:TermsVersion", "2026-11-01");
+            builder.UseSetting("Tenants:a:Legal:Sites:second:PrivacyUrl", "https://a.example.test/second-privacy");
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(ConnectionString(TenantB)));
             builder.UseSetting("Tenants:b:SchemaConnectionString", ConnectionString(TenantB));

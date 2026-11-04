@@ -1,9 +1,9 @@
 import { Alert, ConfigProvider, Flex, Form } from 'antd'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { antLocaleFor } from './antLocale'
-import { AxisButton } from './AxisButton'
+import { AxisActionRow, AxisButton } from './AxisButton'
 import { useCanvasActions } from './canvasActions'
 import { formStatePath } from './formState'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
@@ -32,6 +32,11 @@ interface FormWidgetProps {
 }
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
+
+/** The footer of a form the user cannot save: it has no solid button, so no action is a text button (D128). */
+function FooterRow({ children }: { children: ReactNode }) {
+  return <Flex gap="small">{children}</Flex>
+}
 
 /**
  * Creates or edits one record of the widget's entity. A widget that names a form shows the form's
@@ -277,6 +282,8 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return <Alert data-testid="form-load-error" type="error" title={t('shell.form.loadFailed')} />
   }
 
+  // The footer is an action row only where it draws a solid button. Without one, a main action stays outlined (D128).
+  const Row = !steps.last || canSave ? AxisActionRow : FooterRow
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
       <Flex vertical gap="middle">
@@ -300,7 +307,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
         {/* Enter acts as Next on a step before the last, and saves on the last. */}
         <Form layout="vertical" requiredMark={requiredMark} onFinish={steps.last ? save : steps.next}>
           {steps.fields}
-          <Flex gap="small">
+          <Row>
             {!steps.first && (
               <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking}>
                 {t('shell.form.back')}
@@ -363,7 +370,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
                     )
                   )
                 })}
-          </Flex>
+          </Row>
         </Form>
         {recordId !== null && (
           <RecordHistory

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { identityTwoStepContext } from '../designSystem/fixtures'
 import type { TwoStepContext } from './signInContext'
+import { ThemeModeProvider } from '../platform/theme'
 import { TwoStepPage } from './TwoStepPage'
 
 const context: TwoStepContext = { ...identityTwoStepContext, realmName: 'Contoso', loginAction: '/verify?code=1' }
@@ -17,7 +18,7 @@ function boxes(container: HTMLElement) {
 
 describe('TwoStepPage', () => {
   it('asks for the code in six boxes under the title and the organization', () => {
-    const { container } = render(<TwoStepPage context={context} />)
+    const { container } = render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.getByText('Two-step verification')).toBeInTheDocument()
     expect(screen.getByText('Contoso')).toBeInTheDocument()
@@ -29,7 +30,7 @@ describe('TwoStepPage', () => {
   })
 
   it('keeps only digits, one in each box', async () => {
-    const { container } = render(<TwoStepPage context={context} />)
+    const { container } = render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
 
     await userEvent.type(boxes(container)[0], '12a3')
 
@@ -39,7 +40,7 @@ describe('TwoStepPage', () => {
   })
 
   it('posts otp and login to the login action as a real form', async () => {
-    const { container } = render(<TwoStepPage context={context} />)
+    const { container } = render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
     const form = codeForm(container)
 
     expect(form).toHaveAttribute('method', 'post')
@@ -52,7 +53,7 @@ describe('TwoStepPage', () => {
   })
 
   it('clears the code when a digit is deleted', async () => {
-    const { container } = render(<TwoStepPage context={context} />)
+    const { container } = render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
     const form = codeForm(container)
 
     await userEvent.type(boxes(container)[0], '123456')
@@ -62,7 +63,7 @@ describe('TwoStepPage', () => {
   })
 
   it('asks for the whole code before it posts', async () => {
-    const { container } = render(<TwoStepPage context={context} />)
+    const { container } = render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
 
     await userEvent.type(boxes(container)[0], '123')
     await userEvent.click(screen.getByRole('button', { name: 'Verify' }))
@@ -72,7 +73,7 @@ describe('TwoStepPage', () => {
   })
 
   it('posts tryAnotherWay=on from its own form, only when Keycloak offers another way', () => {
-    const offered = render(<TwoStepPage context={context} />)
+    const offered = render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
     const forms = offered.container.querySelectorAll('form')
     expect(forms).toHaveLength(2)
     expect(forms[1]).toHaveAttribute('method', 'post')
@@ -80,19 +81,21 @@ describe('TwoStepPage', () => {
     expect(forms[1].querySelector('input[name="tryAnotherWay"]')).toHaveValue('on')
     offered.unmount()
 
-    const none = render(<TwoStepPage context={{ ...context, tryAnotherWay: false }} />)
+    const none = render(<TwoStepPage context={{ ...context, tryAnotherWay: false }} />, { wrapper: ThemeModeProvider })
     expect(none.container.querySelectorAll('form')).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Try another way' })).not.toBeInTheDocument()
   })
 
   it('shows an error above the form', () => {
-    render(<TwoStepPage context={{ ...context, error: 'Invalid authenticator code.' }} />)
+    render(<TwoStepPage context={{ ...context, error: 'Invalid authenticator code.' }} />, {
+      wrapper: ThemeModeProvider,
+    })
 
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid authenticator code.')
   })
 
   it('shows no alert without an error', () => {
-    render(<TwoStepPage context={context} />)
+    render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

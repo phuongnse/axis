@@ -69,7 +69,7 @@ built, see [installation key](#installation-key). The
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
-| `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
+| `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](fapi2-profile.md)                      |
 | `--client-key`                 | Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
 | `--retire-client-key <kid>`    | Removes the client key with that key id                                                       |
 
@@ -260,7 +260,7 @@ Both commands also update the tenant's realm, so its "Forgot password?" link is 
 
 ## Legal links
 
-_(planned for M31)_ `tenant legal set <id>` sets the addresses of the tenant's privacy policy and terms of service,
+`tenant legal set <id>` sets the addresses of the tenant's privacy policy and terms of service,
 which the [legal line](legal.md#legal-line) links and the [terms step](legal.md#accepting-the-terms) asks a person to
 accept. Axis writes no policy text: the organization publishes its own.
 
@@ -276,12 +276,31 @@ command prints `<id> legal ok`.
 
 - **The whole block.** Each `set` replaces the tenant's, or the site's, whole legal block, so an option left out is
   cleared.
-- **A new version asks again.** When `--terms-version` differs from the stored one, the next realm sync asks every
-  user of the realm to accept the terms again. Changing only the addresses asks nothing.
-- **Kept in the realm.** Both commands update the tenant's realm, as the mail settings do, see
-  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A site that does not exist yet keeps its
-  addresses until it does.
-- **Audited.** Each run writes a [platform audit record](#platform-audit-records).
+- **A new version asks again.** When `--terms-version` differs from the version the realm holds, the realm sync asks
+  every user of the realm to accept the terms again. Changing only the addresses asks nothing.
+- **Kept in the realm.** Both commands update the tenant's realm right after they store the change, as the mail
+  settings do, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). This includes `--site`,
+  because a site's links live on its `site-<path>` client. If the identity provider fails, the command prints
+  `<id> realm failed: ...`, exits with code 1 and keeps the stored change. The next activation or legal command brings
+  the realm in step.
+- **Stored in the tenant directory.** The tenant's addresses and terms version are in `platform.tenants`, and a site's
+  addresses in `platform.tenant_site_legal_links`, see [storage](storage.md#platform-database). A site that does not
+  exist yet keeps its addresses until it does.
+- **Site paths.** A path is stored in lower case and is checked as `tenant host add --site` checks it: a valid path
+  that is not reserved.
+- **Which tenants.** The commands work on an `active`, `suspended` or preview tenant. A tenant that is still
+  `provisioning` exits with code 2, as the binding commands do.
+- **Settings.** Both commands need `ConnectionStrings:PlatformSchema` and `Tenancy:Source=directory`. When the tenant
+  has a realm, they also need `Platform:SecretKey`, to read the realm's secrets, and the identity provider settings.
+- **Audited.** Each run writes one [platform audit record](#platform-audit-records) with the change, in one
+  transaction. For `set` it names the options that were given, in this order: `privacyUrl`, `termsUrl` and
+  `termsVersion`, then `site:<path>` when `--site` is given. For `clear` it names `legal`, and `site:<path>` after it
+  with `--site`. A name is never a value. Clearing a block that is already empty succeeds.
+- **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown or still
+  `provisioning`, a value is blank, an address is not an absolute `https` address, `set` has neither `--privacy-url`
+  nor `--terms-url`, `--terms-url` is given without `--terms-version` for the tenant, `--terms-version` is given
+  without `--terms-url` or with `--site`, the site path is not valid or is reserved, or an option is given twice or is
+  unknown. The `version` stays and no audit record is written.
 
 ## Hosts
 
@@ -422,7 +441,8 @@ keys. It can be rotated without signing anyone out.
   `tenant restore`, `migrate` and `activate` are built. So is `tenant session end`. So are `tenant data-key rotate` and `tenant data-key retire`. `tenant backup` writes one because an
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
   `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
-  and `tenant email clear`, which name the [mail settings](#mail-settings) they changed. `platform rekey` is
+  and `tenant email clear`, which name the [mail settings](#mail-settings) they changed, and `tenant legal set` and
+  `tenant legal clear`, which name the [legal links](#legal-links) they changed. `platform rekey` is
   built and writes one record for the whole run, with no tenant. `tenant list`, `tenant binding list`, `version` and `publisher`
   write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
   writing one record per tenant, one per run or none. A command without a mark fails a test.

@@ -62,7 +62,7 @@ function renderButton(onCreated = vi.fn()) {
 }
 
 async function openDialog() {
-  await userEvent.click(screen.getByRole('button', { name: 'New application' }))
+  await userEvent.click(screen.getByRole('button', { name: 'New application…' }))
   return screen.findByRole('dialog')
 }
 

@@ -9,6 +9,7 @@ using Axis.Processes.Work;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 
@@ -32,7 +33,7 @@ public static class WorkerServiceCollectionExtensions
     /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none, and only a worker that runs in Development sends email
     /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>.
     /// With <c>Cell:Id</c> set the worker is part of a cell and needs <c>Tenancy:Source=directory</c>, <c>Cell:Region</c> and <c>Cell:TenantDomain</c>.
-    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs and the emails it sends for each tenant per UTC day, in the platform database over <c>ConnectionStrings:Platform</c>. An email past the tenant's <c>emailsPerDay</c> quota waits until 00:00 UTC. The dry run or commit of an import waits for a <c>concurrentImports</c> lease of the tenant, and is due again in one second when none is free.
+    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs and the emails it sends for each tenant per UTC day, in the platform database over <c>ConnectionStrings:Platform</c>. It also brings the first-login deny step of each tenant's realm in step with its <c>users</c> quota every hour. An email past the tenant's <c>emailsPerDay</c> quota waits until 00:00 UTC. The dry run or commit of an import waits for a <c>concurrentImports</c> lease of the tenant, and is due again in one second when none is free.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:IdlePollCeiling</c> is below <c>Worker:PollInterval</c>, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
@@ -143,6 +144,7 @@ public static class WorkerServiceCollectionExtensions
                 services.AddSingleton<IImportLeases, CellImportLeases>();
                 services.AddSingleton<ICallLeases, CellCallLeases>();
                 services.AddSingleton<IWorkItemUsage, CellWorkItemUsage>();
+                services.AddHttpClient(nameof(RealmUsersQuota), client => client.Timeout = TimeSpan.FromSeconds(30));
             }
         }
         else

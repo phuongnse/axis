@@ -69,7 +69,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
 | [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                              |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
-| [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, the FAPI 2.0 profile, authorization, development users |
+| [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, authorization, development users |
+| [FAPI 2.0 profile](reference/fapi2-profile.md)                         | The FAPI 2.0 Security Profile per tenant: PAR, `private_key_jwt`, DPoP and the client key |
 | [Axis's identity provider](reference/identity-provider.md)           | The identity provider Axis ships: realms, the `identityProvider` resource, sign-in per site, platform sign-in, the Axis theme, installation |
 | [User administration](reference/user-administration.md)              | The administrator role, the users page, accounts and their MFA, disabled users, and the roles an administrator gives |
 | [Security headers and rate limits](reference/headers-and-rate-limits.md) | The headers the server sets on every response, and the rate limits per partition      |

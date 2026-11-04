@@ -1,6 +1,7 @@
 using Axis.Core.Tenancy;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
+using Axis.Tenancy;
 
 namespace Axis.Server.Presentation;
 
@@ -9,8 +10,15 @@ internal static class PresentationEndpoints
 {
     public static void MapPresentationEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/site", (ISiteMetadataProvider sites, ITenantContextAccessor tenants) =>
-            Results.Ok(sites.GetSite() with { HostSite = tenants.Current?.SitePath }));
+        endpoints.MapGet("/api/site", (ISiteMetadataProvider sites, ITenantContextAccessor tenants, ITenantCatalog catalog) =>
+        {
+            var legal = tenants.Current is { } tenant ? catalog.Find(tenant.TenantId)?.Legal : null;
+            return Results.Ok(sites.GetSite() with
+            {
+                HostSite = tenants.Current?.SitePath,
+                Legal = legal is { PrivacyUrl: not null } or { TermsUrl: not null } ? new SiteListLegal(legal.PrivacyUrl, legal.TermsUrl) : null,
+            });
+        });
 
         endpoints.MapGet("/api/texts/{locale}", (string locale, ITextResourceProvider texts) =>
             texts.GetTexts(locale) is { } found

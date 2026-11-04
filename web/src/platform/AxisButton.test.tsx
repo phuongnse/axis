@@ -3,7 +3,7 @@ import { ConfigProvider } from 'antd'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { AxisButton } from './AxisButton'
+import { AxisActionRow, AxisButton } from './AxisButton'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -109,6 +109,58 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
     renderRoles()
 
     expect(screen.getByRole('button', { name: 'Main' })).not.toHaveAttribute('role')
+  })
+})
+
+describe('the text button with a caret', () => {
+  it('ends in an aria-hidden down caret and keeps its name', () => {
+    renderIn(
+      'light',
+      <AxisButton role="plain" caret>
+        Account
+      </AxisButton>,
+    )
+
+    const button = screen.getByRole('button', { name: 'Account' })
+    expect(button.lastElementChild).toHaveClass('anticon-down')
+    expect(button.lastElementChild).toHaveAttribute('aria-hidden', 'true')
+    expect(button).toHaveClass('ant-btn-variant-text')
+    expect(button).not.toHaveAttribute('caret')
+  })
+})
+
+describe.each(['light', 'dark'] as const)('the roles of the button inside an action row in %s mode', (mode) => {
+  const { colour } = designTokensFor(mode)
+
+  function renderRow() {
+    renderIn(
+      mode,
+      <AxisActionRow>
+        <AxisButton role="finish">Finish</AxisButton>
+        <AxisButton role="main">Main</AxisButton>
+        <AxisButton role="secondary">Secondary</AxisButton>
+        <AxisButton role="destructive">Destructive</AxisButton>
+      </AxisActionRow>,
+    )
+  }
+
+  it('keeps finish solid and draws every other role as a text button', () => {
+    renderRow()
+
+    expect(screen.getByRole('button', { name: 'Finish' })).toHaveClass('ant-btn-variant-solid')
+    for (const name of ['Main', 'Secondary', 'Destructive']) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toHaveClass('ant-btn-variant-text')
+      expect(button.style.borderColor).toBe('')
+    }
+  })
+
+  it('draws main in primaryText, destructive in dangerText and secondary in the default colour', () => {
+    renderRow()
+
+    expect(screen.getByRole('button', { name: 'Main' })).toHaveStyle({ color: colour.primaryText })
+    expect(screen.getByRole('button', { name: 'Destructive' })).toHaveStyle({ color: colour.dangerText })
+    expect(screen.getByRole('button', { name: 'Secondary' }).style.color).toBe('')
   })
 })
 

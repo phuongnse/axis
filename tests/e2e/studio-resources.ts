@@ -8,7 +8,7 @@ import { pickOption } from './select'
  * resource list shows, which differs for a text resource: `Texts` plus the locale, such as `TextsVi`.
  */
 export async function createResource(page: Page, kind: string, value: string, shownAs = value) {
-  await page.getByRole('button', { name: 'New resource', exact: true }).click()
+  await page.getByRole('button', { name: 'New resource…', exact: true }).click()
   const dialog = await waitForDialog(page, 'New resource')
   await pickOption(dialog.getByRole('combobox', { name: 'Kind', exact: true }), kind)
   await dialog.getByRole('textbox', { name: kind === 'text' ? 'Locale' : 'Name', exact: true }).fill(value)

@@ -1,5 +1,6 @@
 import type { ChartKind } from '../platform/chartOption'
 import type { CurrentUser } from '../platform/currentUser'
+import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
 import type { DeadLetterPage, InstancePage } from '../platform/inspection'
@@ -21,14 +22,25 @@ import type { TaskPage } from '../platform/tasks'
 import type {
   AddAuthenticatorContext,
   AddAuthenticatorTexts,
+  ErrorContext,
+  FrameTexts,
+  FrontChannelSignOutContext,
+  NoticeContext,
+  PageExpiredContext,
   ResetPasswordContext,
   ResetPasswordTexts,
+  SamlPostContext,
+  SelectAuthenticatorContext,
+  SelectAuthenticatorTexts,
   SignInContext,
   SignInTexts,
+  SignOutContext,
   TwoStepContext,
   TwoStepTexts,
   UpdatePasswordContext,
   UpdatePasswordTexts,
+  UpdateProfileContext,
+  UpdateProfileTexts,
 } from '../identitySignIn/signInContext'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
@@ -814,6 +826,24 @@ export const identitySignInTexts: SignInTexts = {
   signIn: 'Sign in',
 }
 
+/** The texts of the identity provider's "Language and theme" gear, in English. */
+export const identityFrameTexts: FrameTexts = {
+  languageAndTheme: 'Language and theme',
+  language: 'Language',
+  theme: 'Theme',
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
+}
+
+/** The legal line under the identity provider's cards in the design system, in English. */
+export const identityLegal: LegalLinks = {
+  privacyUrl: '#privacy',
+  termsUrl: '#terms',
+  licencesUrl: '#licences',
+  texts: { legal: 'Legal', privacy: 'Privacy', terms: 'Terms', licences: 'Licences' },
+}
+
 /** What the identity provider's sign-in page draws in the design system. */
 export const identitySignInContext: SignInContext = {
   page: 'signIn',
@@ -825,10 +855,13 @@ export const identitySignInContext: SignInContext = {
   loginAction: '#sign-in',
   rememberMe: true,
   forgotPasswordUrl: '#forgot-password',
+  locale: 'en',
   locales: [
-    { label: 'English', url: '#en' },
-    { label: 'Tiếng Việt', url: '#vi' },
+    { tag: 'en', label: 'English', url: '#en' },
+    { tag: 'vi', label: 'Tiếng Việt', url: '#vi' },
   ],
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identitySignInTexts,
 }
 
@@ -853,7 +886,10 @@ export const identityTwoStepContext: TwoStepContext = {
   loginAction: '#verify',
   restartUrl: '#sign-in',
   tryAnotherWay: true,
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityTwoStepTexts,
 }
 
@@ -875,7 +911,10 @@ export const identityResetPasswordContext: ResetPasswordContext = {
   username: identitySignInContext.username,
   loginAction: '#reset',
   loginUrl: '#sign-in',
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityResetPasswordTexts,
 }
 
@@ -888,6 +927,7 @@ export const identityUpdatePasswordTexts: UpdatePasswordTexts = {
   newPasswordRequired: 'Enter a new password.',
   passwordsDiffer: 'The passwords do not match.',
   setPassword: 'Set password',
+  cancel: 'Cancel',
 }
 
 /** What the identity provider's page that sets a password draws in the design system. */
@@ -896,7 +936,10 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   title: identityUpdatePasswordTexts.title,
   realmName: identitySignInContext.realmName,
   loginAction: '#set-password',
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityUpdatePasswordTexts,
 }
 
@@ -911,6 +954,7 @@ export const identityAddAuthenticatorTexts: AddAuthenticatorTexts = {
   deviceName: 'Device name',
   deviceNameRequired: 'Enter a name for this device.',
   submit: 'Add authenticator',
+  cancel: 'Cancel',
 }
 
 /** A small PNG with a QR-like pattern. It shows the layout of the page and does not scan. */
@@ -927,8 +971,164 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   manualKey: 'JBSW Y3DP EHPK 3PXP',
   secret: 'fixture-secret',
   deviceNameRequired: false,
+  locale: identitySignInContext.locale,
   locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
   texts: identityAddAuthenticatorTexts,
+}
+
+/** The texts of the page behind "Try another way", in English. */
+export const identitySelectAuthenticatorTexts: SelectAuthenticatorTexts = {
+  title: 'Choose how to sign in',
+  message: 'Pick another way to verify that it is you.',
+  backToSignIn: 'Back to sign in',
+}
+
+/** What the identity provider's page behind "Try another way" draws in the design system. */
+export const identitySelectAuthenticatorContext: SelectAuthenticatorContext = {
+  page: 'selectAuthenticator',
+  title: identitySelectAuthenticatorTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#select-authenticator',
+  restartUrl: '#restart',
+  methods: [
+    { id: 'otp', label: 'Authenticator app', help: 'Enter a verification code from your authenticator app.' },
+    { id: 'password', label: 'Password', help: 'Sign in with your password.' },
+  ],
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: identitySelectAuthenticatorTexts,
+}
+
+/** The texts of the pages that update a profile, in English. */
+export const identityUpdateProfileTexts: UpdateProfileTexts = {
+  submit: 'Save',
+  fieldRequired: '{field} is required.',
+}
+
+/** What the identity provider's update profile page draws in the design system. */
+export const identityUpdateProfileContext: UpdateProfileContext = {
+  page: 'updateProfile',
+  title: 'Update your profile',
+  realmName: identitySignInContext.realmName,
+  notice: 'You need to update your user profile to activate your account.',
+  loginAction: '#update-profile',
+  fields: [
+    {
+      name: 'email',
+      label: 'Email',
+      value: 'alex.morgan@contoso.example',
+      required: true,
+      readOnly: false,
+      autoComplete: 'email',
+    },
+    { name: 'firstName', label: 'First name', value: 'Alex', required: true, readOnly: false },
+    { name: 'lastName', label: 'Last name', value: 'Morgan', required: true, readOnly: false },
+  ],
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: identityUpdateProfileTexts,
+}
+
+/** What the identity provider's sign-out question draws in the design system. */
+export const identitySignOutContext: SignOutContext = {
+  page: 'signOut',
+  title: 'Sign out',
+  realmName: identitySignInContext.realmName,
+  action: '#sign-out',
+  sessionCode: 'fixture-session-code',
+  backUrl: '#application',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: { message: 'Do you want to sign out?', signOut: 'Sign out', backToApplication: 'Back to application' },
+}
+
+/** What the identity provider's notice page draws in the design system. */
+export const identityNoticeContext: NoticeContext = {
+  page: 'notice',
+  title: 'Notice',
+  realmName: identitySignInContext.realmName,
+  message: 'Your account has been updated.',
+  linkUrl: '#application',
+  linkText: 'Back to application',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+}
+
+/** The message of the identity provider's error page in the design system. */
+export const identityErrorMessage = 'The link is no longer valid.'
+
+/** What the identity provider's error page draws in the design system. */
+export const identityErrorContext: ErrorContext = {
+  page: 'error',
+  title: 'Something went wrong',
+  realmName: identitySignInContext.realmName,
+  error: identityErrorMessage,
+  backUrl: '#application',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: { backToApplication: 'Back to application' },
+}
+
+/** What the identity provider's expired page draws in the design system. */
+export const identityPageExpiredContext: PageExpiredContext = {
+  page: 'pageExpired',
+  title: 'Page expired',
+  realmName: identitySignInContext.realmName,
+  continueUrl: '#continue',
+  restartUrl: '#start-again',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: {
+    message: 'This page took too long and has expired. Continue where you were, or start again.',
+    continue: 'Continue',
+    startAgain: 'Start again',
+  },
+}
+
+/** What the identity provider's SAML redirect draws in the design system. */
+export const identitySamlPostContext: SamlPostContext = {
+  page: 'samlPost',
+  title: 'Redirecting',
+  realmName: identitySignInContext.realmName,
+  action: '#saml',
+  samlResponse: 'fixture-saml-response',
+  relayState: 'fixture-relay-state',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: { message: 'Taking you to the next step. If nothing happens, select Continue.', continue: 'Continue' },
+}
+
+/** What the identity provider's front-channel sign-out draws in the design system. */
+export const identityFrontChannelSignOutContext: FrontChannelSignOutContext = {
+  page: 'frontChannelSignOut',
+  title: 'Signing out',
+  realmName: identitySignInContext.realmName,
+  clients: [
+    { name: 'Purchase requests', url: '#purchase-requests-sign-out' },
+    { name: 'Leave requests', url: '#leave-requests-sign-out' },
+  ],
+  redirectUrl: '#signed-out',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: { message: 'Signing you out of your applications. This page goes on by itself.', continue: 'Continue' },
 }
 
 /** The site texts, in English. */
@@ -974,7 +1174,7 @@ export const siteTexts: Record<string, string> = {
 }
 
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
-export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about', '/health/ready'] as const
+export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about'] as const
 
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
@@ -1003,5 +1203,4 @@ export const routes: Record<string, () => unknown> = {
   '/api/sites': () => ({ sites: listedSites }),
   '/api/me': () => currentUser,
   '/api/about': () => ({ version: '0.1.0' }),
-  '/health/ready': () => new Response(null, { status: 200 }),
 }

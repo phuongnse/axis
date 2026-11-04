@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { identityResetPasswordContext } from '../designSystem/fixtures'
+import { ThemeModeProvider } from '../platform/theme'
 import { ResetPasswordPage } from './ResetPasswordPage'
 import type { ResetPasswordContext } from './signInContext'
 
@@ -14,7 +15,7 @@ const context: ResetPasswordContext = {
 
 describe('ResetPasswordPage', () => {
   it('asks for the email or username under the title and the organization', () => {
-    render(<ResetPasswordPage context={context} />)
+    render(<ResetPasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.getByText('Reset your password')).toBeInTheDocument()
     expect(screen.getByText('Contoso')).toBeInTheDocument()
@@ -23,7 +24,7 @@ describe('ResetPasswordPage', () => {
   })
 
   it('posts username to the login action as a real form', () => {
-    const { container } = render(<ResetPasswordPage context={context} />)
+    const { container } = render(<ResetPasswordPage context={context} />, { wrapper: ThemeModeProvider })
     const form = container.querySelector('form') as HTMLFormElement
 
     expect(form).toHaveAttribute('method', 'post')
@@ -32,13 +33,13 @@ describe('ResetPasswordPage', () => {
   })
 
   it('links "Back to sign in" to the login address', () => {
-    render(<ResetPasswordPage context={context} />)
+    render(<ResetPasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/sign-in?client=axis')
   })
 
   it('asks for the username before it posts', async () => {
-    render(<ResetPasswordPage context={{ ...context, username: undefined }} />)
+    render(<ResetPasswordPage context={{ ...context, username: undefined }} />, { wrapper: ThemeModeProvider })
 
     await userEvent.click(screen.getByRole('button', { name: 'Send link' }))
 
@@ -46,13 +47,13 @@ describe('ResetPasswordPage', () => {
   })
 
   it('shows an error above the form', () => {
-    render(<ResetPasswordPage context={{ ...context, error: 'Invalid username.' }} />)
+    render(<ResetPasswordPage context={{ ...context, error: 'Invalid username.' }} />, { wrapper: ThemeModeProvider })
 
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid username.')
   })
 
   it('shows no alert without an error', () => {
-    render(<ResetPasswordPage context={context} />)
+    render(<ResetPasswordPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

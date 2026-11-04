@@ -75,7 +75,7 @@ public sealed class ActivationRealmSyncTests
         using var http = new HttpClient(new ThrowingHandler());
         var plan = new RealmPlan([], [Provider(clientSecretBinding: "PartnerSecret")]);
 
-        await ActivationRealmSync.SyncAsync(http, realm: null, Bindings(), plan, TestContext.Current.CancellationToken);
+        await ActivationRealmSync.SyncAsync(http, realm: null, Bindings(), plan, RealmLegal.None, users: null, TestContext.Current.CancellationToken);
     }
 
     private static RealmProvider Provider(string? clientSecretBinding) =>

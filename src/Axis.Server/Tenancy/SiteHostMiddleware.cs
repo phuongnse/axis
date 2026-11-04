@@ -50,7 +50,7 @@ internal sealed class SiteHostMiddleware(
     }
 
     // What a site's host serves: the SPA at the root and at the site's pages, except under the paths the platform keeps
-    // for itself (Studio, the account page, the users page), the web root's files, sign-in, who is signed in, what the
+    // for itself (Studio, the account page, the users page, the licences page), the web root's files, sign-in, who is signed in, what the
     // SPA shell loads on every host, the site's own API and its application's API.
     private async Task<bool> IsServedAsync(HttpContext context, ActiveApplicationResolver resolver, string site)
     {

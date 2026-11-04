@@ -43,6 +43,7 @@ public interface ITenantCatalog
 /// <param name="PlatformProviders">The brokered providers of the tenant's platform sign-in, which activation keeps in the realm, or <c>null</c> when the source holds none. Only the <c>directory</c> source has them, and a preview tenant has none of its own.</param>
 /// <param name="HostSites">The lower-case site path of each host that belongs to a site, keyed by host and matched ignoring letter case, or <c>null</c> when the source gives no host to a site. A host of no site is not in it.</param>
 /// <param name="Quotas">The tenant's own quota rows keyed by quota, where a <c>null</c> value means no limit, or <c>null</c> when the source has none. A quota with no row takes the cell's default. Only the <c>directory</c> source has them.</param>
+/// <param name="Legal">The tenant's privacy and terms links, or <c>null</c> when it sets none. Both sources have it, and a preview tenant has its main tenant's.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -57,7 +58,35 @@ public sealed record TenantEntry(
     PlatformSignIn? PlatformSignIn = null,
     IReadOnlyList<IdentityProviderModel>? PlatformProviders = null,
     IReadOnlyDictionary<string, string>? HostSites = null,
-    IReadOnlyDictionary<string, long?>? Quotas = null);
+    IReadOnlyDictionary<string, long?>? Quotas = null,
+    TenantLegal? Legal = null);
+
+/// <summary>A tenant's privacy and terms links, and the links its sites set for themselves.</summary>
+/// <param name="PrivacyUrl">The tenant's privacy address, or <c>null</c> for none.</param>
+/// <param name="TermsUrl">The tenant's terms address, or <c>null</c> for none.</param>
+/// <param name="TermsVersion">The version of the tenant's terms, or <c>null</c> for none.</param>
+/// <param name="Sites">The links of the sites that set their own, keyed by lower-case site path and matched ignoring letter case.</param>
+public sealed record TenantLegal(string? PrivacyUrl, string? TermsUrl, string? TermsVersion, IReadOnlyDictionary<string, SiteLegal> Sites)
+{
+    /// <summary>
+    /// The links of a site: its own pair when it sets either address, else the tenant's pair, else <c>null</c> when the
+    /// tenant sets neither address.
+    /// </summary>
+    public SiteLegal? ForSite(string sitePath)
+    {
+        ArgumentNullException.ThrowIfNull(sitePath);
+
+        if (Sites.TryGetValue(sitePath, out var own) && (own.PrivacyUrl is not null || own.TermsUrl is not null))
+        {
+            return own;
+        }
+
+        return PrivacyUrl is null && TermsUrl is null ? null : new SiteLegal(PrivacyUrl, TermsUrl);
+    }
+}
+
+/// <summary>The privacy and terms addresses of one site. A value the source leaves blank is <c>null</c>.</summary>
+public sealed record SiteLegal(string? PrivacyUrl, string? TermsUrl);
 
 /// <summary>
 /// The sign-in of the platform pages (home, Studio, the operator console, the account page and the users page): whether

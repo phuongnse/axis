@@ -1,8 +1,9 @@
 import { Alert, Button, Descriptions, Flex, Input, Result, Segmented, Select, Tag, Typography } from 'antd'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
+import { SiteMark } from '../platform/SiteMark'
 import {
   fetchStudioApps,
   fetchStudioDiagnostics,
@@ -16,6 +17,8 @@ import {
   resourceTitle,
   ServerUnreachableError,
   type StudioApplication,
+  studioAppDescription,
+  studioAppTitle,
   type StudioDiagnostic,
   type StudioNames,
   type StudioResource,
@@ -25,6 +28,10 @@ import {
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
+import { PlatformContext } from './context'
+import { useHomeGrid } from './homeGrid'
+import { HomeTileStyle } from './HomeTileStyle'
 import { StudioEditor } from './StudioEditor'
 import { StudioModuleContract } from './StudioModuleContract'
 import { StudioModuleEntity } from './StudioModuleEntity'
@@ -91,6 +98,54 @@ function ModuleResourceView({
   }
 }
 
+/** The tiles of the applications Studio may edit, in the UI locale with `en` as the fallback. Each opens its application. */
+function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { colour, radius, spacing } = useDesignTokens()
+  const grid = useHomeGrid()
+  return (
+    <div data-testid="studio-apps" style={grid}>
+      {apps.map((app) => {
+        const title = studioAppTitle(app, locale)
+        const description = studioAppDescription(app, locale)
+        return (
+          <Link
+            key={app.name}
+            to={`/studio?app=${encodeURIComponent(app.name)}`}
+            data-home-tile
+            data-testid={`studio-app-${app.name}`}
+            style={{
+              display: 'flex',
+              alignItems: description === null ? 'center' : 'flex-start',
+              gap: spacing.sm,
+              minWidth: 0,
+              padding: spacing.md,
+              background: colour.surface,
+              border: `1px solid ${colour.borderSubtle}`,
+              borderRadius: radius.base,
+            }}
+          >
+            <SiteMark title={title} size={32} />
+            <Flex vertical style={{ minWidth: 0 }}>
+              <Typography.Text strong style={{ color: colour.primaryText }}>
+                {title}
+              </Typography.Text>
+              {description !== null && (
+                <Typography.Paragraph
+                  ellipsis={{ rows: 2, tooltip: description }}
+                  style={{ margin: 0, color: colour.textMuted }}
+                >
+                  {description}
+                </Typography.Paragraph>
+              )}
+            </Flex>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
 /** The applications Studio may edit, or why they could not be listed. */
 type AppsState = StudioApplication[] | typeof forbidden | 'failed'
 
@@ -108,7 +163,9 @@ type ManifestState = { application: string; resource: StudioResource | null }
 /**
  * Studio, the authoring page. The address holds the picked application and the selected resource, as
  * `/studio?app=PurchaseRequests&resource=<id>`. A person without the author role sees a forbidden page.
- * With one application, it is picked at once. The resources are grouped by kind, and a search narrows them
+ * With no application open, it lists the applications as tiles in up to three columns, each with its mark, its title
+ * and its description in the UI locale (`en` as the fallback, then the name), and a solid New application… button
+ * beside the heading. A tile opens its application, and a single application is not opened by itself. The resources are grouped by kind, and a search narrows them
  * by name or id. The diagnostics panel lists the folder's diagnostics, loaded when the application is
  * picked. A diagnostic that names a resource selects it, clears the search, and opens it at the diagnostic's path,
  * as a Used by entry does. A selected resource opens in an editor below its details, with its Uses and Used by
@@ -116,7 +173,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
  * list. A New resource button above the search box creates a resource of any kind from its starter. The new resource
  * joins the list, the diagnostics panel shows the diagnostics of the create, and the editor opens the resource.
- * A New application button sits beside the application picker, and also shows when Studio lists no application. It shows
+ * A New application… button sits beside the application picker, and also shows on the list. It shows
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the picker and is picked at once.
  * Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
  * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
@@ -229,13 +286,6 @@ function StudioWorkspace() {
     })
     return () => controller.abort()
   }, [generation, lost])
-
-  const onlyApplication = Array.isArray(apps) && apps.length === 1 ? apps[0].name : null
-  useEffect(() => {
-    if (onlyApplication !== null && application === null) {
-      setParams({ app: onlyApplication }, { replace: true })
-    }
-  }, [onlyApplication, application, setParams])
 
   useEffect(() => {
     if (application === null) {
@@ -371,7 +421,11 @@ function StudioWorkspace() {
   }
 
   function onApplicationCreated(name: string) {
-    setApps((current) => (Array.isArray(current) ? [...current, { name }] : [{ name }]))
+    setApps((current) =>
+      Array.isArray(current)
+        ? [...current, { name, titles: {}, descriptions: {} }]
+        : [{ name, titles: {}, descriptions: {} }],
+    )
     pickApplication(name)
   }
 
@@ -396,6 +450,24 @@ function StudioWorkspace() {
   }
   if (apps === 'failed') {
     return <Alert data-testid="studio-load-error" type="error" title={t('shell.studio.loadFailed')} />
+  }
+  if (application === null) {
+    return (
+      <Flex vertical gap="middle">
+        <HomeTileStyle />
+        <Flex justify="space-between" align="center">
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            {t('shell.studio.title')}
+          </Typography.Title>
+          {canCreate && <StudioNewApplication primary onCreated={onApplicationCreated} />}
+        </Flex>
+        {apps.length === 0 ? (
+          <Alert data-testid="studio-no-applications" type="info" title={t('shell.studio.noApplications')} />
+        ) : (
+          <StudioApplicationTiles apps={apps} />
+        )}
+      </Flex>
+    )
   }
   if (apps.length === 0) {
     return (

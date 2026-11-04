@@ -8,6 +8,9 @@ namespace Axis.Tenancy;
 /// </summary>
 public sealed class TenantQuotas(CellOptions cell, QuotaDefaults defaults, ITenantCatalog catalog)
 {
+    /// <summary>Whether the host is part of a cell, so quotas apply.</summary>
+    public bool IsCell => cell.IsCell;
+
     /// <summary>The limit of <paramref name="quota"/> for the tenant, or <c>null</c> for no limit.</summary>
     /// <exception cref="ArgumentException"><paramref name="quota"/> is not one of <see cref="QuotaKeys.All"/>.</exception>
     public long? Limit(string tenantId, string quota)

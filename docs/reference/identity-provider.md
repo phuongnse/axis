@@ -33,7 +33,7 @@ administrator and the users page are in [user administration](user-administratio
 - The realm holds the account rules of [accounts](user-administration.md#accounts): an authenticator code at every
   sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed
   sign-ins, a password reset link of 30 minutes and no self-registration.
-- The realm's login theme is the Axis theme `axis`, and so is its email theme _(planned for M31)_, see [theme](#theme).
+- The realm's login theme is the Axis theme `axis`, and so is its email theme, see [theme](#theme).
 - The realm also has its people, its brokered identity providers and a client for each site.
 - The realm's display name is the organization's name, which every sign-in page shows above its card, see
   [theme](#theme). `tenant create` gives the realm no display name until it takes the organization's name, and a rerun
@@ -246,8 +246,8 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   [platform sign-in](tenant-setting-commands.md#platform-sign-in).
 - **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
   email. The realm never links them by email, because another provider's email is not proof of who signed in.
-  Built by the realm sync: every `oidc-` and `saml-` provider uses the realm's own first-login flow `axis first login`, whose only
-  step creates a new user, so the realm never shows an "account already exists, link it?" page. A brokered user's
+  Built by the realm sync: every `oidc-` and `saml-` provider uses the realm's own first-login flow `axis first login`, whose first
+  step denies access and is off when `tenant create` adds it, and a rerun keeps it as it is, and whose second step creates a new user, so the realm never shows an "account already exists, link it?" page. A brokered user's
   username is the provider's alias, a dot and the person's subject, such as `oidc-companyissuer.<sub>`, or for a `saml`
   provider its alias, a dot and the NameID, such as `saml-agencymetadata.<NameID>`, so two providers never clash on a
   username. The realm allows two users to share an email. Linking that the person proves on both sides
@@ -267,12 +267,13 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   realm setting, for activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
   platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
   second run updates the realm, brings it up to the account rules and sets its login theme to `axis` again, and its
-  email theme too _(planned for M31)_. _(planned for M31)_: it also turns off Keycloak's account console client and removes
+  email theme too. It also turns off Keycloak's account console client `account-console` and removes
   `manage-account` from the realm's default roles, because Axis's [account page](platform-pages.md#account-page)
-  replaces it, and leaves the Terms and Conditions required action off until the tenant sets terms, see
+  replaces it. The older `account` client stays, as Keycloak's application-initiated actions may need it.
+  It leaves the Terms and Conditions required action off until the tenant sets terms, see
   [accepting the terms](legal.md#accepting-the-terms). It turns on language support in the realm, with `en` and `vi` and `en` as the default, so
   `kc_locale` and the theme's language links work. It also creates the first-login flow
-  `axis first login` for brokered users. It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
+  `axis first login` for brokered users, with a deny step that is off, before the create-user step. In a cell the server switches that step by the tenant's users quota, see [refusals](tenant-quotas.md#refusals). It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
   page that asks for a missing profile field, such as the last name that a `saml` provider may not send. It allows two users to share an email, which turns sign-in by email off: an
   account's username is its email, see [accounts](user-administration.md#accounts). Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
   `IdentityProvider` settings of its own, see [administration](administration.md#settings). When the identity provider answers a server error (5xx), the realm step reads the realm again and repeats, up to three attempts, and then fails as before, naming the step and its status.
@@ -296,13 +297,13 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   `site-<path>` clients and `oidc-` and `saml-` providers match a desired state. Each site client puts the alias of the provider that
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
   display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
-  `<provider alias>.<subject>`. _(planned for M31)_: it writes the [legal links](legal.md#legal-settings) on every client, and turns
-  the Terms and Conditions required action on while the tenant sets terms, and off when it has none. Each provider also gets an `acr` mapper (`oidc-user-session-note-idp-mapper`) that copies the
+  `<provider alias>.<subject>`. After the full sync it writes the [legal links](legal.md#legal-settings) on every client and the terms
+  version, see the legal links bullet below. Each provider also gets an `acr` mapper (`oidc-user-session-note-idp-mapper`) that copies the
   upstream `acr` claim into the person's realm session, and each site client an `identity provider acr` mapper that puts
   that session value into its ID token as the `identity_provider_acr` claim. Each site client also gets one mapper for each roles claim of
   the providers its site allows, named `axis_roles_<claim>`, which puts that user attribute into the ID token. The sync removes such a
   mapper that the site no longer needs. Each provider names the realm's first-login flow. It touches no other client or
-  provider, apart from the legal links _(planned for M31)_, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A `saml-` provider is
+  provider, apart from the legal links, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A `saml-` provider is
   imported from its metadata: the sync reads the metadata from the `metadata` binding's address before it changes the
   realm, and uploads it to Keycloak's import-config endpoint, so an unreachable address changes nothing. The provider
   asks for a persistent NameID, takes the person's subject from it, and signs its requests with the realm's own key
@@ -316,7 +317,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` and
   `identity provider acr` mappers stay as they are, and a mapper that is removed from `axis` is not removed from the site clients. Each site client also carries two attributes that every sync rewrites:
   `axis.providers`, the aliases of the providers the site allows separated by spaces, and `axis.accounts`, `true` or
-  `false`. _(planned for M31)_: also `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, the links of the site's legal line, see
+  `false`. The legal sync also writes `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, the links of the site's legal line, see
   [legal settings](legal.md#legal-settings). The sync refuses an alias that is empty or contains a space. It also copies the redirect addresses, web origins and post-logout redirect
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
   HMAC-SHA256(platform secret, client id), so the server can compute it. Without a platform secret, Keycloak makes the
@@ -336,12 +337,29 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   path order, or `en` when it has no site. When several applications share a provider, the label comes from the
   application with the lowest application id. A tenant created before `manage-realm` was granted needs `tenant create` again, or activation
   fails at the label step with a 403.
+- **Legal links and terms:** after every full sync, and after `tenant legal set` and `clear`, the sync writes the tenant's
+  [legal settings](legal.md#legal-settings) to the realm. It lists every client and sets `axis.privacyUrl`, `axis.termsUrl`,
+  `axis.licencesUrl`, `axis.tenantPrivacyUrl` and `axis.tenantTermsUrl`, and keeps every other attribute. A `site-<path>`
+  client gets its site's own privacy and terms links, else the tenant's. Every other client gets the tenant's. The licences
+  link is `https://<host>/licences`, where the host is the tenant's first host, in ordinal order, that belongs to no site,
+  or else its first host. It removes an attribute whose value is not set, but `axis.licencesUrl` stays while the tenant
+  has a host. A client is written only when its attributes differ, and a bearer-only client, such as `realm-management` and
+  `broker`, is left alone because no one signs in through it and Keycloak refuses to update some of them. A client that a
+  client policy governs, such as `axis-fapi` of the development realm, must satisfy that policy, or Keycloak answers `400` and the
+  sync fails, see [FAPI 2.0 profile](fapi2-profile.md). The sync turns the Terms and Conditions
+  required action on, with `defaultAction` so new users get it, while the tenant has a terms address, and off when it has
+  none. It stores the tenant's terms version in the realm attribute `axis.termsVersion`. When the version differs from the
+  stored one, it first adds the required action to every user of the realm through the `axis-users` client, one request for
+  each user, and then stores the version, so a failure leaves the old version and the next sync asks again. Changing only the
+  addresses asks no one. When the tenant has no terms, the sync clears the stored version, so terms set later ask every user.
+  A tenant with no `axis-users` client gets the step on for new users but asks no existing user and stores no version. The
+  host commands do not rerun this sync, so a changed host updates `axis.licencesUrl` at the next full sync or legal command.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. The
   stored platform providers are always part of the plan, so a provider that only the platform sign-in names stays in
   the realm. A provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
   Built for `Axis.Admin`: `activate`, and the publisher's `publish`, `publish` with target `preview` and `rollback`
-  update the realm, with its mail server, inside their `activate` step, after the activation has committed. A tenant without an activation
+  update the realm, with its mail server and legal settings, inside their `activate` step, after the activation has committed. A tenant without an activation
   secret, such as a preview tenant or one that signs in through an outside identity provider, skips the update. A
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
@@ -364,7 +382,8 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 - **Brought in step by restore:** `tenant restore` of a tenant that gets a new realm creates the realm as `tenant create`
   does and brings it in step with the active releases of the restored database. The archive holds no secret value, so a
   provider whose bindings have no value yet is left out with a warning. The next activation adds it once the operator has
-  set the bindings, see [tenant restore](tenant-backup-and-restore.md#tenant-restore).
+  set the bindings. When the archive holds `realm.json`, the restore then imports its roles, groups and users into the new realm, so people
+  sign in as before with the same user ids and no invitation, see [tenant restore](tenant-backup-and-restore.md#tenant-restore).
 - **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
   bindings. Built for `saml` providers: `metadata` is a `url` binding, reported at `/metadata/binding`. On a preview tenant activation leaves the provider out with a warning, see
@@ -374,7 +393,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   change, see [sign-in settings](tenant-setting-commands.md#sign-in-settings). Each client lists every key the tenant
   will hold, under its [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) key id. Under `fapi2` the clients use
   `client-jwt` with ES256, require PAR, PKCE `S256` and DPoP-bound tokens, see
-  [FAPI 2.0 profile](security.md#fapi-20-profile). Under `standard` they use `client-secret` and require neither PAR nor
+  [FAPI 2.0 profile](fapi2-profile.md). Under `standard` they use `client-secret` and require neither PAR nor
   DPoP. A failure of the identity provider fails the command and changes nothing in the tenant directory. A tenant that
   signs in through an outside identity provider is unchanged.
 
@@ -394,12 +413,12 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 ## Theme
 
 - Every page of Axis's identity provider has one frame: the organization's mark and name above one card in the middle
-  of the page on `canvas`, and below it the language links and "© <year> Axis". _(planned for M31)_: the shell's gear button
-  takes the language links' place at the page's top right, level with the organization's heading and as far from the
-  top edge as from the right one, and opens the shell's language and theme menu, every language named in its own
-  language, then System, Light and Dark. Below the card, as wide as it, the [legal line](legal.md#legal-line) takes the
-  copyright's place. It follows light and dark mode and the
-  Axis tokens and fonts, as the SPA does. The mark is 32 px, the first letter of the name on a `primary` tile as a
+  of the page on `canvas`, and below it the [legal line](legal.md#legal-line), as wide as the card. The shell's gear button, named "Language and theme", sits at the
+  page's top right, level with the organization's heading and as far from the top edge as from the right one. It opens
+  the shell's language and theme menu, every language named in its own language, then System, Light and Dark. Picking a
+  language reloads the page in it, and picking a theme switches light or dark mode at once. A theme choice is kept in
+  the browser per origin, so one made on the identity provider's host does not carry over to Axis on another host.
+  The page follows light and dark mode and the Axis tokens and fonts, as the SPA does. The mark is 32 px, the first letter of the name on a `primary` tile as a
   site's mark is, with the name beside it. The name is the realm's display name, and Axis while the realm has none.
   The card is at most 400 px wide, on `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl`
   padding. Its title, such as "Sign in", names the step and does not repeat the organization's name. Axis's own
@@ -415,35 +434,57 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 - A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
 - Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Back to sign in" and, when Keycloak offers another way to sign in, "Try another way".
 - "Forgot password?" opens a page that asks for the email or username, with a "Send link" button and "Back to sign in".
-  Keycloak sends the link, and the page after "Send link" is still Keycloak's own. _(planned for M31)_: Keycloak returns to the
-  sign-in page with its notice, which the page shows above the form.
+  Keycloak sends the link and returns to the sign-in page with its notice, which the page shows in an info alert above
+  the form. The notice reads in the page's language and does not say whether an account matched, because Keycloak
+  shows it for an unknown username too.
 - The page that sets a password, which an invitation and a reset link both open, asks for "New password" and "Confirm
   password" and has no way back, because it is a required step. The browser checks only that both fields are filled
   and match. Keycloak checks the password rules and its error shows above the form. Setting a password signs the
   person out on other devices, as Keycloak does by default.
 - Add an authenticator, where a person who must add one sees the QR code, the key to type by hand, the 6-digit code in the same six boxes and the device name. The device name is required only when the person already has an authenticator.
-- **Every other page** _(planned for M31)_. No page keeps Keycloak's look. Shared Axis pages draw the rest from the same
-  frame: the sign-out question, which shows only when the server could not end the session itself (Sign out posts the
-  session code, see [sign-in and the session](security.md#sign-in-and-the-session)), notices, errors as an error alert,
-  the expired page with Continue and Start again, the front-channel sign-out (its hidden frames, then on), the SAML
-  redirect, which posts at once, the choice of method behind "Try another way", one row per method, and the update
-  profile and review profile steps, drawn from the user profile's fields with Keycloak's reminder as an info alert and
-  its field errors under the fields. The terms step is in [accepting the terms](legal.md#accepting-the-terms).
-- **Cancel from the account page** _(planned for M31)_. When a person starts Change password or Authenticators from Axis's
-  [account page](platform-pages.md#account-page), the page that sets a password and the page that adds an
-  authenticator show Cancel, which returns to the account page with nothing changed.
-- **Emails** _(planned for M31)_. The Axis email theme `axis` sits beside the login theme and gives every email the identity
+- **Every other page** _(built, apart from the terms step planned for M31)_. No page keeps Keycloak's look. Shared Axis
+  pages draw the pages below from the same frame:
+  - _(built)_ The sign-out question, which shows only when the server could not end the session itself (Sign out
+    posts the session code, see [sign-in and the session](security.md#sign-in-and-the-session)), with "Back to
+    application" when Keycloak gives an address.
+  - _(built)_ Notices, with the message and the link onward: Keycloak's page redirect address, then its action
+    address, then the client's home address, and none when Keycloak says to skip the link. The title is Keycloak's
+    message header when it gives one, and "Notice" otherwise.
+  - _(built)_ Errors as an error alert, with "Back to application" when the client has a home address.
+  - _(built)_ The expired page, which explains what happened and offers Continue and Start again.
+  - _(built)_ The SAML redirect, a short card whose form posts at once, and the front-channel sign-out, whose hidden
+    frames load before the page goes on to the redirect address.
+  - _(built)_ The choice of method behind "Try another way", which shows "Choose how to sign in" with one row per
+    method, its name and a help line, and "Back to sign in" through Keycloak's restart address. Each row is a submit
+    button that posts the method's execution id as `authenticationExecution`, in one real `<form method="post">` to
+    the login address.
+  - _(built)_ The update profile and review profile steps, "Update your profile" and "Review your profile", one card
+    that differs only in its title. It draws one single-line input per user profile field, filled with the current
+    value, with a read-only field not editable and the email field typed `email`. Keycloak's reminder shows as an info
+    alert above the fields. A field's error shows under the field, and an error that belongs to no field shows as an
+    error alert. Select, multi-value and grouped attributes are not drawn specially. The page leaves out Keycloak's
+    Cancel for an action that a person started from an application.
+  - _(planned for M31)_ The terms step is in [accepting the terms](legal.md#accepting-the-terms).
+- **Cancel from an application** _(built)_. When an application such as Axis's
+  [account page](platform-pages.md#account-page) starts Change password or Authenticators, the page that sets a
+  password and the page that adds an authenticator show Cancel, which returns to that application with nothing changed.
+  An invitation or a reset link shows no Cancel, because there the step is required.
+- **Emails** _(built)_. The Axis email theme `axis` sits beside the login theme and gives every email the identity
   provider sends the organization's mark and name, one white card and a muted footer, in tables and inline styles in
   the light tokens, as mail clients need. The invitation, an administrator's request to act and the password reset
   have Axis bodies with one button and the link's lifetime, and the link itself sits in the plain-text part, because an
   action link holds a token of some 2,000 characters. The bundles are in every locale the platform offers, Vietnamese
-  included, which Keycloak's own email theme lacks.
+  included, which Keycloak's own email theme lacks. Keycloak sends the invitation and an administrator's request to act
+  through one template, so the email reads as the invitation when the actions are exactly a password and an
+  authenticator, and as a request that lists its actions otherwise. The frame names Axis, never the realm id, when the
+  realm has no display name. Other emails, such as the verification email, get the frame but keep Keycloak's English
+  text in Vietnamese.
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts, which activation writes to the realm (_built_).
 - _(built)_ The sign-in page is drawn by shared React components in `web/src/identitySignIn/` from a sign-in context:
-  title, providers, accounts, site, username, error, login address, remember-me, forgot-password address, locales and
-  texts. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's
+  title, providers, accounts, site, username, error, notice, login address, remember-me, forgot-password address, locale, locales (each with its
+  tag) and texts. Every page's context also holds `frameTexts`, the texts of the gear, and `legal`, the addresses and labels of the [legal line](legal.md#legal-line). The `texts` macro of `frame.ftl` writes `legal` from the client attributes `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, and a page without a client leaves the addresses out. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's
   providers and accounts flag. The page then lists only those providers, and shows the account form only when the realm
   and the site both allow accounts. A client without `axis.accounts`, such as `axis`, has no `site`, so the page shows
   every provider and the form as before. The account form is a real `<form method="post">` to the login address. The templates leave `realmName` out when the realm's display name is empty or equals the realm id. The components
@@ -454,19 +495,24 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   and shows only when Keycloak offers another way to sign in. "Back to sign in" uses Keycloak's restart address. The "Forgot password?" page (`page` of `resetPassword`) is a
   real `<form method="post">` to the login address that posts `username`, and its "Back to sign in" uses `url.loginUrl`.
   The page that sets a password (`page` of `updatePassword`) posts `password-new`, `password-confirm` and a hidden
-  `logout-sessions=on`. The page after "Send link" is still Keycloak's. The page that adds an authenticator is
+  `logout-sessions=on`. The page that adds an authenticator is
   drawn too, from its own context with `page` set to `addAuthenticator`: the QR code (a base64 PNG), the manual key, the secret, the
   same six code boxes and the device name, in a real `<form method="post">` to the login address that posts `totp`, `totpSecret`,
-  `userLabel` and, when Keycloak gave one, `mode`. It leaves out Keycloak's "Sign out from other devices" box and the cancel button
-  of an app-initiated action. The design system's
+  `userLabel` and, when Keycloak gave one, `mode`. It leaves out Keycloak's "Sign out from other devices" box. When the context has
+  `appInitiated`, which the templates write when Keycloak sets `isAppInitiatedAction`, both pages draw Cancel as a second form
+  that posts `cancel-aia=true` to the login address. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
-  context: its `login.ftl`, `login-otp.ftl`, `login-config-totp.ftl`, `login-reset-password.ftl` and `login-update-password.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep`, `addAuthenticator`, `resetPassword` or `updatePassword`, and a React bundle draws the page. `scripts/build.sh`
+  context: its `login.ftl`, `login-otp.ftl`, `login-config-totp.ftl`, `login-reset-password.ftl`, `login-update-password.ftl`, `select-authenticator.ftl`, `login-update-profile.ftl`, `idp-review-user-profile.ftl`, `logout-confirm.ftl`, `info.ftl`, `error.ftl`, `login-page-expired.ftl`, `saml-post-form.ftl` and `frontchannel-logout.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep`, `addAuthenticator`, `resetPassword`, `updatePassword`, `selectAuthenticator`, `updateProfile`, `reviewProfile`, `signOut`, `notice`, `error`, `pageExpired`, `samlPost` or `frontChannelSignOut`, and a React bundle draws the page.
+  The sign-out page (`signOut`) is a real `<form method="post">` to `action` that posts the session code as `session_code` with `confirmLogout=on`, and links "Back to application" to `backUrl`. The notice page (`notice`)
+  holds a `message` and, when Keycloak offers a link, the flat fields `linkUrl` and `linkText`. The error page (`error`) draws `error` as an error alert and links `backUrl`.
+  The expired page (`pageExpired`) links Continue to `continueUrl`, Keycloak's login action, and Start again to `restartUrl`. The SAML page (`samlPost`) posts a form to `action` with the hidden `SAMLRequest`, `SAMLResponse` and `RelayState` that Keycloak gave, as soon as the page loads, and needs JavaScript for that.
+  The front-channel page (`frontChannelSignOut`) loads one hidden frame per client in `clients`, and calls `location.replace` on `redirectUrl` once every frame has loaded, or at once when there are none, with a Continue link as the way out. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
-  fonts. The pages the theme has no template for, such as the page after "Send link", still come from Keycloak's `keycloak` parent theme
-  (none is left _(planned for M31)_: `logout-confirm.ftl`, `info.ftl`, `error.ftl`, `login-page-expired.ftl`,
-  `select-authenticator.ftl`, `login-update-profile.ftl`, `idp-review-user-profile.ftl`, `saml-post-form.ftl`,
-  `frontchannel-logout.ftl` and `terms.ftl` join them, with `frame.ftl` holding the macros they share). The development realm `axis` uses the theme as
+  fonts. It also copies the email theme from `web/keycloak-theme/email/` into `artifacts/keycloak-theme/axis/email/`
+  and fails when one of its files is missing. `frame.ftl` holds the head, realm name, locales and frame texts macros that
+  the fourteen templates share, and `scripts/build.sh` checks it too. The pages the theme has no template for still come from Keycloak's `keycloak` parent theme
+  (none is left _(planned for M31)_: `terms.ftl` joins them, using the macros of `frame.ftl`). The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
   theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see
@@ -488,7 +534,8 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   [development realm and users](../development.md#development-realm-and-users). Under Docker Compose it does not,
   because the server's container cannot reach Keycloak at `localhost:8080`.
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator
-  backs it up with the installation. `tenant backup` does not carry them, so a tenant restored where its realm does
-  not exist gets a new realm, and its accounts need new invitations. This is built: `tenant restore` creates the
-  realm in its `realm` step, see [tenant restore](tenant-backup-and-restore.md#tenant-restore). A tenant restored where its realm
-  exists keeps the realm and its users.
+  backs it up with the installation. `tenant backup` carries the accounts and their credentials as `realm.json` when
+  `IdentityProvider:DatabaseConnectionString` is set. A tenant restored where its realm does not exist gets a new realm
+  in the `realm` step of `tenant restore`, which imports `realm.json` when the archive holds it, so people sign in as before. An archive
+  without `realm.json` gives a realm with no accounts, and the people need new invitations, see
+  [tenant restore](tenant-backup-and-restore.md#tenant-restore). A tenant restored where its realm exists keeps the realm and its users.

@@ -1,7 +1,7 @@
 # Authentication and authorization
 
-Detailed reference for sign-in and the session, machine callers, service accounts, the FAPI 2.0
-profile, authorization and the development users. The summary is in
+Detailed reference for sign-in and the session, machine callers, service accounts, authorization
+and the development users. The FAPI 2.0 profile is in [its own page](fapi2-profile.md). The summary is in
 [architecture.md](../architecture.md#authentication-and-authorization).
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
@@ -24,7 +24,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
   [session lifetimes and re-authentication](#session-lifetimes-and-re-authentication). Pushed authorization
   requests (PAR) stay off under the `standard` profile (D9). Under a tenant's
   `fapi2` profile they are required, see
-  [FAPI 2.0 profile](#fapi-20-profile).
+  [FAPI 2.0 profile](fapi2-profile.md).
   - The server registers one OIDC client per tenant. All of them share the
     callback path, and each one ignores a callback that arrives on another
     tenant's host.
@@ -100,6 +100,13 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     provider asks for credentials even when its own session is still open.
     The new session then holds a fresh login time, which
     [ending sessions](#session-lifetimes-and-re-authentication) needs.
+    With `action=` the redirect carries `kc_action` with that value, also
+    under fapi2, where it goes in the pushed authorization request. The
+    [account page](platform-pages.md#account-page) uses it to start the
+    identity provider's own steps. The allowed values are `UPDATE_PASSWORD`,
+    `CONFIGURE_TOTP` and `delete_credential:<id>`, where the id is letters,
+    digits and dashes. Any other value, including an empty one, is a `400`
+    problem details response.
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
     creates no session and redirects to the shell's sign-in page, `/?signIn=failed`,
@@ -109,8 +116,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     none. See the [home page](frontend.md) and
     [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - `POST /api/auth/sign-out` ends the session and returns `200` with
-    `{ "signOutUrl" }`. The SPA sends the browser there, and the identity
-    provider returns it to `/?signedOut` (_(planned for M31)_: the server first ends the identity provider's session by the stored `sid` through the admin API, as the realm's `axis-users` client, and then answers `/?signedOut` itself, so no question is asked; only when that call fails does it answer the end-session address as now), see
+    `{ "signOutUrl" }`. The server first ends the identity provider's session by the stored `sid` through the admin API, as the realm's `axis-users` client (a `404` counts as ended), and answers `/?signedOut`, so the browser visits no identity provider page.
+    It answers the end-session address instead, and the identity provider returns the browser to `/?signedOut`, only when the tenant has no users secret, the row holds no `sid`, or the call fails or takes over 5 seconds. See
     [platform home page](shell.md#platform-home-page). The SPA calls sign-out
     with `fetch` to send the CSRF header, which cannot follow a redirect to the
     identity provider as a page. A successful sign-out also
@@ -143,6 +150,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
       comes before the lookup of the id.
     - An id that is not one of the caller's live sessions of the request's
       host answers a `404` problem, whoever owns it.
+  - `GET /api/me/authenticators` lists the person's own authenticators and needs a session too, see the
+    [users page reference](user-administration.md#the-users-page).
 - **Audit.** Sign-in writes
   [audit records](storage.md#audit-records-and-sequence-counters)
   in the database of the tenant that the host resolves to, see
@@ -187,7 +196,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     session, null for the tenant's own hosts, and the alias of the provider that
     signed the person in, from the ID token's `identity_provider` claim, none for
     accounts, and the roles that each application's provider mapping gave, by application id. Given roles are not in the row, the session reads them from `axis.given_roles` at every request. On a preview tenant it reads those of its main tenant, from the main tenant's database. A session from before a column existed holds none of it and counts
-    as a sign-in through accounts on the tenant's own hosts. The table never holds the session id or a token, and none reaches the browser. _(planned for M31)_: it holds the identity provider's session id, the ID token's `sid` claim, which names that session for sign-out and grants nothing, so [D9](../decisions/d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) holds.
+    as a sign-in through accounts on the tenant's own hosts. The table never holds the session id or a token, and none reaches the browser. It holds the identity provider's session id, the ID token's `sid` claim, which names that session for sign-out and grants nothing, so [D9](../decisions/d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) holds.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
     session id, 256 bits, wrapped and protected by the key ring below. It
     holds no claim. The row's key is the SHA-256 hash of the id.
@@ -287,7 +296,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     application, so they count as application content. The session is checked
     before any `404`, so a caller without a session cannot learn which sites
     or pages exist;
-  - `GET /api/me` and `GET /api/about`;
+  - `GET /api/me`, `GET /api/about` and `GET /api/licences`;
+  - `GET /api/me/authenticators`;
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions`.
 
@@ -356,13 +366,13 @@ Two sessions exist after a sign-in: Axis's session and the identity
 provider's session. Axis does not control the identity provider's session.
 The two are coordinated only through `max_age` and `auth_time`, and the
 sign-out address. This holds under both
-[sign-in profiles](#fapi-20-profile).
+[sign-in profiles](fapi2-profile.md).
 
 | Under either profile | Axis's session                                                   | The identity provider's session                             |
 | -------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
 | What starts it       | The callback creates the row in `axis.sessions`                  | A login on the identity provider's page                     |
 | How long it lasts    | 8 hours after sign-in, or 1 hour without requests                | Set at the identity provider                                |
-| What ends it         | Sign-out, expiry, a new sign-in, an administrator's disable or authenticator reset, an operator or a tenant restore | Its own expiry, the `signOutUrl` that Axis sign-out uses (the admin API call by `sid`, _(planned for M31)_), or an administrator's disable or authenticator reset |
+| What ends it         | Sign-out, expiry, a new sign-in, an administrator's disable or authenticator reset, an operator or a tenant restore | Its own expiry, the admin API call by `sid` that Axis sign-out makes (or the `signOutUrl` when that call fails), or an administrator's disable or authenticator reset |
 
 - **Axis's session.** The lifetimes are those of the
   [session](#sign-in-and-the-session). A new sign-in ends the old session, an
@@ -374,8 +384,8 @@ sign-out address. This holds under both
 - **The identity provider's session.** Its lifetimes are set at the identity
   provider. The development realm sets none, so it keeps Keycloak's defaults.
   Axis sets them in every realm that `tenant create` makes: at most 8 hours, the lifetime of Axis's session.
-  Sign-out from Axis ends both sessions: it deletes the row and sends the
-  browser to the `signOutUrl`, which ends the identity provider's session (_(planned for M31)_: the server ends it by `sid` before it deletes the row).
+  Sign-out from Axis ends both sessions: it ends the identity provider's session by `sid` and deletes the row.
+  Only when that call fails does it send the browser to the `signOutUrl`, which ends the identity provider's session.
 - **When a person signs in again.** When Axis's session ends, the next request
   has no session, and the shell starts a sign-in. At the identity provider,
   the person logs in again whenever the last login there is older than 8 hours.
@@ -402,7 +412,7 @@ sign-out address. This holds under both
   Sign-out from Axis ends both.
 - **Under `fapi2`.** The lifetimes and the rules are the same. The one
   difference is where `max_age` goes: into the pushed authorization request
-  instead of the redirect, see [FAPI 2.0 profile](#fapi-20-profile).
+  instead of the redirect, see [FAPI 2.0 profile](fapi2-profile.md).
 
 ### Development users
 
@@ -445,7 +455,7 @@ systems.
   OAuth 2.0 access token from the tenant's `Oidc` authority through the
   client credentials grant, and sends it as `Authorization: Bearer <token>`.
   Under a tenant's `fapi2` profile it sends `Authorization: DPoP <token>` with
-  a DPoP proof, see [machine callers under `fapi2`](#fapi-20-profile).
+  a DPoP proof, see [machine callers under `fapi2`](fapi2-profile.md).
 - **Tenant setting.** The expected audience is a new tenant setting,
   `Oidc:EndpointAudience`. In the development tenant its value is
   `axis-endpoints`:
@@ -469,7 +479,7 @@ systems.
   [log inventory](log-inventory.md#security-events). Under
   the `fapi2` profile the `401` says `WWW-Authenticate: DPoP algs="ES256 PS256"`
   and the token must also be DPoP-bound, see
-  [machine callers under `fapi2`](#fapi-20-profile).
+  [machine callers under `fapi2`](fapi2-profile.md).
   - The signature, with the keys the authority publishes (its JWKS).
   - The issuer, which must equal the tenant's `Authority`. So another
     tenant's token is a `401`.
@@ -510,7 +520,7 @@ systems.
 - **Not bound to the sender.** Under `standard` a leaked token works until it
   expires. Under a tenant's `fapi2` profile only DPoP-bound tokens are
   accepted, so a stolen token is useless without the caller's private key. See
-  [machine callers under `fapi2`](#fapi-20-profile).
+  [machine callers under `fapi2`](fapi2-profile.md).
 - **Keycloak.** The development realm gets what the purchase request sample
   needs:
   - a confidential client `purchasing-system` with a service account, for
@@ -586,7 +596,7 @@ the operator commands take service accounts now.
   `WWW-Authenticate: Bearer`. Under the `fapi2` profile the token must also
   be DPoP-bound, the `401` says `WWW-Authenticate: DPoP algs="ES256 PS256"` and
   the token comes with a proof, see
-  [machine callers under `fapi2`](#fapi-20-profile).
+  [machine callers under `fapi2`](fapi2-profile.md).
 - **Order of checks.** The tenant, the token (`401`), the path (`404`), then
   the grant (`403`), as for a session. The checks that follow are those of
   each route.
@@ -611,115 +621,6 @@ the operator commands take service accounts now.
   `reporting-system`, which is the token's `sub` and so the caller id. The
   client secret is `reporting-system-development-secret`, for development only.
   Tests use it for allowed and denied calls.
-
-## FAPI 2.0 profile
-
-It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
-can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
-The tenant setting, the client key, the startup check, the machine callers, and
-PAR, `private_key_jwt`, the `iss` check, DPoP at sign-in and the client key rotation are built. The
-verification bullet below is _(planned for M32)_.
-
-- **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
-  `standard` when unset. Any other value stops the server's start, naming the
-  tenant. A preview tenant takes its main tenant's profile.
-- **Sign-in under `fapi2`.**
-  - The server sends the authorization request through pushed authorization
-    requests (PAR), PKCE `S256` included. The browser goes to the identity
-    provider with only the `request_uri` that comes back. A provider whose
-    metadata has no PAR endpoint fails the tenant's sign-in: the server logs a
-    warning that names the tenant, and the browser goes to `/?signIn=failed`.
-    No audit record is written, as no callback happened.
-  - The client authenticates at the PAR endpoint and at the token endpoint with
-    `private_key_jwt`: a JWT of 60 seconds, signed with the tenant's newest
-    client key, with the `kid` of that key. Its `iss` and `sub` are the client
-    id, its `aud` is the tenant's `Authority`, and each request has its own
-    `jti`. The server sends no client secret, even when the tenant has one.
-    Client keys are EC P-256 keys and the assertion is signed with ES256. RSA
-    keys are not supported.
-  - The server checks the `iss` parameter of the authorization response
-    (RFC 9207). It must equal the tenant's `Authority` character for
-    character, after one trailing `/` is removed from the `Authority`. A
-    callback with no `iss`, or a different one, creates no session and writes
-    `session.signInRefused` with the reason `invalidIssuer`. The check runs
-    after the state checks, so a callback with a bad state is still refused as
-    `invalidState` or `otherTenant`. The code is never sent to the token
-    endpoint. An error response from the provider is refused as
-    `providerError`, whatever its `iss`.
-  - The token request carries a DPoP proof (RFC 9449), signed with a new P-256
-    key that is made for each sign-in and thrown away after it. The proof has
-    `typ` `dpop+jwt`, the `htm` `POST` and the token endpoint as `htu`, and
-    holds only the public key. If the provider answers `use_dpop_nonce`, the
-    server sends the request once more, with the nonce in a new proof signed
-    with the same key and with a new client assertion. A second refusal fails
-    the sign-in as `providerError`. The authorization code is not bound to the
-    key, and the PAR request carries no proof. The server keeps no token after
-    sign-in, so the DPoP-bound access token is discarded.
-  - A `standard` tenant is unchanged: no PAR, no check of the `iss` response
-    parameter, no DPoP, and a client secret.
-- **Machine callers under `fapi2`.** Inbound endpoints and service accounts
-  accept only access tokens bound to a DPoP key (RFC 9449). A DPoP proof is a
-  short signed JWT that the caller makes for each request, so a stolen token is
-  useless without the caller's private key. Mutual TLS is not offered, because
-  the TLS proxy ends the client's TLS connection. The same rule holds on every
-  route that takes a bearer token, whichever is built first, because it sits
-  in the token check itself.
-  - The token arrives as `Authorization: DPoP <token>`, with one `DPoP` header
-    that holds the proof. The same token under `Authorization: Bearer` is
-    refused, and so is a plain bearer token.
-  - The proof's `typ` is `dpop+jwt` and its `alg` is `ES256` or `PS256`. Its
-    `jwk` header holds the public key, and a `jwk` with a private key is
-    refused. A `PS256` key must be an RSA key of at least 2048 bits, the floor
-    of FAPI 2.0. The signature is checked with that key.
-  - The proof's `htm` is the request's method. Its `htu` is the request's scheme,
-    host and path, without the query and fragment, after the forwarded headers
-    rules of
-    [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md). So a
-    proof made for the address the caller used passes behind a listed proxy,
-    and one made for the proxy's internal address does not.
-  - The proof's `ath` is the hash of the access token, so a proof made for one
-    token never works with another.
-  - The token's `cnf.jkt` must equal the thumbprint of the proof's key.
-  - The proof's `iat` must be within 60 seconds of the server's clock, on
-    either side, and its `jti` must not be blank.
-  - The server keeps no store of seen `jti` values and asks for no `nonce`. A
-    store on one replica would not stop a replay on another. So the same proof
-    can be replayed for up to 60 seconds, but only to the same method and
-    address and with the same token.
-  - Any failure is a `401` with `WWW-Authenticate: DPoP algs="ES256 PS256"`,
-    which never says which check failed. A tenant under `standard` answers
-    `WWW-Authenticate: Bearer`, as before.
-- **The client key.** A tenant under `fapi2` has a private key for
-  `private_key_jwt`, an EC P-256 key as a PEM (PKCS#8). Under `configuration` it comes from the environment,
-  such as `Tenants__default__Oidc__ClientKey`, as a PEM, with its key id in
-  `Oidc:ClientKeyId`. Under `directory` it is stored encrypted in the tenant
-  directory, with the field name `oidc_client_key` and its key id, see
-  [platform database](storage.md#platform-database). A tenant can hold two keys
-  under `directory`, the current one and the previous one, and one under
-  `configuration`. A tenant under `fapi2` without a key, or with a key without a
-  key id, stops the server's start.
-- **Rotation.** The tenant can hold a second key while the identity provider changes over. The server
-  signs with the newest key after its next refresh. `tenant oidc set --client-key` and `--retire-client-key`
-  change the keys, see [tenant setting commands](tenant-setting-commands.md#sign-in-settings). For a tenant
-  that signs in through its own realm, the command registers each key in the realm's clients and removes a
-  retired one, so the operator only adds, waits for the refresh and retires. A tenant that still signs in
-  through an outside identity provider, such as a restored one, has the operator register the public keys there.
-- **Verification** _(planned for M32)_. The OpenID Foundation's conformance suite runs by hand
-  against the development realm under `fapi2`. Its result is recorded in
-  [ASVS](asvs.md). Axis seeks no certification.
-- **Keycloak.** The development realm has a second client, `axis-fapi`, so
-  tests cover both profiles. Only an integration test host uses it. It has no
-  secret and authenticates with `private_key_jwt`, and it requires PAR and
-  PKCE `S256`. A client policy applies to a client that has a `fapi2` role, and
-  only `axis-fapi` has one, so it never touches the other clients. Its profile `axis-fapi2`
-  has three executors: the PKCE enforcer, the secure client authenticator that
-  allows only `client-jwt`, and the signature algorithm check for signed JWT
-  client assertions. The client's JWKS holds the public keys of two EC P-256
-  keys, `key-1` and `key-2`. It lists each key under that name and under its key id from
-  `tenant oidc set --client-key`, the JWK thumbprint, so Keycloak accepts both. Their private keys are committed as
-  `samples/keycloak/axis-fapi-key-1.pem` and `axis-fapi-key-2.pem`, for
-  development and tests only. They are registered on this client of the
-  development realm and nowhere else.
 
 ## Authorization
 

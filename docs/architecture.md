@@ -382,7 +382,7 @@ bindings work. Status rules and publishing are built too.
   - The session state is in the tenant database, so sign-out revokes it at once
     (D84). A tenant can turn on the FAPI 2.0 profile (D83). See
     [service accounts](reference/security.md#service-accounts) and
-    [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
+    [FAPI 2.0 profile](reference/fapi2-profile.md).
 - **Hardening (D82, D84, D85).**
   - The server sets security headers on every response and rate limits the routes a caller can
     repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
@@ -659,7 +659,7 @@ integration tests, on their Testcontainers PostgreSQL. See
 The integration tests share one Keycloak container with the development realm
 per run. It starts the first time a test needs it, so a run with no such test
 starts none. It is removed when the run ends. A test class never starts its own
-Keycloak. A test that changes realm state must not use the shared container.
+Keycloak. A test that changes realm state must not use the shared container. It keeps its data in a PostgreSQL container of its own, with a read-only role that has `SELECT` on the `credential` table.
 
 The integration tests also share one PostgreSQL 18 container per run. It starts
 the first time a test needs it, so a run with no such test starts none, and it is

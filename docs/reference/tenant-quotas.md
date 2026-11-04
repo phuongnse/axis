@@ -14,7 +14,7 @@ outside a cell. The worker in a cell also samples each tenant's storage and coun
 event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
 are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
 saves and publishes. So are `platform.tenant_leases`, the `concurrentQueries` lease of a record list read and a data
-source rows read, and the `concurrentConnectorCalls` lease of a connector or package call in the worker. The other `users` refusals, among them the first sign-in of a brokered user, and the other leases are
+source rows read, and the `concurrentConnectorCalls` lease of a connector or package call in the worker. The realm's first-login flow holds a deny step, and `RealmUsersQuota.RefreshAsync` switches it on at the `users` quota and off below it. In a cell the server calls it after a successful invite, enable or disable and after each brokered sign-in. The worker's hourly sampling in a cell also calls it for each tenant with realm details. So the `users` refusal of a brokered person's first sign-in is in place. A failed call is logged and never fails the command or the sign-in. The other leases are
 still planned, and so are the usage columns that the text marks. The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -85,7 +85,9 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider
   for the first time, and would pass the quota, is refused at the identity provider with a page
-  that asks them to contact their administrator.
+  that asks them to contact their administrator. The worker's hourly sample in a cell switches that
+  refusal, so a change of the quota, or of the users outside Axis, takes effect within about an hour of the
+  worker's next directory refresh.
 - **`applications`.** Creating an application in Studio is refused when the count would pass the
   quota. Existing applications keep working.
 
@@ -148,7 +150,10 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 
 - **Sampling.** A worker job in a cell samples each tenant's storage every hour. It keeps the
   newest sample in `platform.tenant_usage_latest`, which the storage check reads. A worker with no
-  `Cell:Id` measures nothing and writes no usage row.
+  `Cell:Id` measures nothing and writes no usage row. The same hourly pass brings the deny step of
+  each tenant with realm details in step with its `users` quota. A tenant without realm details, such as
+  a preview tenant, is skipped. A failure for one tenant is logged as a warning that names it, and the pass
+  goes on with the other tenants.
 - **Database bytes and file bytes.** File bytes are the on-disk size of the stored file contents,
   the table `axis.file_contents` with its indexes and TOAST data. Database bytes are
   `pg_database_size` of the tenant database minus the file bytes. A stored file sits inside the tenant

@@ -20,7 +20,7 @@ are an exception to the session and CSRF rules above, as are the
 [service accounts](security.md#service-accounts) of the record API, data source
 rows, process start and process inspection. Under a tenant's `fapi2` profile an endpoint accepts
 only DPoP-bound tokens, sent as `Authorization: DPoP` with a proof, see
-[machine callers under `fapi2`](security.md#fapi-20-profile).
+[machine callers under `fapi2`](fapi2-profile.md).
 
 ## The call
 

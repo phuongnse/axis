@@ -11,6 +11,9 @@ import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { designTokensFor } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
 import { Shell } from './Shell'
+import { ShellNavigation } from './ShellNavigation'
+import { ShellSidebar } from './shellSidebar'
+import { useShellSidebar } from './shellSidebarContext'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import { narrowWidthQuery } from './useNarrowWidth'
@@ -31,10 +34,6 @@ const navigationTexts = [
       'shell.navigation.menu': 'Menu',
       'shell.navigation.collapse': 'Collapse navigation',
       'shell.navigation.expand': 'Expand navigation',
-      'shell.serverStatus.title': 'Server status:',
-      'shell.serverStatus.ready': 'Ready',
-      'shell.serverStatus.checking': 'Checking',
-      'shell.serverStatus.unavailable': 'Unavailable',
       'shell.preferences.label': 'Language and theme',
       'site.title': 'Workspace',
     },
@@ -48,13 +47,8 @@ function Background() {
   return <span data-testid="background">{token.colorBgContainer}</span>
 }
 
-function renderShell(
-  locale: string,
-  initialEntries = ['/'],
-  navigation: typeof notesNavigation = [],
-  children: ReactNode = <DatePicker />,
-) {
-  return render(
+function shellFor(navigation: typeof notesNavigation, children: ReactNode, locale = 'en', initialEntries = ['/']) {
+  return (
     <MemoryRouter initialEntries={initialEntries}>
       <ThemeModeProvider>
         <TextProvider catalogs={navigation.length > 0 ? navigationTexts : catalogs} development={false}>
@@ -69,8 +63,17 @@ function renderShell(
           </Shell>
         </TextProvider>
       </ThemeModeProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+}
+
+function renderShell(
+  locale: string,
+  initialEntries = ['/'],
+  navigation: typeof notesNavigation = [],
+  children: ReactNode = <DatePicker />,
+) {
+  return render(shellFor(navigation, children, locale, initialEntries))
 }
 
 /** Answers the footer's GET /api/about with the version, or with 401 for nobody signed in. */
@@ -416,12 +419,116 @@ describe('Shell above narrow width', () => {
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('shows an open entry as its label alone, with no icon and no count', () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    const entries = screen.getAllByRole('menuitem')
+    expect(entries.map((entry) => entry.textContent)).toEqual(['Home', 'Notes', 'Categories'])
+    for (const entry of entries) {
+      expect(entry.querySelector('.anticon')).toBeNull()
+    }
+  })
+
+  it('shows a collapsed entry as an icon, with the label in a tooltip', async () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }))
+
+    for (const entry of screen.getAllByRole('menuitem')) {
+      expect(entry.querySelector('.anticon')).toHaveAttribute('aria-hidden', 'true')
+    }
+    await userEvent.hover(screen.getByRole('menuitem', { name: 'Categories' }))
+    await waitFor(() =>
+      expect(screen.getAllByRole('tooltip').map((tooltip) => tooltip.textContent)).toContain('Categories'),
+    )
+  })
+
   it('has no sidebar and no collapse button on a one-page site', () => {
     renderShell('en', ['/'], notesNavigation.slice(0, 1))
 
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Collapse navigation' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Expand navigation' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Shell sidebar claimed by a page', () => {
+  const claimed = [
+    { key: 'entities', path: '/studio/entities', label: 'Entities' },
+    { key: 'releases', path: '/studio/releases', label: 'Releases' },
+  ]
+
+  function ClaimedNavigation() {
+    const { collapsed } = useShellSidebar()
+    return <ShellNavigation entries={claimed} activeKey="entities" collapsed={collapsed} />
+  }
+
+  function claim() {
+    return (
+      <ShellSidebar>
+        <ClaimedNavigation />
+      </ShellSidebar>
+    )
+  }
+
+  it("replaces the site's entries and shows the collapse button on a one-page site", async () => {
+    renderShell('en', ['/'], notesNavigation.slice(0, 1), claim())
+
+    const navigation = within(await screen.findByRole('navigation', { name: 'Menu' }))
+    expect(navigation.getByRole('link', { name: 'Entities' })).toHaveAttribute('aria-current', 'page')
+    expect(navigation.getByRole('link', { name: 'Releases' })).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Collapse navigation' })).toBeVisible()
+  })
+
+  it("replaces the site's entries on a site with several", async () => {
+    renderShell('en', ['/'], notesNavigation, claim())
+
+    await screen.findByRole('link', { name: 'Entities' })
+    expect(screen.queryByRole('link', { name: 'Notes' })).toBeNull()
+  })
+
+  it("gives the sidebar back to the site's entries when the page stops claiming it", async () => {
+    const view = renderShell('en', ['/'], notesNavigation.slice(0, 1), claim())
+    await screen.findByRole('link', { name: 'Entities' })
+
+    view.rerender(shellFor(notesNavigation.slice(0, 1), <p>No claim</p>))
+
+    expect(screen.queryByRole('navigation', { name: 'Menu' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Collapse navigation' })).toBeNull()
+  })
+
+  it('collapses the claimed entries to icons with the collapse button', async () => {
+    renderShell('en', ['/'], notesNavigation.slice(0, 1), claim())
+    await screen.findByRole('link', { name: 'Entities' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }))
+
+    for (const entry of screen.getAllByRole('menuitem')) {
+      expect(entry.querySelector('.anticon')).toHaveAttribute('aria-hidden', 'true')
+    }
+    await userEvent.hover(screen.getByRole('menuitem', { name: 'Releases' }))
+    await waitFor(() =>
+      expect(screen.getAllByRole('tooltip').map((tooltip) => tooltip.textContent)).toContain('Releases'),
+    )
+  })
+})
+
+describe('Shell scrolling', () => {
+  it('keeps the header at the top while the page scrolls', () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    expect(screen.getByRole('banner')).toHaveStyle({ position: 'sticky', top: '0px' })
+  })
+
+  describe.each(['light', 'dark'] as const)('in %s mode', (mode) => {
+    it('sets the colour scheme of the page, so scrollbars follow the mode', () => {
+      localStorage.setItem('axis.themeMode', mode)
+      const { container } = renderShell('en')
+
+      expect(document.documentElement.style.colorScheme).toBe(mode)
+      expect(container.querySelector('[data-theme-mode]')).toHaveStyle({ colorScheme: mode })
+    })
   })
 })
 
@@ -444,11 +551,14 @@ describe('Shell footer', () => {
     expect(footer).not.toHaveTextContent(' · v')
   })
 
-  it('shows the readiness of the server', async () => {
+  it('shows the footer without a server status', async () => {
     renderShell('en', ['/'], notesNavigation)
 
-    expect(within(screen.getByRole('contentinfo')).getByText('Server status:')).toBeVisible()
-    expect(await screen.findByTestId('footer-server-status')).toBeInTheDocument()
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/about', expect.anything()))
+    const footer = screen.getByRole('contentinfo')
+    expect(footer).toHaveTextContent(`© ${new Date().getFullYear()} Axis`)
+    expect(footer).not.toHaveTextContent(/server status/i)
+    expect(vi.mocked(fetch).mock.calls.map(([input]) => input)).not.toContain('/health/ready')
   })
 })
 

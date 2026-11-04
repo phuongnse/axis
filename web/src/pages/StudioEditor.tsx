@@ -14,6 +14,7 @@ import {
   type MigrationChange,
 } from '../platform/entityMigrations'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { QuotaRefusedError } from '../platform/quota'
 import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
 import {
@@ -961,36 +962,42 @@ export function StudioEditor({
       )}
       {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
       {deleteFailed && <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />}
-      <Flex gap="small" align="center">
+      <AxisActionRow align="center">
         {undoable && (
           <>
-            <Button aria-keyshortcuts="Control+Z Meta+Z" disabled={history.past.length === 0 || saving} onClick={undo}>
+            <AxisButton
+              role="secondary"
+              aria-keyshortcuts="Control+Z Meta+Z"
+              disabled={history.past.length === 0 || saving}
+              onClick={undo}
+            >
               {t('shell.studio.undo')}
-            </Button>
-            <Button
+            </AxisButton>
+            <AxisButton
+              role="secondary"
               aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
               disabled={history.future.length === 0 || saving}
               onClick={redo}
             >
               {t('shell.studio.redo')}
-            </Button>
+            </AxisButton>
           </>
         )}
-        <Button
-          type="primary"
+        <AxisButton
+          role="finish"
           data-testid="studio-save"
           disabled={patch.length === 0 || jsonInvalid || problems.size > 0 || conflict || saving || reconnecting}
           onClick={save}
         >
           {t('shell.studio.save')}
-        </Button>
+        </AxisButton>
         {item.kind !== 'application' && (
-          <Button danger disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
+          <AxisButton role="destructive" disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
             {t('shell.studio.delete')}
-          </Button>
+          </AxisButton>
         )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
-      </Flex>
+      </AxisActionRow>
       {questions && (
         <EntityMigrationQuestions
           questions={questions}

@@ -5,6 +5,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -70,6 +71,7 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, Realm
         var ids = served.Select(row => row.Id).ToList();
         var bindings = await AdminCommands.ReadBindingsAsync(platform, ids, cancellationToken);
         var realmBindings = await AdminCommands.ReadRealmBindingsAsync(platform, ids, settings.Cipher, cancellationToken);
+        var realmLegal = await AdminCommands.ReadRealmLegalAsync(platform, served, cancellationToken);
         var records = served.ToDictionary(
             row => row.Id,
             row => new PublisherTenant(
@@ -82,6 +84,8 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, Realm
                     DirectoryTenantCatalog.Realm(row, settings.Cipher),
                     realmBindings[row.Id],
                     mail.For(DirectoryTenantCatalog.Email(row, settings.Cipher)),
+                    realmLegal[row.Id],
+                    DirectoryTenantCatalog.RealmUsers(row, settings.Cipher),
                     CancellationToken.None)),
             StringComparer.Ordinal);
         var previewIds = rows
@@ -143,7 +147,14 @@ internal sealed class ConfigurationPublisherTenants(
                 TenantSchemaVersion.Current,
                 Bindings(entry),
                 () => new ConfiguredTenantConnections(entry),
-                SyncRealm: TenantReleaseActivation.RealmSync(http, entry.Realm, entry.Bindings, mail.For(entry.Email), CancellationToken.None)));
+                SyncRealm: TenantReleaseActivation.RealmSync(
+                    http,
+                    entry.Realm,
+                    entry.Bindings,
+                    mail.For(entry.Email),
+                    RealmLegal.Of(entry.Legal, entry.Hosts, entry.HostSites),
+                    entry.RealmUsers,
+                    CancellationToken.None)));
         }
 
         var previewIds = entries
