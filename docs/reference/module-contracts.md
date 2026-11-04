@@ -18,7 +18,7 @@ The record API, a task completion, a process step, a connector or package output
 resolution answer a failing effect, audit the effect records and fire the data change triggers for
 them. Each of them fails as it already fails for a lifecycle refusal and logs the named point and the record id. An inbound endpoint call only creates records, so it makes no transition and runs no effect. The filters of a role's grant ceiling narrow its grants at run time. Studio's contract view, its added states and transitions, Relax,
 Undo relax, the off-standard mark beside Validate and Publish and the mark in the release history are built, see
-[in Studio](#in-studio). The rest of this page is built, except the customization layer parts _(planned for M25)_ and the parts marked _(planned for M29)_ or _(planned for M31)_.
+[in Studio](#in-studio). The rest of this page is built, except the parts marked _(planned for M29)_ or _(planned for M31)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -27,7 +27,7 @@ issues that build each check, as new rows of the [diagnostic codes](diagnostic-c
 
 A contract is a resource of the kind `contract`, one file for each module entity it covers. Only a
 module holds contracts: a `contract` file in an application folder is a diagnostic. A
-[customization layer](customization-layers.md) _(planned for M25)_ only adds states and transitions
+[customization layer](customization-layers.md) only adds states and transitions
 to a contract, so the contract stays apart from the parts of the module that an application
 changes.
 
@@ -121,7 +121,7 @@ module's `Decision` entity:
   as an entity validation does. A child entity has no contract of its own.
 - **Names.** Transitions, states, validations and effects each have a `name`, unique in its list
   ignoring letter case. The name is the element's API name and never changes meaning, see
-  [named points](#named-points). Labels and messages are texts whose keys start with
+  [named points](#named-points). A [customization layer](customization-layers.md#list-keys) finds a state or a transition by its `name`. Labels and messages are texts whose keys start with
   `<module id>.`.
 - **Expressions.** A guard, a core validation and an effect's values use the
   [expression language](expressions.md). They read the record's own fields and its child rows

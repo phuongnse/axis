@@ -6,7 +6,8 @@ The owner agreed this on 2026-11-01. It sets the shapes that
 [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) left open for customization
 layers, so that M25 can be broken into issues. It adds to D102 and changes one point of
 [D121](d121-how-a-module-contract-is-declared-and-checked.md): a layer may add states and
-transitions to a contract. Everything here is _(planned for M25)_.
+transitions to a contract. It is built, except changing a module field _(planned for M26)_. Upgrades
+are _(planned for M29)_.
 [Customization layers](../reference/customization-layers.md) holds the detail.
 
 - **One file for each changed resource:** a `layer` resource at

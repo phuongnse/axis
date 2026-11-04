@@ -9,7 +9,7 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
-references, names, policy matrix, module resource, module resource save, expression check and draft page metadata routes are built. It is agreed in
+references, names, policy matrix, module resource, module resource save, module resource reset, expression check, draft page metadata and module page metadata routes are built. It is agreed in
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md). Its edit routes never activate a release.
 Under `scripts/dev.sh`, a saved file restarts the server, which activates the folder, as a hand edit does today.
 A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch no database. Going live from Studio is
