@@ -650,8 +650,8 @@ function InlineRows({ node, root, rootValue, pointer, value, onChange, kind }: N
 
 /**
  * Proposed: a module's relaxed points in its row of the Modules table, the one place Settings shows them: each point in
- * words with its kind, a link to it on its contract's page, where it is relaxed or undone, with its reason under it. It
- * wraps as free text does. The module's
+ * two lines: its name, a link to it on its contract's page, where it is relaxed or undone and its kind is told, then its
+ * reason. It wraps as free text does. The module's
  * dialog has no list of them, as it holds only what it edits.
  */
 function RelaxedPointsCell({ moduleId }: { moduleId: string }) {
@@ -701,7 +701,6 @@ function RelaxedPointsCell({ moduleId }: { moduleId: string }) {
             ) : (
               <span>{words.title}</span>
             )}
-            {words.kind && <span style={{ color: colour.textMuted }}> · {words.kind}</span>}
             <div>{point.reason}</div>
           </div>
         )

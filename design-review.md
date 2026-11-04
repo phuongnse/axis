@@ -127,8 +127,9 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
   a line of its own between them.
 - **A dialog holds only what it edits:** Add module and Edit module have Module, Version, Roles and Connectors, and no
   read-only list of relaxed points. A table may show what its row's dialog does not edit, as long as the cell leads to
-  where it is edited: the Modules table's Relaxed points cell lists each point in words with its kind, a link to it on its
-  contract's page, and its reason under it, where it showed only an Off-standard tag. The Modules section's line says a point
+  where it is edited: the Modules table's Relaxed points cell lists each point in two lines, its name as a link to it on its
+  contract's page, then its reason, where it showed only an Off-standard tag. Its kind is left to the contract's page, to keep
+  the cell short. The Modules section's line says a point
   is relaxed or undone on its contract's page. Each thing is seen in one place and edited in one place.
 - **To change in the docs:** "Relaxed points in Settings" in `studio-resource-form.md`, which has Settings list them
   read-only in the module's dialog with a line that says where to relax.
