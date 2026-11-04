@@ -189,11 +189,12 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         },
       })
       assert.equal(result.status, 0, result.stderr)
-      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 24)
+      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 28)
       assert.match(result.stderr, /Attempt 1 of 4 failed with status 22/)
       const schemas = join(home, '.cache', 'axis-tools', `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
       assert.deepEqual(readdirSync(schemas).sort(), [
         'configmap-v1.json',
+        'cronjob-batch-v1.json',
         'deployment-apps-v1.json',
         'job-batch-v1.json',
         'service-v1.json',
@@ -248,7 +249,7 @@ describe('scripts/lib/tools.sh fetches the schema files that a cached folder lac
     assert.equal(result.status, 0, result.stderr)
     assert.equal(result.requested.length, 1)
     assert.match(result.requested[0], /\/v1\.33\.0-standalone-strict\/configmap-v1\.json$/)
-    assert.deepEqual(result.schemas, ['configmap-v1.json', 'deployment-apps-v1.json', 'job-batch-v1.json', 'service-v1.json'])
+    assert.deepEqual(result.schemas, ['configmap-v1.json', 'cronjob-batch-v1.json', 'deployment-apps-v1.json', 'job-batch-v1.json', 'service-v1.json'])
     assert.deepEqual(result.leftovers, [])
   })
 

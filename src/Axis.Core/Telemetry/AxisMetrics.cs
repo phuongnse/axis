@@ -46,6 +46,12 @@ public static class AxisMetrics
     /// <summary>The requests that a rate limit refused, by partition.</summary>
     public const string RateLimitRefusals = "axis.rate_limits.refused";
 
+    /// <summary>When each tenant's backup last succeeded, in Unix seconds, by tenant. A tenant that never succeeded has no point.</summary>
+    public const string BackupLastSuccess = "axis.backup.last_success";
+
+    /// <summary>Whether the last restore check of a tenant's archive passed, 1 or 0, by the source tenant.</summary>
+    public const string BackupRestoreCheck = "axis.backup.restore_check";
+
     /// <summary>
     /// The attribute keys that the HTTP client and DNS metrics keep. Any other key, such as
     /// <c>server.address</c>, <c>server.port</c>, <c>network.peer.address</c> or <c>dns.question.name</c>,
@@ -101,6 +107,24 @@ public static class AxisMetrics
         DeadLettersCreated,
         "{dead_letter}",
         "Dead letters that workers wrote.");
+
+    private static readonly Gauge<long> _backupLastSuccess = Meter.CreateGauge<long>(
+        BackupLastSuccess,
+        "s",
+        "When each tenant's backup last succeeded, in Unix seconds.");
+
+    private static readonly Gauge<long> _backupRestoreCheck = Meter.CreateGauge<long>(
+        BackupRestoreCheck,
+        "{result}",
+        "Whether the restore check of a tenant's archive passed, 1 or 0.");
+
+    /// <summary>Records when the backup of <paramref name="tenant"/> last succeeded.</summary>
+    public static void RecordBackupLastSuccess(string tenant, DateTimeOffset at) =>
+        _backupLastSuccess.Record(at.ToUnixTimeSeconds(), new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant));
+
+    /// <summary>Records the result of a restore check of the archive of <paramref name="tenant"/>: 1 when it passed, 0 when it failed.</summary>
+    public static void RecordBackupRestoreCheck(string tenant, bool passed) =>
+        _backupRestoreCheck.Record(passed ? 1 : 0, new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant));
 
     /// <summary>Records one run of a work item. <paramref name="outcome"/> is <c>completed</c>, <c>failed</c> or <c>fenced</c>.</summary>
     public static void RecordWorkItem(string tenant, string kind, string outcome, TimeSpan duration) =>

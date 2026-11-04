@@ -5,6 +5,7 @@ using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -36,6 +37,9 @@ internal interface IPublisherTenants
 
     /// <summary>The tenants to serve now, in ordinal order of id.</summary>
     Task<IReadOnlyList<PublisherTenant>> ReadAsync(CancellationToken cancellationToken);
+
+    /// <summary>Sends the wake signal for <paramref name="tenantId"/>, or nothing when the source has no platform database.</summary>
+    Task WakeAsync(string tenantId, CancellationToken cancellationToken);
 }
 
 /// <summary>The active tenants of the directory that are on this build's schema version.</summary>
@@ -45,6 +49,15 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, Realm
 
     public Task<string?> CheckAsync(CancellationToken cancellationToken) =>
         AdminCommands.PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+
+    public async Task WakeAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(settings.PlatformConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("SELECT pg_notify('axis_work', @tenant)", connection);
+        command.Parameters.AddWithValue("tenant", tenantId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<PublisherTenant>> ReadAsync(CancellationToken cancellationToken)
     {
@@ -58,6 +71,7 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, Realm
         var ids = served.Select(row => row.Id).ToList();
         var bindings = await AdminCommands.ReadBindingsAsync(platform, ids, cancellationToken);
         var realmBindings = await AdminCommands.ReadRealmBindingsAsync(platform, ids, settings.Cipher, cancellationToken);
+        var realmLegal = await AdminCommands.ReadRealmLegalAsync(platform, served, cancellationToken);
         var records = served.ToDictionary(
             row => row.Id,
             row => new PublisherTenant(
@@ -70,6 +84,8 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, Realm
                     DirectoryTenantCatalog.Realm(row, settings.Cipher),
                     realmBindings[row.Id],
                     mail.For(DirectoryTenantCatalog.Email(row, settings.Cipher)),
+                    realmLegal[row.Id],
+                    DirectoryTenantCatalog.RealmUsers(row, settings.Cipher),
                     CancellationToken.None)),
             StringComparer.Ordinal);
         var previewIds = rows
@@ -108,6 +124,8 @@ internal sealed class ConfigurationPublisherTenants(
 
     public Task<string?> CheckAsync(CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 
+    public Task WakeAsync(string tenantId, CancellationToken cancellationToken) => Task.CompletedTask;
+
     public async Task<IReadOnlyList<PublisherTenant>> ReadAsync(CancellationToken cancellationToken)
     {
         foreach (var entry in entries.Where(entry => !_migrated.Contains(entry.Id)))
@@ -129,7 +147,14 @@ internal sealed class ConfigurationPublisherTenants(
                 TenantSchemaVersion.Current,
                 Bindings(entry),
                 () => new ConfiguredTenantConnections(entry),
-                SyncRealm: TenantReleaseActivation.RealmSync(http, entry.Realm, entry.Bindings, mail.For(entry.Email), CancellationToken.None)));
+                SyncRealm: TenantReleaseActivation.RealmSync(
+                    http,
+                    entry.Realm,
+                    entry.Bindings,
+                    mail.For(entry.Email),
+                    RealmLegal.Of(entry.Legal, entry.Hosts, entry.HostSites),
+                    entry.RealmUsers,
+                    CancellationToken.None)));
         }
 
         var previewIds = entries

@@ -214,7 +214,7 @@ flowchart LR
 
 The planned controls are in [cell console](cell-console.md#sign-in), [what the console never shows](cell-console.md#what-the-console-never-shows),
 [provisioning API](tenant-lifecycle.md#provisioning-api), [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) and
-[hosts and certificates](cells.md#hosts-and-certificates). The read routes have one row, P110 in the
+[hosts and certificates](cells.md#hosts-and-certificates). The read routes have one row, P114 in the
 [product threat model](threat-model-product.md), because it is about the caller and the server: a tenant realm token or a
 token without the operator role reads the cell's tenants, and a tenant host answers `404` for every path under `/api/cell/`.
 No other row is written yet. A **Gap** row links the open issue that closes it, and no open M31 issue is linked here.

@@ -1,18 +1,19 @@
-import { Badge, Flex, Layout, Typography } from 'antd'
+import { Layout } from 'antd'
 import { useEffect, useState } from 'react'
 import { fetchAboutVersion } from './about'
-import { statusBadge, useServerStatus } from './serverStatus'
+import { LegalLine } from './LegalLine'
+import type { SiteLegal } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /**
- * The slim footer across the bottom of every site: the copyright, with the server's version for a
- * signed-in person only, and the server's readiness.
+ * The slim footer across the bottom of every site. At the start it holds the copyright, with the server's version
+ * for a signed-in person only. At the end it holds the legal line: Privacy and Terms when `legal` gives their
+ * addresses, and Licences always.
  */
-export function ShellFooter() {
-  const t = useText()
+export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
   const { colour, spacing } = useDesignTokens()
-  const status = useServerStatus()
+  const t = useText()
   const [year] = useState(() => new Date().getFullYear())
   // `null` when nobody is signed in, `undefined` while it loads or when loading failed.
   const [version, setVersion] = useState<string | null | undefined>(undefined)
@@ -38,17 +39,20 @@ export function ShellFooter() {
         borderTop: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Flex justify="space-between" align="center" gap={spacing.md} wrap>
-        <Typography.Text style={{ color: colour.textMuted }}>{copyright}</Typography.Text>
-        <Flex align="center" gap={spacing.sm}>
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.serverStatus.title')}</Typography.Text>
-          <Badge
-            data-testid="footer-server-status"
-            status={statusBadge[status]}
-            text={<span style={{ color: colour.textMuted }}>{t(`shell.serverStatus.${status}`)}</span>}
-          />
-        </Flex>
-      </Flex>
+      <LegalLine
+        copyright={copyright}
+        links={{
+          privacyUrl: legal?.privacyUrl ?? undefined,
+          termsUrl: legal?.termsUrl ?? undefined,
+          licencesUrl: '/licences',
+          texts: {
+            legal: t('shell.legal.label'),
+            privacy: t('shell.legal.privacy'),
+            terms: t('shell.legal.terms'),
+            licences: t('shell.legal.licences'),
+          },
+        }}
+      />
     </Layout.Footer>
   )
 }

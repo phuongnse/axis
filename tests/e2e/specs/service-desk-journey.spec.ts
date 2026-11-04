@@ -282,7 +282,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio`)
 
-    await page.getByRole('button', { name: 'New application', exact: true }).click()
+    await page.getByRole('button', { name: 'New application…', exact: true }).click()
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('ServiceDesk')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
@@ -1450,7 +1450,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 120_000,

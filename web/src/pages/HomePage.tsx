@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Empty, Flex, Spin, Typography } from 'antd'
-import { createElement, useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { createElement, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { isSignInCardAddress, startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
@@ -10,9 +10,9 @@ import { SiteMark } from '../platform/SiteMark'
 import { applicationTitle, fetchSites, localized, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { usePlatform } from './context'
-import { homeGridColumns } from './homeGrid'
+import { useHomeGrid } from './homeGrid'
+import { HomeTileStyle } from './HomeTileStyle'
 import { siteAddress } from '../platform/siteLinks'
 
 /** What the page loaded. `null` means that the call answered 401, and `'failed'` that it failed otherwise. */
@@ -31,24 +31,6 @@ function cardOfAddress(pathname: string, search: string): SignInCardState | null
     return null
   }
   return new URLSearchParams(search).get('signIn') === 'failed' ? 'refused' : 'signedOut'
-}
-
-function useHomeGrid(): CSSProperties {
-  const narrow = useNarrowWidth()
-  const { spacing } = useDesignTokens()
-  return {
-    display: 'grid',
-    gridTemplateColumns: narrow ? '1fr' : homeGridColumns(spacing.md),
-    gap: spacing.md,
-  }
-}
-
-/** The keyboard focus ring of a link tile. Inline styles cannot target focus. */
-function HomeTileStyle() {
-  const { colour } = useDesignTokens()
-  return (
-    <style>{`[data-home-tile]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: 2px; }`}</style>
-  )
 }
 
 /** The card on `/` that replaces the page when nobody is signed in: after a refused sign-in or after sign-out. */
@@ -127,11 +109,16 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
       >
         {createElement(navigationIcon(icon), { 'aria-hidden': true, style: { fontSize: 20 } })}
       </span>
-      <Flex vertical>
+      <Flex vertical style={{ minWidth: 0 }}>
         <Typography.Text strong style={{ color: colour.primaryText }}>
           {title}
         </Typography.Text>
-        <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>
+        <Typography.Paragraph
+          ellipsis={{ rows: 2, tooltip: description }}
+          style={{ margin: 0, color: colour.textMuted }}
+        >
+          {description}
+        </Typography.Paragraph>
       </Flex>
     </Link>
   )
@@ -240,7 +227,12 @@ function ApplicationCard({
                   {siteTitle(site, locale)}
                 </Typography.Text>
                 {siteDescription !== null && (
-                  <Typography.Text style={{ color: colour.textMuted }}>{siteDescription}</Typography.Text>
+                  <Typography.Paragraph
+                    ellipsis={{ rows: 2, tooltip: siteDescription }}
+                    style={{ margin: 0, color: colour.textMuted }}
+                  >
+                    {siteDescription}
+                  </Typography.Paragraph>
                 )}
               </Flex>
             </Link>

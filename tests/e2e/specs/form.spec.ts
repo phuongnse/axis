@@ -282,7 +282,7 @@ test('a category is picked in the lookup and shows on the saved note', async ({ 
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(`Lookup ${run}`)
-  await page.getByRole('button', { name: 'Choose', exact: true }).click()
+  await page.getByRole('button', { name: 'Choose…', exact: true }).click()
   const dialog = await waitForDialog(page)
   await dialog.getByRole('row', { name: new RegExp(category) }).click()
 
@@ -306,7 +306,7 @@ test('a category is picked in the lookup of a line item and shows on the saved l
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await page.getByRole('button', { name: 'Add row', exact: true }).click()
   await page.getByLabel(fieldLabel('Description 1')).fill('Pens')
-  await page.getByRole('button', { name: 'Choose Category 1', exact: true }).click()
+  await page.getByRole('button', { name: 'Choose… Category 1', exact: true }).click()
   const dialog = await waitForDialog(page)
   await dialog.getByRole('row', { name: new RegExp(category) }).click()
 

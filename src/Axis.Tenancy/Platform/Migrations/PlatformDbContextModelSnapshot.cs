@@ -106,6 +106,22 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("tenant_backup_keys", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantBackupRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("LastSuccessAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_success_at");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_tenant_backups");
+
+                    b.ToTable("tenant_backups", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -217,6 +233,41 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasDatabaseName("ix_tenant_hosts_tenant_id_site_path");
 
                     b.ToTable("tenant_hosts", "platform");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantLeaseRow", b =>
+                {
+                    b.Property<Guid>("LeaseId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Holder")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("holder");
+
+                    b.Property<string>("Quota")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("quota");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("LeaseId")
+                        .HasName("pk_tenant_leases");
+
+                    b.HasIndex("TenantId", "Quota", "ExpiresAt")
+                        .HasDatabaseName("ix_tenant_leases_tenant_id_quota_expires_at");
+
+                    b.ToTable("tenant_leases", "platform");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantPlatformProviderRow", b =>
@@ -407,6 +458,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("preview_of");
 
+                    b.Property<string>("PrivacyUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("privacy_url");
+
                     b.Property<byte[]>("RealmActivationClientSecret")
                         .HasColumnType("bytea")
                         .HasColumnName("realm_activation_client_secret");
@@ -471,6 +526,14 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<string>("TermsUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("terms_url");
+
+                    b.Property<string>("TermsVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("terms_version");
+
                     b.Property<long>("Version")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
@@ -499,6 +562,35 @@ namespace Axis.Tenancy.Platform.Migrations
                             t.HasCheckConstraint("ck_tenants_smtp_host", "smtp_host IS NOT NULL OR (smtp_port IS NULL AND smtp_use_tls IS NULL AND smtp_user_name IS NULL AND smtp_password IS NULL)");
 
                             t.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
+
+                            t.HasCheckConstraint("ck_tenants_terms_version", "(terms_url IS NULL) = (terms_version IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantSiteLegalRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("SitePath")
+                        .HasColumnType("text")
+                        .HasColumnName("site_path");
+
+                    b.Property<string>("PrivacyUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("privacy_url");
+
+                    b.Property<string>("TermsUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("terms_url");
+
+                    b.HasKey("TenantId", "SitePath")
+                        .HasName("pk_tenant_site_legal_links");
+
+                    b.ToTable("tenant_site_legal_links", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_site_legal_links_url", "privacy_url IS NOT NULL OR terms_url IS NOT NULL");
                         });
                 });
 
@@ -610,6 +702,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasConstraintName("fk_tenant_backup_keys_tenants_tenant_id");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantBackupRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_backups_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBindingRow", b =>
                 {
                     b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
@@ -650,6 +752,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasConstraintName("fk_tenant_hosts_tenants_tenant_id");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantLeaseRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_leases_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantPlatformProviderRow", b =>
                 {
                     b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
@@ -677,6 +789,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasForeignKey("PreviewOf")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenants_tenants_preview_of");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantSiteLegalRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_site_legal_links_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageLatestRow", b =>

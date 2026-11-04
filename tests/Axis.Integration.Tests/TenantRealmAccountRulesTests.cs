@@ -129,6 +129,32 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     }
 
     [Fact]
+    public async Task Send_link_for_an_unknown_username_returns_to_the_sign_in_page_with_a_notice_that_does_not_say_whether_an_account_matched()
+    {
+        var realm = await NewRealmAsync();
+        await AddClientAsync(realm);
+
+        var (loginHtml, jar) = await OpenLoginPageHtmlAsync(realm);
+        var forgotPasswordUrl = KeycloakSignIn.Property(loginHtml, "forgotPasswordUrl");
+        Assert.False(string.IsNullOrEmpty(forgotPasswordUrl), loginHtml);
+        var resetHtml = await FollowAsync(new HttpRequestMessage(HttpMethod.Get, new Uri(_baseAddress, forgotPasswordUrl)), jar);
+        Assert.Equal("resetPassword", KeycloakSignIn.Page(resetHtml));
+
+        using var send = new HttpRequestMessage(HttpMethod.Post, FormAction(resetHtml))
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["username"] = "nobody-here" }),
+        };
+        var html = await FollowAsync(send, jar);
+
+        Assert.Equal("signIn", KeycloakSignIn.Page(html));
+        Assert.Equal(
+            "If the email or username matches an account, we sent it a link to set a new password.",
+            KeycloakSignIn.Property(html, "notice"));
+        Assert.Null(KeycloakSignIn.Error(html));
+        Assert.Equal("en", KeycloakSignIn.Property(html, "locale"));
+    }
+
+    [Fact]
     public async Task After_5_wrong_passwords_the_right_one_gets_the_message_of_an_unknown_account()
     {
         var realm = await NewRealmAsync();
@@ -197,21 +223,43 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     }
 
     [Fact]
-    public async Task A_second_run_leaves_a_first_login_flow_that_only_creates_a_user_and_the_realm_allows_duplicate_emails()
+    public async Task A_second_run_leaves_a_first_login_flow_that_denies_then_creates_a_user_and_the_realm_allows_duplicate_emails()
     {
         var realm = await NewRealmAsync();
         await EnsureAsync(realm);
 
         var flow = Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias);
-        var executions = await GetJsonAsync($"admin/realms/{realm}/authentication/flows/{flow}/executions");
-        var only = Assert.Single(executions.EnumerateArray());
-        Assert.Equal("idp-create-user-if-unique", only.GetProperty("providerId").GetString());
-        Assert.Equal("REQUIRED", only.GetProperty("requirement").GetString());
+        var executions = (await GetJsonAsync($"admin/realms/{realm}/authentication/flows/{flow}/executions")).EnumerateArray().ToList();
+        Assert.Equal(2, executions.Count);
+        Assert.Equal("deny-access-authenticator", executions[0].GetProperty("providerId").GetString());
+        Assert.Equal("DISABLED", executions[0].GetProperty("requirement").GetString());
+        Assert.True(executions[0].TryGetProperty("authenticationConfig", out _));
+        Assert.Equal("idp-create-user-if-unique", executions[1].GetProperty("providerId").GetString());
+        Assert.Equal("REQUIRED", executions[1].GetProperty("requirement").GetString());
         var flows = await GetJsonAsync($"admin/realms/{realm}/authentication/flows");
         Assert.Equal(1, flows.EnumerateArray().Count(f => f.GetProperty("alias").GetString() == RealmSync.FirstLoginFlowAlias));
         var body = await GetJsonAsync($"admin/realms/{realm}");
         Assert.True(body.GetProperty("duplicateEmailsAllowed").GetBoolean());
         Assert.False(body.GetProperty("loginWithEmailAllowed").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_second_run_keeps_a_switched_on_users_quota_step_on()
+    {
+        var realm = await NewRealmAsync();
+        var path = $"admin/realms/{realm}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions";
+        var deny = (await GetJsonAsync(path)).EnumerateArray().First();
+        var representation = deny.Deserialize<Dictionary<string, JsonElement>>()!;
+        representation["requirement"] = JsonSerializer.SerializeToElement("REQUIRED");
+        using var switchedOn = await SendAsync(HttpMethod.Put, path, representation);
+        Assert.Equal(HttpStatusCode.NoContent, switchedOn.StatusCode);
+
+        await EnsureAsync(realm);
+
+        var executions = (await GetJsonAsync(path)).EnumerateArray().ToList();
+        Assert.Equal(2, executions.Count);
+        Assert.Equal("deny-access-authenticator", executions[0].GetProperty("providerId").GetString());
+        Assert.Equal("REQUIRED", executions[0].GetProperty("requirement").GetString());
     }
 
     [Fact]
@@ -397,13 +445,41 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     /// <summary>Opens the login page as a browser does and returns the address its form posts to and the cookies Keycloak set.</summary>
     private async Task<(string Action, Dictionary<string, string> Jar)> OpenLoginPageAsync(string realm)
     {
+        var (html, jar) = await OpenLoginPageHtmlAsync(realm);
+        return (FormAction(html), jar);
+    }
+
+    /// <summary>Opens the login page as a browser does and returns its page and the cookies Keycloak set.</summary>
+    private async Task<(string Html, Dictionary<string, string> Jar)> OpenLoginPageHtmlAsync(string realm)
+    {
         // Keycloak marks its cookies Secure, which a browser sends to http://localhost but a CookieContainer does not.
         using var page = await _http.GetAsync(AuthorizeUri(realm), TestContext.Current.CancellationToken);
         var html = await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(page.StatusCode == HttpStatusCode.OK, html);
         var jar = new Dictionary<string, string>();
         Remember(jar, page);
-        return (FormAction(html), jar);
+        return (html, jar);
+    }
+
+    /// <summary>Sends a request with the cookies of <paramref name="jar"/>, follows up to 3 redirects as a browser does and returns the page that ends them.</summary>
+    private async Task<string> FollowAsync(HttpRequestMessage first, Dictionary<string, string> jar)
+    {
+        var request = first;
+        for (var redirects = 0; ; redirects++)
+        {
+            request.Headers.Add("Cookie", CookieHeader(jar));
+            using var response = await _http.SendAsync(request, TestContext.Current.CancellationToken);
+            Remember(jar, response);
+            var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            if (response.StatusCode != HttpStatusCode.Found)
+            {
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                return html;
+            }
+
+            Assert.True(redirects < 3, "The page redirected more than 3 times.");
+            request = new HttpRequestMessage(HttpMethod.Get, new Uri(request.RequestUri!, response.Headers.Location!));
+        }
     }
 
     /// <summary>Posts the login form and returns the status, the page, the address that the next form on it posts to and the redirect address.</summary>

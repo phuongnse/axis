@@ -64,7 +64,8 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/`)
     await page.getByRole('banner').getByRole('button', { name: 'Switch to', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Studio', exact: true }).click()
-    // The sample is the only application, so it is picked without a choice.
+    // Studio lists the applications as tiles, even when there is only one, so the author picks it.
+    await page.getByTestId('studio-app-PurchaseRequests').click()
     await expect(page).toHaveURL(/\/studio\?app=PurchaseRequests$/)
     await page.getByRole('searchbox', { name: 'Search by name or id', exact: true }).fill('PurchaseRequest')
     await page.getByTestId(`studio-resource-${entity.id}`).click()

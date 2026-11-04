@@ -65,6 +65,7 @@ flowchart LR
 | P7 | A user reads or changes a page or record without a grant. | Browser and server | Elevation of privilege | High | **Mitigated** | `RecordPolicyTests` (every route is a 401 without a session and a 403 without a grant), `AuthorizationRouteTests` (every route off the open list answers 401 or 403 with no session and no token), `PageAccessTests` (a department manager can read purchase requests but cannot submit them). |
 | P8 | A session stays open past its time limit or after an admin ends it. | Browser and server | Elevation of privilege | Medium | **Mitigated** | `SessionLifetimeTests` (a session ends after an hour idle or eight hours after sign in), `AdminTenantSessionEndTests` (ending one person's sessions leaves other people signed in). |
 | P100 | Crafted input to a parser, in a record body, an import file or an expression, crashes the parser or reaches SQL. | Browser and server | Tampering | High | **Mitigated** | `RecordBodyFuzzTests` (a body is accepted or refused with a 400 problem), `RecordImportFuzzTests` (any bytes give rows or refusals), `ExpressionFuzzTests` (no SQL the translator emits holds input text outside a parameter). |
+| P113 | The public `/licences` page tells an attacker which package versions Axis runs, and so which known weaknesses to try. | Browser and server | Information disclosure | Low | **Mitigated** | `LicenceEndpointTests` (an anonymous caller gets a 401 problem, and only a signed-in caller gets the versions). The public `/licences.json` holds names and licences only. |
 
 ### Server and databases
 
@@ -124,7 +125,7 @@ flowchart LR
 | P21 | A machine caller reads data beyond its own routes or grants. | Caller and server | Information disclosure | High | **Mitigated** | `ServiceAccountRouteTests` (a service token without a session is a 401 on every route outside the service account and endpoint routes), `ServiceAccountRecordTests` (a service account has no grant on another entity, and its record filter hides rows, and the operator commands are 403 without a grant, 404 for a hidden subject and 401 for a token of the wrong audience), `DpopCallerTests` (a plain bearer token is a 401 on every bearer route under `fapi2`). |
 | P22 | A machine caller floods the server with requests. | Caller and server | Denial of service | Medium | **Mitigated** | `RateLimitRouteTests` (every route has a partition, and an endpoint route also has the bearer partition). |
 | P23 | A caller without the invoke grant starts a process. | Caller and server | Elevation of privilege | High | **Mitigated** | `EndpointCallTests` (a caller without the invoke grant gets a 403 before the body and writes nothing), `ServiceAccountRecordTests` (a service account without the grant gets a 403 on a data source and a process). |
-| P110 | A tenant realm token, or a token without the operator role, reads the tenants of the cell. | Caller and server | Elevation of privilege | High | **Mitigated** | `CellProvisioningApiTests` (no token and a tenant realm token are a 401, an operator realm client without the role is a 403, and a tenant host answers 404 for every path under `/api/cell/`), `CellRouteTests` (every route under `/api/cell/` carries the operator route marker and policy and allows no anonymous access). |
+| P114 | A tenant realm token, or a token without the operator role, reads the tenants of the cell. | Caller and server | Elevation of privilege | High | **Mitigated** | `CellProvisioningApiTests` (no token and a tenant realm token are a 401, an operator realm client without the role is a 403, and a tenant host answers 404 for every path under `/api/cell/`), `CellRouteTests` (every route under `/api/cell/` carries the operator route marker and policy and allows no anonymous access). |
 
 ### Worker and outside system
 
@@ -473,7 +474,7 @@ flowchart LR
 | P77 | The sign-in page shows whether an account exists or is locked. | Browser and sign-in page | Information disclosure | Low | **Delegated** | The identity provider: the sign-in page shows the same message in each case, see [accounts](user-administration.md#accounts). |
 | P78 | A provider signs a person in at an `acr` below its list. | Realm and brokered provider | Spoofing | High | **Mitigated** | `SiteSignInTests` (a site callback whose upstream `acr` the provider does not accept is refused), `SignInRefusalsTests` (an `acr` the list does not accept is refused as `acrNotAccepted`). The realm does not forward `acr_values`, so the callback check is the control. |
 | P79 | One person is split into two users, because a provider appears twice with other bindings or claims. | Realm and brokered provider | Spoofing | Medium | **Mitigated** | `RealmPlannerTests` (a provider that shares an issuer binding with another client is a conflict, and so is one with the same bindings and other claims), `AdminActivateRealmTests` (a conflicting second application fails activate with `AXC0291` and leaves the realm unchanged). |
-| P80 | Two people are merged into one user by a shared email. | Realm and brokered provider | Spoofing | High | **Mitigated** | `RealmBrokeredUsersTests` (one person signed in through two providers with the same email becomes two users), `TenantRealmAccountRulesTests` (a second run keeps a first-login flow that only creates a user, and the realm allows duplicate emails). |
+| P80 | Two people are merged into one user by a shared email. | Realm and brokered provider | Spoofing | High | **Mitigated** | `RealmBrokeredUsersTests` (one person signed in through two providers with the same email becomes two users), `TenantRealmAccountRulesTests` (a second run keeps a first-login flow that denies access, switched off, and then creates a user, and the realm allows duplicate emails). |
 | P81 | A person who signs in through a brokered provider skips its second step. | Realm and brokered provider | Spoofing | Medium | **Delegated** | The brokered provider's MFA policy. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) says a person who signs in through their organization follows that organization's MFA policy. |
 | P82 | A brokered OIDC token is forged or changed. | Realm and brokered provider | Tampering | High | **Delegated** | The identity provider checks the token signature with the provider's published keys, because the realm sync turns on signature validation for OIDC providers. See [identity provider](identity-provider.md). |
 | P83 | An ID token for one site's client is used on another site. | Server and realm | Spoofing | High | **Mitigated** | `SiteSignInTests` (an ID token for another site's client is refused and writes no session). |
@@ -493,6 +494,9 @@ flowchart LR
 | P97 | An invitation takes over an account, by a used email or by an old link after a resend. | Administrator and users page | Spoofing | Medium | **Mitigated** | `UserInvitationTests` (an invitation for a used email is refused, and a resent invitation ends the old link). |
 | P98 | A disabled person keeps a session or signs in. | Administrator and users page | Elevation of privilege | High | **Mitigated** | `UserCommandTests` (disabling a person ends their sessions and refuses their sign-in). |
 | P99 | An administrator locks the tenant out by disabling themselves or removing their own administrator role. | Administrator and users page | Denial of service | Medium | **Mitigated** | `UserCommandTests` (disabling oneself, and removing one's own administrator role, answer 409 and change nothing). |
+| P110 | A sign-out ends another person's identity provider session, or a slow identity provider holds sign-out up. | Server and realm | Denial of service | Medium | **Mitigated** | `SignInTests` (sign-out ends only the `sid` stored with the caller's own session, on the CSRF-checked route, and falls back to the end-session address when the call fails). |
+| P111 | Keycloak's account console is a second self-service surface, where a person changes their account outside Axis's account page. | Browser and sign-in page | Elevation of privilege | Low | **Mitigated** | `AdminTenantRealmTests` (`tenant create` turns off the `account-console` client and takes `manage-account` out of the default roles, and a rerun restores both after a hand change). |
+| P112 | A person denies accepting the terms, or a new terms version is never shown. | Server and realm | Repudiation | Low | **Mitigated** | `AdminTenantLegalRealmTests` (`tenant legal set` turns the Terms and Conditions action on with `defaultAction`, and a new `--terms-version` adds it to every user while a change of the addresses alone adds it to no one). Keycloak records when each person accepted. |
 
 An identity provider session's lifetime and CSRF are covered by P1, P2 and P8.
 
@@ -504,19 +508,6 @@ Open, waiting for an issue:
   [sites and sign-in](identity-provider.md#sites-and-sign-in).
 
 Each becomes a **Gap** row, linked to its issue, once that issue exists.
-
-Planned with [D128](../decisions/d128-rules-from-the-studio-review.md) _(planned for M31)_, each to become a row with
-its test when it is built:
-
-- (Denial of service, Medium) sign-out ends the identity provider's session through the admin API by `sid`. The
-  server ends only the `sid` stored with the caller's own session, on the CSRF-checked sign-out route, so no request
-  names a session to end.
-- (Elevation of privilege, Low) Keycloak's account console is a second self-service surface. `tenant create` turns it
-  off and drops `manage-account`, and Axis's account page starts only Keycloak's own application-initiated actions.
-- (Repudiation, Low) a person denies accepting the terms. Keycloak records when each person accepted, and a new terms
-  version asks everyone again.
-- (Information disclosure, Low) the public `/licences` page shows which libraries Axis ships. It shows versions only to
-  a signed-in person, as the footer does.
 
 ### Personal data
 

@@ -24,7 +24,8 @@ namespace Axis.Server.Records;
 /// <c>multipart/form-data</c> part named <c>file</c>, and answers 201 with the id, name, media type and size of the
 /// stored file. The file is stored as <c>pending</c>, owned by the session user, the entity and the field path. It
 /// belongs to no record until a record write attaches it. Service accounts may upload, as they may write records.
-/// A request is checked in order: session or bearer token (401), then the path, where an unknown entity, an unknown
+/// A request is checked in order: session or bearer token (401), then, in a cell, the tenant's storage quota (403
+/// <c>quota-exceeded</c>), then the path, where an unknown entity, an unknown
 /// field and a field that is no file field are 404, then the user's grant (403), then the request content type
 /// (415), and then the body. The grant is a <c>create</c> or <c>update</c> grant on the entity whose <c>fields</c>
 /// cover the field. For a child field it must cover the owner's child collection field. Record filters are not
@@ -70,7 +71,8 @@ internal static class FileEndpoints
         {
             endpoints.MapPost(pattern, UploadAsync)
                 .WithMetadata(ServiceAccountRoute.Instance)
-                .WithMetadata(new RequestSizeLimitAttribute(settings.MaxSize + RequestSizeMargin));
+                .WithMetadata(new RequestSizeLimitAttribute(settings.MaxSize + RequestSizeMargin))
+                .WithStorageQuota();
         }
 
         endpoints.MapGet("/api/apps/{app}/files/{id}", DownloadAsync)

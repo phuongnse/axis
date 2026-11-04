@@ -1,6 +1,7 @@
 using Axis.Configuration.Model;
 using Axis.Core.Telemetry;
 using Axis.Data.Records;
+using Axis.Processes.Work;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -55,7 +56,8 @@ public static class TriggerSchedules
     /// transaction's time, and a trigger with the same <c>schedule</c> and <c>timeZone</c> keeps its
     /// stored one, even a past one, so the worker catches up after downtime. A trigger the application had
     /// before and <paramref name="model"/> no longer has loses its row and its item. The row keeps
-    /// the trigger's latest run occurrence. Triggers of other applications are untouched.
+    /// the trigger's latest run occurrence. Triggers of other applications are untouched. A trigger whose occurrence has
+    /// already passed adds <paramref name="tenantId"/> to the open <see cref="WorkSignals"/> scope.
     /// </summary>
     public static async Task ActivateAsync(
         NpgsqlConnection connection,
@@ -119,6 +121,10 @@ public static class TriggerSchedules
             item.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
             item.Parameters.Add(new NpgsqlParameter("span", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentSpanId() ?? DBNull.Value });
             await item.ExecuteNonQueryAsync(cancellationToken);
+            if (due <= now)
+            {
+                WorkSignals.Add(tenantId);
+            }
         }
 
         var removed = new List<Guid>();

@@ -134,7 +134,8 @@ internal sealed partial class StartupActivation(
                 if (activated.Realm is { } plan)
                 {
                     using var client = http.CreateClient(nameof(StartupActivation));
-                    await ActivationRealmSync.SyncAsync(client, tenant.Realm, tenant.Bindings, plan, cancellationToken);
+                    await ActivationRealmSync.SyncAsync(
+                        client, tenant.Realm, tenant.Bindings, plan, RealmLegal.Of(tenant.Legal, tenant.Hosts, tenant.HostSites), tenant.RealmUsers, cancellationToken);
                 }
 
                 await TriggerSchedules.ActivateAsync(

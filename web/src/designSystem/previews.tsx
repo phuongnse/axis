@@ -279,6 +279,24 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Forgot password', draw: () => <IdentitySignIn page="resetPassword" />, frameHeight: 600 },
     { caption: 'Set password', draw: () => <IdentitySignIn page="updatePassword" />, frameHeight: 600 },
     { caption: 'Add an authenticator', draw: () => <IdentitySignIn page="addAuthenticator" />, frameHeight: 760 },
+    {
+      caption: 'Choose how to sign in',
+      draw: () => <IdentitySignIn page="selectAuthenticator" />,
+      frameHeight: 600,
+    },
+    { caption: 'Update your profile', draw: () => <IdentitySignIn page="updateProfile" />, frameHeight: 720 },
+    { caption: 'Sign out', draw: () => <IdentitySignIn page="signOut" />, frameHeight: 600 },
+    { caption: 'Notice', draw: () => <IdentitySignIn page="notice" />, frameHeight: 600 },
+    { caption: 'Error', draw: () => <IdentitySignIn page="error" />, frameHeight: 600 },
+    {
+      caption: 'Language and theme',
+      draw: () => (
+        <ClickOnMount selector='button[aria-label="Language and theme"]'>
+          <IdentitySignIn page="signIn" />
+        </ClickOnMount>
+      ),
+      frameHeight: 600,
+    },
   ],
 }
 

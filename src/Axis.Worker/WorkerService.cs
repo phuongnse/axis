@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
@@ -9,17 +10,21 @@ using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Npgsql;
 
 namespace Axis.Worker;
 
 /// <summary>
 /// Under the directory source it first reads the tenant directory, and retries until a read works. Then it runs
-/// <c>Worker:Concurrency</c> loops and one poll. The poll runs every <c>Worker:PollInterval</c>, and the loops share the
+/// <c>Worker:Concurrency</c> loops and one poll. The poll runs every <c>Worker:PollInterval</c>. A wake signal from <see cref="WakeSignalListener"/>
+/// checks its tenant at once and joins it to the list, without housekeeping and without moving the next poll, and a reconnect of the listener polls every tenant. The loops share the
 /// active list of <see cref="TenantRounds"/>: the tenants that have work due, which get <c>Worker:Quantum</c> work items times
 /// their <c>workerWeight</c> in each turn. A loop takes the tenant whose turn it is, claims and runs one of its work items, and
 /// takes the next. A tenant leaves the list when a claim finds nothing due and none of its other items runs, or when a run fails, and the next poll puts it back.
 /// So a tenant with a large backlog does not hold back the others, and a tenant alone runs at full speed.
+/// In a cell a call waits when its tenant has no <c>concurrentConnectorCalls</c> lease free: the claim leaves it due, the tenant's
+/// turn ends, and the tenant stays in the list, idle until one of its items ends or the next poll.
 /// The poll checks the tenants in ordinal order of their ids, then adds every tenant that is ready to the list in one step.
 /// A tenant whose database the server has not migrated yet is skipped until it has. Under the directory source the poll
 /// reads the directory again every <c>Tenancy:RefreshInterval</c>. The refresh pauses the loops, waits for the work items
@@ -34,7 +39,8 @@ namespace Axis.Worker;
 /// Once a tenant is ready, the poll also deletes its expired sessions and sweeps its deleted and abandoned files,
 /// and clears the files of its imports uploaded more than 24 hours ago, each at most every five minutes by its own clock,
 /// and deletes its old in-app notifications every 24 hours. In a cell it also measures the storage of each ready tenant every
-/// hour and records the sample in the platform database as the tenant's usage. That housekeeping is outside the rounds.
+/// hour and records the sample in the platform database as the tenant's usage, and brings the users quota step of the tenant's realm in step
+/// with its <c>users</c> quota. That housekeeping is outside the rounds.
 /// </summary>
 internal sealed partial class WorkerService(
     WorkerTenantCatalog tenants,
@@ -50,8 +56,10 @@ internal sealed partial class WorkerService(
     PackageCatalog packages,
     StartupCheckState checkState,
     CellOptions cell,
+    WakeSignals wake,
     ILogger<WorkerService> logger,
-    TenantUsageStore? usage = null) : BackgroundService
+    TenantUsageStore? usage = null,
+    IHttpClientFactory? httpClients = null) : BackgroundService
 {
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts
     // the worker, so a ready tenant is not checked again. A tenant whose database settings change, or that
@@ -122,42 +130,125 @@ internal sealed partial class WorkerService(
     }
 
     /// <summary>
-    /// Every poll interval, checks the tenants, runs their housekeeping, and puts the tenants that are ready in the active list.
+    /// Polls every tenant every poll interval. In between, a wake signal for a known tenant checks that tenant and puts it in the
+    /// active list at once, without housekeeping, and does not move the next poll. A signal for an unknown tenant is ignored.
     /// It is the only code that changes the ready state, so none of it is shared with the loops.
     /// </summary>
     private async Task PollAsync(CancellationToken stoppingToken)
     {
+        // A stopwatch, not the injected clock: a test may freeze that clock, and the next poll would never come.
         while (!stoppingToken.IsCancellationRequested)
         {
-            health.Polled();
-            await ReadSchemaVersionsAsync(stoppingToken);
-            await RefreshIfDueAsync(stoppingToken);
-
-            // Every check comes first, so the first tenant does not run alone while the checks of the next one run.
-            var ready = new List<string>();
-            var tenantIds = tenants.Tenants.Select(tenant => tenant.Id).Order(StringComparer.Ordinal).ToArray();
-            foreach (var tenantId in tenantIds)
+            await PollTenantsAsync(stoppingToken);
+            var nextPoll = Stopwatch.GetTimestamp() + (long)(options.PollInterval.TotalSeconds * Stopwatch.Frequency);
+            while (!stoppingToken.IsCancellationRequested)
             {
-                using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
+                var remaining = Stopwatch.GetElapsedTime(Stopwatch.GetTimestamp(), nextPoll);
+                if (remaining <= TimeSpan.Zero || !await WaitForWakeAsync(remaining, stoppingToken))
                 {
-                    if (await CheckTenantAsync(tenantId, stoppingToken))
-                    {
-                        ready.Add(tenantId);
-                    }
+                    break;
+                }
+
+                if (await WakeTenantsAsync(stoppingToken))
+                {
+                    break;
                 }
             }
-
-            foreach (var tenantId in ready)
-            {
-                using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
-                {
-                    await RunHousekeepingAsync(tenantId, stoppingToken);
-                }
-            }
-
-            _rounds.Join(ready);
-            await Task.Delay(options.PollInterval, stoppingToken);
         }
+    }
+
+    /// <summary>Waits until a wake signal is waiting or the time is up. It is false when the time is up.</summary>
+    private async Task<bool> WaitForWakeAsync(TimeSpan within, CancellationToken stoppingToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        timeout.CancelAfter(within);
+        try
+        {
+            return await wake.Reader.WaitToReadAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reads the wake signals that are waiting. Each known tenant is checked and put in the active list, and an unknown one is dropped.
+    /// It is true when an entry wakes every tenant: nothing is checked then, and the caller polls them all.
+    /// </summary>
+    private async Task<bool> WakeTenantsAsync(CancellationToken stoppingToken)
+    {
+        var woken = new HashSet<string>(StringComparer.Ordinal);
+        var all = false;
+        while (wake.Reader.TryRead(out var signal))
+        {
+            if (signal is null)
+            {
+                all = true;
+            }
+            else
+            {
+                woken.Add(signal);
+            }
+        }
+
+        if (all)
+        {
+            return true;
+        }
+
+        var ready = new List<string>();
+        foreach (var tenantId in woken)
+        {
+            if (tenants.Find(tenantId) is null)
+            {
+                LogWakeIgnored();
+                continue;
+            }
+
+            using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
+            {
+                if (await CheckTenantAsync(tenantId, stoppingToken))
+                {
+                    ready.Add(tenantId);
+                }
+            }
+        }
+
+        _rounds.Join(ready);
+        return false;
+    }
+
+    /// <summary>Checks the tenants, runs their housekeeping, and puts the tenants that are ready in the active list.</summary>
+    private async Task PollTenantsAsync(CancellationToken stoppingToken)
+    {
+        health.Polled();
+        await ReadSchemaVersionsAsync(stoppingToken);
+        await RefreshIfDueAsync(stoppingToken);
+
+        // Every check comes first, so the first tenant does not run alone while the checks of the next one run.
+        var ready = new List<string>();
+        var tenantIds = tenants.Tenants.Select(tenant => tenant.Id).Order(StringComparer.Ordinal).ToArray();
+        foreach (var tenantId in tenantIds)
+        {
+            using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
+            {
+                if (await CheckTenantAsync(tenantId, stoppingToken))
+                {
+                    ready.Add(tenantId);
+                }
+            }
+        }
+
+        foreach (var tenantId in ready)
+        {
+            using (logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
+            {
+                await RunHousekeepingAsync(tenantId, stoppingToken);
+            }
+        }
+
+        _rounds.Join(ready);
     }
 
     /// <summary>
@@ -199,6 +290,7 @@ internal sealed partial class WorkerService(
     private async Task RunNextAsync(int loop, string tenantId, long ticket, CancellationToken stoppingToken)
     {
         var found = false;
+        var waiting = false;
         var failed = false;
         try
         {
@@ -212,7 +304,9 @@ internal sealed partial class WorkerService(
             health.ItemStarted(loop);
             try
             {
-                found = await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken);
+                var next = await runner.TryRunNextAsync(tenantId, options.LeaseDuration, stoppingToken);
+                found = next == NextRun.Ran;
+                waiting = next == NextRun.Waiting;
             }
             finally
             {
@@ -232,6 +326,10 @@ internal sealed partial class WorkerService(
             if (failed)
             {
                 _rounds.Fail(tenantId);
+            }
+            else if (waiting)
+            {
+                _rounds.Wait(tenantId);
             }
             else
             {
@@ -592,9 +690,9 @@ internal sealed partial class WorkerService(
     }
 
     /// <summary>
-    /// In a cell, measures the storage of the tenant database and records the sample in the platform database, at most once per hour.
-    /// The time comes from the worker's clock. A database without the file table yet counts no file bytes. A database failure is logged
-    /// and does not hold back the work items. Self-hosted installations measure nothing.
+    /// In a cell, at most once per hour, measures the storage of the tenant database and records the sample in the platform database,
+    /// then brings the users quota step of the tenant's realm in step with its <c>users</c> quota. The time comes from the worker's clock.
+    /// A failure of either part is logged and does not hold back the other part or the work items. Self-hosted installations do neither.
     /// </summary>
     private async Task SampleUsageAsync(string tenantId, CancellationToken cancellationToken)
     {
@@ -603,6 +701,13 @@ internal sealed partial class WorkerService(
             return;
         }
 
+        await SampleStorageAsync(tenantId, usage, now, cancellationToken);
+        await RefreshUsersQuotaAsync(tenantId, cancellationToken);
+    }
+
+    // A database without the file table yet counts no file bytes.
+    private async Task SampleStorageAsync(string tenantId, TenantUsageStore store, DateTimeOffset now, CancellationToken cancellationToken)
+    {
         var previous = accessor.Current;
         accessor.Current = new TenantContext(tenantId);
         try
@@ -613,7 +718,7 @@ internal sealed partial class WorkerService(
                 sample = await TenantStorageSample.ReadAsync(connection, cancellationToken);
             }
 
-            await usage.RecordSampleAsync(tenantId, sample.DatabaseBytes, sample.FileBytes, now, cancellationToken);
+            await store.RecordSampleAsync(tenantId, sample.DatabaseBytes, sample.FileBytes, now, cancellationToken);
             LogUsageSampled(sample.DatabaseBytes, sample.FileBytes, tenantId);
         }
         catch (NpgsqlException exception)
@@ -623,6 +728,26 @@ internal sealed partial class WorkerService(
         finally
         {
             accessor.Current = previous;
+        }
+    }
+
+    // Only a tenant with realm details takes part. A failure of its identity provider is logged and the pass goes on.
+    private async Task RefreshUsersQuotaAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (httpClients is null || tenants.Find(tenantId) is not { Realm: { } realm, RealmUsers: { } users })
+        {
+            return;
+        }
+
+        try
+        {
+            using var client = httpClients.CreateClient(nameof(RealmUsersQuota));
+            var on = await new RealmUsersQuota(client).RefreshAsync(realm, users, quotas.Limit(tenantId, QuotaKeys.Users), cancellationToken);
+            LogUsersQuotaStep(tenantId, on ? "on" : "off");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            LogUsersQuotaRefreshFailed(exception, tenantId);
         }
     }
 
@@ -701,6 +826,9 @@ internal sealed partial class WorkerService(
     [LoggerMessage(LogLevel.Information, "Read the tenant directory again. {TenantCount} tenant(s) active, {CheckedCount} checked, {WithheldCount} withheld.")]
     private partial void LogRefreshed(int tenantCount, int checkedCount, int withheldCount);
 
+    [LoggerMessage(LogLevel.Debug, "A wake signal named a tenant that is not served. It is ignored.")]
+    private partial void LogWakeIgnored();
+
     [LoggerMessage(LogLevel.Information, "Waiting for the database of tenant {TenantId} to be migrated.")]
     private partial void LogWaitingForMigrations(string tenantId);
 
@@ -751,6 +879,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Debug, "Measured {DatabaseBytes} database byte(s) and {FileBytes} file byte(s) of tenant {TenantId}.")]
     private partial void LogUsageSampled(long databaseBytes, long fileBytes, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Bringing the users quota step of tenant {TenantId} in step failed.")]
+    private partial void LogUsersQuotaRefreshFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Debug, "The users quota step of tenant {TenantId} is {State}.")]
+    private partial void LogUsersQuotaStep(string tenantId, string state);
 
     [LoggerMessage(LogLevel.Error, "Running work items for tenant {TenantId} failed.")]
     private partial void LogRunFailed(Exception exception, string tenantId);

@@ -777,17 +777,16 @@ again with the stored input under the same operation identity.
 
 ## Worker settings
 
-The worker polls every tenant database in the `Tenants` section of its
-configuration (see
-[Tenant configuration](../architecture.md#tenant-configuration)).
-Under `Tenancy:Source=directory`, the worker reads its tenants from the
-[tenant directory](../architecture.md#tenant-directory) instead, over
-`ConnectionStrings:Platform`, and ignores a `Tenants` section. It needs
-`ConnectionStrings:Platform` and `Platform:SecretKey` and stops at start without
-them, and it stops at start when `Tenancy:RefreshInterval` is invalid. It never
-uses `ConnectionStrings:PlatformSchema`. It reads the directory at start. If that
-read fails, it logs the failure once, retries every `Worker:PollInterval` and is
-not ready until a read works.
+The worker polls every tenant database in the `Tenants` section of its configuration (see
+[Tenant configuration](../architecture.md#tenant-configuration)). Under `Tenancy:Source=directory`,
+the worker reads its tenants from the [tenant directory](../architecture.md#tenant-directory)
+instead, over `ConnectionStrings:Platform`, and ignores a `Tenants` section. It needs
+`ConnectionStrings:Platform` and `Platform:SecretKey` and stops at start without them, and it stops
+at start when `Tenancy:RefreshInterval` is invalid. It never uses
+`ConnectionStrings:PlatformSchema`. It reads the directory at start. If that read fails, it logs the
+failure once, retries every `Worker:PollInterval` and is not ready until a read works. Under the
+directory source the worker also listens on `axis_work` over one direct platform connection and
+connects again when it drops, see [waking a tenant](worker-scheduling.md#waking-a-tenant).
 
 Then it reads the directory again every `Tenancy:RefreshInterval`, without a restart. The refresh
 runs in the poll. It pauses the loops and waits for the items already running, not for a tenant's

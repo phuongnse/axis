@@ -400,7 +400,7 @@ test.describe('Studio creates a resource from a starter', () => {
   test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
-    await page.getByRole('button', { name: 'New resource', exact: true }).click()
+    await page.getByRole('button', { name: 'New resource…', exact: true }).click()
     const dialog = await waitForDialog(page, 'New resource')
     const create = dialog.getByRole('button', { name: 'Create', exact: true })
 

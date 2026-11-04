@@ -54,6 +54,53 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task A_publish_sends_the_wake_signal_only_when_a_schedule_trigger_is_already_past_due()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        await using var listener = await WorkSignalListener.StartAsync(scenario.Platform);
+        var snapshot = await SnapshotAsync(
+            null,
+            ("triggers/wake-test.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "trigger",
+              "name": "WakeTest",
+              "formatVersion": 1,
+              "type": "schedule",
+              "schedule": "0 6 * * *",
+              "timeZone": "UTC",
+              "dataSource": "WakeTestRequests",
+              "process": "PurchaseRequestApproval"
+            }
+            """),
+            ("data-sources/wake-test-requests.json", $$"""
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "kind": "dataSource",
+              "name": "WakeTestRequests",
+              "formatVersion": 1,
+              "entity": "PurchaseRequest",
+              "fields": [{ "name": "title", "path": "title" }]
+            }
+            """));
+
+        // The next occurrence is in the future, so the publish adds nothing that is due.
+        var first = await QueueAsync(scenario, ids[0], snapshot);
+        Assert.Equal(0, (await RunPublisherAsync(scenario, ids[0], first)).Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{first}'"));
+        Assert.False(await listener.ReceivesAsync(ids[0], TimeSpan.FromSeconds(2)));
+
+        // A trigger with the same schedule keeps its stored occurrence, which is now past.
+        await ScalarAsync(scenario, ids[0], "UPDATE axis.trigger_schedules SET next_occurrence_at = now() - interval '1 hour'");
+        var second = await QueueAsync(scenario, ids[0], snapshot);
+        Assert.Equal(0, (await RunPublisherAsync(scenario, ids[0], second)).Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{second}'"));
+        Assert.True(await listener.ReceivesAsync(ids[0], TimeSpan.FromSeconds(10)));
+        Assert.False(await listener.ReceivesAsync(ids[1], TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
     public async Task A_publish_that_does_not_compile_fails_with_the_diagnostic_and_keeps_the_active_release()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -302,6 +349,69 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(2, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Null(await ScalarAsync(scenario, ids[0], $"SELECT finished_at FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Equal(0L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action LIKE 'release.%'"));
+    }
+
+    [Fact]
+    public async Task A_validate_whose_tenant_connection_broke_is_claimed_again_at_once_and_succeeds()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null), kind: "validate");
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var text = new StringWriter();
+        var output = TextWriter.Synchronized(text);
+        var publisher = await StartPublisherAsync(scenario, Publisher.DefaultLeaseDuration, output);
+        try
+        {
+            await WaitForStatusAsync(scenario, ids[0], request, "running");
+            await CutWaitingConnectionAsync(scenario, ids[0]);
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
+        }
+        finally
+        {
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await publisher.StopAsync();
+        }
+
+        var lines = PublisherOutput(output, text).Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(2, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Contains($"{ids[0]} validate failed: terminating connection due to administrator command", lines);
+        Assert.Contains(lines, line => line.StartsWith($"{ids[0]} claim released:", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.EndsWith("NpgsqlTransaction", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_request_whose_tenant_connection_broke_on_its_third_claim_fails_with_AXC0215()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(scenario, ids[0], await SnapshotAsync(null), kind: "validate");
+        await SetRunningAsync(scenario, ids[0], request, 2, "now() - interval '1 minute'");
+        await using var hold = await ReleasesHold.StartAsync(scenario, ids[0]);
+        var publisher = await StartPublisherAsync(scenario, Publisher.DefaultLeaseDuration);
+        try
+        {
+            await WaitUntilAsync(
+                async () => (int)(await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"))! == 3,
+                "The publisher did not claim the request a third time.",
+                TimeSpan.FromSeconds(180));
+            await CutWaitingConnectionAsync(scenario, ids[0]);
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await WaitForStatusAsync(scenario, ids[0], request, "succeeded", "failed");
+        }
+        finally
+        {
+            await hold.ReleaseAfterAsync(TimeSpan.Zero);
+            await publisher.StopAsync();
+        }
+
+        Assert.Equal("failed", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(3, await ScalarAsync(scenario, ids[0], $"SELECT claims FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, ids[0], $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
+        var diagnostic = Assert.Single(diagnostics)!;
+        Assert.Equal("AXC0215", diagnostic["code"]!.GetValue<string>());
     }
 
     [Fact]
@@ -622,6 +732,16 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         public async ValueTask DisposeAsync() => await _connection.DisposeAsync();
     }
 
+    // Ends the session of the publisher that waits on the lock of ReleasesHold, as a crash of the database connection does.
+    private static async Task CutWaitingConnectionAsync(AdminScenario scenario, string tenant) =>
+        await WaitUntilAsync(
+            async () => (long)(await PostgreSqlServer.AdminScalarAsync(
+                new NpgsqlConnectionStringBuilder(scenario.Platform) { Database = "postgres" }.ConnectionString,
+                $"SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = 'axis_{tenant}' AND wait_event_type = 'Lock'",
+                CancellationToken))! >= 1,
+            "No session of the publisher waited on the lock.",
+            TimeSpan.FromSeconds(60));
+
     // Makes the row look as if a publisher claimed it and then died: running, with the given claims and lease.
     private static async Task SetRunningAsync(AdminScenario scenario, string tenant, Guid request, int claims, string leaseSql) =>
         await ScalarAsync(
@@ -814,7 +934,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     // Every JSON file of the sample, as the publish route will store it. A title field that is replaced makes the entity not compile.
-    private static async Task<string> SnapshotAsync(string? breakTitle)
+    private static async Task<string> SnapshotAsync(string? breakTitle, params (string File, string Content)[] extra)
     {
         var items = new JsonArray();
         foreach (var path in Directory.EnumerateFiles(_sample, "*.json", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
@@ -830,6 +950,11 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
             }
 
             items.Add(new JsonObject { ["file"] = file, ["version"] = Convert.ToHexStringLower(SHA256.HashData(bytes)), ["content"] = content });
+        }
+
+        foreach (var (file, content) in extra)
+        {
+            items.Add(new JsonObject { ["file"] = file, ["version"] = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))), ["content"] = content });
         }
 
         return items.ToJsonString();

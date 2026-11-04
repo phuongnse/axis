@@ -74,6 +74,9 @@ namespace Axis.Server.Studio;
 /// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
 /// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
+/// In a cell, the create, patch, <c>changes</c>, module resource save and text write routes check the tenant's storage
+/// quota (403 <c>quota-exceeded</c>) right after the session, and a delete never does, see
+/// <c>docs/reference/tenant-quotas.md#refusals</c>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
 /// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
 /// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. Each item has
@@ -88,18 +91,18 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceAsync);
-        endpoints.MapPut("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceSaveAsync);
-        endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync);
-        endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync);
+        endpoints.MapPut("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceSaveAsync).WithStorageQuota();
+        endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync).WithStorageQuota();
+        endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync).WithStorageQuota();
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
         endpoints.MapGet("/api/studio/apps/{application}/names", NamesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/policy-matrix", PolicyMatrixAsync);
         endpoints.MapGet("/api/studio/apps/{application}/releases", ReleasesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}/references", ResourceReferencesAsync);
         endpoints.MapGet("/api/studio/apps/{application}/texts/{key}/references", TextReferencesAsync);
-        endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync);
+        endpoints.MapPatch("/api/studio/apps/{application}/resources/{id}", PatchAsync).WithStorageQuota();
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
-        endpoints.MapPut("/api/studio/apps/{application}/texts/{key}", TextWriteAsync);
+        endpoints.MapPut("/api/studio/apps/{application}/texts/{key}", TextWriteAsync).WithStorageQuota();
         endpoints.MapStudioPublishEndpoints();
         endpoints.MapStudioExpressionEndpoints();
         endpoints.MapStudioPageMetadataEndpoints();
@@ -114,8 +117,12 @@ internal static class StudioEndpoints
             return refusal;
         }
 
-        return Results.Ok(new StudioApplicationListResponse(
-            [.. StudioFolder.Applications(ForRequest(httpContext, options)).Select(name => new StudioApplicationItem(name))]));
+        return Results.Ok(new StudioApplicationListResponse([.. StudioFolder.ApplicationFolders(ForRequest(httpContext, options))
+            .Select(application =>
+            {
+                var (titles, descriptions) = StudioApplicationTexts.Read(application.Folder);
+                return new StudioApplicationItem(application.Name, titles, descriptions);
+            })]));
     }
 
     private static async Task<IResult> ListAsync(
@@ -957,8 +964,12 @@ internal static class StudioEndpoints
 /// <summary>The applications of the Studio folders, in folder order.</summary>
 internal sealed record StudioApplicationListResponse(IReadOnlyList<StudioApplicationItem> Items);
 
-/// <summary>One application in the list: the <c>name</c> in its manifest.</summary>
-internal sealed record StudioApplicationItem(string Name);
+/// <summary>
+/// One application in the list: the <c>name</c> in its manifest, and its title and description by locale. A locale
+/// whose text resource lacks the manifest's <c>label</c> or <c>description</c> key is left out.
+/// </summary>
+internal sealed record StudioApplicationItem(
+    string Name, IReadOnlyDictionary<string, string> Titles, IReadOnlyDictionary<string, string> Descriptions);
 
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
 internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceItem> Items);

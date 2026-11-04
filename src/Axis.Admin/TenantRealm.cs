@@ -24,13 +24,15 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// a password reset link that lasts 30 minutes and no self-registration. It offers the platform locales
 /// (<see cref="PlatformLocales"/>) on its sign-in pages. It allows two users to share an email, which
 /// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
-/// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user, and it turns off the Verify Profile step. It also gets three clients: the platform client
+/// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose steps are a deny step that <see cref="RealmUsersQuota"/> switches, off when made, and one that creates a new user, and it turns off the Verify Profile step. It also turns off the account console client and takes <c>manage-account</c> out of the
+/// realm's default roles, as Axis's account page replaces Keycloak's. It also gets three clients: the platform client
 /// <c>axis</c>, which <see cref="EnsureForTenantAsync"/> gives the redirect addresses of the tenant's hosts, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
 /// Keycloak requires for them and which also covers every realm setting), and <c>axis-users</c> with
-/// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
-/// must hold the theme and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
-/// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the theme again. An error names the step and the status code,
+/// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme and <see cref="EmailTheme"/> as its email theme. The identity provider
+/// must hold the themes and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
+/// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the themes, the client and the roles again. An error names the step and the status code,
 /// never a response body or a secret. A server error (5xx) makes it read the realm again and repeat, up to three attempts.
+/// <see cref="DeleteAsync"/> deletes a realm, and a realm that is already gone counts as deleted.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 {
@@ -42,6 +44,9 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// <summary>The Axis sign-in theme that the realm uses as its login theme. The identity provider holds it in its <c>themes</c> folder.</summary>
     public const string LoginTheme = "axis";
 
+    /// <summary>The Axis email theme that the realm uses as its email theme. The identity provider holds it in its <c>themes</c> folder, beside the login theme.</summary>
+    public const string EmailTheme = "axis";
+
     /// <summary>The file in the identity provider's <c>data/password-blacklists</c> folder that the password policy names.</summary>
     public const string BreachedPasswordList = "axis-breached-passwords.txt";
 
@@ -49,6 +54,9 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     public const int PasswordResetLifespanSeconds = 1800;
 
     private const string ManagementClientId = "realm-management";
+    private const string AccountConsoleClientId = "account-console";
+    private const string AccountClientId = "account";
+    private const string ManageAccountRole = "manage-account";
     private const string CreateUserIfUnique = "idp-create-user-if-unique";
     private const int ServerErrorAttempts = 3;
 
@@ -129,6 +137,19 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return true;
     }
 
+    /// <summary>Deletes the realm with its users and clients. A realm that does not exist (404) counts as deleted. Any other failure throws.</summary>
+    public async Task DeleteAsync(string realm, CancellationToken cancellationToken)
+    {
+        var token = await AdminTokenAsync(cancellationToken);
+        using var response = await SendAsync(token, HttpMethod.Delete, $"admin/realms/{Uri.EscapeDataString(realm)}", null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return;
+        }
+
+        EnsureSuccess(response, "delete the realm");
+    }
+
     public async Task EnsureAsync(
         string realm, string displayName, TenantRealmSecrets secrets, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
     {
@@ -158,6 +179,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         await EnsureSecondStepAsync(token, realmPath, cancellationToken);
         await EnsureFirstLoginFlowAsync(token, realmPath, cancellationToken);
         await EnsureNoProfileReviewAsync(token, realmPath, cancellationToken);
+        await EnsureNoAccountConsoleAsync(token, realmPath, cancellationToken);
         await EnsureClientAsync(token, realmPath, PlatformClient(secrets.Platform), cancellationToken);
         var activation = await EnsureClientAsync(token, realmPath, ServiceClient(ActivationClientId, secrets.Activation), cancellationToken);
         var users = await EnsureClientAsync(token, realmPath, ServiceClient(UsersClientId, secrets.Users), cancellationToken);
@@ -212,6 +234,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["enabled"] = true,
             ["displayName"] = displayName,
             ["loginTheme"] = LoginTheme,
+            ["emailTheme"] = EmailTheme,
             ["ssoSessionMaxLifespan"] = SessionMaxLifespanSeconds,
             ["ssoSessionMaxLifespanRememberMe"] = SessionMaxLifespanSeconds,
             ["registrationAllowed"] = false,
@@ -313,8 +336,53 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     }
 
     /// <summary>
-    /// Makes the flow that brokered providers use at a person's first sign-in. Its one required step creates a new user if
-    /// none has the username. It has no step that reviews the profile, offers to link an existing user or asks for an email.
+    /// Turns off Keycloak's account console, and takes <c>manage-account</c> out of the realm's default roles, so Axis's account
+    /// page is the only self-service page. The older <c>account</c> client and the <c>view-profile</c> role stay, as Keycloak's
+    /// application-initiated actions may need them. A realm without the console, or whose default roles lack the role, has nothing to change.
+    /// </summary>
+    internal async Task EnsureNoAccountConsoleAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        var console = await ClientUuidAsync(token, realmPath, AccountConsoleClientId, cancellationToken);
+        if (console is not null)
+        {
+            var path = $"{realmPath}/clients/{console}";
+            using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
+            EnsureSuccess(response, "read the account console");
+            var client = (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).Deserialize<Dictionary<string, JsonElement>>()!;
+            if (!client.TryGetValue("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.False)
+            {
+                client["enabled"] = JsonSerializer.SerializeToElement(false);
+                using var updated = await SendAsync(token, HttpMethod.Put, path, client, cancellationToken);
+                EnsureSuccess(updated, "turn off the account console");
+            }
+        }
+
+        var account = await ClientUuidAsync(token, realmPath, AccountClientId, cancellationToken);
+        using var realm = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
+        EnsureSuccess(realm, "read the realm");
+        var defaultRole = (await realm.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).TryGetProperty("defaultRole", out var role) ? role : (JsonElement?)null;
+        if (account is null || defaultRole is null)
+        {
+            return;
+        }
+
+        var composites = $"{realmPath}/roles-by-id/{Uri.EscapeDataString(defaultRole.Value.GetProperty("id").GetString()!)}/composites";
+        using var held = await SendAsync(token, HttpMethod.Get, $"{composites}/clients/{account}", null, cancellationToken);
+        EnsureSuccess(held, "read the default roles");
+        var manage = (await held.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Where(composite => composite.GetProperty("name").GetString() == ManageAccountRole).ToList();
+        if (manage.Count > 0)
+        {
+            using var removed = await SendAsync(token, HttpMethod.Delete, composites, manage, cancellationToken);
+            EnsureSuccess(removed, "remove manage-account from the default roles");
+        }
+    }
+
+    /// <summary>
+    /// Makes the flow that brokered providers use at a person's first sign-in. Its first step denies access with the message of
+    /// <see cref="RealmUsersQuota.RefusalMessageKey"/>. It is off when made, a rerun leaves it as it is, and <see cref="RealmUsersQuota"/> switches it.
+    /// Its second step is required and creates a new user if none has the username. It has no step that reviews the profile,
+    /// offers to link an existing user or asks for an email.
     /// </summary>
     private async Task EnsureFirstLoginFlowAsync(string token, string realmPath, CancellationToken cancellationToken)
     {
@@ -338,6 +406,15 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
         var path = $"{realmPath}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions";
         var executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        if (!executions.Any(execution => ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider))
+        {
+            // Keycloak adds a new step as DISABLED, which is how the quota step starts. A rerun never sets its requirement.
+            using var added = await SendAsync(
+                token, HttpMethod.Post, $"{path}/execution", new Dictionary<string, object?> { ["provider"] = RealmUsersQuota.DenyAccessProvider }, cancellationToken);
+            EnsureSuccess(added, "add the users quota step");
+            executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        }
+
         if (!executions.Any(execution => ProviderOf(execution) == CreateUserIfUnique))
         {
             using var added = await SendAsync(
@@ -346,9 +423,17 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             executions = await ReadExecutionsAsync(token, path, cancellationToken);
         }
 
+        var keptDeny = false;
         var keptCreate = false;
+        var deletedAny = false;
         foreach (var execution in executions)
         {
+            if (ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider && !keptDeny)
+            {
+                keptDeny = true;
+                continue;
+            }
+
             if (ProviderOf(execution) == CreateUserIfUnique && !keptCreate)
             {
                 keptCreate = true;
@@ -358,6 +443,36 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             using var deleted = await SendAsync(
                 token, HttpMethod.Delete, $"{realmPath}/authentication/executions/{execution.GetProperty("id").GetString()}", null, cancellationToken);
             EnsureSuccess(deleted, "remove another step of the first-login flow");
+            deletedAny = true;
+        }
+
+        if (deletedAny)
+        {
+            executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        }
+
+        var denyIndex = executions.FindIndex(execution => ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider);
+        var createIndex = executions.FindIndex(execution => ProviderOf(execution) == CreateUserIfUnique);
+        var deny = executions[denyIndex];
+        if (denyIndex > createIndex)
+        {
+            using var raised = await SendAsync(
+                token, HttpMethod.Post, $"{realmPath}/authentication/executions/{deny.GetProperty("id").GetString()}/raise-priority", null, cancellationToken);
+            EnsureSuccess(raised, "move the users quota step first");
+            executions = await ReadExecutionsAsync(token, path, cancellationToken);
+            deny = executions.First(execution => ProviderOf(execution) == RealmUsersQuota.DenyAccessProvider);
+        }
+
+        if (!deny.TryGetProperty("authenticationConfig", out _))
+        {
+            var config = new Dictionary<string, object?>
+            {
+                ["alias"] = "axis users quota",
+                ["config"] = new Dictionary<string, string> { [RealmUsersQuota.DenyMessageConfigKey] = RealmUsersQuota.RefusalMessageKey },
+            };
+            using var configured = await SendAsync(
+                token, HttpMethod.Post, $"{realmPath}/authentication/executions/{deny.GetProperty("id").GetString()}/config", config, cancellationToken);
+            EnsureSuccess(configured, "set the users quota message");
         }
 
         var create = executions.First(execution => ProviderOf(execution) == CreateUserIfUnique);

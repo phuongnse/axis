@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { identityAddAuthenticatorContext, identityQrCode } from '../designSystem/fixtures'
+import { ThemeModeProvider } from '../platform/theme'
 import { AddAuthenticatorPage } from './AddAuthenticatorPage'
 import type { AddAuthenticatorContext } from './signInContext'
 
@@ -22,7 +23,7 @@ function boxes(container: HTMLElement) {
 
 describe('AddAuthenticatorPage', () => {
   it('shows the QR code and the key to type by hand under the title and the organization', () => {
-    render(<AddAuthenticatorPage context={context} />)
+    render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.getByText('Add an authenticator')).toBeInTheDocument()
     expect(screen.getByText('Contoso')).toBeInTheDocument()
@@ -36,7 +37,7 @@ describe('AddAuthenticatorPage', () => {
   })
 
   it('posts totp, totpSecret and userLabel to the login action as a real form', async () => {
-    const { container } = render(<AddAuthenticatorPage context={context} />)
+    const { container } = render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(form(container)).toHaveAttribute('method', 'post')
     expect(form(container)).toHaveAttribute('action', '/add?code=1')
@@ -51,29 +52,31 @@ describe('AddAuthenticatorPage', () => {
   })
 
   it('posts mode only when the context has one', () => {
-    const none = render(<AddAuthenticatorPage context={context} />)
+    const none = render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
     expect(form(none.container).querySelector('input[name="mode"]')).not.toBeInTheDocument()
     none.unmount()
 
-    const manual = render(<AddAuthenticatorPage context={{ ...context, mode: 'manual' }} />)
+    const manual = render(<AddAuthenticatorPage context={{ ...context, mode: 'manual' }} />, {
+      wrapper: ThemeModeProvider,
+    })
     expect(form(manual.container).querySelector('input[name="mode"]')).toHaveValue('manual')
   })
 
   it('asks for a device name only when the person already has an authenticator', async () => {
-    const { unmount } = render(<AddAuthenticatorPage context={context} />)
+    const { unmount } = render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
     await userEvent.click(screen.getByRole('button', { name: 'Add authenticator' }))
     // Only the code is missing, so the device name raises no message.
     await waitFor(() => expect(screen.getByText(context.texts.codeRequired)).toBeInTheDocument())
     expect(screen.queryByText(context.texts.deviceNameRequired)).not.toBeInTheDocument()
     unmount()
 
-    render(<AddAuthenticatorPage context={{ ...context, deviceNameRequired: true }} />)
+    render(<AddAuthenticatorPage context={{ ...context, deviceNameRequired: true }} />, { wrapper: ThemeModeProvider })
     await userEvent.click(screen.getByRole('button', { name: 'Add authenticator' }))
     await waitFor(() => expect(screen.getByText(context.texts.deviceNameRequired)).toBeInTheDocument())
   })
 
   it('asks for the whole code before it posts', async () => {
-    const { container } = render(<AddAuthenticatorPage context={context} />)
+    const { container } = render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
 
     await userEvent.type(boxes(container)[0], '123')
     await userEvent.click(screen.getByRole('button', { name: 'Add authenticator' }))
@@ -81,14 +84,45 @@ describe('AddAuthenticatorPage', () => {
     await waitFor(() => expect(screen.getByText(context.texts.codeRequired)).toBeInTheDocument())
   })
 
+  it('posts cancel-aia=true from its own form, only for an application-initiated action', () => {
+    const started = render(<AddAuthenticatorPage context={{ ...context, appInitiated: true }} />, {
+      wrapper: ThemeModeProvider,
+    })
+    const forms = started.container.querySelectorAll('form')
+    expect(forms).toHaveLength(2)
+    expect(forms[1]).toHaveAttribute('method', 'post')
+    expect(forms[1]).toHaveAttribute('action', '/add?code=1')
+    expect(forms[1].querySelector('input[name="cancel-aia"]')).toHaveValue('true')
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('name', 'cancel-aia')
+    started.unmount()
+
+    const required = render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
+    expect(required.container.querySelectorAll('form')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('skips the checks when it cancels', () => {
+    const { container } = render(<AddAuthenticatorPage context={{ ...context, appInitiated: true }} />, {
+      wrapper: ThemeModeProvider,
+    })
+    const cancel = container.querySelectorAll('form')[1]
+
+    expect(cancel.querySelector('input[name="totp"]')).toBeNull()
+    fireEvent.submit(cancel)
+
+    expect(screen.queryByText(context.texts.codeRequired)).not.toBeInTheDocument()
+  })
+
   it('shows an error above the form', () => {
-    render(<AddAuthenticatorPage context={{ ...context, error: 'Invalid authenticator code.' }} />)
+    render(<AddAuthenticatorPage context={{ ...context, error: 'Invalid authenticator code.' }} />, {
+      wrapper: ThemeModeProvider,
+    })
 
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid authenticator code.')
   })
 
   it('shows no alert without an error', () => {
-    render(<AddAuthenticatorPage context={context} />)
+    render(<AddAuthenticatorPage context={context} />, { wrapper: ThemeModeProvider })
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

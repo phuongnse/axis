@@ -330,6 +330,8 @@ session comes next: a request without a session, or with a bad bearer token, is
 a `401`, before the path. So a caller without a session cannot
 find out which applications or records exist. See
 [Sign-in and the session](security.md#sign-in-and-the-session).
+In a cell, a create or an update of a tenant at or over its storage quota is a `403` right after that, before the
+path. See [Refusals](tenant-quotas.md#refusals).
 After the path, the user needs a grant for the action on the entity, or the
 answer is a `403` before the query or body is read.
 `POST /api/apps/{app}/endpoints/{name}` is exempt from the CSRF header and
@@ -338,7 +340,8 @@ takes no session. Its own order is in [Inbound endpoints](inbound-endpoints.md).
 Policies add more checks. The full order is:
 
 1. The CSRF header, `403`.
-2. The session or the bearer token, `401`.
+2. The session or the bearer token, `401`. On create and update in a cell, the
+   tenant's storage quota follows, `403` with `reason: quota-exceeded`.
 3. The path, `404`.
 4. A grant for the action on the entity, `403`.
 5. The stored record: unknown or outside every read filter, `404`. On
@@ -480,6 +483,10 @@ otherwise the answer is the stale-version `409`. See
   [start lock](processes.md#releases-and-running-work). The server already ran
   the request again on the new release each time. Nothing was written, and the
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
+- **`503` for a busy tenant.** A list in a cell, when the tenant's `concurrentQueries` quota has no free
+  lease for 5 seconds, after the sign-in, path and grant checks. The title is "This tenant is busy. Try
+  again in a moment.", the answer carries `Retry-After: 1` and nothing was queried. See
+  [work at once](tenant-quotas.md#work-at-once).
 - **`503` for a query timeout.** A read past `Data:QueryTimeout`, or a create,
   update or delete past `Data:WriteTimeout`, is cancelled by PostgreSQL. The
   title is "The query took too long. Try again or narrow it." for a read, and

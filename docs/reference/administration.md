@@ -8,7 +8,7 @@ and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant sign-in set`, `tenant binding list|set|remove`,
-`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `cell operator invite`, `publisher` and `version`.
+`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `cell operator invite`, `cell backup`, `cell restore-check`, `publisher` and `version`.
 `platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). `tenant suspend`, `tenant resume` and
 `tenant list` are in [tenant status commands](tenant-status-commands.md). The
 commands that change a tenant after it is created are in
@@ -42,9 +42,10 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant and `cell operator invite` read it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
 | `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when it is set. |
 | `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. It is never stored and never printed. |
+| `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | Optional. A connection string to the identity provider's database, for a role that is read-only and has `SELECT` on Keycloak's `credential` table and no other right. Only `tenant backup` and `cell backup` read it, to put the password hashes and authenticator secrets of a realm's users into `realm.json`, see [Tenant backup](tenant-backup-and-restore.md#tenant-backup). A `tenant restore` into a new realm imports that file and needs no such setting. It is never printed. Without it, no archive holds a `realm.json`. A value that is not a connection string exits with code 2, naming the setting. |
 | `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher`, `cell operator invite` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
-| `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` or `Scenarios:ServerConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
+| `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema`, `Scenarios:ServerConnectionString` or `IdentityProvider:DatabaseConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests and the contract scenarios of `publish` and `validate` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request, or a `publish` or `validate` with contract scenarios to run, fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
@@ -530,7 +531,9 @@ A second loop of the same process does the same for `test` requests, see below. 
 - **Lease.** The lease is five minutes, fixed. The publisher renews it every
   third of the lease while the request runs, so a long request is not claimed
   twice. A `running` request whose lease has run out is claimed again by any
-  publisher, because its publisher died. A request that has been claimed three
+  publisher, because its publisher died. A request whose publisher lost its tenant
+  database connection is claimed again in the next round, without waiting for the
+  lease. A request that has been claimed three
   times and whose lease runs out again ends `failed` with `AXC0215`, see the
   [lifecycle](authoring.md#lifecycle). A `publish` gets a
   `release.publishFailed` audit record with it, a `rollback` gets a
@@ -762,6 +765,45 @@ changes nothing outside one.
 - **Audit.** Each run writes one platform audit record with no tenant, before any change. It lists
   `realm: <name>` and `role: <name>` and never the email.
 - **Second factor.** The realm asks for an authenticator app. Passkeys are not set up yet.
+
+## Cell backup
+
+`cell backup` is the daily backup of a cell: it backs up every `active` and `suspended` tenant, four at a time, and
+uploads each archive to object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`. It runs only in a cell, where `Cell:Id`
+is set. The behaviour is in [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+
+- **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Cell:BackupKeyFile`, the five
+  `Cell:BackupStorage` settings and `PATH`, to find `pg_dump`. It needs no `Admin:ConnectionString`.
+- **Output.** Each line starts with the tenant id, then the step and `ok` or `failed: <message>`. A tenant that
+  fails is tried once more, so its failed line comes twice.
+- **Exit codes.** `0` when every tenant succeeded, `1` when a tenant failed or the run reached its 6-hour limit, and
+  `2` outside a cell, for a missing setting or `pg_dump`, or for an OTLP endpoint setting that is not an `https` URL outside
+  Development, with nothing uploaded.
+- **Last success.** After an upload, the tenant's time goes to `platform.tenant_backups`. At the end of the run the command records
+  the gauge `axis.backup.last_success` and, when an OTLP endpoint is set, exports it, see
+  [host settings](host-settings.md#telemetry-export).
+- **Audit.** One platform audit record for each tenant, written before its first try. A retry writes no second record.
+
+## Cell restore check
+
+`cell restore-check` checks once that a recent archive restores: it restores the newest archive of a random tenant into a scratch
+tenant, compares its row counts and users with the archive, removes the scratch tenant and records the result. It runs only in a cell,
+where `Cell:Id` is set. The behaviour is in
+[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell). The scenario runs of that check and its weekly job are
+_(planned for M31)_.
+
+- **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Admin:ConnectionString`, `Cell:BackupKeyFile`,
+  `Cell:InternalDomain`, the five `Cell:BackupStorage` settings, the `IdentityProvider` settings, `Studio:ApplicationsPath` when an archive holds
+  Studio files, and `PATH`, to find `pg_restore`.
+- **Output.** Each line starts with a tenant id, then the step and `ok` or `failed: <message>`. The last line is
+  `<source tenant> restore-check passed` or `failed`. A table or a number is named, never a row or a username.
+- **Exit codes.** `0` when the check passed, `1` when any step after the pick failed or no tenant has an archive of today or
+  yesterday, and `2` outside a cell, with an argument, for a missing setting or `pg_restore`, or for an OTLP endpoint setting that is not an
+  `https` URL outside Development, with nothing changed.
+- **Metric.** The gauge `axis.backup.restore_check` is `1` for a pass and `0` for a failure, tagged with the source tenant. When an OTLP
+  endpoint is set the command exports it, see [host settings](host-settings.md#telemetry-export).
+- **Audit.** One platform audit record, for the source tenant, written before the first change. It lists `tenant: <scratch tenant id>`. It does not
+  hold the result, which goes to the metric and the output. A run that picks no tenant, or exits `2`, writes none.
 
 ## Version
 

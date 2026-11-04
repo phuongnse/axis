@@ -9,6 +9,7 @@ using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
+using Axis.Processes.Work;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -47,11 +48,13 @@ namespace Axis.Admin;
 /// up no test. While a request runs,
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
 /// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
-/// lost its claim changes nothing. Every step runs as the tenant's schema role. A <c>test</c> may run for at most
+/// lost its claim changes nothing. A request whose run throws, such as when the tenant connection broke, has its lease ended at once,
+/// so the next round claims it again on a new connection, within the same three claims. Every step runs as the tenant's schema role. A <c>test</c> may run for at most
 /// 10 minutes, and past that its running scenario fails, its database is dropped and the request ends <c>failed</c> with
 /// <c>AXC0219</c>. A stop ends a running <c>test</c> at once in the same way, with <c>AXC0220</c>, and lets a running
 /// <c>publish</c>, <c>validate</c> or <c>rollback</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
-/// see <see cref="IPublisherTenants"/>.
+/// see <see cref="IPublisherTenants"/>. After a <c>publish</c> or a <c>rollback</c> that left a work item due now for the tenant, such
+/// as a schedule trigger that is past due, the publisher sends the wake signal for that tenant, and a failure to send it fails nothing.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -114,6 +117,14 @@ internal sealed class Publisher(
         """
         UPDATE axis.publish_requests
         SET lease_until = clock_timestamp() + @lease
+        WHERE id = @id AND status = 'running' AND claims = @claims
+        """;
+
+    // Ends the lease at once, so the next poll round claims the request again. The claims count still limits it to three.
+    private const string ReleaseSql =
+        """
+        UPDATE axis.publish_requests
+        SET lease_until = clock_timestamp()
         WHERE id = @id AND status = 'running' AND claims = @claims
         """;
 
@@ -232,9 +243,32 @@ internal sealed class Publisher(
         catch (Exception exception)
         {
             _output.WriteLine($"{id} claim failed: {TenantDatabaseSteps.Safe(exception)}");
+            await ReleaseClaimAsync(id, connections, request);
         }
 
         return true;
+    }
+
+    // A run that threw, such as when the tenant connection broke, leaves its request running under a lease that the publisher can
+    // no longer renew or finish. Ending the lease lets the next round claim it again, on a new connection. A failure to do so leaves
+    // the lease to run out.
+    private async Task ReleaseClaimAsync(string tenantId, ITenantConnections connections, ClaimedRequest request)
+    {
+        try
+        {
+            await using var connection = await connections.OpenSchemaConnectionAsync();
+            await using var command = new NpgsqlCommand(ReleaseSql, connection);
+            command.Parameters.AddWithValue("id", request.Id);
+            command.Parameters.AddWithValue("claims", request.Claims);
+            if (await command.ExecuteNonQueryAsync() > 0)
+            {
+                _output.WriteLine($"{tenantId} claim released: the request runs again in the next round.");
+            }
+        }
+        catch (Exception exception)
+        {
+            _output.WriteLine($"{tenantId} claim failed: {TenantDatabaseSteps.Safe(exception)}");
+        }
     }
 
     private async Task<ClaimedRequest?> ClaimAsync(ITenantConnections connections, PublisherTenant tenant, bool tests)
@@ -383,6 +417,7 @@ internal sealed class Publisher(
 
         if (request.Kind == "rollback")
         {
+            using var rollbackSignals = WorkSignals.Collect();
             var rolledBack = await activation.RunAsync(
                 tenant.Id,
                 tenant.SchemaVersion,
@@ -393,6 +428,7 @@ internal sealed class Publisher(
                 ActivationActor.User(request.RequestedBy, null, null, request.Id),
                 loadStep: "rollback",
                 syncRealm: tenant.SyncRealm);
+            await WakeAsync(tenant.Id, rollbackSignals);
             await StopRenewalAsync(renewing, renewal);
             await FinishAsync(tenant.Id, connections, request, rolledBack, diagnostics, audit: true);
             return;
@@ -403,6 +439,7 @@ internal sealed class Publisher(
         var target = preview ? tenant.Preview! : tenant;
         await using var previewConnections = preview ? target.Connect() : null;
         ReleaseRun run;
+        using var publishSignals = WorkSignals.Collect();
         if (files is null)
         {
             _output.WriteLine($"{target.Id} compile failed: The snapshot cannot be read.");
@@ -422,9 +459,32 @@ internal sealed class Publisher(
                 contracts: () => activation.ContractsAsync(target.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, contractResults, testLimit));
         }
 
+        await WakeAsync(target.Id, publishSignals);
+
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
         await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview, ContractResultsJson(contractResults));
+    }
+
+    // Sends the wake signal when the activation added a work item due now for the tenant, and only for it: the contract scenarios
+    // run in the same call and add work items under their own tenant id. A signal is a hint, so a failure goes to the error
+    // output and never fails the request.
+    private async Task WakeAsync(string tenantId, WorkSignals.Scope signals)
+    {
+        if (!signals.Contains(tenantId))
+        {
+            return;
+        }
+
+        using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        try
+        {
+            await tenants.WakeAsync(tenantId, limit.Token);
+        }
+        catch (Exception exception)
+        {
+            _error.WriteLine($"{tenantId} wake signal failed: {TenantDatabaseSteps.Safe(exception)}");
+        }
     }
 
     // The outcomes of the contract scenarios of a publish or validate, or null when none ran.

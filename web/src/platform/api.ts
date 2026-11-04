@@ -34,6 +34,14 @@ export function reauthenticateUrl(returnUrl: string): string {
   return `${signInUrl(returnUrl)}&reauthenticate=true`
 }
 
+/** The identity provider's own steps that the sign-in route starts for the account page. */
+export type AccountAction = 'UPDATE_PASSWORD' | 'CONFIGURE_TOTP' | `delete_credential:${string}`
+
+/** The server's sign-in address that runs the identity provider's `action`, then returns to `returnUrl`. */
+export function accountActionUrl(returnUrl: string, action: AccountAction): string {
+  return `${signInUrl(returnUrl)}&action=${encodeURIComponent(action)}`
+}
+
 /** The shell's sign-in card, where the server sends the browser after a refused sign-in. */
 export const signInFailedPath = '/?signIn=failed'
 

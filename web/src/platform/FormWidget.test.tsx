@@ -11,6 +11,8 @@ import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
+import type { ThemeMode } from './themeMode'
 import { hostileMarkup } from '../test/hostile'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
@@ -341,7 +343,7 @@ const texts = {
   'shell.form.conflict': 'This record was changed since you opened it.',
   'shell.form.saveFailed': 'The record could not be saved.',
   'shell.form.loadFailed': 'The record could not be loaded.',
-  'shell.form.choose': 'Choose',
+  'shell.form.choose': 'Choose…',
   'shell.form.clear': 'Clear',
   'shell.form.addRow': 'Add row',
   'shell.form.removeRow': 'Remove',
@@ -479,9 +481,9 @@ function CurrentLocation() {
   )
 }
 
-function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget) {
+function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget, mode?: ThemeMode) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
-  return render(
+  const form = (
     <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
       {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
       <ConfigProvider theme={{ token: { motion: false } }}>
@@ -497,8 +499,9 @@ function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata
         </TextProvider>
       </ConfigProvider>
       <CurrentLocation />
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+  return render(mode ? <ThemeModeProvider initialMode={mode}>{form}</ThemeModeProvider> : form)
 }
 
 describe('FormWidget', () => {
@@ -578,7 +581,7 @@ describe('FormWidget', () => {
 
     const group = await screen.findByTestId('reference-category')
     expect(within(group).getByLabelText('Category')).toHaveValue('Office')
-    expect(within(group).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: 'Choose…' })).toBeInTheDocument()
   })
 
   it('shows Choose and Clear as icon buttons with no visible text', async () => {
@@ -586,7 +589,7 @@ describe('FormWidget', () => {
     renderForm(noteId)
     await screen.findByLabelText('Category')
 
-    const choose = screen.getByRole('button', { name: 'Choose' })
+    const choose = screen.getByRole('button', { name: 'Choose…' })
     const clear = screen.getByRole('button', { name: 'Clear' })
     expect(choose.textContent).toBe('')
     expect(clear.textContent).toBe('')
@@ -600,7 +603,7 @@ describe('FormWidget', () => {
     await screen.findByLabelText('Category')
 
     const group = screen.getByTestId('reference-category')
-    const choose = within(group).getByRole('button', { name: 'Choose' })
+    const choose = within(group).getByRole('button', { name: 'Choose…' })
     const clear = within(group).getByRole('button', { name: 'Clear' })
     expect(choose).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item')
     expect(clear).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item', 'ant-btn-compact-last-item')
@@ -611,9 +614,9 @@ describe('FormWidget', () => {
     renderForm(noteId)
     await screen.findByLabelText('Category')
 
-    act(() => screen.getByRole('button', { name: 'Choose' }).focus())
+    act(() => screen.getByRole('button', { name: 'Choose…' }).focus())
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose…')
   })
 
   it('names Clear on keyboard focus', async () => {
@@ -713,6 +716,21 @@ describe('FormWidget', () => {
       method: 'PATCH',
       body: '{"version":1,"values":{"title":"New"}}',
     })
+  })
+
+  it('sets a field error 4px under its input in 14/20 text, with the field gap below it', async () => {
+    stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
+    renderForm(null, noteWidget, 'light')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const message = await screen.findByTestId('field-error-title')
+    const explain = message.closest('.ant-form-item-explain')
+    const item = message.closest('.ant-form-item')
+    expect(explain).toHaveStyle({ marginTop: '4px', fontSize: '14px', lineHeight: '20px' })
+    expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe(
+      `${designTokensFor('light').spacing.lg}px`,
+    )
   })
 
   it('shows field errors under their field and other errors above the form', async () => {
@@ -817,7 +835,7 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 200, body: categoryPageJson }, { status: 201, body: noteJson('Buy paper', 1) })
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     // The dialog renders into the document body, outside the form.
     const dialog = await screen.findByRole('dialog')
     await userEvent.click(await within(dialog).findByText('Office'))
@@ -850,7 +868,7 @@ describe('FormWidget', () => {
     renderForm(noteId)
     const title = await screen.findByRole('textbox', { name: 'Title' })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Office'))
     await userEvent.type(title, '!')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -868,7 +886,7 @@ describe('FormWidget', () => {
     )
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('Office')
     await userEvent.click(within(dialog).getByTitle('2'))
@@ -888,7 +906,7 @@ describe('FormWidget', () => {
     stubFetch({ status: 500, body: '{}' })
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
 
     expect(await screen.findByTestId('reference-lookup-error')).toHaveTextContent('The records could not be loaded.')
   })
@@ -926,7 +944,7 @@ describe('FormWidget', () => {
     }
     const { unmount } = renderForm(noteId, requiredWidget)
     expect(await screen.findByRole('textbox', { name: 'Category' })).toHaveValue('Office')
-    expect(screen.getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose…' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
     unmount()
 
@@ -1170,7 +1188,7 @@ describe('FormWidget', () => {
     renderForm(null, lineCategoryWidget)
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
 
-    const choose = screen.getByRole('button', { name: 'Choose Category 1' })
+    const choose = screen.getByRole('button', { name: 'Choose… Category 1' })
     expect(choose.textContent).toBe('')
     expect(choose.querySelector('.anticon-search')).not.toBeNull()
     expect(choose).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item')
@@ -1180,7 +1198,7 @@ describe('FormWidget', () => {
     stubFetch({ status: 200, body: categoryPageJson })
     renderForm(null, lineCategoryWidget)
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Choose Category 1' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose… Category 1' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Office'))
 
     const clear = await screen.findByRole('button', { name: 'Clear Category 1' })
@@ -1417,7 +1435,7 @@ describe('FormWidget', () => {
     await screen.findByTestId('field-value-code')
     expect(screen.queryByRole('textbox', { name: 'Code' })).not.toBeInTheDocument()
     expect(screen.getByTestId('field-value-category')).toHaveTextContent('Office')
-    expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Choose…' })).not.toBeInTheDocument()
     expect(screen.getByTestId('cell-lines-0-description')).toHaveTextContent('Pens')
     expect(screen.queryByRole('textbox', { name: 'Description 1' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
@@ -1454,7 +1472,7 @@ describe('FormWidget', () => {
     const title = await screen.findByRole('textbox', { name: 'Title' })
     expect(screen.getByTestId('field-value-priority')).toHaveTextContent('7')
     expect(screen.queryByRole('textbox', { name: 'Priority' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Choose…' })).not.toBeInTheDocument()
 
     await userEvent.clear(title)
     await userEvent.type(title, 'New')
@@ -1775,6 +1793,31 @@ describe('FormWidget', () => {
     expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
   })
 
+  it('shows the quota title when a save is refused past the storage quota', async () => {
+    stubFetch({
+      status: 403,
+      body: JSON.stringify({
+        title: 'This tenant has reached its storage quota.',
+        status: 403,
+        reason: 'quota-exceeded',
+        quota: 'storage',
+      }),
+    })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('form-error')).toHaveTextContent('This tenant has reached its storage quota.')
+  })
+
+  it('keeps the generic message for a 403 without a reason', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubFetch({ status: 403, body: '{"title":"You may not save this record.","status":403}' })
+    renderForm()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
+  })
+
   describe('steps', () => {
     const titleRequired = '{"sections":[],"fields":{},"errors":{"/values/title":["Required."]}}'
 
@@ -1925,6 +1968,24 @@ describe('FormWidget', () => {
       renderForm(null, actionWidget)
       expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('')
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
+    })
+
+    it('draws Cancel and the action as text buttons beside a solid Save', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, actionWidget)
+
+      const action = await screen.findByRole('button', { name: 'Close note' })
+      expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('ant-btn-variant-solid')
+      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('ant-btn-variant-text')
+      expect(action).toHaveClass('ant-btn-variant-text')
+      expect(action).toHaveStyle({ color: designTokensFor('light').colour.primaryText })
+    })
+
+    it('keeps the action outlined when the user cannot save the record', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, { ...actionWidget, access: { actions: ['read'], createFields: [], updateFields: [] } })
+
+      expect(await screen.findByRole('button', { name: 'Close note' })).toHaveClass('ant-btn-variant-outlined')
     })
 
     it('shows a navigate button on a saved record that opens the target with the record values', async () => {

@@ -28,7 +28,8 @@ namespace Axis.Server.Endpoints;
 /// longer the one resolved, the call runs again from resolution on the new release, and answers 503
 /// after three attempts. The transaction runs under <c>Data:WriteTimeout</c>, set before the start lock. A call past it
 /// rolls back, writes nothing and answers 503.
-/// A call is checked in order: bearer token (401), application and endpoint (404), the caller's
+/// A call is checked in order: bearer token (401), in a cell the tenant's storage quota (403 <c>quota-exceeded</c>),
+/// application and endpoint (404), the caller's
 /// <c>invoke</c> grant on the endpoint (403), content type (415), the body against the
 /// endpoint's input fields (400 keyed <c>/input/…</c>), and <c>Idempotency-Key</c> (400). One
 /// transaction then claims the key's receipt, unique per endpoint and caller, and creates the record
@@ -66,7 +67,7 @@ internal static class InboundEndpoints
 
     public static void MapInboundEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/api/apps/{app}/endpoints/{name}", CallAsync).WithWriteTimeout();
+        endpoints.MapPost("/api/apps/{app}/endpoints/{name}", CallAsync).WithStorageQuota().WithWriteTimeout();
         endpoints.MapGet("/api/apps/{app}/endpoints/{name}/instances/{instanceId}", StatusAsync);
     }
 

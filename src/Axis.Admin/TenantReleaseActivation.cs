@@ -1,3 +1,4 @@
+using System.Data;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -128,19 +129,22 @@ internal sealed class TenantReleaseActivation(
     /// <summary>
     /// The realm sync for <see cref="RunAsync"/>: it applies a realm plan to the realm of <paramref name="realm"/> with the tenant's
     /// <paramref name="bindings"/>, then writes <paramref name="smtpServer"/> as the realm's mail server. It is <c>null</c> when the tenant has no realm details,
-    /// such as a preview tenant, so the step skips the sync.
+    /// such as a preview tenant, so the step skips the sync. The sync also writes the tenant's <paramref name="legal"/> links and the terms step, and asks the
+    /// realm's users through <paramref name="users"/> to accept new terms.
     /// </summary>
     public static Func<RealmPlan, Task>? RealmSync(
         HttpClient http,
         TenantRealmAccess? realm,
         IReadOnlyDictionary<string, TenantBinding> bindings,
         IReadOnlyDictionary<string, string> smtpServer,
+        RealmLegal legal,
+        TenantRealmUsers? users,
         CancellationToken cancellationToken) =>
         realm is null
             ? null
             : async plan =>
             {
-                await ActivationRealmSync.SyncAsync(http, realm, bindings, plan, cancellationToken);
+                await ActivationRealmSync.SyncAsync(http, realm, bindings, plan, legal, users, cancellationToken);
                 await new RealmSync(http, realm.BaseAddress).SyncMailServerAsync(realm.Name, realm.ActivationClientSecret.Reveal(), smtpServer, cancellationToken);
             };
 
@@ -196,7 +200,14 @@ internal sealed class TenantReleaseActivation(
                 finally
                 {
                     // Nothing is kept. This also frees the connection for the final status.
-                    await transaction.RollbackAsync(CancellationToken.None);
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None);
+                    }
+                    catch (Exception) when (connection.State != ConnectionState.Open)
+                    {
+                        // The connection broke, and the server rolled the transaction back with it.
+                    }
                 }
             });
     }

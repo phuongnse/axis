@@ -56,7 +56,8 @@ a module has no upload route yet. A service account may upload, as it may
 write records.
 
 - **Order of checks.** The route checks in the order of the record routes:
-  sign-in (`401`), then the path (`404`), then the grant (`403`), then the
+  sign-in (`401`), then in a cell the tenant's
+  [storage quota](tenant-quotas.md#refusals) (`403`, `quota-exceeded`), then the path (`404`), then the grant (`403`), then the
   request content type (`415`), then the body. A user without a grant learns
   nothing from the body checks. An unknown entity or field, and a field that is
   not a `file` field, are `404`.
@@ -208,10 +209,11 @@ This is _(built)_.
   of a child row works the same and uploads to its own route.
 - **Refused upload.** A refused upload shows its message under the input. A
   `413` shows that the file is too large, a `415` that its type is not
-  accepted, and any other failure that the upload failed. The texts are
-  platform texts chosen by the status code, not the server's problem title. A
-  file larger than `maxSize` is refused in the browser with the message of a
-  `413`, and is not uploaded. `accept` only filters the file picker, and the
+  accepted, and any other failure that the upload failed. A `403` for a quota
+  refusal shows the server's title, as [refusals](tenant-quotas.md#refusals)
+  says. The other texts are platform texts chosen by the status code, not the
+  server's problem title. A file larger than `maxSize` is refused in the
+  browser with the message of a `413`, and is not uploaded. `accept` only filters the file picker, and the
   server decides the type.
 - **Table, detail and read-only child rows.** They show the file's name as a
   download link. A file column cannot be sorted.

@@ -34,6 +34,7 @@ public sealed class PooledConnectionStateTests
     private static readonly Dictionary<string, string> _allowed = new()
     {
         ["Axis.Data/EntityIndexBuilder.cs"] = "It takes a session advisory lock with the schema role, against an activation, on a direct connection.",
+        ["Axis.Worker/WakeSignalListener.cs"] = "It runs LISTEN axis_work on the worker's one direct connection to the platform database, not through PgBouncer.",
         ["Axis.Scenarios.Runner/ScenarioRunner.cs"] = "It sets axis.now for the session on the scenario's own direct connection.",
     };
 

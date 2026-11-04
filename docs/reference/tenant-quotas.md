@@ -11,9 +11,12 @@ directory. The server and the worker answer a tenant's effective quota from them
 outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
 [usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
 `emailsPerDay` until 00:00 UTC, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
-event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. The
-other refusals, among them the first sign-in of a brokered user, and the leases are still planned, and so are the
-usage columns that the text marks. The conventions of [architecture.md](../architecture.md) apply.
+event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
+are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
+saves and publishes. So are `platform.tenant_leases`, the `concurrentQueries` lease of a record list read and a data
+source rows read, and the `concurrentConnectorCalls` lease of a connector or package call in the worker. The realm's first-login flow holds a deny step, and `RealmUsersQuota.RefreshAsync` switches it on at the `users` quota and off below it. In a cell the server calls it after a successful invite, enable or disable and after each brokered sign-in. The worker's hourly sampling in a cell also calls it for each tenant with realm details. So the `users` refusal of a brokered person's first sign-in is in place. A failed call is logged and never fails the command or the sign-in. The other leases are
+still planned, and so are the usage columns that the text marks. The conventions of
+[architecture.md](../architecture.md) apply.
 
 The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
 what one tenant uses in total or at once. A rate limit limits how fast one caller asks.
@@ -62,6 +65,8 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
 - The title names the quota in words, and `quota` names its key. Neither names the tenant.
   `reason` tells a quota refusal apart from a `403` of a policy, which has no `reason`.
 - `used` is the last sample for a sampled quota and the exact count otherwise.
+- The check is an endpoint filter that runs after the sign-in check (`401`) and before the path (`404`) and the
+  grant (`403`), so a signed-in caller without a grant also sees the tenant's limit and usage.
 - The check comes before body validation, validations, the
   [module contract](module-contracts.md#where-the-contract-is-checked)
   check and any write, so a refused request evaluates nothing and writes nothing, not even an audit
@@ -74,11 +79,15 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
   or update through the record API, an import, an inbound endpoint call that writes, a file upload,
   a save in Studio and a publish. A delete is never refused. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
-  tenant writes in one sampling interval.
+  tenant writes in one sampling interval. A tenant with no sample yet is not refused, and neither is a
+  write when the platform database cannot be read: the server logs a warning and the write goes on, because a quota
+  is a billing limit and not a security boundary. The server reads the last sample on each such write.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider
   for the first time, and would pass the quota, is refused at the identity provider with a page
-  that asks them to contact their administrator.
+  that asks them to contact their administrator. The worker's hourly sample in a cell switches that
+  refusal, so a change of the quota, or of the users outside Axis, takes effect within about an hour of the
+  worker's next directory refresh.
 - **`applications`.** Creating an application in Studio is refused when the count would pass the
   quota. Existing applications keep working.
 
@@ -94,12 +103,23 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 - **Shared by every host.** The count is one for the whole cell, whatever the number of replicas and
   workers. A limit kept in each host's memory would multiply with the hosts.
 - **What waits, and how.**
-  - An import or an export waits in its queue, and the SPA shows it as queued.
+  - In a cell, the dry run or the commit of an import takes a `concurrentImports` lease before it
+    runs. When none is free it does not run. Its work item is due again in 1 second and the import
+    keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. The
+    lease is held until the work has committed.
   - A connector or package call is not claimed by the worker while the tenant has no lease free.
-    The work item stays due, and the worker runs other tenants' work.
-  - A data source query or a record list read waits up to 5 seconds for a lease. It then answers
-    `503` problem details titled "This tenant is busy. Try again in a moment.", with
-    `Retry-After: 1`. The query timeout counts from the start of the query, not of the wait.
+    The work item stays due, and the worker runs other tenants' work. The worker retries the claim
+    at the tenant's next turn, after one of its items ends or at the next poll. The lease is held
+    until the run of the item ends.
+  - A data source query, a record list read, a record export or a data source export waits up to
+    5 seconds for a lease. It then answers `503` problem details titled "This tenant is busy. Try
+    again in a moment.", with `Retry-After: 1`. The query timeout counts from the start of the
+    query, not of the wait. A query or a list read takes a `concurrentQueries` lease and an export
+    takes a `concurrentImports` lease, so a busy slot of one never blocks the other. An export
+    releases its lease when its file is complete, before the file is sent.
+- **When the platform database is down.** A read, an export, an import or a connector or package call that cannot reach the
+  platform database runs without a lease, and the server or the worker logs a warning. Under `directory` the server keeps serving from the last good
+  directory then, and the limit would otherwise turn a platform outage into a cell-wide read outage.
 - **Cost.** A lease costs two short statements on the platform database. The
   [cell load test](performance.md#cell-load-test) shows whether the objectives still hold with them.
 
@@ -130,7 +150,10 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 
 - **Sampling.** A worker job in a cell samples each tenant's storage every hour. It keeps the
   newest sample in `platform.tenant_usage_latest`, which the storage check reads. A worker with no
-  `Cell:Id` measures nothing and writes no usage row.
+  `Cell:Id` measures nothing and writes no usage row. The same hourly pass brings the deny step of
+  each tenant with realm details in step with its `users` quota. A tenant without realm details, such as
+  a preview tenant, is skipped. A failure for one tenant is logged as a warning that names it, and the pass
+  goes on with the other tenants.
 - **Database bytes and file bytes.** File bytes are the on-disk size of the stored file contents,
   the table `axis.file_contents` with its indexes and TOAST data. Database bytes are
   `pg_database_size` of the tenant database minus the file bytes. A stored file sits inside the tenant

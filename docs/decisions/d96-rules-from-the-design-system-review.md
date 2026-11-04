@@ -36,7 +36,10 @@ docs mark it _(planned)_, and one issue builds it.
   icon and destructive, and one shared Axis button that takes the role.
   Icon-only buttons only where an action repeats on every row or space is
   tight, each with a tooltip and an accessible name. Selected and current
-  states use `primaryText`. See [frontend](../reference/frontend.md).
+  states use `primaryText`. Main is outlined and secondary is grey only where
+  no solid button sits beside them. Beside one they are text buttons, see
+  [D128](d128-rules-from-the-studio-review.md). See
+  [frontend](../reference/frontend.md).
 - **KPI:** the label above, the measure large below it, and a comparison that
   is a reference for the same measure. See the
   [KPI widget](../reference/detail-chart-kpi-widgets.md).

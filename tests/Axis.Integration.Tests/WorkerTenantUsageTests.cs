@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text.Json;
+using Axis.Admin;
 using Axis.Core.Tenancy;
 using Axis.Data.Files;
 using Axis.Data.Storage;
@@ -7,6 +9,7 @@ using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Axis.Worker;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -16,14 +19,16 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using static Axis.Integration.Tests.Polling;
+using TenantSettings = Axis.Tenancy.TenantSettings;
 
 namespace Axis.Integration.Tests;
 
 /// <summary>
 /// In a cell the worker measures the storage of each tenant every hour, and counts the work items it runs, as the
-/// tenant's usage in the platform database. A worker outside a cell writes none.
+/// tenant's usage in the platform database. A worker outside a cell writes none. The same hourly pass brings the users quota
+/// step of each tenant's realm in step with its <c>users</c> quota.
 /// </summary>
-public sealed class WorkerTenantUsageTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
+public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string RecordKind = "test.record";
     private const string TestSecretKey = TestPlatform.SecretKey;
@@ -257,7 +262,80 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database) : IClassF
         }
     }
 
-    private static WebApplication BuildWorker(string platform, TimeProvider clock, params (string Key, string Value)[] extraSettings)
+    [Fact]
+    public async Task The_hourly_pass_switches_the_users_quota_step_on_at_the_quota_and_off_when_it_is_raised_and_a_failing_realm_does_not_stop_it()
+    {
+        var clock = new ManualClock();
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            // The tenant "a" sorts before the realm's tenant, so the poll handles its failing identity provider first.
+            var id = realms.NewRealmName();
+            var secrets = new TenantRealmSecrets("platform-secret-1", "activation-secret-1", "users-secret-1");
+            using var http = new HttpClient();
+            await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+                .EnsureAsync(id, "Acme", secrets, new Dictionary<string, string>(), CancellationToken);
+            await realms.AddUpstreamUserAsync(id);
+
+            var failing = await PrepareTenantAsync("a");
+            var good = await PrepareTenantAsync(id);
+            var platform = await database.CreateDatabaseAsync("usage_platform", CancellationToken);
+            await SeedPlatformAsync(platform, failing, good);
+            await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
+            {
+                var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+                row.OidcAuthority = new Uri(baseAddress, $"realms/{id}").ToString();
+                row.RealmActivationClientSecret = _cipher.Encrypt(id, TenantSecretFields.RealmActivationClientSecret, secrets.Activation);
+                row.RealmUsersClientSecret = _cipher.Encrypt(id, TenantSecretFields.RealmUsersClientSecret, secrets.Users);
+                var unreachable = await context.Tenants.SingleAsync(tenant => tenant.Id == "a", CancellationToken);
+                unreachable.OidcAuthority = "http://127.0.0.1:1/realms/a";
+                unreachable.RealmActivationClientSecret = _cipher.Encrypt("a", TenantSecretFields.RealmActivationClientSecret, "activation-secret-1");
+                unreachable.RealmUsersClientSecret = _cipher.Encrypt("a", TenantSecretFields.RealmUsersClientSecret, "users-secret-1");
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            await PostgreSqlServer.AdminScalarAsync(platform, $"INSERT INTO platform.tenant_quotas (tenant_id, quota, value) VALUES ('{id}', 'users', 1)", CancellationToken);
+            var logs = new LogCollector();
+            await using var app = BuildWorker(platform, clock, logs, [.. _cellSettings, ("Tenancy:RefreshInterval", "00:01:00")]);
+
+            await app.StartAsync(CancellationToken);
+            await WaitUntilAsync(async () => await DenyStepAsync(realms, id) == "REQUIRED", "The worker did not switch the users quota step on.");
+
+            Assert.Contains(
+                logs.Records,
+                record => record.Level == LogLevel.Warning && record.Message.Contains("users quota step of tenant a ", StringComparison.Ordinal));
+            Assert.NotNull(await LatestAsync(platform, "a"));
+
+            // The quota is raised above the user count. The worker reads it at the next directory refresh, and acts on it at the next hourly pass.
+            await PostgreSqlServer.AdminScalarAsync(platform, $"UPDATE platform.tenant_quotas SET value = 5 WHERE tenant_id = '{id}'", CancellationToken);
+            var refreshes = RefreshCount(logs);
+            clock.Advance(TimeSpan.FromMinutes(2));
+            await WaitUntilAsync(() => Task.FromResult(RefreshCount(logs) > refreshes), "The worker did not read the directory again.");
+            clock.Advance(TimeSpan.FromHours(1));
+            await WaitUntilAsync(async () => await DenyStepAsync(realms, id) == "DISABLED", "The worker did not switch the users quota step off.");
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+
+        static int RefreshCount(LogCollector logs) => logs.Entries.Count(entry => entry.Contains("Read the tenant directory again", StringComparison.Ordinal));
+    }
+
+    private static async Task<string?> DenyStepAsync(UpstreamRealms realms, string realm)
+    {
+        var executions = await realms.GetJsonAsync(
+            $"admin/realms/{realm}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions");
+        return executions.EnumerateArray()
+            .FirstOrDefault(execution => execution.TryGetProperty("providerId", out var provider) && provider.GetString() == RealmUsersQuota.DenyAccessProvider)
+            is { ValueKind: JsonValueKind.Object } deny ? deny.GetProperty("requirement").GetString() : null;
+    }
+
+    private static WebApplication BuildWorker(string platform, TimeProvider clock, params (string Key, string Value)[] extraSettings) =>
+        BuildWorker(platform, clock, new LogCollector(), extraSettings);
+
+    private static WebApplication BuildWorker(string platform, TimeProvider clock, LogCollector logs, (string Key, string Value)[] extraSettings)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         var settings = new Dictionary<string, string?>
@@ -275,7 +353,7 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database) : IClassF
 
         builder.Configuration.AddInMemoryCollection(settings);
         builder.Logging.ClearProviders();
-        builder.Logging.AddProvider(new LogCollector());
+        builder.Logging.AddProvider(logs);
         builder.Services.AddSingleton(clock);
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         builder.Services.AddSingleton<IWorkItemHandler, RecordingHandler>();

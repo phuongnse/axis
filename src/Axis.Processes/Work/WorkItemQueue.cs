@@ -45,6 +45,27 @@ public static class WorkItemQueue
         RETURNING {ClaimedColumnsSql}, {ClaimDelaySql}
         """;
 
+    // The gated claim locks the next due item first and claims it in the same transaction, so a lease is taken only for an item
+    // that the claim then holds.
+    private const string GatedPeekSql = $"""
+        SELECT id, kind FROM axis.process_work_items
+        WHERE {ClaimFilterSql}
+        ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED
+        """;
+
+    private const string GatedPeekInQueueOrderSql = $"""
+        SELECT id, kind FROM axis.process_work_items
+        WHERE {ClaimFilterSql}
+        ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED
+        """;
+
+    private const string GatedClaimSql = $"""
+        UPDATE axis.process_work_items w
+        SET claim_token = gen_random_uuid(), lease_expires_at = now() + @lease
+        WHERE w.id = @id
+        RETURNING {ClaimedColumnsSql}, {ClaimDelaySql}
+        """;
+
     private const string ClaimFilterSql = $"""
         tenant_id = @tenant AND kind = ANY(@kinds) AND due_at <= {SqlTranslator.NowSql}
                 AND (lease_expires_at IS NULL OR lease_expires_at <= now())
@@ -72,7 +93,8 @@ public static class WorkItemQueue
     /// <paramref name="revision"/> the revision of the instance that a timer item resumes,
     /// <paramref name="escalation"/> the zero-based index of the escalation that a <c>task.escalate</c> item runs,
     /// <paramref name="emailId"/> the outbox email a <c>notification.email</c> item sends, and
-    /// <paramref name="webhookDeliveryId"/> the webhook delivery a <c>webhook.deliver</c> item sends.
+    /// <paramref name="webhookDeliveryId"/> the webhook delivery a <c>webhook.deliver</c> item sends. An item due now adds
+    /// <paramref name="tenantId"/> to the open <see cref="WorkSignals"/> scope.
     /// </summary>
     public static async Task<Guid> EnqueueAsync(
         NpgsqlConnection connection,
@@ -122,6 +144,11 @@ public static class WorkItemQueue
         command.Parameters.Add(new NpgsqlParameter("email", NpgsqlDbType.Uuid) { Value = (object?)emailId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("webhookDelivery", NpgsqlDbType.Uuid) { Value = (object?)webhookDeliveryId ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
+        if (dueAt <= DateTimeOffset.UtcNow)
+        {
+            WorkSignals.Add(tenantId);
+        }
+
         return id;
     }
 
@@ -152,7 +179,89 @@ public static class WorkItemQueue
             return null;
         }
 
-        return new ClaimedWorkItem(
+        return await ReadClaimedAsync(reader, lease, cancellationToken);
+    }
+
+    /// <summary>
+    /// Claims the earliest due item of the tenant and of one of the kinds as <see cref="ClaimAsync"/> does, but takes a lease
+    /// first when the item's kind is one of <paramref name="gatedKinds"/>. One short transaction locks the item, takes the lease
+    /// through <paramref name="takeLease"/> and claims the item. When no lease is free the transaction rolls back, the item
+    /// stays unclaimed, and <c>Waiting</c> is true. The caller disposes the lease when the run of the item ends. An item of
+    /// another kind gets no lease and <c>Lease</c> is <see langword="null"/>. With nothing due the item is
+    /// <see langword="null"/> and <c>Waiting</c> is false.
+    /// </summary>
+    internal static async Task<(ClaimedWorkItem? Item, IAsyncDisposable? Lease, bool Waiting)> ClaimGatedAsync(
+        NpgsqlConnection connection,
+        string tenantId,
+        IReadOnlyCollection<string> kinds,
+        TimeSpan lease,
+        IReadOnlySet<string> gatedKinds,
+        Func<CancellationToken, Task<IAsyncDisposable?>> takeLease,
+        CancellationToken cancellationToken,
+        bool inQueueOrder = false)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(kinds);
+        ArgumentNullException.ThrowIfNull(gatedKinds);
+        ArgumentNullException.ThrowIfNull(takeLease);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        Guid id;
+        string kind;
+        await using (var peek = new NpgsqlCommand(inQueueOrder ? GatedPeekInQueueOrderSql : GatedPeekSql, connection, transaction))
+        {
+            peek.Parameters.AddWithValue("tenant", tenantId);
+            peek.Parameters.AddWithValue("kinds", NpgsqlDbType.Array | NpgsqlDbType.Text, kinds.ToArray());
+            await using var reader = await peek.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                await reader.CloseAsync();
+                await transaction.CommitAsync(cancellationToken);
+                return (null, null, false);
+            }
+
+            id = reader.GetGuid(0);
+            kind = reader.GetString(1);
+        }
+
+        IAsyncDisposable? taken = null;
+        if (gatedKinds.Contains(kind))
+        {
+            taken = await takeLease(cancellationToken);
+            if (taken is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return (null, null, true);
+            }
+        }
+
+        try
+        {
+            await using var command = new NpgsqlCommand(GatedClaimSql, connection, transaction);
+            command.Parameters.AddWithValue("lease", NpgsqlDbType.Interval, lease);
+            command.Parameters.AddWithValue("id", id);
+            ClaimedWorkItem item;
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            {
+                await reader.ReadAsync(cancellationToken);
+                item = await ReadClaimedAsync(reader, lease, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return (item, taken, false);
+        }
+        catch
+        {
+            if (taken is not null)
+            {
+                await taken.DisposeAsync();
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task<ClaimedWorkItem> ReadClaimedAsync(NpgsqlDataReader reader, TimeSpan lease, CancellationToken cancellationToken) =>
+        new ClaimedWorkItem(
             reader.GetGuid(0),
             reader.GetString(1),
             reader.GetString(2),
@@ -177,7 +286,6 @@ public static class WorkItemQueue
             await reader.IsDBNullAsync(19, cancellationToken) ? null : reader.GetGuid(19),
             TimeSpan.FromSeconds(reader.GetDouble(21)),
             await reader.IsDBNullAsync(20, cancellationToken) ? null : reader.GetGuid(20));
-    }
 
     /// <summary>
     /// Reads, for each kind that has an item whose due time has passed, how many items there are and how many

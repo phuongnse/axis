@@ -6,7 +6,7 @@ The owner reviewed Studio, the shell, the shared controls and every page and ema
 Design System artifact, one change at a time, and agreed these rules between 2026-10-30 and 2026-11-01. They change
 some rules of [D96](d96-rules-from-the-design-system-review.md) (the button levels),
 [D98](d98-rules-from-the-shell-review.md) (the footer) and [D114](d114-rules-from-the-sign-in-and-home-page-review.md)
-(how sign-out reaches `/?signedOut`). None of it is built yet _(planned for M31)_. The prototype is the tag
+(how sign-out reaches `/?signedOut`). The shell's layout, footer and tile rules and the account page's Change password and Authenticators are built. The rest is _(planned for M31)_. The prototype is the tag
 `design-review/2026-10-30-studio`.
 
 - **An open application is a workspace.** Studio lists the applications as the home page lists tools: tiles by title

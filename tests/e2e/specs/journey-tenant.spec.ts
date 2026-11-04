@@ -49,13 +49,13 @@ test.describe('the journey tenant publishes a Studio application', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio`)
 
-    await page.getByRole('button', { name: 'New application', exact: true }).click()
+    await page.getByRole('button', { name: 'New application…', exact: true }).click()
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`app=${name}$`))
 
-    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 60_000,

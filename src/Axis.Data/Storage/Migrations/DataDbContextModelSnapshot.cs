@@ -479,6 +479,10 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("identity_provider");
 
+                    b.Property<string>("IdpSessionId")
+                        .HasColumnType("text")
+                        .HasColumnName("idp_session_id");
+
                     b.Property<DateTimeOffset>("LastRequestAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_request_at");
