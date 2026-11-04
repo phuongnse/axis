@@ -1,3 +1,4 @@
+using Axis.Server.CellApi;
 using Axis.Server.Health;
 using Axis.Server.Http;
 using Axis.Server.Presentation;
@@ -15,10 +16,17 @@ namespace Axis.Server.Authentication;
 /// </summary>
 internal static class RouteAuthorization
 {
-    public static IServiceCollection AddRouteAuthorization(this IServiceCollection services)
+    /// <summary>
+    /// Registers the fallback policy and the policy of the provisioning API, which needs <paramref name="operatorRole"/> of the
+    /// operator realm.
+    /// </summary>
+    public static IServiceCollection AddRouteAuthorization(this IServiceCollection services, string operatorRole)
     {
         services.AddAuthorizationBuilder()
-            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+            .AddPolicy(CellOperator.Policy, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireClaim(CellOperator.RoleClaim, operatorRole));
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, RouteRefusal>();
         return services;
     }
