@@ -9,7 +9,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md)
-agrees. The route, the link, the application picker, New application, New resource, the resource list with its
+agrees. The route, the link, the application row of the sidebar, New application, New resource, the resource list with its
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, Run tests,
@@ -23,14 +23,14 @@ Run and the Test results list, the editable module entity and module process and
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
   them. A Used by entry or a diagnostic that opens a resource at a path adds
   `&path=<path>`. The id of a module entity, process or policy opens it too, as `&resource=<id>`,
-  when the id is not one of the folder's own resources.
-- **New application.** A **New application…** button shows on the list of applications, as its main button, and beside the picker
-  when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
+  when the id is not one of the folder's own resources. `&view=releases` shows only the publishing block, `&kind=<kind>` limits the resource list to one kind, and `&view=policies` shows the policy matrix.
+- **New application.** A **New application…** button shows on the list of applications, as its main button, and in the menu of the
+  sidebar's application row when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
   lists no application. The dialog asks for a name and checks it with the API's
   rule before it sends anything. It offers Blank or a template from
   `GET /api/studio/templates`, with the title and description in the UI locale
   and `en` as the fallback. A built-in template is listed first, with a "Built in" mark. A `409` or a `400` shows next to the name. A success
-  adds the application to the list and the picker, picks it, and loads its resources and
+  adds the application to the list and the row's menu, opens it, and loads its resources and
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
@@ -59,10 +59,9 @@ Run and the Test results list, the editable module entity and module process and
   - After a create, the new resource joins the list, the diagnostics panel shows
     the diagnostics that the create answered, and the editor opens the resource.
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
-- **Application picker.** The first step picks one of the applications that
-  `GET /api/studio/apps` lists. `/studio` with no application open lists them as tiles by title, see
-  [applications](studio-workspace.md#applications). A single application is not picked at once. The picker shows while an application is open. An **Off-standard** tag shows beside it while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio). _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band).
-- **Resource list.** The list groups the resources by kind (in the sidebar, see [workspace](studio-workspace.md#workspace), _planned for M31_). The kind shows as
+- **Application row.** The sidebar's first row, 48 px and sticky, names the open application. Its menu lists the applications that `GET /api/studio/apps` lists, marks the open one, and picking one opens it. It ends in **New application…** for a creator.
+  `/studio` with no application open lists them as tiles by title, see [applications](studio-workspace.md#applications). An **Off-standard** tag shows beside **Validate** and **Publish** while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio). _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band).
+- **Resource list.** The list groups the resources by kind, as the sidebar's entries do, see [workspace](studio-workspace.md#workspace). The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
   its name, kind, `id` and file, and opens it in the editor below. One **Module** group for each kind a module may hold (entities, data sources, rules,
@@ -142,7 +141,7 @@ Run and the Test results list, the editable module entity and module process and
   opens the resource at the diagnostic's `path`, as a Used by entry does. A
   diagnostic with an empty path opens the resource at its top. A diagnostic that
   names no resource cannot be selected. A diagnostic never blocks a save.
-- **Publishing.** Up to three buttons sit under the application picker (in the band, see [band](studio-workspace.md#band), _planned for M31_). They use the
+- **Publishing.** Up to three buttons sit above the resource list (in the band, see [band](studio-workspace.md#band), _planned for M31_). They use the
   [publishing routes](authoring.md#publishing).
   - **Validate** sends a validate request. **Publish** opens a dialog with an
     optional label, up to 100 characters, and an optional note, up to 2000.
@@ -407,9 +406,9 @@ Run and the Test results list, the editable module entity and module process and
     `retry`, `resolve` and `reassign`. An endpoint takes `invoke`. Studio reads each list
     from `policy.schema.json`. Filter and fields are only on entity grants.
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
-  - A Resources / Policy matrix switch sits under the application picker (the policy matrix entry of the sidebar, _planned for M31_). The
+  - The policy matrix is the last entry of the sidebar's Access group. The
     matrix view is kept in the address as `&view=policies`, so a reload or a
-    shared link reopens it. The diagnostics panel shows in both views.
+    shared link reopens it. The diagnostics panel shows in the resource view and the matrix view, and not in `&view=releases`.
   - Selecting a cell opens its grants under the table. A cell lists the
     role's combined actions. A data source cell that lacks the `read` of its
     root entity warns and names that entity. A read-only row shows its reason.

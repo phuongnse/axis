@@ -7,10 +7,10 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { isSignInNeeded } from '../platform/signInNeeded'
 import { assignLocation } from '../platform/navigation'
+import { ShellSidebarContext } from '../platform/shellSidebarContext'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioApplication, StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
-import { segmentLabel } from '../test/antd'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 
@@ -21,6 +21,16 @@ const formId = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
 const departmentId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b'
 const manifestId = 'f0e1d2c3-b4a5-4968-8776-655443322110'
 const folder = '/api/studio/apps/PurchaseRequests'
+
+const apps: (Partial<StudioApplication> & { name: string })[] = [
+  {
+    name: 'PurchaseRequests',
+    titles: { en: 'Purchase requests', vi: 'Yêu cầu mua hàng' },
+    descriptions: { en: 'Runs the purchases.', vi: 'Quản lý việc mua hàng.' },
+  },
+  { name: 'LeaveRequests', titles: { en: 'Leave requests' }, descriptions: {} },
+  { name: 'Inventory' },
+]
 
 const resources: StudioResourceItem[] = [
   { id: departmentId, kind: 'entity', name: 'Department', file: 'entities/department.json', version: 'a', usedBy: 1 },
@@ -264,14 +274,23 @@ function Location() {
   return <div data-testid="location">{location.pathname + location.search}</div>
 }
 
+let sidebar: HTMLDivElement | undefined
+
+/** Renders the page with a shell sidebar. The sidebar's content goes into `sidebar`, and the returned spy counts its claims. */
 function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
+  const claim = vi.fn(() => () => {})
+  sidebar = document.createElement('div')
+  sidebar.dataset.testid = 'sidebar'
+  document.body.append(sidebar)
   const page = (
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter initialEntries={[entry]}>
-          <StudioPage />
-          <Location />
-        </MemoryRouter>
+        <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim }}>
+          <MemoryRouter initialEntries={[entry]}>
+            <StudioPage />
+            <Location />
+          </MemoryRouter>
+        </ShellSidebarContext.Provider>
       </TextProvider>
     </ThemeModeProvider>
   )
@@ -282,9 +301,14 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
       <PlatformContext.Provider value={{ current: { locale, texts: {} } } as Platform}>{page}</PlatformContext.Provider>
     ),
   )
+  return claim
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  sidebar?.remove()
+  sidebar = undefined
+})
 
 describe('StudioPage', () => {
   it('lists the resources in one group per kind', async () => {
@@ -307,7 +331,7 @@ describe('StudioPage', () => {
     expect(screen.getByText('Select a resource.')).toBeInTheDocument()
   })
 
-  it('shows the off-standard mark beside the application picker when application.json has a relax entry', async () => {
+  it('shows the off-standard mark above Validate and Publish when application.json has a relax entry', async () => {
     stubServer(undefined, undefined, undefined, {
       manifest: {
         modules: [
@@ -574,14 +598,14 @@ describe('StudioPage', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/api/studio/apps/PurchaseRequests/resources', expect.anything())
   })
 
-  it('switches between the resources and the policy matrix, kept in the address', async () => {
+  it('switches between the resources and the policy matrix from the sidebar, kept in the address', async () => {
     const fetchMock = stubServer()
     renderPage()
 
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalledWith(`${folder}/policy-matrix`, expect.anything())
 
-    await userEvent.click(screen.getByText('Policy matrix'))
+    await userEvent.click(within(sidebar!).getByRole('link', { name: 'Policy matrix' }))
 
     expect(await screen.findByTestId('studio-matrix')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=policies')
@@ -589,7 +613,7 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
     expect(screen.getByTestId('studio-diagnostics')).toBeInTheDocument()
 
-    await userEvent.click(segmentLabel('Resources'))
+    await userEvent.click(within(sidebar!).getByRole('link', { name: 'Overview' }))
 
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
@@ -627,16 +651,6 @@ describe('StudioPage', () => {
   })
 
   describe('application tiles', () => {
-    const apps: (Partial<StudioApplication> & { name: string })[] = [
-      {
-        name: 'PurchaseRequests',
-        titles: { en: 'Purchase requests', vi: 'Yêu cầu mua hàng' },
-        descriptions: { en: 'Runs the purchases.', vi: 'Quản lý việc mua hàng.' },
-      },
-      { name: 'LeaveRequests', titles: { en: 'Leave requests' }, descriptions: {} },
-      { name: 'Inventory' },
-    ]
-
     it('shows one tile per application with its title and description in the UI locale', async () => {
       stubServer(apps)
       renderPage('/studio', 'vi')
@@ -646,7 +660,7 @@ describe('StudioPage', () => {
       expect(within(purchases).getByText('Quản lý việc mua hàng.')).toBeInTheDocument()
       expect(purchases).toHaveAttribute('href', '/studio?app=PurchaseRequests')
       expect(screen.getByTestId('studio-apps').children).toHaveLength(3)
-      expect(screen.queryByRole('combobox', { name: 'Application' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('studio-application-row')).not.toBeInTheDocument()
       expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
     })
 
@@ -669,7 +683,7 @@ describe('StudioPage', () => {
       await userEvent.click(await screen.findByTestId('studio-app-LeaveRequests'))
 
       expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=LeaveRequests')
-      expect(await screen.findByRole('combobox', { name: 'Application' })).toBeInTheDocument()
+      expect(await screen.findByTestId('studio-application-row')).toBeInTheDocument()
     })
   })
 
@@ -696,6 +710,95 @@ describe('StudioPage', () => {
 
     expect(await screen.findByTestId('studio-load-error')).toBeInTheDocument()
     warn.mockRestore()
+  })
+
+  it('does not claim the sidebar on the list of applications', async () => {
+    stubServer()
+    const claim = renderPage('/studio')
+
+    expect(await screen.findByTestId('studio-app-PurchaseRequests')).toBeInTheDocument()
+    expect(claim).not.toHaveBeenCalled()
+    expect(sidebar).toBeEmptyDOMElement()
+  })
+
+  it('does not claim the sidebar on the forbidden page', async () => {
+    stubServer(403)
+    const claim = renderPage('/studio')
+
+    expect(await screen.findByTestId('studio-forbidden')).toBeInTheDocument()
+    expect(claim).not.toHaveBeenCalled()
+    expect(sidebar).toBeEmptyDOMElement()
+  })
+
+  it('does not claim the sidebar on a load error', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer(500)
+    const claim = renderPage('/studio')
+
+    expect(await screen.findByTestId('studio-load-error')).toBeInTheDocument()
+    expect(claim).not.toHaveBeenCalled()
+    expect(sidebar).toBeEmptyDOMElement()
+    warn.mockRestore()
+  })
+
+  it('draws the application row and the entries of the open application in the sidebar', async () => {
+    stubServer()
+    const claim = renderPage()
+
+    expect(await within(sidebar!).findByTestId('studio-application-row')).toHaveTextContent('PurchaseRequests')
+    expect(claim).toHaveBeenCalled()
+    expect(within(sidebar!).getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
+    expect(within(sidebar!).getByRole('link', { name: 'Entities' })).toHaveAttribute(
+      'href',
+      '/studio?app=PurchaseRequests&kind=entity',
+    )
+  })
+
+  it('lists every application in the row menu and marks the open one', async () => {
+    stubServer(apps)
+    renderPage()
+
+    await userEvent.click(await screen.findByTestId('studio-application-row'))
+
+    for (const title of ['Purchase requests', 'Leave requests', 'Inventory']) {
+      expect(await screen.findByRole('menuitem', { name: title })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('menuitem', { name: 'Purchase requests' })).toHaveClass('ant-dropdown-menu-item-selected')
+    expect(screen.getByRole('menuitem', { name: 'Leave requests' })).not.toHaveClass('ant-dropdown-menu-item-selected')
+  })
+
+  it('opens another application when it is picked in the row menu', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer(apps)
+    renderPage()
+
+    await userEvent.click(await screen.findByTestId('studio-application-row'))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Leave requests' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=LeaveRequests$/)
+    warn.mockRestore()
+  })
+
+  it('shows only the publishing block for &view=releases', async () => {
+    stubServer()
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+
+    expect(await screen.findByRole('button', { name: 'Validate' })).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
+  })
+
+  it('shows only the kind of the address in the resource list, and keeps the kind when a resource is picked', async () => {
+    stubServer()
+    renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+    expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-group-form')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId(`studio-resource-${entityId}`))
+
+    expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent(`app=PurchaseRequests&kind=entity&resource=${entityId}`)
   })
 
   it('shows a load error when the folder cannot be loaded', async () => {
@@ -1310,14 +1413,27 @@ describe('StudioPage publishing', () => {
     it.each([
       ['studioCreate is true', true, true],
       ['studioCreate is false', false, false],
-    ])('shows New application… beside the picker only when it may create: %s', async (_name, studioCreate, shown) => {
-      stubCreateAccess(studioCreate)
+    ])(
+      'shows New application… in the application row only when it may create: %s',
+      async (_name, studioCreate, shown) => {
+        stubCreateAccess(studioCreate)
+        renderPage()
+
+        await userEvent.click(await screen.findByTestId('studio-application-row'))
+        await waitFor(() =>
+          expect(screen.queryAllByRole('menuitem', { name: 'New application…' })).toHaveLength(shown ? 1 : 0),
+        )
+      },
+    )
+
+    it('opens the New application dialog from the application row menu', async () => {
+      stubCreateAccess(true)
       renderPage()
 
-      expect(await screen.findByTestId(`studio-resource-${entityId}`)).toBeInTheDocument()
-      await waitFor(() =>
-        expect(screen.queryAllByRole('button', { name: 'New application…' })).toHaveLength(shown ? 1 : 0),
-      )
+      await userEvent.click(await screen.findByTestId('studio-application-row'))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'New application…' }))
+
+      expect(await screen.findByRole('dialog', { name: 'New application' })).toBeInTheDocument()
     })
 
     it.each([

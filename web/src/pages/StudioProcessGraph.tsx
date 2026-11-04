@@ -335,6 +335,7 @@ export default function StudioProcessGraph({
         edgeTypes={edgeTypes}
         colorMode={mode}
         fitView
+        minZoom={0.1}
         nodesDraggable={false}
         nodesConnectable={!readOnly}
         nodesFocusable={false}
