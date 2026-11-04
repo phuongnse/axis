@@ -16,7 +16,7 @@ import {
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { QuotaRefusedError } from '../platform/quota'
-import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
+import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
   fetchResourceReferences,
@@ -74,15 +74,6 @@ const noProblems = new Map<string, string>()
 const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
 const LazyStudioPageDesign = lazy(() => import('./StudioPageDesign'))
 const LazyStudioFormDesign = lazy(() => import('./StudioFormDesign'))
-
-function seedFieldsOf(content: Content): SeedField[] | null {
-  if (!Array.isArray(content.fields)) {
-    return null
-  }
-  return content.fields.filter(
-    (field): field is SeedField => isContent(field) && typeof field.name === 'string' && typeof field.type === 'string',
-  )
-}
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

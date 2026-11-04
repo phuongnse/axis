@@ -174,12 +174,12 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
- * A kind's list shows the module resources of that kind that the application uses, from the names, by their `<module>/<name>`. A module entity opens in the entity designer, and a module process
- * in the process designer, each with the application's layer applied and every input on, with no JSON tab, Delete,
- * migration questions, Uses or Used by lists. Save writes the layer, and a Customized tag with Reset all, which deletes
- * the layer, shows while it has one. The other kinds open read-only, with no editor, no Uses and no Used by lists: a
- * policy as a table of its grants, a contract as its lifecycle in a state diagram with tables of its named points and a page on the page
- * canvas with no palette, data panel, widget tree or moves, each under a read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
+ * A kind's list shows the module resources of that kind that the application uses, from the names, by their `<module>/<name>`. A module resource of every kind but a contract and a scenario opens in its editor with the application's layer applied
+ * and every input on, with no JSON tab, Delete, migration questions, Uses or Used by lists: an entity in the entity
+ * designer, a process in the process designer, and a data source, rule, trigger, sequence and event in the schema
+ * form, and a seed in the seed grid. Save writes the layer, and a Customized tag with Reset all, which deletes
+ * the layer, shows while it has one. A contract opens in its lifecycle view, and a scenario opens
+ * read-only as JSON under a notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
  * entry open it too, when the id is not one of the folder's. The folder's `application.json` loads with the
  * application and again after a write. An Off-standard tag shows above Validate and Publish while it has a relax
  * entry. A module contract, which the application declares directly, has Relax and Undo relax, which write it.

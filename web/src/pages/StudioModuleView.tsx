@@ -7,7 +7,7 @@ import { StudioModuleReadOnly } from './StudioModuleReadOnly'
 import { useStudioModuleContent } from './useStudioModuleContent'
 
 /**
- * A module file of a kind with no editor yet, read from the module version the application pins: the read-only notice
+ * A module file of a kind with no editor, a scenario, read from the module version the application pins: the read-only notice
  * and the file's content as formatted JSON.
  */
 function StudioModuleJson({ application, module, id }: { application: string; module: string; id: string }) {
@@ -32,9 +32,9 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
 }
 
 /**
- * The view of a module resource, by its kind. An entity, a process, a policy, a text, a form and a page are edited as a
- * layer, and so are the states and transitions that a contract takes from the application. Any other kind, scenarios
- * included, opens in the read-only JSON view. `diagnostics` are the folder's.
+ * The view of a module resource, by its kind. Every kind but a scenario is edited as a layer, and so are the states and
+ * transitions that a contract takes from the application. A scenario opens in the read-only JSON view. `diagnostics`
+ * are the folder's.
  */
 export function ModuleResourceView({
   application,
@@ -60,6 +60,12 @@ export function ModuleResourceView({
     case 'text':
     case 'form':
     case 'page':
+    case 'dataSource':
+    case 'rule':
+    case 'trigger':
+    case 'sequence':
+    case 'event':
+    case 'seed':
       return <StudioModuleEditor application={application} item={item} onWritten={onModuleWritten} />
     case 'contract':
       return (

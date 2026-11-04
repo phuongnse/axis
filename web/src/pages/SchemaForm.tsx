@@ -1,6 +1,7 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import type { StudioNames } from '../platform/studio'
+import { keyPropertyOf, type KeyedLists } from '../platform/layerMarks'
 import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
@@ -9,7 +10,9 @@ import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ReferencePicker } from './ReferencePicker'
+import { SchemaLayerContext } from './schemaLayerContext'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -26,26 +29,37 @@ const conditionalKeywords = new Set(['if', 'then', 'else'])
  * A form built from the JSON Schema of a resource kind, for the draft `value`. It shows text, number,
  * boolean and enum values, nested objects and arrays. A string that names a resource gets a picker of the
  * application's names, as does each key of a map whose keys are marked. Anything else points to the JSON view.
+ * `readOnlyNames` replaces the root properties that show as text, which are `id` and `kind` unless given. With a
+ * `layer` and its `keyedLists`, each element of a keyed list shows its Added or Changed tag with Reset to module, and the elements the
+ * layer removed show as muted rows below the list.
  */
 export function SchemaForm({
   schema,
   value,
   onChange,
+  layer,
+  keyedLists,
+  readOnlyNames = readOnlyRootProperties,
 }: {
   schema: JsonSchema
   value: Record<string, unknown>
   onChange: ChangeHandler
+  layer?: DesignerLayer
+  keyedLists?: KeyedLists
+  readOnlyNames?: Set<string>
 }) {
   return (
-    <Properties
-      node={schema}
-      root={schema}
-      rootValue={value}
-      pointer=""
-      value={value}
-      onChange={onChange}
-      readOnlyNames={readOnlyRootProperties}
-    />
+    <SchemaLayerContext.Provider value={layer && keyedLists && { designer: layer, keyedLists }}>
+      <Properties
+        node={schema}
+        root={schema}
+        rootValue={value}
+        pointer=""
+        value={value}
+        onChange={onChange}
+        readOnlyNames={readOnlyNames}
+      />
+    </SchemaLayerContext.Provider>
   )
 }
 
@@ -105,6 +119,7 @@ function SchemaNode({
   const names = useContext(StudioNamesContext)
   const check = useContext(ExpressionCheckContext)
   const label = useContext(LabelTextsContext)
+  const layer = useContext(SchemaLayerContext)
   const schema = textAlternative(resolveSchema(node, root), root, value)
   const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
@@ -235,6 +250,12 @@ function SchemaNode({
   } else if (isArray) {
     const items = Array.isArray(value) ? value : []
     const itemSchema = schema.items!
+    const keyProperty = layer === undefined ? undefined : keyPropertyOf(layer.keyedLists, pointer)
+    const keyOfItem = (element: unknown): string | undefined => {
+      const key =
+        typeof element === 'object' && element !== null ? (element as Record<string, unknown>)[keyProperty!] : element
+      return typeof key === 'string' ? key : undefined
+    }
     input = (
       <Flex vertical gap="small">
         {items.map((item, index) => (
@@ -245,6 +266,9 @@ function SchemaNode({
             style={{ border: `1px solid ${colour.border}`, borderRadius: radius.base, padding: spacing.xs }}
           >
             <div style={{ flex: 1 }}>
+              {layer !== undefined && keyProperty !== undefined && keyOfItem(item) !== undefined && (
+                <LayerMarkTag layer={layer.designer} list={pointer} index={index} name={keyOfItem(item)!} />
+              )}
               <SchemaNode
                 node={itemSchema}
                 root={root}
@@ -260,6 +284,7 @@ function SchemaNode({
             <Button onClick={() => onChange(`${pointer}/${index}`, undefined)}>{t('shell.studio.removeItem')}</Button>
           </Flex>
         ))}
+        {keyProperty !== undefined && <RemovedRows layer={layer!.designer} list={pointer} />}
         <div>
           <Button onClick={() => onChange(pointer, [...items, defaultFor(itemSchema, root)])}>
             {t('shell.studio.addItem')}

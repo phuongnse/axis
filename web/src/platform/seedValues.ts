@@ -24,6 +24,16 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** The fields an entity's content declares, or `null` when it has no list of fields. */
+export function seedFieldsOf(content: Record<string, unknown>): SeedField[] | null {
+  if (!Array.isArray(content.fields)) {
+    return null
+  }
+  return content.fields.filter(
+    (field): field is SeedField => isObject(field) && typeof field.name === 'string' && typeof field.type === 'string',
+  )
+}
+
 /**
  * The fields the seed grid shows as columns. A seed may not set a computed, sequence or creator field, and a
  * child collection stays as the file has it.

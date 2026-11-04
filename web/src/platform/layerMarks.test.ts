@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { entityKeyedLists, formKeyedLists, layerMarks, markOf, pageListKey, textKeyedMaps } from './layerMarks'
+import {
+  dataSourceKeyedLists,
+  entityKeyedLists,
+  formKeyedLists,
+  layerMarks,
+  markOf,
+  pageListKey,
+  textKeyedMaps,
+} from './layerMarks'
 
 const content = {
   name: 'Department',
@@ -68,6 +76,32 @@ describe('layerMarks', () => {
     )
 
     expect(elements).toEqual([{ list: '/fields', key: 'code', mark: 'removed' }])
+  })
+})
+
+describe('layerMarks of a data source', () => {
+  it('keys a plain-string groupBy element by its value and an object one by its field', () => {
+    const dataSource = {
+      fields: [{ name: 'total' }],
+      aggregate: { groupBy: ['status', { field: 'owner' }] },
+    }
+
+    const elements = layerMarks(
+      dataSource,
+      [
+        { path: '/fields/0', mark: 'changed' },
+        { path: '/aggregate/groupBy/0', mark: 'added' },
+        { path: '/aggregate/groupBy/1', mark: 'changed' },
+      ],
+      [],
+      dataSourceKeyedLists,
+    )
+
+    expect(elements).toEqual([
+      { list: '/fields', key: 'total', mark: 'changed' },
+      { list: '/aggregate/groupBy', key: 'status', mark: 'added' },
+      { list: '/aggregate/groupBy', key: 'owner', mark: 'changed' },
+    ])
   })
 })
 

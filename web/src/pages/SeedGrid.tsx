@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { parseNumberText, seedColumns, seedValuePointer, type SeedField } from '../platform/seedValues'
 import { useText } from '../platform/texts'
 import { newUuid } from '../platform/uuid'
+import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import type { ChangeHandler } from './SchemaForm'
 
 interface Row {
@@ -126,18 +127,21 @@ export function FieldCell(props: CellProps) {
  * The records of a seed as a grid: a row per record and a column per field of the seed's entity that a seed may set.
  * `problems` holds the text key of each value that would fail seeding, by the pointer of the value. The grid edits
  * the draft through `onChange`. An empty cell removes the key from the record's `values`, and a value it does not
- * show, such as a child collection, is not touched.
+ * show, such as a child collection, is not touched. With a `layer`, a record that the layer added or changed shows its
+ * tag with Reset to module, and the records it removed show as muted rows below the grid.
  */
 export function SeedGrid({
   fields,
   records,
   problems,
   onChange,
+  layer,
 }: {
   fields: SeedField[]
   records: unknown
   problems: Map<string, string>
   onChange: ChangeHandler
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const list = Array.isArray(records) ? records : []
@@ -166,6 +170,16 @@ export function SeedGrid({
               title: t('shell.studio.seed.recordId'),
               render: (_, row) => <Typography.Text code>{display(row.id)}</Typography.Text>,
             },
+            ...(layer === undefined
+              ? []
+              : [
+                  {
+                    key: 'layer',
+                    render: (_: unknown, row: Row) => (
+                      <LayerMarkTag layer={layer} list="/records" index={row.index} name={display(row.id)} />
+                    ),
+                  },
+                ]),
             ...seedColumns(fields).map((field) => ({
               key: field.name,
               title: field.name,
@@ -199,6 +213,7 @@ export function SeedGrid({
             },
           ]}
         />
+        <RemovedRows layer={layer} list="/records" />
         <div>
           <Button onClick={() => onChange('/records', [...list, { id: newUuid(), values: {} }])}>
             {t('shell.studio.seed.addRecord')}

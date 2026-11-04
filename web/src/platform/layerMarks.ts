@@ -30,6 +30,16 @@ export const processKeyedLists: Record<string, string> = {
   '/steps': 'name',
 }
 
+/** The keyed lists of a data source: its fields and parameters, each keyed by name, and the group-by fields of its aggregate. */
+export const dataSourceKeyedLists: Record<string, string> = {
+  '/fields': 'name',
+  '/parameters': 'name',
+  '/aggregate/groupBy': 'field',
+}
+
+/** The keyed list of a seed: its records, each keyed by id. */
+export const seedKeyedLists: Record<string, string> = { '/records': 'id' }
+
 /** The page lists that hold elements keyed by name, at any depth: widgets, actions, row actions, toolbar actions, columns and tabs. */
 const pageLists = ['widgets', 'actions', 'rowActions', 'toolbarActions', 'columns', 'tabs']
 
@@ -58,6 +68,15 @@ export function formKeyedLists(content: unknown): Record<string, string> {
 /** The maps of a text resource whose keys the layer marks: `/texts`, each text keyed by its property name. */
 export const textKeyedMaps: readonly string[] = ['/texts']
 
+/** The key property of the list at `list`, or `undefined` when `keyedLists` does not key it. */
+export function keyPropertyOf(keyedLists: KeyedLists, list: string): string | undefined {
+  return typeof keyedLists === 'function'
+    ? keyedLists(list)
+    : Object.hasOwn(keyedLists, list)
+      ? keyedLists[list]
+      : undefined
+}
+
 /**
  * The elements that the read route's `marks` and `removed` name. Only a whole element counts, a pointer such as
  * `/fields/1`, and its key is read from `content`, the resource with the layer applied. A pointer to a property
@@ -73,10 +92,7 @@ export function layerMarks(
   keyedLists: KeyedLists,
   maps: readonly string[] = [],
 ): LayerElement[] {
-  const keyOf =
-    typeof keyedLists === 'function'
-      ? keyedLists
-      : (list: string) => (Object.hasOwn(keyedLists, list) ? keyedLists[list] : undefined)
+  const keyOf = (list: string) => keyPropertyOf(keyedLists, list)
   const elements: LayerElement[] = []
   for (const { path, mark } of marks) {
     const slash = path.lastIndexOf('/')
@@ -93,8 +109,13 @@ export function layerMarks(
       continue
     }
     const element = getAt(content, path)
+    // An element written as a plain string is keyed by its own value, as the server's merge keys it.
     const key =
-      typeof element === 'object' && element !== null ? (element as Record<string, unknown>)[keyOf(list)!] : undefined
+      typeof element === 'string'
+        ? element
+        : typeof element === 'object' && element !== null
+          ? (element as Record<string, unknown>)[keyOf(list)!]
+          : undefined
     if (typeof key === 'string') {
       elements.push({ list, key, mark })
     }
