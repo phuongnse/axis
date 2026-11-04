@@ -1111,7 +1111,8 @@ export function StudioEditor({
       )}
       {messageHolder}
       <SaveBar
-        dirty={patch.length > 0 || Object.keys(pendingTexts).length > 0}
+        // Proposed: JSON that does not parse is an unsaved change too, or the bar would leave just as it is needed.
+        dirty={patch.length > 0 || jsonInvalid || Object.keys(pendingTexts).length > 0}
         canUndo={history.past.length > 0 && !saving}
         canRedo={history.future.length > 0 && !saving}
         onUndo={undo}

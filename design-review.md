@@ -297,6 +297,8 @@ its settings UI beside `settings.json` and Azure a JSON view beside its forms, a
   reaches down to `spacing-md` above the footer at any window height, at least 240 px, and scrolls inside. Its text keeps
   `spacing-sm` from the border. Its colours are tokens, never CodeMirror's: names `primaryText`, strings `text`, numbers
   `infoText`, `true`, `false` and `null` `warningText`, punctuation `textMuted`.
+- **JSON that does not parse is an unsaved change.** The save bar shows while it lasts, with Undo and Discard, and Save
+  is off. A change that leaves the data as it was, such as a space or Format, shows no bar, because nothing can be saved.
 - **A tab bar sits spacing-md under what precedes it.** The owner found the gap between a page's heading and its tabs
   too wide: Ant Design pads a tab's label 12 px above it. The theme starts a tab's label at the top of its bar, the
   underline keeping its 12 px under it, for every tab bar.
