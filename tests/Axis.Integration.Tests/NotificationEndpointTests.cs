@@ -47,6 +47,31 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task A_tenant_notice_with_no_application_is_not_listed_by_the_application()
+    {
+        await ClearAsync();
+        var id = await InsertAsync(TenantA, ("user", "maria"));
+        // Addressed to the role finance, which maria holds, so that only the missing application keeps her list clear of it.
+        await fixture.ExecuteAsync(
+            TenantA,
+            """
+            INSERT INTO axis.notifications
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, created_at)
+            VALUES (@id, NULL, NULL, 'role', 'finance', 'notices.emailsHeld.subject', 'notices.emailsHeld.body',
+                    '{"limit":2}'::jsonb, '{"limit":"integer"}'::jsonb, now())
+            """,
+            ("id", Guid.NewGuid()));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var list = await GetJsonAsync(maria, Notifications);
+
+        var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(id, item.GetProperty("id").GetGuid());
+        Assert.Equal(1, list.RootElement.GetProperty("totalCount").GetInt32());
+        Assert.Equal(1, list.RootElement.GetProperty("unreadCount").GetInt32());
+    }
+
+    [Fact]
     public async Task Values_show_in_the_profile_locale_and_a_date_time_in_the_time_zone_of_the_stored_release()
     {
         await ClearAsync();

@@ -125,6 +125,10 @@ A text value may hold named placeholders, such as
   notification is read, because a role row reaches users with different
   locales. A notification stored before the types were kept has none, so its
   numbers are still formatted and its text shows as written. A step with only the `email` channel stores no row.
+  A tenant notice, which the worker stores for the tenant's administrators, has no application and no release.
+  It uses platform text keys and the recipient kind `platformRole`, see
+  [D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md). Applications never list it. The routes
+  and the bell that show it are _(planned for M31)_.
 - **Who sees one.** A user sees the notifications addressed to their user id,
   and those addressed to a role they hold that the active release declares,
   checked when read, as a role task is.

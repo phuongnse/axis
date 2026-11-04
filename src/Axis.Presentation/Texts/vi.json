@@ -1029,5 +1029,7 @@
   "shell.studio.newApplication.exists": "Đã có ứng dụng với tên này.",
   "shell.studio.newApplication.invalid": "Tên dùng chữ cái và chữ số, bắt đầu bằng chữ cái, dài tối đa 60 ký tự và không được là api, health, assets hay studio.",
   "shell.studio.newApplication.failed": "Không thể tạo ứng dụng.",
-  "shell.studio.newApplication.templatesFailed": "Không thể tải các mẫu. Bạn có thể bắt đầu từ Trống."
+  "shell.studio.newApplication.templatesFailed": "Không thể tải các mẫu. Bạn có thể bắt đầu từ Trống.",
+  "notices.emailsHeld.subject": "Email được giữ đến ngày mai",
+  "notices.emailsHeld.body": "Tenant này đã gửi đủ {limit} email trong hôm nay. Các email còn lại sẽ chờ đến 00:00 UTC."
 }
