@@ -3,7 +3,7 @@
 Status: **Agreed**
 
 The owner agreed this on 2026-10-30. It sets the shapes that [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) left
-open, so that M27 can be broken into issues. It adds to D109 and changes none of its points. It is built in M27, except the search that reads the keys again after a rotation. That is carried over to M24,
+open, so that M27 can be broken into issues. It adds to D109 and changes none of its points. It is built in M27, except the search that reads the keys again after a rotation. That is carried over to M25,
 with the other items listed in [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md). [Data encryption](../reference/data-encryption.md) holds the detail.
 
 - **Stored value:** a `sensitive` field's column is `bytea`. It holds the number of the data key that encrypted it,

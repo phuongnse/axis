@@ -16,12 +16,9 @@ A guard, a core validation and an effect value read `accountableUser()` and `dec
 values of the write they check. The shared record update runs the effects of the transition it makes, in its own transaction.
 The record API, a task completion, a process step, a connector or package output and a call
 resolution answer a failing effect, audit the effect records and fire the data change triggers for
-them. The same steps are still _(planned for M24)_ for an inbound endpoint call, which only creates
-records. Each of them fails as it already fails for a lifecycle refusal and logs the named point and
-the record id. The
-filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view, Relax,
+them. Each of them fails as it already fails for a lifecycle refusal and logs the named point and the record id. An inbound endpoint call only creates records, so it makes no transition and runs no effect. The filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view, Relax,
 Undo relax, the off-standard mark beside the application picker and the mark in the release history are built, see
-[in Studio](#in-studio). The rest of this page is _(planned for M24)_.
+[in Studio](#in-studio). The rest of this page is built, except the customization layer parts _(planned for M25)_ and the parts marked _(planned for M29)_ or _(planned for M31)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -194,7 +191,7 @@ record from referring to itself. A field named `id` is hidden by it.
 
 An effect creates one record when a transition happens, in the transaction of the write that made
 the transition. The compile checks of effects are built, and the compiled contract holds each effect
-with its compiled values. The shared record update runs them. The record API answers a failing effect, audits the effect records and fires the data change triggers for them. A task completion, a process step, a connector or package output and a call resolution do the same. The answer, the audit entries and the triggers on an inbound endpoint call are _(planned for M24)_. A name that repeats an earlier one,
+with its compiled values. The shared record update runs them. The record API answers a failing effect, audits the effect records and fires the data change triggers for them. A task completion, a process step, a connector or package output and a call resolution do the same. An inbound endpoint call only creates records, so it makes no transition and runs no effect. A name that repeats an earlier one,
 ignoring letter case, is `AXC0328`. An `on` that names no transition of the contract, with the same
 letter case, is `AXC0344`. A `create.entity` that is not the plain name of a root entity of the module
 is `AXC0345`. A `values` key that names no writable field, or an expression that does not fit its
