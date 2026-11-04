@@ -440,7 +440,11 @@ exit 0
     const result = run("scripts/integration.sh", "web/src/x.ts");
 
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    const suites = ["Axis.Integration.Tests", ...scenarioSuites()];
+    const suites = [
+      "Axis.Integration.Tests",
+      "Axis.ControlPlane.Integration.Tests",
+      ...scenarioSuites(),
+    ];
     assert.ok(scenarioSuites().length > 0);
     for (const suite of suites) {
       assert.ok(

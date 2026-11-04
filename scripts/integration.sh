@@ -7,9 +7,13 @@
 # The integration tests and the scenarios are skipped when every path changed since NexKit's commit is
 # on the safe list in scripts/lib/affected.mjs. The smoke test of scripts/dev.sh runs in
 # scripts/smoke.sh.
+# The control plane has an integration suite of its own, Axis.ControlPlane.Integration.Tests, which runs
+# beside Axis.Integration.Tests and is skipped with it.
 # Arguments go to dotnet test, for example --filter-class 'Axis.Integration.Tests.Studio*'. With
 # arguments only the matching integration tests run and the summary lists only them: the scenario suites
-# are not expected. A change is checked in minutes, and the full run stays the check.
+# and the control plane suite are not expected. A filtered run of the control plane suite goes through
+# dotnet test --project controlplane/tests/Axis.ControlPlane.Integration.Tests. A change is checked in
+# minutes, and the full run stays the check.
 # Without arguments the performance tests, whose classes end in PerformanceTests, never run here:
 # scripts/performance.sh runs them, in a workflow of its own on main.
 set -euo pipefail
@@ -42,9 +46,12 @@ if affected integration; then
   for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done
   run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
     --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" --filter-not-class '*PerformanceTests'
+  run_suite Axis.ControlPlane.Integration.Tests controlplane/tests/Axis.ControlPlane.Integration.Tests dotnet test --project controlplane/tests/Axis.ControlPlane.Integration.Tests -c Release \
+    --report-xunit-junit --report-xunit-junit-filename Axis.ControlPlane.Integration.Tests.xml --results-directory "$results_dir"
 else
   for suite in "${scenario_suites[@]}"; do skip_suite "$suite" .; done
   skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests
+  skip_suite Axis.ControlPlane.Integration.Tests controlplane/tests/Axis.ControlPlane.Integration.Tests
 fi
 
 finish_report
