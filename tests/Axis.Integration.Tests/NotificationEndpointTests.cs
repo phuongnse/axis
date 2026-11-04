@@ -51,12 +51,13 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     {
         await ClearAsync();
         var id = await InsertAsync(TenantA, ("user", "maria"));
+        // Addressed to the role finance, which maria holds, so that only the missing application keeps her list clear of it.
         await fixture.ExecuteAsync(
             TenantA,
             """
             INSERT INTO axis.notifications
                 (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, created_at)
-            VALUES (@id, NULL, NULL, 'platformRole', 'administrator', 'notices.emailsHeld.subject', 'notices.emailsHeld.body',
+            VALUES (@id, NULL, NULL, 'role', 'finance', 'notices.emailsHeld.subject', 'notices.emailsHeld.body',
                     '{"limit":2}'::jsonb, '{"limit":"integer"}'::jsonb, now())
             """,
             ("id", Guid.NewGuid()));
