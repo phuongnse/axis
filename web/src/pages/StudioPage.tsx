@@ -686,6 +686,7 @@ function StudioWorkspace() {
                           application={application!}
                           item={selectedModuleItem}
                           manifest={manifest}
+                          diagnostics={loaded.diagnostics}
                           onModuleWritten={onModuleWritten}
                           onManifestSaved={onManifestSaved}
                           onManifestStale={() => setManifestReload((value) => value + 1)}

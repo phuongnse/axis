@@ -13,7 +13,7 @@ test.setTimeout(180_000);
 
 // The module app pins the fixture module checklists, which the sample modules folder does not hold. The second server
 // reads a Modules:Path of its own, with the sample modules and checklists, and Studio edits a copy of the module app.
-test.describe("Studio opens a module's contracts read-only", () => {
+test.describe("Studio opens a module's contracts with only added states and transitions editable", () => {
   test.describe.configure({ mode: "serial" });
 
   let copy: string;
@@ -55,7 +55,7 @@ test.describe("Studio opens a module's contracts read-only", () => {
     };
     const details = page.getByTestId("studio-resource-details");
     const expectLifecycleAndPoints = async () => {
-      await expect(details.getByRole("alert")).toContainText("read-only");
+      await expect(page.getByTestId("studio-contract-add-only")).toContainText("add states and transitions");
       await expect(page.getByTestId("studio-contract-lifecycle")).toBeVisible();
       await expect(page.locator('[data-testid^="studio-contract-state-"]')).toHaveCount(3);
       for (const point of [

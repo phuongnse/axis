@@ -5,7 +5,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioConnectionContext } from '../platform/studioConnection'
 import { ThemeModeProvider } from '../platform/theme'
-import type { StudioResource } from '../platform/studio'
+import type { StudioDiagnostic, StudioResource } from '../platform/studio'
 import { StudioModuleContract } from './StudioModuleContract'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -50,14 +50,15 @@ function rowTexts(table: HTMLElement) {
 }
 
 describe('StudioModuleContract', () => {
-  it('shows the read-only notice, every state in the diagram and every edge', async () => {
+  it('shows the add-only notice, every state in the diagram and every edge', async () => {
     const fetchMock = renderView(
       new Response(
         JSON.stringify({ id: 'contract-id', kind: 'contract', name: 'ChecklistContract', content: contract }),
       ),
     )
 
-    expect(await screen.findByTestId('studio-module-read-only')).toHaveAttribute('role', 'alert')
+    expect(await screen.findByTestId('studio-contract-add-only')).toHaveTextContent('add states and transitions')
+    expect(screen.queryByTestId('studio-module-read-only')).toBeNull()
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
       '/api/studio/apps/Checklist%20App/modules/checklists/resources/contract-id',
     )
@@ -129,6 +130,125 @@ describe('StudioModuleContract', () => {
 
     expect(await screen.findByTestId('studio-resource-load-error')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-module-read-only')).toBeNull()
+  })
+
+  describe('adding and removing states and transitions', () => {
+    const layer = { id: 'layer-id', file: 'customizations/checklists/ChecklistContract.json', version: 'v1' }
+    const withHold = {
+      ...contract,
+      lifecycle: {
+        ...contract.lifecycle,
+        states: [...contract.lifecycle.states, { name: 'onHold' }],
+        transitions: [...contract.lifecycle.transitions, { name: 'hold', from: ['open'], to: 'onHold' }],
+      },
+    }
+    const layered = {
+      id: 'contract-id',
+      kind: 'contract',
+      name: 'ChecklistContract',
+      content: withHold,
+      layer,
+      marks: [
+        { path: '/lifecycle/states/3', mark: 'added' },
+        { path: '/lifecycle/transitions/3', mark: 'added' },
+      ],
+      removed: [],
+    }
+
+    function renderLayered(diagnostics: StudioDiagnostic[] = []) {
+      const fetchMock = vi.fn(async (_input: string, init?: RequestInit) =>
+        init?.method === 'PUT'
+          ? new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
+          : new Response(JSON.stringify(layered)),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      const onWritten = vi.fn()
+      render(
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioModuleContract
+              application="Checklist App"
+              module="checklists"
+              id="contract-id"
+              diagnostics={diagnostics}
+              onWritten={onWritten}
+            />
+          </TextProvider>
+        </ThemeModeProvider>,
+      )
+      const puts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')
+      return { puts, onWritten }
+    }
+
+    it('marks an added state and transition Added with Remove, and the module rows have no Remove', async () => {
+      renderLayered()
+
+      expect(await screen.findByRole('note', { name: 'Added onHold' })).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'Added hold' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Remove onHold' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Remove hold' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Remove open' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Remove check' })).toBeNull()
+      expect(screen.queryByRole('note', { name: 'Added open' })).toBeNull()
+      expect(screen.queryByText('Checklist/states/onHold/initial')).toBeNull()
+      expect(screen.queryByText('Checklist/transitions/hold')).toBeNull()
+      expect(screen.getByText('Checklist/transitions/check')).toBeInTheDocument()
+      expect(screen.getByTestId('studio-save')).toBeDisabled()
+    })
+
+    it('sends the contract without a removed state to the module save route on Save', async () => {
+      const { puts, onWritten } = renderLayered()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Remove onHold' }))
+      expect(screen.queryByRole('note', { name: 'Added onHold' })).toBeNull()
+      await userEvent.click(screen.getByTestId('studio-save'))
+
+      await waitFor(() => expect(puts()).toHaveLength(1))
+      const [url, init] = puts()[0]
+      expect(url).toBe('/api/studio/apps/Checklist%20App/modules/checklists/resources/contract-id')
+      expect(new Headers(init?.headers).get('If-Match')).toBe('"v1"')
+      const body = JSON.parse(String(init?.body))
+      expect(body.lifecycle.states.map((state: { name: string }) => state.name)).toEqual(['open', 'checked', 'closed'])
+      expect(body.lifecycle.transitions.map((transition: { name: string }) => transition.name)).toContain('hold')
+      await waitFor(() => expect(onWritten).toHaveBeenCalledTimes(1))
+    })
+
+    it('adds a state and a transition from the dialogs as unsaved Added rows', async () => {
+      renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-state'))
+      const stateDialog = await screen.findByRole('dialog')
+      expect(within(stateDialog).getByRole('button', { name: 'Add' })).toBeDisabled()
+      await userEvent.type(within(stateDialog).getByRole('textbox', { name: 'Name' }), 'ONHOLD')
+      expect(within(stateDialog).getByRole('button', { name: 'Add' })).toBeDisabled()
+      await userEvent.clear(within(stateDialog).getByRole('textbox', { name: 'Name' }))
+      await userEvent.type(within(stateDialog).getByRole('textbox', { name: 'Name' }), 'review')
+      await userEvent.click(within(stateDialog).getByRole('checkbox', { name: 'Deletable' }))
+      await userEvent.click(within(stateDialog).getByRole('button', { name: 'Add' }))
+
+      expect(await screen.findByRole('note', { name: 'Added review' })).toBeInTheDocument()
+      expect(screen.getByTestId('studio-save')).toBeEnabled()
+      expect(screen.getByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
+    })
+
+    it('shows the diagnostics that name the contract layer and no other', async () => {
+      const diagnostic = {
+        code: 'AXC0370',
+        severity: 'error' as const,
+        message: 'The transition enters a protected state.',
+        file: layer.file,
+        path: '/changes/lifecycle/transitions/3/to',
+      }
+      renderLayered([
+        { ...diagnostic, resourceId: 'layer-id' },
+        { ...diagnostic, code: 'AXC0999', resourceId: 'other-id' },
+      ])
+
+      const list = await screen.findByTestId('studio-contract-diagnostics')
+      expect(list).toHaveTextContent('AXC0370')
+      expect(list).toHaveTextContent('The transition enters a protected state.')
+      expect(list).not.toHaveTextContent('AXC0999')
+    })
   })
 
   describe('relaxing a point', () => {
