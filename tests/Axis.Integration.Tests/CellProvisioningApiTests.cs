@@ -5,6 +5,7 @@ using System.Text.Json;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -29,6 +30,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     private readonly HttpClient _http = new();
     private readonly string _realm = $"ops-{Guid.NewGuid():N}"[..16];
     private Uri _baseAddress = null!;
+    private string _platform = null!;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -199,6 +201,133 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
 
+    [Fact]
+    public async Task An_operator_sets_and_clears_quotas_and_the_tenant_read_and_an_audit_record_show_them()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var set = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["users"] = 100, ["storage"] = null } });
+        using var afterSet = await GetAsync(client, "/api/cell/tenants/b", token);
+        using var remove = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { remove = new List<string> { "users" } });
+        using var afterRemove = await GetAsync(client, "/api/cell/tenants/b", token);
+
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        var setQuotas = (await set.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas");
+        AssertQuota(setQuotas, "users", 100, true);
+        AssertQuota(setQuotas, "storage", null, true);
+        AssertQuota(setQuotas, "applications", 10, false);
+        var readQuotas = (await afterSet.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas");
+        AssertQuota(readQuotas, "users", 100, true);
+        AssertQuota(readQuotas, "storage", null, true);
+        AssertQuota(readQuotas, "applications", 10, false);
+        AssertQuota(readQuotas, "authoringRequests", null, false);
+
+        Assert.Equal(HttpStatusCode.OK, remove.StatusCode);
+        AssertQuota((await remove.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas"), "users", 50, false);
+        var removedQuotas = (await afterRemove.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas");
+        AssertQuota(removedQuotas, "users", 50, false);
+        AssertQuota(removedQuotas, "storage", null, true);
+
+        var records = await AuditRecordsAsync();
+        Assert.Equal(
+            [("tenant quotas set", "b", "storage,users"), ("tenant quotas set", "b", "users")],
+            records);
+    }
+
+    [Fact]
+    public async Task An_unknown_key_or_a_negative_value_answers_400_and_writes_nothing()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var unknown = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["nope"] = 1 } });
+        using var negative = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["users"] = -1 } });
+        using var unknownRemoved = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { remove = new List<string> { "nope" } });
+        using var both = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["users"] = 1 }, remove = new List<string> { "users" } });
+        using var empty = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { });
+
+        foreach (var response in new[] { unknown, negative, unknownRemoved, both, empty })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+
+        Assert.Equal(0, await CountAsync("platform.tenant_quotas"));
+        Assert.Equal(0, await CountAsync("platform.audit_records"));
+    }
+
+    [Fact]
+    public async Task Setting_quotas_without_the_role_answers_403_and_an_unknown_or_preview_tenant_answers_404()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        var body = new { set = new Dictionary<string, long?> { ["users"] = 1 } };
+
+        using var noRole = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", noRoleToken, body);
+        using var none = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token: null, body);
+        using var unknown = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/nobody/quotas", operatorToken, body);
+        using var preview = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/a-preview/quotas", operatorToken, body);
+
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.tenant_quotas"));
+        Assert.Equal(0, await CountAsync("platform.audit_records"));
+    }
+
+    private static void AssertQuota(JsonElement quotas, string key, long? value, bool overridden)
+    {
+        var quota = quotas.GetProperty(key);
+        Assert.Equal(value, quota.GetProperty("value").ValueKind == JsonValueKind.Null ? null : quota.GetProperty("value").GetInt64());
+        Assert.Equal(overridden, quota.GetProperty("overridden").GetBoolean());
+    }
+
+    private async Task<long> CountAsync(string table)
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand($"SELECT count(*) FROM {table}", connection);
+        return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
+    private async Task<List<(string Command, string Tenant, string Changed)>> AuditRecordsAsync()
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT command, tenant_id, array_to_string(changed, ',') FROM platform.audit_records ORDER BY occurred_at, id", connection);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var records = new List<(string, string, string)>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            records.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+        }
+
+        return records;
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, string? token, object body)
+    {
+        using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative)) { Content = JsonContent.Create(body) };
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        else
+        {
+            // A write without a bearer token is a session write, which needs the CSRF header, so the answer comes from authentication.
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
     private static string[] Hosts(JsonElement tenant) =>
         [.. tenant.GetProperty("hosts").EnumerateArray().Select(host => host.GetString()!)];
 
@@ -235,6 +364,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     {
         var authority = await keycloak.StartAsync();
         var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
+        _platform = platform;
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

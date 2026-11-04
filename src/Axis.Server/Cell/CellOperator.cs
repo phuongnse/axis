@@ -37,6 +37,15 @@ internal static partial class CellOperator
     public const string IdClaim = "axis:operator_id";
     public const string DisplayNameClaim = "axis:operator_display_name";
 
+    /// <summary>
+    /// Whether the request is a machine caller's: its route carries <see cref="CellOperatorRoute"/> and it has an
+    /// <c>Authorization: Bearer</c> header, in any letter case. Such a request never reads the session cookie, so it needs no
+    /// CSRF header, see <c>CsrfHeader</c>.
+    /// </summary>
+    public static bool IsBearerCall(HttpContext context) =>
+        context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null
+        && context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+
     [LoggerMessage(LogLevel.Warning, "A bearer token was refused on a cell route: {Reason}.")]
     private static partial void TokenRefused(ILogger logger, string reason);
 

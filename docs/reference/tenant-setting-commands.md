@@ -442,7 +442,9 @@ keys. It can be rotated without signing anyone out.
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
   `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
   and `tenant email clear`, which name the [mail settings](#mail-settings) they changed, and `tenant legal set` and
-  `tenant legal clear`, which name the [legal links](#legal-links) they changed. `platform rekey` is
+  `tenant legal clear`, which name the [legal links](#legal-links) they changed. `tenant quotas set` is built too. The quotas route of the
+  [provisioning API](tenant-lifecycle.md#provisioning-api), `PUT /api/cell/tenants/{id}/quotas`, writes it with the quota keys it was given
+  in `changed`, in one transaction with the rows, and the record has no operator or machine caller. `platform rekey` is
   built and writes one record for the whole run, with no tenant. `tenant list`, `tenant binding list`, `version` and `publisher`
   write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
   writing one record per tenant, one per run or none. A command without a mark fails a test.

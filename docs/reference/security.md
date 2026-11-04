@@ -326,8 +326,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
   writes. See the record API's
   [CSRF header rule](record-api.md#create-update-and-delete).
   Paths under `/api/apps/{app}/endpoints/` are exempt from the header,
-  because they take a bearer token and no session cookie. See
-  [Machine callers](#machine-callers).
+  because they take a bearer token and no session cookie. So are the writes under `/api/cell/` that carry
+  a bearer token. See [Machine callers](#machine-callers).
 - **Tests.** Tests of sign-in itself start the development realm in Keycloak
   through Testcontainers, and drive its login page. Tests of the session
   lifetime run on real PostgreSQL, create the session through a test-only hook
