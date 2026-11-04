@@ -61,6 +61,10 @@ changed to suit the prototype, and any of it that keeping the prototype loses is
   and group, with Clear all, and the filter lives in the address. A kind's list filters in the browser. For a record table,
   filtering is logic for the issue: the record API needs a filter, which refuses a field the person may not read.
 
+- **Step 3, built:** `TableColumns` in `web/src/platform/`: Columns… opens a dialog that shows, hides and orders the columns, with
+  Reset. The identifying column stays first and always shows. The choice lives in the address, and a hidden column is still
+  searched and filtered on. Keeping the choice for each person is logic, for the issue.
+
 ### A table with too little room
 
 - **Asked:** one rule for every table, in place of the sideways scroll that hid columns such as Status.

@@ -70,6 +70,8 @@ export interface AxisRowAction {
  */
 export interface AxisTableToolbar {
   view?: ReactNode
+  /** Proposed: the Columns… control, before Refresh. */
+  columns?: ReactNode
   refresh?: () => void
   secondary?: ReactNode
   main?: ReactNode
@@ -268,6 +270,7 @@ export function AxisTable<T extends object>({
   const hasToolbar =
     toolbar !== undefined &&
     (toolbar.view !== undefined ||
+      toolbar.columns !== undefined ||
       toolbar.refresh !== undefined ||
       toolbar.secondary !== undefined ||
       toolbar.main !== undefined)
@@ -277,6 +280,7 @@ export function AxisTable<T extends object>({
         <Flex justify="space-between" align="center" gap="small" wrap>
           {toolbar.view}
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
+            {toolbar.columns}
             {toolbar.refresh && (
               <AxisButton
                 role="icon"

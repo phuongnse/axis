@@ -22,6 +22,7 @@ import {
   type FilterField,
   type FilterGroup,
 } from '../platform/TableFilter'
+import { chosenColumns, parseColumnChoice, TableColumnsButton, writeColumnChoice } from '../platform/TableColumns'
 import { pageSizes, recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -311,6 +312,10 @@ export function StudioResourceTable({
     },
   ]
 
+  const columnChoice = parseColumnChoice(
+    params.get('columns'),
+    columns.map((column) => column.key),
+  )
   const shown = searchRows(rows, columns, searchText).filter((row) => matchesFilter(filter, read(row)))
   const lastPage = Math.max(1, Math.ceil(shown.length / pageSize))
   const page = Math.min(Math.max(1, Number(params.get('page')) || 1), lastPage)
@@ -320,13 +325,33 @@ export function StudioResourceTable({
       testId="studio-resource-table"
       rows={shown}
       rowKey={(row) => row.id}
-      columns={columns}
+      columns={chosenColumns(columns, columnChoice)}
       toolbar={{
         view: (
           <Flex gap="small" align="center">
             {search}
             <TableFilterButton fields={filterFields} filter={filter} onApply={applyFilter} />
           </Flex>
+        ),
+        columns: (
+          <TableColumnsButton
+            columns={columns.map((column) => ({ key: column.key, label: String(column.title) }))}
+            choice={columnChoice}
+            onApply={(choice) =>
+              setParams(
+                (current) => {
+                  const query = new URLSearchParams(current)
+                  if (choice === null) {
+                    query.delete('columns')
+                  } else {
+                    query.set('columns', writeColumnChoice(choice))
+                  }
+                  return query
+                },
+                { replace: true },
+              )
+            }
+          />
         ),
         refresh: onRefresh,
         main,
