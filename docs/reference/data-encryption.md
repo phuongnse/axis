@@ -194,8 +194,8 @@ A scenario's tenant gets a random data key and lookup key, held in memory for th
 steps, task completions, seeds and process steps use the cipher, so a value is never written in clear, and a read under a
 grant whose `filter` tests an exact lookup field matches through the lookup hashes. Test: `ScenarioRunnerTests`. A data source `filter` and a measure's `filter` that test an exact lookup field match the same
 way, in the rows, the export and the id read of the trigger fan-out. Test: `ExactLookupFilterTests`. The
-data change trigger, event trigger start and task escalation reads do not use it yet _(planned for M26)_: each of them
-fails on a record that holds a stored sensitive value. An inbound endpoint's start condition reads it, as `ProcessSensitiveValueTests` shows. Activation's inline recompute of computed fields passes the cipher, but no test covers it over a stored sensitive value yet _(planned for M26)_. The worker's `computed.backfill` does not use the cipher either: on an entity that holds a stored sensitive value it fails and writes nothing, until it does _(planned for M26)_.
+data change trigger, event trigger start, task escalation and inbound endpoint start condition reads do not use it yet
+_(planned for M26)_: each of them fails on a record that holds a stored sensitive value. Activation's inline recompute of computed fields passes the cipher, but no test covers it over a stored sensitive value yet _(planned for M26)_. The worker's `computed.backfill` does not use the cipher either: on an entity that holds a stored sensitive value it fails and writes nothing, until it does _(planned for M26)_.
 
 The leave request sample marks its `reason` `sensitive` and shows each request by a required `title`, its display
 field, because a sensitive field cannot be one. The department manager reads the reason on the review task, and another
