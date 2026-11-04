@@ -10,8 +10,8 @@ idea, and [D124](../decisions/d124-the-organization-and-approvals-modules.md) ag
 hold. `organization` 1.0.0 exists under `modules/organization`, with its entities, data sources, rule,
 role slots, contracts, policies, contract scenarios, pages, one form and texts. `approvals` 1.0.0 exists under
 `modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots, contracts,
-process, policies, contract scenarios, pages and texts. Its built-in
-application is _(planned for M26)_. The `service-desk` and `assets` modules are _(planned for M30)_.
+process, policies, contract scenarios, pages and texts. The built-in application `approvals` exists under
+`applications/approvals`, with its roles, one site, Axis accounts and texts. The `service-desk` and `assets` modules are _(planned for M30)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check.
@@ -27,11 +27,12 @@ issues that build each check.
   and the folder holds the roles, a site, an identity provider and texts. It holds no entity,
   process, page or policy of its own.
 - **Installed with Axis.** `scripts/build.sh`, `scripts/dev.sh` and the E2E run install the modules
-  under `artifacts/modules/`, next to the sample modules, and the built-in applications _(planned
-  for M26)_ under `artifacts/templates/`. The development images hold the modules in `/modules`
-  today. The production images `axis-server`, `axis-worker` and `axis-admin` do not yet, and the
-  built-in applications are not installed yet. Shipping them in every installation _(planned for
-  M26)_ needs its own design, because the Helm chart mounts a volume over `/modules`.
+  under `artifacts/modules/`, next to the sample modules, and the built-in applications under
+  `artifacts/templates/`, next to the sample templates. The development images hold the modules in
+  `/modules` and the built-in applications in `/templates`. The production images `axis-server`,
+  `axis-worker` and `axis-admin` do not yet, and a cell's operator fills its templates volume.
+  Shipping them in every installation _(planned for M26)_ needs its own design, because the Helm
+  chart mounts a volume over `/modules`.
 - **Creating an application from one.** Studio's new application dialog lists the built-in
   applications first, marked as built in, then the templates. Creating one copies the thin folder,
   as any template does, so the application declares the modules instead of copying them, and every
@@ -289,8 +290,9 @@ The built-in application `approvals` is what a business starts from.
 
 - **Modules.** It declares `organization` `^1.0.0` and `approvals` `^1.0.0`.
 - **Roles.** `admin` and `employee`, mapped to the `admin` and `member` slots of both modules.
-- **Site.** One site with My requests, To decide, Out of office, and, for `admin`, All requests,
-  Request types, Departments and Employees.
+- **Site.** One site that links My requests, To decide, Out of office, All requests, Request types,
+  Departments and Employees. The site has no setting per role, so a person sees only the pages their
+  role can read, and the rest are for `admin`.
 - **Sign-in.** Axis accounts with a second step, as
   [the identity provider](identity-provider.md) describes for an application's own accounts.
 - **Texts** in `en` and `vi`.

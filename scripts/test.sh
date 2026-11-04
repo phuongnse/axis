@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
 source scripts/lib/tools.sh
 
-# The server tests start the server, which reads the built-in modules, sample modules and templates from artifacts/. NexKit
+# The server tests start the server, which reads the built-in modules, sample modules, sample templates and built-in applications from artifacts/. NexKit
 # runs this script in a job without scripts/build.sh, which installs them too.
 bash scripts/lib/install-modules.sh
 bash scripts/lib/install-sample-templates.sh

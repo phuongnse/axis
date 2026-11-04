@@ -1,0 +1,19 @@
+{
+  "id": "caa72dce-2f02-4654-a9b0-da536d599004",
+  "kind": "site",
+  "name": "Approvals",
+  "formatVersion": 1,
+  "path": "approvals",
+  "title": { "textKey": "site.title" },
+  "description": { "textKey": "site.description" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
+  "navigation": [
+    { "page": "approvals/MyRequests", "label": { "textKey": "nav.myRequests" }, "icon": "list" },
+    { "page": "approvals/ToDecide", "label": { "textKey": "nav.toDecide" }, "icon": "inbox" },
+    { "page": "organization/OutOfOffice", "label": { "textKey": "nav.outOfOffice" }, "icon": "calendar" },
+    { "page": "approvals/AllRequests", "label": { "textKey": "nav.allRequests" }, "icon": "folder" },
+    { "page": "approvals/RequestTypes", "label": { "textKey": "nav.requestTypes" }, "icon": "tag" },
+    { "page": "organization/Departments", "label": { "textKey": "nav.departments" }, "icon": "people" },
+    { "page": "organization/Employees", "label": { "textKey": "nav.employees" }, "icon": "person" }
+  ]
+}

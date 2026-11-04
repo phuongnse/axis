@@ -1,0 +1,12 @@
+{
+  "id": "5b73af3c-5d5e-4f2c-969a-14d86daf75cd",
+  "kind": "application",
+  "name": "Approvals",
+  "formatVersion": 1,
+  "label": { "textKey": "application.title" },
+  "description": { "textKey": "application.description" },
+  "modules": [
+    { "id": "organization", "version": "^1.0.0", "roles": { "admin": "admin", "member": "employee" } },
+    { "id": "approvals", "version": "^1.0.0", "roles": { "admin": "admin", "member": "employee" } }
+  ]
+}

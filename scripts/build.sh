@@ -3,8 +3,8 @@
 # and license texts, then writes the open source licence lists (the public wwwroot/licences.json and the server's
 # licences.json with versions) from the SPA's lock file and the NuGet project assets, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
 # files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the .NET solution,
-# which installs the sample extension package in artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates in
-# artifacts/templates.
+# which installs the sample extension package in artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates and the built-in
+# applications in artifacts/templates.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
