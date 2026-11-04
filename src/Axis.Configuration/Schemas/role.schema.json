@@ -9,6 +9,7 @@
     "kind": { "const": "role" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
+    "description": { "$ref": "#/$defs/textReference" },
     "label": { "$ref": "#/$defs/textReference" }
   },
   "$defs": {

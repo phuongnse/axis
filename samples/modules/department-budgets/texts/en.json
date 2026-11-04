@@ -5,6 +5,13 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "department-budgets.entities.budget-decision.description": "An approver's answer to a budget, with the amount decided.",
+    "department-budgets.entities.budget.description": "The money a department may spend in a period.",
+    "department-budgets.contracts.budget.description": "The rules every budget keeps, such as a decided amount staying frozen.",
+    "department-budgets.processes.budget-approval.description": "Sends a budget to its approver and records the decision.",
+    "department-budgets.policies.approver-access.description": "Lets approvers create budgets and decide them.",
+    "department-budgets.pages.budget-form.description": "Creates or edits a budget.",
+    "department-budgets.pages.budgets.description": "Lists the budgets of the departments.",
     "department-budgets.budget.label": "Budget",
     "department-budgets.budget.name": "Name",
     "department-budgets.budget.department": "Department",

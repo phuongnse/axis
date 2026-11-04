@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Software",
   "formatVersion": 1,
+  "description": { "textKey": "software.resourceDescription" },
   "label": {
     "textKey": "software.label"
   },

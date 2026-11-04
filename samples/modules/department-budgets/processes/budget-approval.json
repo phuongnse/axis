@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "BudgetApproval",
   "formatVersion": 1,
+  "description": { "textKey": "department-budgets.processes.budget-approval.description" },
   "entity": "Budget",
   "start": "review",
   "steps": [

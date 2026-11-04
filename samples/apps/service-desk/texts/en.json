@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "category.resourceDescription": "What a ticket is about, which decides who handles it.",
+    "ticket.resourceDescription": "A request for help that an agent works on until it is solved.",
     "application.title": "Service desk",
     "application.description": "Handles the company's internal support requests.",
     "site.title": "Service desk",

@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Budget",
   "formatVersion": 1,
+  "description": { "textKey": "department-budgets.entities.budget.description" },
   "label": { "textKey": "department-budgets.budget.label" },
   "displayField": "name",
   "fields": [

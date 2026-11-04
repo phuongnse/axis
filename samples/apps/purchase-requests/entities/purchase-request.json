@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "PurchaseRequest",
   "formatVersion": 1,
+  "description": { "textKey": "purchaseRequest.resourceDescription" },
   "label": { "textKey": "purchaseRequest.label" },
   "displayField": "title",
   "fields": [

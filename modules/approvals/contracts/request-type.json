@@ -3,6 +3,7 @@
   "kind": "contract",
   "name": "RequestTypeContract",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.contracts.request-type.description" },
   "entity": "RequestType",
   "validations": [
     {

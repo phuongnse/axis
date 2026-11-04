@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "leaveRequest.resourceDescription": "Đơn xin nghỉ, do trưởng bộ phận quyết định.",
     "application.title": "Đơn nghỉ phép",
     "application.description": "Theo dõi việc nghỉ phép, từ đơn xin nghỉ đến khi quản lý phê duyệt.",
     "site.title": "Nghỉ phép",

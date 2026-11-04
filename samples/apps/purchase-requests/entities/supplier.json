@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Supplier",
   "formatVersion": 1,
+  "description": { "textKey": "supplier.resourceDescription" },
   "label": { "textKey": "supplier.label" },
   "displayField": "name",
   "fields": [

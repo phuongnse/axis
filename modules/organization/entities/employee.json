@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Employee",
   "formatVersion": 1,
+  "description": { "textKey": "organization.entities.employee.description" },
   "label": { "textKey": "organization.employee.label" },
   "displayField": "fullName",
   "fields": [

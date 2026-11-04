@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Attachment",
   "formatVersion": 1,
+  "description": { "textKey": "attachment.resourceDescription" },
   "label": {
     "textKey": "attachment.label"
   },

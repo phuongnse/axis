@@ -3,6 +3,7 @@
   "kind": "policy",
   "name": "AdminAccess",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.policies.admin-access.description" },
   "roles": ["admin"],
   "grants": [
     { "name": "requestTypeAll", "entity": "RequestType", "actions": ["read", "create", "update", "delete"] },

@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Vendor",
   "formatVersion": 1,
+  "description": { "textKey": "vendor.resourceDescription" },
   "label": {
     "textKey": "vendor.label"
   },

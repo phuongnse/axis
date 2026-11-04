@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "leaveRequest.resourceDescription": "A request for time off, which the head of the department decides.",
     "application.title": "Leave requests",
     "application.description": "Tracks time off, from the request to the manager's approval.",
     "site.title": "Leave",

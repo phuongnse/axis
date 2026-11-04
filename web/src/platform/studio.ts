@@ -156,6 +156,17 @@ export interface StudioResourceItem {
   titles?: Record<string, string> | null
   /** Proposed: the locale a text resource holds, or null for every other kind. */
   locale?: string | null
+  /** Proposed: the resource's description in each locale that holds its key, or null when it has none. */
+  descriptions?: Record<string, string> | null
+}
+
+/** Proposed: what a list shows beside a resource and the files alone cannot say: its status against the live release. */
+export interface StudioResourceActivity {
+  id: string
+  status: 'new' | 'changed' | 'published'
+  /** A module's resource: its label and its description in each locale that holds them. */
+  titles?: Record<string, string> | null
+  descriptions?: Record<string, string> | null
 }
 
 /** A resource with its content, as `GET /api/studio/apps/{application}/resources/{id}` answers. */
@@ -444,6 +455,19 @@ export async function fetchStudioResources(application: string, signal?: AbortSi
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return ((await response.json()) as { items: StudioResourceItem[] }).items
+}
+
+/** Proposed: loads the status of each resource of an application's folder and of its modules. */
+export async function fetchStudioResourceActivity(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioResourceActivity[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/resource-activity`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioResourceActivity[] }).items
 }
 
 /** Loads the compile diagnostics of an application's folder. A 401 shows the sign-in prompt and throws, as any other failure does. */
@@ -1168,7 +1192,8 @@ export function filterResources(items: StudioResourceItem[], search: string, loc
     (item) =>
       item.id.toLowerCase().includes(needle) ||
       (item.name?.toLowerCase().includes(needle) ?? false) ||
-      resourceTitle(item, locale).toLowerCase().includes(needle),
+      resourceTitle(item, locale).toLowerCase().includes(needle) ||
+      (resourceDescription(item, locale)?.toLowerCase().includes(needle) ?? false),
   )
 }
 
@@ -1192,6 +1217,11 @@ export function resourceTitle(
     }
   }
   return item.titles?.[locale] ?? item.titles?.en ?? item.name ?? item.file
+}
+
+/** Proposed: a resource's description in the author's locale, then in English, or null when it has none. */
+export function resourceDescription(item: Pick<StudioResourceItem, 'descriptions'>, locale = 'en'): string | null {
+  return item.descriptions?.[locale] ?? item.descriptions?.en ?? null
 }
 
 /** Groups resources by kind. Kinds are sorted ordinally, and each group's items by name, or by file when a resource has no name. */

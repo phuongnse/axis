@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "BudgetForm",
   "formatVersion": 1,
+  "description": { "textKey": "department-budgets.pages.budget-form.description" },
   "title": { "textKey": "department-budgets.pages.budgetForm.title" },
   "widgets": [{ "type": "form", "name": "budgetForm", "form": "BudgetReview" }]
 }

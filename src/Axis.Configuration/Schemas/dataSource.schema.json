@@ -9,6 +9,7 @@
     "kind": { "const": "dataSource" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
+    "description": { "$ref": "#/$defs/textReference" },
     "entity": { "$ref": "#/$defs/entityName", "x-axis-reference": "entity" },
     "fields": {
       "type": "array",

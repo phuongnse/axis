@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Department",
   "formatVersion": 1,
+  "description": { "textKey": "organization.entities.department.description" },
   "label": { "textKey": "organization.department.label" },
   "displayField": "name",
   "fields": [

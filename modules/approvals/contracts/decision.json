@@ -3,6 +3,7 @@
   "kind": "contract",
   "name": "DecisionContract",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.contracts.decision.description" },
   "entity": "Decision",
   "ceiling": {
     "slots": {

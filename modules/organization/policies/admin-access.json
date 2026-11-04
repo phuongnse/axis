@@ -3,6 +3,7 @@
   "kind": "policy",
   "name": "AdminAccess",
   "formatVersion": 1,
+  "description": { "textKey": "organization.policies.admin-access.description" },
   "roles": ["admin"],
   "grants": [
     { "name": "departmentAll", "entity": "Department", "actions": ["read", "create", "update", "delete", "export", "import"] },

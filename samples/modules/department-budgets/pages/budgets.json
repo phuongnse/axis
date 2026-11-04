@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "Budgets",
   "formatVersion": 1,
+  "description": { "textKey": "department-budgets.pages.budgets.description" },
   "title": { "textKey": "department-budgets.pages.budgets.title" },
   "widgets": [
     {

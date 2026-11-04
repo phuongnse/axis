@@ -3,6 +3,7 @@
   "kind": "contract",
   "name": "EmployeeContract",
   "formatVersion": 1,
+  "description": { "textKey": "organization.contracts.employee.description" },
   "entity": "Employee",
   "validations": [
     {

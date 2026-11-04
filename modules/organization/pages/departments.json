@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "Departments",
   "formatVersion": 1,
+  "description": { "textKey": "organization.pages.departments.description" },
   "title": { "textKey": "organization.pages.departments.title" },
   "widgets": [
     {

@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "DepartmentForm",
   "formatVersion": 1,
+  "description": { "textKey": "organization.pages.department-form.description" },
   "title": { "textKey": "organization.pages.departmentForm.title" },
   "widgets": [{ "type": "form", "name": "departmentForm", "entity": "Department" }]
 }

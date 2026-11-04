@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Decision",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.entities.decision.description" },
   "label": { "textKey": "approvals.decision.label" },
   "fields": [
     { "name": "request", "type": "reference", "target": "Request", "required": true, "label": { "textKey": "approvals.decision.request" } },

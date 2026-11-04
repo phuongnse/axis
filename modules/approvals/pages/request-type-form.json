@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "RequestTypeForm",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.pages.request-type-form.description" },
   "title": { "textKey": "approvals.pages.requestTypeForm.title" },
   "widgets": [{ "type": "form", "name": "requestTypeForm", "entity": "RequestType" }]
 }

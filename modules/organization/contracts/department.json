@@ -3,6 +3,7 @@
   "kind": "contract",
   "name": "DepartmentContract",
   "formatVersion": 1,
+  "description": { "textKey": "organization.contracts.department.description" },
   "entity": "Department",
   "validations": [
     {

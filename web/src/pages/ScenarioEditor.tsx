@@ -5,6 +5,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ReferencePicker } from './ReferencePicker'
 import { Field, KeyInput, KeyValueRows, ScenarioStep } from './ScenarioStep'
+import { ResourceDescription } from './ResourceDescription'
 import type { ChangeHandler } from './SchemaForm'
 
 function StubCard({
@@ -146,6 +147,7 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
           onChange={(event) => onChange('/name', event.target.value)}
         />
       </Field>
+      <ResourceDescription value={value.description} onChange={onChange} />
       <Field pointer="/now" name={t('shell.studio.scenario.now')}>
         <Input
           aria-label={t('shell.studio.scenario.now')}

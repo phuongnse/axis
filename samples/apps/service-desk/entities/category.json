@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Category",
   "formatVersion": 1,
+  "description": { "textKey": "category.resourceDescription" },
   "label": {
     "textKey": "category.label"
   },

@@ -1220,9 +1220,16 @@ const blankResources = [
   studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f54', 'text', 'en', 'texts/en.json'),
 ]
 
+/** Proposed: a release of the history with no relaxed point, as the history answers it. */
+function withRelaxed(releases: unknown) {
+  const history = releases as { items: object[] }
+  return { ...history, items: history.items.map((item) => ({ relaxed: [], offStandard: false, ...item })) }
+}
+
 /** The answers Studio loads for one application's folder. */
 function studioFolder(name: string, items: unknown[], diagnostics: unknown[], releases: unknown) {
   const base = `/api/studio/apps/${name}`
+  const manifest = (items as { id: string; kind: string }[]).find((item) => item.kind === 'application')!
   const names = {
     locales: ['en'],
     entities: [],
@@ -1236,13 +1243,23 @@ function studioFolder(name: string, items: unknown[], diagnostics: unknown[], re
     forms: [],
     pages: [],
     policies: [],
+    contracts: [],
     texts: [],
   }
   return {
     [`${base}/resources`]: () => ({ items }),
+    // Proposed: Studio reads the manifest of the application it opens.
+    [`${base}/resources/${manifest.id}`]: () => ({
+      ...manifest,
+      content: { id: manifest.id, kind: 'application', name, formatVersion: 1 },
+    }),
+    // Proposed: a folder with no release holds only new resources.
+    [`${base}/resource-activity`]: () => ({
+      items: (items as { id: string }[]).map((item) => ({ id: item.id, status: 'new' })),
+    }),
     [`${base}/diagnostics`]: () => ({ diagnostics }),
     [`${base}/names`]: () => names,
-    [`${base}/releases`]: () => releases,
+    [`${base}/releases`]: () => withRelaxed(releases),
   }
 }
 
@@ -1271,7 +1288,12 @@ export const routes: Record<string, () => unknown> = {
   '/api/about': () => ({ version: '0.1.0' }),
   '/health/ready': () => new Response(null, { status: 200 }),
   // Proposed: Studio's answers for the purchase request sample, as the local stack gave them, with a short release history.
-  ...Object.fromEntries(Object.entries(studioFixtures).map(([path, body]) => [path, () => body])),
+  ...Object.fromEntries(
+    Object.entries(studioFixtures).map(([path, body]) => [
+      path,
+      () => (path.endsWith('/releases') ? withRelaxed(body) : body),
+    ]),
+  ),
   // Proposed: two more applications for Studio's overview: one with errors and changes that are not live yet, and one
   // just created, with nothing but what a blank application holds.
   '/api/studio/apps': () => ({ items: [...studioFixtures['/api/studio/apps'].items, studioBlankApp] }),

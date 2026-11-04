@@ -15,6 +15,9 @@ public abstract record Resource
 
     public TextReference? Label { get; init; }
 
+    /// <summary>Proposed: what the resource is for, in one line, which Studio's lists show.</summary>
+    public TextReference? Description { get; init; }
+
     /// <summary>
     /// The file the resource was loaded from, relative to the application folder with <c>/</c>
     /// separators. Set by the loader, never read from the file.

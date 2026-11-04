@@ -3,6 +3,7 @@
   "kind": "policy",
   "name": "ApproverAccess",
   "formatVersion": 1,
+  "description": { "textKey": "department-budgets.policies.approver-access.description" },
   "roles": ["approver"],
   "grants": [
     { "name": "budgetRead", "entity": "Budget", "actions": ["read", "create", "update"] },

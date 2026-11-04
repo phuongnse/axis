@@ -5,6 +5,13 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "department-budgets.entities.budget-decision.description": "Câu trả lời của người duyệt cho ngân sách, với số tiền được quyết định.",
+    "department-budgets.entities.budget.description": "Số tiền một phòng ban được chi trong một kỳ.",
+    "department-budgets.contracts.budget.description": "Các quy tắc mọi ngân sách phải giữ, như số tiền đã quyết không đổi.",
+    "department-budgets.processes.budget-approval.description": "Gửi ngân sách cho người duyệt và ghi lại quyết định.",
+    "department-budgets.policies.approver-access.description": "Cho phép người duyệt tạo và quyết định ngân sách.",
+    "department-budgets.pages.budget-form.description": "Tạo hoặc sửa một ngân sách.",
+    "department-budgets.pages.budgets.description": "Liệt kê ngân sách của các phòng ban.",
     "department-budgets.budget.label": "Ngân sách",
     "department-budgets.budget.name": "Tên",
     "department-budgets.budget.department": "Phòng ban",

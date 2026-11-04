@@ -4,6 +4,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
+import { ResourceDescription } from './ResourceDescription'
 import type { ChangeHandler } from './SchemaForm'
 import { LabelTextsContext } from './labelTextsContext'
 
@@ -171,6 +172,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
   return (
     <Flex vertical gap="small" data-testid="studio-identity-provider-editor">
       {textField('/name', t('shell.studio.identityProvider.name'), value.name)}
+      <ResourceDescription value={value.description} onChange={onChange} />
       <div data-testid="studio-field-/type">
         <div>{t('shell.studio.identityProvider.type')}</div>
         <Select

@@ -3,6 +3,7 @@
   "kind": "contract",
   "name": "RequestContract",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.contracts.request.description" },
   "entity": "Request",
   "lifecycle": {
     "field": "status",

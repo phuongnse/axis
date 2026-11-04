@@ -9,12 +9,19 @@
     "kind": { "const": "webhook" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
+    "description": { "$ref": "#/$defs/textReference" },
     "event": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "event" },
     "url": { "$ref": "#/$defs/binding" },
     "secret": { "$ref": "#/$defs/binding" },
     "timeout": { "type": "string" }
   },
   "$defs": {
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": { "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" } }
+    },
     "id": {
       "type": "string",
       "format": "uuid",

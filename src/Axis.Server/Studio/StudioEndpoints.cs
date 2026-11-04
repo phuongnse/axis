@@ -90,6 +90,7 @@ internal static class StudioEndpoints
     {
         endpoints.MapGet("/api/studio/apps", AppsAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources", ListAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/resource-activity", ResourceActivityAsync);
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceAsync);
         endpoints.MapPut("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceSaveAsync).WithStorageQuota();
@@ -127,9 +128,8 @@ internal static class StudioEndpoints
     }
 
     /// <summary>
-    /// Proposed: an application of the list with its title and description per locale, from the `label` and
-    /// `description` of its manifest and its text resources, so Studio lists it as the home page does. A key that no
-    /// text holds, or a folder that does not load, leaves the name and no description.
+    /// An application of the list with its title and description per locale, as <see cref="StudioApplicationTexts"/> reads
+    /// them. A folder that gives neither leaves the name, which Studio then shows.
     /// </summary>
     private static StudioApplicationItem DescribeApplication(StudioOptions options, string name)
     {
@@ -138,22 +138,8 @@ internal static class StudioEndpoints
             return new StudioApplicationItem(name);
         }
 
-        var loaded = Axis.Configuration.Loading.ApplicationLoader.Load(folder);
-        var manifest = loaded.Application;
-        var titles = new Dictionary<string, string>(StringComparer.Ordinal);
-        var descriptions = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var text in loaded.Texts)
-        {
-            titles[text.Locale] = manifest?.Label is { } label && text.Texts.TryGetValue(label.TextKey, out var title)
-                ? title
-                : name;
-            if (manifest?.Description is { } description && text.Texts.TryGetValue(description.TextKey, out var line))
-            {
-                descriptions[text.Locale] = line;
-            }
-        }
-
-        return new StudioApplicationItem(name, titles, descriptions.Count > 0 ? descriptions : null);
+        var (titles, descriptions) = StudioApplicationTexts.Read(folder);
+        return new StudioApplicationItem(name, titles, descriptions);
     }
 
     private static async Task<IResult> ListAsync(
@@ -185,7 +171,8 @@ internal static class StudioEndpoints
                 file.Version,
                 usedBy.GetValueOrDefault(file.Id),
                 ResourceTitles(file, texts),
-                file.Kind == "text" ? TextLocale(file) : null))
+                file.Kind == "text" ? TextLocale(file) : null,
+                ResourceDescriptions(file, texts)))
             .ToList();
         return Results.Ok(new StudioResourceListResponse(items));
     }
@@ -220,6 +207,129 @@ internal static class StudioEndpoints
         }
 
         return byLocale;
+    }
+
+    /// <summary>Proposed: the text of a resource's <c>description</c> in each locale that holds its key, or null when it has none.</summary>
+    private static Dictionary<string, string>? ResourceDescriptions(
+        StudioFile file, Dictionary<string, Dictionary<string, string>> texts)
+    {
+        string? key;
+        try
+        {
+            key = (JsonNode.Parse(file.Bytes) as JsonObject)?["description"]?["textKey"]?.GetValue<string>();
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            return null;
+        }
+
+        if (key is null)
+        {
+            return null;
+        }
+
+        var descriptions = texts
+            .Where(locale => locale.Value.ContainsKey(key))
+            .ToDictionary(locale => locale.Key, locale => locale.Value[key], StringComparer.Ordinal);
+        return descriptions.Count > 0 ? descriptions : null;
+    }
+
+    /// <summary>
+    /// Proposed: what the Studio lists show beside each resource and the files alone cannot say: whether it is live. It reads
+    /// the tenant database, so it is a route of its own and the resource list keeps working without it.
+    /// </summary>
+    private static async Task<IResult> ResourceActivityAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        TenantDatabase database)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        var files = StudioFolder.List(folder);
+        if (files.FirstOrDefault(file => file.File == "application.json")?.Id is not { } applicationId)
+        {
+            return Results.Ok(new StudioResourceActivityResponse(
+                [.. files.Select(file => new StudioResourceActivityItem(file.Id.ToString("D"), "new"))]));
+        }
+
+        var context = await database.GetConfigurationAsync(cancellationToken);
+        var active = await new ActiveReleaseStore(context).FindByApplicationIdAsync(applicationId, cancellationToken);
+        // A file the release does not hold is new, whether or not it loads. A file it holds that no longer loads counts as
+        // removed from the comparison, so it shows as changed rather than as what the release holds.
+        var live = active is null
+            ? []
+            : (await context.ReleaseResources
+                .Where(resource => resource.ReleaseId == active.ReleaseId)
+                .Select(resource => resource.Path)
+                .ToListAsync(cancellationToken))
+                .ToHashSet(StringComparer.Ordinal);
+        var compiled = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules);
+        var changed = active is null
+            ? []
+            : (await LiveChangesAsync(database, folder, compiled, active.ReleaseId, cancellationToken))
+                .Select(change => change.Path)
+                .ToHashSet(StringComparer.Ordinal);
+        string Status(string path) => !live.Contains(path) ? "new" : changed.Contains(path) ? "changed" : "published";
+        return Results.Ok(new StudioResourceActivityResponse(
+            [.. files.Select(file => new StudioResourceActivityItem(file.Id.ToString("D"), Status(file.File))),
+            .. ModuleActivity(compiled, Status)]));
+    }
+
+    /// <summary>
+    /// Proposed: the resources a module brings, each with the id in its file, which is the id the names answer, its file in
+    /// a release, and its label and description in each locale, as the resource list answers them for the folder's own. A
+    /// module has a status like the application's own: declaring it, a new version or a layer changes it. A folder with
+    /// errors has no compiled files, so it lists none.
+    /// </summary>
+    private static List<StudioResourceActivityItem> ModuleActivity(CompilationResult compiled, Func<string, string> status)
+    {
+        var files = compiled.Resources
+            .Where(resource => resource.Path.StartsWith("modules/", StringComparison.Ordinal))
+            .Select(resource => (resource.Path, Root: JsonNode.Parse(resource.Content) as JsonObject))
+            .ToList();
+        var texts = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var (_, root) in files.Where(file => (string?)file.Root?["kind"] == "text"))
+        {
+            if (root?["locale"]?.GetValue<string>() is { } locale && root["texts"] is JsonObject entries)
+            {
+                var target = texts.TryGetValue(locale, out var existing) ? existing : texts[locale] = new(StringComparer.Ordinal);
+                foreach (var (key, value) in entries)
+                {
+                    if (value is JsonValue text && text.TryGetValue<string>(out var line))
+                    {
+                        target[key] = line;
+                    }
+                }
+            }
+        }
+
+        Dictionary<string, string>? TextsOf(JsonNode? reference)
+        {
+            // A property such as a scenario's title is plain text, not a text reference.
+            if (reference is not JsonObject target || target["textKey"] is not JsonValue value || !value.TryGetValue<string>(out var key))
+            {
+                return null;
+            }
+
+            var found = texts.Where(locale => locale.Value.ContainsKey(key)).ToDictionary(locale => locale.Key, locale => locale.Value[key], StringComparer.Ordinal);
+            return found.Count > 0 ? found : null;
+        }
+
+        return [.. files
+            .Where(file => file.Root?["id"] is JsonValue id && id.TryGetValue<string>(out _))
+            .Select(file => new StudioResourceActivityItem(
+                file.Root!["id"]!.GetValue<string>(),
+                status(file.Path),
+                TextsOf(file.Root["label"] ?? file.Root["title"]),
+                TextsOf(file.Root["description"])))];
     }
 
     /// <summary>Proposed: the locale a text resource holds, which Studio names it by, as the language's name.</summary>
@@ -664,49 +774,49 @@ internal static class StudioEndpoints
             .ToList();
         var changes = activeRelease is null || activeRelease.ContentHash == folderContentHash
             ? []
-            : await ChangesAsync(folder, compiled, activeRelease.ReleaseId, cancellationToken);
+            : await LiveChangesAsync(database, folder, compiled, activeRelease.ReleaseId, cancellationToken);
         return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, items, changes));
+    }
 
-        async Task<IReadOnlyList<StudioReleaseChange>> ChangesAsync(
-            string folderPath, CompilationResult result, Guid releaseId, CancellationToken token)
+    private static async Task<IReadOnlyList<StudioReleaseChange>> LiveChangesAsync(
+        TenantDatabase database, string folderPath, CompilationResult result, Guid releaseId, CancellationToken token)
+    {
+        // Proposed: the files that differ from the live release, as the Overview lists them. Both sides are the
+        // canonical JSON a release stores, so a file that only moved its spaces does not count. A folder with errors
+        // has no compiled files, so its own files are read and the modules' copies are left out on both sides.
+        var withModules = result.Resources.Count > 0;
+        var folderFiles = (withModules ? result.Resources : Axis.Configuration.Loading.ApplicationLoader.Load(folderPath).Resources)
+            .ToDictionary(resource => resource.Path, resource => resource.Content, StringComparer.Ordinal);
+        var context = await database.GetConfigurationAsync(token);
+        var releaseFiles = await context.ReleaseResources
+            .Where(resource => resource.ReleaseId == releaseId)
+            .Select(resource => new { resource.Path, resource.Content })
+            .ToListAsync(token);
+        var live = releaseFiles
+            .Where(file => withModules || !file.Path.StartsWith("modules/", StringComparison.Ordinal))
+            .ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+        var list = new List<StudioReleaseChange>();
+        foreach (var (path, content) in folderFiles)
         {
-            // Proposed: the files that differ from the live release, as the Overview lists them. Both sides are the
-            // canonical JSON a release stores, so a file that only moved its spaces does not count. A folder with errors
-            // has no compiled files, so its own files are read and the modules' copies are left out on both sides.
-            var withModules = result.Resources.Count > 0;
-            var folderFiles = (withModules ? result.Resources : Axis.Configuration.Loading.ApplicationLoader.Load(folderPath).Resources)
-                .ToDictionary(resource => resource.Path, resource => resource.Content, StringComparer.Ordinal);
-            var context = await database.GetConfigurationAsync(token);
-            var releaseFiles = await context.ReleaseResources
-                .Where(resource => resource.ReleaseId == releaseId)
-                .Select(resource => new { resource.Path, resource.Content })
-                .ToListAsync(token);
-            var live = releaseFiles
-                .Where(file => withModules || !file.Path.StartsWith("modules/", StringComparison.Ordinal))
-                .ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
-            var list = new List<StudioReleaseChange>();
-            foreach (var (path, content) in folderFiles)
+            if (!live.TryGetValue(path, out var liveContent))
             {
-                if (!live.TryGetValue(path, out var liveContent))
-                {
-                    list.Add(new StudioReleaseChange(path, "added"));
-                }
-                else if (liveContent != content)
-                {
-                    list.Add(new StudioReleaseChange(path, "changed"));
-                }
+                list.Add(new StudioReleaseChange(path, "added"));
             }
-
-            // Proposed: a removed file is no longer in the folder, so Studio names it from the live release: its kind, its
-            // name and its label in the release's own texts.
-            var removed = live.Where(file => !folderFiles.ContainsKey(file.Key)).ToList();
-            if (removed.Count > 0)
+            else if (liveContent != content)
             {
-                var releaseTexts = ReleaseTexts(live.Values);
-                list.AddRange(removed.Select(file => RemovedChange(file.Key, file.Value, releaseTexts)));
+                list.Add(new StudioReleaseChange(path, "changed"));
             }
-            return [.. list.OrderBy(change => change.Path, StringComparer.Ordinal)];
         }
+
+        // Proposed: a removed file is no longer in the folder, so Studio names it from the live release: its kind, its
+        // name and its label in the release's own texts.
+        var removed = live.Where(file => !folderFiles.ContainsKey(file.Key)).ToList();
+        if (removed.Count > 0)
+        {
+            var releaseTexts = ReleaseTexts(live.Values);
+            list.AddRange(removed.Select(file => RemovedChange(file.Key, file.Value, releaseTexts)));
+        }
+        return [.. list.OrderBy(change => change.Path, StringComparer.Ordinal)];
     }
 
     /// <summary>
@@ -1436,7 +1546,7 @@ internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceIt
 /// <summary>
 /// One resource in the list. <c>Version</c> is the lower-case SHA-256 hex of the file's bytes, and <c>UsedBy</c>
 /// is the number of references that point at the resource. Proposed: <c>Titles</c> is its label in each locale, and
-/// <c>Locale</c> the locale a text resource holds.
+/// <c>Locale</c> the locale a text resource holds, and <c>Descriptions</c> its description in each locale.
 /// </summary>
 internal sealed record StudioResourceItem(
     string Id,
@@ -1446,7 +1556,21 @@ internal sealed record StudioResourceItem(
     string Version,
     int UsedBy,
     IReadOnlyDictionary<string, string>? Titles = null,
-    string? Locale = null);
+    string? Locale = null,
+    IReadOnlyDictionary<string, string>? Descriptions = null);
+
+/// <summary>Proposed: the answer of the resource activity route.</summary>
+internal sealed record StudioResourceActivityResponse(IReadOnlyList<StudioResourceActivityItem> Items);
+
+/// <summary>
+/// Proposed: one resource's <c>Status</c> against the live release, <c>new</c>, <c>changed</c> or <c>published</c>. A module's
+/// resource also has its <c>Titles</c> and <c>Descriptions</c> by locale, as the resource list has them for the folder's.
+/// </summary>
+internal sealed record StudioResourceActivityItem(
+    string Id,
+    string Status,
+    IReadOnlyDictionary<string, string>? Titles = null,
+    IReadOnlyDictionary<string, string>? Descriptions = null);
 
 /// <summary>One resource with its JSON content.</summary>
 internal sealed record StudioResourceResponse(string Id, string Kind, string? Name, string File, string Version, JsonElement Content);

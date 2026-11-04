@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Input, Result, Typography } from 'antd'
+import { Alert, Button, Flex, Input, Result } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -31,6 +31,7 @@ import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioModuleContract } from './StudioModuleContract'
 import { StudioModuleEntity } from './StudioModuleEntity'
+import { StudioResourceTable } from './StudioResourceTable'
 import { StudioModulePage } from './StudioModulePage'
 import { StudioModulePolicy } from './StudioModulePolicy'
 import { StudioModuleProcess } from './StudioModuleProcess'
@@ -236,13 +237,6 @@ function StudioWorkspace() {
     })
     return () => controller.abort()
   }, [generation, lost])
-
-  const onlyApplication = Array.isArray(apps) && apps.length === 1 ? apps[0].name : null
-  useEffect(() => {
-    if (onlyApplication !== null && application === null) {
-      setParams({ app: onlyApplication }, { replace: true })
-    }
-  }, [onlyApplication, application, setParams])
 
   useEffect(() => {
     if (application === null) {
@@ -646,8 +640,12 @@ function StudioWorkspace() {
                 onWritten={onWritten}
               />
             ) : view.name === 'kind' ? (
-              <Flex vertical gap="middle">
-                <Flex gap="small" align="center">
+              <StudioResourceTable
+                application={application}
+                folderRevision={folderRevision}
+                items={listed}
+                extra={moduleGroups.find((group) => group.kind === view.kind)?.items ?? []}
+                search={
                   <Input.Search
                     aria-label={t('shell.studio.search')}
                     placeholder={t('shell.studio.search')}
@@ -656,20 +654,18 @@ function StudioWorkspace() {
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                   />
-                  <div style={{ flex: 1 }} />
+                }
+                main={
                   <StudioNewResource
                     application={application}
                     resources={resources}
-                    kind={view.name === 'kind' ? view.kind : undefined}
+                    kind={view.kind}
                     onCreated={onCreated}
                   />
-                </Flex>
-                <StudioResourceRows
-                  items={listed}
-                  extra={moduleGroups.find((group) => group.kind === view.kind)?.items ?? []}
-                  onOpen={selectResource}
-                />
-              </Flex>
+                }
+                addressOf={(id) => `/studio?${new URLSearchParams({ app: application, resource: id })}`}
+                onOpen={selectResource}
+              />
             ) : view.name === 'overview' ? (
               <StudioOverview
                 application={application}
@@ -762,56 +758,6 @@ function StudioApplicationTiles({ applications }: { applications: readonly Studi
           />
         )
       })}
-    </div>
-  )
-}
-
-/** Proposed: the resources of one kind as rows, each its label and file, which opens it in the editor. */
-function StudioResourceRows({
-  items,
-  extra,
-  onOpen,
-}: {
-  items: readonly StudioResourceItem[]
-  extra: readonly { id: string; name: string; module: string | null }[]
-  onOpen: (id: string) => void
-}) {
-  const t = useText()
-  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour, spacing, radius } = useDesignTokens()
-  const rows = [
-    ...items.map((item) => ({ id: item.id, name: resourceTitle(item, locale), detail: item.file })),
-    ...extra.map((entity) => ({ id: entity.id, name: entity.name, detail: entity.module ?? '' })),
-  ]
-  if (rows.length === 0) {
-    return <Typography.Text type="secondary">{t('shell.studio.noResources')}</Typography.Text>
-  }
-  return (
-    <div style={{ background: colour.surface, border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base }}>
-      {rows.map((row, index) => (
-        <button
-          key={row.id}
-          type="button"
-          data-testid={`studio-resource-${row.id}`}
-          onClick={() => onOpen(row.id)}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: spacing.md,
-            width: '100%',
-            padding: `${spacing.xs}px ${spacing.md}px`,
-            background: 'transparent',
-            border: 'none',
-            borderTop: index === 0 ? 'none' : `1px solid ${colour.divider}`,
-            cursor: 'pointer',
-            font: 'inherit',
-            textAlign: 'start',
-          }}
-        >
-          <Typography.Text style={{ color: colour.primaryText }}>{row.name}</Typography.Text>
-          <Typography.Text style={{ color: colour.textMuted }}>{row.detail}</Typography.Text>
-        </button>
-      ))}
     </div>
   )
 }

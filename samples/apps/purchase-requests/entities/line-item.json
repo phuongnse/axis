@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "LineItem",
   "formatVersion": 1,
+  "description": { "textKey": "lineItem.resourceDescription" },
   "label": { "textKey": "lineItem.label" },
   "fields": [
     { "name": "description", "type": "text", "required": true, "maxLength": 200, "label": { "textKey": "lineItem.description" } },

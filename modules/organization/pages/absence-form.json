@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "AbsenceForm",
   "formatVersion": 1,
+  "description": { "textKey": "organization.pages.absence-form.description" },
   "title": { "textKey": "organization.pages.absenceForm.title" },
   "widgets": [{ "type": "form", "name": "absenceForm", "form": "Absence" }]
 }

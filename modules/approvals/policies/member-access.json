@@ -3,6 +3,7 @@
   "kind": "policy",
   "name": "MemberAccess",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.policies.member-access.description" },
   "roles": ["member"],
   "grants": [
     {

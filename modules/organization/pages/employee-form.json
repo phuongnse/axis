@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "EmployeeForm",
   "formatVersion": 1,
+  "description": { "textKey": "organization.pages.employee-form.description" },
   "title": { "textKey": "organization.pages.employeeForm.title" },
   "widgets": [{ "type": "form", "name": "employeeForm", "entity": "Employee" }]
 }

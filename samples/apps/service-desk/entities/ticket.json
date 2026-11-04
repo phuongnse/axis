@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Ticket",
   "formatVersion": 1,
+  "description": { "textKey": "ticket.resourceDescription" },
   "label": {
     "textKey": "ticket.label"
   },

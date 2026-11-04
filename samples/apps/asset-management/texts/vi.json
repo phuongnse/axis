@@ -5,6 +5,13 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "asset.resourceDescription": "Tài sản công ty sở hữu và theo dõi, cùng người đang giữ.",
+    "attachment.resourceDescription": "Tệp đi kèm tài sản, như hóa đơn hoặc tài liệu hướng dẫn.",
+    "category.resourceDescription": "Nhóm các tài sản cùng loại.",
+    "location.resourceDescription": "Nơi đặt tài sản.",
+    "maintenance.resourceDescription": "Một lần bảo trì tài sản.",
+    "software.resourceDescription": "Giấy phép phần mềm công ty đang có.",
+    "vendor.resourceDescription": "Công ty cung cấp tài sản.",
     "application.title": "Quản lý tài sản",
     "application.description": "Theo dõi tài sản của công ty, người đang giữ và việc bảo trì.",
     "site.title": "Quản lý tài sản",

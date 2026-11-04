@@ -26,6 +26,7 @@ import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { LabelTexts } from './LabelTexts'
+import { ResourceDescription } from './ResourceDescription'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTextsContext } from './labelTextsContext'
@@ -129,6 +130,7 @@ export function PageEditor({
           </div>
         )}
       </div>
+      <ResourceDescription value={value.description} onChange={onChange} />
       <PageParameters value={value.parameters} onChange={onChange} />
       <PageWidgets value={value} selected={selected ?? picked} onSelect={onSelect ?? setPicked} onChange={onChange} />
     </Flex>

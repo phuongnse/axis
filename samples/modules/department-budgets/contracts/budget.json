@@ -3,6 +3,7 @@
   "kind": "contract",
   "name": "BudgetContract",
   "formatVersion": 1,
+  "description": { "textKey": "department-budgets.contracts.budget.description" },
   "entity": "Budget",
   "lifecycle": {
     "field": "status",

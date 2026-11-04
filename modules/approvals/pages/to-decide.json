@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "ToDecide",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.pages.to-decide.description" },
   "title": { "textKey": "approvals.pages.toDecide.title" },
   "widgets": [{ "type": "taskInbox", "name": "inbox" }]
 }

@@ -2,6 +2,7 @@ import { Button, Card, Checkbox, Flex, Input, Select, Typography } from 'antd'
 import { useText } from '../platform/texts'
 import { BindingPicker } from './BindingPicker'
 import { ReferencePicker } from './ReferencePicker'
+import { ResourceDescription } from './ResourceDescription'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -119,6 +120,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
   return (
     <Flex vertical gap="small" data-testid="studio-connector-editor">
       {textField('/name', t('shell.studio.connector.name'), value.name, true)}
+      <ResourceDescription value={value.description} onChange={onChange} />
       {bindingField('/baseUrl/binding', t('shell.studio.connector.urlBinding'), value.baseUrl)}
       <div data-testid="studio-field-/auth">
         <div data-testid="studio-field-/auth/type">

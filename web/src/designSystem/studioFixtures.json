@@ -57,23 +57,28 @@
         "kind": "application",
         "name": "PurchaseRequests",
         "file": "application.json",
-        "version": "9f4a249a154de3eb533a891b9e029bf93bcc28c18b2be56d44011c5c6d83d7b1",
+        "version": "f774e202f7528b40e88d8a793ca8a6b45e551ad35a3eece94c0b3bfecf72c7f4",
         "usedBy": 0,
         "titles": {
           "en": "Purchase requests",
           "vi": "Yêu cầu mua hàng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": {
+          "en": "Runs the company's purchases, from the request to approval and ordering.",
+          "vi": "Quản lý việc mua hàng của công ty, từ yêu cầu đến phê duyệt và đặt hàng."
+        }
       },
       {
         "id": "409bc638-0aec-4084-ada2-e3baed50057d",
         "kind": "connector",
         "name": "PurchasingSystem",
         "file": "connectors/purchasing-system.json",
-        "version": "f3ffc528e346f4c77c58aff927271911688dfcdb0ffd432fc8206758ec05863d",
+        "version": "5180ec2cfd6990297aa77c5170cb4190751212c689d919607bc1f905c00666df",
         "usedBy": 3,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "cf3831ca-5fcf-4d28-8d13-507454ea11d3",
@@ -83,7 +88,8 @@
         "version": "66027bd388f3bfeea2496f02325e358c5b7c35910ea9d03a62aa41ce284eba77",
         "usedBy": 4,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "3eb3d7ba-f87e-492a-825c-916f7a5ae7a4",
@@ -93,69 +99,81 @@
         "version": "f410bbb6046240ccb6de27e9897884a94bf5204678c0531d4732cf2deac6f155",
         "usedBy": 3,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "bc241668-fe85-45a4-b7cf-d36da8d56b71",
         "kind": "endpoint",
         "name": "SubmitPurchaseRequest",
         "file": "endpoints/submit-purchase-request.json",
-        "version": "6c3eeaffdb710892f0e672526880234d4f045931e96fe7708c4f96d5b7c4edbf",
+        "version": "434c1b3ede2ff62c76c019d7be6f69342b8a90402ec68fb3c628c8be68963691",
         "usedBy": 1,
         "titles": null,
-        "locale": null
-      },
-      {
-        "id": "ebe6bc20-4772-4d6c-839b-65d426ebeeca",
-        "kind": "entity",
-        "name": "Department",
-        "file": "entities/department.json",
-        "version": "4559f85296a834d80e072641e9db9dc44727ca8c979d3bfbc98c6edfa7593281",
-        "usedBy": 10,
-        "titles": {
-          "en": "Department",
-          "vi": "Phòng ban"
-        },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "7c1f3e52-9b4a-4d8e-a6f0-3b2d5e8c91a4",
         "kind": "entity",
         "name": "LineItem",
         "file": "entities/line-item.json",
-        "version": "1ee936bcfc8a2339cae657c529bfb94012b86e0b977c3a96516a3b6d709d638c",
+        "version": "e567aa83bdbbfac2851746e90c250a4dcda7bff8ae27e983f992f0cf89ac7a9d",
         "usedBy": 2,
         "titles": {
           "en": "Line item",
           "vi": "Dòng hàng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": {
+          "en": "A line of a purchase request: what is bought, how many and at what price.",
+          "vi": "Một dòng của đề nghị mua hàng: mua gì, bao nhiêu và giá bao nhiêu."
+        }
       },
       {
         "id": "d9ccbf89-5004-4d52-8885-2ee377b7caa5",
         "kind": "entity",
         "name": "PurchaseRequest",
         "file": "entities/purchase-request.json",
-        "version": "c4937e21daaaa1a20e2f5fe6bda7f4220356d939a6e60b1eb4fa89e231a55f64",
-        "usedBy": 16,
+        "version": "732b215f69868381769119c8700b7c7d921f51e86aa34d339186dd8f742d6295",
+        "usedBy": 17,
         "titles": {
           "en": "Purchase request",
           "vi": "Yêu cầu mua hàng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": {
+          "en": "A request to buy goods or services, which a department head approves.",
+          "vi": "Đề nghị mua hàng hóa hoặc dịch vụ, do trưởng bộ phận phê duyệt."
+        }
       },
       {
         "id": "2deb5acd-dfd8-4c5a-b546-a1aa03df6964",
         "kind": "entity",
         "name": "Supplier",
         "file": "entities/supplier.json",
-        "version": "d82d01f0532754a823c36d59575014d5ac366977c36943baa513232aea686512",
+        "version": "216650ffae6ad2dfc43c2223ba5b0d11e4e7595b7559c1e1fe9326a6c54b1e24",
         "usedBy": 9,
         "titles": {
           "en": "Supplier",
           "vi": "Nhà cung cấp"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": {
+          "en": "A company that purchase requests buy from.",
+          "vi": "Công ty cung cấp hàng cho các đề nghị mua hàng."
+        }
+      },
+      {
+        "id": "5a82a574-4daa-4450-9bfd-1ff215172233",
+        "kind": "event",
+        "name": "PurchaseRequestApproved",
+        "file": "events/purchase-request-approved.json",
+        "version": "1ca617d2d045f24309a7752ef4c802ed0f2f79d58cb3c1bea7f0e54ebab19b5d",
+        "usedBy": 2,
+        "titles": null,
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "77c7c183-7283-46a7-b56f-5cf5cec518aa",
@@ -165,7 +183,8 @@
         "version": "9afa6a608421293bfe510b703c659d38944fe3d12a457a5a918802403a60bab2",
         "usedBy": 2,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "b52449b4-bc18-4972-bf11-7b73f5a82198",
@@ -175,158 +194,186 @@
         "version": "d808f0228e2b646e67ee99b26b4aaba0752de8f08f57b2a4fffe1600f88ecfa6",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
+      },
+      {
+        "id": "eae52dc0-bf4d-4f5c-88e2-bac1ef94678e",
+        "kind": "identityProvider",
+        "name": "company",
+        "file": "identity-providers/company.json",
+        "version": "3283fb990ac6c4a9b0858d37b0528fdf5ab109f5b6882cbe30eb33756502ae0c",
+        "usedBy": 0,
+        "titles": {
+          "en": "Example Company",
+          "vi": "Example Company"
+        },
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "5ffa28da-f66a-46d6-b996-9c8f00dc3643",
         "kind": "page",
         "name": "Approvals",
         "file": "pages/approvals.json",
-        "version": "26f893ce02970961d7d96d4c1d813f1fe2ec4b380296317bddf1096809030308",
+        "version": "9c4faee01602c3d48856c4d90b1ee0f031fe0645bbd5ab7c6c07a08de5c61cb6",
         "usedBy": 1,
         "titles": {
           "en": "Purchase request approvals",
           "vi": "Theo dõi quy trình phê duyệt"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "40d4c8a6-7017-4f7c-9467-67fc9ea8dcd1",
         "kind": "page",
         "name": "Departments",
         "file": "pages/departments.json",
-        "version": "c7117f9b47a8de2a584ef5e1ecb36ea2c5c747e94da33cb047dfb854575602e2",
+        "version": "c8c72c6f9956d678f4559da6d4458b752f74aab0ada350733d749e4011b6b37a",
         "usedBy": 1,
         "titles": {
           "en": "Departments",
           "vi": "Phòng ban"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "894259ed-7e0e-49aa-9e51-43fb45700409",
         "kind": "page",
         "name": "MyTasks",
         "file": "pages/my-tasks.json",
-        "version": "dad7646046b35b05b527b57084fe4d5777482fc17f1242cd843c85425bd29dac",
+        "version": "dbc62ea7e45e1ab726e2c879ea37bfb0ab2f97d77aa46e91153221744f727683",
         "usedBy": 1,
         "titles": {
           "en": "My tasks",
           "vi": "Nhiệm vụ của tôi"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "20a80495-3566-40d6-bf99-74fcdd9bb42b",
         "kind": "page",
         "name": "PurchaseRequestForm",
         "file": "pages/purchase-request-form.json",
-        "version": "4592c3d90487808b4496cadc22592baf8259da2ae5d6af0dd3aaa32341b865b2",
+        "version": "af0b496df47196c93250cee418db7487cb602b8d49ff66c1bf9a53dd0bbc7da6",
         "usedBy": 2,
         "titles": {
           "en": "Purchase request",
           "vi": "Yêu cầu mua hàng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "e0ee63b0-ff11-4f06-95ee-e73922f2c1a9",
         "kind": "page",
         "name": "PurchaseRequests",
         "file": "pages/purchase-requests.json",
-        "version": "7c6d34054b6eb30fe202b055139875906425989d0c3500052a11c23126afa388",
+        "version": "2cd5a215689bbe699c636d5e0fb2fbc1be434e6d8b1d0f7d19f1cf85aa30937f",
         "usedBy": 1,
         "titles": {
           "en": "Purchase requests",
           "vi": "Yêu cầu mua hàng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "3b501ea6-096a-4a2a-ba23-39b062150983",
         "kind": "page",
         "name": "RequestsByDepartment",
         "file": "pages/requests-by-department.json",
-        "version": "cee0935b433cfb10421e4225b156642d62cde02e5e7d47f8d47de43ba0cc5451",
+        "version": "68bec877f3f8eea8f04967b41afdc70a24c98071283b13742d44200a180e9f38",
         "usedBy": 1,
         "titles": {
           "en": "Purchase request totals by department",
           "vi": "Tổng yêu cầu mua hàng theo phòng ban"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "9b707fe9-a837-433e-8062-48a2a9b4d62a",
         "kind": "page",
         "name": "Suppliers",
         "file": "pages/suppliers.json",
-        "version": "714dbf8ef38d3856bfc38d367ab93f635e859270e02a549868abb45a165b4079",
+        "version": "594368eadf7f798668a148c47413859f3266b1910a1befa9db37d19f7c427fbe",
         "usedBy": 1,
         "titles": {
           "en": "Suppliers",
           "vi": "Nhà cung cấp"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "7d9f722e-7406-4a39-87d5-e99293353a05",
         "kind": "policy",
         "name": "DepartmentManagerAccess",
         "file": "policies/department-manager-access.json",
-        "version": "06f90b94527dad0dd343e6e3c7099acf930b4b7d3a36d6304f8ad0c0fc349148",
+        "version": "7c3e3c04e20f5be480c5770438a702070c943361b090ff7369168cb5aa010a49",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "2eeb31d5-47d9-4fb9-bd84-eb7ffdc11f12",
         "kind": "policy",
         "name": "EmployeeAccess",
         "file": "policies/employee-access.json",
-        "version": "3f3ef441b78f4f21d16b8658318655d4071edde4ec080a2f504fa37fc02fd45a",
+        "version": "77ac2089efafe3620374fffc21292f8308b64230c3a362cec2b4ff774c6c74bd",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "d9788ec8-1186-488d-8c83-cbc9e5441d11",
         "kind": "policy",
         "name": "FinanceReviewerAccess",
         "file": "policies/finance-reviewer-access.json",
-        "version": "a4211aa2f891e888954bace9091129ec019f1cd92d569c10d717596fa0ad8ae9",
+        "version": "74fa75ba6d4256f1b5de9d111db2ca08d7df05f64c6072a8da8f3bbf6344facc",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "ad149043-1f24-4e7d-a9b8-1ba518f8e010",
         "kind": "policy",
         "name": "OperatorAccess",
         "file": "policies/operator-access.json",
-        "version": "1d29a6530fa08dbc5307c16b94ad35ba3a603c7931f420a5c4a583c216a6c5c2",
+        "version": "012afb06da2a2d451937ffa0defe0c74d33b54028418c89e9132e8b86069de61",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "1a742db5-543d-4e8d-8c66-61bf42a1b93b",
         "kind": "policy",
         "name": "PurchasingSystemAccess",
         "file": "policies/purchasing-system-access.json",
-        "version": "dd3947f9762b2050c8adc96e2f066a232f7644cce19d213f4e6b6e3d9efd4522",
+        "version": "dc78d6b89a8066a1477413fce8e586b43cd038081d6b7f6a7bbafe81050b2110",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "4b60c03e-02d0-4329-80c6-75f972190399",
         "kind": "process",
         "name": "PurchaseRequestApproval",
         "file": "processes/purchase-request-approval.json",
-        "version": "1a51d965c248b5b4a8765dbd30821ceb604177f9e96b02a01da177fa03f23f6f",
+        "version": "a9f6d7ef5216174d3157b1b243ce1e5de32c8f8a003b8c3cd00bc00487a86c27",
         "usedBy": 16,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "6fedaeb5-8afd-4fed-9aad-af8dc6b60f58",
@@ -334,12 +381,13 @@
         "name": "department-manager",
         "file": "roles/department-manager.json",
         "version": "77483a5f812145ece164c78ad77e612400f795835cafc267c37547d65c4b3c07",
-        "usedBy": 5,
+        "usedBy": 7,
         "titles": {
           "en": "Department manager",
           "vi": "Trưởng phòng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "f373f3ea-4e4d-4842-9791-4daf7be47f0a",
@@ -347,12 +395,13 @@
         "name": "employee",
         "file": "roles/employee.json",
         "version": "ef3471c236885b05ae65b0e9ca6b2f41c70c407fdb944c4848b0771d426e6781",
-        "usedBy": 7,
+        "usedBy": 8,
         "titles": {
           "en": "Employee",
           "vi": "Nhân viên"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "83e56e02-92d0-46d4-a67d-78f6e76468a4",
@@ -365,7 +414,8 @@
           "en": "Finance reviewer",
           "vi": "Người duyệt tài chính"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "d2cd0512-1503-4857-91ac-c0100e82be70",
@@ -378,7 +428,8 @@
           "en": "Operator",
           "vi": "Người vận hành"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "ae4c47b6-4ece-4666-ae0a-4e7b6731bf7d",
@@ -391,7 +442,8 @@
           "en": "Purchasing system",
           "vi": "Hệ thống mua hàng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "313225f1-c69f-41bc-b746-12d91f127c39",
@@ -401,67 +453,96 @@
         "version": "818a209452223c1efc4b027b8bee1b057564ce75cca125654320c41fd9d4db8b",
         "usedBy": 1,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "09d75317-fd9e-411e-8322-317778fc1b2b",
         "kind": "scenario",
         "name": "ApprovalBelowThreshold",
         "file": "scenarios/approval-below-threshold.json",
-        "version": "f45349bcd67e3df6c58dc7cf426075d61090062874d1040c22d891689f013d13",
+        "version": "890c5fd5441c574c81243e9e47caeee43e1cb96e13c9783e3a9dea31642cf2da",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "ee1ac8c8-74c5-4105-867a-1090a15746a7",
         "kind": "scenario",
         "name": "FinanceApprovalAboveThreshold",
         "file": "scenarios/finance-approval.json",
-        "version": "6538d8f04390de19fbfe7e3945a4ab77a9e7822c37b2dcdeb85104f7d2b0728c",
+        "version": "81ab6518870ff75a1557255d2a26dc3c6ba6abb860c53b15c1f48adb5d65b65c",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
+      },
+      {
+        "id": "e66c1415-6219-4e0d-9d4a-65db373d2e3d",
+        "kind": "scenario",
+        "name": "ManagerApprovesBudget",
+        "file": "scenarios/manager-approves-budget.json",
+        "version": "51fcb0920033651d4b3a78b482703d0afd45307f75faa88960579174c8b13c42",
+        "usedBy": 0,
+        "titles": null,
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "8010fda7-5577-4d68-bdbe-4b49ab8f05fe",
         "kind": "scenario",
         "name": "ManagerCannotTakeFinanceDecision",
         "file": "scenarios/manager-cannot-decide-finance.json",
-        "version": "c09936c288c78cf2e9487985f67befe457abde8523befaafa68f72b2bd66e223",
+        "version": "5861d51010d21bcbcb0e88d15de8e3bca7ba602afb3296a6aba994c0bcdd27ec",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "5b97473d-ab62-4fd9-a610-016ffb81b7e3",
         "kind": "scenario",
         "name": "RequesterCannotReadAnotherRequest",
         "file": "scenarios/requester-cannot-read-others.json",
-        "version": "1fc367023f44aa4e40cf4261ef97d843089f41a444ef24b8d73ba8cfea565a38",
+        "version": "5e2f3a9414af2dc451fb4eb35a7767a971f9b0eca5b373be04dec1fa88a81f74",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "bd059896-4e74-43d6-bd45-f6e8abd08d41",
         "kind": "scenario",
         "name": "ReturnedRequestGoesBackToRequester",
         "file": "scenarios/returned-request.json",
-        "version": "754efe969cb1c32bb432ecfe5b382e28909894bdafbfdb67a521fee06bf40a97",
+        "version": "3adafd3b4e3d4778c2fe285e692d7aae3ada540d205bbb1dbef507ffcdad8c5c",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
-        "id": "46e28f6b-ce3b-4a17-829e-92fb3a5930ad",
+        "id": "c8a5aa01-5f0c-4487-9f64-4355f2ddbb2f",
         "kind": "seed",
-        "name": "Departments",
-        "file": "seeds/departments.json",
-        "version": "15da3c0fd26aa874892b7a3d90e3325175d9da539144d04127f60964b087192e",
+        "name": "Employees",
+        "file": "seeds/employees.json",
+        "version": "8e64c2ada4bf64f6c03cb51a2b46c4256fe6a76611ab7349512f4182453466a6",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
+      },
+      {
+        "id": "45d4447e-db09-47e8-9b84-c1a6ea4e813a",
+        "kind": "seed",
+        "name": "OrganizationDepartments",
+        "file": "seeds/organization-departments.json",
+        "version": "0ecf5e219359c5f8fc047a5a898e67ab29b8d4f4b25ce09cf3b576b672c981bc",
+        "usedBy": 0,
+        "titles": null,
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "e9139b79-4dd5-485e-89a1-48b0e93eeaf9",
@@ -471,7 +552,8 @@
         "version": "fcf39feced8a9e33cdac010fd161adb17cb55386c647f7c8e732579e0718600b",
         "usedBy": 0,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "72ecc491-f825-4968-8eb6-1f2ac19cae7d",
@@ -481,40 +563,58 @@
         "version": "2a76949a9e95d77b7730720358f185bf319c7d182a915b1873a916145313fadd",
         "usedBy": 1,
         "titles": null,
-        "locale": null
+        "locale": null,
+        "descriptions": null
       },
       {
         "id": "0cec2d63-0949-465f-a29e-80b546dfa347",
         "kind": "site",
         "name": "Purchasing",
         "file": "sites/purchasing.json",
-        "version": "34fc51174017619a9a6497a882b10edcf865217040386b90be3d3e35af124890",
+        "version": "33a64a1dfae68d46b0d3f1173b4ab84d60cbd056ccce55830953b8dbb09106ce",
         "usedBy": 0,
         "titles": {
           "en": "Purchasing",
           "vi": "Mua hàng"
         },
-        "locale": null
+        "locale": null,
+        "descriptions": {
+          "en": "Request purchases and take them through approval.",
+          "vi": "Gửi yêu cầu mua hàng và theo dõi đến khi được phê duyệt."
+        }
       },
       {
         "id": "494288c9-ce9b-4fc9-bea0-d618094e66fe",
         "kind": "text",
         "name": "TextsEn",
         "file": "texts/en.json",
-        "version": "f92e43ce0d721e16021986a926858742018cca1cc94318ed0831269507110e43",
+        "version": "0f45ca51c24eec1443c98fad178d7e458bae9087babee9a64408afd484f6855f",
         "usedBy": 0,
         "titles": null,
-        "locale": "en"
+        "locale": "en",
+        "descriptions": null
       },
       {
         "id": "05298509-1d5c-40d1-96ab-21909ec74972",
         "kind": "text",
         "name": "TextsVi",
         "file": "texts/vi.json",
-        "version": "2f4a97b543d440ffd2ac14490b430ce54d18f3d50efab4be9b4ce93ce705a9ed",
+        "version": "0f31df5b5f6da8ef46a614ddd2b73e8fe188ac5ac07f03881adb5b515c8100c0",
         "usedBy": 0,
         "titles": null,
-        "locale": "vi"
+        "locale": "vi",
+        "descriptions": null
+      },
+      {
+        "id": "a515d557-18da-45c7-826e-938e2cf4a473",
+        "kind": "webhook",
+        "name": "PurchaseRequestApprovedWebhook",
+        "file": "webhooks/purchase-request-approved.json",
+        "version": "c53c16e137a0e56d87a805deeb0bcea1feb7909bd94afe41512048af51797b79",
+        "usedBy": 0,
+        "titles": null,
+        "locale": null,
+        "descriptions": null
       }
     ]
   },
@@ -522,9 +622,9 @@
     "locales": ["en", "vi"],
     "entities": [
       {
-        "id": "ebe6bc20-4772-4d6c-839b-65d426ebeeca",
-        "name": "Department",
-        "module": null,
+        "id": "25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95",
+        "name": "organization/Department",
+        "module": "organization",
         "fields": [
           {
             "name": "code",
@@ -539,7 +639,160 @@
             "values": null
           },
           {
+            "name": "parent",
+            "type": "reference",
+            "target": "organization/Department",
+            "values": null
+          },
+          {
+            "name": "head",
+            "type": "reference",
+            "target": "organization/Employee",
+            "values": null
+          },
+          {
+            "name": "active",
+            "type": "boolean",
+            "target": null,
+            "values": null
+          }
+        ]
+      },
+      {
+        "id": "c2ad798a-c10d-49f3-957f-86c491e68706",
+        "name": "organization/Employee",
+        "module": "organization",
+        "fields": [
+          {
+            "name": "fullName",
+            "type": "text",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "workEmail",
+            "type": "text",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "phone",
+            "type": "text",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "jobTitle",
+            "type": "text",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "department",
+            "type": "reference",
+            "target": "organization/Department",
+            "values": null
+          },
+          {
             "name": "manager",
+            "type": "reference",
+            "target": "organization/Employee",
+            "values": null
+          },
+          {
+            "name": "user",
+            "type": "text",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "active",
+            "type": "boolean",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "delegate",
+            "type": "reference",
+            "target": "organization/Employee",
+            "values": null
+          },
+          {
+            "name": "delegateFrom",
+            "type": "date",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "delegateUntil",
+            "type": "date",
+            "target": null,
+            "values": null
+          }
+        ]
+      },
+      {
+        "id": "594da8be-0ed9-4b95-8afb-271b7a8a4d68",
+        "name": "department-budgets/BudgetDecision",
+        "module": "department-budgets",
+        "fields": [
+          {
+            "name": "budget",
+            "type": "reference",
+            "target": "department-budgets/Budget",
+            "values": null
+          },
+          {
+            "name": "amount",
+            "type": "decimal",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "decidedBy",
+            "type": "text",
+            "target": null,
+            "values": null
+          }
+        ]
+      },
+      {
+        "id": "372cf999-b3a9-4b83-abfd-9b05f61ceeb4",
+        "name": "department-budgets/Budget",
+        "module": "department-budgets",
+        "fields": [
+          {
+            "name": "name",
+            "type": "text",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "department",
+            "type": "reference",
+            "target": "organization/Department",
+            "values": null
+          },
+          {
+            "name": "year",
+            "type": "integer",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "amount",
+            "type": "decimal",
+            "target": null,
+            "values": null
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "target": null,
+            "values": ["draft", "approved", "rejected"]
+          },
+          {
+            "name": "requester",
             "type": "text",
             "target": null,
             "values": null
@@ -603,7 +856,7 @@
           {
             "name": "department",
             "type": "reference",
-            "target": "Department",
+            "target": "organization/Department",
             "values": null
           },
           {
@@ -684,6 +937,126 @@
     ],
     "dataSources": [
       {
+        "id": "d25b93f9-6098-40ab-b907-24fb5dedda00",
+        "name": "organization/Departments",
+        "module": "organization",
+        "parameters": [],
+        "columns": [
+          {
+            "name": "code",
+            "type": "text"
+          },
+          {
+            "name": "name",
+            "type": "text"
+          },
+          {
+            "name": "parent",
+            "type": "reference"
+          },
+          {
+            "name": "head",
+            "type": "reference"
+          },
+          {
+            "name": "active",
+            "type": "boolean"
+          }
+        ],
+        "groupBy": null
+      },
+      {
+        "id": "249dbb40-8bc2-4b9b-b5f8-b76192a9ffe8",
+        "name": "organization/Employees",
+        "module": "organization",
+        "parameters": [],
+        "columns": [
+          {
+            "name": "fullName",
+            "type": "text"
+          },
+          {
+            "name": "workEmail",
+            "type": "text"
+          },
+          {
+            "name": "jobTitle",
+            "type": "text"
+          },
+          {
+            "name": "department",
+            "type": "reference"
+          },
+          {
+            "name": "manager",
+            "type": "reference"
+          },
+          {
+            "name": "user",
+            "type": "text"
+          },
+          {
+            "name": "active",
+            "type": "boolean"
+          }
+        ],
+        "groupBy": null
+      },
+      {
+        "id": "cdcc2f3e-580b-4349-aad7-46e150475937",
+        "name": "organization/OutOfOffice",
+        "module": "organization",
+        "parameters": [],
+        "columns": [
+          {
+            "name": "fullName",
+            "type": "text"
+          },
+          {
+            "name": "delegate",
+            "type": "reference"
+          },
+          {
+            "name": "delegateFrom",
+            "type": "date"
+          },
+          {
+            "name": "delegateUntil",
+            "type": "date"
+          }
+        ],
+        "groupBy": null
+      },
+      {
+        "id": "74e1db38-87c8-4711-90d2-f022e98aae00",
+        "name": "department-budgets/Budgets",
+        "module": "department-budgets",
+        "parameters": [],
+        "columns": [
+          {
+            "name": "name",
+            "type": "text"
+          },
+          {
+            "name": "department",
+            "type": "reference"
+          },
+          {
+            "name": "year",
+            "type": "integer"
+          },
+          {
+            "name": "amount",
+            "type": "decimal"
+          },
+          {
+            "name": "status",
+            "type": "enum"
+          }
+        ],
+        "groupBy": null
+      },
+      {
         "id": "cf3831ca-5fcf-4d28-8d13-507454ea11d3",
         "name": "PurchaseRequestList",
         "module": null,
@@ -753,8 +1126,38 @@
     ],
     "processes": [
       {
+        "id": "94f1cc25-6a68-435f-9383-36fc43aae860",
+        "name": "department-budgets/BudgetApproval",
+        "module": "department-budgets",
+        "entity": "department-budgets/Budget",
+        "parameters": [],
+        "steps": [
+          {
+            "name": "review",
+            "type": "task",
+            "outcomes": ["approve", "reject"]
+          },
+          {
+            "name": "markApproved",
+            "type": "operation",
+            "outcomes": []
+          },
+          {
+            "name": "markRejected",
+            "type": "operation",
+            "outcomes": []
+          },
+          {
+            "name": "done",
+            "type": "end",
+            "outcomes": []
+          }
+        ]
+      },
+      {
         "id": "4b60c03e-02d0-4329-80c6-75f972190399",
         "name": "PurchaseRequestApproval",
+        "module": null,
         "entity": "PurchaseRequest",
         "parameters": [],
         "steps": [
@@ -780,6 +1183,11 @@
           },
           {
             "name": "markApproved",
+            "type": "operation",
+            "outcomes": []
+          },
+          {
+            "name": "announceApproved",
             "type": "operation",
             "outcomes": []
           },
@@ -818,6 +1226,22 @@
         "module": null,
         "parameters": [],
         "resultType": "decimal"
+      },
+      {
+        "id": "67ac475c-d365-4fa5-80e1-1f9f74afe70f",
+        "name": "organization:IsDelegating",
+        "module": "organization",
+        "parameters": [
+          {
+            "name": "from",
+            "type": "date"
+          },
+          {
+            "name": "until",
+            "type": "date"
+          }
+        ],
+        "resultType": "boolean"
       }
     ],
     "connectors": [
@@ -834,7 +1258,23 @@
         ]
       }
     ],
-    "events": [],
+    "events": [
+      {
+        "id": "5a82a574-4daa-4450-9bfd-1ff215172233",
+        "name": "PurchaseRequestApproved",
+        "entity": "PurchaseRequest",
+        "fields": [
+          {
+            "name": "number",
+            "type": "text"
+          },
+          {
+            "name": "totalAmount",
+            "type": "decimal"
+          }
+        ]
+      }
+    ],
     "roles": [
       {
         "id": "6fedaeb5-8afd-4fed-9aad-af8dc6b60f58",
@@ -865,45 +1305,167 @@
     ],
     "forms": [
       {
+        "id": "9d25c16f-ec0c-476f-acc3-e35f9f1bf10e",
+        "name": "organization/Absence"
+      },
+      {
+        "id": "12dffe7c-7ed8-47c0-9ed5-fa9b4251d85e",
+        "name": "department-budgets/BudgetReview"
+      },
+      {
         "id": "77c7c183-7283-46a7-b56f-5cf5cec518aa",
         "name": "PurchaseRequestReview"
       }
     ],
     "pages": [
       {
+        "id": "1ba6ffbd-817b-4335-bbe3-59d061b75bae",
+        "name": "organization/AbsenceForm",
+        "module": "organization",
+        "parameters": []
+      },
+      {
+        "id": "e7053450-4311-4e49-a758-093aa0c9063a",
+        "name": "organization/DepartmentForm",
+        "module": "organization",
+        "parameters": []
+      },
+      {
+        "id": "6698ddc3-724c-4ad9-b964-d0388954ace8",
+        "name": "organization/Departments",
+        "module": "organization",
+        "parameters": []
+      },
+      {
+        "id": "e6a61738-5889-4986-a47f-73777839d5f0",
+        "name": "organization/EmployeeForm",
+        "module": "organization",
+        "parameters": []
+      },
+      {
+        "id": "a298a3cf-613e-4bc4-91ed-a1ca8e253eb3",
+        "name": "organization/Employees",
+        "module": "organization",
+        "parameters": []
+      },
+      {
+        "id": "6a20c73a-fe47-4a7e-b96f-ac1778764fd7",
+        "name": "organization/OutOfOffice",
+        "module": "organization",
+        "parameters": []
+      },
+      {
+        "id": "87f084d6-acd9-477c-ae73-e35b3f8e92b6",
+        "name": "department-budgets/BudgetForm",
+        "module": "department-budgets",
+        "parameters": []
+      },
+      {
+        "id": "f7e6e78e-2ef4-49f4-9d38-c9db95fc2ba2",
+        "name": "department-budgets/Budgets",
+        "module": "department-budgets",
+        "parameters": []
+      },
+      {
         "id": "5ffa28da-f66a-46d6-b996-9c8f00dc3643",
         "name": "Approvals",
+        "module": null,
         "parameters": []
       },
       {
         "id": "40d4c8a6-7017-4f7c-9467-67fc9ea8dcd1",
         "name": "Departments",
+        "module": null,
         "parameters": []
       },
       {
         "id": "894259ed-7e0e-49aa-9e51-43fb45700409",
         "name": "MyTasks",
+        "module": null,
         "parameters": []
       },
       {
         "id": "20a80495-3566-40d6-bf99-74fcdd9bb42b",
         "name": "PurchaseRequestForm",
+        "module": null,
         "parameters": []
       },
       {
         "id": "e0ee63b0-ff11-4f06-95ee-e73922f2c1a9",
         "name": "PurchaseRequests",
+        "module": null,
         "parameters": []
       },
       {
         "id": "3b501ea6-096a-4a2a-ba23-39b062150983",
         "name": "RequestsByDepartment",
+        "module": null,
         "parameters": []
       },
       {
         "id": "9b707fe9-a837-433e-8062-48a2a9b4d62a",
         "name": "Suppliers",
+        "module": null,
         "parameters": []
+      }
+    ],
+    "policies": [
+      {
+        "id": "561e949c-4b60-4a87-9134-15b98f154043",
+        "name": "organization/AdminAccess",
+        "module": "organization"
+      },
+      {
+        "id": "de640772-ab6e-4889-b4ab-7e3217ed5d2f",
+        "name": "organization/MemberAccess",
+        "module": "organization"
+      },
+      {
+        "id": "414e4a09-e2f0-4c68-8940-9d47fd28b179",
+        "name": "department-budgets/ApproverAccess",
+        "module": "department-budgets"
+      },
+      {
+        "id": "7d9f722e-7406-4a39-87d5-e99293353a05",
+        "name": "DepartmentManagerAccess",
+        "module": null
+      },
+      {
+        "id": "2eeb31d5-47d9-4fb9-bd84-eb7ffdc11f12",
+        "name": "EmployeeAccess",
+        "module": null
+      },
+      {
+        "id": "d9788ec8-1186-488d-8c83-cbc9e5441d11",
+        "name": "FinanceReviewerAccess",
+        "module": null
+      },
+      {
+        "id": "ad149043-1f24-4e7d-a9b8-1ba518f8e010",
+        "name": "OperatorAccess",
+        "module": null
+      },
+      {
+        "id": "1a742db5-543d-4e8d-8c66-61bf42a1b93b",
+        "name": "PurchasingSystemAccess",
+        "module": null
+      }
+    ],
+    "contracts": [
+      {
+        "id": "7fa87793-d002-4b81-99b1-408df2a70d49",
+        "name": "organization/DepartmentContract",
+        "module": "organization"
+      },
+      {
+        "id": "9dbf22b1-376a-474d-9407-7bf069ab4610",
+        "name": "organization/EmployeeContract",
+        "module": "organization"
+      },
+      {
+        "id": "c413e87c-c2c2-43cb-8a39-84c3fc16cdbf",
+        "name": "department-budgets/BudgetContract",
+        "module": "department-budgets"
       }
     ],
     "texts": [
@@ -927,7 +1489,7 @@
         "key": "application.description",
         "texts": {
           "en": "Runs the company's purchases, from the request to approval and ordering.",
-          "vi": "Quản lý việc mua hàng của công ty, từ yêu cầu đến duyệt và đặt hàng."
+          "vi": "Quản lý việc mua hàng của công ty, từ yêu cầu đến phê duyệt và đặt hàng."
         },
         "usedBy": 1
       },
@@ -940,15 +1502,39 @@
         "usedBy": 1
       },
       {
-        "key": "department.code",
+        "key": "department-budgets.actions.new",
         "texts": {
-          "en": "Code",
-          "vi": "Mã"
+          "en": "New",
+          "vi": "Mới"
         },
         "usedBy": 1
       },
       {
-        "key": "department.label",
+        "key": "department-budgets.actions.submit",
+        "texts": {
+          "en": "Submit for approval",
+          "vi": "Gửi phê duyệt"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budget.amount",
+        "texts": {
+          "en": "Amount",
+          "vi": "Số tiền"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budget.amountFrozen",
+        "texts": {
+          "en": "The amount cannot change once the budget is decided",
+          "vi": "Không thể đổi số tiền sau khi đã quyết định"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.budget.department",
         "texts": {
           "en": "Department",
           "vi": "Phòng ban"
@@ -956,20 +1542,260 @@
         "usedBy": 1
       },
       {
-        "key": "department.manager",
+        "key": "department-budgets.budget.label",
         "texts": {
-          "en": "Manager",
-          "vi": "Trưởng phòng"
+          "en": "Budget",
+          "vi": "Ngân sách"
         },
         "usedBy": 1
       },
       {
-        "key": "department.name",
+        "key": "department-budgets.budget.name",
         "texts": {
           "en": "Name",
           "vi": "Tên"
         },
         "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budget.noSelfDecision",
+        "texts": {
+          "en": "The creator of a budget cannot decide it",
+          "vi": "Người lập ngân sách không thể tự quyết định"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.budget.requester",
+        "texts": {
+          "en": "Requester",
+          "vi": "Người lập"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budget.status",
+        "texts": {
+          "en": "Status",
+          "vi": "Trạng thái"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budget.year",
+        "texts": {
+          "en": "Year",
+          "vi": "Năm"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetApproval.approve",
+        "texts": {
+          "en": "Approve",
+          "vi": "Phê duyệt"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetApproval.reject",
+        "texts": {
+          "en": "Reject",
+          "vi": "Từ chối"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetApproval.review",
+        "texts": {
+          "en": "Review the budget",
+          "vi": "Xem xét ngân sách"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetDecision.amount",
+        "texts": {
+          "en": "Amount",
+          "vi": "Số tiền"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetDecision.budget",
+        "texts": {
+          "en": "Budget",
+          "vi": "Ngân sách"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetDecision.decidedBy",
+        "texts": {
+          "en": "Decided by",
+          "vi": "Người quyết định"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetDecision.label",
+        "texts": {
+          "en": "Budget decision",
+          "vi": "Quyết định ngân sách"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.budgetReview.title",
+        "texts": {
+          "en": "Budget",
+          "vi": "Ngân sách"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.contract.budget.amountFrozenOnceDecided",
+        "texts": {
+          "en": "Amount locked once decided",
+          "vi": "Khoá số tiền khi đã quyết định"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.contract.budget.approve",
+        "texts": {
+          "en": "Approve",
+          "vi": "Duyệt"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.contract.budget.approved",
+        "texts": {
+          "en": "Approved",
+          "vi": "Đã duyệt"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.contract.budget.decisionRecorded",
+        "texts": {
+          "en": "Decision recorded",
+          "vi": "Ghi lại quyết định"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.contract.budget.draft",
+        "texts": {
+          "en": "Draft",
+          "vi": "Nháp"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.contract.budget.reject",
+        "texts": {
+          "en": "Reject",
+          "vi": "Từ chối"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.contract.budget.rejected",
+        "texts": {
+          "en": "Rejected",
+          "vi": "Đã từ chối"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.contracts.budget.description",
+        "texts": {
+          "en": "The rules every budget keeps, such as a decided amount staying frozen.",
+          "vi": "Các quy tắc mọi ngân sách phải giữ, như số tiền đã quyết không đổi."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.entities.budget-decision.description",
+        "texts": {
+          "en": "An approver's answer to a budget, with the amount decided.",
+          "vi": "Câu trả lời của người duyệt cho ngân sách, với số tiền được quyết định."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.entities.budget.description",
+        "texts": {
+          "en": "The money a department may spend in a period.",
+          "vi": "Số tiền một phòng ban được chi trong một kỳ."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.pages.budget-form.description",
+        "texts": {
+          "en": "Creates or edits a budget.",
+          "vi": "Tạo hoặc sửa một ngân sách."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.pages.budgetForm.title",
+        "texts": {
+          "en": "Budget",
+          "vi": "Ngân sách"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.pages.budgets.description",
+        "texts": {
+          "en": "Lists the budgets of the departments.",
+          "vi": "Liệt kê ngân sách của các phòng ban."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.pages.budgets.title",
+        "texts": {
+          "en": "Budgets",
+          "vi": "Ngân sách"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.policies.approver-access.description",
+        "texts": {
+          "en": "Lets approvers create budgets and decide them.",
+          "vi": "Cho phép người duyệt tạo và quyết định ngân sách."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.processes.budget-approval.description",
+        "texts": {
+          "en": "Sends a budget to its approver and records the decision.",
+          "vi": "Gửi ngân sách cho người duyệt và ghi lại quyết định."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "department-budgets.roles.administrator",
+        "texts": {
+          "en": "Organization administrator",
+          "vi": "Quản trị tổ chức"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "department-budgets.roles.approver",
+        "texts": {
+          "en": "Budget approver",
+          "vi": "Người phê duyệt ngân sách"
+        },
+        "usedBy": 0
       },
       {
         "key": "lineItem.amount",
@@ -1012,6 +1838,14 @@
         "usedBy": 1
       },
       {
+        "key": "lineItem.resourceDescription",
+        "texts": {
+          "en": "A line of a purchase request: what is bought, how many and at what price.",
+          "vi": "Một dòng của đề nghị mua hàng: mua gì, bao nhiêu và giá bao nhiêu."
+        },
+        "usedBy": 1
+      },
+      {
         "key": "lineItem.unitPrice",
         "texts": {
           "en": "Unit price",
@@ -1032,6 +1866,14 @@
         "texts": {
           "en": "Approvals",
           "vi": "Theo dõi phê duyệt"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "nav.budgets",
+        "texts": {
+          "en": "Budgets",
+          "vi": "Ngân sách"
         },
         "usedBy": 1
       },
@@ -1074,6 +1916,422 @@
           "vi": "Nhà cung cấp"
         },
         "usedBy": 1
+      },
+      {
+        "key": "organization.absence.title",
+        "texts": {
+          "en": "Absence",
+          "vi": "Thời gian vắng mặt"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.actions.new",
+        "texts": {
+          "en": "New",
+          "vi": "Thêm mới"
+        },
+        "usedBy": 2
+      },
+      {
+        "key": "organization.actions.open",
+        "texts": {
+          "en": "Open",
+          "vi": "Mở"
+        },
+        "usedBy": 3
+      },
+      {
+        "key": "organization.contract.department.notOwnParent",
+        "texts": {
+          "en": "Not its own parent",
+          "vi": "Không là đơn vị cha của chính nó"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.contract.employee.delegateDatesInOrder",
+        "texts": {
+          "en": "Delegation dates in order",
+          "vi": "Ngày uỷ quyền đúng thứ tự"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.contract.employee.delegateHasDates",
+        "texts": {
+          "en": "A delegation has its dates",
+          "vi": "Uỷ quyền có ngày bắt đầu và kết thúc"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.contract.employee.notOwnDelegate",
+        "texts": {
+          "en": "Not their own delegate",
+          "vi": "Không tự uỷ quyền cho chính mình"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.contract.employee.notOwnManager",
+        "texts": {
+          "en": "Not their own manager",
+          "vi": "Không tự quản lý chính mình"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.contracts.department.description",
+        "texts": {
+          "en": "The rules every department keeps, whatever an application adds.",
+          "vi": "Các quy tắc mọi phòng ban phải giữ, dù ứng dụng thêm gì."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.contracts.employee.description",
+        "texts": {
+          "en": "The rules every employee record keeps, whatever an application adds.",
+          "vi": "Các quy tắc mọi hồ sơ nhân viên phải giữ, dù ứng dụng thêm gì."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.department.active",
+        "texts": {
+          "en": "Active",
+          "vi": "Đang hoạt động"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.department.code",
+        "texts": {
+          "en": "Code",
+          "vi": "Mã"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.department.codeUpperCase",
+        "texts": {
+          "en": "Use capital letters for the code.",
+          "vi": "Dùng chữ in hoa cho mã."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.department.head",
+        "texts": {
+          "en": "Head",
+          "vi": "Trưởng phòng"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.department.label",
+        "texts": {
+          "en": "Department",
+          "vi": "Phòng ban"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.department.name",
+        "texts": {
+          "en": "Name",
+          "vi": "Tên"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.department.notOwnParent",
+        "texts": {
+          "en": "A department cannot be its own parent.",
+          "vi": "Phòng ban không thể là cấp trên của chính nó."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.department.parent",
+        "texts": {
+          "en": "Parent department",
+          "vi": "Phòng ban cấp trên"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.active",
+        "texts": {
+          "en": "Active",
+          "vi": "Đang làm việc"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.delegate",
+        "texts": {
+          "en": "Delegate",
+          "vi": "Người được ủy quyền"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.delegateDatesInOrder",
+        "texts": {
+          "en": "The end date cannot be before the start date.",
+          "vi": "Ngày kết thúc không được trước ngày bắt đầu."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.employee.delegateFrom",
+        "texts": {
+          "en": "Absent from",
+          "vi": "Vắng từ ngày"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.delegateHasDates",
+        "texts": {
+          "en": "Give both dates when you name a delegate.",
+          "vi": "Nhập cả hai ngày khi chọn người được ủy quyền."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.employee.delegateUntil",
+        "texts": {
+          "en": "Absent until",
+          "vi": "Vắng đến ngày"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.department",
+        "texts": {
+          "en": "Department",
+          "vi": "Phòng ban"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.fullName",
+        "texts": {
+          "en": "Full name",
+          "vi": "Họ và tên"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.jobTitle",
+        "texts": {
+          "en": "Job title",
+          "vi": "Chức danh"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.label",
+        "texts": {
+          "en": "Employee",
+          "vi": "Nhân viên"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.manager",
+        "texts": {
+          "en": "Manager",
+          "vi": "Quản lý trực tiếp"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.notOwnDelegate",
+        "texts": {
+          "en": "An employee cannot be their own delegate.",
+          "vi": "Nhân viên không thể tự ủy quyền cho chính mình."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.employee.notOwnManager",
+        "texts": {
+          "en": "An employee cannot be their own manager.",
+          "vi": "Nhân viên không thể là quản lý trực tiếp của chính mình."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.employee.phone",
+        "texts": {
+          "en": "Phone",
+          "vi": "Số điện thoại"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.user",
+        "texts": {
+          "en": "Account",
+          "vi": "Tài khoản"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.employee.workEmail",
+        "texts": {
+          "en": "Work email",
+          "vi": "Email công việc"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.entities.department.description",
+        "texts": {
+          "en": "A team in the company, with its head and its parent team.",
+          "vi": "Một phòng ban trong công ty, với trưởng phòng và phòng ban cấp trên."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.entities.employee.description",
+        "texts": {
+          "en": "A person who works for the company, with their manager and department.",
+          "vi": "Một người làm việc cho công ty, với quản lý và phòng ban của họ."
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.pages.absence-form.description",
+        "texts": {
+          "en": "Where a person records an absence and a delegate.",
+          "vi": "Nơi một người ghi lịch vắng và người thay thế."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.absenceForm.title",
+        "texts": {
+          "en": "Out of office",
+          "vi": "Vắng mặt"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.department-form.description",
+        "texts": {
+          "en": "Creates or edits a department.",
+          "vi": "Tạo hoặc sửa một phòng ban."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.departmentForm.title",
+        "texts": {
+          "en": "Department",
+          "vi": "Phòng ban"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.departments.description",
+        "texts": {
+          "en": "Lists the departments of the company.",
+          "vi": "Liệt kê các phòng ban của công ty."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.departments.title",
+        "texts": {
+          "en": "Departments",
+          "vi": "Phòng ban"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.employee-form.description",
+        "texts": {
+          "en": "Creates or edits an employee.",
+          "vi": "Tạo hoặc sửa một nhân viên."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.employeeForm.title",
+        "texts": {
+          "en": "Employee",
+          "vi": "Nhân viên"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.employees.description",
+        "texts": {
+          "en": "Lists the employees of the company.",
+          "vi": "Liệt kê nhân viên của công ty."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.employees.title",
+        "texts": {
+          "en": "Employees",
+          "vi": "Nhân viên"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.out-of-office.description",
+        "texts": {
+          "en": "Shows who is away and who stands in for them.",
+          "vi": "Cho biết ai đang vắng và ai làm thay."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.pages.outOfOffice.title",
+        "texts": {
+          "en": "Out of office",
+          "vi": "Vắng mặt"
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.policies.admin-access.description",
+        "texts": {
+          "en": "Lets administrators manage departments and employees.",
+          "vi": "Cho phép quản trị viên quản lý phòng ban và nhân viên."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.policies.member-access.description",
+        "texts": {
+          "en": "Lets members read the organization and update their own absence.",
+          "vi": "Cho phép thành viên xem tổ chức và cập nhật lịch vắng của mình."
+        },
+        "usedBy": 1
+      },
+      {
+        "key": "organization.roles.admin",
+        "texts": {
+          "en": "Organization administrator",
+          "vi": "Quản trị viên tổ chức"
+        },
+        "usedBy": 0
+      },
+      {
+        "key": "organization.roles.member",
+        "texts": {
+          "en": "Organization member",
+          "vi": "Thành viên tổ chức"
+        },
+        "usedBy": 0
       },
       {
         "key": "pages.approvals.title",
@@ -1228,6 +2486,14 @@
         "usedBy": 1
       },
       {
+        "key": "purchaseRequest.resourceDescription",
+        "texts": {
+          "en": "A request to buy goods or services, which a department head approves.",
+          "vi": "Đề nghị mua hàng hóa hoặc dịch vụ, do trưởng bộ phận phê duyệt."
+        },
+        "usedBy": 1
+      },
+      {
         "key": "purchaseRequest.sections.decision",
         "texts": {
           "en": "Decision",
@@ -1340,10 +2606,18 @@
         "usedBy": 1
       },
       {
+        "key": "signIn.company",
+        "texts": {
+          "en": "Example Company",
+          "vi": "Example Company"
+        },
+        "usedBy": 1
+      },
+      {
         "key": "site.description",
         "texts": {
           "en": "Request purchases and take them through approval.",
-          "vi": "Tạo yêu cầu mua hàng và đưa chúng qua các bước duyệt."
+          "vi": "Gửi yêu cầu mua hàng và theo dõi đến khi được phê duyệt."
         },
         "usedBy": 1
       },
@@ -1380,6 +2654,14 @@
         "usedBy": 1
       },
       {
+        "key": "supplier.resourceDescription",
+        "texts": {
+          "en": "A company that purchase requests buy from.",
+          "vi": "Công ty cung cấp hàng cho các đề nghị mua hàng."
+        },
+        "usedBy": 1
+      },
+      {
         "key": "task.approve",
         "texts": {
           "en": "Approve",
@@ -1403,8 +2685,7 @@
         },
         "usedBy": 2
       }
-    ],
-    "policies": []
+    ]
   },
   "/api/studio/apps/PurchaseRequests/releases": {
     "active": {
@@ -4155,5 +5436,2362 @@
         ]
       }
     ]
+  },
+  "/api/studio/apps/PurchaseRequests/resource-activity": {
+    "items": [
+      {
+        "id": "219102bc-864f-42ed-874a-c19eaee0d1ba",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "409bc638-0aec-4084-ada2-e3baed50057d",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "cf3831ca-5fcf-4d28-8d13-507454ea11d3",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "3eb3d7ba-f87e-492a-825c-916f7a5ae7a4",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "bc241668-fe85-45a4-b7cf-d36da8d56b71",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "7c1f3e52-9b4a-4d8e-a6f0-3b2d5e8c91a4",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "d9ccbf89-5004-4d52-8885-2ee377b7caa5",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "2deb5acd-dfd8-4c5a-b546-a1aa03df6964",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "5a82a574-4daa-4450-9bfd-1ff215172233",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "77c7c183-7283-46a7-b56f-5cf5cec518aa",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "b52449b4-bc18-4972-bf11-7b73f5a82198",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "eae52dc0-bf4d-4f5c-88e2-bac1ef94678e",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "5ffa28da-f66a-46d6-b996-9c8f00dc3643",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "40d4c8a6-7017-4f7c-9467-67fc9ea8dcd1",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "894259ed-7e0e-49aa-9e51-43fb45700409",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "20a80495-3566-40d6-bf99-74fcdd9bb42b",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "e0ee63b0-ff11-4f06-95ee-e73922f2c1a9",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "3b501ea6-096a-4a2a-ba23-39b062150983",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "9b707fe9-a837-433e-8062-48a2a9b4d62a",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "7d9f722e-7406-4a39-87d5-e99293353a05",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "2eeb31d5-47d9-4fb9-bd84-eb7ffdc11f12",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "d9788ec8-1186-488d-8c83-cbc9e5441d11",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "ad149043-1f24-4e7d-a9b8-1ba518f8e010",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "1a742db5-543d-4e8d-8c66-61bf42a1b93b",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "4b60c03e-02d0-4329-80c6-75f972190399",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "6fedaeb5-8afd-4fed-9aad-af8dc6b60f58",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "f373f3ea-4e4d-4842-9791-4daf7be47f0a",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "83e56e02-92d0-46d4-a67d-78f6e76468a4",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "d2cd0512-1503-4857-91ac-c0100e82be70",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "ae4c47b6-4ece-4666-ae0a-4e7b6731bf7d",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "313225f1-c69f-41bc-b746-12d91f127c39",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "09d75317-fd9e-411e-8322-317778fc1b2b",
+        "status": "new",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "ee1ac8c8-74c5-4105-867a-1090a15746a7",
+        "status": "new",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "e66c1415-6219-4e0d-9d4a-65db373d2e3d",
+        "status": "new",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "8010fda7-5577-4d68-bdbe-4b49ab8f05fe",
+        "status": "new",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "5b97473d-ab62-4fd9-a610-016ffb81b7e3",
+        "status": "new",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "bd059896-4e74-43d6-bd45-f6e8abd08d41",
+        "status": "new",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "c8a5aa01-5f0c-4487-9f64-4355f2ddbb2f",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "45d4447e-db09-47e8-9b84-c1a6ea4e813a",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "e9139b79-4dd5-485e-89a1-48b0e93eeaf9",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "72ecc491-f825-4968-8eb6-1f2ac19cae7d",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "0cec2d63-0949-465f-a29e-80b546dfa347",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "494288c9-ce9b-4fc9-bea0-d618094e66fe",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "05298509-1d5c-40d1-96ab-21909ec74972",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "a515d557-18da-45c7-826e-938e2cf4a473",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "c413e87c-c2c2-43cb-8a39-84c3fc16cdbf",
+        "status": "published",
+        "titles": null,
+        "descriptions": {
+          "en": "The rules every budget keeps, such as a decided amount staying frozen.",
+          "vi": "Các quy tắc mọi ngân sách phải giữ, như số tiền đã quyết không đổi."
+        }
+      },
+      {
+        "id": "74e1db38-87c8-4711-90d2-f022e98aae00",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "594da8be-0ed9-4b95-8afb-271b7a8a4d68",
+        "status": "published",
+        "titles": {
+          "en": "Budget decision",
+          "vi": "Quyết định ngân sách"
+        },
+        "descriptions": {
+          "en": "An approver's answer to a budget, with the amount decided.",
+          "vi": "Câu trả lời của người duyệt cho ngân sách, với số tiền được quyết định."
+        }
+      },
+      {
+        "id": "372cf999-b3a9-4b83-abfd-9b05f61ceeb4",
+        "status": "published",
+        "titles": {
+          "en": "Budget",
+          "vi": "Ngân sách"
+        },
+        "descriptions": {
+          "en": "The money a department may spend in a period.",
+          "vi": "Số tiền một phòng ban được chi trong một kỳ."
+        }
+      },
+      {
+        "id": "12dffe7c-7ed8-47c0-9ed5-fa9b4251d85e",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "department-budgets",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "87f084d6-acd9-477c-ae73-e35b3f8e92b6",
+        "status": "published",
+        "titles": {
+          "en": "Budget",
+          "vi": "Ngân sách"
+        },
+        "descriptions": {
+          "en": "Creates or edits a budget.",
+          "vi": "Tạo hoặc sửa một ngân sách."
+        }
+      },
+      {
+        "id": "f7e6e78e-2ef4-49f4-9d38-c9db95fc2ba2",
+        "status": "published",
+        "titles": {
+          "en": "Budgets",
+          "vi": "Ngân sách"
+        },
+        "descriptions": {
+          "en": "Lists the budgets of the departments.",
+          "vi": "Liệt kê ngân sách của các phòng ban."
+        }
+      },
+      {
+        "id": "414e4a09-e2f0-4c68-8940-9d47fd28b179",
+        "status": "published",
+        "titles": null,
+        "descriptions": {
+          "en": "Lets approvers create budgets and decide them.",
+          "vi": "Cho phép người duyệt tạo và quyết định ngân sách."
+        }
+      },
+      {
+        "id": "94f1cc25-6a68-435f-9383-36fc43aae860",
+        "status": "published",
+        "titles": null,
+        "descriptions": {
+          "en": "Sends a budget to its approver and records the decision.",
+          "vi": "Gửi ngân sách cho người duyệt và ghi lại quyết định."
+        }
+      },
+      {
+        "id": "b90b32ef-6b04-49d1-a001-88457d552c76",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "993a4113-6bb1-4f65-9414-f4f4156e5cf2",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "7fa87793-d002-4b81-99b1-408df2a70d49",
+        "status": "published",
+        "titles": null,
+        "descriptions": {
+          "en": "The rules every department keeps, whatever an application adds.",
+          "vi": "Các quy tắc mọi phòng ban phải giữ, dù ứng dụng thêm gì."
+        }
+      },
+      {
+        "id": "9dbf22b1-376a-474d-9407-7bf069ab4610",
+        "status": "published",
+        "titles": null,
+        "descriptions": {
+          "en": "The rules every employee record keeps, whatever an application adds.",
+          "vi": "Các quy tắc mọi hồ sơ nhân viên phải giữ, dù ứng dụng thêm gì."
+        }
+      },
+      {
+        "id": "d25b93f9-6098-40ab-b907-24fb5dedda00",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "249dbb40-8bc2-4b9b-b5f8-b76192a9ffe8",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "cdcc2f3e-580b-4349-aad7-46e150475937",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "25b6e7c1-48dc-47fb-85e6-a2cbbd9d5c95",
+        "status": "published",
+        "titles": {
+          "en": "Department",
+          "vi": "Phòng ban"
+        },
+        "descriptions": {
+          "en": "A team in the company, with its head and its parent team.",
+          "vi": "Một phòng ban trong công ty, với trưởng phòng và phòng ban cấp trên."
+        }
+      },
+      {
+        "id": "c2ad798a-c10d-49f3-957f-86c491e68706",
+        "status": "published",
+        "titles": {
+          "en": "Employee",
+          "vi": "Nhân viên"
+        },
+        "descriptions": {
+          "en": "A person who works for the company, with their manager and department.",
+          "vi": "Một người làm việc cho công ty, với quản lý và phòng ban của họ."
+        }
+      },
+      {
+        "id": "9d25c16f-ec0c-476f-acc3-e35f9f1bf10e",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "organization",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "1ba6ffbd-817b-4335-bbe3-59d061b75bae",
+        "status": "published",
+        "titles": {
+          "en": "Out of office",
+          "vi": "Vắng mặt"
+        },
+        "descriptions": {
+          "en": "Where a person records an absence and a delegate.",
+          "vi": "Nơi một người ghi lịch vắng và người thay thế."
+        }
+      },
+      {
+        "id": "e7053450-4311-4e49-a758-093aa0c9063a",
+        "status": "published",
+        "titles": {
+          "en": "Department",
+          "vi": "Phòng ban"
+        },
+        "descriptions": {
+          "en": "Creates or edits a department.",
+          "vi": "Tạo hoặc sửa một phòng ban."
+        }
+      },
+      {
+        "id": "6698ddc3-724c-4ad9-b964-d0388954ace8",
+        "status": "published",
+        "titles": {
+          "en": "Departments",
+          "vi": "Phòng ban"
+        },
+        "descriptions": {
+          "en": "Lists the departments of the company.",
+          "vi": "Liệt kê các phòng ban của công ty."
+        }
+      },
+      {
+        "id": "e6a61738-5889-4986-a47f-73777839d5f0",
+        "status": "published",
+        "titles": {
+          "en": "Employee",
+          "vi": "Nhân viên"
+        },
+        "descriptions": {
+          "en": "Creates or edits an employee.",
+          "vi": "Tạo hoặc sửa một nhân viên."
+        }
+      },
+      {
+        "id": "a298a3cf-613e-4bc4-91ed-a1ca8e253eb3",
+        "status": "published",
+        "titles": {
+          "en": "Employees",
+          "vi": "Nhân viên"
+        },
+        "descriptions": {
+          "en": "Lists the employees of the company.",
+          "vi": "Liệt kê nhân viên của công ty."
+        }
+      },
+      {
+        "id": "6a20c73a-fe47-4a7e-b96f-ac1778764fd7",
+        "status": "published",
+        "titles": {
+          "en": "Out of office",
+          "vi": "Vắng mặt"
+        },
+        "descriptions": {
+          "en": "Shows who is away and who stands in for them.",
+          "vi": "Cho biết ai đang vắng và ai làm thay."
+        }
+      },
+      {
+        "id": "561e949c-4b60-4a87-9134-15b98f154043",
+        "status": "published",
+        "titles": null,
+        "descriptions": {
+          "en": "Lets administrators manage departments and employees.",
+          "vi": "Cho phép quản trị viên quản lý phòng ban và nhân viên."
+        }
+      },
+      {
+        "id": "de640772-ab6e-4889-b4ab-7e3217ed5d2f",
+        "status": "published",
+        "titles": null,
+        "descriptions": {
+          "en": "Lets members read the organization and update their own absence.",
+          "vi": "Cho phép thành viên xem tổ chức và cập nhật lịch vắng của mình."
+        }
+      },
+      {
+        "id": "67ac475c-d365-4fa5-80e1-1f9f74afe70f",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "9fcbdc3e-0b2c-4ef1-8a6a-a53e4fbe0386",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      },
+      {
+        "id": "2e7e77ae-5582-4a57-a69b-19dd99f7a919",
+        "status": "published",
+        "titles": null,
+        "descriptions": null
+      }
+    ]
+  },
+  "/api/studio/catalog": {
+    "modules": [
+      {
+        "id": "approvals",
+        "label": "Approvals",
+        "versions": ["1.0.0"],
+        "roles": [
+          {
+            "name": "admin",
+            "titles": {
+              "en": "Administrator",
+              "vi": "Quản trị viên"
+            }
+          },
+          {
+            "name": "member",
+            "titles": {
+              "en": "Member",
+              "vi": "Thành viên"
+            }
+          }
+        ],
+        "connectors": []
+      },
+      {
+        "id": "department-budgets",
+        "label": "Department budgets",
+        "versions": ["1.2.0"],
+        "roles": [
+          {
+            "name": "approver",
+            "titles": {
+              "en": "Budget approver",
+              "vi": "Người phê duyệt ngân sách"
+            }
+          },
+          {
+            "name": "administrator",
+            "titles": {
+              "en": "Organization administrator",
+              "vi": "Quản trị tổ chức"
+            }
+          }
+        ],
+        "connectors": []
+      },
+      {
+        "id": "organization",
+        "label": "Organization",
+        "versions": ["1.0.0"],
+        "roles": [
+          {
+            "name": "admin",
+            "titles": {
+              "en": "Organization administrator",
+              "vi": "Quản trị viên tổ chức"
+            }
+          },
+          {
+            "name": "member",
+            "titles": {
+              "en": "Organization member",
+              "vi": "Thành viên tổ chức"
+            }
+          }
+        ],
+        "connectors": []
+      }
+    ],
+    "packages": [
+      {
+        "id": "payment-references",
+        "label": "Payment references",
+        "versions": ["1.0.0"]
+      }
+    ],
+    "timeZones": [
+      {
+        "id": "Pacific/Midway",
+        "offset": -660
+      },
+      {
+        "id": "Pacific/Niue",
+        "offset": -660
+      },
+      {
+        "id": "Pacific/Pago_Pago",
+        "offset": -660
+      },
+      {
+        "id": "America/Adak",
+        "offset": -600
+      },
+      {
+        "id": "Pacific/Honolulu",
+        "offset": -600
+      },
+      {
+        "id": "Pacific/Rarotonga",
+        "offset": -600
+      },
+      {
+        "id": "Pacific/Tahiti",
+        "offset": -600
+      },
+      {
+        "id": "Pacific/Marquesas",
+        "offset": -570
+      },
+      {
+        "id": "America/Anchorage",
+        "offset": -540
+      },
+      {
+        "id": "America/Juneau",
+        "offset": -540
+      },
+      {
+        "id": "America/Metlakatla",
+        "offset": -540
+      },
+      {
+        "id": "America/Nome",
+        "offset": -540
+      },
+      {
+        "id": "America/Sitka",
+        "offset": -540
+      },
+      {
+        "id": "America/Yakutat",
+        "offset": -540
+      },
+      {
+        "id": "Pacific/Gambier",
+        "offset": -540
+      },
+      {
+        "id": "America/Los_Angeles",
+        "offset": -480
+      },
+      {
+        "id": "America/Tijuana",
+        "offset": -480
+      },
+      {
+        "id": "Pacific/Pitcairn",
+        "offset": -480
+      },
+      {
+        "id": "America/Boise",
+        "offset": -420
+      },
+      {
+        "id": "America/Cambridge_Bay",
+        "offset": -420
+      },
+      {
+        "id": "America/Ciudad_Juarez",
+        "offset": -420
+      },
+      {
+        "id": "America/Creston",
+        "offset": -420
+      },
+      {
+        "id": "America/Dawson",
+        "offset": -420
+      },
+      {
+        "id": "America/Dawson_Creek",
+        "offset": -420
+      },
+      {
+        "id": "America/Denver",
+        "offset": -420
+      },
+      {
+        "id": "America/Fort_Nelson",
+        "offset": -420
+      },
+      {
+        "id": "America/Hermosillo",
+        "offset": -420
+      },
+      {
+        "id": "America/Mazatlan",
+        "offset": -420
+      },
+      {
+        "id": "America/Phoenix",
+        "offset": -420
+      },
+      {
+        "id": "America/Vancouver",
+        "offset": -420
+      },
+      {
+        "id": "America/Whitehorse",
+        "offset": -420
+      },
+      {
+        "id": "America/Bahia_Banderas",
+        "offset": -360
+      },
+      {
+        "id": "America/Belize",
+        "offset": -360
+      },
+      {
+        "id": "America/Chicago",
+        "offset": -360
+      },
+      {
+        "id": "America/Chihuahua",
+        "offset": -360
+      },
+      {
+        "id": "America/Costa_Rica",
+        "offset": -360
+      },
+      {
+        "id": "America/Edmonton",
+        "offset": -360
+      },
+      {
+        "id": "America/El_Salvador",
+        "offset": -360
+      },
+      {
+        "id": "America/Guatemala",
+        "offset": -360
+      },
+      {
+        "id": "America/Indiana/Knox",
+        "offset": -360
+      },
+      {
+        "id": "America/Indiana/Tell_City",
+        "offset": -360
+      },
+      {
+        "id": "America/Inuvik",
+        "offset": -360
+      },
+      {
+        "id": "America/Managua",
+        "offset": -360
+      },
+      {
+        "id": "America/Matamoros",
+        "offset": -360
+      },
+      {
+        "id": "America/Menominee",
+        "offset": -360
+      },
+      {
+        "id": "America/Merida",
+        "offset": -360
+      },
+      {
+        "id": "America/Mexico_City",
+        "offset": -360
+      },
+      {
+        "id": "America/Monterrey",
+        "offset": -360
+      },
+      {
+        "id": "America/North_Dakota/Beulah",
+        "offset": -360
+      },
+      {
+        "id": "America/North_Dakota/Center",
+        "offset": -360
+      },
+      {
+        "id": "America/North_Dakota/New_Salem",
+        "offset": -360
+      },
+      {
+        "id": "America/Ojinaga",
+        "offset": -360
+      },
+      {
+        "id": "America/Rankin_Inlet",
+        "offset": -360
+      },
+      {
+        "id": "America/Regina",
+        "offset": -360
+      },
+      {
+        "id": "America/Resolute",
+        "offset": -360
+      },
+      {
+        "id": "America/Swift_Current",
+        "offset": -360
+      },
+      {
+        "id": "America/Tegucigalpa",
+        "offset": -360
+      },
+      {
+        "id": "Pacific/Galapagos",
+        "offset": -360
+      },
+      {
+        "id": "America/Atikokan",
+        "offset": -300
+      },
+      {
+        "id": "America/Bogota",
+        "offset": -300
+      },
+      {
+        "id": "America/Cancun",
+        "offset": -300
+      },
+      {
+        "id": "America/Cayman",
+        "offset": -300
+      },
+      {
+        "id": "America/Detroit",
+        "offset": -300
+      },
+      {
+        "id": "America/Eirunepe",
+        "offset": -300
+      },
+      {
+        "id": "America/Grand_Turk",
+        "offset": -300
+      },
+      {
+        "id": "America/Guayaquil",
+        "offset": -300
+      },
+      {
+        "id": "America/Havana",
+        "offset": -300
+      },
+      {
+        "id": "America/Indiana/Indianapolis",
+        "offset": -300
+      },
+      {
+        "id": "America/Indiana/Marengo",
+        "offset": -300
+      },
+      {
+        "id": "America/Indiana/Petersburg",
+        "offset": -300
+      },
+      {
+        "id": "America/Indiana/Vevay",
+        "offset": -300
+      },
+      {
+        "id": "America/Indiana/Vincennes",
+        "offset": -300
+      },
+      {
+        "id": "America/Indiana/Winamac",
+        "offset": -300
+      },
+      {
+        "id": "America/Iqaluit",
+        "offset": -300
+      },
+      {
+        "id": "America/Jamaica",
+        "offset": -300
+      },
+      {
+        "id": "America/Kentucky/Louisville",
+        "offset": -300
+      },
+      {
+        "id": "America/Kentucky/Monticello",
+        "offset": -300
+      },
+      {
+        "id": "America/Lima",
+        "offset": -300
+      },
+      {
+        "id": "America/Nassau",
+        "offset": -300
+      },
+      {
+        "id": "America/New_York",
+        "offset": -300
+      },
+      {
+        "id": "America/Panama",
+        "offset": -300
+      },
+      {
+        "id": "America/Port-au-Prince",
+        "offset": -300
+      },
+      {
+        "id": "America/Rio_Branco",
+        "offset": -300
+      },
+      {
+        "id": "America/Toronto",
+        "offset": -300
+      },
+      {
+        "id": "America/Winnipeg",
+        "offset": -300
+      },
+      {
+        "id": "Pacific/Easter",
+        "offset": -300
+      },
+      {
+        "id": "America/Anguilla",
+        "offset": -240
+      },
+      {
+        "id": "America/Antigua",
+        "offset": -240
+      },
+      {
+        "id": "America/Aruba",
+        "offset": -240
+      },
+      {
+        "id": "America/Barbados",
+        "offset": -240
+      },
+      {
+        "id": "America/Blanc-Sablon",
+        "offset": -240
+      },
+      {
+        "id": "America/Boa_Vista",
+        "offset": -240
+      },
+      {
+        "id": "America/Campo_Grande",
+        "offset": -240
+      },
+      {
+        "id": "America/Caracas",
+        "offset": -240
+      },
+      {
+        "id": "America/Cuiaba",
+        "offset": -240
+      },
+      {
+        "id": "America/Curacao",
+        "offset": -240
+      },
+      {
+        "id": "America/Dominica",
+        "offset": -240
+      },
+      {
+        "id": "America/Glace_Bay",
+        "offset": -240
+      },
+      {
+        "id": "America/Goose_Bay",
+        "offset": -240
+      },
+      {
+        "id": "America/Grenada",
+        "offset": -240
+      },
+      {
+        "id": "America/Guadeloupe",
+        "offset": -240
+      },
+      {
+        "id": "America/Guyana",
+        "offset": -240
+      },
+      {
+        "id": "America/Halifax",
+        "offset": -240
+      },
+      {
+        "id": "America/Kralendijk",
+        "offset": -240
+      },
+      {
+        "id": "America/La_Paz",
+        "offset": -240
+      },
+      {
+        "id": "America/Lower_Princes",
+        "offset": -240
+      },
+      {
+        "id": "America/Manaus",
+        "offset": -240
+      },
+      {
+        "id": "America/Marigot",
+        "offset": -240
+      },
+      {
+        "id": "America/Martinique",
+        "offset": -240
+      },
+      {
+        "id": "America/Moncton",
+        "offset": -240
+      },
+      {
+        "id": "America/Montserrat",
+        "offset": -240
+      },
+      {
+        "id": "America/Port_of_Spain",
+        "offset": -240
+      },
+      {
+        "id": "America/Porto_Velho",
+        "offset": -240
+      },
+      {
+        "id": "America/Puerto_Rico",
+        "offset": -240
+      },
+      {
+        "id": "America/Santo_Domingo",
+        "offset": -240
+      },
+      {
+        "id": "America/St_Barthelemy",
+        "offset": -240
+      },
+      {
+        "id": "America/St_Kitts",
+        "offset": -240
+      },
+      {
+        "id": "America/St_Lucia",
+        "offset": -240
+      },
+      {
+        "id": "America/St_Thomas",
+        "offset": -240
+      },
+      {
+        "id": "America/St_Vincent",
+        "offset": -240
+      },
+      {
+        "id": "America/Thule",
+        "offset": -240
+      },
+      {
+        "id": "America/Tortola",
+        "offset": -240
+      },
+      {
+        "id": "Atlantic/Bermuda",
+        "offset": -240
+      },
+      {
+        "id": "America/St_Johns",
+        "offset": -210
+      },
+      {
+        "id": "America/Araguaina",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Buenos_Aires",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Catamarca",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Cordoba",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Jujuy",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/La_Rioja",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Mendoza",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Rio_Gallegos",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Salta",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/San_Juan",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/San_Luis",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Tucuman",
+        "offset": -180
+      },
+      {
+        "id": "America/Argentina/Ushuaia",
+        "offset": -180
+      },
+      {
+        "id": "America/Asuncion",
+        "offset": -180
+      },
+      {
+        "id": "America/Bahia",
+        "offset": -180
+      },
+      {
+        "id": "America/Belem",
+        "offset": -180
+      },
+      {
+        "id": "America/Cayenne",
+        "offset": -180
+      },
+      {
+        "id": "America/Coyhaique",
+        "offset": -180
+      },
+      {
+        "id": "America/Fortaleza",
+        "offset": -180
+      },
+      {
+        "id": "America/Maceio",
+        "offset": -180
+      },
+      {
+        "id": "America/Miquelon",
+        "offset": -180
+      },
+      {
+        "id": "America/Montevideo",
+        "offset": -180
+      },
+      {
+        "id": "America/Paramaribo",
+        "offset": -180
+      },
+      {
+        "id": "America/Punta_Arenas",
+        "offset": -180
+      },
+      {
+        "id": "America/Recife",
+        "offset": -180
+      },
+      {
+        "id": "America/Santarem",
+        "offset": -180
+      },
+      {
+        "id": "America/Santiago",
+        "offset": -180
+      },
+      {
+        "id": "America/Sao_Paulo",
+        "offset": -180
+      },
+      {
+        "id": "Antarctica/Palmer",
+        "offset": -180
+      },
+      {
+        "id": "Antarctica/Rothera",
+        "offset": -180
+      },
+      {
+        "id": "Atlantic/Stanley",
+        "offset": -180
+      },
+      {
+        "id": "America/Noronha",
+        "offset": -120
+      },
+      {
+        "id": "America/Nuuk",
+        "offset": -120
+      },
+      {
+        "id": "America/Scoresbysund",
+        "offset": -120
+      },
+      {
+        "id": "Atlantic/South_Georgia",
+        "offset": -120
+      },
+      {
+        "id": "Atlantic/Azores",
+        "offset": -60
+      },
+      {
+        "id": "Atlantic/Cape_Verde",
+        "offset": -60
+      },
+      {
+        "id": "Africa/Abidjan",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Accra",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Bamako",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Banjul",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Bissau",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Casablanca",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Conakry",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Dakar",
+        "offset": 0
+      },
+      {
+        "id": "Africa/El_Aaiun",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Freetown",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Lome",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Monrovia",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Nouakchott",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Ouagadougou",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Sao_Tome",
+        "offset": 0
+      },
+      {
+        "id": "America/Danmarkshavn",
+        "offset": 0
+      },
+      {
+        "id": "Antarctica/Troll",
+        "offset": 0
+      },
+      {
+        "id": "Atlantic/Canary",
+        "offset": 0
+      },
+      {
+        "id": "Atlantic/Faroe",
+        "offset": 0
+      },
+      {
+        "id": "Atlantic/Madeira",
+        "offset": 0
+      },
+      {
+        "id": "Atlantic/Reykjavik",
+        "offset": 0
+      },
+      {
+        "id": "Atlantic/St_Helena",
+        "offset": 0
+      },
+      {
+        "id": "Europe/Dublin",
+        "offset": 0
+      },
+      {
+        "id": "Europe/Guernsey",
+        "offset": 0
+      },
+      {
+        "id": "Europe/Isle_of_Man",
+        "offset": 0
+      },
+      {
+        "id": "Europe/Jersey",
+        "offset": 0
+      },
+      {
+        "id": "Europe/Lisbon",
+        "offset": 0
+      },
+      {
+        "id": "Europe/London",
+        "offset": 0
+      },
+      {
+        "id": "UTC",
+        "offset": 0
+      },
+      {
+        "id": "Africa/Algiers",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Bangui",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Brazzaville",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Ceuta",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Douala",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Kinshasa",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Lagos",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Libreville",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Luanda",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Malabo",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Ndjamena",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Niamey",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Porto-Novo",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Tunis",
+        "offset": 60
+      },
+      {
+        "id": "Arctic/Longyearbyen",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Amsterdam",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Andorra",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Belgrade",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Berlin",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Bratislava",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Brussels",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Budapest",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Busingen",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Copenhagen",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Gibraltar",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Ljubljana",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Luxembourg",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Madrid",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Malta",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Monaco",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Oslo",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Paris",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Podgorica",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Prague",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Rome",
+        "offset": 60
+      },
+      {
+        "id": "Europe/San_Marino",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Sarajevo",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Skopje",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Stockholm",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Tirane",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Vaduz",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Vatican",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Vienna",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Warsaw",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Zagreb",
+        "offset": 60
+      },
+      {
+        "id": "Europe/Zurich",
+        "offset": 60
+      },
+      {
+        "id": "Africa/Blantyre",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Bujumbura",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Cairo",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Gaborone",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Harare",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Johannesburg",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Juba",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Khartoum",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Kigali",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Lubumbashi",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Lusaka",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Maputo",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Maseru",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Mbabane",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Tripoli",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Windhoek",
+        "offset": 120
+      },
+      {
+        "id": "Asia/Beirut",
+        "offset": 120
+      },
+      {
+        "id": "Asia/Famagusta",
+        "offset": 120
+      },
+      {
+        "id": "Asia/Gaza",
+        "offset": 120
+      },
+      {
+        "id": "Asia/Hebron",
+        "offset": 120
+      },
+      {
+        "id": "Asia/Jerusalem",
+        "offset": 120
+      },
+      {
+        "id": "Asia/Nicosia",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Athens",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Bucharest",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Chisinau",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Helsinki",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Kaliningrad",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Kyiv",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Mariehamn",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Riga",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Sofia",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Tallinn",
+        "offset": 120
+      },
+      {
+        "id": "Europe/Vilnius",
+        "offset": 120
+      },
+      {
+        "id": "Africa/Addis_Ababa",
+        "offset": 180
+      },
+      {
+        "id": "Africa/Asmara",
+        "offset": 180
+      },
+      {
+        "id": "Africa/Dar_es_Salaam",
+        "offset": 180
+      },
+      {
+        "id": "Africa/Djibouti",
+        "offset": 180
+      },
+      {
+        "id": "Africa/Kampala",
+        "offset": 180
+      },
+      {
+        "id": "Africa/Mogadishu",
+        "offset": 180
+      },
+      {
+        "id": "Africa/Nairobi",
+        "offset": 180
+      },
+      {
+        "id": "Antarctica/Syowa",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Aden",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Amman",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Baghdad",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Bahrain",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Damascus",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Kuwait",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Qatar",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Riyadh",
+        "offset": 180
+      },
+      {
+        "id": "Europe/Istanbul",
+        "offset": 180
+      },
+      {
+        "id": "Europe/Kirov",
+        "offset": 180
+      },
+      {
+        "id": "Europe/Minsk",
+        "offset": 180
+      },
+      {
+        "id": "Europe/Moscow",
+        "offset": 180
+      },
+      {
+        "id": "Europe/Simferopol",
+        "offset": 180
+      },
+      {
+        "id": "Europe/Volgograd",
+        "offset": 180
+      },
+      {
+        "id": "Indian/Antananarivo",
+        "offset": 180
+      },
+      {
+        "id": "Indian/Comoro",
+        "offset": 180
+      },
+      {
+        "id": "Indian/Mayotte",
+        "offset": 180
+      },
+      {
+        "id": "Asia/Tehran",
+        "offset": 210
+      },
+      {
+        "id": "Asia/Baku",
+        "offset": 240
+      },
+      {
+        "id": "Asia/Dubai",
+        "offset": 240
+      },
+      {
+        "id": "Asia/Muscat",
+        "offset": 240
+      },
+      {
+        "id": "Asia/Tbilisi",
+        "offset": 240
+      },
+      {
+        "id": "Asia/Yerevan",
+        "offset": 240
+      },
+      {
+        "id": "Europe/Astrakhan",
+        "offset": 240
+      },
+      {
+        "id": "Europe/Samara",
+        "offset": 240
+      },
+      {
+        "id": "Europe/Saratov",
+        "offset": 240
+      },
+      {
+        "id": "Europe/Ulyanovsk",
+        "offset": 240
+      },
+      {
+        "id": "Indian/Mahe",
+        "offset": 240
+      },
+      {
+        "id": "Indian/Mauritius",
+        "offset": 240
+      },
+      {
+        "id": "Indian/Reunion",
+        "offset": 240
+      },
+      {
+        "id": "Asia/Kabul",
+        "offset": 270
+      },
+      {
+        "id": "Antarctica/Mawson",
+        "offset": 300
+      },
+      {
+        "id": "Antarctica/Vostok",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Almaty",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Aqtau",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Aqtobe",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Ashgabat",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Atyrau",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Dushanbe",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Karachi",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Oral",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Qostanay",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Qyzylorda",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Samarkand",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Tashkent",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Yekaterinburg",
+        "offset": 300
+      },
+      {
+        "id": "Indian/Kerguelen",
+        "offset": 300
+      },
+      {
+        "id": "Indian/Maldives",
+        "offset": 300
+      },
+      {
+        "id": "Asia/Colombo",
+        "offset": 330
+      },
+      {
+        "id": "Asia/Kolkata",
+        "offset": 330
+      },
+      {
+        "id": "Asia/Kathmandu",
+        "offset": 345
+      },
+      {
+        "id": "Asia/Bishkek",
+        "offset": 360
+      },
+      {
+        "id": "Asia/Dhaka",
+        "offset": 360
+      },
+      {
+        "id": "Asia/Omsk",
+        "offset": 360
+      },
+      {
+        "id": "Asia/Thimphu",
+        "offset": 360
+      },
+      {
+        "id": "Asia/Urumqi",
+        "offset": 360
+      },
+      {
+        "id": "Indian/Chagos",
+        "offset": 360
+      },
+      {
+        "id": "Asia/Yangon",
+        "offset": 390
+      },
+      {
+        "id": "Indian/Cocos",
+        "offset": 390
+      },
+      {
+        "id": "Antarctica/Davis",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Bangkok",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Barnaul",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Ho_Chi_Minh",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Hovd",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Jakarta",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Krasnoyarsk",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Novokuznetsk",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Novosibirsk",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Phnom_Penh",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Pontianak",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Tomsk",
+        "offset": 420
+      },
+      {
+        "id": "Asia/Vientiane",
+        "offset": 420
+      },
+      {
+        "id": "Indian/Christmas",
+        "offset": 420
+      },
+      {
+        "id": "Antarctica/Casey",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Brunei",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Hong_Kong",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Irkutsk",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Kuala_Lumpur",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Kuching",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Macau",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Makassar",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Manila",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Shanghai",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Singapore",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Taipei",
+        "offset": 480
+      },
+      {
+        "id": "Asia/Ulaanbaatar",
+        "offset": 480
+      },
+      {
+        "id": "Australia/Perth",
+        "offset": 480
+      },
+      {
+        "id": "Australia/Eucla",
+        "offset": 525
+      },
+      {
+        "id": "Asia/Chita",
+        "offset": 540
+      },
+      {
+        "id": "Asia/Dili",
+        "offset": 540
+      },
+      {
+        "id": "Asia/Jayapura",
+        "offset": 540
+      },
+      {
+        "id": "Asia/Khandyga",
+        "offset": 540
+      },
+      {
+        "id": "Asia/Pyongyang",
+        "offset": 540
+      },
+      {
+        "id": "Asia/Seoul",
+        "offset": 540
+      },
+      {
+        "id": "Asia/Tokyo",
+        "offset": 540
+      },
+      {
+        "id": "Asia/Yakutsk",
+        "offset": 540
+      },
+      {
+        "id": "Pacific/Palau",
+        "offset": 540
+      },
+      {
+        "id": "Australia/Darwin",
+        "offset": 570
+      },
+      {
+        "id": "Antarctica/DumontDUrville",
+        "offset": 600
+      },
+      {
+        "id": "Asia/Ust-Nera",
+        "offset": 600
+      },
+      {
+        "id": "Asia/Vladivostok",
+        "offset": 600
+      },
+      {
+        "id": "Australia/Brisbane",
+        "offset": 600
+      },
+      {
+        "id": "Australia/Lindeman",
+        "offset": 600
+      },
+      {
+        "id": "Pacific/Chuuk",
+        "offset": 600
+      },
+      {
+        "id": "Pacific/Guam",
+        "offset": 600
+      },
+      {
+        "id": "Pacific/Port_Moresby",
+        "offset": 600
+      },
+      {
+        "id": "Pacific/Saipan",
+        "offset": 600
+      },
+      {
+        "id": "Australia/Adelaide",
+        "offset": 630
+      },
+      {
+        "id": "Australia/Broken_Hill",
+        "offset": 630
+      },
+      {
+        "id": "Antarctica/Macquarie",
+        "offset": 660
+      },
+      {
+        "id": "Asia/Magadan",
+        "offset": 660
+      },
+      {
+        "id": "Asia/Sakhalin",
+        "offset": 660
+      },
+      {
+        "id": "Asia/Srednekolymsk",
+        "offset": 660
+      },
+      {
+        "id": "Australia/Hobart",
+        "offset": 660
+      },
+      {
+        "id": "Australia/Lord_Howe",
+        "offset": 660
+      },
+      {
+        "id": "Australia/Melbourne",
+        "offset": 660
+      },
+      {
+        "id": "Australia/Sydney",
+        "offset": 660
+      },
+      {
+        "id": "Pacific/Bougainville",
+        "offset": 660
+      },
+      {
+        "id": "Pacific/Efate",
+        "offset": 660
+      },
+      {
+        "id": "Pacific/Guadalcanal",
+        "offset": 660
+      },
+      {
+        "id": "Pacific/Kosrae",
+        "offset": 660
+      },
+      {
+        "id": "Pacific/Noumea",
+        "offset": 660
+      },
+      {
+        "id": "Pacific/Pohnpei",
+        "offset": 660
+      },
+      {
+        "id": "Asia/Anadyr",
+        "offset": 720
+      },
+      {
+        "id": "Asia/Kamchatka",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Fiji",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Funafuti",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Kwajalein",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Majuro",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Nauru",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Norfolk",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Tarawa",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Wake",
+        "offset": 720
+      },
+      {
+        "id": "Pacific/Wallis",
+        "offset": 720
+      },
+      {
+        "id": "Antarctica/McMurdo",
+        "offset": 780
+      },
+      {
+        "id": "Pacific/Apia",
+        "offset": 780
+      },
+      {
+        "id": "Pacific/Auckland",
+        "offset": 780
+      },
+      {
+        "id": "Pacific/Fakaofo",
+        "offset": 780
+      },
+      {
+        "id": "Pacific/Kanton",
+        "offset": 780
+      },
+      {
+        "id": "Pacific/Tongatapu",
+        "offset": 780
+      },
+      {
+        "id": "Pacific/Chatham",
+        "offset": 825
+      },
+      {
+        "id": "Pacific/Kiritimati",
+        "offset": 840
+      }
+    ]
+  },
+  "/api/studio/apps/PurchaseRequests/resources/219102bc-864f-42ed-874a-c19eaee0d1ba": {
+    "id": "219102bc-864f-42ed-874a-c19eaee0d1ba",
+    "kind": "application",
+    "name": "PurchaseRequests",
+    "file": "application.json",
+    "version": "f774e202f7528b40e88d8a793ca8a6b45e551ad35a3eece94c0b3bfecf72c7f4",
+    "content": {
+      "id": "219102bc-864f-42ed-874a-c19eaee0d1ba",
+      "kind": "application",
+      "name": "PurchaseRequests",
+      "formatVersion": 1,
+      "label": {
+        "textKey": "application.title"
+      },
+      "description": {
+        "textKey": "application.description"
+      },
+      "packages": [
+        {
+          "id": "payment-references",
+          "version": "^1.0.0"
+        }
+      ],
+      "modules": [
+        {
+          "id": "organization",
+          "version": "^1.0.0",
+          "roles": {
+            "admin": "operator",
+            "member": "department-manager"
+          }
+        },
+        {
+          "id": "department-budgets",
+          "version": "^1.2.0",
+          "roles": {
+            "approver": "department-manager",
+            "administrator": "operator"
+          }
+        }
+      ]
+    }
   }
 }

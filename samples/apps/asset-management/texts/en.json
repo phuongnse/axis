@@ -5,6 +5,13 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "asset.resourceDescription": "A thing the company owns and tracks, and who holds it.",
+    "attachment.resourceDescription": "A file kept with an asset, such as an invoice or a manual.",
+    "category.resourceDescription": "A group of similar assets.",
+    "location.resourceDescription": "A place where assets are kept.",
+    "maintenance.resourceDescription": "One piece of maintenance done on an asset.",
+    "software.resourceDescription": "A software licence the company holds.",
+    "vendor.resourceDescription": "A company that assets are bought from.",
     "application.title": "Asset management",
     "application.description": "Keeps track of the company's assets, who holds them and their upkeep.",
     "site.title": "Asset management",

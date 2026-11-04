@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Location",
   "formatVersion": 1,
+  "description": { "textKey": "location.resourceDescription" },
   "label": {
     "textKey": "location.label"
   },

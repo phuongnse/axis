@@ -29,6 +29,7 @@ import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
+import { ResourceDescription } from './ResourceDescription'
 import { LabelTextsContext } from './labelTextsContext'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
@@ -231,6 +232,7 @@ export function EntityDesigner({
           </div>
         )}
       </div>
+      {!readOnly && <ResourceDescription value={value.description} onChange={onChange} />}
       <Picker
         pointer="/displayField"
         label={t('shell.studio.entity.displayField')}

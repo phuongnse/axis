@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "ApprovalStep",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.entities.approval-step.description" },
   "label": { "textKey": "approvals.approvalStep.label" },
   "fields": [
     { "name": "sequence", "type": "integer", "required": true, "min": 1, "label": { "textKey": "approvals.approvalStep.sequence" } },

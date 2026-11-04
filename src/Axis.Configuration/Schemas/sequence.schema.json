@@ -9,12 +9,19 @@
     "kind": { "const": "sequence" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
+    "description": { "$ref": "#/$defs/textReference" },
     "format": {
       "type": "string",
       "pattern": "^(?:[^{}]|\\{yyyy\\})*\\{n(?::(?:[1-9]|1[0-8]))?\\}(?:[^{}]|\\{yyyy\\})*$"
     }
   },
   "$defs": {
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": { "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" } }
+    },
     "id": {
       "type": "string",
       "format": "uuid",

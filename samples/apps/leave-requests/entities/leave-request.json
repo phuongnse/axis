@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "LeaveRequest",
   "formatVersion": 1,
+  "description": { "textKey": "leaveRequest.resourceDescription" },
   "label": { "textKey": "leaveRequest.label" },
   "displayField": "title",
   "fields": [

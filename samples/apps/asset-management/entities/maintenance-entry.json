@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "MaintenanceEntry",
   "formatVersion": 1,
+  "description": { "textKey": "maintenance.resourceDescription" },
   "label": {
     "textKey": "maintenance.label"
   },

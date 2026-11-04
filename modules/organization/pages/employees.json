@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "Employees",
   "formatVersion": 1,
+  "description": { "textKey": "organization.pages.employees.description" },
   "title": { "textKey": "organization.pages.employees.title" },
   "widgets": [
     {

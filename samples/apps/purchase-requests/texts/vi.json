@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "lineItem.resourceDescription": "Một dòng của đề nghị mua hàng: mua gì, bao nhiêu và giá bao nhiêu.",
+    "purchaseRequest.resourceDescription": "Đề nghị mua hàng hóa hoặc dịch vụ, do trưởng bộ phận phê duyệt.",
+    "supplier.resourceDescription": "Công ty cung cấp hàng cho các đề nghị mua hàng.",
     "application.title": "Yêu cầu mua hàng",
     "application.description": "Quản lý việc mua hàng của công ty, từ yêu cầu đến phê duyệt và đặt hàng.",
     "site.title": "Mua hàng",

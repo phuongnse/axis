@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "OutOfOffice",
   "formatVersion": 1,
+  "description": { "textKey": "organization.pages.out-of-office.description" },
   "title": { "textKey": "organization.pages.outOfOffice.title" },
   "widgets": [
     {

@@ -3,6 +3,7 @@
   "kind": "page",
   "name": "RequestTypes",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.pages.request-types.description" },
   "title": { "textKey": "approvals.pages.requestTypes.title" },
   "widgets": [
     {

@@ -523,6 +523,19 @@ public static partial class ApplicationCompiler
             CheckTextKey(provider.Label, provider, "/label", references, diagnostics);
         }
 
+        // Proposed: every kind may say what it is for. The application and a site check theirs where they check the rest.
+        Resource[] described =
+        [
+            .. loaded.Entities, .. loaded.Pages, .. loaded.Seeds, .. loaded.DataSources, .. loaded.Rules, .. loaded.Sequences,
+            .. loaded.Processes, .. loaded.Forms, .. loaded.Roles, .. loaded.Policies, .. loaded.Connectors,
+            .. loaded.IdentityProviders, .. loaded.Events, .. loaded.Endpoints, .. loaded.Triggers, .. loaded.Webhooks,
+            .. loaded.Migrations, .. loaded.Scenarios,
+        ];
+        foreach (var resource in described)
+        {
+            CheckTextKey(resource.Description, resource, "/description", references, diagnostics);
+        }
+
         // A module rule sees the rules of its own module by plain name and those of the modules it
         // declares as '<module id>:<name>(…)'. Application expressions call it the same way, so the
         // module rules are checked first.

@@ -9,6 +9,7 @@
     "kind": { "const": "trigger" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
+    "description": { "$ref": "#/$defs/textReference" },
     "type": { "enum": ["event", "dataChange", "schedule"] },
     "event": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "event" },
     "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
@@ -63,6 +64,12 @@
     }
   ],
   "$defs": {
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": { "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" } }
+    },
     "id": {
       "type": "string",
       "format": "uuid",

@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "lineItem.resourceDescription": "A line of a purchase request: what is bought, how many and at what price.",
+    "purchaseRequest.resourceDescription": "A request to buy goods or services, which a department head approves.",
+    "supplier.resourceDescription": "A company that purchase requests buy from.",
     "application.title": "Purchase requests",
     "application.description": "Runs the company's purchases, from the request to approval and ordering.",
     "site.title": "Purchasing",

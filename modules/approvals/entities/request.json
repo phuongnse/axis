@@ -3,6 +3,7 @@
   "kind": "entity",
   "name": "Request",
   "formatVersion": 1,
+  "description": { "textKey": "approvals.entities.request.description" },
   "label": { "textKey": "approvals.request.label" },
   "displayField": "title",
   "fields": [
