@@ -55,6 +55,8 @@ namespace Axis.Admin;
 /// <c>publish</c>, <c>validate</c> or <c>rollback</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
 /// see <see cref="IPublisherTenants"/>. After a <c>publish</c> or a <c>rollback</c> that left a work item due now for the tenant, such
 /// as a schedule trigger that is past due, the publisher sends the wake signal for that tenant, and a failure to send it fails nothing.
+/// Under the directory source it also runs the provisioning jobs of <c>platform.jobs</c> in a third loop, see <see cref="ProvisioningJobs"/>.
+/// A stop lets a running job finish.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -65,7 +67,8 @@ internal sealed class Publisher(
     TimeSpan testLimit,
     TextWriter output,
     TextWriter error,
-    CancellationToken stopping)
+    CancellationToken stopping,
+    ProvisioningJobs? jobs = null)
 {
     // Both loops write to these.
     private readonly TextWriter _output = TextWriter.Synchronized(output);
@@ -161,9 +164,38 @@ internal sealed class Publisher(
             return 1;
         }
 
-        // Two loops, so a long test holds up no publish. Only the first reads the tenants again.
-        await Task.WhenAll(LoopAsync(tests: false), LoopAsync(tests: true));
+        // Two loops, so a long test holds up no publish. Only the first reads the tenants again. A third runs the provisioning jobs.
+        await Task.WhenAll(LoopAsync(tests: false), LoopAsync(tests: true), jobs is null ? Task.CompletedTask : JobsLoopAsync(jobs));
         return 0;
+    }
+
+    // Runs the provisioning jobs one at a time. A stop is checked only between jobs, so a running job finishes.
+    private async Task JobsLoopAsync(ProvisioningJobs provisioning)
+    {
+        while (!stopping.IsCancellationRequested)
+        {
+            var claimed = false;
+            try
+            {
+                claimed = await provisioning.RunNextAsync(_output, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                _output.WriteLine($"platform claim failed: {TenantDatabaseSteps.Safe(exception)}");
+            }
+
+            if (!claimed)
+            {
+                try
+                {
+                    await Task.Delay(PollInterval, stopping);
+                }
+                catch (OperationCanceledException)
+                {
+                    // A stop ends the loop.
+                }
+            }
+        }
     }
 
     private async Task LoopAsync(bool tests)

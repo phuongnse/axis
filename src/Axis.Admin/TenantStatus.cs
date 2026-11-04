@@ -16,6 +16,10 @@ internal static class TenantStatus
 
     private const string Provisioning = "provisioning";
 
+    internal const string UnknownMessage = "The tenant does not exist.";
+
+    internal const string ProvisioningMessage = "the tenant is still provisioning. Finish tenant create first.";
+
     private static readonly string[] _header = ["id", "status", "hosts", "schema version", "preview of"];
 
     public static Task<int> SuspendAsync(string connectionString, string id, TenantAudit audit, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
@@ -49,7 +53,7 @@ internal static class TenantStatus
                 exists.Parameters.AddWithValue("id", id);
                 if (await exists.ExecuteScalarAsync(cancellationToken) is null)
                 {
-                    error.WriteLine("The tenant does not exist.");
+                    error.WriteLine(UnknownMessage);
                     return 2;
                 }
             }
@@ -59,38 +63,19 @@ internal static class TenantStatus
                 return 1;
             }
 
-            await using (var update = new NpgsqlCommand(
-                "UPDATE platform.tenants SET status = @to, version = version + 1 WHERE id = @id AND status = @from",
-                connection))
+            switch (await ChangeAsync(connection, id, from, to, cancellationToken))
             {
-                update.Parameters.AddWithValue("to", to);
-                update.Parameters.AddWithValue("from", from);
-                update.Parameters.AddWithValue("id", id);
-                if (await update.ExecuteNonQueryAsync(cancellationToken) == 1)
-                {
+                case StatusChange.Unknown:
+                    error.WriteLine(UnknownMessage);
+                    return 2;
+                case StatusChange.Provisioning:
+                    output.WriteLine($"{id} status failed: {ProvisioningMessage}");
+                    return 1;
+                default:
+                    // Changed, or unchanged because the tenant already has the wanted status: a no-op that leaves the version alone.
                     output.WriteLine($"{id} status ok");
                     return 0;
-                }
             }
-
-            await using var read = new NpgsqlCommand("SELECT status FROM platform.tenants WHERE id = @id", connection);
-            read.Parameters.AddWithValue("id", id);
-            var status = (string?)await read.ExecuteScalarAsync(cancellationToken);
-            if (status is null)
-            {
-                error.WriteLine("The tenant does not exist.");
-                return 2;
-            }
-
-            if (status == Provisioning)
-            {
-                output.WriteLine($"{id} status failed: the tenant is still provisioning. Finish tenant create first.");
-                return 1;
-            }
-
-            // The tenant already has the wanted status: a no-op that leaves the version alone.
-            output.WriteLine($"{id} status ok");
-            return 0;
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
         {
@@ -98,6 +83,44 @@ internal static class TenantStatus
             return 1;
         }
     }
+
+    /// <summary>
+    /// Moves a tenant from <paramref name="from"/> to <paramref name="to"/> with one conditional update, so a <c>tenant create</c>
+    /// that finishes at the same moment is never overwritten. When the update changed no row, a read tells an unknown tenant, a
+    /// refusal and a no-op apart. The command line and the provisioning jobs both call it.
+    /// </summary>
+    internal static async Task<StatusChange> ChangeAsync(NpgsqlConnection connection, string id, string from, string to, CancellationToken cancellationToken)
+    {
+        await using (var update = new NpgsqlCommand(
+            "UPDATE platform.tenants SET status = @to, version = version + 1 WHERE id = @id AND status = @from",
+            connection))
+        {
+            update.Parameters.AddWithValue("to", to);
+            update.Parameters.AddWithValue("from", from);
+            update.Parameters.AddWithValue("id", id);
+            if (await update.ExecuteNonQueryAsync(cancellationToken) == 1)
+            {
+                return StatusChange.Changed;
+            }
+        }
+
+        await using var read = new NpgsqlCommand("SELECT status FROM platform.tenants WHERE id = @id", connection);
+        read.Parameters.AddWithValue("id", id);
+        return (string?)await read.ExecuteScalarAsync(cancellationToken) switch
+        {
+            null => StatusChange.Unknown,
+            Provisioning => StatusChange.Provisioning,
+            _ => StatusChange.Unchanged,
+        };
+    }
+
+    /// <summary>Suspends an active tenant, as <c>tenant suspend</c> does.</summary>
+    internal static Task<StatusChange> SuspendChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
+        ChangeAsync(connection, id, Active, Suspended, cancellationToken);
+
+    /// <summary>Resumes a suspended tenant, as <c>tenant resume</c> does.</summary>
+    internal static Task<StatusChange> ResumeChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
+        ChangeAsync(connection, id, Suspended, Active, cancellationToken);
 
     public static async Task<int> ListAsync(string connectionString, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
@@ -153,4 +176,20 @@ internal static class TenantStatus
         PostgresException postgres => postgres.MessageText,
         _ => exception.GetType().Name,
     };
+}
+
+/// <summary>The outcome of <see cref="TenantStatus.ChangeAsync"/>.</summary>
+internal enum StatusChange
+{
+    /// <summary>The tenant had the old status and now has the new one.</summary>
+    Changed,
+
+    /// <summary>The tenant already had the new status, so nothing changed and the version stays.</summary>
+    Unchanged,
+
+    /// <summary>There is no such tenant.</summary>
+    Unknown,
+
+    /// <summary>The tenant is still provisioning, so its status is not changed.</summary>
+    Provisioning,
 }

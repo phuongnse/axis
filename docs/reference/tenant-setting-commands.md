@@ -445,7 +445,9 @@ keys. It can be rotated without signing anyone out.
   `tenant legal clear`, which name the [legal links](#legal-links) they changed. `tenant quotas set` is built too. The quotas route of the
   [provisioning API](tenant-lifecycle.md#provisioning-api), `PUT /api/cell/tenants/{id}/quotas`, writes it with the quota keys it was given
   in `changed`, in one transaction with the rows, and the record has no operator or machine caller. `platform rekey` is
-  built and writes one record for the whole run, with no tenant. `tenant list`, `tenant binding list`, `version` and `publisher`
+  built and writes one record for the whole run, with no tenant. A `suspend` or `resume` job that the
+  [publisher](administration.md#publisher) runs writes one record when it ends, with the command name of `tenant suspend` or
+  `tenant resume`, `job:<id>` in `changed` and the job's actor, in the same transaction as the job's final state. `tenant list`, `tenant binding list`, `version` and `publisher`
   write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
   writing one record per tenant, one per run or none. A command without a mark fails a test.
 - **When.** One record per tenant, when tenant work starts: after the checks of the command and
@@ -471,7 +473,7 @@ keys. It can be rotated without signing anyone out.
   for it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other
   tenants of `migrate` and `activate` go on. A record that is written prints no line.
 - **A record.** The time, the command, the tenant id, the operating system user and the machine that
-  ran it, and the names of what changed, such as a binding name or a setting name. It never holds a
+  ran it, the `actor` (empty unless a job wrote it, see above), and the names of what changed, such as a binding name or a setting name. It never holds a
   secret value. The binding and host commands write the names as `binding:<name>` and
   `host:<host>`, so one record can name things of more than one kind. `tenant host move` writes one
   record, on the target tenant, with `host:<host>` and `from:<source id>`.

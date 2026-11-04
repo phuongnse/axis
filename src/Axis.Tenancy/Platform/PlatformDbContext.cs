@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -43,6 +43,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantDailyCounterRow> TenantDailyCounters => Set<TenantDailyCounterRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
+
+    public DbSet<JobRow> Jobs => Set<JobRow>();
 
     public DbSet<PlatformAuditRecordRow> AuditRecords => Set<PlatformAuditRecordRow>();
 
@@ -363,6 +365,34 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             record.Property(r => r.OsUser).HasColumnName("os_user");
             record.Property(r => r.Machine).HasColumnName("machine");
             record.Property(r => r.Changed).HasColumnName("changed").HasColumnType("text[]");
+            record.Property(r => r.Actor).HasColumnName("actor");
+        });
+
+        modelBuilder.Entity<JobRow>(job =>
+        {
+            job.ToTable("jobs", table =>
+            {
+                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume')");
+                table.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
+            });
+            job.HasKey(j => j.Id).HasName("pk_jobs");
+            job.Property(j => j.Id).HasColumnName("id").ValueGeneratedNever();
+            job.Property(j => j.Kind).HasColumnName("kind");
+            job.Property(j => j.TenantId).HasColumnName("tenant_id");
+            job.Property(j => j.State).HasColumnName("state");
+            job.Property(j => j.Steps).HasColumnName("steps").HasColumnType("jsonb");
+            job.Property(j => j.Error).HasColumnName("error");
+            job.Property(j => j.IdempotencyKey).HasColumnName("idempotency_key");
+            job.Property(j => j.RequestHash).HasColumnName("request_hash");
+            job.Property(j => j.Actor).HasColumnName("actor");
+            job.Property(j => j.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("clock_timestamp()");
+            job.Property(j => j.StartedAt).HasColumnName("started_at").HasColumnType("timestamp with time zone");
+            job.Property(j => j.FinishedAt).HasColumnName("finished_at").HasColumnType("timestamp with time zone");
+            job.Property(j => j.ClaimedBy).HasColumnName("claimed_by");
+            job.Property(j => j.LeaseUntil).HasColumnName("lease_until").HasColumnType("timestamp with time zone");
+            job.Property(j => j.Claims).HasColumnName("claims").HasDefaultValue(0);
+            job.HasIndex(j => new { j.State, j.CreatedAt }).HasDatabaseName("ix_jobs_state_created_at");
+            job.HasIndex(j => j.IdempotencyKey).HasDatabaseName("ix_jobs_idempotency_key");
         });
     }
 }

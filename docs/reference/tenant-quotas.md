@@ -44,8 +44,8 @@ what one tenant uses in total or at once. A rate limit limits how fast one calle
 tenant's rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
 - **Who sets them.** The operator sets a tenant's quotas through the
   [provisioning API](tenant-lifecycle.md#provisioning-api). Each change writes a platform audit
-  record that names the keys of the request. It carries no operator or machine caller yet, as
-  `platform.audit_records` has no actor column _(planned for M31)_. The hosts read the quotas with the directory, at each `Tenancy:RefreshInterval`.
+  record that names the keys of the request. It carries no operator or machine caller yet: the
+  `actor` column of `platform.audit_records` exists, but the route does not pass one _(planned for M31)_. The hosts read the quotas with the directory, at each `Tenancy:RefreshInterval`.
 - **Lowering a quota below use.** It refuses new use and removes nothing. A tenant over its storage
   quota keeps its data and can still delete.
 

@@ -21,4 +21,7 @@ public sealed class PlatformAuditRecordRow
     public string Machine { get; set; } = "";
 
     public string[] Changed { get; set; } = [];
+
+    /// <summary>The operator or machine caller that asked for the change, when a job ran it. Empty for a command that ran directly.</summary>
+    public string? Actor { get; set; }
 }
