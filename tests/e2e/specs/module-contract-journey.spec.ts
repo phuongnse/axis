@@ -7,6 +7,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { fieldLabel } from '../fields'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
+import { createResource, openTab } from '../studio-resources'
 
 // The journey server is the second server of the run, and a publish request waits behind the ones that other
 // specs queue.
@@ -65,7 +66,16 @@ test.describe('an author publishes a module application on the journey tenant an
     await confirmDialog(page, 'Publish')
   }
 
-  async function createBudget(page: Page): Promise<string> {
+  async function start(page: Page, budgetId: string): Promise<string> {
+    const response = await page.request.post(`${journeyURL}/api/apps/${name}/processes/QuickBudgetApproval/instances`, {
+      data: { subjectId: budgetId },
+      headers: csrfHeaders,
+    })
+    expect(response.status(), await response.text()).toBe(201)
+    return ((await response.json()) as { id: string }).id
+  }
+
+  async function createBudget(page: Page): Promise<{ budget: string; id: string }> {
     const budget = `Budget ${Date.now()}-${test.info().retry}`
     await page.goto(`${journeyURL}/${sitePath}/department-budgets/budgets`)
     await page.getByRole('button', { name: 'New', exact: true }).click()
@@ -78,8 +88,9 @@ test.describe('an author publishes a module application on the journey tenant an
     await expect(page).toHaveURL(new RegExp(`/${sitePath}/department-budgets/budgets$`))
     const row = page.getByRole('row', { name: new RegExp(budget) })
     await expect(row).toBeVisible()
-    expect(await row.getAttribute('data-row-key')).toBeTruthy()
-    return budget
+    const id = await row.getAttribute('data-row-key')
+    expect(id).toBeTruthy()
+    return { budget, id: id! }
   }
 
   test('an author creates a blank application, pins the modules and publishes release 1 on the journey host', async ({
@@ -159,6 +170,45 @@ test.describe('an author publishes a module application on the journey tenant an
     ])
     await writeText(page, 'nav.budgets', 'Budgets')
 
+    await page.goto(`${journeyURL}/studio?app=${name}`)
+    await createResource(page, 'process', 'QuickBudgetApproval')
+    const quickApproval = (await resources(page)).find((item) => item.file === 'processes/quick-budget-approval.json')!
+    await openTab(page, 'JSON')
+    const content = {
+      id: quickApproval.id,
+      kind: 'process',
+      name: 'QuickBudgetApproval',
+      formatVersion: 1,
+      entity: 'department-budgets/Budget',
+      start: 'approve',
+      steps: [
+        {
+          name: 'approve',
+          type: 'operation',
+          operation: 'updateRecord',
+          set: { status: "'approved'" },
+          next: 'done',
+        },
+        { name: 'done', type: 'end' },
+      ],
+    }
+    await page.getByRole('textbox', { name: 'JSON', exact: true }).fill(JSON.stringify(content, null, 2))
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
+
+    const starters = await page.request.post(`${studioApi}/resources`, {
+      headers: csrfHeaders,
+      data: {
+        id: randomUUID(),
+        kind: 'policy',
+        name: 'BudgetStarters',
+        formatVersion: 1,
+        roles: ['department-manager'],
+        grants: [{ name: 'quickApprovalStart', process: 'QuickBudgetApproval', actions: ['start'] }],
+      },
+    })
+    expect(starters.status(), await starters.text()).toBe(201)
+
     const diagnostics = await page.request.get(`${studioApi}/diagnostics`)
     expect(diagnostics.status()).toBe(200)
     const { diagnostics: items } = (await diagnostics.json()) as { diagnostics: { severity: string }[] }
@@ -176,7 +226,28 @@ test.describe('an author publishes a module application on the journey tenant an
 
   test('a department manager creates a budget on the module page, and it reads draft', async ({ page }) => {
     await useJourneySession(page, 'manager')
-    const budget = await createBudget(page)
+    const { budget } = await createBudget(page)
+    await expect(page.getByRole('row', { name: new RegExp(`${budget}.*draft`, 'i') })).toBeVisible()
+  })
+
+  test('a process that approves a budget at once fails on the contract, and the platform operator sees the named point', async ({
+    page,
+  }) => {
+    await useJourneySession(page, 'manager')
+    const { budget, id } = await createBudget(page)
+    const instanceId = await start(page, id)
+
+    await useJourneySession(page, 'platform-operator')
+    await expect(async () => {
+      await page.goto(`${journeyURL}/console`)
+      const row = page.getByTestId('console-failed-work').locator(`tr[data-row-key="${instanceId}"]`)
+      await expect(row).toContainText('QuickBudgetApproval', { timeout: 2_000 })
+      await expect(row).toContainText('named point Budget/transitions/approve', { timeout: 2_000 })
+    }).toPass({ timeout: 30_000 })
+    await expect(page.locator('[data-theme-mode="light"]').first()).toBeVisible()
+
+    await useJourneySession(page, 'manager')
+    await page.goto(`${journeyURL}/${sitePath}/department-budgets/budgets`)
     await expect(page.getByRole('row', { name: new RegExp(`${budget}.*draft`, 'i') })).toBeVisible()
   })
 
