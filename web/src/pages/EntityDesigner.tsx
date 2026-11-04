@@ -1,20 +1,31 @@
+import { ArrowDownOutlined, ArrowUpOutlined, CheckOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
   Checkbox,
   ConfigProvider,
+  Drawer,
   Flex,
   Input,
   InputNumber,
   Radio,
   Select,
   Switch,
-  Table,
+  Tabs,
+  Tag,
+  Tooltip,
   Typography,
   DatePicker,
+  type TabsProps,
 } from 'antd'
 import dayjs from 'dayjs'
-import { lazy, Suspense, useContext } from 'react'
+import { lazy, Suspense, useContext, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { EmptyDash } from '../platform/EmptyValue'
+import { searchRows } from '../platform/tableControls'
+import { useDesignTokens } from '../platform/themeMode'
+import { PlatformContext } from './context'
 import {
   changeFieldType,
   editableSettings,
@@ -165,100 +176,276 @@ function Picker({
   )
 }
 
-/**
- * The designer of an entity. It shows the entity's name, label and display field, then its fields as a table of
- * name, label, type, required, unique and a settings column that shows only the settings the field's type takes,
- * and its validations as rows of a name, an expression, a message key and a field. A field can be added, removed and moved,
- * and a type change drops the settings the new type does not take. A computed field's `expression` and each
- * validation's expression use the expression editor, and so does a field's `default`, which has no field in scope.
- * A field's settings also include `min` and `max` in the type of the field, `minLength` and `searchable`, and they
- * hide `default`, `min`, `max` and `minLength` next to an `expression`, a `sequence` or `creator`. An Indexes list
- * under the fields adds, moves and removes the entity's `indexes`, each a name, a list of the entity's fields and a
- * Unique choice. The name of an index or a validation is shown as plain text, and an added one gets `index1` or
- * `validation1`, the first name its list does not use. The designer edits the draft through `onChange`, so a key it
- * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
- * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
- * at the row of a setting that the row does not show. Clearing an optional value removes its key. With `readOnly`,
- * as for an entity of a module, every input is off, the label is its plain text key, and there are no buttons that
- * add, remove or move a field or a validation. With `origins`, the loaded name of each row of the fields table or
- * `null` for a row added in this session, Add field, Remove and Move report the origins that follow through
- * `onOriginsChange`, and Remove also reports the origin of the removed row as touched. With `warnings`, the row
- * numbers of fields whose change no migration follows, a warning shows in the settings column of that row.
- */
-export function EntityDesigner({
-  value,
-  onChange,
-  readOnly = false,
-  origins,
-  warnings,
-  onOriginsChange,
-}: {
+/** Props every part of the entity designer shares. */
+interface EntityParts {
   value: Content
   onChange: ChangeHandler
   readOnly?: boolean
   origins?: FieldOrigin[]
   warnings?: Map<number, FieldWarning>
   onOriginsChange?: (next: FieldOrigin[], touched?: string) => void
-}) {
-  const t = useText()
+}
+
+/**
+ * The designer of an entity, as a module's entity shows it read-only: its header, then its parts as tabs. The editor of
+ * a resource of the folder draws the same header and tabs through {@link EntityHeader} and {@link entityTabItems}, with
+ * its JSON tab after them.
+ *
+ * Proposed: the entity designer reads as the long-standing table designers do (Salesforce's Object Manager, Dataverse's
+ * table designer, Directus's data model): a header that sums up the entity, with Edit details, then one tab for each
+ * part, Fields, Validations and Indexes, each with its count. Fields is the standard table, one row a field, and a field's
+ * settings open in a drawer beside it, so the list stays in sight. Every input keeps its `studio-field-<pointer>` id and
+ * each row the id of its field, so a diagnostic opens at the row.
+ */
+export function EntityDesigner(props: EntityParts) {
+  const designer = (
+    <Flex vertical gap="middle" data-testid="studio-entity-designer">
+      <EntityHeader value={props.value} onChange={props.onChange} readOnly={props.readOnly} />
+      <Tabs items={entityTabItems(props, (part) => part)} />
+    </Flex>
+  )
+  return props.readOnly ? <ConfigProvider componentDisabled>{designer}</ConfigProvider> : designer
+}
+
+/** The text of a label or description in the interface's language, else in the folder's first, else its text key. */
+function useLabelText(): (value: unknown) => string | null {
   const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
+  const resource = useContext(LabelTextsContext)
+  const uiLocale = useContext(PlatformContext)?.current.locale ?? 'en'
+  return (value) => {
+    const key = isContent(value) && typeof value.textKey === 'string' ? value.textKey : null
+    if (key === null || key === '') {
+      return null
+    }
+    const texts = resource?.pending?.[key] ?? names?.texts.find((entry) => entry.key === key)?.texts
+    if (!texts) {
+      return key
+    }
+    const locale = names?.locales.includes(uiLocale) ? uiLocale : names?.locales[0]
+    return (locale && texts[locale]?.trim()) || key
+  }
+}
+
+/**
+ * Proposed: the editor's tabs, where an entity's Fields, Validations and Indexes stand in place of the item `form`. With
+ * no `entity`, the tabs are as given.
+ */
+export function EntityTabs({
+  entity,
+  wrap,
+  items = [],
+  ...tabs
+}: TabsProps & { entity: EntityParts | null; wrap: (part: ReactNode) => ReactNode }) {
+  return (
+    <Tabs
+      {...tabs}
+      items={
+        entity === null ? items : items.flatMap((item) => (item.key === 'form' ? entityTabItems(entity, wrap) : [item]))
+      }
+    />
+  )
+}
+
+/** A tab's name with the number of its rows after it, in `textMuted`. */
+function CountedTab({ nameKey, count }: { nameKey: string; count: number }) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  return (
+    <span>
+      {t(nameKey)}
+      <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>{count}</span>
+    </span>
+  )
+}
+
+/**
+ * Proposed: the entity's parts as tab items: Fields, under the key `form` so a diagnostic of the form lands on it, then
+ * Validations and Indexes. `wrap` puts each part in what the editor puts around its form.
+ */
+function entityTabItems(
+  props: EntityParts,
+  wrap: (part: ReactNode) => ReactNode,
+): { key: string; label: ReactNode; children: ReactNode }[] {
+  const { value, onChange, readOnly = false } = props
   const fields = Array.isArray(value.fields) ? value.fields : undefined
   const fieldNames = (fields ?? []).flatMap((field) =>
     isContent(field) && typeof field.name === 'string' && field.name !== '' ? [field.name] : [],
   )
-
-  const designer = (
-    <Flex vertical gap="middle" data-testid="studio-entity-designer">
-      <div data-testid="studio-field-/name">
-        <div>{t('shell.studio.entity.name')}</div>
-        <Input
-          aria-label={t('shell.studio.entity.name')}
-          value={text(value.name)}
-          onChange={(event) => onChange('/name', event.target.value)}
-        />
-      </div>
-      <div data-testid="studio-field-/label">
-        <div>{t('shell.studio.entity.label')}</div>
-        {names !== undefined && label !== null && !readOnly ? (
-          <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
-        ) : (
-          <div data-testid="studio-field-/label/textKey">
-            <Input
-              aria-label={t('shell.studio.labelKey')}
-              value={text(isContent(value.label) ? value.label.textKey : undefined)}
-              onChange={(event) => onChange('/label/textKey', event.target.value)}
-            />
-          </div>
-        )}
-      </div>
-      {!readOnly && <ResourceDescription value={value.description} onChange={onChange} />}
-      <Picker
-        pointer="/displayField"
-        label={t('shell.studio.entity.displayField')}
-        options={fieldNames}
-        value={value.displayField}
-        required={false}
-        onPick={(next) => onChange('/displayField', next)}
-      />
-      <Fields
-        fields={fields}
-        readOnly={readOnly}
-        origins={origins}
-        warnings={warnings}
-        onOriginsChange={onOriginsChange}
-        onChange={onChange}
-      />
-      <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} onChange={onChange} />
-      <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />
-    </Flex>
-  )
-
-  return readOnly ? <ConfigProvider componentDisabled>{designer}</ConfigProvider> : designer
+  const count = (list: unknown) => (Array.isArray(list) ? list.length : 0)
+  return [
+    {
+      key: 'form',
+      label: <CountedTab nameKey="shell.studio.entity.fields" count={count(value.fields)} />,
+      children: wrap(
+        <EntityFields
+          fields={fields}
+          readOnly={readOnly}
+          origins={props.origins}
+          warnings={props.warnings}
+          onOriginsChange={props.onOriginsChange}
+          onChange={onChange}
+        />,
+      ),
+    },
+    {
+      key: 'validations',
+      label: <CountedTab nameKey="shell.studio.entity.validations" count={count(value.validations)} />,
+      children: wrap(
+        <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />,
+      ),
+    },
+    {
+      key: 'indexes',
+      label: <CountedTab nameKey="shell.studio.entity.indexes" count={count(value.indexes)} />,
+      children: wrap(<Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} onChange={onChange} />),
+    },
+  ]
 }
 
-/** The fields of the entity as a table, with Add field below it. */
-function Fields({
+/**
+ * Proposed: the entity's header, under the page's title, which is its label: its description, then its name and display
+ * field, with Edit details, which opens them with its label in a drawer. As everywhere in the editor, an edit goes into the
+ * draft, and the save bar saves it.
+ */
+export function EntityHeader({
+  value,
+  onChange,
+  readOnly = false,
+}: Pick<EntityParts, 'value' | 'onChange' | 'readOnly'>) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const names = useContext(StudioNamesContext)
+  const label = useContext(LabelTextsContext)
+  const labelText = useLabelText()
+  const [open, setOpen] = useState(false)
+  const fields = Array.isArray(value.fields) ? value.fields.filter(isContent) : []
+  const fieldNames = fields.flatMap((field) =>
+    typeof field.name === 'string' && field.name !== '' ? [field.name] : [],
+  )
+  const display = fields.find((field) => field.name === value.displayField)
+  const description = labelText(value.description)
+  const fact = (name: string, shown: ReactNode, testId: string) => (
+    <span data-testid={testId}>
+      <span style={{ color: colour.textMuted }}>{name}</span>
+      <span style={{ marginInlineStart: spacing.xs }}>{shown}</span>
+    </span>
+  )
+
+  return (
+    <Flex justify="space-between" align="flex-start" gap={spacing.md} data-testid="studio-entity-header">
+      <Flex vertical gap={spacing.xs}>
+        {description ? <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text> : null}
+        <Flex gap={spacing.lg} wrap>
+          {fact(
+            t('shell.studio.entity.name'),
+            <Typography.Text code>{text(value.name)}</Typography.Text>,
+            'studio-entity-name',
+          )}
+          {fact(
+            t('shell.studio.entity.displayField'),
+            display ? (labelText(display.label) ?? text(display.name)) : <EmptyDash />,
+            'studio-entity-display-field',
+          )}
+        </Flex>
+      </Flex>
+      <AxisButton role="secondary" onClick={() => setOpen(true)}>
+        {t(readOnly ? 'shell.studio.entity.details' : 'shell.studio.entity.editDetails')}
+      </AxisButton>
+      <Drawer
+        open={open}
+        size={560}
+        title={t('shell.studio.entity.details')}
+        onClose={() => setOpen(false)}
+        data-testid="studio-entity-details"
+      >
+        <Flex vertical gap="middle">
+          <div data-testid="studio-field-/name">
+            <div>{t('shell.studio.entity.name')}</div>
+            <Input
+              aria-label={t('shell.studio.entity.name')}
+              value={text(value.name)}
+              onChange={(event) => onChange('/name', event.target.value)}
+            />
+          </div>
+          <div data-testid="studio-field-/label">
+            <div>{t('shell.studio.entity.label')}</div>
+            {names !== undefined && label !== null && !readOnly ? (
+              <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
+            ) : (
+              <div data-testid="studio-field-/label/textKey">
+                <Input
+                  aria-label={t('shell.studio.labelKey')}
+                  value={text(isContent(value.label) ? value.label.textKey : undefined)}
+                  onChange={(event) => onChange('/label/textKey', event.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          {!readOnly && <ResourceDescription value={value.description} onChange={onChange} />}
+          <Picker
+            pointer="/displayField"
+            label={t('shell.studio.entity.displayField')}
+            options={fieldNames}
+            value={value.displayField}
+            required={false}
+            onPick={(next) => onChange('/displayField', next)}
+          />
+        </Flex>
+      </Drawer>
+    </Flex>
+  )
+}
+
+/** Proposed: what a field's type says in the Type column: its name, then the entity it points to or its number of values. */
+function TypeCell({ field }: { field: Content }) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const type = text(field.type)
+  if (type === '') {
+    return <EmptyDash />
+  }
+  const target = text(field.target)
+  const values = Array.isArray(field.values) ? field.values.length : 0
+  const detail =
+    target !== ''
+      ? `→ ${target}`
+      : type === 'enum'
+        ? t('shell.studio.entity.valueCount').replace('{count}', String(values))
+        : null
+  return (
+    <span>
+      {t(`shell.studio.entity.type.${type}`)}
+      {detail && <span style={{ color: colour.textMuted }}> {detail}</span>}
+    </span>
+  )
+}
+
+/** Proposed: the settings that set a field apart, as neutral tags in the Properties column. */
+function fieldTraits(field: Content): string[] {
+  return [
+    typeof field.expression === 'string' && field.expression !== '' ? 'shell.studio.entity.computed' : null,
+    typeof field.sequence === 'string' && field.sequence !== '' ? 'shell.studio.entity.sequence' : null,
+    field.creator === true ? 'shell.studio.entity.creator' : null,
+    field.default !== undefined ? 'shell.studio.entity.default' : null,
+    field.searchable === true ? 'shell.studio.entity.searchable' : null,
+    field.sensitive === true ? 'shell.studio.entity.sensitive' : null,
+  ].filter((key): key is string => key !== null)
+}
+
+/** A yes cell of Required or Unique: a check, named for screen readers. A no is the dash. */
+function Yes({ name }: { name: string }) {
+  const { colour } = useDesignTokens()
+  return <CheckOutlined aria-label={name} style={{ color: colour.primaryText }} />
+}
+
+/**
+ * Proposed: the entity's fields as the standard table, in the order of the file, which is the order a default form
+ * shows them in, so the table has no sort by column. Its columns are Name, a link that opens the field's drawer,
+ * Label, Type, Required, Unique and Properties, the settings that set the field apart. Search looks in the name and
+ * label. A row's actions are Move up, Move down and Remove; moving is off while a search narrows the rows. Add field
+ * adds a text field and opens its drawer.
+ */
+function EntityFields({
   fields,
   readOnly,
   origins,
@@ -274,6 +461,10 @@ function Fields({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const labelText = useLabelText()
+  const [search, setSearch] = useState('')
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   if (fields === undefined) {
     return (
@@ -282,6 +473,9 @@ function Fields({
       </div>
     )
   }
+
+  /** The origin of each row, `null` for a row that has none. */
+  const rowOrigins = (): FieldOrigin[] => fields.map((_, index) => origins?.[index] ?? null)
 
   function move(index: number, offset: number) {
     const next = [...fields!]
@@ -294,17 +488,14 @@ function Fields({
     }
   }
 
-  /** The origin of each row, `null` for a row that has none. */
-  function rowOrigins(): FieldOrigin[] {
-    return fields!.map((_, index) => origins?.[index] ?? null)
-  }
-
   function addField() {
     onChange('/fields', [...fields!, { name: '', type: 'text' }])
     onOriginsChange?.([...rowOrigins(), null])
+    setOpenIndex(fields!.length)
   }
 
   function removeField(index: number) {
+    setOpenIndex(null)
     onChange(
       '/fields',
       fields!.filter((_, position) => position !== index),
@@ -315,134 +506,256 @@ function Fields({
     )
   }
 
+  type Row = { index: number; field: Content }
+  const rows: Row[] = fields.map((field, index) => ({ index, field: isContent(field) ? field : {} }))
+  const columns: AxisColumn<Row>[] = [
+    {
+      key: 'name',
+      kind: 'fit',
+      title: t('shell.studio.entity.fieldName'),
+      searchText: (row) => text(row.field.name),
+      render: (row) => (
+        <Flex gap={spacing.xs} align="center">
+          <Typography.Link
+            data-testid={`studio-entity-field-open-${row.index}`}
+            style={{ color: colour.primaryText }}
+            onClick={() => setOpenIndex(row.index)}
+          >
+            {text(row.field.name) || t('shell.studio.entity.unnamedField')}
+          </Typography.Link>
+          {warnings?.get(row.index) && (
+            <Tooltip title={t('shell.studio.entity.migration.rowWarning')}>
+              <WarningOutlined
+                aria-label={t('shell.studio.entity.migration.rowWarning')}
+                style={{ color: colour.warningText }}
+              />
+            </Tooltip>
+          )}
+        </Flex>
+      ),
+    },
+    {
+      key: 'label',
+      kind: 'text',
+      title: t('shell.studio.entity.fieldLabel'),
+      searchText: (row) => labelText(row.field.label) ?? '',
+      render: (row) => labelText(row.field.label) ?? <EmptyDash />,
+    },
+    {
+      key: 'type',
+      kind: 'fit',
+      title: t('shell.studio.entity.fieldType'),
+      render: (row) => <TypeCell field={row.field} />,
+    },
+    {
+      key: 'required',
+      kind: 'fit',
+      title: t('shell.studio.entity.required'),
+      render: (row) => (row.field.required === true ? <Yes name={t('shell.studio.entity.required')} /> : <EmptyDash />),
+    },
+    {
+      key: 'unique',
+      kind: 'fit',
+      title: t('shell.studio.entity.unique'),
+      render: (row) => (row.field.unique === true ? <Yes name={t('shell.studio.entity.unique')} /> : <EmptyDash />),
+    },
+    {
+      key: 'properties',
+      kind: 'text',
+      priority: 'low',
+      title: t('shell.studio.entity.properties'),
+      render: (row) => {
+        const traits = fieldTraits(row.field)
+        return traits.length === 0 ? (
+          <EmptyDash />
+        ) : (
+          <Flex gap={spacing.xs} wrap>
+            {traits.map((key) => (
+              <Tag key={key} style={{ marginInlineEnd: 0 }}>
+                {t(key)}
+              </Tag>
+            ))}
+          </Flex>
+        )
+      },
+    },
+  ]
+  const searching = search.trim() !== ''
+  const shown = searchRows(rows, columns, search)
+  const open = openIndex !== null && openIndex < fields.length ? openIndex : null
+
   return (
     <div data-testid="studio-field-/fields">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.fields')}</Typography.Text>
-        <Table<unknown>
-          size="small"
-          pagination={false}
-          scroll={{ x: 'max-content' }}
-          dataSource={fields}
-          rowKey={(row) => fields!.indexOf(row)}
-          onRow={(_, index) =>
-            ({ 'data-testid': `studio-field-/fields/${index}` }) as React.HTMLAttributes<HTMLElement>
-          }
-          columns={[
-            {
-              title: t('shell.studio.entity.fieldName'),
-              render: (_, field, index) => (
-                <div data-testid={`studio-field-/fields/${index}/name`}>
-                  <Input
-                    aria-label={t('shell.studio.entity.fieldName')}
-                    value={text(isContent(field) ? field.name : undefined)}
-                    onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
-                  />
-                </div>
-              ),
-            },
-            {
-              title: t('shell.studio.entity.fieldLabel'),
-              render: (_, field, index) => (
-                <FieldLabel
-                  name={t('shell.studio.entity.fieldLabel')}
-                  pointer={`/fields/${index}/label`}
-                  value={isContent(field) ? field.label : undefined}
-                  onChange={onChange}
-                />
-              ),
-            },
-            {
-              title: t('shell.studio.entity.fieldType'),
-              render: (_, field, index) => {
-                const content = isContent(field) ? field : {}
-                return (
-                  <div data-testid={`studio-field-/fields/${index}/type`}>
-                    <Select
-                      aria-label={t('shell.studio.entity.fieldType')}
-                      showSearch
-                      optionFilterProp="label"
-                      virtual={false}
-                      style={{ minWidth: 160 }}
-                      value={typeof content.type === 'string' ? content.type : undefined}
-                      options={fieldTypes.map((option) => ({ value: option, label: option }))}
-                      onChange={(next: string) => onChange(`/fields/${index}`, changeFieldType(content, next))}
-                    />
-                  </div>
-                )
-              },
-            },
-            {
-              title: t('shell.studio.entity.required'),
-              render: (_, field, index) => (
-                <Flag field={field} setting="required" pointer={`/fields/${index}/required`} onChange={onChange} />
-              ),
-            },
-            {
-              title: t('shell.studio.entity.unique'),
-              render: (_, field, index) => (
-                <Flag field={field} setting="unique" pointer={`/fields/${index}/unique`} onChange={onChange} />
-              ),
-            },
-            {
-              title: t('shell.studio.entity.settings'),
-              render: (_, field, index) => (
-                <Flex vertical gap="small">
-                  <FieldLabel
-                    name={t('shell.studio.entity.help')}
-                    pointer={`/fields/${index}/help`}
-                    value={isContent(field) ? field.help : undefined}
-                    onChange={onChange}
-                  />
-                  <Settings
-                    index={index}
-                    field={isContent(field) ? field : {}}
-                    fields={fields}
-                    readOnly={readOnly}
-                    onChange={onChange}
-                  />
-                  {warnings?.get(index) && (
-                    <Alert
-                      type="warning"
-                      data-testid={`studio-migration-warning-/fields/${index}`}
-                      title={t(
-                        warnings.get(index) === 'enum'
-                          ? 'shell.studio.entity.migration.enumWarning'
-                          : 'shell.studio.entity.migration.uniqueWarning',
-                      )}
-                    />
-                  )}
-                </Flex>
-              ),
-            },
-            ...(readOnly
-              ? []
-              : [
+      <AxisTable<Row>
+        testId="studio-entity-fields"
+        rows={shown}
+        rowKey={(row) => row.index}
+        columns={columns}
+        onRow={(row) => ({ 'data-testid': `studio-field-/fields/${row.index}` }) as HTMLAttributes<HTMLElement>}
+        rowActions={
+          readOnly
+            ? undefined
+            : {
+                count: 3,
+                of: (row) => [
                   {
-                    render: (_: unknown, __: unknown, index: number) => (
-                      <Flex gap="small">
-                        <Button disabled={index === 0} onClick={() => move(index, -1)}>
-                          {t('shell.studio.entity.moveUp')}
-                        </Button>
-                        <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
-                          {t('shell.studio.entity.moveDown')}
-                        </Button>
-                        <Button danger onClick={() => removeField(index)}>
-                          {t('shell.studio.entity.removeField')}
-                        </Button>
-                      </Flex>
-                    ),
+                    key: 'up',
+                    labelKey: 'shell.studio.entity.moveUp',
+                    icon: <ArrowUpOutlined />,
+                    disabled: searching || row.index === 0,
+                    onClick: () => move(row.index, -1),
                   },
-                ]),
-          ]}
-        />
-        {readOnly ? null : (
-          <div>
-            <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
-          </div>
-        )}
-      </Flex>
+                  {
+                    key: 'down',
+                    labelKey: 'shell.studio.entity.moveDown',
+                    icon: <ArrowDownOutlined />,
+                    disabled: searching || row.index === fields.length - 1,
+                    onClick: () => move(row.index, 1),
+                  },
+                  {
+                    key: 'remove',
+                    labelKey: 'shell.studio.entity.removeField',
+                    icon: <DeleteOutlined />,
+                    destructive: true,
+                    onClick: () => removeField(row.index),
+                  },
+                ],
+              }
+        }
+        toolbar={{
+          view: (
+            <Input.Search
+              aria-label={t('shell.studio.search')}
+              placeholder={t('shell.studio.search')}
+              allowClear
+              style={{ maxWidth: 360 }}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          ),
+          main: readOnly ? undefined : (
+            <AxisButton role="main" onClick={addField}>
+              {t('shell.studio.entity.addField')}
+            </AxisButton>
+          ),
+        }}
+        emptyText={t('shell.studio.entity.noFields')}
+        pagination={false}
+      />
+      <FieldDrawer
+        index={open}
+        fields={fields}
+        readOnly={readOnly}
+        warning={open === null ? undefined : warnings?.get(open)}
+        onChange={onChange}
+        onClose={() => setOpenIndex(null)}
+      />
     </div>
+  )
+}
+
+/**
+ * Proposed: one field's settings, in a drawer beside the fields table, so the table stays in sight: its name, label,
+ * type, Required and Unique, help, then the settings its type takes. Each edit goes into the draft at once.
+ */
+function FieldDrawer({
+  index,
+  fields,
+  readOnly,
+  warning,
+  onChange,
+  onClose,
+}: {
+  index: number | null
+  fields: unknown[]
+  readOnly: boolean
+  warning: FieldWarning | undefined
+  onChange: ChangeHandler
+  onClose: () => void
+}) {
+  const t = useText()
+  const labelText = useLabelText()
+  const field = index === null ? {} : isContent(fields[index]) ? (fields[index] as Content) : {}
+  const pointer = `/fields/${index}`
+  return (
+    <Drawer
+      open={index !== null}
+      size={560}
+      title={labelText(field.label) ?? (text(field.name) || t('shell.studio.entity.unnamedField'))}
+      onClose={onClose}
+      data-testid="studio-entity-field-drawer"
+    >
+      {index !== null && (
+        <Flex vertical gap="middle">
+          <div data-testid={`studio-field-${pointer}/name`}>
+            <div>{t('shell.studio.entity.fieldName')}</div>
+            <Input
+              aria-label={t('shell.studio.entity.fieldName')}
+              value={text(field.name)}
+              onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
+            />
+          </div>
+          <div>
+            <div>{t('shell.studio.entity.fieldLabel')}</div>
+            <FieldLabel
+              name={t('shell.studio.entity.fieldLabel')}
+              pointer={`${pointer}/label`}
+              value={field.label}
+              onChange={onChange}
+            />
+          </div>
+          <div data-testid={`studio-field-${pointer}/type`}>
+            <div>{t('shell.studio.entity.fieldType')}</div>
+            <Select
+              aria-label={t('shell.studio.entity.fieldType')}
+              showSearch
+              optionFilterProp="label"
+              virtual={false}
+              style={{ width: '100%' }}
+              value={typeof field.type === 'string' ? field.type : undefined}
+              options={fieldTypes.map((option) => ({ value: option, label: t(`shell.studio.entity.type.${option}`) }))}
+              onChange={(next: string) => onChange(pointer, changeFieldType(field, next))}
+            />
+          </div>
+          <Flex gap="large">
+            <FlagRow field={field} setting="required" pointer={`${pointer}/required`} onChange={onChange} />
+            <FlagRow field={field} setting="unique" pointer={`${pointer}/unique`} onChange={onChange} />
+          </Flex>
+          <FieldLabel
+            name={t('shell.studio.entity.help')}
+            pointer={`${pointer}/help`}
+            value={field.help}
+            onChange={onChange}
+          />
+          <Settings index={index} field={field} fields={fields} readOnly={readOnly} onChange={onChange} />
+          {warning && (
+            <Alert
+              type="warning"
+              data-testid={`studio-migration-warning-${pointer}`}
+              title={t(
+                warning === 'enum'
+                  ? 'shell.studio.entity.migration.enumWarning'
+                  : 'shell.studio.entity.migration.uniqueWarning',
+              )}
+            />
+          )}
+        </Flex>
+      )}
+    </Drawer>
+  )
+}
+
+/** Required or Unique with its name beside the checkbox, as the drawer has room for. */
+function FlagRow(props: { field: Content; setting: FieldSetting; pointer: string; onChange: ChangeHandler }) {
+  const t = useText()
+  if (!fieldSettings(text(props.field.type)).includes(props.setting)) {
+    return null
+  }
+  return (
+    <Flex gap="small" align="center">
+      <Flag {...props} />
+      <span>{t(`shell.studio.entity.${props.setting}`)}</span>
+    </Flex>
   )
 }
 
@@ -913,7 +1226,6 @@ function Indexes({
   return (
     <div data-testid="studio-field-/indexes">
       <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.indexes')}</Typography.Text>
         {list.map((index, position) => {
           const pointer = `/indexes/${position}`
           const content = isContent(index) ? index : {}
@@ -997,7 +1309,6 @@ function Validations({
   return (
     <div data-testid="studio-field-/validations">
       <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.validations')}</Typography.Text>
         {list.map((validation, index) => {
           const pointer = `/validations/${index}`
           const content = isContent(validation) ? validation : {}
