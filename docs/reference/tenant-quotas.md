@@ -159,8 +159,8 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
   warning for the tenant. The notice is a row with no application and no release, whose texts are the
   platform texts `notices.emailsHeld.subject` and `notices.emailsHeld.body` with the value `limit`,
   the tenant's `emailsPerDay`. A tenant with no limit, and a worker outside a cell, store none. The
-  administrators read the notice on the [notification routes](notifications.md#in-app-notifications). The bell is
-  _(planned for M31)_.
+  administrators read the notice on the [notification routes](notifications.md#in-app-notifications). The bell of the
+  [platform site](notifications.md#in-app-notifications) shows it.
 
 ## Usage
 
