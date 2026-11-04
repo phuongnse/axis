@@ -280,6 +280,9 @@ shows a grant's filter and fields read-only, and there is no way yet to add a gr
   Studio. A save is refused when it changes `id`, `kind`, `name` or `formatVersion`, drops a
   property of the module, leaves a keyed element without a key, repeats a key or changes only the
   letter case of one.
+- **Drawing a draft form.** For the form designer's canvas, the authoring API turns an unsaved module form into
+  the layer in memory and answers its widget without writing anything, see
+  [a module form draft](draft-page-metadata.md).
 - **Refused changes.** A save is checked like any save. A change that breaks the contract, such as
   a step that moves a request to `approved` past its guard, publishes as a failed contract scenario
   or a refused write, and a change that adds a transition into a protected state is a diagnostic in

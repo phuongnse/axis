@@ -12,8 +12,7 @@ in git. The application list, application create, resource list, read, patch, cr
 references, names, policy matrix, module resource, module resource save, expression check and draft page metadata routes are built. It is agreed in
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md). Its edit routes never activate a release.
 Under `scripts/dev.sh`, a saved file restarts the server, which activates the folder, as a hand edit does today.
-A write takes a lock in the platform database, see [Versions](#versions). Reads
-and diagnostics touch no database. Going live from Studio is
+A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch no database. Going live from Studio is
 [Publishing](#publishing). `validate`, `publish`, `preview`, `rollback` and the release history are built. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
@@ -81,6 +80,7 @@ in the application. File names and names can change.
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [Draft page metadata](draft-page-metadata.md) |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [Draft page metadata](draft-page-metadata.md) |
+| `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ widget, diagnostics }` for a draft form of the module version that the application pins. The body is the whole edited form as `application/json`, see [Draft page metadata](draft-page-metadata.md) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either

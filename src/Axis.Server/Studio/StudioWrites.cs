@@ -172,14 +172,7 @@ internal static class StudioWrites
             return new StudioLayerOutcome(null, null, null);
         }
 
-        var bytes = Serialize(new JsonObject
-        {
-            ["id"] = (existing?.File.Id ?? Guid.NewGuid()).ToString("D"),
-            ["kind"] = "layer",
-            ["formatVersion"] = 1,
-            ["target"] = existing?.Target ?? $"{moduleId}/{name}",
-            ["changes"] = changes.DeepClone(),
-        });
+        var bytes = Serialize(LayerObject(existing?.File.Id ?? Guid.NewGuid(), existing?.Target ?? $"{moduleId}/{name}", changes));
         if (existing is not null)
         {
             await ReplaceAsync(target, bytes, cancellationToken);
@@ -192,11 +185,22 @@ internal static class StudioWrites
         return new StudioLayerOutcome(null, file, Version(bytes));
     }
 
+    // The content of a layer file, as a save writes it.
+    internal static JsonObject LayerObject(Guid id, string target, JsonObject changes) =>
+        new()
+        {
+            ["id"] = id.ToString("D"),
+            ["kind"] = "layer",
+            ["formatVersion"] = 1,
+            ["target"] = target,
+            ["changes"] = changes.DeepClone(),
+        };
+
     // A layer file with its target as written.
-    private sealed record ExistingLayer(StudioFile File, string Target);
+    internal sealed record ExistingLayer(StudioFile File, string Target);
 
     // The first layer in path order whose target names this module exactly and this resource ignoring letter case.
-    private static ExistingLayer? FindLayer(IReadOnlyList<StudioFile> files, string moduleId, string name)
+    internal static ExistingLayer? FindLayer(IReadOnlyList<StudioFile> files, string moduleId, string name)
     {
         foreach (var file in files.Where(file => file.Kind == "layer"))
         {
