@@ -1,10 +1,12 @@
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { Button, Flex, Menu, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { markOf } from '../platform/layerMarks'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { innermostCollision, silent } from './designDrag'
+import { type DesignerLayer, RemovedRows } from './LayerMarkViews'
 import { visuallyHidden } from './pagePaletteSupport'
 import { choiceLabel, type ConnectChoice, connectChoices, connectEdit } from './processConnect'
 import { buildProcessGraph, type ProcessGraphTransition, transitionName, transitionPointer } from './processGraph'
@@ -39,6 +41,10 @@ function nameAt(list: unknown[], index: number): string {
  * transition. A click, Enter or Space on an entry inserts after the selection: into the selected edge, else into the
  * `next` of the selected step, else unconnected. An `end` step is refused where it would replace a target. The live
  * region says what was added, after which step, or why nothing was.
+ *
+ * With `layer`, the designer shows a module process with the application's customization layer applied. A step the
+ * layer added or changed is marked Added or Changed on its graph node and on its card, which also has Reset to module.
+ * A step the layer removed is a muted row under the graph, marked Removed, with Reset to module.
  */
 export default function StudioProcessDesign({
   schema,
@@ -47,6 +53,7 @@ export default function StudioProcessDesign({
   selected,
   onSelect,
   onChange,
+  layer,
 }: {
   schema: JsonSchema
   draft: Record<string, unknown>
@@ -54,6 +61,7 @@ export default function StudioProcessDesign({
   selected: number | null
   onSelect: (index: number | null) => void
   onChange: ChangeHandler
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const { colour } = useDesignTokens()
@@ -69,6 +77,18 @@ export default function StudioProcessDesign({
   // The menu names steps by number, so an edit of the draft closes it.
   const pending = requested?.draft === draft ? requested : null
   const graph = useMemo(() => buildProcessGraph(draft, diagnosticPaths), [draft, diagnosticPaths])
+  const layerMarks = useMemo(() => {
+    const marks = new Map<number, 'added' | 'changed'>()
+    if (layer) {
+      graph.steps.forEach((step) => {
+        const mark = step.name ? markOf(layer.elements, '/steps', step.name) : undefined
+        if (mark === 'added' || mark === 'changed') {
+          marks.set(step.index, mark)
+        }
+      })
+    }
+    return marks
+  }, [graph, layer])
   const selectedTransition =
     edge === null ? undefined : graph.transitions.find((t) => t.path === edge && t.source === selected)
   const stepSelected = selected !== null && selected < steps.length
@@ -259,6 +279,7 @@ export default function StudioProcessDesign({
               onSelectEdge={selectEdge}
               onRemove={removeSelection}
               onConnect={connect}
+              layerMarks={layerMarks}
             />
             {pending ? (
               <div
@@ -277,6 +298,7 @@ export default function StudioProcessDesign({
                 />
               </div>
             ) : null}
+            <RemovedRows layer={layer} list="/steps" />
           </div>
           <aside style={{ width: 420, flexShrink: 0 }}>
             <Flex vertical gap="middle">
@@ -300,6 +322,7 @@ export default function StudioProcessDesign({
                     onChange={onChange}
                     onMove={(offset) => moveStep(selected, offset)}
                     onRemove={() => removeStep(selected)}
+                    layer={layer}
                   />
                 </Flex>
               ) : (

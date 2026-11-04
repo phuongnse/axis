@@ -18,6 +18,11 @@ export const entityKeyedLists: Record<string, string> = {
   '/indexes': 'name',
 }
 
+/** The keyed list of a process: its steps, each keyed by name. */
+export const processKeyedLists: Record<string, string> = {
+  '/steps': 'name',
+}
+
 /**
  * The elements that the read route's `marks` and `removed` name. Only a whole element counts, a pointer such as
  * `/fields/1`, and its key is read from `content`, the resource with the layer applied. A pointer to a property

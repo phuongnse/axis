@@ -1,5 +1,5 @@
 import type { DndContextProps } from '@dnd-kit/core'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import type { DesignerLayer } from './LayerMarkViews'
 import { paletteEntries } from './processPalette'
 import StudioProcessDesign from './StudioProcessDesign'
 
@@ -61,7 +62,7 @@ beforeAll(async () => {
 })
 
 /** Applies each change to the draft, as the Studio editor does, and records the changes and the selections. */
-function renderDesign(start: number | null) {
+function renderDesign(start: number | null, layer?: DesignerLayer) {
   const calls = { changes: [] as [string, unknown][], selected: [] as (number | null)[] }
   function Harness() {
     const [draft, setDraft] = useState<Record<string, unknown>>(initial)
@@ -74,6 +75,7 @@ function renderDesign(start: number | null) {
               schema={schema}
               draft={draft}
               diagnosticPaths={[]}
+              layer={layer}
               selected={selected}
               onSelect={(index) => {
                 calls.selected.push(index)
@@ -238,5 +240,61 @@ describe('moving a step', () => {
     expect(calls.changes).toEqual([['/steps', [submit, check, resolve, done]]])
     expect(calls.selected.at(-1)).toBe(1)
     expect(announcement()).toHaveTextContent(/^Step check moved after submit$/)
+  })
+})
+
+describe('a module process with a customization layer', () => {
+  // The first lookup waits for the graph to lay out, which is slow while other test files run.
+  const slow = { timeout: 5000 }
+
+  function renderLayered(disabled = false) {
+    const onReset = vi.fn()
+    renderDesign(2, {
+      elements: [
+        { list: '/steps', key: 'check', mark: 'changed' },
+        { list: '/steps', key: 'review', mark: 'removed' },
+      ],
+      disabled,
+      onReset,
+    })
+    return onReset
+  }
+
+  it('marks a changed step on its graph node and on its card, with Reset to module', async () => {
+    const onReset = renderLayered()
+
+    expect(await screen.findByRole('button', { name: 'check · decision · Changed' }, slow)).toBe(
+      screen.getByTestId('studio-graph-node-2'),
+    )
+    expect(screen.getByRole('button', { name: 'submit · operation' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-step-2')).getByRole('note', { name: 'Changed check' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Reset to module check' }))
+
+    expect(onReset).toHaveBeenCalledWith('/steps', 'check')
+  })
+
+  it('lists a removed step as a muted row under the graph, whose Reset to module resets that step', async () => {
+    const onReset = renderLayered()
+
+    const row = await screen.findByTestId('studio-layer-removed-/steps/review', undefined, slow)
+    expect(row).toHaveAttribute('data-muted')
+    expect(within(row).getByRole('note', { name: 'Removed review' })).toBeInTheDocument()
+    await userEvent.click(within(row).getByRole('button', { name: 'Reset to module review' }))
+
+    expect(onReset).toHaveBeenCalledWith('/steps', 'review')
+  })
+
+  it('turns Reset to module off while the draft has unsaved edits', async () => {
+    renderLayered(true)
+
+    expect(await screen.findByRole('button', { name: 'Reset to module check' }, slow)).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Reset to module review' })).toBeDisabled()
+  })
+
+  it('shows no marks when the process has no layer', async () => {
+    renderDesign(2)
+
+    expect(await screen.findByRole('button', { name: 'check · decision' }, slow)).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-layer-mark-/steps/2')).toBeNull()
   })
 })
