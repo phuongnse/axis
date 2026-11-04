@@ -224,7 +224,7 @@ export function EntityDesigner(props: EntityParts) {
         {...section('fields')}
         action={
           readOnly || fields === undefined ? undefined : (
-            <AxisButton role="secondary" onClick={addField}>
+            <AxisButton role="main" onClick={addField}>
               {t('shell.studio.entity.addField')}
             </AxisButton>
           )
