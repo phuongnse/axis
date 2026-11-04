@@ -253,8 +253,9 @@ Studio shows each module resource with the application's layer applied, and an a
 as they change any resource of their own. The [authoring API](authoring.md) reads the resource with the layer
 applied, its marks and its removed elements, its [save route](module-resource-saves.md) writes the layer, and its
 [reset route](module-resource-saves.md#element-reset) takes one element out of it. All three are built. The module entity editor
-is built, with its Customized tag, **Reset all**, the element marks and **Reset to module**. The editors of the other
-kinds are _(planned for M25)_.
+and the module process editor are built, with their Customized tag, **Reset all**, the element marks and
+**Reset to module**. The module process opens in the [process designer](process-designer.md), and
+its marks and resets are on steps. The editors of the other kinds are _(planned for M25)_.
 
 - **Editable.** The module groups list every resource of the modules the application uses, by
   `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.

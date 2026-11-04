@@ -50,7 +50,7 @@ function problem(status: number, title = 'Problem') {
   return new Response(JSON.stringify({ title }), { status, headers: { 'Content-Type': 'application/problem+json' } })
 }
 
-function renderEditor(respond: (url: string, init?: RequestInit) => Response) {
+function renderEditor(respond: (url: string, init?: RequestInit) => Response, editing: ModuleResourceItem = item) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => respond(String(input), init))
   vi.stubGlobal('fetch', fetchMock)
   const onWritten = vi.fn()
@@ -58,7 +58,7 @@ function renderEditor(respond: (url: string, init?: RequestInit) => Response) {
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
-          <StudioModuleEditor application="Leave Requests" item={item} onWritten={onWritten} />
+          <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
         </StudioConnectionContext.Provider>
       </TextProvider>
     </ThemeModeProvider>,
@@ -258,5 +258,31 @@ describe('StudioModuleEditor', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Entity name' }), 'X')
 
     expect(screen.getByRole('button', { name: 'Reset to module title' })).toBeDisabled()
+  })
+
+  it('opens a module process in the process designer with the layer applied', async () => {
+    const process = {
+      id: 'process-id',
+      kind: 'process',
+      name: 'ChecklistReview',
+      start: 'submit',
+      steps: [
+        { name: 'submit', type: 'operation', operation: 'updateRecord', set: {}, next: 'done' },
+        { name: 'done', type: 'end' },
+      ],
+    }
+    renderEditor(() => read(layer, process, [{ path: '/steps/0', mark: 'added' }]), {
+      id: 'process-id',
+      kind: 'process',
+      name: 'checklists/ChecklistReview',
+      module: 'checklists',
+    })
+
+    expect(await screen.findByTestId('studio-process-design', undefined, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByTestId('studio-module-reset-all')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-entity-designer')).toBeNull()
+    expect(
+      await screen.findByRole('button', { name: 'submit · operation · Added' }, { timeout: 5000 }),
+    ).toBeInTheDocument()
   })
 })

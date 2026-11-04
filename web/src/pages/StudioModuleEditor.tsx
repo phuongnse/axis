@@ -1,8 +1,8 @@
 import { Alert, Button, Flex, Modal, Tag } from 'antd'
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
-import { entityKeyedLists, layerMarks } from '../platform/layerMarks'
+import { entityKeyedLists, layerMarks, processKeyedLists } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   deleteStudioResource,
@@ -17,10 +17,16 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { EntityDesigner } from './EntityDesigner'
+import type { DesignerLayer } from './LayerMarkViews'
+
+const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
 
 type Content = Record<string, unknown>
+
+const noDiagnosticPaths: readonly string[] = []
 
 /** What the editor loaded: the module resource with the layer applied, and the layer when there is one. */
 interface Loaded {
@@ -31,10 +37,10 @@ interface Loaded {
 }
 
 /**
- * An editor of a module resource, for the `entity` kind now. The resource opens with the application's layer applied
+ * An editor of a module resource, for the `entity` and `process` kinds. The resource opens with the application's layer applied
  * and every input on. Save sends the whole entity to the module save route, which writes only the difference as the
  * layer. When the resource has a layer, a Customized tag and Reset all show, which delete the layer file, and the
- * designer marks the elements the layer added, changed or removed, each with Reset to module, which undoes that one
+ * entity designer or the process designer marks the elements the layer added, changed or removed, each with Reset to module, which undoes that one
  * element on the server. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
  * diagnostics after a save, a Reset all or a Reset to module, with the layer the write added to the folder's list or the
  * id of the layer it removed.
@@ -60,6 +66,8 @@ export function StudioModuleEditor({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [schema, setSchema] = useState<JsonSchema>()
+  const [selected, setSelected] = useState<number | null>(null)
 
   /** Takes a read as what was loaded. Unless `force`, a draft with unsaved edits stays. */
   function adopt(resource: StudioModuleResource, force: boolean) {
@@ -97,10 +105,29 @@ export function StudioModuleEditor({
     return () => controller.abort()
   }, [application, item.module, item.id, generation, lost])
 
+  useEffect(() => {
+    if (item.kind !== 'process') {
+      return
+    }
+    let current = true
+    loadKindSchema('process').then(
+      (loadedSchema) => current && setSchema(loadedSchema),
+      (error: unknown) => {
+        console.warn(`Loading the process schema failed`, error)
+        if (current) {
+          setLoadFailed(true)
+        }
+      },
+    )
+    return () => {
+      current = false
+    }
+  }, [item.kind])
+
   if (loadFailed) {
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
-  if (!loaded) {
+  if (!loaded || (item.kind === 'process' && !schema)) {
     return null
   }
 
@@ -249,6 +276,17 @@ export function StudioModuleEditor({
     }
   }
 
+  /** What the designer needs to mark the layer's elements, or nothing when the resource has no layer. */
+  function designerLayer(keyedLists: Record<string, string>): DesignerLayer | undefined {
+    return loaded!.layer === null
+      ? undefined
+      : {
+          elements: layerMarks(loaded!.content, loaded!.marks, loaded!.removed, keyedLists),
+          disabled: patch.length > 0 || saving || resetting || reconnecting || conflict,
+          onReset: (list, key) => void resetElement(list, key),
+        }
+  }
+
   return (
     <Flex vertical gap="middle">
       {loaded.layer !== null && (
@@ -264,19 +302,21 @@ export function StudioModuleEditor({
           </AxisButton>
         </Flex>
       )}
-      <EntityDesigner
-        value={draft}
-        onChange={change}
-        layer={
-          loaded.layer === null
-            ? undefined
-            : {
-                elements: layerMarks(loaded.content, loaded.marks, loaded.removed, entityKeyedLists),
-                disabled: patch.length > 0 || saving || resetting || reconnecting || conflict,
-                onReset: (list, key) => void resetElement(list, key),
-              }
-        }
-      />
+      {item.kind === 'process' && schema ? (
+        <Suspense fallback={null}>
+          <LazyStudioProcessDesign
+            schema={schema}
+            draft={draft}
+            diagnosticPaths={noDiagnosticPaths}
+            selected={selected}
+            onSelect={setSelected}
+            onChange={change}
+            layer={designerLayer(processKeyedLists)}
+          />
+        </Suspense>
+      ) : (
+        <EntityDesigner value={draft} onChange={change} layer={designerLayer(entityKeyedLists)} />
+      )}
       {conflict && (
         <Alert
           data-testid="studio-conflict"
