@@ -14,7 +14,9 @@ namespace Axis.Server.CellApi;
 /// plus <c>realms/&lt;Cell:OperatorRealm&gt;</c> and checks the token's issuer, signature, expiry and type. It checks no
 /// audience, because no setting names one for the operator realm and the realm serves only the cell. The roles come from
 /// Keycloak's <c>realm_access.roles</c> claim, and the route policy needs <see cref="CellOptions.OperatorRole"/> among them.
-/// A route opts in with <see cref="CellOperatorRoute"/>, and the scheme choice reads that marker, never the path. The
+/// A route opts in with <see cref="CellOperatorRoute"/>, and the scheme choice reads that marker, never the path. A route of the
+/// group also takes the session of an operator who signed in to the cell console, see <see cref="CellOperatorSession"/>: a
+/// request with a bearer token uses the token and never reads the cookie. The
 /// principal has its own claim types, so <see cref="Session.Read"/> and <see cref="EndpointCaller.Read"/> never take an
 /// operator for a session user or an endpoint caller.
 /// </summary>
@@ -32,8 +34,8 @@ internal static partial class CellOperator
     /// <summary>The claim that holds each role of the operator.</summary>
     public const string RoleClaim = "axis:operator_role";
 
-    private const string IdClaim = "axis:operator_id";
-    private const string DisplayNameClaim = "axis:operator_display_name";
+    public const string IdClaim = "axis:operator_id";
+    public const string DisplayNameClaim = "axis:operator_display_name";
 
     [LoggerMessage(LogLevel.Warning, "A bearer token was refused on a cell route: {Reason}.")]
     private static partial void TokenRefused(ILogger logger, string reason);
@@ -146,7 +148,7 @@ internal static partial class CellOperator
         context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(CellOperator).FullName!);
 
     /// <summary>The realm roles in the <c>realm_access.roles</c> claim, or none when the claim is missing or has another shape.</summary>
-    private static IEnumerable<string> RealmRoles(JsonWebToken token)
+    internal static IEnumerable<string> RealmRoles(JsonWebToken token)
     {
         if (!token.TryGetPayloadValue<JsonElement>("realm_access", out var access)
             || access.ValueKind != JsonValueKind.Object

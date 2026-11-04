@@ -13,6 +13,9 @@ public sealed class CellOptions
     /// <summary>The operator realm when <c>Cell:OperatorRealm</c> is not set.</summary>
     public const string DefaultOperatorRealm = "axis-operators";
 
+    /// <summary>The console client when <c>Cell:ConsoleClientId</c> is not set.</summary>
+    public const string DefaultConsoleClientId = "axis-cell-console";
+
     /// <summary>The operator role when <c>Cell:OperatorRole</c> is not set.</summary>
     public const string DefaultOperatorRole = "cell-operator";
 
@@ -49,6 +52,12 @@ public sealed class CellOptions
     /// </summary>
     public string OperatorRole { get; set; } = DefaultOperatorRole;
 
+    /// <summary>
+    /// The client of the operator realm that the cell console signs in with, <c>axis-cell-console</c> by default. A blank
+    /// value keeps the default. Its secret is <c>Cell:ConsoleClientSecret</c>, which only the server reads.
+    /// </summary>
+    public string ConsoleClientId { get; set; } = DefaultConsoleClientId;
+
     /// <summary>The file of the cell's backup key, which wraps each tenant's backup key.</summary>
     public string? BackupKeyFile { get; set; }
 
@@ -76,6 +85,11 @@ public sealed class CellOptions
         if (string.IsNullOrWhiteSpace(options.OperatorRole))
         {
             options.OperatorRole = DefaultOperatorRole;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.ConsoleClientId))
+        {
+            options.ConsoleClientId = DefaultConsoleClientId;
         }
 
         if (!options.IsCell)

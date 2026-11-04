@@ -2,15 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Axis.Processes.Storage;
 using Axis.Server.Tests;
-using Axis.Tenancy;
-using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -31,9 +25,6 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
     private static readonly Uri _console = new("http://console.test/");
     private static readonly Uri _tenantHost = new("http://localhost/");
-
-    private static readonly TenantSecretCipher _cipher = TenantSecretCipher.Load(
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestPlatform.SecretKey }).Build());
 
     private readonly HttpClient _http = new();
     private readonly string _realm = $"ops-{Guid.NewGuid():N}"[..16];
@@ -243,44 +234,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     private async Task<WebApplicationFactory<Program>> StartAsync()
     {
         var authority = await keycloak.StartAsync();
-        var platform = await database.CreateDatabaseAsync("cell_api_platform", CancellationToken);
-        var tenantDatabase = await database.CreateDatabaseAsync("cell_api_a", CancellationToken);
-        await using (var connection = new NpgsqlConnection(tenantDatabase))
-        {
-            await connection.OpenAsync(CancellationToken);
-            await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
-            await using var data = DataDatabaseFixture.CreateContext(connection);
-            await configuration.Database.MigrateAsync(CancellationToken);
-            await data.Database.MigrateAsync(CancellationToken);
-        }
-
-        await PostgreSqlServer.GrantRuntimeRoleAsync(tenantDatabase, CancellationToken);
-        var served = new NpgsqlConnectionStringBuilder(tenantDatabase);
-
-        await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
-        {
-            await context.Database.MigrateAsync(CancellationToken);
-
-            // Tenant b has no recorded schema version, so the server withholds it and opens no database for it.
-            context.Tenants.AddRange(
-                Tenant("a", "active", TenantSchemaVersion.Current, served, authority),
-                Tenant("b", "active", string.Empty, served, authority),
-                Tenant("c", "suspended", string.Empty, served, authority),
-                Tenant("a-preview", "suspended", string.Empty, served, authority, previewOf: "a"));
-            context.TenantHosts.AddRange(
-                new TenantHostRow { TenantId = "a", Host = "localhost" },
-                new TenantHostRow { TenantId = "b", Host = "b2.vn.example.test" },
-                new TenantHostRow { TenantId = "b", Host = "b.vn.example.test" },
-                new TenantHostRow { TenantId = "c", Host = "c.vn.example.test" },
-                new TenantHostRow { TenantId = "a-preview", Host = "a-preview.vn.example.test" });
-            await context.SaveChangesAsync(CancellationToken);
-        }
-
-        await using (var connection = new NpgsqlConnection(platform))
-        {
-            await connection.OpenAsync(CancellationToken);
-            await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, CancellationToken);
-        }
+        var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -296,29 +250,4 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());
         });
     }
-
-    private static TenantRow Tenant(
-        string id,
-        string status,
-        string schemaVersion,
-        NpgsqlConnectionStringBuilder databaseAddress,
-        Uri authority,
-        string? previewOf = null) =>
-        new()
-        {
-            Id = id,
-            Status = status,
-            SchemaVersion = schemaVersion,
-            PreviewOf = previewOf,
-            DatabaseHost = databaseAddress.Host!,
-            DatabasePort = databaseAddress.Port,
-            DatabaseName = databaseAddress.Database!,
-            RuntimeUser = PostgreSqlServer.RuntimeRole,
-            SchemaUser = PostgreSqlServer.SchemaRole,
-            RuntimePassword = _cipher.Encrypt(id, TenantSecretFields.RuntimePassword, PostgreSqlServer.RolePassword),
-            SchemaPassword = _cipher.Encrypt(id, TenantSecretFields.SchemaPassword, PostgreSqlServer.RolePassword),
-            OidcAuthority = authority.ToString(),
-            OidcClientId = KeycloakFixture.ClientId,
-            OidcClientSecret = _cipher.Encrypt(id, TenantSecretFields.OidcClientSecret, KeycloakFixture.ClientSecret),
-        };
 }
