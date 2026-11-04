@@ -147,6 +147,7 @@ public static class TenantOptionsValidator
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
-    private static bool IsValidTenantId(string tenantId) =>
+    /// <summary>Whether the id is one or more lowercase letters, digits or hyphens. <c>tenant create</c> and the create route add a length limit and a reserved name.</summary>
+    public static bool IsValidTenantId(string tenantId) =>
         tenantId.Length > 0 && tenantId.All(character => character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 }
