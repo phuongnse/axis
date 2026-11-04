@@ -8,7 +8,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { pickAction, pickOption } from '../select'
 import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab } from '../studio-resources'
+import { createResource, openFormTab, openNewApplication } from '../studio-resources'
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it.
 test.setTimeout(240_000)
@@ -67,7 +67,7 @@ test.describe('Studio builds a page with two columns', () => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await page.getByRole('button', { name: 'New application…', exact: true }).click()
+    await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     await dialog.getByRole('radio', { name: /^Request approval/ }).click()

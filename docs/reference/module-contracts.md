@@ -17,7 +17,7 @@ values of the write they check. The shared record update runs the effects of the
 The record API, a task completion, a process step, a connector or package output and a call
 resolution answer a failing effect, audit the effect records and fire the data change triggers for
 them. Each of them fails as it already fails for a lifecycle refusal and logs the named point and the record id. An inbound endpoint call only creates records, so it makes no transition and runs no effect. The filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view, Relax,
-Undo relax, the off-standard mark beside the application picker and the mark in the release history are built, see
+Undo relax, the off-standard mark beside Validate and Publish and the mark in the release history are built, see
 [in Studio](#in-studio). The rest of this page is built, except the customization layer parts _(planned for M25)_ and the parts marked _(planned for M29)_ or _(planned for M31)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
@@ -488,7 +488,7 @@ some of them as contract scenarios.
   `application.json` changed since Studio loaded it, and Studio loads it again.
 - **Mark.** The application's header and its release history show the off-standard mark while any
   entry is present. _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band), and the tag
-  stays beside a release's number. The mark beside the application picker is _(built)_. The mark in the release
+  stays beside a release's number. The mark beside Validate and Publish is _(built)_. The mark in the release
   history is _(built)_: the Off-standard tag, then the module, point and reason of each relaxed entry.
 - **Diagnostics.** A grant past a ceiling, a relax entry for an unknown point and a failing contract
   scenario show where Studio shows other diagnostics and publish results. The contract scenarios of a publish or validate,

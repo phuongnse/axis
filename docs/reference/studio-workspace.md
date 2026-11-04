@@ -6,7 +6,7 @@ band, its page headings, its Overview, its Releases list and a release's page. T
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
 [D129](../decisions/d129-rules-from-the-studio-editors-review.md) and
-[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications section is built. The rest of this page is _(planned for M31)_.
+[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications and Workspace sections are built. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
