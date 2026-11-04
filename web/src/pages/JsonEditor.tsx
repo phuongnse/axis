@@ -239,7 +239,7 @@ export function JsonEditor({
   return <div ref={hostRef} data-testid="studio-json-editor" />
 }
 
-function editorTheme({ colour, radius, type }: ReturnType<typeof designTokensFor>, mode: 'light' | 'dark') {
+function editorTheme({ colour, radius, spacing, type }: ReturnType<typeof designTokensFor>, mode: 'light' | 'dark') {
   return [
     EditorView.theme(
       {
@@ -255,7 +255,10 @@ function editorTheme({ colour, radius, type }: ReturnType<typeof designTokensFor
           fontSize: `${type.fontSize}px`,
         },
         '&.cm-focused': { outline: `2px solid ${colour.focusRing}` },
-        '.cm-content': { caretColor: colour.text },
+        // Proposed: the text keeps spacing-sm from the border on every side. CodeMirror moves the gutter down with the content.
+        '.cm-content': { caretColor: colour.text, paddingBlock: `${spacing.sm}px` },
+        '.cm-line': { paddingInline: `${spacing.sm}px` },
+        '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px ${spacing.xs}px` },
         '.cm-scroller': { fontFamily: 'inherit', overflow: 'auto' },
         '.cm-gutters': {
           backgroundColor: colour.surface,
