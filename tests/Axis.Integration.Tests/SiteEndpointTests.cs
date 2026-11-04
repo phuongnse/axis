@@ -72,12 +72,40 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     }
 
     [Fact]
+    public async Task Single_site_gives_its_own_links_or_its_tenants_and_null_when_neither_sets_any()
+    {
+        using var recordsInA = await GetJsonAsync("/api/sites/records", HostA);
+        using var secondInA = await GetJsonAsync("/api/sites/second", HostA);
+        using var recordsInB = await GetJsonAsync("/api/sites/records", HostB);
+
+        var records = recordsInA.RootElement.GetProperty("legal");
+        Assert.Equal("https://a.example.test/privacy", records.GetProperty("privacyUrl").GetString());
+        Assert.Equal("https://a.example.test/terms", records.GetProperty("termsUrl").GetString());
+        var second = secondInA.RootElement.GetProperty("legal");
+        Assert.Equal("https://a.example.test/second-privacy", second.GetProperty("privacyUrl").GetString());
+        Assert.Equal(JsonValueKind.Null, second.GetProperty("termsUrl").ValueKind);
+        Assert.Equal(JsonValueKind.Null, recordsInB.RootElement.GetProperty("legal").ValueKind);
+    }
+
+    [Fact]
+    public async Task Platform_site_gives_the_links_of_the_tenant_and_null_when_it_sets_none()
+    {
+        using var siteInA = await GetJsonAsync("/api/site", HostA);
+        using var siteInB = await GetJsonAsync("/api/site", HostB);
+
+        var legal = siteInA.RootElement.GetProperty("legal");
+        Assert.Equal("https://a.example.test/privacy", legal.GetProperty("privacyUrl").GetString());
+        Assert.Equal("https://a.example.test/terms", legal.GetProperty("termsUrl").GetString());
+        Assert.Equal(JsonValueKind.Null, siteInB.RootElement.GetProperty("legal").ValueKind);
+    }
+
+    [Fact]
     public async Task Site_returns_its_title_locales_and_navigation_matching_the_path_ignoring_letter_case()
     {
         using var site = await GetJsonAsync("/api/sites/RECORDS", HostA);
 
         var root = site.RootElement;
-        Assert.Equal(["path", "titleKey", "locales", "navigation", "notificationsPath"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["path", "titleKey", "locales", "navigation", "notificationsPath", "legal"], root.EnumerateObject().Select(property => property.Name));
         Assert.Equal("records", root.GetProperty("path").GetString());
         Assert.Equal("site.title", root.GetProperty("titleKey").GetString());
         var locales = root.GetProperty("locales");

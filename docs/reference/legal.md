@@ -18,7 +18,8 @@ lists the licences of what Axis ships, and the step where a person accepts the t
   [tenancy settings](host-settings.md#tenancy-settings).
 - **Where they show.** `GET /api/sites` gives each site's `legal`, written `{ "privacyUrl", "termsUrl" }`: its own
   addresses when it sets either, else its tenant's, and `null` when neither sets any. A site that sets either address
-  uses only its own pair. The platform site, the home page and Studio take the tenant's _(planned for M31)_. The realm
+  uses only its own pair. The platform site, the home page and Studio take the tenant's: `GET /api/site` gives the
+  tenant's `legal`, and `GET /api/sites/{path}` gives a site's `legal` by the same rule as the list. The realm
   sync writes the identity provider's copy on each client, see
   [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step):
   `axis.privacyUrl` and `axis.termsUrl` (the site's, or else the tenant's), `axis.licencesUrl` (`/licences` on the
@@ -28,7 +29,7 @@ lists the licences of what Axis ships, and the step where a person accepts the t
 ## Legal line
 
 - **One line in two places.** Every page of the identity provider ends in it, under the card and as wide as the card,
-  and so does the shell's footer _(planned for M31)_, see [layout](shell.md#layout).
+  and so does the shell's footer, see [layout](shell.md#layout).
 - **Copyright at the start, links at the end.** The line starts with the copyright in `textMuted`. At its end sit the
   links, in `primaryText` as links: Privacy and Terms when the site or its tenant sets them, then Licences, always. At
   narrow width the links wrap and stay at the end. The links sit in a navigation landmark named Legal.

@@ -261,6 +261,15 @@ test('the footer shows the version only to a signed-in person', async ({ page })
   await expect(page.getByRole('contentinfo')).toContainText(new RegExp(`© ${year} Axis · v\\S+`))
 })
 
+test('the footer ends with the Legal landmark that holds a Licences link', async ({ page }) => {
+  await page.goto('/?signedOut')
+
+  const footer = page.getByRole('contentinfo')
+  await expect(footer).toContainText(`© ${new Date().getFullYear()} Axis`)
+  const legal = footer.getByRole('navigation', { name: 'Legal', exact: true })
+  await expect(legal.getByRole('link', { name: 'Licences', exact: true })).toHaveAttribute('href', '/licences')
+})
+
 test('the readiness endpoint reports healthy', async ({ request }) => {
   const response = await request.get('/health/ready')
 
