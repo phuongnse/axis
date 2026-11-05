@@ -17,6 +17,8 @@ like the author and the operator roles.
   a person who holds the role, after Studio and the operator console, see
   [app switcher and preferences](shell.md#app-switcher-and-preferences). `GET /api/me` adds a boolean `users`.
 - **Application policies play no part.** The role gives the users page and nothing in an application.
+- **The control plane reads it.** `GET /api/cell/tenants/{id}/administrators` lists the enabled holders with an email, see
+  [routes](tenant-lifecycle.md#routes).
 
 ## The users page
 

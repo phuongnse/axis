@@ -1,3 +1,4 @@
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -17,3 +18,9 @@ internal sealed record CellPlatformWriter(string SchemaConnectionString)
             .UseNpgsql(new NpgsqlConnectionStringBuilder(SchemaConnectionString) { Pooling = false }.ConnectionString)
             .Options);
 }
+
+/// <summary>
+/// The settings that open a tenant's database from its directory row, for a route that must answer for a tenant the server's tenant
+/// catalog leaves out, such as a suspended one: the TLS settings of the platform connection and the runtime address, if any.
+/// </summary>
+internal sealed record CellTenantDatabases(TenantDatabaseTls Tls, TenantRuntimeAddress? Address);
