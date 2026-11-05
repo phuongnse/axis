@@ -171,7 +171,10 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
 ## Usage
 
 - **Sampling.** A worker job in a cell samples each tenant's storage every hour. It keeps the
-  newest sample in `platform.tenant_usage_latest`, which the storage check reads. A worker with no
+  newest sample in `platform.tenant_usage_latest`, which the storage check reads. The same pass counts
+  the tenant's failed instances, its calls with an unknown outcome and its open dead letters, the
+  failed work that its [operator console](operator-console.md) lists, and stores the three counts in that row.
+  The provisioning API answers them as `failedWork`. A worker with no
   `Cell:Id` measures nothing and writes no usage row. The same hourly pass brings the deny step of
   each tenant with realm details in step with its `users` quota. A tenant without realm details, such as
   a preview tenant, is skipped. A failure for one tenant is logged as a warning that names it, and the pass

@@ -820,13 +820,25 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("database_bytes");
 
+                    b.Property<long?>("FailedInstances")
+                        .HasColumnType("bigint")
+                        .HasColumnName("failed_instances");
+
                     b.Property<long>("FileBytes")
                         .HasColumnType("bigint")
                         .HasColumnName("file_bytes");
 
+                    b.Property<long?>("OpenDeadLetters")
+                        .HasColumnType("bigint")
+                        .HasColumnName("open_dead_letters");
+
                     b.Property<DateTimeOffset>("SampledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sampled_at");
+
+                    b.Property<long?>("UnknownCalls")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unknown_calls");
 
                     b.HasKey("TenantId")
                         .HasName("pk_tenant_usage_latest");
@@ -835,7 +847,13 @@ namespace Axis.Tenancy.Platform.Migrations
                         {
                             t.HasCheckConstraint("ck_tenant_usage_latest_database_bytes", "database_bytes >= 0");
 
+                            t.HasCheckConstraint("ck_tenant_usage_latest_failed_instances", "failed_instances IS NULL OR failed_instances >= 0");
+
                             t.HasCheckConstraint("ck_tenant_usage_latest_file_bytes", "file_bytes >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_latest_open_dead_letters", "open_dead_letters IS NULL OR open_dead_letters >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_usage_latest_unknown_calls", "unknown_calls IS NULL OR unknown_calls >= 0");
                         });
                 });
 

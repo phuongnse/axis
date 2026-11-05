@@ -125,6 +125,114 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_list_and_the_detail_answer_the_failed_work_counts_of_the_last_sample_and_null_for_a_tenant_without_one()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, failed_instances, unknown_calls, open_dead_letters, sampled_at)
+            VALUES ('a', 1, 1, 1, 1, 1, now())
+            """);
+
+        using var list = await GetAsync(client, "/api/cell/tenants", token);
+        using var sampled = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var unsampled = await GetAsync(client, "/api/cell/tenants/b", token);
+
+        var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.Equal((1, 1, 1), FailedWork(items[0]));
+        Assert.Null(FailedWork(items[1]));
+        Assert.Null(FailedWork(items[2]));
+        Assert.Equal((1, 1, 1), FailedWork(await sampled.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)));
+        Assert.Null(FailedWork(await unsampled.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)));
+    }
+
+    [Fact]
+    public async Task A_row_written_before_the_counts_existed_answers_null_failed_work()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, sampled_at) VALUES ('a', 1, 1, now())");
+
+        using var response = await GetAsync(client, "/api/cell/tenants/a", token);
+
+        Assert.Null(FailedWork(await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)));
+    }
+
+    [Fact]
+    public async Task Every_field_of_the_list_and_the_detail_is_on_the_allowed_list_and_holds_no_secret_binding_or_tenant_user()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        const string bindingUrl = "https://marker-binding.example.test/reports";
+        const string userName = "Marker Person";
+        const string userEmail = "marker.person@example.test";
+        await ExecuteAsync(
+            $"""
+            INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, failed_instances, unknown_calls, open_dead_letters, sampled_at)
+            VALUES ('a', 1, 1, 1, 1, 1, now());
+            INSERT INTO platform.tenant_bindings (tenant_id, name, kind, url) VALUES ('a', 'ReportsUrl', 'url', '{bindingUrl}')
+            """);
+        var tenantDatabase = new NpgsqlConnectionStringBuilder(_platform)
+        {
+            Database = (string)(await ScalarAsync("SELECT database_name FROM platform.tenants WHERE id = 'a'"))!,
+        }.ConnectionString;
+        await PostgreSqlServer.AdminScalarAsync(
+            tenantDatabase,
+            $"""
+            INSERT INTO axis.user_profiles (user_id, display_name, email, locale, first_signed_in_at, last_signed_in_at)
+            VALUES ('marker-user', '{userName}', '{userEmail}', 'en', now(), now())
+            """,
+            CancellationToken);
+        var forbidden = new List<string> { PostgreSqlServer.RolePassword, KeycloakFixture.ClientSecret, ClientSecret, bindingUrl, userName, userEmail };
+        await using (var connection = new NpgsqlConnection(_platform))
+        {
+            await connection.OpenAsync(CancellationToken);
+            await using var command = new NpgsqlCommand(
+                "SELECT runtime_password, schema_password, oidc_client_secret FROM platform.tenants WHERE id IN ('a', 'b', 'c')",
+                connection);
+            await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+            while (await reader.ReadAsync(CancellationToken))
+            {
+                for (var column = 0; column < 3; column++)
+                {
+                    var stored = (byte[])reader.GetValue(column);
+                    forbidden.Add(Convert.ToBase64String(stored));
+                    forbidden.Add(Convert.ToHexString(stored));
+                }
+            }
+        }
+
+        using var list = await GetAsync(client, "/api/cell/tenants", token);
+        using var detail = await GetAsync(client, "/api/cell/tenants/a", token);
+
+        string[] failedWork = ["failedWork.instances", "failedWork.unknownCalls", "failedWork.deadLetters", "failedWork"];
+        string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork];
+        AssertFields(
+            await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
+            [.. tenantFields.Select(field => $"items[].{field}")],
+            forbidden);
+        AssertFields(
+            await detail.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
+            [.. tenantFields, "quotas.*.value", "quotas.*.overridden"],
+            forbidden);
+    }
+
+    [Fact]
+    public void The_field_walk_fails_on_a_field_outside_the_allowed_list_and_on_a_planted_value()
+    {
+        var tenant = JsonSerializer.Deserialize<JsonElement>("""{ "id": "a", "hosts": ["localhost"], "extra": 1 }""");
+        var planted = JsonSerializer.Deserialize<JsonElement>("""{ "id": "a", "hosts": ["a.example.test", "x-planted-secret-x"] }""");
+
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertFields(tenant, ["id", "hosts[]"], []));
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertFields(planted, ["id", "hosts[]"], ["planted-secret"]));
+        AssertFields(planted, ["id", "hosts[]"], ["not-planted"]);
+    }
+
+    [Fact]
     public async Task The_list_leaves_out_a_preview_tenant_and_an_unknown_or_preview_id_answers_404()
     {
         await using var factory = await StartAsync();
@@ -1466,6 +1574,57 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         }
 
         return await client.SendAsync(request, CancellationToken);
+    }
+
+    // Every leaf of the response is on the allowed paths, and no string leaf equals or contains a forbidden value. A path names
+    // the properties down to the leaf, an array as [] and the key of a quota as *. A null failedWork is a leaf of its own.
+    private static void AssertFields(JsonElement response, IReadOnlyCollection<string> allowed, IReadOnlyCollection<string> forbidden)
+    {
+        var leaves = new List<(string Path, JsonElement Value)>();
+        Walk(response, "", leaves);
+        Assert.NotEmpty(leaves);
+        foreach (var (path, value) in leaves)
+        {
+            Assert.Contains(path, allowed);
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                var text = value.GetString()!;
+                Assert.DoesNotContain(forbidden, secret => text.Contains(secret, StringComparison.Ordinal));
+            }
+        }
+
+        static void Walk(JsonElement element, string path, List<(string, JsonElement)> leaves)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        var name = path == "quotas" ? "*" : property.Name;
+                        Walk(property.Value, path.Length == 0 ? name : $"{path}.{name}", leaves);
+                    }
+
+                    break;
+                case JsonValueKind.Array:
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        Walk(item, $"{path}[]", leaves);
+                    }
+
+                    break;
+                default:
+                    leaves.Add((path, element));
+                    break;
+            }
+        }
+    }
+
+    private static (long Instances, long UnknownCalls, long DeadLetters)? FailedWork(JsonElement tenant)
+    {
+        var counts = tenant.GetProperty("failedWork");
+        return counts.ValueKind == JsonValueKind.Null
+            ? null
+            : (counts.GetProperty("instances").GetInt64(), counts.GetProperty("unknownCalls").GetInt64(), counts.GetProperty("deadLetters").GetInt64());
     }
 
     private static string[] Hosts(JsonElement tenant) =>

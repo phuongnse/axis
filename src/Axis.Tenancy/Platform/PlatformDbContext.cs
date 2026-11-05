@@ -305,11 +305,17 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             {
                 table.HasCheckConstraint("ck_tenant_usage_latest_database_bytes", "database_bytes >= 0");
                 table.HasCheckConstraint("ck_tenant_usage_latest_file_bytes", "file_bytes >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_latest_failed_instances", "failed_instances IS NULL OR failed_instances >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_latest_unknown_calls", "unknown_calls IS NULL OR unknown_calls >= 0");
+                table.HasCheckConstraint("ck_tenant_usage_latest_open_dead_letters", "open_dead_letters IS NULL OR open_dead_letters >= 0");
             });
             usage.HasKey(u => u.TenantId).HasName("pk_tenant_usage_latest");
             usage.Property(u => u.TenantId).HasColumnName("tenant_id");
             usage.Property(u => u.DatabaseBytes).HasColumnName("database_bytes").HasColumnType("bigint");
             usage.Property(u => u.FileBytes).HasColumnName("file_bytes").HasColumnType("bigint");
+            usage.Property(u => u.FailedInstances).HasColumnName("failed_instances").HasColumnType("bigint");
+            usage.Property(u => u.UnknownCalls).HasColumnName("unknown_calls").HasColumnType("bigint");
+            usage.Property(u => u.OpenDeadLetters).HasColumnName("open_dead_letters").HasColumnType("bigint");
             usage.Property(u => u.SampledAt).HasColumnName("sampled_at").HasColumnType("timestamp with time zone");
         });
 

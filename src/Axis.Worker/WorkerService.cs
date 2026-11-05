@@ -44,8 +44,8 @@ namespace Axis.Worker;
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
 /// Once a tenant is ready, the poll also deletes its expired sessions and sweeps its deleted and abandoned files,
 /// and clears the files of its imports uploaded more than 24 hours ago, each at most every five minutes by its own clock,
-/// and deletes its old in-app notifications every 24 hours. In a cell it also measures the storage of each ready tenant every
-/// hour and records the sample in the platform database as the tenant's usage, and brings the users quota step of the tenant's realm in step
+/// and deletes its old in-app notifications every 24 hours. In a cell it also measures the storage of each ready tenant and counts its failed work every
+/// hour and records both in the platform database as the tenant's usage, and brings the users quota step of the tenant's realm in step
 /// with its <c>users</c> quota. That housekeeping is outside the rounds.
 /// </summary>
 internal sealed partial class WorkerService(
@@ -754,7 +754,7 @@ internal sealed partial class WorkerService(
     }
 
     /// <summary>
-    /// In a cell, at most once per hour, measures the storage of the tenant database and records the sample in the platform database,
+    /// In a cell, at most once per hour, measures the storage of the tenant database and counts its failed work, and records both in the platform database,
     /// then brings the users quota step of the tenant's realm in step with its <c>users</c> quota. The time comes from the worker's clock.
     /// A failure of either part is logged and does not hold back the other part or the work items. Self-hosted installations do neither.
     /// </summary>
@@ -777,12 +777,14 @@ internal sealed partial class WorkerService(
         try
         {
             TenantStorageSample sample;
+            TenantFailedWorkCounts failedWork;
             await using (var connection = await connections.OpenConnectionAsync(cancellationToken))
             {
                 sample = await TenantStorageSample.ReadAsync(connection, cancellationToken);
+                failedWork = await FailedWorkQueries.CountAsync(connection, cancellationToken);
             }
 
-            await store.RecordSampleAsync(tenantId, sample.DatabaseBytes, sample.FileBytes, now, cancellationToken);
+            await store.RecordSampleAsync(tenantId, sample.DatabaseBytes, sample.FileBytes, failedWork, now, cancellationToken);
             LogUsageSampled(sample.DatabaseBytes, sample.FileBytes, tenantId);
         }
         catch (NpgsqlException exception)

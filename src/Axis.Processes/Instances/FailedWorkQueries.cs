@@ -1,3 +1,4 @@
+using Axis.Tenancy.Platform;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -7,7 +8,8 @@ namespace Axis.Processes.Instances;
 /// Reads the failed work of a tenant over a connection to its database, for the operator console: the
 /// instances that are <c>failed</c>, and the connector and package calls whose outcome is <c>unknown</c>,
 /// across every process of every application. An item never carries a call input, a history input or output,
-/// or a record value.
+/// or a record value. It also counts the failed work of a tenant for the cell's usage sample, with the same definition
+/// of failed work plus the dead letters in the <c>open</c> state.
 /// </summary>
 public static class FailedWorkQueries
 {
@@ -47,6 +49,30 @@ public static class FailedWorkQueries
         """;
 
     private const string ApplicationFilter = "WHERE (@application::uuid IS NULL OR application_id = @application)";
+
+    /// <summary>
+    /// Counts the failed instances, the calls with an unknown outcome and the open dead letters of the tenant. The first
+    /// two counts together are the total of <see cref="ListAsync"/> without an application.
+    /// </summary>
+    public static async Task<TenantFailedWorkCounts> CountAsync(NpgsqlConnection connection, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            $"""
+            {WorkSql}
+            SELECT count(*) FILTER (WHERE kind = 'instance'),
+                   count(*) FILTER (WHERE kind <> 'instance'),
+                   (SELECT count(*) FROM axis.dead_letters WHERE state = @open)
+            FROM work
+            """,
+            connection);
+        AddParameters(command, null);
+        command.Parameters.AddWithValue("open", DeadLetters.Open);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return new TenantFailedWorkCounts(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2));
+    }
 
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> items of failed work, newest first, and
