@@ -1,5 +1,5 @@
 import { Select, Tag } from 'antd'
-import { asChoice, choiceNames, type ReferenceChoice, type ReferenceOption } from '../platform/studioNames'
+import { asChoice, choiceNames, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useTextOfKey } from './useTextOfKey'
@@ -34,8 +34,17 @@ export function ReferencePicker({
   const { colour, spacing } = useDesignTokens()
   const current = value === undefined || value === '' ? undefined : value
   const names = choiceNames(options)
-  const all = options.map(asChoice)
-  const labelOf = (option: ReferenceChoice) => textOfKey(option.labelKey)
+  // Each choice's label is read once, and counted, so the name shows beside a label that more than one choice has.
+  const all = options.map((option) => {
+    const choice = asChoice(option)
+    return { ...choice, text: textOfKey(choice.labelKey) }
+  })
+  const uses = new Map<string, number>()
+  for (const { text } of all) {
+    if (text !== null) {
+      uses.set(text, (uses.get(text) ?? 0) + 1)
+    }
+  }
   const match =
     current === undefined ? undefined : names.find((option) => option.toLowerCase() === current.toLowerCase())
   const choices = [
@@ -52,9 +61,8 @@ export function ReferencePicker({
         ]
       : []),
     ...all.map((option) => {
-      const text = labelOf(option)
-      // The name shows beside the label only where the label alone would leave two options alike.
-      const alike = text !== null && all.some((other) => other !== option && labelOf(other) === text)
+      const text = option.text
+      const alike = text !== null && (uses.get(text) ?? 0) > 1
       return {
         value: option.name,
         search: text ? `${text} ${option.name}` : option.name,

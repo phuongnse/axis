@@ -1061,7 +1061,7 @@ export function relaxedPointWords(
   locale: string,
   t: (key: string) => string,
 ): { module: string; title: string; kind: string | null } {
-  const pick = (titles: Record<string, string> | null | undefined) => titles?.[locale] ?? titles?.en
+  const pick = (titles: Record<string, string> | null | undefined) => textIn(titles, locale)
   const segments = point.point.split('/')
   const entity = pick(point.entityTitles) ?? segments[0]
   const title =
@@ -1447,9 +1447,16 @@ export function resourceTitle(
   if (typeof item.locale === 'string' && item.locale !== '' && (item.kind === undefined || item.kind === 'text')) {
     return languageName(item.locale, locale)
   }
-  const titles = item.titles ?? {}
   // A file name shows only where the caller has no kind to name the resource by, such as a file the live release removed.
-  return titles[locale] ?? titles.en ?? item.name ?? (t && item.kind ? kindSingular(item.kind, t) : (item.file ?? ''))
+  return textIn(item.titles, locale) ?? item.name ?? (t && item.kind ? kindSingular(item.kind, t) : (item.file ?? ''))
+}
+
+/**
+ * The text of a label or title, given by locale, as Studio shows it: in `locale`, else in `en`, else `undefined`. A
+ * resource's title, a picker's choice and a relaxed point all take it, so one label never reads two ways.
+ */
+export function textIn(texts: Record<string, string> | null | undefined, locale: string): string | undefined {
+  return texts?.[locale] ?? texts?.en
 }
 
 function languageName(tag: string, locale: string): string {

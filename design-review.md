@@ -17,17 +17,19 @@ After a merge, run the type check, lint, and the tests of the shared widgets, an
 
 ## State and how to continue
 
-Last updated 2026-11-05 (merged `main` at fd1bf541; Display field names fields by label). The review is open; the owner is reviewing it one step at a time.
+Last updated 2026-11-05 (merged `main` at 7d171005; one action row; one language rule for labels). The review is open; the
+owner is reviewing it one step at a time.
 
-- **Done:** the kind lists (one table, standard table steps 1 to 3, a table with too little room); the entity designer's
-  sections, `AxisField` with required help, the required mark, the Publish dialog's fields, the relaxed points in the Modules
-  table, and step 2, the field drawer in groups with the rules at the field. The last commit before this note is 09b31849.
+- **Done:** the kind lists (one table, standard table steps 1 to 3, a table with too little room); the band (too little
+  room, its actions); the entity designer's sections, `AxisField` with required help, the required mark, the Publish
+  dialog's fields, the relaxed points in the Modules table, step 2, the field drawer in groups with the rules at the field;
+  and "A picker names by the label" for every `ReferencePicker`.
 - **Waiting:** the owner's verdict on step 2, the field drawer.
 - **Next, in order:**
   1. Step 3: Add field opens a choice of type first, a grid of the types, each with an icon and one line, then the drawer.
   2. Step 4: the entity's Validations section as `AxisField` boxes like the drawer's rules, with a Field column or label,
      and Indexes the same way.
-  3. The rule "A picker names by the label" is built for every `ReferencePicker`. Left: the multi-choice of fields in Indexes.
+  3. "A picker names by the label", left: the multi-choice of fields in Indexes.
   4. Then the review's End, as the `axis-design` skill says: one docs change, the tag, one NexKit issue.
 - **To pick it up on another machine:**
   - `git fetch && git switch design/2026-11-04-entities`, then `scripts/setup.sh` once and `scripts/dev.sh`.
@@ -118,6 +120,14 @@ Last updated 2026-11-05 (merged `main` at fd1bf541; Display field names fields b
 - **Built:** the band measures itself. When its actions do not fit, Validate, Preview and Run tests fold into one "…" menu, in
   that order, and New resource… and Publish… stay. They unfold when the room comes back.
 
+### The band's actions
+
+- **Asked:** the band's actions are one row of the same kind of button, whoever the author is.
+- **Built:** New resource…, Validate, Preview and Run tests are text buttons, `AxisButton` in an `AxisActionRow`, the same gap
+  apart, and Publish… is the one solid button. The row is the same with or without Publish…, for an author who may not
+  publish. The folded "…" is `AxisButton`'s `icon` role. The row does not wrap (`AxisActionRow`'s `wrap`, Proposed), so the
+  band can measure whether it fits.
+
 ### The entity designer, step by step
 
 - **Asked:** the entity designer rendered every setting of every field inside its table row, so a field of many settings
@@ -195,6 +205,11 @@ Last updated 2026-11-05 (merged `main` at fd1bf541; Display field names fields b
   field, process, step, data source, rule, connector, event, role, page, policy and the module resources), in
   `DefinedNames`. `referenceOptions` gives each choice as `{ name, labelKey }`, and `ReferencePicker` resolves the key
   through `useTextOfKey`, the one way Studio turns a text key into words, which the entity designer's label text uses too.
+  A module's label resolves too, as the names route's texts hold the module texts merged into the application's.
+- **One language rule:** a label shows in the author's language, else in `en`, as a resource's title does (`resourceTitle`).
+  `textIn` in `platform/studio.ts` is that rule, and `resourceTitle`, `useTextOfKey` and a relaxed point's words take it, so
+  a table and a picker never name one resource two ways. The label editor's own rule, a box in the author's language or else
+  the application's first, is about which language is edited and stays as it is.
   Every picker gets the rule with no change of its own, and the slot pickers of `SchemaForm` use `ReferencePicker` again in
   place of their own labelled select.
 - **For the issue:** the names route gains `labelKey`, so `docs/reference` for the route says so. A choice the picker is given
@@ -208,7 +223,9 @@ concern has one mechanism" says. Found by reading, not yet run.
 1. Name of a kind: `platform/studioKinds.ts` (`kindName`, `kindSingular`) against `pages/studioViews.ts` (`kindName`, other
    text keys) and `kindLabel` in `StudioPage.tsx`.
 2. A localized title with its fallback: `localized()` in `platform/site.ts` against the copies in `platform/studio.ts` and
-   `SchemaForm.tsx`, which fall back differently (first locale, or `en`).
+   `SchemaForm.tsx`, which fall back differently (first locale, or `en`). Studio's labels and resource titles now take one,
+   `textIn` (see "A picker names by the label"); the application's title and description, and the site's, still fall back
+   to the first locale.
 3. Sorting names: `nameCollator` in `pages/studioViews.ts` against inline collators and bare `localeCompare` calls. It moves
    to `platform/`.
 4. The label of an option: done in this review, see "A picker names by the label". `StudioResourceTitle` stays for the

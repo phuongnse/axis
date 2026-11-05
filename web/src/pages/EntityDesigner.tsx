@@ -269,7 +269,7 @@ export function EntityDesigner(props: EntityParts) {
   return readOnly ? <ConfigProvider componentDisabled>{designer}</ConfigProvider> : designer
 }
 
-/** The text of a label or description in the interface's language, else in the folder's first, else its text key. */
+/** The text of a label or description as `useTextOfKey` gives it, else its text key. */
 function useLabelText(): (value: unknown) => string | null {
   const textOfKey = useTextOfKey()
   return (value) => {
