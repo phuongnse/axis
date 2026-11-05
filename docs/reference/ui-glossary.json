@@ -1,0 +1,639 @@
+{
+  "$comment": "The terms Axis's own screens use for each concept, by locale. See docs/reference/ui-writing.md. status: approved, proposed or decide.",
+  "locales": [
+    "en",
+    "vi"
+  ],
+  "keep": {
+    "names": [
+      "API",
+      "AXC codes such as AXC0035",
+      "Axis",
+      "CSV",
+      "HTML",
+      "ID",
+      "JSON",
+      "names an author gave",
+      "PDF",
+      "PIN",
+      "placeholders such as {count}",
+      "Studio",
+      "TOTP",
+      "URL",
+      "XLSX",
+      "ZIP"
+    ],
+    "integration": [
+      "webhook",
+      "endpoint",
+      "tenant",
+      "token",
+      "API key"
+    ],
+    "$comment": "names never change in any locale. integration terms stay in English and show only on integration and operator screens."
+  },
+  "terms": [
+    {
+      "concept": "Application",
+      "en": "application",
+      "vi": "ứng dụng",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "app"
+        ]
+      }
+    },
+    {
+      "concept": "Resource",
+      "en": "resource",
+      "vi": "tài nguyên",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "resource"
+        ]
+      }
+    },
+    {
+      "concept": "Module",
+      "en": "module",
+      "vi": "mô-đun",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "module",
+          "môđun"
+        ]
+      }
+    },
+    {
+      "concept": "Built-in module",
+      "en": "built-in module",
+      "vi": "mô-đun có sẵn",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "mô-đun tích hợp"
+        ]
+      }
+    },
+    {
+      "concept": "Module contract",
+      "en": "contract",
+      "vi": "cam kết",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "contract",
+          "hợp đồng"
+        ]
+      },
+      "note": "What a module promises the application."
+    },
+    {
+      "concept": "Customization layer",
+      "en": "layer",
+      "vi": "lớp tùy biến",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "layer"
+        ]
+      }
+    },
+    {
+      "concept": "Release",
+      "en": "release",
+      "vi": "phiên bản",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "release",
+          "bản phát hành"
+        ]
+      }
+    },
+    {
+      "concept": "Publish (action)",
+      "en": "Publish",
+      "vi": "Phát hành",
+      "status": "approved",
+      "note": "The verb that makes a release: \"Phát hành…\" makes \"phiên bản\".",
+      "avoid": {
+        "vi": [
+          "Xuất bản"
+        ]
+      }
+    },
+    {
+      "concept": "Activate (a release)",
+      "en": "Activate",
+      "vi": "Kích hoạt",
+      "status": "approved"
+    },
+    {
+      "concept": "Live (release)",
+      "en": "Live",
+      "vi": "Đang chạy",
+      "status": "approved"
+    },
+    {
+      "concept": "Diagnostic",
+      "en": "problem",
+      "vi": "vấn đề",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "chẩn đoán",
+          "diagnostic"
+        ]
+      },
+      "note": "A diagnostic is an error or a warning: \"lỗi\" and \"cảnh báo\"."
+    },
+    {
+      "concept": "Studio",
+      "en": "Studio",
+      "vi": "Studio",
+      "status": "approved",
+      "note": "A product name, kept."
+    },
+    {
+      "concept": "Entity",
+      "en": "entity",
+      "vi": "đối tượng",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "entity",
+          "thực thể"
+        ]
+      },
+      "note": "The definition of a kind of record, such as Purchase request. \"bảng\" names the table widget."
+    },
+    {
+      "concept": "Field",
+      "en": "field",
+      "vi": "trường",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "field"
+        ]
+      }
+    },
+    {
+      "concept": "Record",
+      "en": "record",
+      "vi": "bản ghi",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "record"
+        ]
+      }
+    },
+    {
+      "concept": "Display field",
+      "en": "display field",
+      "vi": "trường hiển thị",
+      "status": "approved"
+    },
+    {
+      "concept": "Data source",
+      "en": "data source",
+      "vi": "nguồn dữ liệu",
+      "status": "approved"
+    },
+    {
+      "concept": "Sequence",
+      "en": "sequence",
+      "vi": "dãy số",
+      "status": "approved"
+    },
+    {
+      "concept": "Seed data",
+      "en": "seed data",
+      "vi": "dữ liệu ban đầu",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "dữ liệu mẫu"
+        ]
+      },
+      "note": "Seed data is the data an application starts with, not sample data."
+    },
+    {
+      "concept": "Migration",
+      "en": "migration",
+      "vi": "di chuyển dữ liệu",
+      "status": "approved"
+    },
+    {
+      "concept": "Enum (field type)",
+      "en": "Enum",
+      "vi": "Lựa chọn",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "enum",
+          "danh sách chọn"
+        ]
+      }
+    },
+    {
+      "concept": "Reference (field type)",
+      "en": "Reference",
+      "vi": "Tham chiếu",
+      "status": "approved"
+    },
+    {
+      "concept": "Child collection (field type)",
+      "en": "Child collection",
+      "vi": "Bảng con",
+      "status": "approved"
+    },
+    {
+      "concept": "Required",
+      "en": "Required",
+      "vi": "Bắt buộc",
+      "status": "approved"
+    },
+    {
+      "concept": "Unique",
+      "en": "Unique",
+      "vi": "Không trùng",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "unique",
+          "duy nhất"
+        ]
+      }
+    },
+    {
+      "concept": "Sensitive",
+      "en": "Sensitive",
+      "vi": "Nhạy cảm",
+      "status": "approved"
+    },
+    {
+      "concept": "Computed",
+      "en": "Computed",
+      "vi": "Tính toán",
+      "status": "approved"
+    },
+    {
+      "concept": "Label",
+      "en": "label",
+      "vi": "nhãn",
+      "status": "approved"
+    },
+    {
+      "concept": "Help text",
+      "en": "help text",
+      "vi": "hướng dẫn",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "văn bản trợ giúp"
+        ]
+      }
+    },
+    {
+      "concept": "Expression",
+      "en": "expression",
+      "vi": "biểu thức",
+      "status": "approved"
+    },
+    {
+      "concept": "Rule",
+      "en": "rule",
+      "vi": "quy tắc",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "rule"
+        ]
+      },
+      "note": "A named, reusable expression with parameters, which validations, filters and processes call."
+    },
+    {
+      "concept": "Validation",
+      "en": "validation",
+      "vi": "quy tắc kiểm tra",
+      "status": "approved",
+      "note": "A condition a record must meet to be saved, as a validation rule: \"Thêm quy tắc kiểm tra\", \"3 quy tắc kiểm tra\". A kind of rule, so it may call one.",
+      "avoid": {
+        "vi": [
+          "điều kiện lưu",
+          "kiểm tra hợp lệ",
+          "ràng buộc"
+        ]
+      }
+    },
+    {
+      "concept": "Process",
+      "en": "process",
+      "vi": "quy trình",
+      "status": "approved"
+    },
+    {
+      "concept": "Step",
+      "en": "step",
+      "vi": "bước",
+      "status": "approved"
+    },
+    {
+      "concept": "Human task",
+      "en": "task",
+      "vi": "công việc",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "nhiệm vụ",
+          "task"
+        ]
+      }
+    },
+    {
+      "concept": "Trigger",
+      "en": "trigger",
+      "vi": "bộ kích hoạt",
+      "status": "approved"
+    },
+    {
+      "concept": "Event",
+      "en": "event",
+      "vi": "sự kiện",
+      "status": "approved"
+    },
+    {
+      "concept": "Connector",
+      "en": "connector",
+      "vi": "bộ kết nối",
+      "status": "approved"
+    },
+    {
+      "concept": "Endpoint",
+      "en": "endpoint",
+      "vi": "endpoint",
+      "status": "approved",
+      "note": "Kept in English: integrators say it.",
+      "avoid": {
+        "vi": [
+          "điểm cuối"
+        ]
+      }
+    },
+    {
+      "concept": "Webhook",
+      "en": "webhook",
+      "vi": "webhook",
+      "status": "approved"
+    },
+    {
+      "concept": "Test scenario",
+      "en": "test scenario",
+      "vi": "kịch bản kiểm thử",
+      "status": "approved"
+    },
+    {
+      "concept": "Site",
+      "en": "site",
+      "vi": "trang web",
+      "status": "approved"
+    },
+    {
+      "concept": "Page",
+      "en": "page",
+      "vi": "trang",
+      "status": "approved"
+    },
+    {
+      "concept": "Form",
+      "en": "form",
+      "vi": "biểu mẫu",
+      "status": "approved"
+    },
+    {
+      "concept": "Widget",
+      "en": "widget",
+      "vi": "thành phần",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "widget"
+        ]
+      }
+    },
+    {
+      "concept": "Text resource",
+      "en": "language",
+      "vi": "ngôn ngữ",
+      "status": "approved",
+      "note": "An application's texts in one language. On screens it is named as a language, \"Languages\", \"Add language…\", \"Ngôn ngữ\", \"Thêm ngôn ngữ…\", and each one by its language's name, \"Tiếng Việt\", \"English\". The source language is one of them. \"text resource\" stays the kind's name in files, docs and the API.",
+      "avoid": {
+        "en": [
+          "text resource"
+        ],
+        "vi": [
+          "tài nguyên văn bản",
+          "bộ văn bản",
+          "bản văn bản"
+        ]
+      }
+    },
+    {
+      "concept": "Translation",
+      "en": "translation",
+      "vi": "bản dịch",
+      "status": "approved",
+      "note": "One text in another language, as a label's Translations… dialog shows it. Not a whole language."
+    },
+    {
+      "concept": "Role",
+      "en": "role",
+      "vi": "vai trò",
+      "status": "approved"
+    },
+    {
+      "concept": "Policy",
+      "en": "policy",
+      "vi": "chính sách",
+      "status": "approved"
+    },
+    {
+      "concept": "Identity provider",
+      "en": "identity provider",
+      "vi": "nhà cung cấp danh tính",
+      "status": "approved"
+    },
+    {
+      "concept": "Tenant",
+      "en": "tenant",
+      "vi": "tenant",
+      "status": "approved",
+      "note": "Kept in English: operators say it.",
+      "avoid": {
+        "vi": [
+          "người thuê",
+          "đơn vị thuê"
+        ]
+      }
+    },
+    {
+      "concept": "Operator console",
+      "en": "operator console",
+      "vi": "bảng điều khiển vận hành",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Save",
+      "en": "Save",
+      "vi": "Lưu",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Cancel",
+      "en": "Cancel",
+      "vi": "Hủy",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "Huỷ"
+        ]
+      }
+    },
+    {
+      "concept": "Action: Delete",
+      "en": "Delete",
+      "vi": "Xóa",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "Xoá",
+          "Xóa bỏ"
+        ]
+      },
+      "note": "Destroys a thing."
+    },
+    {
+      "concept": "Action: Remove",
+      "en": "Remove",
+      "vi": "Loại bỏ",
+      "status": "approved",
+      "note": "Takes a thing out of a list or a setting; the thing itself stays."
+    },
+    {
+      "concept": "Action: Add",
+      "en": "Add",
+      "vi": "Thêm",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Create",
+      "en": "Create",
+      "vi": "Tạo",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Edit",
+      "en": "Edit",
+      "vi": "Sửa",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Discard",
+      "en": "Discard",
+      "vi": "Bỏ thay đổi",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Undo",
+      "en": "Undo",
+      "vi": "Hoàn tác",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Redo",
+      "en": "Redo",
+      "vi": "Làm lại",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Refresh",
+      "en": "Refresh",
+      "vi": "Làm mới",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Search",
+      "en": "Search",
+      "vi": "Tìm",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Filter",
+      "en": "Filter",
+      "vi": "Lọc",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Validate",
+      "en": "Validate",
+      "vi": "Kiểm tra lỗi",
+      "status": "approved",
+      "note": "Checks the application's configuration for errors and warnings, not the data of any record."
+    },
+    {
+      "concept": "Action: Preview",
+      "en": "Preview",
+      "vi": "Xem trước",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Run tests",
+      "en": "Run tests",
+      "vi": "Chạy kiểm thử",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Export",
+      "en": "Export",
+      "vi": "Xuất",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Import",
+      "en": "Import",
+      "vi": "Nhập",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Restore",
+      "en": "Restore",
+      "vi": "Khôi phục",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Done",
+      "en": "Done",
+      "vi": "Xong",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Clear",
+      "en": "Clear",
+      "vi": "Xóa",
+      "status": "approved",
+      "note": "Empties a value or a search; destroys nothing that was saved."
+    },
+    {
+      "concept": "Error",
+      "en": "Error",
+      "vi": "lỗi",
+      "status": "approved"
+    }
+  ]
+}

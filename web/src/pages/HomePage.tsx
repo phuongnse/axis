@@ -7,13 +7,13 @@ import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
-import { applicationTitle, fetchSites, localized, siteTitle, type SiteListItem } from '../platform/site'
+import { applicationTitle, fetchSites, localized, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
 import { useHomeGrid } from './homeGrid'
 import { HomeTileStyle } from './HomeTileStyle'
-import { siteAddress } from '../platform/siteLinks'
+import { SiteTiles } from './SiteTiles'
 
 /** What the page loaded. `null` means that the call answered 401, and `'failed'` that it failed otherwise. */
 interface Loaded {
@@ -180,9 +180,7 @@ function ApplicationCard({
   locale: string
 }) {
   const { colour, radius, spacing } = useDesignTokens()
-  const grid = useHomeGrid()
   const headingId = useId()
-  const sorted = [...sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
 
   return (
     <section
@@ -208,39 +206,7 @@ function ApplicationCard({
         </Flex>
       </Flex>
       <div style={{ borderTop: `1px solid ${colour.divider}`, marginBlock: spacing.md }} />
-      <div data-testid="home-grid" style={grid}>
-        {sorted.map((site) => {
-          const siteDescription = localized(site.descriptions, locale)
-          return (
-            <Link
-              key={site.path}
-              to={siteAddress(site.path)}
-              data-home-tile
-              style={{
-                display: 'flex',
-                alignItems: siteDescription === null ? 'center' : 'flex-start',
-                gap: spacing.sm,
-                minWidth: 0,
-              }}
-            >
-              <SiteMark title={siteTitle(site, locale)} size={20} />
-              <Flex vertical style={{ minWidth: 0 }}>
-                <Typography.Text strong style={{ color: colour.primaryText }}>
-                  {siteTitle(site, locale)}
-                </Typography.Text>
-                {siteDescription !== null && (
-                  <Typography.Paragraph
-                    ellipsis={{ rows: 2, tooltip: siteDescription }}
-                    style={{ margin: 0, color: colour.textMuted }}
-                  >
-                    {siteDescription}
-                  </Typography.Paragraph>
-                )}
-              </Flex>
-            </Link>
-          )
-        })}
-      </div>
+      <SiteTiles sites={sites} locale={locale} />
     </section>
   )
 }

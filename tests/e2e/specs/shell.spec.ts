@@ -232,9 +232,13 @@ test('the page scrolls in the browser while the header and the sidebar navigatio
   await page.goto('/e2e/notes')
   await expect(page.getByRole('menuitem', { name: 'Notes', exact: true })).toBeVisible()
 
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
-
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  // The list loads after the menu, so keep scrolling until the page is taller than the viewport.
+  await expect
+    .poll(async () => {
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      return page.evaluate(() => window.scrollY)
+    })
+    .toBeGreaterThan(0)
   expect((await page.getByRole('banner').boundingBox())?.y).toBe(0)
   expect((await page.locator('#shell-sidebar nav').boundingBox())?.y).toBe(48)
 })

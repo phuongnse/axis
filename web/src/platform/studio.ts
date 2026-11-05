@@ -3,7 +3,7 @@ import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
 import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
-import { kindSingular } from './studioKinds'
+import { kindSingular, studioKinds } from './studioKinds'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
@@ -1003,12 +1003,24 @@ export interface StudioReleaseItem {
 
 /**
  * The release history of `GET /api/studio/apps/{application}/releases`. `folderContentHash` is `null` when the folder
- * has errors, so it does not compile.
+ * has errors, so it does not compile. `changes` lists the files that differ from the live release, and is `null` when
+ * no release is live.
  */
 export interface StudioReleases {
   active: { releaseId: string; number: number; contentHash: string } | null
   folderContentHash: string | null
   items: StudioReleaseItem[]
+  changes: StudioReleaseChange[] | null
+}
+
+/** A file that differs from the live release. The other fields are set for a removed file only. */
+export interface StudioReleaseChange {
+  path: string
+  change: 'added' | 'changed' | 'removed'
+  kind: string | null
+  name: string | null
+  titles: Record<string, string> | null
+  locale: string | null
 }
 
 /**
@@ -1198,6 +1210,65 @@ export function folderDiffers(history: StudioReleases): boolean {
     history.folderContentHash !== null &&
     history.folderContentHash !== history.active.contentHash
   )
+}
+
+/** A row of the change list: its name, its kind when it has one, and the resource it opens, which a removed file lacks. */
+export interface StudioChangeRow {
+  key: string
+  name: string
+  kind: string | null
+  change: StudioReleaseChange['change']
+  resourceId: string | null
+}
+
+/**
+ * The rows of the change list, in the sidebar's kind order and then by name. The manifest is named Settings and comes
+ * first. A file the folder list lacks, or a removed file of a kind Studio does not name, is named by its path.
+ */
+export function changeRows(
+  changes: readonly StudioReleaseChange[],
+  items: readonly StudioResourceItem[],
+  locale: string,
+  t: (key: string) => string,
+): StudioChangeRow[] {
+  return changes
+    .map((change) => changeRow(change, items, locale, t))
+    .sort((left, right) => left.order - right.order || left.row.name.localeCompare(right.row.name, locale))
+    .map(({ row }) => row)
+}
+
+function changeRow(
+  change: StudioReleaseChange,
+  items: readonly StudioResourceItem[],
+  locale: string,
+  t: (key: string) => string,
+): { order: number; row: StudioChangeRow } {
+  const key = `${change.change}:${change.path}`
+  const item = change.change === 'removed' ? undefined : items.find((candidate) => candidate.file === change.path)
+  const kind = item?.kind ?? change.kind
+  const resourceId = item?.id ?? null
+  if (kind === 'application') {
+    return {
+      order: -1,
+      row: { key, name: t('shell.studio.nav.settings'), kind: null, change: change.change, resourceId },
+    }
+  }
+  const index = studioKinds.findIndex((entry) => entry.kind === kind)
+  const order = index === -1 ? studioKinds.length : index
+  if (kind === null) {
+    return { order, row: { key, name: change.path, kind: null, change: change.change, resourceId: null } }
+  }
+  const titled: StudioResourceItem = item ?? {
+    id: '',
+    kind,
+    name: change.name,
+    file: change.path,
+    version: '',
+    usedBy: 0,
+    titles: change.titles ?? {},
+    locale: change.locale,
+  }
+  return { order, row: { key, name: resourceTitle(titled, locale, t), kind, change: change.change, resourceId } }
 }
 
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */

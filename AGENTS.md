@@ -37,6 +37,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - Keep AGENTS.md to rules, not details: a rule takes at most five lines and links the doc that holds the rest.
 - One concern has one mechanism. Search for what already does the job and extend it. Never copy, fork or work round a
   shared widget, see [shared widgets](docs/reference/shared-widgets.md).
+- Write each locale of a screen's text for its purpose, not as a translation of the English, and name concepts by the
+  [glossary](docs/reference/ui-glossary.json). See [UI writing](docs/reference/ui-writing.md).
 - No application-specific code in the platform. Sample applications live under `samples/apps/`,
   extension packages under `samples/packages/`, modules under `samples/modules/` and templates
   under `samples/templates/`.
