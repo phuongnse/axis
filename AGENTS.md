@@ -39,7 +39,7 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
   copy a component or its logic, fork it with a second way to the same result, or work round it in the caller. A
   caller that must build what its shared component should know, such as the label of an option, means the shared
   component or its data is incomplete: fix it there, so every caller gets it. If a second mechanism already exists,
-  merge the two in the same change.
+  merge the two in the same change. [Shared widgets](docs/reference/shared-widgets.md) says which widget does which job.
 - No application-specific code in the platform. Sample applications live under `samples/apps/`,
   extension packages under `samples/packages/`, modules under `samples/modules/` and templates
   under `samples/templates/`.
