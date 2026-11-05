@@ -368,6 +368,10 @@ owner is reviewing it one step at a time.
   drawer's type group, the expression editor's "Gives" and "Needs to give" lines and its completion's type detail take
   it, in place of the editor's own lower-casing. A name an author gave keeps its capitals. The rule is in #2974.
 - **A child collection reads "Bảng con gồm Dòng hàng"**, so the entity is what the rows are, not who owns the table.
+- **"Người dùng", not "mọi người":** Studio's help said "mọi người" where English says "people", which reads as a crowd.
+  The people who use an application are left out where the sentence needs no subject, "Thông báo hiện ở trường này khi
+  điều kiện không thỏa.", and are "người dùng" where it needs one; the rule and the glossary term are in #2974. 15 texts
+  in every area, and the last four old tone marks, "xoá" to "xóa".
 - **For the issue:** the rewrite of the other areas, one NexKit issue each, after the owner's review of this one.
 
 ### Second mechanisms found by the audit of 2026-11-05
