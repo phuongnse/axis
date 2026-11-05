@@ -87,9 +87,8 @@ an optional `quotas`, which the `tenant` step writes as the tenant's quota rows,
   digits and hyphens, and not `master`. A bad id answers `400`. An id that a directory row holds, in any
   status and a preview tenant's included, or that a `queued` or `running` create job holds, answers `409`.
   An id that a deleted tenant had answers `409` too _(planned for M31, once deletion adds `platform.deleted_tenants`)_.
-- `application` names a built-in application installed in the cell _(planned for M26)_. Until M26 it
-  names an [application template](modules-and-templates.md#application-templates), and an id that is not
-  an installed template answers `400`. The job keeps the id, and its `application` step takes the newest version.
+- `application` names an installed [application template](modules-and-templates.md#application-templates),
+  such as the built-in `approvals`. An id that is not an installed template answers `400`. The job keeps the id, and its `application` step takes the newest version.
 - `administrator` is the email of the person invited as the tenant's first administrator. A value that is
   not an email answers `400`.
 - A cell at its cap answers `409`, see [cell size](cells.md#cell-size).

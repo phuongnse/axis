@@ -36,9 +36,9 @@
 # The sample extension package payment-references is built first, into artifacts/extensions,
 # which the server and the worker read through Extensions:Path. The built-in modules under modules
 # and the sample modules under samples/modules are installed into artifacts/modules, which they read
-# through Modules:Path. A change to a module needs a restart of this script. The sample templates under samples/templates are
-# installed into artifacts/templates, which the server reads through Templates:Path, and a template
-# change needs a restart too.
+# through Modules:Path. A change to a module needs a restart of this script. The sample templates under samples/templates and the built-in
+# applications under applications are installed into artifacts/templates, which the server reads through
+# Templates:Path, and a template change needs a restart too.
 # AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, AXIS_MAILPIT_SMTP_PORT,
 # AXIS_MAILPIT_WEB_PORT, AXIS_SERVER_PORT and AXIS_WEB_PORT move the ports (5432, 8080, 5207, 1025, 8025,
 # 5206, 5173).
@@ -199,7 +199,7 @@ log "Installing the built-in and sample modules"
 bash scripts/lib/install-modules.sh
 
 # The server reads the template catalog only when it starts, so this runs once, before the server.
-log "Installing the sample templates"
+log "Installing the sample templates and built-in applications"
 bash scripts/lib/install-sample-templates.sh
 
 # The publisher runs from this build. dotnet watch would build the shared projects at the same time as

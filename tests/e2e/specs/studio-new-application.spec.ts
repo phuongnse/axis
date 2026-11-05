@@ -47,7 +47,8 @@ test.describe('Studio creates an application', () => {
     }
   })
 
-  // The id sorts after request-approval, so only the built-in flag puts it first.
+  // The id sorts after request-approval, so only the built-in flag puts it before it. Among the built-in entries the
+  // order is by id, so the installed approvals application comes first.
   async function addBuiltInTemplate(root: string) {
     const folder = path.join(root, 'tracker-test', '1.0.0')
     await mkdir(path.join(folder, 'sites'), { recursive: true })
@@ -158,9 +159,10 @@ test.describe('Studio creates an application', () => {
   async function expectBuiltInTemplateFirst(page: Page) {
     await openNewApplication(page)
     const dialog = await waitForDialog(page)
-    await expect(dialog.getByRole('radio').nth(1)).toHaveAccessibleName(/^Tracker test.*Built in/)
-    await expect(dialog.getByRole('radio').nth(2)).toHaveAccessibleName(/^Request approval/)
-    await expect(dialog.getByRole('radio').nth(2)).not.toHaveAccessibleName(/Built in/)
+    await expect(dialog.getByRole('radio').nth(1)).toHaveAccessibleName(/^Approvals.*Built in/)
+    await expect(dialog.getByRole('radio').nth(2)).toHaveAccessibleName(/^Tracker test.*Built in/)
+    await expect(dialog.getByRole('radio').nth(3)).toHaveAccessibleName(/^Request approval/)
+    await expect(dialog.getByRole('radio').nth(3)).not.toHaveAccessibleName(/Built in/)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   }
 
