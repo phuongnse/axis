@@ -154,6 +154,19 @@ owner is reviewing it one step at a time.
   to, by its label, as "Reference to Department" or "Child collection of Line item", from
   `shell.studio.entity.typeOf.<type>`. The label comes from `referenceOptions` and `useTextOfKey`, as the drawer's target
   picker gives it, and the name shows only where the entity has no label. Enum and every other type is its name alone.
+- **The target is a link:** in the Type cell, the entity a reference, references or child collection points to is a
+  link that opens it, a module's entity at its module view. Only the label is the link; the field's name stays the row's
+  button that opens the drawer. The address comes from `studioResourceAddress` in `platform/studio.ts`, which Uses, Used by
+  and the kind tables take too, in place of three addresses built by hand.
+- **Leave without saving:** Studio dropped an unsaved draft on any link. Now one guard, `LeaveGuardProvider` around the
+  shell in `PlatformShellRoute`, asks "Leave without saving?" with Stay and Leave before any link in the shell is followed,
+  the header, the sidebar, Uses and the Type cell among them, and before a navigation the workspace starts by itself
+  (`useGuard`: open a reference or a problem, a policy, an application, a sidebar entry). An editor counts itself in through
+  `useUnsavedChanges`, which `SaveBar` calls, so every editor with a save bar is guarded. A reload or closing the tab asks
+  the browser's own question. A link opened in a new tab is not asked about.
+- **For the issue:** the browser's Back is not guarded, as the SPA's router is not a data router; the issue moves to
+  `createBrowserRouter` and `useBlocker`, or leaves Back unguarded. The module editors and the contract pages have no save
+  bar, so they are not guarded yet. A module entity's page heading shows `organization/Department`, its name, not its label.
 - **Tried and dropped:** tabs for Fields, Validations and Indexes with a header that summed the entity up and an Edit details
   drawer. The owner wanted the details on the page. Sections suit an entity better than tabs while its parts are small;
   tabs are for parts that are large and apart, as Salesforce's many object parts are. Not every page must be sections.

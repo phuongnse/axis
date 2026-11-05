@@ -1625,3 +1625,11 @@ export async function fetchStudioBindings(signal?: AbortSignal): Promise<StudioB
   }
   return (await response.json()) as StudioBindingNames
 }
+
+/**
+ * Proposed: the workspace address of a resource of `application`, opened at `path` within it when one is given. Every
+ * link to a resource takes it, so a link and the workspace read one address.
+ */
+export function studioResourceAddress(application: string, id: string, path?: string | null): string {
+  return `/studio?${new URLSearchParams({ app: application, resource: id, ...(path ? { path } : {}) })}`
+}

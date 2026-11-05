@@ -6,6 +6,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { fetchTexts } from '../platform/texts'
 import { LocaleLoadFailed } from './LocaleLoadFailed'
 import { usePlatform } from './context'
+import { LeaveGuardProvider } from '../platform/LeaveGuardProvider'
 
 // A tenant notice has no page to open, so the site path is never used.
 const tenantNotices = { path: '/api/notifications', sitePath: '/' }
@@ -60,18 +61,20 @@ export function PlatformShellRoute({ children }: { children: ReactNode }) {
 
   return (
     <TextProvider catalogs={catalogs} development={development}>
-      <Shell
-        titleKey={site.titleKey}
-        navigation={site.navigation}
-        locales={site.locales.available}
-        locale={current.locale}
-        onLocaleChange={changeLocale}
-        legal={site.legal}
-        notifications={user?.users ? tenantNotices : undefined}
-      >
-        {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
-        {children}
-      </Shell>
+      <LeaveGuardProvider>
+        <Shell
+          titleKey={site.titleKey}
+          navigation={site.navigation}
+          locales={site.locales.available}
+          locale={current.locale}
+          onLocaleChange={changeLocale}
+          legal={site.legal}
+          notifications={user?.users ? tenantNotices : undefined}
+        >
+          {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
+          {children}
+        </Shell>
+      </LeaveGuardProvider>
     </TextProvider>
   )
 }

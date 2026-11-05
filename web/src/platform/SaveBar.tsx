@@ -3,6 +3,7 @@ import { Button, Modal, Typography } from 'antd'
 import { useContext, useState } from 'react'
 import { AxisButton } from './AxisButton'
 import { dialogWidth } from './dialogButtons'
+import { useUnsavedChanges } from './leaveGuard'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -39,6 +40,8 @@ export function SaveBar({
   const { colour, spacing } = useDesignTokens()
   const pad = useContext(ShellSidebarContext)?.contentPadding ?? spacing.lg
   const [confirming, setConfirming] = useState(false)
+  // Proposed: unsaved changes guard every way out of the page, see `LeaveGuardProvider`.
+  useUnsavedChanges(dirty)
   if (!dirty && !canRedo) {
     return null
   }

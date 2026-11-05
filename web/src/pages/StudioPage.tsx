@@ -23,10 +23,12 @@ import {
   type StudioResourceItem,
   waitForServer,
   releaseGroups,
+  studioResourceAddress,
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
 import { starterKinds } from '../platform/studioStarters'
+import { useGuard } from '../platform/leaveGuard'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioResourceTable } from './StudioResourceTable'
@@ -320,12 +322,15 @@ function StudioWorkspace() {
       ? undefined
       : moduleGroups.flatMap((group) => group.items).find((item) => item.id.toLowerCase() === resourceId.toLowerCase())
 
+  // Proposed: a navigation the workspace starts by itself goes through the leave guard, as a link does.
+  const guard = useGuard()
+
   function pickApplication(name: string) {
-    setParams({ app: name })
+    guard(() => setParams({ app: name }))
   }
 
   function selectResource(id: string) {
-    setParams({ app: application!, resource: id })
+    guard(() => setParams({ app: application!, resource: id }))
   }
 
   function onCreated(item: StudioResourceItem, diagnostics: StudioDiagnostic[]) {
@@ -375,7 +380,7 @@ function StudioWorkspace() {
   }
 
   function openReference(id: string, referencePath: string | null) {
-    setParams({ app: application!, resource: id, ...(referencePath ? { path: referencePath } : {}) })
+    guard(() => setParams({ app: application!, resource: id, ...(referencePath ? { path: referencePath } : {}) }))
   }
 
   function selectDiagnostic(id: string, diagnosticPath: string) {
@@ -479,14 +484,16 @@ function StudioWorkspace() {
           canCreate={canCreate}
           onPickApplication={pickApplication}
           onApplicationCreated={onApplicationCreated}
-          onView={(next) => {
-            if (next.name === 'settings') {
-              const settings = resources.find((item) => item.kind === 'application')
-              setParams(settings ? { app: application, resource: settings.id } : { app: application })
-            } else {
-              setParams(new URLSearchParams(studioAddress(application, next).split('?')[1]))
-            }
-          }}
+          onView={(next) =>
+            guard(() => {
+              if (next.name === 'settings') {
+                const settings = resources.find((item) => item.kind === 'application')
+                setParams(settings ? { app: application, resource: settings.id } : { app: application })
+              } else {
+                setParams(new URLSearchParams(studioAddress(application, next).split('?')[1]))
+              }
+            })
+          }
         />
       )}
       <PageLayout
@@ -643,7 +650,7 @@ function StudioWorkspace() {
                 application={application}
                 folderRevision={folderRevision}
                 names={names}
-                onOpenPolicy={(id) => setParams({ app: application, resource: id })}
+                onOpenPolicy={(id) => guard(() => setParams({ app: application, resource: id }))}
                 onWritten={onWritten}
               />
             ) : view.name === 'kind' ? (
@@ -663,7 +670,7 @@ function StudioWorkspace() {
                     onChange={(event) => setSearch(event.target.value)}
                   />
                 }
-                addressOf={(id) => `/studio?${new URLSearchParams({ app: application, resource: id })}`}
+                addressOf={(id) => studioResourceAddress(application, id)}
                 onRefresh={() => {
                   setListReloads((value) => value + 1)
                   setFolderRevision((value) => value + 1)

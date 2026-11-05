@@ -50,6 +50,8 @@ import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 import { setOwn } from '../platform/ownProperty'
+import { Link, useSearchParams } from 'react-router'
+import { studioResourceAddress } from '../platform/studio'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -365,13 +367,16 @@ const typesWithTarget = new Set(['reference', 'references', 'child-collection'])
 /**
  * Proposed: what a field's type says in the Type column, in words: the type, and for a type that points to an entity,
  * that entity by its label, as "Reference to Department" or "Child collection of Line item", as the target picker in the
- * drawer names it. The name shows only where the entity has no label. Enum and the other types are their name alone,
+ * drawer names it. The name shows only where the entity has no label. The entity is a link that opens it, a module's
+ * entity at its module view, through the leave guard as every link is. Enum and the other types are their name alone,
  * with no count, as a list shows no count that leads nowhere.
  */
 function TypeCell({ field }: { field: Content }) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const names = useContext(StudioNamesContext)
   const textOfKey = useTextOfKey()
+  const application = useSearchParams()[0].get('app')
   const type = text(field.type)
   if (type === '') {
     return <EmptyDash />
@@ -380,13 +385,24 @@ function TypeCell({ field }: { field: Content }) {
   if (target === '' || !typesWithTarget.has(type)) {
     return <span>{t(`shell.studio.entity.type.${type}`)}</span>
   }
+  const entity = names?.entities.find((item) => item.name.toLowerCase() === target.toLowerCase())
   const choice = names
-    ? referenceOptions(names, 'entity', undefined, '').find(
-        (option) => option.name.toLowerCase() === target.toLowerCase(),
-      )
+    ? referenceOptions(names, 'entity', undefined, '').find((option) => option.name === entity?.name)
     : undefined
+  const words = textOfKey(choice?.labelKey) ?? target
+  const [before, after = ''] = t(`shell.studio.entity.typeOf.${type}`).split('{entity}')
   return (
-    <span>{t(`shell.studio.entity.typeOf.${type}`).replace('{entity}', textOfKey(choice?.labelKey) ?? target)}</span>
+    <span>
+      {before}
+      {entity && application ? (
+        <Link to={studioResourceAddress(application, entity.id)} style={{ color: colour.primaryText }}>
+          {words}
+        </Link>
+      ) : (
+        words
+      )}
+      {after}
+    </span>
   )
 }
 

@@ -5,6 +5,7 @@ import {
   ServerUnreachableError,
   type StudioReference,
   type StudioResourceReferences,
+  studioResourceAddress,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
@@ -128,13 +129,12 @@ function ReferencePanel({
     const relationKey = `shell.studio.relation.${entry.relation.replace(/ ([a-z])/g, (_, letter: string) => letter.toUpperCase())}`
     const relation = t(relationKey) === relationKey ? '' : t(relationKey)
     if (node.type === 'resource') {
-      const address = `/studio?app=${encodeURIComponent(application)}&resource=${encodeURIComponent(node.id)}`
       rows.push({
         key,
         name: titleOf(node.id) ?? node.name ?? node.file,
         kind: kindName(node.kind, t),
         change: relation,
-        to: direction === 'usedBy' ? `${address}&path=${encodeURIComponent(entry.path)}` : address,
+        to: studioResourceAddress(application, node.id, direction === 'usedBy' ? entry.path : null),
         order: kindOrder(node.kind),
       })
     } else if (node.type === 'module') {
