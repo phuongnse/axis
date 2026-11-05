@@ -14,7 +14,7 @@ namespace Axis.ControlPlane.Integration.Tests;
 
 /// <summary>
 /// A stand-in for a cell: a Kestrel server on a free local port that requires a client certificate and accepts only the one
-/// it issued. It serves a fake token endpoint, one <c>POST</c> route and the job read, and records what it sees. The
+/// it issued. It serves a fake token endpoint, two <c>POST</c> routes and the job read, and records what it sees. The
 /// certificates are made fresh for each server, and written as PEM files to a folder of their own.
 /// </summary>
 internal sealed class CellTestServer : IAsyncDisposable
@@ -55,6 +55,9 @@ internal sealed class CellTestServer : IAsyncDisposable
     public IReadOnlyCollection<SeenRequest> Posts => _posts;
 
     public int JobReads => Volatile.Read(ref _jobReads);
+
+    /// <summary>When set, the create route answers <c>409</c> with this title. Otherwise it queues a job.</summary>
+    public string? ConflictTitle { get; set; }
 
     /// <summary>Makes the next <paramref name="count"/> calls to the cell, the token requests excepted, answer <c>401</c>.</summary>
     public void RefuseNext(int count) => Volatile.Write(ref _refusals, count);
@@ -154,6 +157,20 @@ internal sealed class CellTestServer : IAsyncDisposable
             return Results.Json(
                 new { id = Guid.Parse("11111111-1111-1111-1111-111111111111"), kind = "suspend", tenantId = id, state = "queued", createdAt = DateTimeOffset.UnixEpoch },
                 statusCode: StatusCodes.Status202Accepted);
+        });
+
+        app.MapPost("/api/cell/tenants", () =>
+        {
+            if (Refuse())
+            {
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
+            }
+
+            return ConflictTitle is { } title
+                ? Results.Problem(statusCode: StatusCodes.Status409Conflict, title: title)
+                : Results.Json(
+                    new { id = Guid.Parse("11111111-1111-1111-1111-111111111111"), kind = "create", tenantId = "acme", state = "queued", createdAt = DateTimeOffset.UnixEpoch },
+                    statusCode: StatusCodes.Status202Accepted);
         });
 
         app.MapGet("/api/cell/jobs/{id:guid}", (Guid id) =>
