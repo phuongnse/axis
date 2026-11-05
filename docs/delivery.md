@@ -292,6 +292,11 @@ owner.
   and topic, and the tag is pushed: it starts no CI run, and it is never
   deleted, so the links to the prototype never break. The branch is then
   deleted, locally and on GitHub.
+- **A prototype follows `main` by merging it.** When design issues have merged, or `main` has changed code the prototype
+  touches, the session merges `main` into the newest `design/` branch, never rebasing it. `main` is the standard for
+  behaviour and the prototype for look: where both built the same thing, `main`'s API, data shape, texts and logic are
+  the base and the prototype's look and agreed additions go back on it, and `main`'s logic is never changed to suit the
+  prototype. What a merge made the prototype lose is brought back, and the review's `design-review.md` records each merge.
 - **The design runs ahead of the repository only by open issues.** While a
   design issue is open, the artifact holds its change and its last change note
   names the issue. A review does not change the artifact: it is published once
