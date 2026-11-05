@@ -448,7 +448,8 @@ keys. It can be rotated without signing anyone out.
   built and writes one record for the whole run, with no tenant. The [publisher](administration.md#publisher) writes
   `tenant host verify` when it verifies a host request and the host joins the tenant, with the actor of the request. A `suspend` or `resume` job that the
   [publisher](administration.md#publisher) runs writes one record when it ends, with the command name of `tenant suspend` or
-  `tenant resume`, `job:<id>` in `changed` and the job's actor, in the same transaction as the job's final state. `tenant list`, `tenant binding list`, `version` and `publisher`
+  `tenant resume`, `job:<id>` in `changed` and the job's actor, in the same transaction as the job's final state. The exports route, `GET /api/cell/tenants/{id}/exports/{exportId}`, writes
+  `tenant export download` for each download of the ZIP, with the operator as actor and `export:<id>` in `changed`. A refused call and a read of the JSON write none. `tenant list`, `tenant binding list`, `version` and `publisher`
   write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
   writing one record per tenant, one per run or none. A command without a mark fails a test.
 - **When.** One record per tenant, when tenant work starts: after the checks of the command and

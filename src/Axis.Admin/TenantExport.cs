@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Axis.Administration;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
@@ -104,7 +105,7 @@ internal static class TenantExport
                 new PutObjectRequest
                 {
                     BucketName = settings.Storage.Value.Bucket,
-                    Key = $"exports/{tenantId}/{jobId:D}.zip",
+                    Key = TenantExports.Key(tenantId, jobId),
                     FilePath = archive,
                     ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256,
                 },

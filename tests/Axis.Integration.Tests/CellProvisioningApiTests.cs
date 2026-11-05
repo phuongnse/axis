@@ -1,8 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
+using Amazon.S3;
+using Amazon.S3.Model;
 using Axis.Admin;
+using Axis.Administration;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -17,10 +21,10 @@ namespace Axis.Integration.Tests;
 /// preview tenant in the platform tables: <c>a</c> is active and served at <c>localhost</c> from a migrated database, <c>b</c>
 /// is active, and <c>c</c> is suspended. The operator realm is a realm of its own, made for the test, with the role
 /// <c>cell-operator</c> and two service account clients, one with the role and one without. A tenant realm token is a token
-/// of the development <c>axis</c> realm.
+/// of the development <c>axis</c> realm. The export routes read and stream a ZIP in a bucket of a real MinIO.
 /// </summary>
-public sealed class CellProvisioningApiTests(PostgreSqlFixture database, KeycloakFixture keycloak)
-    : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
+public sealed class CellProvisioningApiTests(PostgreSqlFixture database, KeycloakFixture keycloak, MinioFixture minio)
+    : IClassFixture<PostgreSqlFixture>, IClassFixture<MinioFixture>, IAsyncLifetime
 {
     private const string OperatorRole = "cell-operator";
     private const string CallerClientId = "ops-caller";
@@ -34,6 +38,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     private readonly string _realm = $"ops-{Guid.NewGuid():N}"[..16];
     private Uri _baseAddress = null!;
     private string _platform = null!;
+    private CellBackupStorage? _exportStorage;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -1015,6 +1020,203 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         }
     }
 
+    [Fact]
+    public async Task A_tenant_realm_token_and_a_token_without_the_role_cannot_download_an_export_and_no_record_is_written()
+    {
+        await using var factory = await StartAsync(exportBucket: true);
+        var (exportId, _) = await SeedExportAsync("b");
+        using var client = CreateClient(factory, _console);
+        var tenantRealmToken = await TokenAsync("axis", KeycloakFixture.PurchasingClientId, KeycloakFixture.PurchasingClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        using var none = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token: null);
+        using var tenantRealm = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", tenantRealmToken);
+        using var noRole = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", noRoleToken);
+        using var noRoleJson = await GetAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", noRoleToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, tenantRealm.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRoleJson.StatusCode);
+        Assert.Equal(0, await DownloadRecordsAsync());
+    }
+
+    [Fact]
+    public async Task An_operator_download_returns_the_stored_zip_and_writes_one_record_naming_the_operator_and_the_export()
+    {
+        await using var factory = await StartAsync(exportBucket: true);
+        var (exportId, bytes) = await SeedExportAsync("b");
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var download = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+        Assert.Equal("application/zip", download.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(bytes, await download.Content.ReadAsByteArrayAsync(CancellationToken));
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT tenant_id, actor, array_to_string(changed, ',') FROM platform.audit_records WHERE command = 'tenant export download'", connection);
+        await using var records = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await records.ReadAsync(CancellationToken));
+        Assert.Equal(("b", new JsonWebToken(token).Subject, $"export:{exportId:D}"), (records.GetString(0), records.GetString(1), records.GetString(2)));
+        Assert.False(await records.ReadAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task The_export_read_answers_its_fields_and_404_for_an_export_of_another_tenant_an_unknown_export_and_a_preview_tenant()
+    {
+        await using var factory = await StartAsync(exportBucket: true);
+        var (exportId, _) = await SeedExportAsync("b");
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var read = await GetAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+        using var otherTenant = await GetAsync(client, $"/api/cell/tenants/c/exports/{exportId:D}", token);
+        using var otherTenantDownload = await DownloadAsync(client, $"/api/cell/tenants/c/exports/{exportId:D}", token);
+        using var unknownExport = await GetAsync(client, $"/api/cell/tenants/b/exports/{Guid.NewGuid():D}", token);
+        using var unknownTenant = await GetAsync(client, $"/api/cell/tenants/nobody/exports/{exportId:D}", token);
+        using var preview = await GetAsync(client, $"/api/cell/tenants/a-preview/exports/{exportId:D}", token);
+
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var export = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(exportId, export.GetProperty("id").GetGuid());
+        Assert.Equal("b", export.GetProperty("tenantId").GetString());
+        Assert.Equal("succeeded", export.GetProperty("state").GetString());
+        var createdAt = export.GetProperty("createdAt").GetDateTimeOffset();
+        var expiresAt = export.GetProperty("expiresAt").GetDateTimeOffset();
+        Assert.True(createdAt > DateTimeOffset.UtcNow.AddMinutes(-5));
+        Assert.InRange(expiresAt, DateTimeOffset.UtcNow.AddDays(7).AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(7).AddMinutes(5));
+        Assert.Equal(HttpStatusCode.NotFound, otherTenant.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, otherTenantDownload.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownExport.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownTenant.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(0, await DownloadRecordsAsync());
+    }
+
+    [Fact]
+    public async Task An_export_that_has_not_succeeded_has_no_expiry_and_a_download_answers_409_and_writes_no_record()
+    {
+        await using var factory = await StartAsync(exportBucket: true);
+        var (exportId, _) = await SeedExportAsync("b", state: "running");
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var read = await GetAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+        using var download = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var export = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("running", export.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, export.GetProperty("expiresAt").ValueKind);
+        Assert.Equal(HttpStatusCode.Conflict, download.StatusCode);
+        Assert.Equal(0, await DownloadRecordsAsync());
+    }
+
+    [Fact]
+    public async Task A_server_without_the_export_storage_settings_still_reads_an_export_and_a_download_answers_503()
+    {
+        await using var factory = await StartAsync();
+        var (exportId, _) = await SeedExportAsync("b");
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var read = await GetAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+        using var download = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, download.StatusCode);
+        Assert.Equal(0, await DownloadRecordsAsync());
+    }
+
+    [Fact]
+    public async Task The_sweep_deletes_a_zip_stored_more_than_7_days_ago_and_the_download_then_answers_410()
+    {
+        await using var factory = await StartAsync(exportBucket: true);
+        var (exportId, _) = await SeedExportAsync("b");
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var sweep = new TenantExportSweep(_exportStorage!);
+        var output = new StringWriter();
+
+        await sweep.RunRoundAsync(DateTimeOffset.UtcNow, output, CancellationToken);
+        Assert.Equal([TenantExports.Key("b", exportId)], await KeysAsync());
+        using var kept = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+        Assert.Equal(HttpStatusCode.OK, kept.StatusCode);
+
+        await sweep.RunRoundAsync(DateTimeOffset.UtcNow.AddDays(8), output, CancellationToken);
+
+        Assert.Empty(await KeysAsync());
+        Assert.Equal($"b export deleted: {TenantExports.Key("b", exportId)}{Environment.NewLine}", output.ToString());
+        using var gone = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+        Assert.Equal(HttpStatusCode.Gone, gone.StatusCode);
+        Assert.Equal(1, await DownloadRecordsAsync());
+    }
+
+    [Fact]
+    public async Task An_export_whose_job_finished_more_than_7_days_ago_answers_410_on_the_read_and_the_download()
+    {
+        await using var factory = await StartAsync(exportBucket: true);
+        var (exportId, _) = await SeedExportAsync("b", finishedAgo: TimeSpan.FromDays(8));
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var read = await GetAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+        using var download = await DownloadAsync(client, $"/api/cell/tenants/b/exports/{exportId:D}", token);
+
+        Assert.Equal(HttpStatusCode.Gone, read.StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, download.StatusCode);
+        Assert.Equal(0, await DownloadRecordsAsync());
+    }
+
+    // An export job of the tenant, and its ZIP in the bucket of the export storage when the server has one.
+    private async Task<(Guid Id, byte[] Bytes)> SeedExportAsync(string tenant, string state = "succeeded", TimeSpan? finishedAgo = null)
+    {
+        var id = Guid.CreateVersion7();
+        var bytes = RandomNumberGenerator.GetBytes(256);
+        var finished = DateTimeOffset.UtcNow - (finishedAgo ?? TimeSpan.Zero);
+        await ExecuteAsync(
+            $"""
+            INSERT INTO platform.jobs (id, kind, tenant_id, state, steps, actor, created_at, finished_at)
+            VALUES ('{id:D}', 'export', '{tenant}', '{state}', '[]', 'operator-1', '{finished - TimeSpan.FromMinutes(1):O}',
+                    {(state == "succeeded" ? $"'{finished:O}'" : "NULL")})
+            """);
+        if (_exportStorage is { } storage)
+        {
+            using var s3 = storage.NewClient();
+            using var content = new MemoryStream(bytes);
+            await s3.PutObjectAsync(
+                new PutObjectRequest { BucketName = storage.Bucket, Key = TenantExports.Key(tenant, id), InputStream = content },
+                CancellationToken);
+        }
+
+        return (id, bytes);
+    }
+
+    private async Task<List<string>> KeysAsync()
+    {
+        using var s3 = _exportStorage!.NewClient();
+        var response = await s3.ListObjectsV2Async(new ListObjectsV2Request { BucketName = _exportStorage.Bucket }, CancellationToken);
+        return [.. (response.S3Objects ?? []).Select(item => item.Key).Order(StringComparer.Ordinal)];
+    }
+
+    private async Task<long> DownloadRecordsAsync() =>
+        (long)(await ScalarAsync($"SELECT count(*) FROM platform.audit_records WHERE command = '{TenantExports.DownloadCommand}'"))!;
+
+    private static async Task<HttpResponseMessage> DownloadAsync(HttpClient client, string path, string? token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/zip"));
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
     private async Task<bool> RunJobAsync() =>
         await new ProvisioningJobs(_platform, ProvisioningJobs.Builtin(_platform), TimeSpan.FromMinutes(5))
             .RunNextAsync(TextWriter.Null, CancellationToken);
@@ -1145,11 +1347,19 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null, string? templates = null)
+    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null, string? templates = null, bool exportBucket = false)
     {
         var authority = await keycloak.StartAsync();
         var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
         _platform = platform;
+        if (exportBucket)
+        {
+            // A bucket of its own, so no test sees another's objects.
+            var bucket = $"exports-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6))}";
+            _exportStorage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
+            using var s3 = _exportStorage.NewClient();
+            await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket }, CancellationToken);
+        }
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -1164,6 +1374,15 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             builder.UseSetting("Cell:OperatorRole", OperatorRole);
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());
             builder.UseSetting("Templates:Path", templates ?? BuiltInApplications.Path);
+            if (_exportStorage is { } storage)
+            {
+                builder.UseSetting("Cell:ExportStorage:ServiceUrl", storage.ServiceUrl);
+                builder.UseSetting("Cell:ExportStorage:Region", storage.Region);
+                builder.UseSetting("Cell:ExportStorage:Bucket", storage.Bucket);
+                builder.UseSetting("Cell:ExportStorage:AccessKeyId", storage.AccessKeyId);
+                builder.UseSetting("Cell:ExportStorage:SecretAccessKey", storage.SecretAccessKey);
+            }
+
             if (tenantCap is { } cap)
             {
                 builder.UseSetting("Cell:TenantCap", cap.ToString(System.Globalization.CultureInfo.InvariantCulture));

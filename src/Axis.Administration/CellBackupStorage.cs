@@ -2,14 +2,14 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Microsoft.Extensions.Configuration;
 
-namespace Axis.Admin;
+namespace Axis.Administration;
 
 /// <summary>
 /// Where <c>cell backup</c> uploads the archives and <c>cell restore-check</c> reads them (and where the <c>export</c> job puts a tenant export, from <c>Cell:ExportStorage</c>): an S3-compatible service with path-style addressing, from the five
-/// <c>Cell:BackupStorage</c> settings. Only those two commands read them. A message names a setting and never holds its value,
+/// <c>Cell:BackupStorage</c> settings. Only those two commands and, for <c>Cell:ExportStorage</c>, the server's export download read them. A message names a setting and never holds its value,
 /// and the secret access key is never printed.
 /// </summary>
-internal sealed record CellBackupStorage(string ServiceUrl, string Region, string Bucket, string AccessKeyId, string SecretAccessKey)
+public sealed record CellBackupStorage(string ServiceUrl, string Region, string Bucket, string AccessKeyId, string SecretAccessKey)
 {
     private const string Section = "Cell:BackupStorage";
 

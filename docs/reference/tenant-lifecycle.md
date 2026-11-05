@@ -4,7 +4,7 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the route that requests a host of a tenant's own, and the job read of the
+Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the export read and download route, the route that requests a host of a tenant's own, and the job read of the
 [provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete and cancel-deletion described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
@@ -73,7 +73,7 @@ implementation.
 | `PUT /api/cell/tenants/{id}/quotas` | Sets or clears the tenant's quota rows, see [quotas](tenant-quotas.md#quotas). The body is `{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }`. A set value of `null` is no limit, a removed key goes back to the cell's default, and a key the body does not name stays as it is. It applies at once, with no job, and answers `200` with the tenant's `quotas` as the tenant read does. An unknown key, a negative value, a key both set and removed, or a body that names no key answers `400` and writes nothing. An unknown tenant id or a preview tenant's id answers `404`. It writes the rows and one [platform audit record](tenant-setting-commands.md#platform-audit-records), `tenant quotas set`, in one transaction, over the schema role: the server opens a connection for the write alone and keeps none in a pool. The hosts apply the new values at their next `Tenancy:RefreshInterval`. |
 | `POST /api/cell/tenants/{id}/hosts` | Asks for a host of the tenant's own, see [hosts](#hosts). |
 | `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant), through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`, and `202` with a `Location` header. A tenant that is still `provisioning` makes the job fail. |
-| `GET /api/cell/tenants/{id}/exports/{exportId}` | _(planned for M31)_ Answers the export, and its download while it is kept. |
+| `GET /api/cell/tenants/{id}/exports/{exportId}` | Answers the [tenant export](#exporting-a-tenant) as JSON: `id`, `tenantId`, `state`, `createdAt` and `expiresAt`, which is 7 days after the job finished and `null` until it succeeded. The same route streams the ZIP when the request sends `Accept: application/zip`, and answers the JSON to every other request. The server streams the ZIP from the export storage itself and never redirects to a storage address. A download before the job succeeded answers `409`. An export past its `expiresAt`, or whose ZIP the storage no longer holds, answers `410` on both forms. An unknown tenant, a preview tenant or an id that is not an export of that tenant answers `404`. A download on a server without the five `Cell:ExportStorage` settings answers `503`, and the JSON read still works there. Each download writes the platform audit record `tenant export download`, see [platform audit records](tenant-setting-commands.md#platform-audit-records). |
 | `DELETE /api/cell/tenants/{id}` | Schedules the deletion through a `delete` job, see [deleting a tenant](#deleting-a-tenant). It answers `202` as `suspend` does. |
 | `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window through a `cancel-deletion` job. It answers as `suspend` does. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
@@ -179,7 +179,10 @@ tenant administrator can run it in M33.
   the five [`Cell:ExportStorage`](host-settings.md#cell-settings) settings, with S3 server-side encryption (`AES256`), so that the owner
   can open the downloaded ZIP without a key of the cell. The export id is the job id. A publisher without these
   settings still runs every other job, and the `export` job fails with a message that names the missing setting.
-  The deletion after 7 days, the download and its audit record are _(planned for M31)_.
+  The download, its audit record and the sweep are built. The [publisher](administration.md#publisher) sweeps the export bucket every hour and
+  deletes each ZIP under `exports/` that was stored more than 7 days ago, so a ZIP can outlive its `expiresAt` by up to an hour, and the
+  route answers `410` from `expiresAt` in that time. The download is the [exports route](#provisioning-api) with `Accept: application/zip`,
+  and its audit record names the operator as actor and `export:<id>` in `changed`.
 - **Sensitive fields.** The export holds their values in clear, because the data is the owner's. The
   ZIP is [restricted](keys-and-data-protection.md#restricted) data, and the console says so before
   the download.
