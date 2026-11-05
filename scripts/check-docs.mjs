@@ -11,7 +11,9 @@
 //   decision file has the file's title and status. The row of a superseded decision has no file: it
 //   names the live decisions that superseded it and links the last text of its file at a commit on
 //   GitHub.
-// - No '(planned for Mx)' marker under docs/ names a milestone that docs/roadmap.md calls Done.
+// - No '(planned for Mx)' marker under docs/ names a milestone that docs/roadmap.md calls Done, and each
+//   marker '_(planned for Mx)_' sits on a line of its own under a heading, right after a bold lead-in,
+//   or in a table row, never in the middle of a sentence.
 // - docs/reference/asvs.md, when it exists, has one row for each requirement of the committed ASVS list
 //   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
 //   evidence. A Met row names only test classes that exist. A Gap row links the GitHub issue that
@@ -329,6 +331,7 @@ export function checkDocs(root, { baseLineCount } = {}) {
   }
 
   checkPlannedMarkers(root, files, report)
+  for (const file of files) checkPlannedPlacement(file, report)
 
   // The decisions.
   const index = path.join(docs, 'decisions.md')
@@ -433,6 +436,32 @@ function checkPlannedMarkers(root, files, report) {
   }
 }
 
+const plannedMarkerPattern = /_\(planned for M\d+(?:(?:, | and )M\d+)*\)_/g
+
+/** Reports each planned marker that is not on a line of its own under a heading, after a bold lead-in or in a table row. */
+function checkPlannedPlacement(file, report) {
+  const text = lines(file)
+  let fenced = false
+  text.forEach((line, i) => {
+    if (/^\s*```/.test(line)) {
+      fenced = !fenced
+      return
+    }
+    if (fenced || /^\s*\|/.test(line)) return
+    const prose = line.replace(/`[^`]*`/g, '')
+    for (const match of prose.matchAll(plannedMarkerPattern)) {
+      if (prose.trim() === match[0]) {
+        let j = i - 1
+        while (j >= 0 && text[j].trim() === '') j--
+        if (j >= 0 && /^#{1,6} /.test(text[j])) continue
+      } else if (prose.slice(0, match.index).endsWith('** ')) {
+        continue
+      }
+      report(file, i + 1, `${match[0]} sits in a sentence: put it on a line of its own under the heading of a planned section, or right after the bold lead-in of a planned rule`)
+    }
+  })
+}
+
 /** Runs git in root and returns its output, or undefined when git fails. */
 function git(root, args) {
   try {
@@ -464,7 +493,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the planned markers, the ASVS table, the threat model tables, the development users and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users and the doc and skill sizes are in order.')
   return 0
 }
 
