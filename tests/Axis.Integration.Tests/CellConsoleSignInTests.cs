@@ -6,6 +6,7 @@ using Axis.Server.Authentication;
 using Axis.Server.CellApi;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +27,7 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
     private const string ConsoleClientId = "axis-cell-console";
     private const string ConsoleClientSecret = "console-development-secret";
     private const string TotpSecret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+    private const string TrustedProxy = "10.0.0.5";
     private const string Sessions = "SELECT count(*) FROM platform.operator_sessions";
 
     // The development realm's client accepts redirects to http://localhost:5206/*.
@@ -227,6 +229,36 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task An_address_outside_the_allowed_networks_gets_403_on_the_console_host_and_one_inside_reaches_the_sign_in()
+    {
+        var (factory, _) = await StartAsync(allowedNetwork: "192.168.0.0/16");
+        await using var _ = factory;
+
+        // The proxy 10.0.0.5 is outside the list, so the forwarded address is the one that is checked.
+        foreach (var path in new[] { "/", "/api/cell/tenants", "/api/cell/auth/sign-in" })
+        {
+            var refused = await SendAsync(factory, _console.Host, path, forwardedFor: "203.0.113.7");
+            Assert.Equal(StatusCodes.Status403Forbidden, refused.Response.StatusCode);
+        }
+
+        var allowed = await SendAsync(factory, _console.Host, "/api/cell/auth/sign-in", forwardedFor: "192.168.1.20");
+
+        Assert.Equal(StatusCodes.Status302Found, allowed.Response.StatusCode);
+        Assert.Contains($"realms/{_realm}", allowed.Response.Headers.Location.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_address_outside_the_allowed_networks_still_gets_the_normal_answer_on_a_tenant_host()
+    {
+        var (factory, _) = await StartAsync(allowedNetwork: "192.168.0.0/16");
+        await using var _ = factory;
+
+        var response = await SendAsync(factory, _tenantHost.Host, "/api/me", forwardedFor: "203.0.113.7");
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, response.Response.StatusCode);
+    }
+
     private static object User(string username, string[] roles) => new
     {
         username,
@@ -271,6 +303,18 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
         return await client.SendAsync(request, CancellationToken);
     }
 
+    private static Task<HttpContext> SendAsync(WebApplicationFactory<Program> factory, string host, string path, string forwardedFor) =>
+        factory.Server.SendAsync(
+            request =>
+            {
+                request.Request.Method = HttpMethods.Get;
+                request.Request.Path = path;
+                request.Request.Host = new HostString(host);
+                request.Connection.RemoteIpAddress = IPAddress.Parse(TrustedProxy);
+                request.Request.Headers["X-Forwarded-For"] = forwardedFor;
+            },
+            CancellationToken);
+
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory, Uri address, bool handleCookies = true) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -297,7 +341,7 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<(WebApplicationFactory<Program> Factory, string Platform)> StartAsync(bool withSecret = true)
+    private async Task<(WebApplicationFactory<Program> Factory, string Platform)> StartAsync(bool withSecret = true, string? allowedNetwork = null)
     {
         var authority = await keycloak.StartAsync();
         var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
@@ -316,6 +360,12 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
             if (withSecret)
             {
                 builder.UseSetting(CellConsoleSignIn.ClientSecretSetting, ConsoleClientSecret);
+            }
+
+            if (allowedNetwork is not null)
+            {
+                builder.UseSetting("Cell:ConsoleAllowedNetworks:0", allowedNetwork);
+                builder.UseSetting("ForwardedHeaders:KnownProxies:0", TrustedProxy);
             }
 
             builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(_clock));

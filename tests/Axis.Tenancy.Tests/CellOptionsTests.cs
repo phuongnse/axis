@@ -105,6 +105,24 @@ public sealed class CellOptionsTests
         Assert.Contains(missing, exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("10.0.0.5")]
+    [InlineData("10.0.0.0/33")]
+    [InlineData("not-a-range")]
+    [InlineData("")]
+    public void A_cell_with_a_console_network_that_is_not_a_cidr_range_is_refused_naming_the_setting(string network)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => CellOptions.Load(Settings(
+            ("Tenancy:Source", "directory"),
+            ("Cell:Id", "vn-1"),
+            ("Cell:Region", "vn"),
+            ("Cell:TenantDomain", "vn.example.com"),
+            ("Cell:ConsoleAllowedNetworks:0", "10.0.0.0/8"),
+            ("Cell:ConsoleAllowedNetworks:1", network))));
+
+        Assert.Contains("Cell:ConsoleAllowedNetworks", exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_cell_with_every_requirement_missing_names_each_setting()
     {

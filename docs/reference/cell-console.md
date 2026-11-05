@@ -4,7 +4,7 @@ Detailed reference for the cell console: the web page where the platform operato
 of a [cell](cells.md) and provisions them. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the [sign-in](#sign-in) of the console host. The [operator console](operator-console.md) of a
+Everything in this file is _(planned for M31)_, except the [sign-in](#sign-in) of the console host and the **Network** limit of [host and route](#host-and-route). The [operator console](operator-console.md) of a
 tenant stays as it is: it shows one tenant's failed work in detail, inside that tenant. The
 conventions of [architecture.md](../architecture.md) apply.
 
@@ -16,7 +16,10 @@ conventions of [architecture.md](../architecture.md) apply.
 - **Route.** The page is `/` on that host. Its API is the [provisioning API](tenant-lifecycle.md#provisioning-api)
   under `/api/cell/`.
 - **Network.** `Cell:ConsoleAllowedNetworks`, a list of address ranges, limits who reaches the host.
-  It is empty by default, which allows every address, because the second factor guards sign-in.
+  It is empty by default, which allows every address, because the second factor guards sign-in. When it lists
+  ranges, a request to the console host from an address outside every range gets `403`, on every path, before tenant
+  resolution and before any sign-in work. The address is the real client address, which is the forwarded one behind a
+  listed proxy. Tenant hosts and the internal listener's host are not limited.
 
 ## Sign-in
 

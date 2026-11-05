@@ -645,7 +645,7 @@ commands do not read `Quotas:Defaults`.
 | `Cell:HostCheckInterval` | Publisher | How often the publisher checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS, `00:10:00` by default. Zero, a negative value or one that is not a time span stops the publisher with exit code `2`, and the message names the setting. |
 | `Cell:TenantCap` | Server | The measured number of tenants the cell holds, see [cell size](cells.md#cell-size). |
 | `Cell:ConsoleHost` | Server | The host of the [cell console](cell-console.md). |
-| `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
+| `Cell:ConsoleAllowedNetworks` | Server | Address ranges in CIDR notation, such as `10.0.0.0/8`, that may reach the console host. Any other address gets `403`. Empty allows every address. A range that is not CIDR stops the start in a cell, and the message names the setting. |
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
