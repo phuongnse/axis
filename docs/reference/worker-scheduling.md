@@ -68,8 +68,8 @@ An idle tenant is polled less and less often, and a wake signal brings it back a
 - **Sending the signal.** When the server or the publisher commits a transaction that adds a work
   item due now, it sends `NOTIFY axis_work, '<tenant id>'` on the platform database, after the
   commit. The server sends once for each tenant that a request touched, when the request ends. The
-  publisher sends for the tenant it published or rolled back to, when the activation left a schedule
-  trigger past due. Each send is cut off after about 2 seconds, and a failed send is logged and never
+  publisher sends for the tenant it published to or activated a stored release in, when the
+  activation left a schedule trigger past due. Each send is cut off after about 2 seconds, and a failed send is logged and never
   fails the request or the publish. An installation under `Tenancy:Source=configuration` with no
   platform database sends no signal, and its worker finds work by polling alone.
 - **Receiving the signal.** The worker holds one direct connection, named `axis-worker-listen`, that

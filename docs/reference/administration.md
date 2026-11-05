@@ -410,9 +410,9 @@ runs until it is stopped. It has no HTTP endpoint and listens on no port, so not
 
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
-and the E2E script each start one too. It runs `publish`, `validate`, `rollback` and `test` requests
-under both tenancy sources, and `publish` requests with the target `preview`, see
-[preview requests](#preview-requests).
+and the E2E script each start one too. It runs `publish`, `validate`,
+[`rollback`](authoring.md#publishing) and `test` requests under both tenancy sources, and `publish`
+requests with the target `preview`, see [preview requests](#preview-requests).
 
 One process runs these loops:
 
@@ -493,7 +493,7 @@ way.
   claimed, and stays `queued`. A preview request that is not claimed does not block the later
   requests of its application.
 - **One at a time.** For one tenant and application it runs one request at a time, oldest first, so
-  when two publishes are queued the newer one ends up live, and a rollback that is queued after a
+  when two publishes are queued the newer one ends up live, and a `rollback` that is queued after a
   publish runs after it. A `validate` waits behind a running `publish` of the same application. A
   claim skips an application that already has a `running` request. Requests of other applications
   and tenants can run at the same time. Each claim takes a lock of the tenant database before it
@@ -562,12 +562,13 @@ tenant's schema role unless it says otherwise.
      another application, fails the step too.
    - The `activate` step then runs every activation check, so a migration that was applied after the
      release and is missing from it is `AXC0174`, and a field that the release lacks but the tables
-     hold is `AXC0015`. A refused rollback changes nothing. The activation adds a row to the
+     hold is `AXC0015`. A refused `rollback` changes nothing. The activation adds a row to the
      [release history](storage.md#release-history) with the requesting user and the request id, no
      label and no note, unless the release is already active. The step then updates the tenant's
-     realm to match the rolled back release.
+     realm to match the activated release.
    - `seed` then sets the schedule triggers and the seed records of that release, and `indexes`
-     builds the indexes of that release that its tables lack. See [rollback](authoring.md#rollback).
+     builds the indexes of that release that its tables lack. See
+     [activating a release](authoring.md#activating-a-release).
 7. For `test`: `version`, then the step `test`. It checks, in this order, that the setting is set
    (`AXC0217`), that the snapshot can be read, that it compiles, and that every name in the request
    is a scenario of the application (`AXC0218`, once for each unknown name). The first check that

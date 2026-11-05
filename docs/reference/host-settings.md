@@ -116,14 +116,14 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
 | `Studio:Folders`          | `Studio__Folders__0`, `Studio__Folders__1` and so on       | empty   | The application folders that Studio may edit. An empty entry is ignored                         |
 | `Studio:ApplicationsPath` | `Studio__ApplicationsPath`                                 | none    | The folder where Studio creates new applications. With no value, Studio cannot create one       |
 | `Studio:AuthorRole`       | `Studio__AuthorRole`                                       | none    | The roles claim value, such as `author`, of a signed-in user who may use Studio                 |
-| `Studio:PublisherRole`    | `Studio__PublisherRole`                                    | none    | The roles claim value, such as `publisher`, that may also publish and roll back                 |
+| `Studio:PublisherRole`    | `Studio__PublisherRole`                                    | none    | The roles claim value, such as `publisher`, that may also publish and activate a release        |
 | `Studio:Tests`            | `Studio__Tests`                                            | `false` | Shows the test controls in Studio to its users                                                  |
 
 - **When Studio is on.** Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath`
   is set, and only for a user whose roles claim holds `Studio:AuthorRole`. So with the defaults,
   which Production keeps, there is no Studio. A blank role counts as no value, and with no author role
-  nobody may author, and with no publisher role nobody may publish or roll back. Application policies
-  play no part in either role, because an author edits them.
+  nobody may author, and with no publisher role nobody may publish or activate a release.
+  Application policies play no part in either role, because an author edits them.
 - **Paths.** Relative paths in `Studio:Folders` and `Studio:ApplicationsPath` are resolved against the
   server content root. A `Studio:ApplicationsPath` folder that does not exist is created at start,
   and the server stops if it cannot create it. Under several replicas it sits on the shared Studio
@@ -349,7 +349,7 @@ and `Data:TenantPoolIdleLifetime`.
 | `Data:QueryTimeout`           | `00:00:10` | The `statement_timeout` of every interactive read: record lists, single reads and histories, data source rows, lookups and page reads. A read past it is a `503`.                                                                                                                       |
 | `Data:ExportQueryTimeout`     | `00:01:00` | The `statement_timeout` of an export's query. An export past it is a `503` and sends no file.                                                                                                                                                                                          |
 | `Data:WriteTimeout`           | `00:00:15` | The `statement_timeout` of the write transaction of record create, update and delete, process start, task complete and an inbound endpoint call. A write past it rolls back, writes nothing and is a `503`.                                                                             |
-| `Data:ActivationTimeout`      | `00:30:00` | The `statement_timeout` of each statement of the activation transaction (schema changes, migrations and the active release write) at startup, in `admin activate`, in a rollback and in the publisher. It also bounds a wait for a lock. Past it, the activation rolls back and the previous release stays active. It limits each statement, not the whole activation. |
+| `Data:ActivationTimeout`      | `00:30:00` | The `statement_timeout` of each statement of the activation transaction (schema changes, migrations and the active release write) at startup, in `admin activate` and in the publisher, for a publish and for the activation of a stored release. It also bounds a wait for a lock. Past it, the activation rolls back and the previous release stays active. It limits each statement, not the whole activation. |
 | `Data:ExportMaxRows`          | `100000`   | The most data rows one export file holds, an integer from 1 to 2147483646. The file stops there and the response carries `Axis-Export-Truncated: true`.                                                                                                                                |
 | `Data:ImportMaxRows`          | `10000`    | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start.                                                                                                                            |
 | `Data:ImportMaxBytes`         | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start.                                                                                                                                  |
@@ -438,7 +438,7 @@ minute for one replica. The rules of the limits are in
 | `RateLimits:SignIn`     | 300     | Sign-in and its callback, by client address                              |
 | `RateLimits:Session`    | 1200    | Every other route that takes a session, by tenant and user               |
 | `RateLimits:Bearer`     | 1200    | Requests with a bearer token, by tenant and caller id                    |
-| `RateLimits:Publishing` | 60      | Studio validate, publish, preview, rollback and test, by tenant and user |
+| `RateLimits:Publishing` | 60      | Studio validate, publish, preview, activate and test, by tenant and user |
 
 - **`RateLimits:Mcp`** _(planned for M35)_. MCP tool calls, by tenant and client, 600 by default.
 - **Environment variables.** `RateLimits__SignIn`, `RateLimits__Session`, `RateLimits__Bearer` and
