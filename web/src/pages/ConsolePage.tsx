@@ -100,7 +100,12 @@ export function ConsolePage() {
           <Flex vertical gap="middle">
             <Flex gap="small" align="center">
               <span>{t('shell.console.tenant.status')}</span>
-              <Tag color={tenant.status === 'readOnly' ? colour.warning : colour.success}>
+              <Tag
+                style={{
+                  color: tenant.status === 'readOnly' ? colour.warningText : colour.successText,
+                  borderColor: tenant.status === 'readOnly' ? colour.warning : colour.success,
+                }}
+              >
                 {t(`shell.console.tenant.status.${tenant.status}`)}
               </Tag>
             </Flex>
