@@ -1,4 +1,5 @@
 using Axis.ControlPlane;
+using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.Storage;
@@ -22,6 +23,9 @@ builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(options.ConnectionStr
 // After the migration start, whose StartingAsync runs before any hosted service starts. With no job handler the runner is idle.
 builder.Services.AddSingleton(new JobRunnerOptions());
 builder.Services.AddHostedService<JobRunner>();
+
+// The clients of the region's cells. With no cell listed they hold nothing and the service starts as before.
+builder.Services.AddCellClients(options);
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
