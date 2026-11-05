@@ -1386,7 +1386,8 @@ internal static partial class AdminCommands
                 storage is null ? JobSetting<CellBackupStorage>.Missing(storageProblem!) : JobSetting<CellBackupStorage>.Of(storage),
                 http,
                 new TenantLeases(leaseSource, NullLogger<TenantLeases>.Instance),
-                quotas)),
+                quotas,
+                ResolveFolder(configuration[StudioApplicationsPathSetting]))),
         };
 
         // The create and purge jobs run in a cell only: outside one, the provisioning API answers 404, so no create job is queued and no delete job
