@@ -4,7 +4,7 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, and the job read of the
+Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, the route that requests a host of a tenant's own, and the job read of the
 [provisioning API](#provisioning-api), the job runner for suspend, resume and create described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
@@ -113,9 +113,32 @@ The job's steps, in order:
 
 `POST /api/cell/tenants/{id}/hosts` takes `{ "host" }` and answers the host's verification token and
 the DNS records to add. The checks, the certificate and the rule that a host is never served before it
-is verified are in [hosts and certificates](cells.md#hosts-and-certificates). A host already held by a
-tenant of the cell, or held back after a deletion, answers `409`, and the message does not say which
-tenant holds it.
+is verified are in [hosts and certificates](cells.md#hosts-and-certificates).
+
+The route is built as far as the request:
+
+- **The host.** The server trims the host and keeps it in lower case. It must be a DNS name of at
+  least two labels, each of 1 to 63 letters, digits or inner hyphens, 253 characters at most, with
+  no trailing dot, and no IP address. A blank or malformed host answers `400`. An unknown tenant or a
+  preview tenant answers `404`.
+- **The answer.** `201` with `{ host, token, state, expiresAt, txt, cname }`. The `token` is 32
+  random bytes as base64url, `txt` is the record `_axis-verify.<host>` that holds the token, `cname`
+  points the host to `<id>.<Cell:TenantDomain>`, and `expiresAt` is 7 days after the request.
+- **A repeat.** The same tenant asking again for the same pending host answers `200` with the same
+  token, so a retry does not invalidate DNS records the customer already added. Once `expiresAt` has
+  passed the request is no longer pending, and a new request stores a new row with a new token. A
+  transaction lock on the tenant and host keeps two parallel retries from storing two tokens.
+- **A host that is held.** A host that `platform.tenant_hosts` holds, for any tenant, answers `409`,
+  and the message does not say which tenant holds it. The held back check after a deletion is
+  _(planned for M31)_, with tenant deletion.
+- **A pending request holds nothing.** The request is a row of `platform.tenant_host_requests`, see
+  [storage](storage.md#platform-database), and another tenant may request the same host. The host is
+  not in `platform.tenant_hosts`, so it still answers `404` for every path. The server stores the
+  request over the platform reader role, which may insert into that table and nothing else there.
+  The row's `actor` is the operator's id. The route queues no job and takes no `Idempotency-Key`.
+
+The job that checks the customer's DNS records, the certificate and adding the verified host are
+_(planned for M31)_. Until they exist, nothing changes a request to `verified` or `expired`.
 
 ## Exporting a tenant
 

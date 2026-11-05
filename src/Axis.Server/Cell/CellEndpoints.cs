@@ -1,3 +1,5 @@
+using System.Buffers.Text;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
@@ -63,6 +65,18 @@ namespace Axis.Server.CellApi;
 /// holds (<c>409</c>) and the cell's <see cref="CellOptions.TenantCap"/> (<c>409</c>, "This cell is full."). The job's <c>input</c> holds the
 /// application and the administrator and the job read never returns it.
 /// </para>
+/// <para>
+/// <c>POST /api/cell/tenants/{id}/hosts</c> takes <c>{ "host" }</c>, a host of the tenant's own such as <c>approvals.acme.vn</c>, and
+/// stores a pending request in <c>platform.tenant_host_requests</c>, with the host in lower case. It answers <c>201</c> with
+/// <c>{ host, token, state, expiresAt, txt, cname }</c>: the token is 32 random bytes as base64url, <c>txt</c> is the record
+/// <c>_axis-verify.&lt;host&gt;</c> that holds the token, <c>cname</c> points the host to <c>&lt;id&gt;.&lt;Cell:TenantDomain&gt;</c>, and the
+/// request expires 7 days later. A repeat request from the same tenant for the same pending host answers <c>200</c> with the same
+/// token. A blank host or one that is not a DNS name of at least two labels answers <c>400</c>, an unknown tenant or a preview tenant
+/// <c>404</c>, and a host that <c>platform.tenant_hosts</c> holds for any tenant <c>409</c>, whose title names no tenant. A transaction
+/// lock on the tenant and host serializes parallel requests. A pending request does not hold the host, so another tenant may request it
+/// and the host still answers <c>404</c> until a later step verifies it. The insert goes over the reader role. The request's <c>actor</c>
+/// is the operator's id. The route queues no job and takes no <c>Idempotency-Key</c>.
+/// </para>
 /// </summary>
 internal static class CellEndpoints
 {
@@ -82,6 +96,12 @@ internal static class CellEndpoints
 
     private const int MaxTenantIdLength = 50;
 
+    private const int MaxHostLength = 253;
+
+    private const int MaxHostLabelLength = 63;
+
+    private static readonly TimeSpan _hostRequestWindow = TimeSpan.FromDays(7);
+
     public static void MapCellEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var cell = endpoints.MapGroup("/api/cell")
@@ -95,6 +115,7 @@ internal static class CellEndpoints
             QueueJobAsync("suspend", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/resume", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("resume", id, http, dataSource, cancellationToken));
+        cell.MapPost("/tenants/{id}/hosts", RequestHostAsync);
         cell.MapGet("/jobs/{id:guid}", GetJobAsync);
 
         // Sign-in and sign-out are the only routes that skip the operator policy. They keep the route marker, so the console
@@ -252,6 +273,98 @@ internal static class CellEndpoints
         await transaction.CommitAsync(cancellationToken);
         return Accepted(job);
     }
+
+    [SuppressMessage("Performance", "CA1862:Use the 'StringComparison' method overloads", Justification = "The query must translate to lower(host) to use the unique index on lower(host).")]
+    private static async Task<IResult> RequestHostAsync(
+        string id,
+        CellHostRequest? request,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        CellOptions cell,
+        CancellationToken cancellationToken)
+    {
+        var trimmed = request?.Host?.Trim();
+        if (trimmed is null || !IsValidHost(trimmed.ToLowerInvariant()))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The host must be a DNS name such as approvals.example.com.");
+        }
+
+        // Hosts are ASCII, so lower() in the database matches this lower case.
+        var host = trimmed.ToLowerInvariant();
+        await using var platform = Open(dataSource);
+        await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
+
+        // The lock keeps two parallel retries from inserting two pending requests with different tokens.
+        await platform.Database.ExecuteSqlAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended('axis-host-request:' || {id} || ':' || {host}, 0))",
+            cancellationToken);
+        if (!await platform.Tenants.AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+        }
+
+        // The title names neither the host nor the tenant that holds it.
+        if (await platform.TenantHosts.AnyAsync(row => row.Host.ToLower() == host, cancellationToken))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This host already belongs to a tenant.");
+        }
+
+        // A request whose expiry has passed is not pending, although its state says so until a later step marks it expired.
+        var now = DateTimeOffset.UtcNow;
+        var pending = await platform.TenantHostRequests.AsNoTracking()
+            .Where(row => row.TenantId == id && row.Host == host && row.State == "pending" && row.ExpiresAt > now)
+            .OrderByDescending(row => row.RequestedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (pending is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(HostResponse(pending, cell));
+        }
+
+        var created = new TenantHostRequestRow
+        {
+            TenantId = id,
+            Host = host,
+            Token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)),
+            State = "pending",
+            RequestedAt = now,
+            ExpiresAt = now + _hostRequestWindow,
+            Actor = httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
+        };
+        platform.TenantHostRequests.Add(created);
+        await platform.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Results.Json(HostResponse(created, cell), statusCode: StatusCodes.Status201Created);
+    }
+
+    private static CellHostResponse HostResponse(TenantHostRequestRow request, CellOptions cell) =>
+        new(
+            request.Host,
+            request.Token,
+            request.State,
+            request.ExpiresAt,
+            new CellDnsRecord("_axis-verify." + request.Host, request.Token),
+            new CellCnameRecord(request.Host, $"{request.TenantId}.{cell.TenantDomain!.Trim()}"));
+
+    // A host of a tenant's own must be a public DNS name that can carry a CNAME, so it has at least two labels and is no IP address.
+    private static bool IsValidHost(string host)
+    {
+        if (host.Length is 0 or > MaxHostLength || Uri.CheckHostName(host) != UriHostNameType.Dns)
+        {
+            return false;
+        }
+
+        var labels = host.Split('.');
+        return labels.Length >= 2 && labels.All(IsValidHostLabel);
+    }
+
+    private static bool IsValidHostLabel(string label) =>
+        label.Length is >= 1 and <= MaxHostLabelLength
+        && label[0] != '-'
+        && label[^1] != '-'
+        && label.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 
     private static async Task<IResult> CreateTenantAsync(
         HttpContext httpContext,
@@ -525,6 +638,24 @@ internal sealed record CellQuotasResponse(IReadOnlyDictionary<string, CellQuotaR
 
 /// <summary>The body of the create route. A missing or wrongly typed member is null and answers <c>400</c>.</summary>
 internal sealed record CellCreateTenantRequest(string? Id, string? Application, string? Administrator);
+
+/// <summary>The body of the host request route. A missing or wrongly typed host is null and answers <c>400</c>.</summary>
+internal sealed record CellHostRequest(string? Host);
+
+/// <summary>A pending request for a host of a tenant's own, with the DNS records the customer must add.</summary>
+internal sealed record CellHostResponse(
+    string Host,
+    string Token,
+    string State,
+    DateTimeOffset ExpiresAt,
+    CellDnsRecord Txt,
+    CellCnameRecord Cname);
+
+/// <summary>A <c>TXT</c> record to add.</summary>
+internal sealed record CellDnsRecord(string Name, string Value);
+
+/// <summary>A <c>CNAME</c> record to add: the host <c>Name</c> points to <c>Target</c>.</summary>
+internal sealed record CellCnameRecord(string Name, string Target);
 
 /// <summary>A queued job of the provisioning API.</summary>
 internal sealed record CellJobResponse(Guid Id, string Kind, string TenantId, string State, DateTimeOffset CreatedAt);

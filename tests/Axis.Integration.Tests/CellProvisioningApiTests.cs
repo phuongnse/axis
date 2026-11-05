@@ -284,6 +284,169 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task A_host_request_answers_201_with_the_token_the_txt_record_and_the_cname_and_stores_a_pending_row()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var response = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = " Shop.Acme.Test " });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var requestToken = body.GetProperty("token").GetString()!;
+        Assert.Equal(43, requestToken.Length);
+        Assert.Equal("shop.acme.test", body.GetProperty("host").GetString());
+        Assert.Equal("pending", body.GetProperty("state").GetString());
+        Assert.InRange(body.GetProperty("expiresAt").GetDateTimeOffset(), DateTimeOffset.UtcNow.AddDays(7).AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(7).AddMinutes(5));
+        Assert.Equal("_axis-verify.shop.acme.test", body.GetProperty("txt").GetProperty("name").GetString());
+        Assert.Equal(requestToken, body.GetProperty("txt").GetProperty("value").GetString());
+        Assert.Equal("shop.acme.test", body.GetProperty("cname").GetProperty("name").GetString());
+        Assert.Equal("b.vn.example.test", body.GetProperty("cname").GetProperty("target").GetString());
+
+        Assert.Equal(1, await CountAsync("platform.tenant_host_requests"));
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT tenant_id, host, token, state, actor, checked_at IS NULL FROM platform.tenant_host_requests", connection);
+        await using var rows = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await rows.ReadAsync(CancellationToken));
+        Assert.Equal(
+            ("b", "shop.acme.test", requestToken, "pending", new JsonWebToken(token).Subject, true),
+            (rows.GetString(0), rows.GetString(1), rows.GetString(2), rows.GetString(3), rows.GetString(4), rows.GetBoolean(5)));
+    }
+
+    [Fact]
+    public async Task A_repeat_request_of_the_same_tenant_answers_200_with_the_same_token_and_another_tenant_may_request_the_host()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+        using var again = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "SHOP.acme.test" });
+        using var other = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/c/hosts", token, new { host = "shop.acme.test" });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, other.StatusCode);
+        var firstToken = (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("token").GetString();
+        var againBody = await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var otherBody = await other.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(firstToken, againBody.GetProperty("token").GetString());
+        Assert.NotEqual(firstToken, otherBody.GetProperty("token").GetString());
+        Assert.Equal("c.vn.example.test", otherBody.GetProperty("cname").GetProperty("target").GetString());
+        Assert.Equal(2, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_request_after_the_pending_one_expired_stores_a_new_row_with_a_new_token()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+        await ExecuteAsync("UPDATE platform.tenant_host_requests SET expires_at = now() - interval '1 minute'");
+        using var second = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        Assert.NotEqual(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("token").GetString(),
+            (await second.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("token").GetString());
+        Assert.Equal(2, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_host_that_another_tenant_holds_answers_409_without_naming_the_tenant()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var response = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/c/hosts", token, new { host = "B2.vn.example.test" });
+        using var own = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "b2.vn.example.test" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.DoesNotContain("\"b\"", body);
+        Assert.Equal(HttpStatusCode.Conflict, own.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_requested_host_that_is_not_verified_still_answers_404_on_a_tenant_route()
+    {
+        await using var factory = await StartAsync();
+        using var console = CreateClient(factory, _console);
+        using var requested = CreateClient(factory, new Uri("http://shop.acme.test/"));
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var request = await SendAsync(console, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+        using var root = await GetAsync(requested, "/", token: null);
+        using var me = await GetAsync(requested, "/api/me", token: null);
+
+        Assert.Equal(HttpStatusCode.Created, request.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, root.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, me.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_host_request_without_the_role_answers_403_without_a_token_401_and_stores_nothing()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        var body = new { host = "shop.acme.test" };
+
+        using var noRole = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", noRoleToken, body);
+        using var none = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token: null, body);
+
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_blank_or_malformed_host_answers_400_and_an_unknown_or_preview_tenant_answers_404()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        var bad = new List<HttpResponseMessage>();
+        try
+        {
+            foreach (var host in new[] { "", "  ", "not a host", "localhost", "1.2.3.4", "shop.acme.test.", "-a.acme.test", "a_b.acme.test", "a..acme.test", new string('a', 64) + ".test" })
+            {
+                bad.Add(await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host }));
+            }
+
+            bad.Add(await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { }));
+            using var unknown = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/nobody/hosts", token, new { host = "shop.acme.test" });
+            using var preview = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/a-preview/hosts", token, new { host = "shop.acme.test" });
+
+            Assert.All(bad, response =>
+            {
+                Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+                Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+            });
+            Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+            Assert.Equal(0, await CountAsync("platform.tenant_host_requests"));
+        }
+        finally
+        {
+            foreach (var response in bad)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    [Fact]
     public async Task Suspend_and_resume_queue_jobs_that_the_runner_finishes_with_one_audit_record_naming_the_operator()
     {
         await using var factory = await StartAsync();
