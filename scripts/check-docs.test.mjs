@@ -395,7 +395,7 @@ describe('ASVS table', () => {
     write('docs/reference/asvs.md', table(row('V1.1.1', '**Met**', '`FooTests` and `MissingTests`.'), row('V1.2.1'), row('V9.1.1')))
 
     assert.deepEqual(messages(), [
-      'docs/reference/asvs.md:7: V1.1.1 names the test class MissingTests, which no .cs file under tests/ or samples/ declares',
+      'docs/reference/asvs.md:7: V1.1.1 names the test class MissingTests, which no .cs file under tests/, controlplane/tests/ or samples/ declares',
     ])
   })
 
@@ -404,7 +404,7 @@ describe('ASVS table', () => {
     write('docs/reference/asvs.md', table(row('V1.1.1', '**Met**', '`BazTests`.'), row('V1.2.1', '**Met**', '`BarTests`.'), row('V9.1.1')))
 
     assert.deepEqual(messages(), [
-      'docs/reference/asvs.md:8: V1.2.1 names the test class BarTests, which no .cs file under tests/ or samples/ declares',
+      'docs/reference/asvs.md:8: V1.2.1 names the test class BarTests, which no .cs file under tests/, controlplane/tests/ or samples/ declares',
     ])
   })
 
@@ -570,8 +570,15 @@ describe('threat model table', () => {
     const text = writePage({ product: [row('P1', { status: '**Mitigated**', evidence: '`FooTests` and `MissingTests`.' }), row('P2')] })
 
     assert.deepEqual(messages(), [
-      `${page}:${lineOf(text, '| P1 |')}: P1 names the test class MissingTests, which no .cs file under tests/ or samples/ declares`,
+      `${page}:${lineOf(text, '| P1 |')}: P1 names the test class MissingTests, which no .cs file under tests/, controlplane/tests/ or samples/ declares`,
     ])
+  })
+
+  test('accepts a Mitigated row that names a test class declared under controlplane/tests', () => {
+    write('controlplane/tests/X/CellOnlyTests.cs', 'public sealed class CellOnlyTests\n{\n}\n')
+    writePage({ product: [row('P1', { status: '**Mitigated**', evidence: '`CellOnlyTests`.' }), row('P2')] })
+
+    assert.deepEqual(messages(), [])
   })
 
   test('reports a Gap row that links no issue', () => {
@@ -594,6 +601,7 @@ describe('the repository threat model', () => {
     ['threat-model-product.md', '## The product'],
     ['threat-model-installation.md', '## The installation'],
     ['threat-model-build.md', '## The way Axis is built'],
+    ['threat-model-control-plane.md', '## The control plane'],
   ]
 
   test('has a threat table under each scope section, in a file of its own', () => {

@@ -81,6 +81,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Threat model: the product](reference/threat-model-product.md) | The server, worker, SPA, Studio, packages, connectors, identity provider and personal data threats |
 | [Threat model: the installation](reference/threat-model-installation.md) | The images, hosts, databases, backups, secrets and the cell console threats of an install |
 | [Threat model: the way Axis is built](reference/threat-model-build.md) | The NexKit, CI and AI agent threats of how Axis is built |
+| [Threat model: the control plane](reference/threat-model-control-plane.md) | The sign-up, cell call, DNS and billing portal sign-in threats of Axis SaaS |
 | [Threat model method](reference/threat-model-method.md)                | How the threat model is filled: the methods, the rows, the ratings and the statuses    |
 | [Log inventory](reference/log-inventory.md)                            | Every log Axis writes: events, format, destination, readers, retention and the security events |
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |

@@ -41,7 +41,7 @@ rated by a short form of a standard rating.
   - a status that is not one of the four above
   - a rating that is missing or is not one of the four above
   - a row without evidence
-  - a **Mitigated** row that names a test class no `.cs` file under `tests/` or `samples/` declares
+  - a **Mitigated** row that names a test class no `.cs` file under `tests/`, `controlplane/tests/` or `samples/` declares
   - a **Gap** row that links no GitHub issue
   - an **Accepted** row that gives no date
   - It does not judge that a test covers its threat, that a time frame was kept, or that a
