@@ -31,6 +31,7 @@ node --test scripts/check-links.test.mjs || status=1
 node --test scripts/check-docs.test.mjs || status=1
 node --test scripts/check-locators.test.mjs || status=1
 node --test scripts/check-raw-html.test.mjs || status=1
+node --test scripts/check-shared-widgets.test.mjs || status=1
 node --test scripts/check-prototype-pollution.test.mjs || status=1
 node --test scripts/check-bundle.test.mjs || status=1
 node --test scripts/check-fonts.test.mjs || status=1

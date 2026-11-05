@@ -128,7 +128,12 @@ prototype. The rule is in [Design changes](../../../docs/delivery.md#design-chan
    `prettier --check` in `web/`, `dotnet build`, the tests of the shared widgets the merge touched (`AxisTable`,
    `TableWidget`, `Shell`), and `scripts/design-system.sh`. A test that fails because the prototype changed a widget on
    purpose is listed in `design-review.md`, not fixed on this branch.
-6. Write the merge into `design-review.md`: which `main` commit, what was kept from each side, and what is left unused.
+6. Search the merged code for one concern with two mechanisms, as the "One concern has one mechanism" rule in
+   [AGENTS.md](../../../AGENTS.md#working-rules) says: two components or helpers for the same job, a prop that does what a
+   context or a route already does, a caller that builds what its shared widget should know. Run
+   `node scripts/check-shared-widgets.mjs`, which on a prototype lists where the code differs from the baseline of `main` and
+   is not expected to pass, and put it with what else you find in `design-review.md`.
+7. Write the merge into `design-review.md`: which `main` commit, what was kept from each side, and what is left unused.
    Commit it with the merge, and push the branch.
 
 ### Checking a card
@@ -149,6 +154,9 @@ A check passes only when the card behaves as it will in the artifact.
 
 ### End
 
+0. Audit the prototype for one concern with two mechanisms: have an agent read `web/src` and the server for copies, forks
+   and second ways to the same result, and put what it finds in `design-review.md`, so the issue merges each into the
+   shared one. The rule is in [AGENTS.md](../../../AGENTS.md#working-rules).
 1. When the owner has agreed every change, write one docs change on its own
    branch from `main`: the rules in the reference docs that hold their
    detail, and a decision when a rule changes configuration, an API or an
