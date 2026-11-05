@@ -87,9 +87,9 @@ and `POST /api/cell/tenants/{id}/read-only` set and `resume` clears.
   `reason` is `tenant-read-only`, titled "This workspace is read-only.": record writes, imports, task
   completions, process starts, inbound endpoint calls, Studio saves and publish requests, and the
   users page's changes.
-- **No work** _(planned for M33)_. The worker claims none of the tenant's new work, as for a suspended
+- **No work**. The worker claims none of the tenant's new work, as for a suspended
   tenant. Work already claimed finishes. Schedules do not fire, and a missed occurrence is not caught
-  up after a resume. No email is sent for the tenant.
+  up after a resume: the worker skips them when it first sees the tenant active again. No email is sent for the tenant.
 - **A banner** _(planned for M33)_. `GET /api/me` answers `tenantStatus: "readOnly"`, and the shell
   shows a banner on every page: why the workspace is read-only, and, for an administrator, a link to
   the [billing portal](billing-portal.md).

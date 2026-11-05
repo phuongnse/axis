@@ -18,6 +18,9 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
     private volatile DirectoryTenantCatalog? _directory;
     private volatile bool _refreshFailed;
 
+    // The tenants that were read-only in the last good read, before the catalog withheld them.
+    private HashSet<string> _readOnly = new(StringComparer.Ordinal);
+
     private WorkerTenantCatalog(
         ITenantCatalog? catalog,
         string? platformConnectionString,
@@ -80,7 +83,10 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
 
     // The directory serves read-only tenants to the hosts that answer requests, but the worker claims no work for them, as for a suspended tenant.
     private static DirectoryTenantCatalog WithholdReadOnly(DirectoryTenantCatalog loaded) =>
-        loaded.Withhold([.. loaded.Tenants.Where(tenant => tenant.ReadOnly).Select(tenant => tenant.Id)]);
+        loaded.Withhold([.. ReadOnlyIds(loaded)]);
+
+    private static HashSet<string> ReadOnlyIds(DirectoryTenantCatalog loaded) =>
+        [.. loaded.Tenants.Where(tenant => tenant.ReadOnly).Select(tenant => tenant.Id)];
 
     /// <summary>Reads the active tenants from the tenant directory and keeps them.</summary>
     /// <exception cref="InvalidOperationException">The directory cannot be read. The message holds no connection value.</exception>
@@ -91,7 +97,9 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
             return;
         }
 
-        var loaded = WithholdReadOnly(await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress));
+        var read = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress);
+        var loaded = WithholdReadOnly(read);
+        _readOnly = ReadOnlyIds(read);
         _directory = loaded;
         _current = loaded;
     }
@@ -110,13 +118,13 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         ArgumentNullException.ThrowIfNull(passesRoleCheck);
         if (_platformConnectionString is null || _cipher is null || _directory is not { } current)
         {
-            return new TenantRefreshResult([], Tenants.Count, 0, 0);
+            return new TenantRefreshResult([], [], Tenants.Count, 0, 0);
         }
 
-        DirectoryTenantCatalog loaded;
+        DirectoryTenantCatalog read;
         try
         {
-            loaded = WithholdReadOnly(await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress));
+            read = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress);
         }
         catch (InvalidOperationException)
         {
@@ -124,6 +132,9 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
             throw;
         }
 
+        var loaded = WithholdReadOnly(read);
+        var readOnly = ReadOnlyIds(read);
+        var resumed = _readOnly.Where(id => read.Find(id) is { ReadOnly: false }).ToList();
         var pending = loaded.DatabaseChanges(current);
         var withheld = new List<string>();
         foreach (var id in pending)
@@ -139,8 +150,9 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         var dropped = current.Tenants.Select(tenant => tenant.Id).Except(next.Tenants.Select(tenant => tenant.Id), StringComparer.Ordinal);
         _directory = next;
         _current = next;
+        _readOnly = readOnly;
         _refreshFailed = false;
-        return new TenantRefreshResult([.. changed.Concat(dropped).Distinct(StringComparer.Ordinal)], next.Tenants.Count, pending.Count, withheld.Count);
+        return new TenantRefreshResult([.. changed.Concat(dropped).Distinct(StringComparer.Ordinal)], resumed, next.Tenants.Count, pending.Count, withheld.Count);
     }
 
     /// <summary>
@@ -155,7 +167,8 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
 }
 
 /// <param name="Retired">The tenants whose database settings changed or that are no longer active, whose old pool must go.</param>
+/// <param name="Resumed">The tenants that were read-only in the read before and are not read-only now, whether or not they passed the role check.</param>
 /// <param name="TenantCount">The tenants that are active after the read.</param>
 /// <param name="CheckedCount">The tenants that went through the runtime role check.</param>
 /// <param name="WithheldCount">The tenants that failed the runtime role check.</param>
-internal sealed record TenantRefreshResult(IReadOnlyList<string> Retired, int TenantCount, int CheckedCount, int WithheldCount);
+internal sealed record TenantRefreshResult(IReadOnlyList<string> Retired, IReadOnlyList<string> Resumed, int TenantCount, int CheckedCount, int WithheldCount);
