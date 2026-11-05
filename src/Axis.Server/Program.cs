@@ -57,6 +57,16 @@ builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, R
 
 // Read before any database work too, so a bad value stops the start.
 var cell = CellOptions.Load(builder.Configuration);
+
+// Only the Internal endpoint asks for a client certificate. The public endpoints never do.
+var internalListener = CellInternalListener.Load(builder.Configuration, cell);
+if (internalListener is not null)
+{
+    builder.WebHost.ConfigureKestrel((context, kestrel) => kestrel
+        .Configure(context.Configuration.GetSection("Kestrel"), reloadOnChange: false)
+        .Endpoint(CellInternalListener.EndpointName, endpoint => internalListener.Apply(endpoint.HttpsOptions)));
+}
+
 var runtimeAddress = TenantRuntimeAddress.Load(builder.Configuration, cell);
 builder.Services.AddSingleton(cell);
 builder.Services.AddSingleton(new CellHosts(cell));

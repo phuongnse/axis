@@ -59,9 +59,10 @@ over a private network with mutual TLS.
   plane's client certificate, follows no redirect and goes over `https` only: a cell address that is
   not `https` stops the start. With `ControlPlane:CellCertificateAuthorityPath` the client trusts only
   a server certificate that chains to that authority, and checks no revocation list.
-- **The cell's side** _(planned for M33)_. The cell accepts on its
+- **The cell's side.** The cell accepts on its
   [internal listener](tenant-lifecycle.md#provisioning-api) only a client certificate that the
-  region's internal certificate authority issued to the control plane.
+  region's internal certificate authority issued to the control plane. A cell sets
+  `Cell:InternalClientCa` for this, see [host settings](host-settings.md#cell-settings).
 - **The chart's wiring** _(planned for M33)_. The Helm chart mounts the client certificate, the
   authority file and the cells' secrets, so that a region's control plane reaches its cells.
 - **Idempotent.** Every `POST` to a cell carries an `Idempotency-Key` that the control plane derives

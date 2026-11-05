@@ -19,9 +19,14 @@ has one implementation.
   path outside `/api/cell/`, the page at `/` included. A tenant host answers `404` for every path
   under `/api/cell/`, before any sign-in work. A self-hosted installation has no platform host, so
   every `/api/cell/` path answers `404` there.
-- **The internal listener** _(planned for M33)_. The server opens a listener of its own for
-  `Cell:InternalUrl`, which only the cell's network reaches and which accepts only a client
-  certificate of the region's internal certificate authority, see
+- **The internal listener.** The server opens a listener of its own for `Cell:InternalUrl`, which only
+  the cell's network reaches. It is the Kestrel endpoint `Internal`, with its own URL and server
+  certificate. With `Cell:InternalClientCa` set, it requires a client certificate that chains to the
+  region's internal certificate authority in that PEM file, and the TLS handshake fails without one.
+  The server checks the chain against that authority only and no revocation list, and it refuses a
+  certificate whose extended key usage leaves out client authentication. The public listeners never ask
+  for a client certificate. The route still needs a bearer token, see the next item. Without
+  `Cell:InternalClientCa` the endpoint serves without client certificates, which development uses. See
   [reaching the cells](control-plane.md#reaching-the-cells).
 - **Who may call.** A caller signs in through the cell's [operator realm](cell-console.md#sign-in):
   the cell console with the operator's session, and a machine caller, such as the control plane or a

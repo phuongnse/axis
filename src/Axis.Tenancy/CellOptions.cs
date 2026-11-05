@@ -43,6 +43,12 @@ public sealed class CellOptions
     /// <summary>The internal listener of the provisioning API.</summary>
     public string? InternalUrl { get; set; }
 
+    /// <summary>
+    /// A PEM file with the region's internal certificate authority. With it set, the <c>Internal</c> Kestrel endpoint of the
+    /// server requires a client certificate that chains to it.
+    /// </summary>
+    public string? InternalClientCa { get; set; }
+
     /// <summary>The operator realm, <c>axis-operators</c> by default. A blank value keeps the default.</summary>
     public string OperatorRealm { get; set; } = DefaultOperatorRealm;
 
