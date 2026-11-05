@@ -388,6 +388,10 @@ owner is reviewing it one step at a time.
   by blocks a delete. `usesShownByForm`, which kept Uses from repeating the form, goes with it. Tries that came first: a
   Dependencies tab with a Used by / Uses switch inside it, a tab within a tab; grouped lists; a table with group rows.
   The glossary's "Phụ thuộc" and "Sử dụng" are to leave it in the next docs change.
+- **"Nơi sử dụng":** the Vietnamese tab reads "Nơi sử dụng", and the delete dialog's link "Xem nơi sử dụng". "Được dùng
+  bởi" was a passive built on "bởi", as English says "Used by", which the owner found unnatural in an application, as the
+  standard's rule against an English passive says. English keeps "Used by". The glossary's Used by is to read "Nơi sử
+  dụng", with "Được dùng bởi" avoided, in the next docs change.
 - **Delete:** the Danger zone sat under the tabs, so every tab showed it. Delete… is now in a "…" menu at the right of
   the resource's heading, through a slot the page gives the editor, as the release page's Activate… is. Its dialog keeps
   the warning that the resource is used, with "See what uses it", which opens the Used by tab.
