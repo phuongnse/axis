@@ -728,6 +728,19 @@ describe('App', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
   })
 
+  it('puts the footer under the content column of a site with a sidebar, and not in the sidebar', async () => {
+    stubServer()
+
+    renderApp('/e2e/notes')
+
+    await screen.findByRole('heading', { name: 'All notes' })
+    const sidebar = screen.getByRole('complementary')
+    const footer = screen.getByRole('contentinfo')
+    expect(sidebar).not.toContainElement(footer)
+    expect(footer.parentElement).toContainElement(screen.getByRole('main'))
+    expect(footer.parentElement).not.toContainElement(sidebar)
+  })
+
   it('shows the Studio and operator console tiles only for the roles that hold them', async () => {
     for (const [studio, console_] of [
       [true, false],

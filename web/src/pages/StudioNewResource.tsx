@@ -1,5 +1,6 @@
-import { Button, Form, Input, Modal, Select } from 'antd'
+import { Form, Input, Modal, Select } from 'antd'
 import { useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import {
   createStudioResource,
   fetchStudioResource,
@@ -19,7 +20,7 @@ const fallbackLocale = 'en'
 type Problem = 'exists' | 'invalid' | 'failed'
 
 /**
- * The New resource button of the open application, and its dialog. The dialog asks for a kind, listed by its singular
+ * The New resource button of the open application's band, a text button, and its dialog. The dialog asks for a kind, listed by its singular
  * name under the sidebar's groups, and a name, or for a locale when the kind is `text`. It creates the resource from
  * the kind's starter with an id from `crypto.randomUUID()`. A new text resource is named after its locale, such as `TextsVi`, and copies every key and
  * text of the default locale of the first site in file order, or of `en` when there is no site, so every label still
@@ -97,7 +98,9 @@ export function StudioNewResource({
 
   return (
     <>
-      <Button onClick={show}>{t('shell.studio.newResource.button')}</Button>
+      <AxisButton role="secondary" onClick={show}>
+        {t('shell.studio.newResource.button')}
+      </AxisButton>
       <Modal
         open={open}
         title={t('shell.studio.newResource.title')}

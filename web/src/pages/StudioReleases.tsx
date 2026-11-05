@@ -14,17 +14,20 @@ import { PlatformContext } from './context'
  * published, who published it and the note, from the release's first activation. An empty label or note shows the em
  * dash, and Published by is a name, never an id. When `canRollBack`, every row but the live one has an Activate… icon
  * button, off while `busy`. The button opens a dialog that says which release replaces the live one, and its
- * confirmation calls `onRollBack`.
+ * confirmation calls `onRollBack`. The list has a level-5 title unless `titled` is false, where the page's own heading
+ * names it.
  */
 export function StudioReleasesList({
   history,
   canRollBack,
   busy,
+  titled = true,
   onRollBack,
 }: {
   history: StudioReleases
   canRollBack: boolean
   busy: boolean
+  titled?: boolean
   onRollBack: (row: StudioReleaseListRow) => void
 }) {
   const t = useText()
@@ -73,7 +76,7 @@ export function StudioReleasesList({
   return (
     <section data-testid="studio-releases">
       <Flex vertical gap="small">
-        <Typography.Title level={3}>{t('shell.studio.releases')}</Typography.Title>
+        {titled && <Typography.Title level={5}>{t('shell.studio.releases')}</Typography.Title>}
         <AxisTable<StudioReleaseListRow>
           columns={columns}
           rowKey={(row) => row.releaseId}

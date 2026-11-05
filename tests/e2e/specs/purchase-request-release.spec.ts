@@ -14,7 +14,7 @@ import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openKind, openTab } from '../studio-resources'
+import { openKind, openProblems, openTab } from '../studio-resources'
 import { chooseTheme } from '../shell'
 import { logInAtKeycloak } from '../keycloak'
 
@@ -362,7 +362,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         timeout: 60_000,
       })
       await expect(page.getByTestId('studio-release-number')).toHaveCount(0)
-      await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0100')
+      await expect(await openProblems(page)).toContainText('AXC0100')
       await useSession(page, 'requester')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
@@ -573,7 +573,7 @@ test.describe('the active release of the purchase request sample changes', () =>
           timeout: 120_000,
         })
         await expect(failedScenario('light')).toBeVisible()
-        await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0342')
+        await expect(await openProblems(page)).toContainText('AXC0342')
         await expect(page.getByTestId('studio-release-row').filter({ hasText: labelB })).toHaveCount(0)
         await expect(page.getByTestId('studio-release-row').filter({ hasText: labelA })).toHaveAttribute(
           'data-active',
@@ -713,7 +713,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
         timeout: 60_000,
       })
-      await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0174')
+      await expect(await openProblems(page)).toContainText('AXC0174')
       await expect(page.locator('[data-testid="studio-release-row"][data-number="2"]')).toHaveAttribute(
         'data-active',
         'true',
@@ -764,9 +764,8 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       await page.getByRole('button', { name: 'Validate', exact: true }).click()
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
-      const diagnostics = page.getByTestId('studio-diagnostics')
-      await expect(diagnostics.locator('li')).toHaveCount(0)
-      await expect(diagnostics).toContainText('No diagnostics.')
+      // With no problem left, the band has no problems button.
+      await expect(page.getByTestId('studio-problems')).toHaveCount(0)
 
       await page.getByTestId('studio-preview').click()
       // The status still shows the validate that ended before the click, so wait for the preview link instead.

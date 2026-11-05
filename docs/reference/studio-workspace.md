@@ -6,7 +6,7 @@ band, its page headings, its Overview, its Releases list and a release's page. T
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
 [D129](../decisions/d129-rules-from-the-studio-editors-review.md) and
-[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace, Releases and Names sections are built, except where marked. The rest of this page is _(planned for M31)_.
+[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace, Band, Problems panel, Page heading, Releases and Names sections are built, except where marked. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
@@ -61,8 +61,8 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules c
   `textMuted` and never a link: "Changes not live" when the folder differs from the live release, "Not published yet"
   when there is no live release, "Release 7 is live" when nothing needs attention, so a quiet band never reads as
   still loading, and "Releases did not load" in `warningText` when the history fails. A live release that is
-  off-standard reads "Release 3 is live, off-standard", as the Off-standard tag marks a release, never the folder, and
-  stays beside a release's number. No state has an icon, as its
+  off-standard reads "Release 3 is live, off-standard" _(planned for M31)_, as the Off-standard tag marks a release, never the folder, and
+  stays beside a release's number. Until then, the folder's Off-standard tag shows after the state. No state has an icon, as its
   words already say it. While the history loads, only the problems show.
 - **The actions.** New resource…, Validate, Preview and Run tests are text buttons with no icon, the same gap apart,
   and Publish… is the band's one solid button, see [buttons](actions-and-controls.md#buttons). New resource… heads

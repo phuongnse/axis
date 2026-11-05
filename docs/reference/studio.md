@@ -10,7 +10,7 @@ Studio is where authors edit an application's resources. It uses the
 [authoring API](authoring.md) and writes the same JSON files that git keeps, as
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md)
 agrees. The route, the link, the application row of the sidebar, New application, New resource, a kind's list, the editor, the reference pickers, the Uses and Used by lists, the delete
-button and its warning, the diagnostics panel, Validate, Preview and Publish with
+button and its warning, the Problems panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Activate…, Run tests,
 Run and the Test results list, the editable module entity and module process and the editable module policy, and the reconnect message are built. Where each sits is in [Studio workspace](studio-workspace.md).
 
@@ -33,7 +33,7 @@ Run and the Test results list, the editable module entity and module process and
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **New resource.** A **New resource** button above the content (New resource… in the band, starting with the list's kind, _planned for M31_) opens a
+- **New resource.** A **New resource…** button in the band (starting with the list's kind, _planned for M31_) opens a
   dialog that asks for the kind and the name, or the locale for a `text`
   resource. The kind picker lists the 20 kinds the create route accepts: every
   kind except the manifest. It names each kind by its singular name, such as Entity, under the sidebar's group headings in sidebar order. The author can type to narrow it. A new
@@ -55,14 +55,14 @@ Run and the Test results list, the editable module entity and module process and
     such as `TextsVi` for `vi` and `TextsPtBr` for `pt-BR`.
   - A `409`, when the id or the file exists, and a `400`, when the name or the
     locale is refused, show under the field and keep the dialog open.
-  - After a create, the new resource joins the list, the diagnostics panel shows
+  - After a create, the new resource joins the list, the Problems panel shows
     the diagnostics that the create answered, and the editor opens the resource.
   - Its texts are platform texts under `shell.studio.*`, in `en` and `vi`.
 - **Application row.** The sidebar's first row, 48 px and sticky, names the open application. Its menu lists the applications that `GET /api/studio/apps` lists, marks the open one, and picking one opens it. It ends in **New application…** for a creator.
-  `/studio` with no application open lists them as tiles by title, see [applications](studio-workspace.md#applications). An **Off-standard** tag shows beside **Validate** and **Publish** while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio). _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band).
+  `/studio` with no application open lists them as tiles by title, see [applications](studio-workspace.md#applications). An **Off-standard** tag shows in the band, after the application's state, while `application.json` has a relax entry, see [in Studio](module-contracts.md#in-studio). _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band).
 - **Kind's list.** A kind's sidebar entry opens its list: a heading with the kind's plural name, then its resources, see [workspace](studio-workspace.md#workspace). Picking a resource opens it alone, with its name, kind, `id` and file, and its editor below. A list entry and the heading of an open resource use the resource's name, see [names](studio-workspace.md#names), and the Kind detail shows the kind's singular name, such as Entity. One **Module** group for each kind a module may hold (entities, data sources, rules,
   sequences, forms, pages, processes, events, texts, seeds, policies, triggers, scenarios and contracts) shows under that kind's list, for the modules the application uses, by `<module>/<name>`, from
-  the application's names. A group shows only when it has a resource. A module entity opens in the [entity designer](entity-designer.md) with the application's layer applied and every input on, and Save writes the layer. A module process opens in the [process designer](process-designer.md) with the layer applied, with Added and Changed marks on its steps, Reset to module and Reset all, and Save writes the layer. A module text opens in the text table with the layer applied, with Added and Changed marks on its keys, Reset to module and Reset all, and Save writes the layer. A module policy opens in the module editor with the layer applied, with an action checkbox and a Remove button on each grant, its filter and fields read-only, Added and Changed marks and Removed rows on its grants, Reset to module and Reset all, and Save writes the layer. A grant past the module contract's ceiling shows in the diagnostics panel after the save. A module page opens in the page designer with the layer applied, with the same marks on its widgets, actions, columns and tabs, and Save writes the layer.
+  the application's names. A group shows only when it has a resource. A module entity opens in the [entity designer](entity-designer.md) with the application's layer applied and every input on, and Save writes the layer. A module process opens in the [process designer](process-designer.md) with the layer applied, with Added and Changed marks on its steps, Reset to module and Reset all, and Save writes the layer. A module text opens in the text table with the layer applied, with Added and Changed marks on its keys, Reset to module and Reset all, and Save writes the layer. A module policy opens in the module editor with the layer applied, with an action checkbox and a Remove button on each grant, its filter and fields read-only, Added and Changed marks and Removed rows on its grants, Reset to module and Reset all, and Save writes the layer. A grant past the module contract's ceiling shows in the Problems panel after the save. A module page opens in the page designer with the layer applied, with the same marks on its widgets, actions, columns and tabs, and Save writes the layer.
   A module contract as its lifecycle in a state diagram (initial and deletable states marked, each arrow labelled with its transition's name and whether it has a guard) with tables of its states, transitions, core validations, effects and ceiling entries, each row with its [named point](module-contracts.md#named-points). A module contract is edited only for the states and transitions the application adds: **Add state**, **Add transition**, **Remove** on an added row and **Save**, which writes the contract's layer. Its notice says so and is not the read-only one. A module data source, rule, trigger, sequence and event open in the schema form with the layer applied and every input on, and a module seed opens in the seed grid with a form of its other properties. Each shows the Customized tag and Reset all, and Save writes the layer. A data source marks its `fields`, `parameters` and `aggregate.groupBy`, and a seed its `records`, each with Added and Changed marks, Removed rows and Reset to module. Their `name` shows as text. A module scenario opens in a read-only view of the notice and the file's content as formatted JSON, with the notice in the alert role. In a module contract, when `application.json` declares the module directly, each named point also has a **Relax** button, which opens a dialog for a reason of 1 to 500 characters, and a relaxed point shows its reason and an **Undo relax** button. Both write `application.json` with `If-Match`, see [in Studio](module-contracts.md#in-studio).
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
@@ -123,21 +123,21 @@ Run and the Test results list, the editable module entity and module process and
   resource's `usedBy` count is above 0, the dialog warns and names the count. The
   author can still confirm. The delete sends the loaded version in `If-Match`. A
   stale version shows the conflict message, and nothing is deleted. After a
-  delete, the resource leaves the list and the diagnostics panel shows the
+  delete, the resource leaves the list and the Problems panel shows the
   diagnostics that the delete answered, which report what broke.
 - **Stale counts.** The `usedBy` counts and the lists load with the selected
   resource. A save does not reload them, so a count can be out of date until the
   page is reloaded. The names, and so the counts that labels show, load again
   after a save and after a text write.
-- **Diagnostics panel.** The panel lists the diagnostics of the folder, with
-  each one's code, severity, message, file and `path`. It loads them from
-  `GET /api/studio/apps/{application}/diagnostics` when an application is
-  picked. After a save, it shows the diagnostics that the save answered
-  instead. A diagnostic that names a resource selects it, and
-  opens the resource at the diagnostic's `path`, as a Used by entry does. A
-  diagnostic with an empty path opens the resource at its top. A diagnostic that
-  names no resource cannot be selected. A diagnostic never blocks a save.
-- **Publishing.** Up to three buttons sit above the content (in the band, see [band](studio-workspace.md#band), _planned for M31_). They use the
+- **Problems panel.** The band's errors and warnings are one text button, such as "2 errors, 1 warning",
+  that opens the panel beside the page and stays open while problems are opened, see
+  [problems panel](studio-workspace.md#problems-panel). It lists the folder's diagnostics, errors first, with each
+  one's code, severity, message, file and `path`, loaded from `GET /api/studio/apps/{application}/diagnostics`
+  when an application is picked. After a save, it shows the diagnostics that the save answered
+  instead. A diagnostic that names a resource selects it, and opens the resource at the diagnostic's `path`,
+  as a Used by entry does, or at its top when the path is empty. A diagnostic that names no resource cannot be
+  selected. A diagnostic never blocks a save.
+- **Publishing.** Up to three buttons sit in the band, see [band](studio-workspace.md#band). They use the
   [publishing routes](authoring.md#publishing).
   - **Validate** sends a validate request. **Publish** opens a dialog with an
     optional label, up to 100 characters, and an optional note, up to 2000.
@@ -154,7 +154,7 @@ Run and the Test results list, the editable module entity and module process and
     paths from the folder's `site` resources when the preview succeeds. A site
     renamed after the request was sent can give a wrong link. The preview host
     must be served on the same port and protocol as the page. A failed preview
-    shows **Preview failed** and puts its diagnostics in the diagnostics panel.
+    shows **Preview failed** and puts its diagnostics in the Problems panel.
     A preview shows no release number and does not change the Releases list,
     because its release belongs to the preview tenant's own history.
   - Studio then checks `GET .../requests/{id}` every second until the status is
@@ -166,7 +166,7 @@ Run and the Test results list, the editable module entity and module process and
     the failure and no release number, even when the request names a release, so a
     failure never looks like a success. A rollback shows its own texts, **Rolled back**
     and **Rollback failed**.
-  - When a request ends, the diagnostics panel shows the request's diagnostics in
+  - When a request ends, the Problems panel shows the request's diagnostics in
     place of the loaded ones, for a failed request and for a succeeded one that holds
     warnings. They open at their paths as before.
   - The buttons are off while a request runs and while the reconnect message
@@ -195,10 +195,10 @@ Run and the Test results list, the editable module entity and module process and
     no scenario ran, and points to the diagnostics. Compile errors, a missing
     setting and an unknown scenario name fail a run this way.
   - The list is not kept across a page reload. The request's diagnostics go in the
-    diagnostics panel, as before.
+    Problems panel, as before.
   - The buttons are off while a request runs and while the reconnect message
     shows.
-- **Releases.** A list under the publishing buttons (the Releases entry of the sidebar, _planned for M31_) shows the
+- **Releases.** A list under the page's content (the Releases entry of the sidebar, _planned for M31_) shows the
   open application's release history from `GET .../releases` on the shared table, see
   [releases](studio-workspace.md#releases).
   - One row for each release, the highest number first, on one page. Its label, note, time and publisher are those of
@@ -283,7 +283,7 @@ Run and the Test results list, the editable module entity and module process and
     leaves the draft as it was. The button is off while it writes, while the
     reconnect message shows, and while the key is empty or holds `/`.
   - A text write counts as a change of the folder, as a save does. The
-    diagnostics panel shows the diagnostics that it answered, and the names and
+    Problems panel shows the diagnostics that it answered, and the names and
     the Releases list load again.
   - A key that other labels use shows how many, from `usedBy` in the names
     answer, so the author knows the edit changes them too.
@@ -404,7 +404,7 @@ Run and the Test results list, the editable module entity and module process and
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
   - The policy matrix is the last entry of the sidebar's Access group. The
     matrix view is kept in the address as `&view=policies`, so a reload or a
-    shared link reopens it. The diagnostics panel shows in the resource view and the matrix view, and not in `&view=releases`.
+    shared link reopens it. The band and the Problems panel show in the resource view, the matrix view and `&view=releases`.
   - Selecting a cell opens its grants under the table. A cell lists the
     role's combined actions. A data source cell that lacks the `read` of its
     root entity warns and names that entity. A read-only row shows its reason.
@@ -429,7 +429,7 @@ Run and the Test results list, the editable module entity and module process and
     has no `<Role>Access`, Save creates `policies/<role>-access.json` with
     `roles` set to that role only. A stale version shows a conflict message,
     keeps the draft and offers Reload, which discards it.
-  - After a save, the diagnostics panel, the matrix and the names load again,
+  - After a save, the Problems panel, the matrix and the names load again,
     and the selected cell stays open. Selecting another cell, or a matrix that
     loads again after another write, discards an unsaved draft.
   - A shared grant, a grant of a read-only row and a grant in any other policy

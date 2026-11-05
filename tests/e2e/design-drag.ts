@@ -6,14 +6,17 @@ export async function waitForCanvas(page: Page) {
 }
 
 /**
- * Scrolls `element` to the top of the window, just below the shell's sticky header, which covers the top of the window
- * and would take the mouse of a drag that starts or aims there.
+ * Scrolls `element` to the top of the window, just below the shell's sticky header and the Studio band under it, which
+ * cover the top of the window and would take the mouse of a drag that starts or aims there.
  */
 export async function scrollBelowHeader(element: Locator) {
   await element.evaluate((node) => {
-    const header = document.querySelector('header')
+    const covered = ['header', '[data-testid="studio-band"]'].reduce(
+      (sum, selector) => sum + (document.querySelector(selector)?.getBoundingClientRect().height ?? 0),
+      0,
+    )
     node.scrollIntoView({ block: 'start' })
-    window.scrollBy(0, -(header?.getBoundingClientRect().height ?? 0))
+    window.scrollBy(0, -covered)
   })
 }
 

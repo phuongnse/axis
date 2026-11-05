@@ -16,7 +16,8 @@ const rowHeight = 48
 /**
  * The sidebar of an open application in Studio. Its row stays at the top: a button with the application's mark and
  * title, which opens a menu of every application with the open one marked. A creator also gets New application… at the
- * end of that menu. The application's entries sit below the row and scroll under it. Collapsed, the row shows the mark alone.
+ * end of that menu, which has no All applications entry. The row stays in place with the page's band, and the application's
+ * entries sit below it and scroll under it. Collapsed, the row shows the mark alone.
  */
 export function StudioSidebar({
   apps,

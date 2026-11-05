@@ -304,6 +304,12 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
   return claim
 }
 
+/** Opens the Problems panel from the band's problems button and returns it. */
+async function openProblems() {
+  await userEvent.click(await screen.findByTestId('studio-problems'))
+  return screen.getByTestId('studio-diagnostics')
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
   sidebar?.remove()
@@ -463,7 +469,7 @@ describe('StudioPage', () => {
   it('shows the diagnostics of the save answer in place of the loaded ones', async () => {
     stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const panel = await screen.findByTestId('studio-diagnostics')
+    const panel = await openProblems()
     expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
 
     const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
@@ -521,7 +527,7 @@ describe('StudioPage', () => {
     stubServer()
     renderPage()
 
-    const panel = await screen.findByTestId('studio-diagnostics')
+    const panel = await openProblems()
     expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
     expect(within(panel).getByText('The field type is unknown.')).toBeInTheDocument()
     expect(within(panel).getByText(/entities\/purchase-request\.json · Path: \/fields\/0\/type/)).toBeInTheDocument()
@@ -532,6 +538,7 @@ describe('StudioPage', () => {
     stubServer()
     renderPage()
 
+    await openProblems()
     await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
 
     expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
@@ -542,6 +549,7 @@ describe('StudioPage', () => {
     stubServer()
     renderPage()
 
+    await openProblems()
     await screen.findByText('The application has no description.')
 
     expect(screen.queryByRole('button', { name: /AXC0001/ })).not.toBeInTheDocument()
@@ -555,6 +563,7 @@ describe('StudioPage', () => {
       stubServer()
       renderPage()
 
+      await openProblems()
       await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
 
       const field = await screen.findByTestId('studio-field-/fields/0/type')
@@ -588,6 +597,7 @@ describe('StudioPage', () => {
       })
       renderPage()
 
+      await openProblems()
       await userEvent.click(await screen.findByRole('button', { name: /AXC0102/ }))
 
       await screen.findByTestId('studio-field-/fields/0/name')
@@ -622,7 +632,7 @@ describe('StudioPage', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=policies')
     expect(fetchMock).toHaveBeenCalledWith(`${folder}/policy-matrix`, expect.anything())
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
-    expect(screen.getByTestId('studio-diagnostics')).toBeInTheDocument()
+    expect(await screen.findByTestId('studio-problems')).toBeInTheDocument()
 
     await userEvent.click(within(sidebar!).getByRole('link', { name: 'Overview' }))
 
@@ -777,6 +787,88 @@ describe('StudioPage', () => {
     }
     expect(screen.getByRole('menuitem', { name: 'Purchase requests' })).toHaveClass('ant-dropdown-menu-item-selected')
     expect(screen.getByRole('menuitem', { name: 'Leave requests' })).not.toHaveClass('ant-dropdown-menu-item-selected')
+  })
+
+  it('lists only the applications and New application… in the row menu, with no All applications', async () => {
+    const fetchMock = stubServer(apps)
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === '/api/me' ? json({ id: 'author', studio: true, studioCreate: true }) : base(input, init),
+    )
+    renderPage()
+
+    await userEvent.click(await screen.findByTestId('studio-application-row'))
+    await screen.findByRole('menuitem', { name: 'New application…' })
+
+    const items = screen.getAllByRole('menuitem').filter((item) => item.classList.contains('ant-dropdown-menu-item'))
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Purchase requests',
+      'Leave requests',
+      'Inventory',
+      'New application…',
+    ])
+    expect(screen.queryByRole('menuitem', { name: /All applications/ })).not.toBeInTheDocument()
+  })
+
+  describe('band, Problems panel and page heading', () => {
+    it('opens the Problems panel from the band and keeps it open while problems are opened', async () => {
+      stubServer()
+      renderPage()
+
+      const button = await screen.findByTestId('studio-problems')
+      expect(button).toHaveTextContent('1 error, 1 warning')
+      expect(button).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
+
+      const panel = await openProblems()
+      expect(button).toHaveAttribute('aria-expanded', 'true')
+      const items = within(panel).getAllByRole('listitem')
+      expect(items[0]).toHaveTextContent('AXC0101')
+      expect(items[1]).toHaveTextContent('AXC0001')
+
+      await userEvent.click(within(panel).getByRole('button', { name: /AXC0101/ }))
+
+      expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
+      expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
+      expect(screen.getByTestId('studio-diagnostics')).toBeInTheDocument()
+
+      await userEvent.click(
+        within(screen.getByTestId('studio-diagnostics')).getByRole('button', { name: 'Close problems' }),
+      )
+
+      expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
+      expect(button).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('has the band and no level-2 Studio title on an open application', async () => {
+      stubServer()
+      renderPage()
+
+      expect(await screen.findByTestId('studio-band')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument()
+    })
+
+    it.each([
+      ['the list of applications', '/studio'],
+      ['the Overview', '/studio?app=PurchaseRequests'],
+      ['a kind’s list', '/studio?app=PurchaseRequests&kind=entity'],
+      ['a resource', `/studio?app=PurchaseRequests&resource=${entityId}`],
+      ['Releases', '/studio?app=PurchaseRequests&view=releases'],
+      ['the policy matrix', '/studio?app=PurchaseRequests&view=policies'],
+    ])('has no breadcrumb and exactly one level-4 heading on %s', async (_, entry) => {
+      stubServer()
+      renderPage(entry)
+
+      await screen.findByRole('heading', { level: 4 })
+      if (entry.includes('view=policies')) {
+        await screen.findByTestId('studio-matrix')
+      } else if (entry.includes('resource=')) {
+        await screen.findByTestId('studio-editor')
+      }
+
+      expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+      expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(1)
+    })
   })
 
   it('opens another application when it is picked in the row menu', async () => {
@@ -950,6 +1042,7 @@ describe('StudioPage', () => {
         slow,
       )
 
+      await openProblems()
       await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }, slow))
 
       const field = await screen.findByTestId('studio-field-/fields/0/type', {}, slow)
@@ -1285,7 +1378,7 @@ describe('StudioPage publishing', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
     expect(screen.getByTestId('studio-release-number')).toHaveTextContent('3')
-    const panel = screen.getByTestId('studio-diagnostics')
+    const panel = await openProblems()
     expect(within(panel).getByText('AXC0900')).toBeInTheDocument()
     expect(within(panel).queryByText('AXC0101')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Validate' })).toBeEnabled()
@@ -1369,7 +1462,7 @@ describe('StudioPage publishing', () => {
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed'))
     expect(screen.getByTestId('studio-request-status')).toHaveTextContent('Preview failed.')
     expect(screen.queryByTestId('studio-preview-link')).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
+    expect(within(await openProblems()).getByText('AXC0777')).toBeInTheDocument()
   })
 
   it('puts the diagnostics of a failed validate in the panel and shows no release number', async () => {
@@ -1383,7 +1476,7 @@ describe('StudioPage publishing', () => {
 
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed'))
     expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
+    expect(within(await openProblems()).getByText('AXC0777')).toBeInTheDocument()
   })
 
   it('keeps checking the request after a reconnect', async () => {
@@ -1567,7 +1660,7 @@ describe('StudioPage publishing', () => {
       })
       expect(body.id).toMatch(/^[0-9a-f-]{36}$/)
       expect(screen.getByTestId('studio-resource-details')).toBeInTheDocument()
-      expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
+      expect(within(await openProblems()).getByText('AXC0777')).toBeInTheDocument()
     })
 
     it('creates a webhook that names no event and no binding yet', async () => {

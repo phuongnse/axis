@@ -1,12 +1,11 @@
 import { Alert, Flex, Input, Modal } from 'antd'
-import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { type ReactNode, type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
   fetchStudioResource,
-  folderDiffers,
   previewSiteUrl,
   previewStudioApp,
   publishStudioApp,
@@ -22,6 +21,7 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
+import { StudioBand } from './StudioBand'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
@@ -35,8 +35,12 @@ export interface StudioPublishingHandle {
 }
 
 /**
- * The Validate, Preview, Run tests and Publish buttons of the open application, with the status of the request they
- * send, and its release history. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
+ * The band of the open application, with the status of the request its buttons send and its release history. The
+ * band holds the `newResource` button, Validate, Preview, Run tests and Publish. On its left it shows the application's
+ * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the `problems`
+ * panel beside the page, then the release state, and `bandState` after it. The request status, test results and
+ * preview links show at the top of the content, under the band, then `children`, then the release list. The release
+ * list keeps its own title unless `releasesView`, where the page's heading names it. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
@@ -47,12 +51,12 @@ export interface StudioPublishingHandle {
  * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
  * stored under the status line, when it stored any.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
- * status meanwhile. When it ends, its diagnostics go to the diagnostics panel. A succeeded publish or rollback
+ * status meanwhile. When it ends, its diagnostics go to the Problems panel. A succeeded publish or rollback
  * shows its release number, found in the release history by the request's `releaseId`. Publish and Activate… show
  * only when `canPublish`. They and Validate are off while a request runs and while the reconnect message shows. The
  * history loads when the application is picked, and again after a request ends, after the reconnect, and when
- * `folderRevision` changes, which the page does after a save or a delete. A warning shows when the folder differs
- * from the active release. When the server
+ * `folderRevision` changes, which the page does after a save or a delete. The band says "Changes not live" when the
+ * folder differs from the active release. When the server
  * does not answer, the checking starts again after the reconnect. `onDiagnostics` runs while the page may have
  * changed, so it must not depend on a stale copy of the page's state. `onBusyChange` runs when a request is sent,
  * checked or finished, or the reconnect starts or ends.
@@ -64,10 +68,18 @@ export function StudioPublishing({
   previewHost,
   sites,
   folderRevision,
+  diagnostics,
+  problemsOpen,
+  onToggleProblems,
+  newResource,
+  bandState,
+  problems,
+  releasesView,
   onDiagnostics,
   onOpenScenario,
   onBusyChange,
   ref,
+  children,
 }: {
   application: string
   canPublish: boolean
@@ -75,10 +87,18 @@ export function StudioPublishing({
   previewHost: string | null
   sites: StudioResourceItem[]
   folderRevision: number
+  diagnostics: StudioDiagnostic[]
+  problemsOpen: boolean
+  onToggleProblems: () => void
+  newResource: ReactNode
+  bandState?: ReactNode
+  problems: ReactNode
+  releasesView: boolean
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
   onOpenScenario: (resourceId: string, path: string) => void
   onBusyChange?: (busy: boolean) => void
   ref?: Ref<StudioPublishingHandle>
+  children?: ReactNode
 }) {
   const t = useText()
   const { generation, reconnecting, lost } = useStudioConnection()
@@ -237,71 +257,75 @@ export function StudioPublishing({
   }))
 
   return (
-    <Flex vertical gap="small">
-      <AxisActionRow align="center">
-        <AxisButton role="secondary" disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
-          {t('shell.studio.validate')}
-        </AxisButton>
-        {previewHost !== null && (
-          <AxisButton
-            role="secondary"
-            data-testid="studio-preview"
-            disabled={busy}
-            onClick={() => send(() => previewStudioApp(application))}
-          >
-            {t('shell.studio.preview')}
+    <Flex vertical gap="middle">
+      <StudioBand
+        diagnostics={diagnostics}
+        history={history}
+        problemsOpen={problemsOpen}
+        onToggleProblems={onToggleProblems}
+        state={bandState}
+      >
+        <AxisActionRow align="center">
+          {newResource}
+          <AxisButton role="secondary" disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
+            {t('shell.studio.validate')}
           </AxisButton>
-        )}
-        {canTest && (
-          <AxisButton
-            role="secondary"
-            data-testid="studio-run-tests"
-            disabled={busy}
-            onClick={() => send(() => testStudioApp(application))}
-          >
-            {t('shell.studio.runTests')}
-          </AxisButton>
-        )}
-        {canPublish && (
-          <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
-            {t('shell.studio.publish')}
-          </AxisButton>
-        )}
-      </AxisActionRow>
-      {sendError !== null && <Alert data-testid="studio-request-error" type="error" title={sendError} />}
-      {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
-      {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
-        <StudioTestResults request={request} onSelect={onOpenScenario} />
-      )}
-      {previewLinks.length > 0 && (
-        <Flex vertical gap={4}>
-          {previewLinks.map((link) => (
-            <a key={link} data-testid="studio-preview-link" href={link} target="_blank" rel="noreferrer">
-              {link}
-            </a>
-          ))}
-        </Flex>
-      )}
-      {history === 'failed' && (
-        <Alert data-testid="studio-releases-error" type="error" title={t('shell.studio.releases.loadFailed')} />
-      )}
-      {history && history !== 'failed' && (
-        <>
-          {folderDiffers(history) && (
-            <Alert
-              data-testid="studio-folder-differs"
-              type="warning"
-              title={t('shell.studio.releases.folderDiffers')}
+          {previewHost !== null && (
+            <AxisButton
+              role="secondary"
+              data-testid="studio-preview"
+              disabled={busy}
+              onClick={() => send(() => previewStudioApp(application))}
+            >
+              {t('shell.studio.preview')}
+            </AxisButton>
+          )}
+          {canTest && (
+            <AxisButton
+              role="secondary"
+              data-testid="studio-run-tests"
+              disabled={busy}
+              onClick={() => send(() => testStudioApp(application))}
+            >
+              {t('shell.studio.runTests')}
+            </AxisButton>
+          )}
+          {canPublish && (
+            <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
+              {t('shell.studio.publish')}
+            </AxisButton>
+          )}
+        </AxisActionRow>
+      </StudioBand>
+      <Flex gap="middle" align="flex-start">
+        <Flex vertical gap="middle" style={{ flex: 1, minWidth: 0 }}>
+          {sendError !== null && <Alert data-testid="studio-request-error" type="error" title={sendError} />}
+          {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
+          {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
+            <StudioTestResults request={request} onSelect={onOpenScenario} />
+          )}
+          {previewLinks.length > 0 && (
+            <Flex vertical gap={4}>
+              {previewLinks.map((link) => (
+                <a key={link} data-testid="studio-preview-link" href={link} target="_blank" rel="noreferrer">
+                  {link}
+                </a>
+              ))}
+            </Flex>
+          )}
+          {children}
+          {history && history !== 'failed' && (
+            <StudioReleasesList
+              history={history}
+              canRollBack={canPublish}
+              busy={busy}
+              titled={!releasesView}
+              onRollBack={(row: StudioReleaseListRow) => send(() => rollbackStudioRelease(application, row.releaseId))}
             />
           )}
-          <StudioReleasesList
-            history={history}
-            canRollBack={canPublish}
-            busy={busy}
-            onRollBack={(row: StudioReleaseListRow) => send(() => rollbackStudioRelease(application, row.releaseId))}
-          />
-        </>
-      )}
+        </Flex>
+        {problems}
+      </Flex>
       <Modal
         open={dialogOpen}
         title={t('shell.studio.publish.title')}

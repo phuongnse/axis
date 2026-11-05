@@ -259,7 +259,7 @@ its marks and resets are on steps. A module text opens in the text table with th
 its keys, **Reset to module** and **Reset all**. A module policy opens in the module editor, built with the policy matrix's
 action checkboxes, and its marks and resets are on grants, keyed by `name`. It edits a grant's actions and removes grants, and
 shows a grant's filter and fields read-only, and there is no way yet to add a grant. A grant past the module contract's ceiling
-(`AXC0334`) shows in the diagnostics panel after the save. A module form opens in the [form designer](form-designer.md) with the layer applied. Its marks and resets are
+(`AXC0334`) shows in the Problems panel after the save. A module form opens in the [form designer](form-designer.md) with the layer applied. Its marks and resets are
 on sections and steps, keyed by `name`, and on a section's fields, keyed by `field`, all in the outline. A module contract opens in its contract editor, where the author adds and removes
 the application's own states and transitions, marked **Added**, and **Save** writes the contract's layer. The module page opens in the [page designer](studio.md), and its marks
 and resets are on widgets, actions, row actions, toolbar actions, columns and tabs. The canvas draws the saved page
