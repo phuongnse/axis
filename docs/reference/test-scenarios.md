@@ -337,7 +337,7 @@ and each user has a profile with the address `<user>@scenario.invalid`, so a
 `notify` step stages an email for a `user` recipient.
 
 `scripts/integration.sh` runs the scenarios of every application under
-`samples/apps/` and of every sample template under `samples/templates/` from the
+`samples/apps/` from the
 integration tests, on their Testcontainers PostgreSQL.
 
 What runs now:

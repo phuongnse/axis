@@ -6,7 +6,7 @@ no test changes on this branch, and logic left to the review's issue.
 Topic: Studio's Entities page.
 
 The prototype starts from the tag `design-review/2026-11-03-studio-settings`, so the owner keeps seeing the workspace and
-the resource form that `main` has not built yet, with `main` merged in, first at 624ab6e1 and again at fd1bf541 (2026-11-05). Its own diff starts at the first merge.
+the resource form that `main` has not built yet, with `main` merged in, first at 624ab6e1, then at fd1bf541 and at 7d171005 (2026-11-05). Its own diff starts at the first merge.
 Each entry is one agreed change: what the owner asked, in English, and what was built, for the docs change at the end
 of the review.
 
@@ -234,17 +234,36 @@ Problems panel, Studio's sidebar entries, and the layer editors for module resou
   `resourceTitle` (a file name never shows where the resource has a kind), `StudioResourceTitles` and `StudioReleaseChanges` on
   the server, the history answer's shape, and the texts where both gave a key a value.
 - **The prototype's put back on it:** `AxisTable`'s `priority`, `searchText`, `columns` slot, move-under-row, `testId`, the
-  range text and the empty state; `dialogSizeTokens`; the Tabs, Modal and expanded-row theme; `ActionRow` and
-  `NamedIconButton`; `contentPadding` in the sidebar context; the descriptions and the activity route.
+  range text and the empty state; `dialogSizeTokens`; the Tabs, Modal and expanded-row theme; `NamedIconButton`; `contentPadding` in the sidebar context; the descriptions and the activity route.
 - **The prototype's workspace kept:** `StudioPage` with `PageLayout`, `StudioNavigation`, `StudioStatus`, the Overview, the kind
   tables and the release pages, with `main`'s module editors, layers (`onModuleWritten`, `diagnostics`) and manifest handling
   wired in, and the entity designer with `main`'s layer marks and Reset to module.
-- **On the branch and not used by the prototype page:** `main`'s `StudioBand`, `StudioSidebar`, `studioNavigation` and
-  `StudioProblems`. The issue replaces the prototype's parts with them or the other way round; it decides.
+- **On the branch and not used by the prototype page:** `main`'s `StudioBand`, `StudioSidebar` and `studioNavigation`. The
+  issue replaces the prototype's parts with them or the other way round; it decides.
+- **Replaced, not kept:** `main`'s `StudioProblems` (a sticky column beside the page, `onSelect`) is not on the branch: the
+  file holds the prototype's `StudioProblemsPanel`, a drawer that links each problem through `addressOf`. `main`'s
+  `StudioBand` still names `problemsPanelId` in `aria-controls`, which no element carries now. The issue takes `main`'s
+  component as the base and puts the prototype's look on it, or keeps the drawer and moves the id to it.
 - **Texts:** `main`'s wording wins where a key has both, such as `shell.studio.activate` (now "Activate release") and the
   `{release}` placeholder of its dialog.
 - **Known differences from `main`'s tests:** a tooltip on an icon button opens on keyboard focus only when the browser says
   `:focus-visible`, which jsdom does not, so the two tests that focus such a button by keyboard fail.
+
+### Merge of `main` at 7d171005, 2026-11-05
+
+`main` built, since fd1bf541: the review's process change (#2947, the same text as this branch's), New resource… on the band
+that asks for a kind and New entity… on a kind's list that asks for none (#2847), the built-in Approvals application in
+place of the request-approval template, and the cell's DNS check of tenant hosts. How each conflict went:
+
+- **`StudioNewResource`:** `main`'s file is the base: its `kind` prop, its kind choice from `studioKinds`, and its texts
+  `shell.studio.newResource.kindButton.<kind>` and `kindTitle.<kind>`. The prototype's `inBand`, `buttonOf` and `titleOf`
+  are gone, as `main`'s role follows `kind` alone. The prototype's look is back on it: the dialog is `dialogWidth('medium')`.
+  The kind list's heading shows the button only for a kind with a starter, as `main`'s caller does.
+- **`StudioPage`:** the prototype's workspace is kept; `main`'s new kind list heading is the prototype's already.
+- **`docs/development.md` and the texts:** `main`'s.
+- **One action row:** the prototype's `ActionRow` is gone, as it was a second way to `AxisActionRow`. `AxisActionRow` takes
+  `wrap` (Proposed), false on the band, whose fold measures whether its actions overflow. `FormWidget`'s footer and the entity
+  migration dialogs are `main`'s again (`AxisActionRow`, and `FooterRow` where a form has no solid button).
 
 ### Lost in merges
 
@@ -255,7 +274,9 @@ Problems panel, Studio's sidebar entries, and the layer editors for module resou
 - `shell.users.invite.send`, the name of the invite dialog's button.
 - A site's pages keep the checkbox and radio alignment and error border, in `PageTheme`.
 - Initials are of the first and last words, not the first two.
-- The entity migration dialogs use `AxisButton` again, so Drop data is in `dangerText`.
+- The entity migration dialogs use `AxisButton` and `AxisActionRow` again, so Drop data is in `dangerText`.
+- `FormWidget`'s footer is `main`'s `AxisActionRow` or `FooterRow` again, where the prototype had its own `ActionRow`.
+- `main`'s `StudioProblems`, see "Replaced, not kept" under the merge at fd1bf541.
 - No inline `theme` on the workspace menu and no literal font in the JSON editor's find bar.
 
 ### Found by the previews

@@ -1,7 +1,7 @@
 import { Alert, Button, Flex, Input, Result } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ActionRow } from '../platform/AxisButton'
+import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
 import {
@@ -26,6 +26,7 @@ import {
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
+import { starterKinds } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioResourceTable } from './StudioResourceTable'
@@ -80,7 +81,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * and opens it at the diagnostic's path, as a Used by entry does, and the panel stays open. A selected resource opens in an editor below its details, with its Uses and Used by
  * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
  * save, the Problems panel shows the diagnostics that the save answered. After a delete, the resource leaves the
- * folder, and Studio shows the Overview. A New resource… button in the band creates a resource of any kind from its starter. The new resource
+ * folder, and Studio shows the Overview. A New resource… button in the band creates a resource of any kind from its starter, and a kind's list has its own button named for the kind, such as New entity…, on the right of its heading, whose dialog asks for the name alone. The new resource
  * joins its kind's list, the Problems panel shows the diagnostics of the create, and the editor opens the resource.
  * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
@@ -153,7 +154,6 @@ function StudioWorkspace() {
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null)
   // Proposed: the right side of a release page's heading, where its Activate… shows.
   const [headingSlot, setHeadingSlot] = useState<HTMLDivElement | null>(null)
-  const { spacing } = useDesignTokens()
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   // Proposed: a kind's list keeps its search in the address, as its sort and page, so a reload and a shared link keep them.
@@ -513,7 +513,11 @@ function StudioWorkspace() {
             >
               {t('shell.studio.runScenario')}
             </Button>
-          ) : view.name === 'kind' && !selected && loaded && 'resources' in loaded ? (
+          ) : view.name === 'kind' &&
+            !selected &&
+            loaded &&
+            'resources' in loaded &&
+            starterKinds.includes(view.kind) ? (
             // Proposed: New entity… acts on the application, not on the table, so it sits on the page's heading.
             <StudioNewResource application={application} resources={resources} kind={view.kind} onCreated={onCreated} />
           ) : view.name === 'release' && !selected ? (
@@ -533,15 +537,14 @@ function StudioWorkspace() {
         actions={
           // Proposed: New resource… heads the band's actions, the same gap apart as the others, as every one acts on the
           // application; Publish… stands out as the one solid button and is never beside it.
-          // The band is always a row of text actions, with or without Publish…, so it looks the same for every author.
-          <ActionRow finish>
-            <Flex align="center" gap={spacing.xs}>
-              {loaded && 'resources' in loaded && (
-                <StudioNewResource application={application} resources={resources} inBand onCreated={onCreated} />
-              )}
-              <div ref={setActionsSlot} style={{ display: 'flex' }} />
-            </Flex>
-          </ActionRow>
+          // Proposed: the band is always a row of text actions, with or without Publish…, so it looks the same for every
+          // author.
+          <AxisActionRow align="center" wrap={false}>
+            {loaded && 'resources' in loaded && (
+              <StudioNewResource application={application} resources={resources} onCreated={onCreated} />
+            )}
+            <div ref={setActionsSlot} style={{ display: 'flex' }} />
+          </AxisActionRow>
         }
       >
         {loaded && 'resources' in loaded && (

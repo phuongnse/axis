@@ -19,7 +19,7 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
-    private const string TemplateId = "request-approval";
+    private const string TemplateId = "expense-claims";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -174,7 +174,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
             ("""{ "name": "Fine", "template": null }""", HttpStatusCode.BadRequest),
             ("""{ "name": "Fine", "template": 5 }""", HttpStatusCode.BadRequest),
             ("""{ "name": "Fine", "template": "no-such-template" }""", HttpStatusCode.NotFound),
-            ("""{ "name": "Fine", "template": "Request-Approval" }""", HttpStatusCode.NotFound),
+            ("""{ "name": "Fine", "template": "Expense-Claims" }""", HttpStatusCode.NotFound),
         };
         foreach (var (body, status) in cases)
         {
@@ -380,8 +380,8 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                   "kind": "applicationTemplate",
                   "id": "{{TemplateId}}",
                   "version": "1.0.0",
-                  "title": { "en": "Request approval", "vi": "Phê duyệt yêu cầu" },
-                  "description": { "en": "A request approval.", "vi": "Một phê duyệt yêu cầu." }
+                  "title": { "en": "Expense claims", "vi": "Đề nghị hoàn ứng" },
+                  "description": { "en": "Expense claims.", "vi": "Đề nghị hoàn ứng." }
                 }
                 """);
             Write(folder, "application.json", $$"""

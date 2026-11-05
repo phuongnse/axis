@@ -35,32 +35,27 @@ const ActionRowContext = createContext(false)
 
 /**
  * A row of actions that has a solid `finish` button (D128). Beside it, `main`, `secondary` and `destructive` buttons
- * are text buttons in their own colour, so the finish button is the only filled shape.
+ * are text buttons in their own colour, so the finish button is the only filled shape. Proposed: with `wrap` false the
+ * row stays on one line, so a band that measures whether its actions fit can fold them.
  */
 export function AxisActionRow({
   children,
   justify,
   align,
+  wrap = true,
 }: {
   children: ReactNode
   justify?: FlexProps['justify']
   align?: FlexProps['align']
+  wrap?: boolean
 }) {
   return (
     <ActionRowContext.Provider value={true}>
-      <Flex gap="small" wrap justify={justify} align={align}>
+      <Flex gap="small" wrap={wrap} justify={justify} align={align}>
         {children}
       </Flex>
     </ActionRowContext.Provider>
   )
-}
-
-/**
- * Proposed: a row of actions that holds a `finish` button only when `finish`. Beside it, every other action is a text
- * button in its own level's colour, so the solid button is the row's one filled shape. A form's footer is such a row.
- */
-export function ActionRow({ finish, children }: { finish: boolean; children: ReactNode }) {
-  return <ActionRowContext.Provider value={finish}>{children}</ActionRowContext.Provider>
 }
 
 /**

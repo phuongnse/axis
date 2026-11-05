@@ -1351,6 +1351,20 @@ describe('StudioPage publishing', () => {
     expect(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
   })
 
+  it("heads the band's actions with New resource… and ends them with Publish…", async () => {
+    stubPublishing(publisher)
+    renderPage()
+
+    await screen.findByRole('button', { name: 'Publish…' })
+    const names = within(screen.getByTestId('studio-band'))
+      .getAllByRole('button')
+      .filter((button) => button.dataset.testid !== 'studio-problems')
+      .map((button) => button.textContent)
+    expect(names[0]).toBe('New resource…')
+    expect(names[1]).toBe('Validate')
+    expect(names.at(-1)).toBe('Publish…')
+  })
+
   it('shows the status while a publish runs and the release number when it succeeds', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const fetchMock = stubPublishing(publisher, [
@@ -1626,6 +1640,81 @@ describe('StudioPage publishing', () => {
       await userEvent.type(screen.getByRole('textbox', { name: valueLabel }), value)
       await userEvent.click(screen.getByRole('button', { name: 'Create' }))
     }
+
+    it('asks for a kind in the sidebar groups, migrations included, then for a name', async () => {
+      stubCreate(201)
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New resource…' }))
+      await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
+
+      const headings = [...document.querySelectorAll('.ant-select-item-group')].map((group) => group.textContent)
+      expect(headings).toEqual(['Data', 'Pages', 'Logic', 'Access', 'Integration', 'Texts', 'Tests'])
+      const data = [...document.querySelectorAll('.ant-select-item-option')].map((option) =>
+        option.getAttribute('title'),
+      )
+      expect(data.indexOf('Migration')).toBeGreaterThan(data.indexOf('Entity'))
+      expect(data.indexOf('Migration')).toBeLessThan(data.indexOf('Site'))
+      await userEvent.click(await screen.findByTitle('Migration'))
+      expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+    })
+
+    it("asks a kind's New entity… for the name alone", async () => {
+      const fetchMock = stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New entity…' }))
+
+      const dialog = await screen.findByRole('dialog', { name: 'New entity' })
+      expect(within(dialog).queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
+      const create = within(dialog).getByRole('button', { name: 'Create' })
+      expect(create).toBeDisabled()
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'CostCentre')
+      expect(create).toBeEnabled()
+      await userEvent.click(create)
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('resource='))
+      const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
+      expect(JSON.parse(init!.body as string)).toMatchObject({ kind: 'entity', name: 'CostCentre' })
+    })
+
+    it("asks a kind's New text resource… for a locale alone", async () => {
+      const fetchMock = stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=text')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New text resource…' }))
+
+      const dialog = await screen.findByRole('dialog', { name: 'New text resource' })
+      expect(within(dialog).queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument()
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Locale' }), 'de')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
+      const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
+      expect(JSON.parse(init!.body as string)).toMatchObject({ kind: 'text', name: 'TextsDe', locale: 'de' })
+    })
+
+    it("shows a kind's conflict under the field and keeps its dialog open", async () => {
+      stubCreate(409)
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New entity…' }))
+      await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'CostCentre')
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      expect(await screen.findByText('A resource with this name or locale already exists.')).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'New entity' })).toBeInTheDocument()
+    })
+
+    it('offers no create button on the list of a kind that has no starter', async () => {
+      stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=layer')
+
+      expect(await screen.findByRole('heading', { name: 'Layers' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'New resource…' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^New (?!resource…)/ })).not.toBeInTheDocument()
+    })
 
     it('narrows the kinds to what is typed', async () => {
       stubCreate(201)

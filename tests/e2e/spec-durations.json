@@ -35,7 +35,6 @@
   "specs/reduced-motion.spec.ts": 2,
   "specs/references.spec.ts": 3,
   "specs/release-pinning.spec.ts": 33,
-  "specs/request-approval-journey.spec.ts": 16,
   "specs/select-helpers.spec.ts": 4,
   "specs/select.spec.ts": 9,
   "specs/service-desk-journey.spec.ts": 396,

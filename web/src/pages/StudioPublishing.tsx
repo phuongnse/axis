@@ -2,7 +2,7 @@ import { EllipsisOutlined } from '@ant-design/icons'
 import { Alert, Dropdown, Flex, Input, Modal } from 'antd'
 import { type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
-import { ActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
@@ -326,51 +326,49 @@ export function StudioPublishing({
       : []),
   ]
 
-  // The band is always a row of text actions, with or without Publish…, so it looks the same for every author.
+  // Proposed: the band is always a row of text actions, with or without Publish…, so it looks the same for every author.
   const actions = (
-    <ActionRow finish>
-      <Flex gap="small" align="center">
-        {folded ? (
-          <Dropdown
-            trigger={['click']}
-            autoFocus
-            menu={{
-              'aria-label': t('shell.studio.moreActions'),
-              items: checks.map((check) => ({
-                key: check.key,
-                label: t(check.labelKey),
-                disabled: busy,
-                onClick: () => send(check.run),
-              })),
-            }}
+    <AxisActionRow align="center" wrap={false}>
+      {folded ? (
+        <Dropdown
+          trigger={['click']}
+          autoFocus
+          menu={{
+            'aria-label': t('shell.studio.moreActions'),
+            items: checks.map((check) => ({
+              key: check.key,
+              label: t(check.labelKey),
+              disabled: busy,
+              onClick: () => send(check.run),
+            })),
+          }}
+        >
+          <AxisButton
+            role="icon"
+            nameKey="shell.studio.moreActions"
+            data-testid="studio-more-actions"
+            icon={<EllipsisOutlined />}
+          />
+        </Dropdown>
+      ) : (
+        checks.map((check) => (
+          <AxisButton
+            key={check.key}
+            role="secondary"
+            data-testid={check.testId}
+            disabled={busy}
+            onClick={() => send(check.run)}
           >
-            <AxisButton
-              role="icon"
-              nameKey="shell.studio.moreActions"
-              data-testid="studio-more-actions"
-              icon={<EllipsisOutlined />}
-            />
-          </Dropdown>
-        ) : (
-          checks.map((check) => (
-            <AxisButton
-              key={check.key}
-              role="secondary"
-              data-testid={check.testId}
-              disabled={busy}
-              onClick={() => send(check.run)}
-            >
-              {t(check.labelKey)}
-            </AxisButton>
-          ))
-        )}
-        {canPublish && (
-          <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
-            {t('shell.studio.publish')}
+            {t(check.labelKey)}
           </AxisButton>
-        )}
-      </Flex>
-    </ActionRow>
+        ))
+      )}
+      {canPublish && (
+        <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
+          {t('shell.studio.publish')}
+        </AxisButton>
+      )}
+    </AxisActionRow>
   )
 
   return (

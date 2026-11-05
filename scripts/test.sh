@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
 source scripts/lib/tools.sh
 
-# The server tests start the server, which reads the built-in modules, sample modules, sample templates and built-in applications from artifacts/. NexKit
+# The server tests start the server, which reads the built-in modules, sample modules and built-in applications from artifacts/. NexKit
 # runs this script in a job without scripts/build.sh, which installs them too.
 bash scripts/lib/install-modules.sh
 bash scripts/lib/install-sample-templates.sh
@@ -24,7 +24,7 @@ run_suite web web npm test --prefix web -- \
 # The report, smoke test selection, link check, docs structure check, locator check, raw HTML check, prototype pollution check, bundle budget check,
 # font check, licence writer, design-system bundle check, dependency scan, image scan, setup retries, image build retries, E2E and integration shard
 # splits, load script, load test workflow, load objectives, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, load test routes and TOTP module, Compose status
-# helper, module install script, dev script stop helper, development realm script and Helm chart scripts' own tests.
+# helper, module install script, sample template check, dev script stop helper, development realm script and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
 node --test scripts/check-links.test.mjs || status=1
@@ -50,6 +50,7 @@ node --test scripts/load-workflow.test.mjs || status=1
 node --test scripts/smoke.test.mjs || status=1
 node --test scripts/install-modules.test.mjs || status=1
 node --test scripts/sample-modules.test.mjs || status=1
+node --test scripts/sample-templates.test.mjs || status=1
 node --test scripts/compose-status.test.mjs || status=1
 node --test scripts/dev-stop.test.mjs || status=1
 node --test scripts/development-realm.test.mjs || status=1

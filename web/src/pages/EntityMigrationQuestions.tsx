@@ -2,7 +2,7 @@ import { Flex, Input, Modal, Typography } from 'antd'
 import { useState } from 'react'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
 import { useText } from '../platform/texts'
-import { ActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { dialogWidth } from '../platform/dialogButtons'
 
 /** The answers so far, with a `skip` for each question that the earlier answers make unnecessary. */
@@ -59,21 +59,19 @@ export function EntityMigrationQuestions({
       title={t(rename ? 'shell.studio.entity.migration.renameTitle' : 'shell.studio.entity.migration.removeTitle')}
       onCancel={onCancel}
       footer={
-        <Flex gap="small" justify="end">
-          <ActionRow finish>
-            {rename && (
-              <AxisButton role="secondary" onClick={onCancel}>
-                {t('shell.studio.cancel')}
-              </AxisButton>
-            )}
-            <AxisButton role="destructive" onClick={() => answer('drop')}>
-              {t('shell.studio.entity.migration.dropData')}
+        <AxisActionRow justify="end">
+          {rename && (
+            <AxisButton role="secondary" onClick={onCancel}>
+              {t('shell.studio.cancel')}
             </AxisButton>
-            <AxisButton role="finish" onClick={() => answer('keep')}>
-              {t(rename ? 'shell.studio.entity.migration.keepData' : 'shell.studio.entity.migration.keepField')}
-            </AxisButton>
-          </ActionRow>
-        </Flex>
+          )}
+          <AxisButton role="destructive" onClick={() => answer('drop')}>
+            {t('shell.studio.entity.migration.dropData')}
+          </AxisButton>
+          <AxisButton role="finish" onClick={() => answer('keep')}>
+            {t(rename ? 'shell.studio.entity.migration.keepData' : 'shell.studio.entity.migration.keepField')}
+          </AxisButton>
+        </AxisActionRow>
       }
     >
       <div data-testid="studio-migration-question">
@@ -119,19 +117,17 @@ function ExpressionQuestion({
       title={t(convert ? 'shell.studio.entity.migration.convertTitle' : 'shell.studio.entity.migration.fillTitle')}
       onCancel={onCancel}
       footer={
-        <Flex gap="small" justify="end">
-          <ActionRow finish>
-            <AxisButton role="secondary" onClick={onCancel}>
-              {t('shell.studio.cancel')}
-            </AxisButton>
-            <AxisButton role="secondary" onClick={() => onAnswer('skip')}>
-              {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
-            </AxisButton>
-            <AxisButton role="finish" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>
-              {t(convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls')}
-            </AxisButton>
-          </ActionRow>
-        </Flex>
+        <AxisActionRow justify="end">
+          <AxisButton role="secondary" onClick={onCancel}>
+            {t('shell.studio.cancel')}
+          </AxisButton>
+          <AxisButton role="secondary" onClick={() => onAnswer('skip')}>
+            {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
+          </AxisButton>
+          <AxisButton role="finish" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>
+            {t(convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls')}
+          </AxisButton>
+        </AxisActionRow>
       }
     >
       <div data-testid="studio-migration-question">

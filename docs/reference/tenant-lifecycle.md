@@ -136,8 +136,26 @@ The route is built as far as the request:
   request over the platform reader role, which may insert into that table and nothing else there.
   The row's `actor` is the operator's id. The route queues no job and takes no `Idempotency-Key`.
 
-The job that checks the customer's DNS records, the certificate and adding the verified host are
-_(planned for M31)_. Until they exist, nothing changes a request to `verified` or `expired`.
+The [publisher](administration.md#publisher) checks the customer's DNS records, under
+`Tenancy:Source=directory`, every `Cell:HostCheckInterval` (10 minutes by default):
+
+- **Expired.** A pending request past `expires_at` becomes `expired` without a DNS lookup, and its
+  host keeps answering `404`.
+- **Checked once for each interval.** The publisher claims the due requests by setting `checked_at`,
+  and skips the rows that another publisher holds. A request is not checked twice in one interval,
+  also across restarts and several publishers.
+- **Verified.** When a `TXT` record of `_axis-verify.<host>` equals the token, the host joins the
+  tenant, the realm's redirect addresses gain it, and the request becomes `verified`. The
+  [platform audit record](tenant-setting-commands.md#platform-audit-records) is named
+  `tenant host verify` and names the operator who asked for the host as its actor. The request is
+  marked last, so a stop or a failed realm update is retried in the next round, and a host that the
+  tenant already holds is not added or audited twice. A host is never verified without a matching
+  record.
+- **Pending.** A wrong token, no record or a DNS failure leaves the request pending, and the failure
+  only writes a line. The request also stays pending when another tenant holds the host.
+
+The certificate of a verified host is _(planned for M31)_. Until it exists the host is in the
+directory, but the ingress has no route or certificate for it.
 
 ## Exporting a tenant
 

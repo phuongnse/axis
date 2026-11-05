@@ -366,8 +366,7 @@ Studio, publishes it and takes one ticket through the process on the site.
 - Another Playwright journey uses the sample at phone
   width.
 - A second, smaller journey creates an application from the
-  `request-approval` template in Studio, runs its test scenario, publishes it,
-  and takes one request through the approval on the site.
+  built-in Approvals application in Studio, publishes it, and opens it as an employee.
 
 ## Fourth application: asset management
 

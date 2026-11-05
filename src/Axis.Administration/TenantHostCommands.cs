@@ -18,13 +18,26 @@ public static class TenantHostCommands
     /// stored in lower case. A path with bad syntax, a reserved path, or a site that the tenant already has a host for is refused.
     /// The command does not check that a release has the site.
     /// </summary>
-    public static async Task<TenantSettingResult> AddAsync(
+    public static Task<TenantSettingResult> AddAsync(
         PlatformDbContext platform,
         string command,
         string tenantId,
         string host,
         string? sitePath = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        AddAsync(platform, command, tenantId, host, sitePath, actor: null, cancellationToken);
+
+    /// <summary>
+    /// The same, for a host that a job adds. <paramref name="actor"/> names the operator behind the host, and the platform audit record carries it.
+    /// </summary>
+    public static async Task<TenantSettingResult> AddAsync(
+        PlatformDbContext platform,
+        string command,
+        string tenantId,
+        string host,
+        string? sitePath,
+        string? actor,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(platform);
         ArgumentException.ThrowIfNullOrWhiteSpace(command);
@@ -80,7 +93,8 @@ public static class TenantHostCommands
                 return Task.FromResult<TenantSettingResult?>(null);
             },
             Conflict,
-            cancellationToken);
+            cancellationToken,
+            actor);
     }
 
     /// <summary>
