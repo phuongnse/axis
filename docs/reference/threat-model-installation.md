@@ -1,6 +1,8 @@
 # Threat model: the installation
 
-Part of the [threat model](threat-model.md). How the rows are filled is in [threat model method](threat-model-method.md).
+This page holds the threats to an installation of Axis, the **I** scope of the
+[threat model](threat-model.md). How its rows are found, rated and checked is in
+[threat model method](threat-model-method.md).
 
 ## The installation
 
@@ -179,7 +181,7 @@ Other categories do not apply to stored keys. A changed key ring fails to start,
 
 ### Cell console and provisioning API
 
-The platform operator, through the cell console on `Cell:ConsoleHost` and the provisioning API under `/api/cell/`, acts on every tenant of a cell. The read routes under `/api/cell/` are built. The rest, the writes, the jobs and the console, is _(planned for M31)_.
+The platform operator, through the cell console on `Cell:ConsoleHost` and the provisioning API under `/api/cell/`, acts on every tenant of a cell.
 
 ```mermaid
 flowchart LR
@@ -212,14 +214,13 @@ flowchart LR
     Jobs -->|acts on| Data
 ```
 
-The planned controls are in [cell console](cell-console.md#sign-in), [what the console never shows](cell-console.md#what-the-console-never-shows),
+The controls are in [cell console](cell-console.md#sign-in), [what the console never shows](cell-console.md#what-the-console-never-shows),
 [provisioning API](tenant-lifecycle.md#provisioning-api), [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) and
 [hosts and certificates](cells.md#hosts-and-certificates). The read routes have one row, P114 in the
 [product threat model](threat-model-product.md), because it is about the caller and the server: a tenant realm token or a
 token without the operator role reads the cell's tenants, and a tenant host answers `404` for every path under `/api/cell/`.
-No other row is written yet. A **Gap** row links the open issue that closes it, and no open M31 issue is linked here.
 
-Open, waiting for an issue:
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 
 - (Spoofing, High) an attacker takes over an operator account and acts on every tenant of the cell. Sign-in needs a
   password and a second factor in the operator realm, which has accounts only.
@@ -232,5 +233,5 @@ Open, waiting for an issue:
 - (Spoofing, High) a host is served before its owner is verified, so one tenant takes another's name. The cell adds a
   host only once its DNS record matches.
 
-Repudiation does not need a row: each job is planned to write a platform audit record with the actor, see
+Repudiation does not need a row: each job writes a platform audit record with the actor, see
 [provisioning API](tenant-lifecycle.md#provisioning-api).

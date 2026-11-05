@@ -1,10 +1,13 @@
 # Threat model: the way Axis is built
 
-Part of the [threat model](threat-model.md). How the rows are filled is in [threat model method](threat-model-method.md).
+This page holds the threats to the way Axis is built, the **B** scope of the
+[threat model](threat-model.md). How its rows are found, rated and checked is in
+[threat model method](threat-model-method.md).
 
 ## The way Axis is built
 
-NexKit, CI, the AI agents that write to the repository, and the repository itself.
+The way Axis is built covers NexKit, CI, the AI agents that write to the repository, and the
+repository itself. The overview shows how they connect, and each boundary below has its own table.
 
 ```mermaid
 flowchart LR
@@ -36,7 +39,7 @@ flowchart LR
         Text[Issue text, comments and repository files]
     end
     subgraph pipeline [NexKit pipeline]
-        Run[NexKit workflow pinned to tag v5.9.1]
+        Run[NexKit workflow pinned to a release tag]
     end
     subgraph review [Pull request]
         Branch[Branch with a nexkit prefix and its pull request]
@@ -110,7 +113,7 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| B1 | An agent adds an exception to a security check, or loosens one, to turn a red check green, such as in `scripts/scan-accepted.json` or `scripts/check-docs.mjs`. | Agents | Tampering | High | **Mitigated** | The owner guards the security checks with `.github/CODEOWNERS`, as [D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) agrees: a pull request that changes one of those files waits for the owner's review, see [delivery decisions](../delivery.md#decisions). |
+| B1 | An agent adds an exception to a security check, or loosens one, to turn a red check green, such as in `scripts/scan-accepted.json` or `scripts/check-docs.mjs`. | Agents | Tampering | High | **Mitigated** | The owner guards the security checks with `.github/CODEOWNERS`: a pull request that changes one of those files waits for the owner's review, see [delivery decisions](../delivery.md#decisions). |
 | B2 | Text in an issue, a comment or a repository file steers an agent. This is prompt injection. | Agents | Tampering | High | **Mitigated** | The [delivery decisions](../delivery.md#decisions) limit what an agent can change: protected paths, no push token, and NexKit's checks and review on every pull request. These limit the damage. They do not stop the steering. |
 | B5 | The AI review shares the writer's blind spots, because the same kind of model writes and reviews the code. | Agents | Tampering | Medium | **Accepted** | Accepted on 2026-10-29. The owner keeps NexKit's AI review as the only gate before a merge, with the checks and code owners of [D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) around it. |
 | B7 | An agent turns off or narrows a CI job or a CodeQL check. | Agents | Tampering | High | **Mitigated** | `.github/` and `.nexkit/` are protected paths, see [delivery decisions](../delivery.md#decisions). A change to them is a hand-made pull request, opened by the hourly driver or the local agent session. The owner reviews and merges each one. |

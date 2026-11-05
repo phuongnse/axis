@@ -2,22 +2,25 @@
 
 Status: **Agreed**
 
-- **Protocol:** OIDC authorization code flow with PKCE.
-- **Client:** a .NET backend-for-frontend (BFF) acts as the confidential
-  client.
-- **Session:** the browser holds only a secure HttpOnly session cookie.
-  Tokens never reach the browser.
-- **Identity provider:** an external OIDC provider. Development uses Keycloak.
-  Enterprise SAML or directory identities are handled by brokering through the
-  identity provider, not inside Axis.
-  - [D99](d99-axis-ships-its-own-identity-provider.md) changes this line: Axis ships its own identity provider, which
-    brokers to each organization's.
-- **FAPI 2.0:** the structure follows FAPI 2.0 roles (authorization server,
-  confidential client, resource server). PAR, `private_key_jwt` and DPoP can be
-  enabled later without restructuring. FAPI conformance is a later milestone.
-  - [D83](d83-the-fapi-20-profile-per-tenant.md) adds the FAPI 2.0 profile as
-    a setting per tenant.
+## Context
 
-_Why:_ the BFF pattern gives most of the protection. For a configuration
-platform the real risk is business authorization, which FAPI does not cover.
-Requiring full FAPI early would block every milestone.
+Axis must sign people in with their organizations' identities, keep no passwords and let no token
+reach the browser. Some customers will ask for FAPI 2.0, but requiring it early would block every
+milestone.
+
+## Decision
+
+- **OIDC with PKCE through a BFF.** The .NET server is the confidential client, and the browser holds
+  only a secure HttpOnly session cookie.
+- **Accounts live at the identity provider,** which brokers to enterprise identities. It is Axis's own
+  ([D99](d99-axis-ships-its-own-identity-provider.md)).
+- **Shaped for FAPI 2.0.** The parts follow its roles, so a tenant can turn the profile on
+  ([D83](d83-the-fapi-20-profile-per-tenant.md)).
+
+The detail is in [sign-in and the session](../reference/security.md#sign-in-and-the-session).
+
+## Consequences
+
+The BFF gives most of the protection. The real risk of a configuration platform, business
+authorization, lies outside FAPI, and [D12](d12-authorization-is-server-side-and-default-deny.md)
+covers it.
