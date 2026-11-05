@@ -25,7 +25,8 @@ public sealed class DocumentationTests
         {
             for (var i = 0; i < lines.Length; i++)
             {
-                if (!Regex.IsMatch(lines[i], @"^\|\s*Code\s*\|"))
+                // Other tables, such as the form condition checks, also begin with a Code column but are not this table.
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Code\s*\|\s*Meaning\s*\|"))
                 {
                     continue;
                 }
@@ -47,7 +48,7 @@ public sealed class DocumentationTests
             }
         }
 
-        Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Code |' under docs/, found {tables.Count}.");
+        Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Code | Meaning |' under docs/, found {tables.Count}.");
         var (builtCodes, plannedCodes) = tables[0];
         var documented = builtCodes.Concat(plannedCodes).ToList();
         // Configuration and expression codes share one number range and one table.
