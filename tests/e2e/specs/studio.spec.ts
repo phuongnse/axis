@@ -666,13 +666,21 @@ test.describe('Studio on a copy of its own', () => {
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
+    await expect(page.getByTestId('studio-band')).toBeVisible()
     await expect(page.getByRole('region', { name: 'Get started', exact: true })).toHaveCount(0)
-    const tiles = page
-      .getByRole('region', { name: 'Live', exact: true })
-      .getByRole('link', { name: /opens in a new tab$/ })
-    await expect(tiles.first()).toBeVisible()
+    const live = page.getByRole('region', { name: 'Live', exact: true })
+    const purchasing = live.getByRole('link', { name: 'Purchasing, opens in a new tab', exact: true })
+    await expect(purchasing).toBeVisible()
+    await expect(purchasing).toHaveAttribute('target', '_blank')
+    const tiles = live.getByRole('link', { name: /opens in a new tab$/ })
     for (const tile of await tiles.all()) {
       await expect(tile).toHaveAttribute('target', '_blank')
     }
+
+    await page
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('link', { name: 'Releases', exact: true })
+      .click()
+    await expect(page.getByTestId('studio-releases')).toBeVisible()
   })
 })
