@@ -638,7 +638,9 @@ the session, the service account or the endpoint caller. It follows
   `GET /api/auth/sign-in`, `POST /api/auth/sign-out`,
   `GET /api/cell/auth/sign-in`, `POST /api/cell/auth/sign-out` and the SPA's pages.
   The last two are the [cell console](cell-console.md#sign-in)'s, and they answer only on its host.
-  The static files stay public. The OIDC handlers answer the sign-in callbacks inside
+  On the console host the open routes that answer are the health probes, `GET /api/site`,
+  `GET /api/texts/{locale}`, the cell console's sign-in and sign-out, and the SPA's pages.
+  The static files stay public, on the console host too. The OIDC handlers answer the sign-in callbacks inside
   authentication, so they are outside the routes.
 - **The answers.** A session route answers `401` with the title "Sign in to read
   or write this data.". A service account route keeps its bearer answer. An
