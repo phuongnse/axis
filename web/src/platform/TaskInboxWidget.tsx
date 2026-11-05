@@ -1,8 +1,8 @@
-import { Alert, Space, Table, Tag, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Space, Tag, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { formatValue } from './formatValue'
-import { markCurrentPage } from './pagination'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
@@ -102,10 +102,11 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
     return () => controller.abort()
   }, [tasksPath, requestQuery])
 
-  const columns = useMemo<TableColumnsType<TaskListItem>>(
+  const columns = useMemo<AxisColumn<TaskListItem>[]>(
     () => [
       {
         key: 'task',
+        kind: 'freeText',
         title: t('shell.tasks.task'),
         render: (_value: unknown, task: TaskListItem) => {
           const releaseCatalog = releaseCatalogs.get(task.releaseId)
@@ -123,18 +124,21 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
       },
       {
         key: 'subject',
+        kind: 'freeText',
         title: t('shell.tasks.subject'),
-        render: (_value: unknown, task: TaskListItem) => task.subject.label ?? '',
+        render: (_value: unknown, task: TaskListItem) => task.subject.label ?? null,
       },
       {
         key: 'dueAt',
+        kind: 'fixed',
         title: t('shell.tasks.dueAt'),
-        render: (_value: unknown, task: TaskListItem) => (
-          <Space size="small">
-            {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
-            {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
-          </Space>
-        ),
+        render: (_value: unknown, task: TaskListItem) =>
+          task.dueAt === null ? null : (
+            <Space size="small">
+              {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
+              {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
+            </Space>
+          ),
       },
     ],
     [locale, t, taskPath, releaseCatalogs, catalogs, development],
@@ -151,24 +155,19 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
     return <Alert data-testid="tasks-error" type="error" title={t('shell.tasks.loadFailed')} />
   }
   return (
-    <div aria-busy={loading || textsLoading}>
-      <Table<TaskListItem>
-        rowKey="id"
-        columns={columns}
-        scroll={{ x: 'max-content' }}
-        dataSource={state.page?.items}
-        loading={loading || textsLoading}
-        locale={{ emptyText: t('shell.tasks.empty') }}
-        pagination={{
-          current: query.page,
-          pageSize: query.pageSize,
-          total: state.page?.totalCount ?? 0,
-          pageSizeOptions: pageSizes,
-          showSizeChanger: true,
-          itemRender: markCurrentPage(query.page),
-        }}
-        onChange={onChange}
-      />
-    </div>
+    <AxisTable<TaskListItem>
+      rowKey={(task) => task.id}
+      columns={columns}
+      dataSource={state.page?.items}
+      loading={loading || textsLoading}
+      emptyText={t('shell.tasks.empty')}
+      pagination={{
+        current: query.page,
+        pageSize: query.pageSize,
+        total: state.page?.totalCount ?? 0,
+        pageSizeOptions: pageSizes,
+      }}
+      onChange={onChange}
+    />
   )
 }
