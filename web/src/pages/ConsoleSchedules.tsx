@@ -1,7 +1,7 @@
-import { Alert, Card, Flex, Select, Table, type TableColumnsType } from 'antd'
+import { Alert, Card, Flex, Select } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { fetchConsoleSchedules, type ConsoleApplication, type ConsoleScheduleItem } from '../platform/console'
-import { EmptyDash } from '../platform/EmptyValue'
 import { useText } from '../platform/texts'
 
 interface ConsoleSchedulesProps {
@@ -54,28 +54,42 @@ export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps
     return () => controller.abort()
   }, [application])
 
-  const columns = useMemo<TableColumnsType<ConsoleScheduleItem>>(
+  const columns = useMemo<AxisColumn<ConsoleScheduleItem>[]>(
     () => [
       {
         key: 'application',
+        kind: 'freeText',
         title: t('shell.console.schedules.application'),
         render: (_value, item) => item.application,
       },
-      { key: 'trigger', title: t('shell.console.schedules.trigger'), render: (_value, item) => item.trigger },
-      { key: 'process', title: t('shell.console.schedules.process'), render: (_value, item) => item.process },
+      {
+        key: 'trigger',
+        kind: 'freeText',
+        title: t('shell.console.schedules.trigger'),
+        render: (_value, item) => item.trigger,
+      },
+      {
+        key: 'process',
+        kind: 'freeText',
+        title: t('shell.console.schedules.process'),
+        render: (_value, item) => item.process,
+      },
       {
         key: 'schedule',
+        kind: 'fixed',
         title: t('shell.console.schedules.schedule'),
         render: (_value, item) => `${item.schedule} ${item.timeZone}`,
       },
       {
         key: 'lastOccurrence',
+        kind: 'fixed',
         title: t('shell.console.schedules.lastOccurrence'),
         render: (_value, item) =>
-          item.lastOccurrenceAt === null ? <EmptyDash /> : new Date(item.lastOccurrenceAt).toLocaleString(locale),
+          item.lastOccurrenceAt === null ? null : new Date(item.lastOccurrenceAt).toLocaleString(locale),
       },
       {
         key: 'nextOccurrence',
+        kind: 'fixed',
         title: t('shell.console.schedules.nextOccurrence'),
         render: (_value, item) => new Date(item.nextOccurrenceAt).toLocaleString(locale),
       },
@@ -100,14 +114,12 @@ export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps
         {load.failed && !loading ? (
           <Alert data-testid="console-schedules-error" type="error" title={t('shell.console.schedules.loadFailed')} />
         ) : (
-          <Table<ConsoleScheduleItem>
+          <AxisTable<ConsoleScheduleItem>
             rowKey={(item) => `${item.applicationId}:${item.triggerId}`}
             columns={columns}
-            scroll={{ x: 'max-content' }}
             dataSource={load.items}
             loading={loading}
-            locale={{ emptyText: t('shell.console.schedules.empty') }}
-            pagination={false}
+            emptyText={t('shell.console.schedules.empty')}
           />
         )}
       </Flex>

@@ -150,6 +150,57 @@ describe('AxisTable', () => {
     expect(screen.queryByRole('list')).not.toBeInTheDocument()
   })
 
+  describe('paging', () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({ id: String(index), name: `Row ${index}`, amount: index }))
+    const bodyRows = () => screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)
+
+    it('lists every row and draws no pager when pagination is not given', () => {
+      renderTable({ dataSource: many, pagination: undefined })
+
+      expect(bodyRows()).toHaveLength(25)
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    })
+
+    it('shows the page-size picker when page sizes are offered', () => {
+      renderTable({ dataSource: many })
+
+      expect(screen.getByRole('combobox')).toBeInTheDocument()
+      expect(screen.getByRole('list')).toBeInTheDocument()
+    })
+
+    it('shows a pager with no picker when there is more than one page and no page sizes are offered', () => {
+      renderTable({ pagination: { current: 1, pageSize: 20, total: 30 } })
+
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+      expect(screen.getByRole('list')).toBeInTheDocument()
+    })
+
+    it('draws no pager when there is no picker and one page', () => {
+      renderTable({ pagination: { current: 1, pageSize: 20, total: 2 } })
+
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    })
+  })
+
+  it('renders with no toolbar and no loading state', () => {
+    render(
+      <TextProvider catalogs={catalogs} development={false}>
+        <AxisTable<Row> columns={[nameColumn]} rowKey={(row) => row.id} dataSource={rows} emptyText="Nothing here" />
+      </TextProvider>,
+    )
+
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('table').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument()
+  })
+
+  it('puts testId on the outer element of the table', () => {
+    renderTable({ testId: 'a-table' })
+
+    expect(screen.getByTestId('a-table')).toContainElement(screen.getByRole('table'))
+  })
+
   it('puts the attributes of rowAttributes on the row element', () => {
     renderTable({
       rowAttributes: (row) =>
@@ -158,6 +209,15 @@ describe('AxisTable', () => {
 
     const found = screen.getAllByTestId('a-row')
     expect(found.map((row) => row.getAttribute('data-amount'))).toEqual(['12', null])
+  })
+
+  it('passes the index of each row to rowAttributes', () => {
+    renderTable({
+      rowAttributes: (_row, index) => ({ 'data-index': String(index) }) as HTMLAttributes<HTMLElement>,
+    })
+
+    const found = [...document.querySelectorAll('tbody tr[data-index]')]
+    expect(found.map((row) => row.getAttribute('data-index'))).toEqual(['0', '1'])
   })
 
   it('shows the failure in place of the rows and keeps the toolbar', () => {

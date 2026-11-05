@@ -1,13 +1,12 @@
-import { Alert, Card, Flex, Select, Table, Tag, type TableColumnsType } from 'antd'
+import { Alert, Card, Flex, Select, Tag } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import {
   fetchConsoleWebhookDeliveries,
   type ConsoleApplication,
   type ConsoleWebhookDelivery,
   type ConsoleWebhookDeliveryPage,
 } from './console'
-import { EmptyDash } from './EmptyValue'
-import { markCurrentPage } from './pagination'
 import { useText } from './texts'
 
 interface ConsoleWebhookDeliveriesProps {
@@ -78,41 +77,46 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
     (candidate) => !application || candidate.applicationId === application,
   )
 
-  const columns = useMemo<TableColumnsType<ConsoleWebhookDelivery>>(
+  const columns = useMemo<AxisColumn<ConsoleWebhookDelivery>[]>(
     () => [
       {
         key: 'application',
+        kind: 'freeText',
         title: t('shell.console.webhooks.application'),
-        render: (_value: unknown, row) => row.application ?? <EmptyDash />,
+        render: (_value, row) => row.application,
       },
       {
         key: 'webhook',
+        kind: 'freeText',
         title: t('shell.console.webhooks.webhook'),
-        render: (_value: unknown, row) => row.webhook ?? <EmptyDash />,
+        render: (_value, row) => row.webhook,
       },
       {
         key: 'event',
+        kind: 'freeText',
         title: t('shell.console.webhooks.event'),
-        render: (_value: unknown, row) => row.event ?? <EmptyDash />,
+        render: (_value, row) => row.event,
       },
       {
         key: 'state',
+        kind: 'fixed',
         title: t('shell.console.webhooks.state'),
-        render: (_value: unknown, row) => (
+        render: (_value, row) => (
           <Tag color={stateColors[row.state]}>{t(`shell.console.webhooks.state.${row.state}`)}</Tag>
         ),
       },
-      { key: 'attempts', title: t('shell.console.webhooks.attempts'), dataIndex: 'attempts' },
+      { key: 'attempts', kind: 'fixed', title: t('shell.console.webhooks.attempts'), dataIndex: 'attempts' },
       {
         key: 'statusCode',
+        kind: 'fixed',
         title: t('shell.console.webhooks.statusCode'),
-        render: (_value: unknown, row) => row.statusCode ?? <EmptyDash />,
+        render: (_value, row) => row.statusCode,
       },
       {
         key: 'deliveredAt',
+        kind: 'fixed',
         title: t('shell.console.webhooks.deliveredAt'),
-        render: (_value: unknown, row) =>
-          row.deliveredAt === null ? <EmptyDash /> : new Date(row.deliveredAt).toLocaleString(locale),
+        render: (_value, row) => (row.deliveredAt === null ? null : new Date(row.deliveredAt).toLocaleString(locale)),
       },
     ],
     [locale, t],
@@ -158,20 +162,16 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
             title={t('shell.console.webhooks.loadFailed')}
           />
         ) : (
-          <Table<ConsoleWebhookDelivery>
-            rowKey="id"
+          <AxisTable<ConsoleWebhookDelivery>
+            rowKey={(row) => row.id}
             columns={columns}
-            scroll={{ x: 'max-content' }}
             dataSource={load.page?.items}
             loading={loading}
-            locale={{ emptyText: t('shell.console.webhooks.empty') }}
+            emptyText={t('shell.console.webhooks.empty')}
             pagination={{
               current: page,
-              pageSize: load.page?.pageSize,
+              pageSize: load.page?.pageSize ?? 20,
               total: load.page?.totalCount ?? 0,
-              showSizeChanger: false,
-              hideOnSinglePage: true,
-              itemRender: markCurrentPage(page),
             }}
             onChange={(pagination) => setPage(pagination.current ?? 1)}
           />

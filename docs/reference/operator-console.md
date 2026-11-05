@@ -156,7 +156,8 @@ and pages through them.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
   read-only. Publishing and rollback stay in Studio. A card under the Webhook deliveries view with
   a picker of the applications of the Tenant view, which starts on the first one. A releases table
-  shows the number, label, note, who activated it and when, and marks the active release. It marks an
+  shows the number, label, note, who activated it and when, and marks the active release. Who activated it is named
+  in words, as [names](studio-workspace.md#names) says for Studio. It marks an
   [off-standard release](module-contracts.md#off-standard-releases) with the Off-standard tag and the
   module, point and reason of each relaxed entry, as Studio does. A paged
   table shows each publish request with its kind, target, status, label, who asked, when it was

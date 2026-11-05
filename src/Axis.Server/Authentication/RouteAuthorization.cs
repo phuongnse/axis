@@ -43,7 +43,7 @@ internal static class RouteAuthorization
 
         app.MapGroup(string.Empty).WithRateLimit(Partition.Session).AllowAnonymous().MapAuthEndpoints();
 
-        app.MapFallbackToFile("index.html").WithoutRateLimit().AllowAnonymous();
+        app.MapFallbackToFile("index.html").WithoutRateLimit().AllowAnonymous().WithMetadata(CellConsoleRoute.Instance);
     }
 }
 

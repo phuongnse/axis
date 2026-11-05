@@ -4,7 +4,8 @@ namespace Axis.Presentation.Sites;
 /// <param name="TitleKey">Text key of the site title.</param>
 /// <param name="HostSite">The lower-case path of the site whose own host the request came on, or <c>null</c> when the host belongs to no site. The SPA then shows that site at <c>/</c>.</param>
 /// <param name="Legal">The tenant's privacy and terms links, or null when it sets neither.</param>
-public sealed record SiteMetadata(string Name, string TitleKey, SiteLocales Locales, IReadOnlyList<NavigationItem> Navigation, string? HostSite = null, SiteListLegal? Legal = null);
+/// <param name="CellConsole">Whether the request came on the cell console's host, see docs/reference/cell-console.md.</param>
+public sealed record SiteMetadata(string Name, string TitleKey, SiteLocales Locales, IReadOnlyList<NavigationItem> Navigation, string? HostSite = null, SiteListLegal? Legal = null, bool CellConsole = false);
 
 /// <summary>The locales a site offers, with the one shown first and the one used for missing texts.</summary>
 public sealed record SiteLocales(string Default, string Fallback, IReadOnlyList<string> Available);

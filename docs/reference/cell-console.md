@@ -4,7 +4,7 @@ Detailed reference for the cell console: the web page where the platform operato
 of a [cell](cells.md) and provisions them. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the [sign-in](#sign-in) of the console host and the **Network** limit of [host and route](#host-and-route). The [operator console](operator-console.md) of a
+Everything in this file is _(planned for M31)_, except the [sign-in](#sign-in) of the console host with its session read, the **Network** limit of [host and route](#host-and-route), and the host serving the SPA's page and its shell reads. The console's views and actions stay planned. The [operator console](operator-console.md) of a
 tenant stays as it is: it shows one tenant's failed work in detail, inside that tenant. The
 conventions of [architecture.md](../architecture.md) apply.
 
@@ -13,8 +13,10 @@ conventions of [architecture.md](../architecture.md) apply.
 - **Its own host.** The cell console answers only on `Cell:ConsoleHost`, such as
   `console.vn-1.example.com`, a host that belongs to no tenant. Request resolution treats it as a
   platform host: it resolves no tenant, and a tenant host never serves the console's page or its API.
-- **Route.** The page is `/` on that host. Its API is the [provisioning API](tenant-lifecycle.md#provisioning-api)
-  under `/api/cell/`.
+- **Route.** The page is `/` on that host, and every client path, such as `/tenants/a`, answers the SPA's
+  `index.html`. The host also serves the SPA's web-root files, `GET /api/site`, which answers `cellConsole: true`
+  there and `false` on a tenant host, and `GET /api/texts/{locale}`. Its API is the
+  [provisioning API](tenant-lifecycle.md#provisioning-api) under `/api/cell/`. Every other path answers `404`.
 - **Network.** `Cell:ConsoleAllowedNetworks`, a list of address ranges, limits who reaches the host.
   It is empty by default, which allows every address, because the second factor guards sign-in. When it lists
   ranges, a request to the console host from an address outside every range gets `403`, on every path, before tenant
@@ -47,6 +49,8 @@ conventions of [architecture.md](../architecture.md) apply.
   end the operator's session at the identity provider. Like every write under `/api`, it is refused with `403`
   unless it carries the `X-Axis-Csrf` header. These two routes are the only ones under `/api/cell/` that need no
   operator role. Sign-in answers `404` on any other host.
+- **Session read.** `GET /api/cell/session` answers `{ displayName }` of the signed-in operator. It answers `401`
+  without a session and `403` without the role. For a machine caller with a bearer token the display name is the client id.
 - **Client.** The console signs in as a confidential client of the operator realm, `Cell:ConsoleClientId`
   (`axis-cell-console` by default) with the secret `Cell:ConsoleClientSecret`, using the code flow with PKCE. The client
   must accept the redirect `https://<Cell:ConsoleHost>/api/cell/auth/callback`. Without the secret the server offers no

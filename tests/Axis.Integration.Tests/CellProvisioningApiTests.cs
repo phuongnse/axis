@@ -280,20 +280,18 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
-    public async Task The_console_host_serves_only_the_probes_and_the_cell_routes()
+    public async Task The_console_host_serves_the_probes_and_answers_404_for_tenant_routes_and_unknown_cell_routes()
     {
         await using var factory = await StartAsync();
         using var client = CreateClient(factory, _console);
         var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
 
         using var live = await GetAsync(client, "/health/live", token: null);
-        using var page = await GetAsync(client, "/", token: null);
         using var me = await GetAsync(client, "/api/me", token: null);
         using var meWithToken = await GetAsync(client, "/api/me", token);
         using var other = await GetAsync(client, "/api/cell/other", token);
 
         Assert.Equal(HttpStatusCode.OK, live.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, page.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, me.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, meWithToken.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
