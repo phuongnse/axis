@@ -1,4 +1,5 @@
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { expect, test } from '../test'
@@ -10,8 +11,9 @@ import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
 import { createResource, openFormTab, openNewApplication } from '../studio-resources'
 
-// A second server starts in beforeAll, and the journey creates an application and publishes it.
-test.setTimeout(240_000)
+// A second server starts in beforeAll, and the journey creates an application and publishes it. The publisher runs
+// the contract scenarios of both modules, so the publish takes longer than in the other Studio journeys.
+test.setTimeout(420_000)
 
 // The journey publishes a new application, which would change the live release of the shared purchase request copy
 // that other specs use. So it runs on a second server whose applications folder is a temporary one.
@@ -70,10 +72,28 @@ test.describe('Studio builds a page with two columns', () => {
     await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
-    await dialog.getByRole('radio', { name: /^Request approval/ }).click()
+    await dialog.getByRole('radio', { name: /^Approvals/ }).click()
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`app=${name}$`))
     await expect(dialog).toBeHidden()
+
+    // The table reads a data source over the module entity approvals/Request, which the journey adds here.
+    const folder = await applicationFolder(name)
+    await mkdir(path.join(folder, 'data-sources'), { recursive: true })
+    await writeFile(
+      path.join(folder, 'data-sources', 'request-list.json'),
+      JSON.stringify({
+        id: randomUUID(),
+        kind: 'dataSource',
+        name: 'RequestList',
+        formatVersion: 1,
+        entity: 'approvals/Request',
+        fields: [
+          { name: 'title', path: 'title' },
+          { name: 'status', path: 'status' },
+        ],
+      }),
+    )
 
     await createResource(page, 'page', 'Overview')
     await openFormTab(page)
@@ -99,7 +119,7 @@ test.describe('Studio builds a page with two columns', () => {
       page.getByTestId('studio-widget-/widgets/1/columns/0/widgets/0'),
     )
     await page.getByTestId('studio-widget-/widgets/1/columns/0/widgets/0').click()
-    await pick(page, 'studio-field-/widgets/1/columns/0/widgets/0/entity', 'Request')
+    await pick(page, 'studio-field-/widgets/1/columns/0/widgets/0/dataSource', 'RequestList')
 
     // The starter task inbox goes into the second column. The columns widget is then the first widget.
     await pickAction(
@@ -118,7 +138,6 @@ test.describe('Studio builds a page with two columns', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
 
-    const folder = await applicationFolder(name)
     const saved = JSON.parse(await readFile(path.join(folder, 'pages', 'overview.json'), 'utf8')) as {
       widgets: unknown[]
     }
@@ -127,7 +146,7 @@ test.describe('Studio builds a page with two columns', () => {
         type: 'columns',
         name: 'columns1',
         columns: [
-          { name: 'column1', width: 8, widgets: [{ type: 'table', name: 'table1', entity: 'Request' }] },
+          { name: 'column1', width: 8, widgets: [{ type: 'table', name: 'table1', dataSource: 'RequestList' }] },
           { name: 'column2', width: 4, widgets: [{ type: 'taskInbox', name: 'taskInbox1' }] },
         ],
       },
@@ -136,7 +155,7 @@ test.describe('Studio builds a page with two columns', () => {
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
-      timeout: 60_000,
+      timeout: 300_000,
     })
 
     const sites = await readdir(path.join(folder, 'sites'))
