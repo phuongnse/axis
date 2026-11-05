@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
+import { readdir, readFile } from 'node:fs/promises'
+import path from 'node:path'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { expect } from './test'
 import { csrfHeaders } from './csrf'
 import { confirmDialog, waitForDialog } from './dialogs'
 import { fieldLabel } from './fields'
-import { journeyURL } from './server-settings'
+import { journeyApplications, journeyURL } from './server-settings'
 import { useJourneySession } from './sessions'
 
 interface ResourceItem {
@@ -49,6 +51,20 @@ async function choose(page: Page, field: string, label: string, name: string) {
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
   await expect(page.getByLabel(fieldLabel(label))).toHaveValue(name)
+}
+
+/** The folder under the journey applications folder whose manifest is called `name`. */
+export async function applicationFolder(name: string): Promise<string> {
+  for (const folder of await readdir(journeyApplications)) {
+    const directory = path.join(journeyApplications, folder)
+    try {
+      const manifest = JSON.parse(await readFile(path.join(directory, 'application.json'), 'utf8'))
+      if (manifest.name === name) return directory
+    } catch {
+      // A folder without a manifest is not an application.
+    }
+  }
+  throw new Error(`No application called ${name} under ${journeyApplications}.`)
 }
 
 /** Creates the application `name` from the built-in Approvals application and returns the path of its site. */

@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process'
-import { readdir, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '../test'
+import { applicationFolder } from '../approvals'
 import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
-import { journeyApplications, journeyURL } from '../server-settings'
+import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
 
 // The journey server is the second server of the run, and a publish request waits behind the ones that other
@@ -26,17 +27,10 @@ function count(database: string, query: string): number {
   return Number(result.stdout.trim())
 }
 
-/** The id in the manifest of the application folder under the journey applications folder that is called `name`. */
+/** The id in the manifest of the application called `name`. */
 async function applicationId(name: string): Promise<string> {
-  for (const folder of await readdir(journeyApplications)) {
-    try {
-      const manifest = JSON.parse(await readFile(path.join(journeyApplications, folder, 'application.json'), 'utf8'))
-      if (manifest.name === name) return manifest.id as string
-    } catch {
-      // A folder without a manifest is not an application.
-    }
-  }
-  throw new Error(`No application called ${name} under ${journeyApplications}.`)
+  const manifest = JSON.parse(await readFile(path.join(await applicationFolder(name), 'application.json'), 'utf8'))
+  return manifest.id as string
 }
 
 test.describe('the journey tenant publishes a Studio application', () => {
