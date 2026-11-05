@@ -97,6 +97,34 @@ changes, and logic goes in `design-review.md` for the review's issue.
 
 The artifact does not change during a review. It is published once, at the end.
 
+### Bringing `main` into the prototype
+
+Use this when the owner asks to continue a review after design issues merged, or when `main` has moved on under the
+prototype. The rule is in [Design changes](../../../docs/delivery.md#design-changes).
+
+1. `git fetch origin --tags --prune`, then switch to the newest `design/` branch (`git branch -r --list
+   'origin/design/*' --sort=-committerdate`). Never start from an older one.
+2. Find what `main` built: `git log --oneline $(git merge-base HEAD origin/main)..origin/main`, and the issues that link a
+   `design-review/` tag, with `gh issue list --state all --search "design-review in:body"`. Tell the owner which design
+   issues have merged.
+3. `git merge origin/main`. Never rebase a pushed prototype.
+4. Resolve every conflict by one rule: `main` is the standard for behaviour, the prototype for look.
+   - Where both built the same thing, take `main`'s API, data shape, texts and logic as the base, and put the prototype's
+     look and its agreed additions back on it, as `design-review.md` lists them. Never keep the prototype's logic over
+     `main`'s, and never change `main`'s logic to suit the prototype.
+   - Where only the prototype built it, keep it, and move it to `main`'s names and APIs.
+   - Check what a past merge of the prototype lost: `git diff $(git merge-base HEAD origin/main) origin/main --stat`
+     shows what `main` has that a file without a conflict may still lack. Bring it back into the prototype's files and
+     list it under "Lost in merges".
+   - A text key that both gave a value takes `main`'s. Edit the text files as lines, as a JSON round trip drops their
+     duplicate keys.
+5. Check it: `npm ci --prefix web` when the packages are old, then `tsc -b --noEmit`, `oxlint --deny-warnings` and
+   `prettier --check` in `web/`, `dotnet build`, the tests of the shared widgets the merge touched (`AxisTable`,
+   `TableWidget`, `Shell`), and `scripts/design-system.sh`. A test that fails because the prototype changed a widget on
+   purpose is listed in `design-review.md`, not fixed on this branch.
+6. Write the merge into `design-review.md`: which `main` commit, what was kept from each side, and what is left unused.
+   Commit it with the merge, and push the branch.
+
 ### Checking a card
 
 A check passes only when the card behaves as it will in the artifact.
