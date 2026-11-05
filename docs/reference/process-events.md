@@ -369,7 +369,8 @@ transaction does this:
 1. It records the occurrence as the trigger's last occurrence. It changes the state only while the
    stored next occurrence is still the one this item ran. When several occurrences were missed, for
    example while no worker ran, only the latest one at or before now runs, once, and the worker logs
-   how many it skipped.
+   how many it skipped. Occurrences that fell while the tenant was
+   [read-only](subscriptions.md#the-read-only-tenant) are skipped, not caught up.
 2. It queues a `trigger.fanOut` work item for the occurrence.
 3. It computes the next occurrence after now, and sets the item's `due_at` to it.
 
