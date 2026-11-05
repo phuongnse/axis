@@ -47,6 +47,7 @@ refuses is in [the read-only tenant](subscriptions.md#the-read-only-tenant).
 - **Writes are refused** _(planned for M33)_. People still sign in and read, and every write answers
   `403` with the reason `tenant-read-only`.
 - **Ending it.** `tenant resume` makes the tenant `active` again, and `tenant suspend` suspends it.
+  After a resume the worker skips the schedule occurrences that fell while the tenant was read-only.
 - **The provisioning API.** The same change is a job of the
   [provisioning API](tenant-lifecycle.md#provisioning-api).
 - **When a trial ends** _(planned for M33)_. The [control plane](control-plane.md) makes the tenant
