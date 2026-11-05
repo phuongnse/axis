@@ -164,8 +164,16 @@ owner is reviewing it one step at a time.
   (`useGuard`: open a reference or a problem, a policy, an application, a sidebar entry). An editor counts itself in through
   `useUnsavedChanges`, which `SaveBar` calls, so every editor with a save bar is guarded. A reload or closing the tab asks
   the browser's own question. A link opened in a new tab is not asked about.
-- **For the issue:** the browser's Back is not guarded, as the SPA's router is not a data router; the issue moves to
-  `createBrowserRouter` and `useBlocker`, or leaves Back unguarded. The module editors and the contract pages have no save
+- **Back is the browser's:** Studio has no Back or Next of its own. Every view has its own address and each move is a
+  history entry (the search replaces its entry), so the browser's Back and Forward, Alt+Left and the mouse's back button step
+  through it. A second Back would be one concern with two mechanisms, and people would have to guess whether the two differ.
+  Desktop IDEs such as Mendix Studio Pro and VS Code have their own because they have no browser around them; web builders
+  such as Salesforce Setup and Power Apps leave it to the browser. Where the author is comes from the sidebar's marked entry,
+  which also leads up to the list, and the page heading, so Studio keeps no breadcrumb.
+- **For the issue, so Back works well:** the SPA moves to a data router, `createBrowserRouter`, so `useBlocker` guards
+  Back and Forward with the same "Leave without saving?" and `<ScrollRestoration>` returns the author to where they were in a
+  long page such as the Fields table. A field's drawer gets an address, `&field=<name>`, so Back reopens it and a link can
+  open a field. The module editors and the contract pages have no save
   bar, so they are not guarded yet. A module entity's page heading shows `organization/Department`, its name, not its label.
 - **Tried and dropped:** tabs for Fields, Validations and Indexes with a header that summed the entity up and an Edit details
   drawer. The owner wanted the details on the page. Sections suit an entity better than tabs while its parts are small;
