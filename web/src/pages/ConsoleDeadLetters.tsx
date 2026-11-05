@@ -1,7 +1,7 @@
 import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, Card, Flex, Select, Table, Tag, type TableColumnsType } from 'antd'
+import { Alert, Card, Flex, Select, Tag } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import {
   consoleDeadLettersPath,
   fetchConsoleDeadLetters,
@@ -11,7 +11,6 @@ import {
 } from '../platform/console'
 import { formatValue } from '../platform/formatValue'
 import { deadLetterCommands, forbidden, sendDeadLetterCommand, type DeadLetterCommand } from '../platform/inspection'
-import { markCurrentPage } from '../platform/pagination'
 import { ReasonDialog } from '../platform/ReasonDialog'
 import { useText } from '../platform/texts'
 
@@ -81,60 +80,51 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
     return () => controller.abort()
   }, [query, loadKey])
 
-  const columns = useMemo<TableColumnsType<ConsoleDeadLetterItem>>(() => {
+  const columns = useMemo<AxisColumn<ConsoleDeadLetterItem>[]>(() => {
     const names = new Map(applications.map((row) => [row.id, row.name]))
     return [
       {
         key: 'application',
+        kind: 'freeText',
         title: t('shell.console.deadLetters.application'),
-        render: (_value: unknown, item) => names.get(item.applicationId) ?? item.applicationId,
+        render: (_value, item) => names.get(item.applicationId) ?? item.applicationId,
       },
-      { key: 'kind', title: t('shell.inspector.deadLetters.kind'), render: (_value: unknown, item) => item.kind },
-      { key: 'event', title: t('shell.console.deadLetters.event'), render: (_value: unknown, item) => item.eventId },
+      { key: 'kind', kind: 'fixed', title: t('shell.inspector.deadLetters.kind'), render: (_value, item) => item.kind },
+      {
+        key: 'event',
+        kind: 'fixed',
+        title: t('shell.console.deadLetters.event'),
+        render: (_value, item) => item.eventId,
+      },
       {
         key: 'target',
+        kind: 'freeText',
         title: t('shell.console.deadLetters.target'),
-        render: (_value: unknown, item) => item.triggerId ?? item.webhookId,
+        render: (_value, item) => item.triggerId ?? item.webhookId,
       },
       {
         key: 'attempts',
+        kind: 'fixed',
         title: t('shell.inspector.deadLetters.attempts'),
-        render: (_value: unknown, item) => item.attempts,
+        render: (_value, item) => item.attempts,
       },
       {
         key: 'lastError',
+        kind: 'freeText',
         title: t('shell.inspector.deadLetters.lastError'),
-        render: (_value: unknown, item) => item.lastError,
+        render: (_value, item) => item.lastError,
       },
       {
         key: 'state',
+        kind: 'fixed',
         title: t('shell.console.deadLetters.state'),
-        render: (_value: unknown, item) => <Tag>{t(`shell.console.deadLetters.state.${item.state}`)}</Tag>,
+        render: (_value, item) => <Tag>{t(`shell.console.deadLetters.state.${item.state}`)}</Tag>,
       },
       {
         key: 'createdAt',
+        kind: 'fixed',
         title: t('shell.inspector.deadLetters.createdAt'),
-        render: (_value: unknown, item) => formatValue(createdAtField, item.createdAt, {}, { locale, text: t }),
-      },
-      {
-        key: 'commands',
-        render: (_value: unknown, item) => (
-          <Flex gap="small">
-            {deadLetterCommands
-              .filter((command) => item.commands.includes(command))
-              .map((command) => (
-                <AxisButton
-                  key={command}
-                  role="icon"
-                  nameKey={`shell.inspector.commands.${command}`}
-                  destructive={command === 'discard'}
-                  icon={command === 'redeliver' ? <SendOutlined /> : <DeleteOutlined />}
-                  data-testid={`console-dead-letter-${command}-${item.id}`}
-                  onClick={() => setOpen({ command, item })}
-                />
-              ))}
-          </Flex>
-        ),
+        render: (_value, item) => formatValue(createdAtField, item.createdAt, {}, { locale, text: t }),
       },
     ]
   }, [applications, locale, t])
@@ -163,22 +153,32 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
             title={t('shell.console.deadLetters.loadFailed')}
           />
         ) : (
-          <Table<ConsoleDeadLetterItem>
-            rowKey="id"
+          <AxisTable<ConsoleDeadLetterItem>
+            rowKey={(item) => item.id}
             columns={columns}
-            scroll={{ x: 'max-content' }}
             dataSource={load.page?.items}
             loading={loading}
-            locale={{ emptyText: t('shell.console.deadLetters.empty') }}
+            emptyText={t('shell.console.deadLetters.empty')}
             pagination={{
               current: page,
-              pageSize: load.page?.pageSize,
+              pageSize: load.page?.pageSize ?? 20,
               total: load.page?.totalCount ?? 0,
-              showSizeChanger: false,
-              hideOnSinglePage: true,
-              itemRender: markCurrentPage(page),
             }}
             onChange={(pagination) => setPage(pagination.current ?? 1)}
+            rowActions={{
+              configured: deadLetterCommands.length,
+              actions: (item) =>
+                deadLetterCommands
+                  .filter((command) => item.commands.includes(command))
+                  .map((command) => ({
+                    key: command,
+                    labelKey: `shell.inspector.commands.${command}`,
+                    icon: command === 'redeliver' ? <SendOutlined /> : <DeleteOutlined />,
+                    destructive: command === 'discard',
+                    onClick: () => setOpen({ command, item }),
+                    attributes: { 'data-testid': `console-dead-letter-${command}-${item.id}` },
+                  })),
+            }}
           />
         )}
       </Flex>

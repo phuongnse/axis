@@ -134,7 +134,7 @@ describe('ConsolePublishing', () => {
     expect(within(rows[0]!).getByText('Spring')).toBeVisible()
     expect(within(rows[0]!).getByText('Back again')).toBeVisible()
     expect(within(rows[0]!).getByText('Rita Reader')).toBeVisible()
-    expect(within(rows[1]!).getByText('startup')).toBeVisible()
+    expect(within(rows[1]!).getByText('System')).toBeVisible()
     expect(within(releases).getAllByText('Active')).toHaveLength(1)
     expect(within(rows[0]!).getByText('Active')).toBeVisible()
 
@@ -147,6 +147,28 @@ describe('ConsolePublishing', () => {
     expect(within(requestRows[0]!).getByText('Alan Author')).toBeVisible()
     expect(within(requestRows[1]!).getByText('u9')).toBeVisible()
     expect(within(requestRows[1]!).getByText('Succeeded')).toBeVisible()
+  })
+
+  it('names who activated each release in words, and never shows an id that has no name', async () => {
+    stubServer(() =>
+      answer({
+        ...leave,
+        releases: [
+          release('r3', 3, { actor: 'startup' }),
+          release('r2', 2, { actor: 'operator', activatedAt: '2026-10-27T10:00:00Z' }),
+          release('r1', 1, { actor: 'u7', activatedAt: '2026-10-27T09:00:00Z' }),
+        ],
+      }),
+    )
+    renderView()
+
+    const releases = await screen.findByTestId('console-publishing-releases')
+    expect(await within(releases).findByText('#3')).toBeVisible()
+    const rows = within(releases).getAllByRole('row').slice(1)
+    expect(within(rows[0]!).getByText('System')).toBeVisible()
+    expect(within(rows[1]!).getByText('The platform operator')).toBeVisible()
+    expect(within(rows[2]!).getByText('Someone no longer known')).toBeVisible()
+    expect(within(releases).queryByText('u7')).toBeNull()
   })
 
   it('marks an off-standard release with the tag, its points and reasons, and leaves a standard release unmarked', async () => {

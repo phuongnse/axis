@@ -39,15 +39,8 @@
   "web/src/pages/ConnectorInputRows.tsx": {
     "button": 2
   },
-  "web/src/pages/ConsoleDeadLetters.tsx": {
-    "table": 1
-  },
   "web/src/pages/ConsolePage.tsx": {
-    "tag": 1,
-    "table": 2
-  },
-  "web/src/pages/ConsoleSchedules.tsx": {
-    "table": 1
+    "tag": 1
   },
   "web/src/pages/EndpointValues.tsx": {
     "button": 2
@@ -148,12 +141,6 @@
     "table": 1
   },
   "web/src/platform/ChildCollectionTable.tsx": {
-    "table": 1
-  },
-  "web/src/platform/ConsolePublishing.tsx": {
-    "table": 2
-  },
-  "web/src/platform/ConsoleWebhookDeliveries.tsx": {
     "table": 1
   },
   "web/src/platform/DeadLetterList.tsx": {
