@@ -326,8 +326,9 @@ export function StudioPublishing({
       : []),
   ]
 
+  // The band is always a row of text actions, with or without Publish…, so it looks the same for every author.
   const actions = (
-    <ActionRow finish={canPublish}>
+    <ActionRow finish>
       <Flex gap="small" align="center">
         {folded ? (
           <Dropdown

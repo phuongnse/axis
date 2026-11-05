@@ -533,7 +533,8 @@ function StudioWorkspace() {
         actions={
           // Proposed: New resource… heads the band's actions, the same gap apart as the others, as every one acts on the
           // application; Publish… stands out as the one solid button and is never beside it.
-          <ActionRow finish={canPublish}>
+          // The band is always a row of text actions, with or without Publish…, so it looks the same for every author.
+          <ActionRow finish>
             <Flex align="center" gap={spacing.xs}>
               {loaded && 'resources' in loaded && (
                 <StudioNewResource application={application} resources={resources} inBand onCreated={onCreated} />
