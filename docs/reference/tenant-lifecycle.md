@@ -180,8 +180,9 @@ tenant administrator can run it in M33.
   a cell, export without a lease. One export of a tenant runs at a time, because the publisher runs one job of a tenant at a
   time.
 - **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does: one `RepeatableRead`
-  transaction for the active releases, every record and every stored file. The Studio folder is read from disk while the job runs, outside the snapshot,
-  so an author's edit during the export may or may not be in the ZIP, as in a backup.
+  transaction for the active releases, every record, every stored file and the given roles. The Studio folder is read from disk while the job runs, outside the snapshot,
+  so an author's edit during the export may or may not be in the ZIP, as in a backup. The accounts of `users.csv` come from the realm, which is
+  also outside that snapshot, so an account made or removed during the export can disagree with the given roles.
 - **Kept.** The ZIP is stored in the cell's object storage, encrypted at rest, for 7 days, then
   deleted. The download answers it to a caller of the provisioning API, and to nobody else. Each
   download writes a platform audit record. The job stores the ZIP at `exports/<tenant>/<job id>.zip` in the bucket of
@@ -224,7 +225,7 @@ same job and the same ZIP as the provisioning API, as
 | `data/<application>/<entity>.jsonl` | One JSON object per line for each record, in the shape of the [record API](record-api.md#record-shape), with child rows inside the record. A child entity has no file of its own. |
 | `data/<application>/<entity>.csv` | The same records in the CSV form of [export](import-export.md#export), one file per entity. Its first column is `id`, the record id, which entity export does not write. Child rows go in a file of their own named `<entity>.<field>.csv`, whose first column is `recordId`, the id of the record that owns the row, so a row can be joined to its record. |
 | `files/<application>/<entity>/<record id>/<field>/<file name>` | Each attached file, read in the snapshot, under its record and field. `<entity>` is the entity's file name in `data/`. A file of a child row goes under its parent record, and its `<field>` is the stored field path made safe, such as `attachments_file`. |
-| `users.csv` | _(planned for M31)_ The realm's accounts: user name, email, display name, roles, enabled, created. No credential. |
+| `users.csv` | One row for each user of the tenant's realm, read as `axis-users`, with the columns `userName,email,displayName,roles,enabled,created`. Service accounts are left out, and brokered users are listed. `displayName` is the first and last name, or the user name when both are empty. `roles` holds the person's [given roles](user-administration.md#roles) in the export's snapshot, joined with `; `: first the platform roles, each by its kind such as `administrator`, then the application roles, each as `<application name>:<role>`, with the application id in place of the name when no active release names the application. `enabled` is `true` or `false`, and `created` is the realm's creation time in UTC, as `yyyy-MM-ddTHH:mm:ssZ`. Rows are ordered by user name. No column or entry holds a password hash or any other credential. A tenant without its own realm, such as one that signs in with an outside identity provider, gets no `users.csv`. A realm that cannot be read fails the `export` step, so a ZIP without the users is never stored. |
 
 An entity name, a field path or a file name that is not a safe file name is written with its unsafe characters
 replaced by `_`, and `export.json` lists the original name. The safe characters are letters, digits, `.`, `_` and `-`, so the

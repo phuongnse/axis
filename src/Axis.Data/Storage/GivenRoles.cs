@@ -6,7 +6,8 @@ namespace Axis.Data.Storage;
 /// <summary>
 /// Gives and removes the roles that an administrator gives a person, as rows of <c>axis.given_roles</c>. A null application id
 /// is a platform role, whose row holds its kind. Both steps run in the caller's transaction and report whether they changed a
-/// row, so a repeat is not a change. A move gives every role of one person to another id. A read lists the roles of one person.
+/// row, so a repeat is not a change. A move gives every role of one person to another id. A read lists the roles of one person, and another lists the roles of every
+/// person in a transaction.
 /// </summary>
 public static class GivenRoles
 {
@@ -22,6 +23,24 @@ public static class GivenRoles
         while (await reader.ReadAsync(cancellationToken))
         {
             roles.Add(new GivenRole(reader.IsDBNull(0) ? null : reader.GetGuid(0), reader.GetString(1)));
+        }
+
+        return roles;
+    }
+
+    /// <summary>Lists the roles of every person in the transaction's snapshot, ordered by person, then platform roles first, then by application and role name.</summary>
+    public static async Task<IReadOnlyList<(string UserId, GivenRole Role)>> ListAllAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken cancellationToken = default)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT user_id, application_id, role FROM axis.given_roles ORDER BY user_id, application_id NULLS FIRST, role",
+            connection,
+            transaction);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var roles = new List<(string, GivenRole)>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            roles.Add((reader.GetString(0), new GivenRole(reader.IsDBNull(1) ? null : reader.GetGuid(1), reader.GetString(2))));
         }
 
         return roles;
