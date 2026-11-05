@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 namespace Axis.Admin;
 
 /// <summary>
-/// Where <c>cell backup</c> uploads the archives and <c>cell restore-check</c> reads them: an S3-compatible service with path-style addressing, from the five
+/// Where <c>cell backup</c> uploads the archives and <c>cell restore-check</c> reads them (and where the <c>export</c> job puts a tenant export, from <c>Cell:ExportStorage</c>): an S3-compatible service with path-style addressing, from the five
 /// <c>Cell:BackupStorage</c> settings. Only those two commands read them. A message names a setting and never holds its value,
 /// and the secret access key is never printed.
 /// </summary>
@@ -13,16 +13,23 @@ internal sealed record CellBackupStorage(string ServiceUrl, string Region, strin
 {
     private const string Section = "Cell:BackupStorage";
 
+    /// <summary>The section of the five settings for the storage of tenant exports, which has the same form.</summary>
+    public const string ExportSection = "Cell:ExportStorage";
+
     /// <summary>Reads the settings. Returns null with the reason in <paramref name="problem"/> when one is blank.</summary>
-    public static CellBackupStorage? Read(IConfiguration configuration, out string? problem)
+    public static CellBackupStorage? Read(IConfiguration configuration, out string? problem) =>
+        Read(configuration, Section, out problem);
+
+    /// <summary>Reads the five settings of <paramref name="section"/>. Returns null with the reason in <paramref name="problem"/> when one is blank.</summary>
+    public static CellBackupStorage? Read(IConfiguration configuration, string section, out string? problem)
     {
         var values = new List<string>();
         foreach (var name in new[] { "ServiceUrl", "Region", "Bucket", "AccessKeyId", "SecretAccessKey" })
         {
-            var value = configuration[$"{Section}:{name}"];
+            var value = configuration[$"{section}:{name}"];
             if (string.IsNullOrWhiteSpace(value))
             {
-                problem = $"The setting {Section}:{name} is required.";
+                problem = $"The setting {section}:{name} is required.";
                 return null;
             }
 

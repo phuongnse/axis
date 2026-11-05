@@ -79,6 +79,7 @@ public sealed class CellRouteTests
                 "GET /api/cell/tenants/{id}",
                 "POST /api/cell/auth/sign-out",
                 "POST /api/cell/tenants",
+                "POST /api/cell/tenants/{id}/exports",
                 "POST /api/cell/tenants/{id}/hosts",
                 "POST /api/cell/tenants/{id}/resume",
                 "POST /api/cell/tenants/{id}/suspend",

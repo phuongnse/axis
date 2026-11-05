@@ -1,7 +1,7 @@
 using System.Text;
 using Axis.Configuration.Model;
 
-namespace Axis.Server.Exports;
+namespace Axis.Data.Exports;
 
 /// <summary>
 /// Writes an export as RFC 4180 CSV in UTF-8 with a byte order mark, so Excel reads non-ASCII text,
@@ -9,7 +9,7 @@ namespace Axis.Server.Exports;
 /// tab or a carriage return gets a leading <c>'</c>, so a spreadsheet never reads it as a formula. A number
 /// is never prefixed: it cannot be a formula, and a prefix would break its machine form.
 /// </summary>
-internal sealed class CsvExportWriter(Stream stream) : IExportWriter
+public sealed class CsvExportWriter(Stream stream) : IExportWriter
 {
     private const string LineEnd = "\r\n";
 

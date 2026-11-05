@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
+using Axis.Data.Exports;
 using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Policy;

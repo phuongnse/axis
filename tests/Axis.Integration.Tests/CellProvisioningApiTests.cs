@@ -502,6 +502,44 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task An_operator_queues_an_export_job_with_one_pending_step_and_an_unknown_tenant_a_preview_tenant_and_a_missing_key_are_refused()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var unknown = await PostJobAsync(client, "/api/cell/tenants/nobody/exports", token, "export-nobody");
+        using var preview = await PostJobAsync(client, "/api/cell/tenants/a-preview/exports", token, "export-preview");
+        using var noKey = await PostJobAsync(client, "/api/cell/tenants/b/exports", token, key: null);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noKey.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+
+        using var export = await PostJobAsync(client, "/api/cell/tenants/b/exports", token, "export-b");
+        using var again = await PostJobAsync(client, "/api/cell/tenants/b/exports", token, "export-b");
+        using var otherKind = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "export-b");
+
+        Assert.Equal(HttpStatusCode.Accepted, export.StatusCode);
+        var queued = await export.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("export", queued.GetProperty("kind").GetString());
+        Assert.Equal("b", queued.GetProperty("tenantId").GetString());
+        Assert.Equal("queued", queued.GetProperty("state").GetString());
+        var id = queued.GetProperty("id").GetGuid();
+        Assert.Equal($"/api/cell/jobs/{id:D}", export.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(id, (await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, otherKind.StatusCode);
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+
+        using var read = await GetAsync(client, $"/api/cell/jobs/{id:D}", token);
+        var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var step = Assert.Single(job.GetProperty("steps").EnumerateArray());
+        Assert.Equal("export", step.GetProperty("name").GetString());
+        Assert.Equal("pending", step.GetProperty("state").GetString());
+    }
+
+    [Fact]
     public async Task The_same_key_and_body_answer_the_first_job_and_any_other_request_with_that_key_answers_422()
     {
         await using var factory = await StartAsync();

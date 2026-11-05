@@ -4,8 +4,8 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, the route that requests a host of a tenant's own, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend, resume and create described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, the exports route that queues its job, the route that requests a host of a tenant's own, and the job read of the
+[provisioning API](#provisioning-api), the job runner for suspend, resume, create and export described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -47,7 +47,8 @@ implementation.
   The job's actor is the operator's id, the subject of the token or the session. The create route is built too: it queues a `create` job with the five steps of
   [creating a tenant](#creating-a-tenant), all `pending`, and keeps the request's `application` and `administrator` in the job's
   `input`, which the job read never returns. The publisher runs the `create` job in a cell with the five steps, see the
-  [create job](administration.md#create-job). The routes for the other kinds and the run again of a failed job are _(planned for M31)_.
+  [create job](administration.md#create-job). The exports route is built too: it queues an `export` job with the one step `export`, see
+  [exporting a tenant](#exporting-a-tenant). The routes for the other kinds and the run again of a failed job are _(planned for M31)_.
 - **Idempotency.** Each `POST` that queues a job needs an `Idempotency-Key` header of 1 to 255 characters, and the answer is `400`
   without one, with no job queued. The same key with the same request answers the first job again for 24 hours. The request is the kind,
   the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.
@@ -71,8 +72,8 @@ implementation.
 | `GET /api/cell/tenants/{id}/administrators` | _(planned for M33)_ Lists the accounts that hold the [administrator role](user-administration.md#the-administrator-role) in the tenant's realm: email, display name and language. The [control plane](control-plane.md) mails them. |
 | `PUT /api/cell/tenants/{id}/quotas` | Sets or clears the tenant's quota rows, see [quotas](tenant-quotas.md#quotas). The body is `{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }`. A set value of `null` is no limit, a removed key goes back to the cell's default, and a key the body does not name stays as it is. It applies at once, with no job, and answers `200` with the tenant's `quotas` as the tenant read does. An unknown key, a negative value, a key both set and removed, or a body that names no key answers `400` and writes nothing. An unknown tenant id or a preview tenant's id answers `404`. It writes the rows and one [platform audit record](tenant-setting-commands.md#platform-audit-records), `tenant quotas set`, in one transaction, over the schema role: the server opens a connection for the write alone and keeps none in a pool. The hosts apply the new values at their next `Tenancy:RefreshInterval`. |
 | `POST /api/cell/tenants/{id}/hosts` | Asks for a host of the tenant's own, see [hosts](#hosts). |
-| `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant). |
-| `GET /api/cell/tenants/{id}/exports/{exportId}` | Answers the export, and its download while it is kept. |
+| `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant), through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`, and `202` with a `Location` header. A tenant that is still `provisioning` makes the job fail. |
+| `GET /api/cell/tenants/{id}/exports/{exportId}` | _(planned for M31)_ Answers the export, and its download while it is kept. |
 | `DELETE /api/cell/tenants/{id}` | Schedules the deletion, see [deleting a tenant](#deleting-a-tenant). |
 | `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
@@ -166,12 +167,19 @@ An export gives a tenant's data to its owner in a form that any tool reads. It i
 restore takes an [archive](tenant-backup-and-restore.md), never an export. It is built so that a
 tenant administrator can run it in M33.
 
-- **When.** For a tenant in any status but `provisioning`. One export of a tenant runs at a time, and
-  it takes a lease of the tenant's `concurrentImports` quota.
-- **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does.
+- **When.** For a tenant in any status but `provisioning`. A job for a `provisioning` tenant fails with the
+  refusal that `suspend` gives. The `export` job of the publisher is built, and an operator starts it with the
+  exports route. One export of a tenant runs at a time, and it takes a lease of the tenant's `concurrentImports`
+  quota _(planned for M31)_.
+- **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does: one `RepeatableRead`
+  transaction for the active releases and every record.
 - **Kept.** The ZIP is stored in the cell's object storage, encrypted at rest, for 7 days, then
   deleted. The download answers it to a caller of the provisioning API, and to nobody else. Each
-  download writes a platform audit record.
+  download writes a platform audit record. The job stores the ZIP at `exports/<tenant>/<job id>.zip` in the bucket of
+  the five [`Cell:ExportStorage`](host-settings.md#cell-settings) settings, with S3 server-side encryption (`AES256`), so that the owner
+  can open the downloaded ZIP without a key of the cell. The export id is the job id. A publisher without these
+  settings still runs every other job, and the `export` job fails with a message that names the missing setting.
+  The deletion after 7 days, the download and its audit record are _(planned for M31)_.
 - **Sensitive fields.** The export holds their values in clear, because the data is the owner's. The
   ZIP is [restricted](keys-and-data-protection.md#restricted) data, and the console says so before
   the download.
@@ -199,15 +207,17 @@ same job and the same ZIP as the provisioning API, as
 
 | Entry | What it holds |
 | --- | --- |
-| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application with its name, its active release number and its entities. |
-| `applications/<application>/` | The application folder from the tenant's Studio folder, as Studio writes it, its `customizations/` included. |
-| `data/<application>/<entity>.jsonl` | One JSON object per line for each record, in the shape of the [record API](record-api.md#record-shape), with child rows inside the record. |
-| `data/<application>/<entity>.csv` | The same records in the CSV form of [export](import-export.md#export), one file per entity, child rows in a file of their own named `<entity>.<field>.csv`. |
-| `files/<application>/<entity>/<record id>/<field>/<file name>` | Each stored file, under its record and field. |
-| `users.csv` | The realm's accounts: user name, email, display name, roles, enabled, created. No credential. |
+| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application, ordered by name, with its `name`, its `folder`, its active `release` number and its `entities`, each `{ name, file }` with the original entity name and the file name without its extension. |
+| `applications/<application>/` | _(planned for M31)_ The application folder from the tenant's Studio folder, as Studio writes it, its `customizations/` included. |
+| `data/<application>/<entity>.jsonl` | One JSON object per line for each record, in the shape of the [record API](record-api.md#record-shape), with child rows inside the record. A child entity has no file of its own. |
+| `data/<application>/<entity>.csv` | The same records in the CSV form of [export](import-export.md#export), one file per entity. Its first column is `id`, the record id, which entity export does not write. Child rows go in a file of their own named `<entity>.<field>.csv`, whose first column is `recordId`, the id of the record that owns the row, so a row can be joined to its record. |
+| `files/<application>/<entity>/<record id>/<field>/<file name>` | _(planned for M31)_ Each stored file, under its record and field. |
+| `users.csv` | _(planned for M31)_ The realm's accounts: user name, email, display name, roles, enabled, created. No credential. |
 
 An entity name or a file name that is not a safe file name is written with its unsafe characters
-replaced by `_`, and `export.json` lists the original name.
+replaced by `_`, and `export.json` lists the original name. The safe characters are letters, digits, `.`, `_` and `-`, so the
+module entity `organization/Department` is written as `organization_Department`. When two names become the same file name
+in one application, the later one gets `_2`, `_3` and so on.
 
 ## Deleting a tenant
 
