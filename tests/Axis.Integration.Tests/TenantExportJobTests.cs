@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Axis.Admin;
+using Axis.Administration;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Axis.Data.Records;

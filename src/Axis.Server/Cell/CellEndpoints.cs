@@ -1,9 +1,11 @@
 using System.Buffers.Text;
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Amazon.S3;
 using Axis.Administration;
 using Axis.Configuration.Templates;
 using Axis.Server.Authentication;
@@ -58,6 +60,15 @@ namespace Axis.Server.CellApi;
 /// <c>422</c>. The key is shared across the cell. A transaction lock on the key serializes parallel retries, so they queue one job.
 /// <c>GET /api/cell/jobs/{id}</c> answers the job with its <c>steps</c> and the <c>error</c> of a failed job, or <c>404</c>.
 /// <c>POST /api/cell/tenants/{id}/exports</c> queues an <c>export</c> job with the one step <c>export</c> in the same way.
+/// </para>
+/// <para>
+/// <c>GET /api/cell/tenants/{id}/exports/{exportId}</c> answers the export as <c>{ id, tenantId, state, createdAt, expiresAt }</c>, where
+/// <c>expiresAt</c> is <see cref="TenantExports.Kept"/> after the job finished and <see langword="null"/> until it succeeded. With
+/// <c>Accept: application/zip</c> it streams the stored ZIP instead, after it wrote one platform audit record, command
+/// <c>tenant export download</c>, with the operator as actor and <c>export:&lt;id&gt;</c> in <c>changed</c>. The server streams the ZIP
+/// itself and never redirects to the storage. An unknown tenant, a preview tenant or an id that is no export of the tenant answers <c>404</c>,
+/// an export past its expiry or whose ZIP the storage no longer holds <c>410</c>, a download before the job succeeded <c>409</c> and a
+/// download on a server without the <c>Cell:ExportStorage</c> settings <c>503</c>. A refused call and a read of the JSON write no record.
 /// </para>
 /// <para>
 /// <c>POST /api/cell/tenants</c> takes <c>{ "id", "application", "administrator" }</c> and queues a <c>create</c> job with the five
@@ -128,6 +139,7 @@ internal static class CellEndpoints
         cell.MapPost("/tenants/{id}/exports", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("export", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/hosts", RequestHostAsync);
+        cell.MapGet("/tenants/{id}/exports/{exportId:guid}", GetExportAsync);
         cell.MapGet("/jobs/{id:guid}", GetJobAsync);
 
         // Sign-in and sign-out are the only routes that skip the operator policy. They keep the route marker, so the console
@@ -555,6 +567,87 @@ internal static class CellEndpoints
     private static IResult Accepted(JobRow job) =>
         Results.Accepted($"/api/cell/jobs/{job.Id:D}", new CellJobResponse(job.Id, job.Kind, job.TenantId, job.State, job.CreatedAt));
 
+    private static async Task<IResult> GetExportAsync(
+        string id,
+        Guid exportId,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        CellPlatformWriter writer,
+        CellExportStorage storage,
+        CancellationToken cancellationToken)
+    {
+        JobRow? job;
+        await using (var platform = Open(dataSource))
+        {
+            if (!await platform.Tenants.AsNoTracking().AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+            }
+
+            job = await platform.Jobs.AsNoTracking()
+                .SingleOrDefaultAsync(row => row.Id == exportId && row.Kind == "export" && row.TenantId == id, cancellationToken);
+        }
+
+        if (job is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No export of this tenant has this id.");
+        }
+
+        var succeeded = job.State == "succeeded";
+        DateTimeOffset? expiresAt = succeeded && job.FinishedAt is { } finished ? finished + TenantExports.Kept : null;
+        if (expiresAt <= DateTimeOffset.UtcNow)
+        {
+            return Gone();
+        }
+
+        if (!httpContext.Request.GetTypedHeaders().Accept.Any(accept => accept.MediaType.Equals("application/zip", StringComparison.OrdinalIgnoreCase)))
+        {
+            return Results.Ok(new CellExportResponse(job.Id, job.TenantId, job.State, job.CreatedAt, expiresAt));
+        }
+
+        if (!succeeded)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The export is not ready.");
+        }
+
+        if (storage.Storage is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "The export storage is not configured.");
+        }
+
+        var client = storage.Storage.NewClient();
+        httpContext.Response.RegisterForDispose(client);
+        Amazon.S3.Model.GetObjectResponse stored;
+        try
+        {
+            stored = await client.GetObjectAsync(storage.Storage.Bucket, TenantExports.Key(id, exportId), cancellationToken);
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound || exception.ErrorCode == "NoSuchKey")
+        {
+            return Gone();
+        }
+
+        httpContext.Response.RegisterForDispose(stored);
+
+        // The record comes after the storage returned the object and before the first byte, so a download that breaks half-way is
+        // still recorded, and a download that finds no ZIP is not.
+        await using (var platform = writer.Open())
+        {
+            await PlatformAuditRecords.WriteAsync(
+                platform,
+                TenantExports.DownloadCommand,
+                id,
+                [$"export:{exportId:D}"],
+                httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
+                cancellationToken);
+        }
+
+        return Results.Stream(stored.ResponseStream, "application/zip", $"{id}-{exportId:D}.zip");
+
+        static IResult Gone() =>
+            Results.Problem(statusCode: StatusCodes.Status410Gone, title: "The export was deleted after 7 days.");
+    }
+
     private static async Task<IResult> GetJobAsync(Guid id, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
     {
         await using var platform = Open(dataSource);
@@ -684,3 +777,6 @@ internal sealed record CellJobDetailResponse(
 
 /// <summary>One step of a job. <c>Error</c> is the refusal of a failed step.</summary>
 internal sealed record CellJobStepResponse(string Name, string State, string? Error);
+
+/// <summary>A tenant export. <c>ExpiresAt</c> is null until the export job succeeds.</summary>
+internal sealed record CellExportResponse(Guid Id, string TenantId, string State, DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt);
