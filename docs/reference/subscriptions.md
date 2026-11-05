@@ -81,12 +81,14 @@ A read-only tenant can still be signed in to and read, and nothing in it changes
 cell's tenant status `readOnly`, which [`tenant read-only`](tenant-status-commands.md#tenant-read-only)
 and `POST /api/cell/tenants/{id}/read-only` set and `resume` clears.
 
-- **Signing in works** _(planned for M33)_. People sign in, read records, lists, data sources,
+- **Signing in works.** People sign in, read records, lists, data sources,
   history, tasks and dashboards, and export what their grants allow.
-- **No write** _(planned for M33)_. Every request that writes answers `403` problem details whose
+- **No write.** Every request that writes answers `403` problem details whose
   `reason` is `tenant-read-only`, titled "This workspace is read-only.": record writes, imports, task
   completions, process starts, inbound endpoint calls, Studio saves and publish requests, and the
-  users page's changes.
+  users page's changes. The refusal comes before the route runs, so it reads no body.
+- **What stays open.** Signing out, ending a session and starting a tenant administrator's
+  [export](tenant-lifecycle.md#exports-by-a-tenant-administrator) still work.
 - **No work** _(planned for M33)_. The worker claims none of the tenant's new work, as for a suspended
   tenant. Work already claimed finishes. Schedules do not fire, and a missed occurrence is not caught
   up after a resume. No email is sent for the tenant.

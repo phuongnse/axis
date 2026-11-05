@@ -60,7 +60,9 @@ Idempotency-Key: po-import-20261012-0042
 ## Order of checks
 
 The checks of a call come before any write, and one transaction then creates the record, starts the
-process and raises the event. A call is checked in this order, and the first failure is the response:
+process and raises the event. A call in a [read-only tenant](subscriptions.md#the-read-only-tenant)
+is refused before all of these checks. Any other call is checked in this order, and the first failure
+is the response:
 
 1. The bearer token, `401` with `WWW-Authenticate: Bearer` (`DPoP` under
    `fapi2`, with its proof). It comes before

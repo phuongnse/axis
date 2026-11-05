@@ -199,6 +199,12 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         await RefreshAsync(factory);
 
         await ListAsync(client, "quiz.example.test");
+        using var refusedWrite = await client.SendAsync(
+            Request(HttpMethod.Post, Departments, "quiz.example.test", """{ "values": { "name": "Refused" } }"""),
+            CancellationToken);
+        Assert.Equal(HttpStatusCode.Forbidden, refusedWrite.StatusCode);
+        using var refusal = JsonDocument.Parse(await refusedWrite.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal("tenant-read-only", refusal.RootElement.GetProperty("reason").GetString());
         using var console = factory.CreateClient().SignedInAs("operator-1");
         using var response = await console.SendAsync(Request("/api/console/tenant", "quiz.example.test"), CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -210,6 +216,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         using var active = await console.SendAsync(Request("/api/console/tenant", "quiz.example.test"), CancellationToken);
         using var activeBody = JsonDocument.Parse(await active.Content.ReadAsStringAsync(CancellationToken));
         Assert.Equal("active", activeBody.RootElement.GetProperty("status").GetString());
+        await CreateDepartmentAsync(client, "quiz.example.test", "Accepted");
     }
 
     [Fact]

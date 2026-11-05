@@ -302,6 +302,10 @@ app.UseCsrfHeader();
 app.UseWhen(RateLimits.IsCallback, branch => branch.UseRateLimiter());
 app.UseAuthentication();
 
+// After the session, so a service account or session is known, and before the limiter and every route, so a refused write
+// reads no body and uses no limit.
+app.UseReadOnlyTenant();
+
 // After authentication, so the caller is known and a refused request still gets its 401 or 403 first.
 app.UseWhen(context => !RateLimits.IsCallback(context), branch => branch.UseRateLimiter());
 
