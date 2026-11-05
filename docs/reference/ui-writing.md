@@ -73,6 +73,9 @@ noun.
 ## Placeholders and numbers
 
 - Keep every placeholder, such as `{count}` or `{entity}`, in every locale, and move it to where the language puts it.
+- A word Axis defines that a placeholder puts in a sentence, such as a type's or a kind's name, follows the sentence's
+  capitals: "Text settings" where it starts the text, "Thiết lập văn bản" in the middle. A name an author gave, such as
+  an entity's label, keeps its own capitals: "Tham chiếu tới Phòng ban".
 - A count reads naturally: English needs "1 field" and "3 fields"; a language without plural forms writes one text.
 - Dates, times and numbers come from the locale's formats, never from words in a text.
 
