@@ -161,6 +161,10 @@ agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
   - 1 tenant with a backlog of 100,000 due work items, made before the run starts;
   - 949 idle tenants, each with one user who signs in once an hour and reads one page every
     10 minutes.
+
+  _(Built.)_ `scripts/lib/load-cell-tenants.mjs` creates the busy and idle tenants through the provisioning API with
+  one idempotency key each, polls each create job, adds the users and the machine callers of the busy tenants, and writes
+  the file that `AXIS_LOAD_TENANTS` names. The tenant with the backlog stays planned.
 - **Scenarios.** _(Built.)_ `tests/load/cell.js` holds the two k6 scenarios: the busy tenants run the loop of the
   objectives, and each idle tenant signs in once an hour and reads a page every 10 minutes. The scenarios read the
   tenants from the JSON file named by `AXIS_LOAD_TENANTS`. The file has a `busy` list, with each tenant's `url`,
