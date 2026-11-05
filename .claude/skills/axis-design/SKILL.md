@@ -96,8 +96,10 @@ changes, and logic goes in `design-review.md` for the review's issue.
 5. Check every changed card as the artifact shows it (see below).
 6. Commit the change on the branch with a message that says what it shows,
    so the branch history lists the review's changes in order. Push the branch.
-7. Show the owner the change on the local stack and ask for a verdict. Keep,
-   change or drop the change as they say. Write down each rule they agree, in
+7. Make sure the local stack serves the change, restarting `scripts/dev.sh`
+   after a text change, then tell the owner what changed and where to look,
+   and ask for a verdict. The owner looks on the stack; take no screenshots
+   for them. Keep, change or drop the change as they say. Write down each rule they agree, in
    English as all committed text is, in `design-review.md` for the docs change
    at the end, then commit and push it.
 
