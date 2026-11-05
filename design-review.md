@@ -345,6 +345,19 @@ owner is reviewing it one step at a time.
   record, as Notion does, through `ExpressionInterpreter`. A "Did you mean" for an unknown name. `ExpressionEditor`'s
   tests change: the type reads in words, the code follows the message, and Tab stops at Expand before it leaves.
 
+### Vietnamese texts of the entities area
+
+- **Asked:** the owner found the Vietnamese texts poor. `docs/reference/ui-writing.md` and its glossary, merged in #2971,
+  are the standard, and the Vietnamese texts are rewritten to it area by area, the entities area first, for the owner to
+  review before the rest follow as NexKit issues. #2972 is the check that keeps them to it.
+- **Rewritten:** the texts of the entity page, the field drawer, the expression editor and the entity kind, 113 in `vi`:
+  "đối tượng" for entity, "trường", "quy tắc kiểm tra" for a validation, "Không trùng", "Hướng dẫn", "Lựa chọn" for an
+  enum, "Kiểm tra lỗi" and "phát hành" for Validate and publish; no "field", "entity", "unique", "Policy", "Ràng buộc" or
+  "thực thể" left; "Biểu thức tính" in place of "Tính từ"; one spelling, "thỏa"; "Thêm đối tượng…" verb first.
+- **English too:** the field drawer's validations read "Validations", "Add validation" and "Delete validation", where they
+  said "Rules", which names another concept.
+- **For the issue:** the rewrite of the other areas, one NexKit issue each, after the owner's review of this one.
+
 ### Second mechanisms found by the audit of 2026-11-05
 
 Each is one concern with more than one way to do it. The issue merges each into the first one named, as the rule "One
