@@ -256,6 +256,19 @@ describe('AccountPage', () => {
     expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
   })
 
+  it('shows the em dash for an authenticator with no added date', async () => {
+    stubServer(
+      () => json(sessions(true)),
+      undefined,
+      () => json({ account: true, authenticators: [{ id: 'totp-1', label: 'Phone', createdAt: null }] }),
+    )
+    renderPage()
+
+    const row = (await screen.findByText('Phone')).closest('tr')!
+
+    expect(within(row).getByText('—')).toBeVisible()
+  })
+
   it('shows an error and no actions when the authenticators cannot be loaded', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubServer(
