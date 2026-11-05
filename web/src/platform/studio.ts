@@ -1186,10 +1186,11 @@ export function releaseList(history: StudioReleases): StudioReleaseListRow[] {
 }
 
 /**
- * Who published a release, in words: the person's name, "System" for a startup activation, "The platform operator" for
- * an operator activation, and "Someone no longer known" for any other actor, so a raw id is never shown.
+ * Who activated a release, in words, in Studio and the operator console: the person's name, "System" for a startup
+ * activation, "The platform operator" for an operator activation, and "Someone no longer known" for any other actor, so
+ * a raw id is never shown.
  */
-export function releasePublisher(row: StudioReleaseListRow, t: (key: string) => string): string {
+export function releasePublisher(row: { actor: string; actorName: string | null }, t: (key: string) => string): string {
   if (row.actorName) {
     return row.actorName
   }

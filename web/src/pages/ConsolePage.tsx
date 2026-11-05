@@ -1,6 +1,7 @@
-import { Alert, Card, Flex, Result, Select, Table, Tag } from 'antd'
+import { Alert, Card, Flex, Result, Select, Tag } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { AxisTable } from '../platform/AxisTable'
 import {
   fetchConsoleFailedWork,
   fetchConsoleTenant,
@@ -11,7 +12,6 @@ import {
 } from '../platform/console'
 import { ConsolePublishing } from '../platform/ConsolePublishing'
 import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
-import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
 import { ConsoleDeadLetters } from './ConsoleDeadLetters'
@@ -100,28 +100,33 @@ export function ConsolePage() {
               <span>{t('shell.console.tenant.status')}</span>
               <Tag color="green">{t(`shell.console.tenant.status.${tenant.status}`)}</Tag>
             </Flex>
-            <Table<ConsoleApplication>
-              style={{ width: '100%' }}
-              rowKey="id"
+            <AxisTable<ConsoleApplication>
+              rowKey={(row) => row.id}
               dataSource={tenant.applications}
-              pagination={false}
+              emptyText={t('shell.console.tenant.empty')}
               columns={[
-                { title: t('shell.console.tenant.application'), dataIndex: 'name' },
                 {
-                  title: t('shell.console.tenant.release'),
-                  render: (_: unknown, row: ConsoleApplication) =>
-                    row.releaseNumber === null && !row.releaseLabel ? (
-                      <EmptyDash />
-                    ) : (
-                      [row.releaseNumber === null ? null : `#${row.releaseNumber}`, row.releaseLabel]
-                        .filter(Boolean)
-                        .join(' ')
-                    ),
+                  key: 'application',
+                  kind: 'freeText',
+                  title: t('shell.console.tenant.application'),
+                  dataIndex: 'name',
                 },
                 {
+                  key: 'release',
+                  kind: 'freeText',
+                  title: t('shell.console.tenant.release'),
+                  render: (_value, row) =>
+                    row.releaseNumber === null && !row.releaseLabel
+                      ? null
+                      : [row.releaseNumber === null ? null : `#${row.releaseNumber}`, row.releaseLabel]
+                          .filter(Boolean)
+                          .join(' '),
+                },
+                {
+                  key: 'activatedAt',
+                  kind: 'fixed',
                   title: t('shell.console.tenant.activatedAt'),
-                  dataIndex: 'activatedAt',
-                  render: (value: string) => new Date(value).toLocaleString(locale),
+                  render: (_value, row) => new Date(row.activatedAt).toLocaleString(locale),
                 },
               ]}
             />
@@ -152,54 +157,59 @@ export function ConsolePage() {
                 title={t('shell.console.failedWork.loadFailed')}
               />
             )}
-            <Table<ConsoleFailedWorkItem>
-              style={{ width: '100%' }}
+            <AxisTable<ConsoleFailedWorkItem>
               rowKey={(row) => row.callId ?? row.instanceId}
               loading={!failedWork && !failedWorkFailed}
               dataSource={failedWork?.items ?? []}
-              pagination={{
-                current: page,
-                pageSize,
-                total: failedWork?.totalCount ?? 0,
-                showSizeChanger: false,
-                onChange: setPage,
-              }}
+              emptyText={t('shell.console.failedWork.empty')}
+              pagination={{ current: page, pageSize, total: failedWork?.totalCount ?? 0 }}
+              onChange={(pagination) => setPage(pagination.current ?? 1)}
               columns={[
                 {
+                  key: 'application',
+                  kind: 'freeText',
                   title: t('shell.console.failedWork.application'),
-                  dataIndex: 'application',
-                  render: (value: string | null) => value ?? <EmptyDash />,
+                  render: (_value, row) => row.application,
                 },
                 {
+                  key: 'process',
+                  kind: 'freeText',
                   title: t('shell.console.failedWork.process'),
-                  dataIndex: 'process',
-                  render: (value: string | null) => value ?? <EmptyDash />,
+                  render: (_value, row) => row.process,
                 },
                 {
+                  key: 'instance',
+                  kind: 'fixed',
                   title: t('shell.console.failedWork.instance'),
-                  dataIndex: 'instanceId',
-                  render: (value: string) => (
-                    <Link to={`/console/instances/${value}`} data-testid={`console-failed-work-open-${value}`}>
-                      {value}
+                  render: (_value, row) => (
+                    <Link
+                      to={`/console/instances/${row.instanceId}`}
+                      data-testid={`console-failed-work-open-${row.instanceId}`}
+                    >
+                      {row.instanceId}
                     </Link>
                   ),
                 },
                 {
+                  key: 'stepOrCall',
+                  kind: 'freeText',
                   title: t('shell.console.failedWork.stepOrCall'),
-                  render: (_: unknown, row: ConsoleFailedWorkItem) =>
+                  render: (_value, row) =>
                     row.kind === 'instance'
                       ? row.step
                       : `${row.step}: ${row.connector ?? row.package} ${row.operation}`,
                 },
                 {
+                  key: 'failedAt',
+                  kind: 'fixed',
                   title: t('shell.console.failedWork.failedAt'),
-                  dataIndex: 'failedAt',
-                  render: (value: string) => new Date(value).toLocaleString(locale),
+                  render: (_value, row) => new Date(row.failedAt).toLocaleString(locale),
                 },
                 {
+                  key: 'error',
+                  kind: 'freeText',
                   title: t('shell.console.failedWork.error'),
-                  dataIndex: 'error',
-                  render: (value: string | null) => value ?? <EmptyDash />,
+                  render: (_value, row) => row.error,
                 },
               ]}
             />
