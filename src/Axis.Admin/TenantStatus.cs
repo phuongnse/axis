@@ -5,7 +5,7 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>tenant suspend</c>, <c>tenant resume</c> and <c>tenant list</c>. They write and read only the tenant directory.
+/// <c>tenant suspend</c>, <c>tenant resume</c>, <c>tenant read-only</c> and <c>tenant list</c>. They write and read only the tenant directory.
 /// The hosts pick a change up at their next directory refresh.
 /// </summary>
 internal static class TenantStatus
@@ -14,29 +14,36 @@ internal static class TenantStatus
 
     private const string Suspended = "suspended";
 
+    private const string ReadOnly = "readOnly";
+
     private const string Provisioning = "provisioning";
 
     internal const string UnknownMessage = "The tenant does not exist.";
 
     internal const string ProvisioningMessage = "the tenant is still provisioning. Finish tenant create first.";
 
+    internal const string SuspendedMessage = "the tenant is suspended. Resume it first.";
+
     private static readonly string[] _header = ["id", "status", "hosts", "schema version", "preview of"];
 
     public static Task<int> SuspendAsync(string connectionString, string id, TenantAudit audit, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
-        SetAsync(connectionString, id, Active, Suspended, audit, output, error, cancellationToken);
+        SetAsync(connectionString, id, [Active, ReadOnly], Suspended, audit, output, error, cancellationToken);
 
     public static Task<int> ResumeAsync(string connectionString, string id, TenantAudit audit, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
-        SetAsync(connectionString, id, Suspended, Active, audit, output, error, cancellationToken);
+        SetAsync(connectionString, id, [Suspended, ReadOnly], Active, audit, output, error, cancellationToken);
+
+    public static Task<int> ReadOnlyAsync(string connectionString, string id, TenantAudit audit, TextWriter output, TextWriter error, CancellationToken cancellationToken) =>
+        SetAsync(connectionString, id, [Active], ReadOnly, audit, output, error, cancellationToken);
 
     /// <summary>
-    /// Moves a tenant from one status to the other with one conditional update, so a <c>tenant create</c> that finishes
-    /// at the same moment is never overwritten. A read first refuses an unknown tenant, so that a refusal writes no audit record.
+    /// Moves a tenant from one of the <paramref name="from"/> statuses to another with one conditional update, so a <c>tenant create</c>
+    /// that finishes at the same moment is never overwritten. A read first refuses an unknown tenant, so that a refusal writes no audit record.
     /// When the update changed no row, a second read tells a no-op from a refusal.
     /// </summary>
     private static async Task<int> SetAsync(
         string connectionString,
         string id,
-        string from,
+        IReadOnlyList<string> from,
         string to,
         TenantAudit audit,
         TextWriter output,
@@ -71,6 +78,9 @@ internal static class TenantStatus
                 case StatusChange.Provisioning:
                     output.WriteLine($"{id} status failed: {ProvisioningMessage}");
                     return 1;
+                case StatusChange.Refused:
+                    output.WriteLine($"{id} status failed: {SuspendedMessage}");
+                    return 1;
                 default:
                     // Changed, or unchanged because the tenant already has the wanted status: a no-op that leaves the version alone.
                     output.WriteLine($"{id} status ok");
@@ -85,18 +95,18 @@ internal static class TenantStatus
     }
 
     /// <summary>
-    /// Moves a tenant from <paramref name="from"/> to <paramref name="to"/> with one conditional update, so a <c>tenant create</c>
-    /// that finishes at the same moment is never overwritten. When the update changed no row, a read tells an unknown tenant, a
-    /// refusal and a no-op apart. The command line and the provisioning jobs both call it.
+    /// Moves a tenant from one of the <paramref name="from"/> statuses to <paramref name="to"/> with one conditional update, so a
+    /// <c>tenant create</c> that finishes at the same moment is never overwritten. When the update changed no row, a read tells an
+    /// unknown tenant, a provisioning one, a refusal and a no-op apart. The command line and the provisioning jobs both call it.
     /// </summary>
-    internal static async Task<StatusChange> ChangeAsync(NpgsqlConnection connection, string id, string from, string to, CancellationToken cancellationToken)
+    internal static async Task<StatusChange> ChangeAsync(NpgsqlConnection connection, string id, IReadOnlyList<string> from, string to, CancellationToken cancellationToken)
     {
         await using (var update = new NpgsqlCommand(
-            "UPDATE platform.tenants SET status = @to, version = version + 1 WHERE id = @id AND status = @from",
+            "UPDATE platform.tenants SET status = @to, version = version + 1 WHERE id = @id AND status = ANY(@from)",
             connection))
         {
             update.Parameters.AddWithValue("to", to);
-            update.Parameters.AddWithValue("from", from);
+            update.Parameters.AddWithValue("from", from.ToArray());
             update.Parameters.AddWithValue("id", id);
             if (await update.ExecuteNonQueryAsync(cancellationToken) == 1)
             {
@@ -106,25 +116,31 @@ internal static class TenantStatus
 
         await using var read = new NpgsqlCommand("SELECT status FROM platform.tenants WHERE id = @id", connection);
         read.Parameters.AddWithValue("id", id);
-        return (string?)await read.ExecuteScalarAsync(cancellationToken) switch
+        var current = (string?)await read.ExecuteScalarAsync(cancellationToken);
+        return current switch
         {
             null => StatusChange.Unknown,
             Provisioning => StatusChange.Provisioning,
-            _ => StatusChange.Unchanged,
+            _ when current == to => StatusChange.Unchanged,
+            _ => StatusChange.Refused,
         };
     }
 
-    /// <summary>Suspends an active tenant, as <c>tenant suspend</c> does.</summary>
+    /// <summary>Suspends an active or read-only tenant, as <c>tenant suspend</c> does.</summary>
     internal static Task<StatusChange> SuspendChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
-        ChangeAsync(connection, id, Active, Suspended, cancellationToken);
+        ChangeAsync(connection, id, [Active, ReadOnly], Suspended, cancellationToken);
 
-    /// <summary>Resumes a suspended tenant, as <c>tenant resume</c> does.</summary>
+    /// <summary>Resumes a suspended or read-only tenant, as <c>tenant resume</c> does.</summary>
     internal static Task<StatusChange> ResumeChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
-        ChangeAsync(connection, id, Suspended, Active, cancellationToken);
+        ChangeAsync(connection, id, [Suspended, ReadOnly], Active, cancellationToken);
 
-    /// <summary>Sets a provisioning tenant active, as the last step of a create job does. A tenant that already left <c>provisioning</c> is <see cref="StatusChange.Unchanged"/>.</summary>
+    /// <summary>Makes an active tenant read-only, as <c>tenant read-only</c> does. A suspended tenant is <see cref="StatusChange.Refused"/>.</summary>
+    internal static Task<StatusChange> ReadOnlyChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
+        ChangeAsync(connection, id, [Active], ReadOnly, cancellationToken);
+
+    /// <summary>Sets a provisioning tenant active, as the last step of a create job does. A tenant that already left <c>provisioning</c> is <see cref="StatusChange.Unchanged"/> when it is active and <see cref="StatusChange.Refused"/> otherwise.</summary>
     internal static Task<StatusChange> ActivateChangeAsync(NpgsqlConnection connection, string id, CancellationToken cancellationToken) =>
-        ChangeAsync(connection, id, Provisioning, Active, cancellationToken);
+        ChangeAsync(connection, id, [Provisioning], Active, cancellationToken);
 
     public static async Task<int> ListAsync(string connectionString, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
@@ -196,4 +212,7 @@ internal enum StatusChange
 
     /// <summary>The tenant is still provisioning, so its status is not changed.</summary>
     Provisioning,
+
+    /// <summary>The tenant has a status that the change does not start from, such as a suspended tenant made read-only, so nothing changes.</summary>
+    Refused,
 }

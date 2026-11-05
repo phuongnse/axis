@@ -5,7 +5,7 @@ public sealed class TenantRow
 {
     public string Id { get; set; } = "";
 
-    /// <summary><c>provisioning</c>, <c>active</c> or <c>suspended</c>.</summary>
+    /// <summary><c>provisioning</c>, <c>active</c>, <c>suspended</c> or <c>readOnly</c>.</summary>
     public string Status { get; set; } = "";
 
     public long Version { get; set; } = 1;

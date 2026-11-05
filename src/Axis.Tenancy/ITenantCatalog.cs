@@ -19,7 +19,7 @@ public interface ITenantCatalog
     TenantEntry? FindByHost(string host);
 
     /// <summary>
-    /// Whether the host belongs to a tenant the source knows but does not serve, such as a suspended tenant. Such a
+    /// Whether the host belongs to a tenant the source knows but does not serve, such as a suspended tenant (a read-only tenant is served). Such a
     /// host resolves no tenant. A source that keeps no such tenants answers <c>false</c>.
     /// </summary>
     bool IsUnavailableHost(string host);
@@ -44,6 +44,7 @@ public interface ITenantCatalog
 /// <param name="HostSites">The lower-case site path of each host that belongs to a site, keyed by host and matched ignoring letter case, or <c>null</c> when the source gives no host to a site. A host of no site is not in it.</param>
 /// <param name="Quotas">The tenant's own quota rows keyed by quota, where a <c>null</c> value means no limit, or <c>null</c> when the source has none. A quota with no row takes the cell's default. Only the <c>directory</c> source has them.</param>
 /// <param name="Legal">The tenant's privacy and terms links, or <c>null</c> when it sets none. Both sources have it, and a preview tenant has its main tenant's.</param>
+/// <param name="ReadOnly">Whether the tenant is read-only: its hosts are served, and each request learns it. Only the <c>directory</c> source has read-only tenants.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -59,7 +60,8 @@ public sealed record TenantEntry(
     IReadOnlyList<IdentityProviderModel>? PlatformProviders = null,
     IReadOnlyDictionary<string, string>? HostSites = null,
     IReadOnlyDictionary<string, long?>? Quotas = null,
-    TenantLegal? Legal = null);
+    TenantLegal? Legal = null,
+    bool ReadOnly = false);
 
 /// <summary>A tenant's privacy and terms links, and the links its sites set for themselves.</summary>
 /// <param name="PrivacyUrl">The tenant's privacy address, or <c>null</c> for none.</param>

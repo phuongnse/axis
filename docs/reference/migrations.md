@@ -343,6 +343,10 @@ in the application's copy. It cannot drop the module entity.
      after planning and before the first statement, and only when the plan
      holds a destructive change that plans a statement.
   5. Run pending migrations in ordinal path order, and changes in file order.
+     The entity designer names its migrations by time, so the files of one
+     entity run in the order they were written, and a hand-written migration
+     of the same entity whose name sorts later runs after them. Nothing else
+     orders them.
      _(Built for `renameField`, `dropField`, `dropEntity`, `fill` and `convert`.
      A `fill` runs one `UPDATE` that counts the rows it left `null`. Any such row
      is `AXC0176` and rolls the activation back. A `convert` that fails for a

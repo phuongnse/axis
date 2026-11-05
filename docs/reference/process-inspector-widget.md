@@ -42,8 +42,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     Release column shows `releaseNumber`, the release's number such as 3 under
     the Release header, never its id. A `null` `releaseNumber`, for a release
     with no history row, shows the same muted dash as a running instance. An
-    instance still running shows a muted "—" under Ended
-    ([D96](../decisions/d96-rules-from-the-design-system-review.md)). A
+    instance still running shows a muted "—" under Ended. A
     process without a subject has no record to name its instances, so each
     instance gets a number within its process, such as #1042. That is agreed,
     and its design is not decided yet.

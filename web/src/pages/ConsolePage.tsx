@@ -98,7 +98,9 @@ export function ConsolePage() {
           <Flex vertical gap="middle">
             <Flex gap="small" align="center">
               <span>{t('shell.console.tenant.status')}</span>
-              <Tag color="green">{t(`shell.console.tenant.status.${tenant.status}`)}</Tag>
+              <Tag color={tenant.status === 'readOnly' ? 'warning' : 'success'}>
+                {t(`shell.console.tenant.status.${tenant.status}`)}
+              </Tag>
             </Flex>
             <AxisTable<ConsoleApplication>
               rowKey={(row) => row.id}

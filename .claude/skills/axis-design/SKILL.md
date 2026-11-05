@@ -160,12 +160,11 @@ A check passes only when the card behaves as it will in the artifact.
    and second ways to the same result, and put what it finds in `design-review.md`, so the issue merges each into the
    shared one. The rule is in [AGENTS.md](../../../AGENTS.md#working-rules).
 1. When the owner has agreed every change, write one docs change on its own
-   branch from `main`: the rules in the reference docs that hold their
-   detail, and a decision when a rule changes configuration, an API or an
-   earlier decision. Follow
-   [keeping the docs current](../../../docs/delivery.md#keeping-the-docs-current),
-   and mark what is not built yet. Open it as a hand-made pull request for
-   the owner to merge.
+   branch from `main` that rewrites each agreed rule where it lives, in the
+   reference pages, and deletes what it replaces. Add a decision only for a
+   choice between real alternatives, never one that lists the review's rules.
+   Follow [writing the docs](../../../docs/writing-docs.md), and mark what is
+   not built yet. Open it as a hand-made pull request for the owner to merge.
 2. Before the issue, tag the prototype's last commit and push the tag, so
    NexKit's agents can read it and no link to it ever breaks:
    `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"` and

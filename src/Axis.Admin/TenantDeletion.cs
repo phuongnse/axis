@@ -39,6 +39,7 @@ internal static class TenantDeletion
             {
                 StatusChange.Unknown => TenantStatus.UnknownMessage,
                 StatusChange.Provisioning => TenantStatus.ProvisioningMessage,
+                StatusChange.Refused => TenantStatus.SuspendedMessage,
                 _ => null,
             };
             if (refusal is not null)

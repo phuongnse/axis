@@ -7,9 +7,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 ## Buttons
 
-A button's level follows its role, so the same kind of action always has the same style
-([D96](../decisions/d96-rules-from-the-design-system-review.md)). Its place decides the rest
-([D128](../decisions/d128-rules-from-the-studio-review.md)).
+A button's level follows its role, so the same kind of action always has the same style. Its place decides the rest.
 
 - _Finish_: solid primary. The one action that finishes a task, such as Save or Next, one per screen.
 - _Main_: outlined in `primaryText`, and a text button in an action row. The main action of a region: a table's first toolbar action that is shown, such
@@ -38,8 +36,9 @@ A button's level follows its role, so the same kind of action always has the sam
   keeps the bare verb, such as Invite.
 - **Icon-only buttons.** Only for actions repeated on every row, or where space is tight. Main toolbar actions keep
   their text. Every icon-only button shows its name as a tooltip on hover and on keyboard focus, and has the same text
-  as its accessible name, from the text resources. Configuration never names an icon, so the platform gives an icon
-  only to an action whose meaning it knows. At narrow width row actions fold into a menu of text entries, so touch
+  as its accessible name, from the text resources. Configuration names no icon, except a site's navigation entry,
+  which names one from Axis's own list, see [navigation icons](shell.md#navigation-icons). So the platform gives an
+  icon only to an action whose meaning it knows. At narrow width row actions fold into a menu of text entries, so touch
   users lose nothing.
 - **A tooltip goes with the pointer** _(planned for M31)_. A click on an icon-only button closes its tooltip until the
   pointer comes back, and focus that a click or a closing dialog gives the button opens none. Keyboard focus still
@@ -79,7 +78,7 @@ a gap too wide.
 
 ## Text
 
-These rules hold for every word the SPA shows ([D129](../decisions/d129-rules-from-the-studio-editors-review.md))
+These rules hold for every word the SPA shows
 _(planned for M31)_.
 
 - **No technical name.** What the UI shows is a text, never an internal code, a resource's file or a key: a label,
@@ -95,11 +94,10 @@ _(planned for M31)_.
 ## Tables
 
 Every table of the platform, the `table` widget, Studio's, the console's and the users page's, is drawn by one shared
-table, `AxisTable` in `web/src/platform/`, on Ant Design's table
-([D129](../decisions/d129-rules-from-the-studio-editors-review.md)) _(planned for M31)_. Tables that each go their own
+table, `AxisTable` in `web/src/platform/`, on Ant Design's table _(planned for M31)_. Tables that each go their own
 way cannot be kept right, so a lint rule refuses `Table` from `antd` anywhere but `AxisTable.tsx`.
 
-- **Toolbar.** D96's toolbar holds for every table: the view controls, search and filters, on the left; Refresh, the
+- **Toolbar.** One toolbar holds for every table: the view controls, search and filters, on the left; Refresh, the
   secondary actions such as Import and Export, and the main action last, on the right. Their places and looks are
   fixed; whether a table has each depends on what it needs, so a short list has no search.
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a status tag or the
@@ -116,14 +114,13 @@ way cannot be kept right, so a lint rule refuses `Table` from `antd` anywhere bu
 - **An empty table keeps its header** _(planned for M31)_, with the [empty state](#showing-what-is-empty) in its body.
 - **Paging and scrolling.** A long table pages, and one narrower than its columns' content scrolls sideways rather
   than squeezing them.
-- **Bulk actions** _(Proposed)_. Selecting rows is for bulk actions alone: a table shows checkboxes only when it has a
-  bulk action, and a selection shows an "N selected" bar that holds them.
-  [D59](../decisions/d59-table-row-and-toolbar-actions.md) left bulk actions for later.
+- **Bulk actions** _(planned for M31)_. Selecting rows is for bulk actions alone: a table shows checkboxes only when
+  it has a bulk action, and a selection shows an "N selected" bar that holds them. An action on one row stays on the
+  row.
 
 ## Opening things
 
-Three levels, chosen by what the person does, never by taste
-([D132](../decisions/d132-rules-from-the-studio-settings-review.md)) _(planned for M31)_.
+Three levels, chosen by what the person does, never by taste _(planned for M31)_.
 
 - **Opening a record is a page.** Every thing with an identity of its own, such as a record, a Studio resource, a
   release, a user or a process instance, opens from its table's identifying cell, a real link, as a page with its own
@@ -152,7 +149,7 @@ These rules hold for every dialog, through the shared `ConfigProvider` _(planned
 
 ## Showing what is empty
 
-Information always shows rather than being hidden ([D132](../decisions/d132-rules-from-the-studio-settings-review.md))
+Information always shows rather than being hidden
 _(planned for M31)_.
 
 - **A field the object always has always shows.** Empty, it reads "Not set" on a form or a detail and the muted dash in
@@ -167,7 +164,7 @@ _(planned for M31)_.
 
 ## List order
 
-Three rules, chosen by what a list is ([D132](../decisions/d132-rules-from-the-studio-settings-review.md))
+Three rules, chosen by what a list is
 _(planned for M31)_.
 
 - **An order the author gives keeps it.** Process steps, wizard steps, a table's columns, a form's fields and navigation
@@ -181,8 +178,7 @@ _(planned for M31)_.
 
 ## Undo rather than confirm
 
-These rules follow from what a person can take back
-([D132](../decisions/d132-rules-from-the-studio-settings-review.md)) _(planned for M31)_.
+These rules follow from what a person can take back _(planned for M31)_.
 
 - **What can be taken back is undone, not confirmed.** Removing a row changes only the draft, so it asks nothing. A
   notice names it, such as "Organization removed.", with Undo, for ten seconds.

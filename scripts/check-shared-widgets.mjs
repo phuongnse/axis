@@ -5,7 +5,9 @@
 // It refuses three ways round a shared widget, read from the source as text:
 //   button  An Ant Design `<Button` outside AxisButton.tsx. Use `AxisButton` with a role.
 //   table   An Ant Design `<Table` outside AxisTable.tsx. Use `AxisTable`.
-//   tag     A `<Tag color="blue">` with an Ant Design preset colour name. Use the colour tokens.
+//   tag     A `<Tag` whose colour is an Ant Design preset: a colour name such as `blue` or `blue-inverse`, or a status
+//           preset such as `success`. It counts as a string or inside a `color={…}` expression, even on a later line.
+//           Use the colour tokens.
 // The code that broke a rule before the check existed is counted in scripts/shared-widgets-baseline.json, by file and
 // rule. A file may not use a rule more often than its baseline, and a file that uses one less must lower its baseline,
 // so the count only goes down. `--write-baseline` writes the baseline from the code as it is now. Prints one line per
@@ -21,24 +23,27 @@ const extensions = ['.tsx', '.jsx']
 
 const presetColours =
   'magenta|red|volcano|orange|gold|lime|green|cyan|blue|geekblue|purple|pink|yellow'
+const statusPresets = 'success|processing|error|warning|default'
+const preset = `(?:(?:${presetColours})(?:-inverse)?|${statusPresets})`
 
+// button and table do not match across a line break, so a tag whose name ends its line is not counted yet.
 /** Each rule: its name, the pattern, the files that are the shared widget itself, and what to say. */
 export const rules = [
   {
     name: 'button',
-    pattern: /<Button(?=[\s>/])/g,
+    pattern: /<Button(?=[^\S\n]|[>/])/g,
     owner: 'web/src/platform/AxisButton.tsx',
     advice: 'Use AxisButton with a role.',
   },
   {
     name: 'table',
-    pattern: /<Table(?=[\s<>/])/g,
+    pattern: /<Table(?=[^\S\n]|[<>/])/g,
     owner: 'web/src/platform/AxisTable.tsx',
     advice: 'Use AxisTable.',
   },
   {
     name: 'tag',
-    pattern: new RegExp(`<Tag\\b[^>]*\\bcolor=["'](?:${presetColours})["']`, 'g'),
+    pattern: new RegExp(`<Tag\\b[^>]*?\\bcolor=(?:["']${preset}["']|\\{[^{}]*["']${preset}["'][^{}]*\\})`, 'g'),
     owner: null,
     advice: 'Colour a tag with the colour tokens, not a preset name.',
   },
@@ -46,16 +51,18 @@ export const rules = [
 
 export const baselineFile = 'scripts/shared-widgets-baseline.json'
 
-/** Returns the uses in the source as { line, rule }, for the rules that apply to `file`. */
+/** Returns the uses in the source as { line, rule }, for the rules that apply to `file`, in line order. */
 export function findUses(source, file) {
   const found = []
-  source.split('\n').forEach((text, index) => {
-    for (const rule of rules) {
-      if (rule.owner === file) continue
-      for (const _ of text.matchAll(rule.pattern)) found.push({ line: index + 1, rule: rule.name })
+  rules.forEach((rule, order) => {
+    if (rule.owner === file) return
+    for (const match of source.matchAll(rule.pattern)) {
+      found.push({ line: source.slice(0, match.index).split('\n').length, rule: rule.name, order })
     }
   })
   return found
+    .sort((a, b) => a.line - b.line || a.order - b.order)
+    .map(({ line, rule }) => ({ line, rule }))
 }
 
 function findSourceFiles(directory, files = []) {

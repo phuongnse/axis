@@ -78,6 +78,7 @@ internal static partial class AdminCommands
                activate <folder> [--tenant <id>]
                tenant suspend <id>
                tenant resume <id>
+               tenant read-only <id>
                tenant rotate-passwords <id>
                tenant oidc set <id> [--endpoint-audience <value>] [--service-audience <value>] [--profile standard|fapi2] [--client-key] [--retire-client-key <kid>]
                tenant sign-in set <id> --accounts true|false [--provider <name> --type oidc|saml [--issuer <binding>] [--client-id <binding>] [--client-secret <binding>] [--client-key <binding>] [--metadata <binding>] [--claim <name>=<claim>]... [--roles-claim <claim>] [--role <value>=<role>]...]...
@@ -192,6 +193,7 @@ internal static partial class AdminCommands
         new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant read-only", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant oidc set", AuditMark.OnePerTenant, run => OidcSetAsync(run.Command.Name, run.Args, run.Configuration, run.Input, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant sign-in set", AuditMark.OnePerTenant, TenantSettings.SignInSetAsync),
@@ -415,6 +417,7 @@ internal static partial class AdminCommands
         {
             "suspend" => await TenantStatus.SuspendAsync(connectionString, args[2], new TenantAudit(command, connectionString), output, error, cancellationToken),
             "resume" => await TenantStatus.ResumeAsync(connectionString, args[2], new TenantAudit(command, connectionString), output, error, cancellationToken),
+            "read-only" => await TenantStatus.ReadOnlyAsync(connectionString, args[2], new TenantAudit(command, connectionString), output, error, cancellationToken),
             _ => await TenantStatus.ListAsync(connectionString, output, error, cancellationToken),
         };
     }
@@ -1881,7 +1884,7 @@ internal static partial class AdminCommands
         return new RestoreSettings(create, path, configuration[PackageCatalog.PathSetting]);
     }
 
-    /// <summary><c>tenant suspend</c>, <c>resume</c> and <c>list</c> need only the platform database. They decrypt nothing and create no role or database.</summary>
+    /// <summary><c>tenant suspend</c>, <c>resume</c>, <c>read-only</c> and <c>list</c> need only the platform database. They decrypt nothing and create no role or database.</summary>
     internal static string? ReadDirectorySettings(IConfiguration configuration, out string problem)
     {
         problem = "";

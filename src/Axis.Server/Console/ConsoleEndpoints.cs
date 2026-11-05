@@ -19,7 +19,7 @@ namespace Axis.Server.Console;
 /// <para>
 /// <c>GET /api/console/tenant</c> answers the tenant of the host: its <c>id</c>, its <c>status</c> and, for each active
 /// application in name order, its active release with the release <c>number</c> and <c>label</c> from the release history
-/// and the time it was activated. The status is always <c>active</c>, because a host serves only active tenants.
+/// and the time it was activated. The status is <c>active</c> or <c>readOnly</c>, because a host serves only those tenants.
 /// </para>
 /// <para>
 /// The dead letter routes under <c>/api/console/dead-letters</c> list, redeliver and discard the dead letters of every
@@ -60,9 +60,6 @@ namespace Axis.Server.Console;
 /// </summary>
 internal static class ConsoleEndpoints
 {
-    // A host serves only active tenants: a suspended tenant's hosts answer 503, so a request that got here is on an active one.
-    private const string ActiveStatus = "active";
-
     public static void MapConsoleEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var console = endpoints.MapGroup("/api/console");
@@ -110,7 +107,7 @@ internal static class ConsoleEndpoints
                 active.ApplicationId, active.Name, active.ReleaseId, activation?.Number, activation?.Label, active.ActivatedAt));
         }
 
-        return Results.Ok(new ConsoleTenantResponse(tenant.TenantId, ActiveStatus, applications));
+        return Results.Ok(new ConsoleTenantResponse(tenant.TenantId, tenant.ReadOnly ? "readOnly" : "active", applications));
     }
 
     private static async Task<IResult> ListFailedWorkAsync(

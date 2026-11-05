@@ -63,7 +63,7 @@ namespace Axis.Server.CellApi;
 /// <c>actor</c> column stays empty.
 /// </para>
 /// <para>
-/// <c>POST /api/cell/tenants/{id}/suspend</c> and <c>/resume</c>, <c>DELETE /api/cell/tenants/{id}</c> and
+/// <c>POST /api/cell/tenants/{id}/suspend</c>, <c>/resume</c> and <c>/read-only</c>, <c>DELETE /api/cell/tenants/{id}</c> and
 /// <c>POST /api/cell/tenants/{id}/deletion/cancel</c> queue a job in <c>platform.jobs</c> and answer <c>202</c> with
 /// <c>{ id, kind, tenantId, state, createdAt }</c> and a <c>Location</c> header of the job. The publisher's job runner changes the
 /// tenant's status later. The jobs insert over the reader role. The job's <c>actor</c> is the operator's id, the subject of the
@@ -123,6 +123,7 @@ internal static class CellEndpoints
     {
         ["suspend"] = ["status"],
         ["resume"] = ["status"],
+        ["read-only"] = ["status"],
         ["delete"] = ["schedule"],
         ["cancel-deletion"] = ["cancel"],
         ["create"] = ["tenant", "application", "activate", "invite", "resume"],
@@ -152,6 +153,8 @@ internal static class CellEndpoints
             QueueJobAsync("suspend", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/resume", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("resume", id, http, dataSource, cancellationToken));
+        cell.MapPost("/tenants/{id}/read-only", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
+            QueueJobAsync("read-only", id, http, dataSource, cancellationToken));
         cell.MapDelete("/tenants/{id}", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("delete", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/deletion/cancel", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>

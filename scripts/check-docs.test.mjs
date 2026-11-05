@@ -184,6 +184,73 @@ describe('checkDocs', () => {
       'docs/decisions/notes.md:1: a decision file is named docs/decisions/d<n>-<slug>.md',
     ])
   })
+
+  const sha = 'a'.repeat(40)
+  const lastText = (name) => `[last text](https://github.com/owner/axis/blob/${sha}/docs/decisions/${name})`
+
+  test('passes a superseded row that names a decision in force and has no file', () => {
+    write('docs/decisions/d3-files-and-folders.md', '# D3. Files and folders\n\nStatus: **Agreed**\n')
+    rmSync(path.join(root, 'docs/decisions/d1-files-first.md'))
+    write(
+      'docs/decisions.md',
+      index(
+        `| D1 | Files first | Superseded by [D3](decisions/d3-files-and-folders.md), ${lastText('d1-files-first.md')} |`,
+        '| [D2](decisions/d2-typed-expressions.md) | Typed expressions | **Proposed** |',
+        '| [D3](decisions/d3-files-and-folders.md) | Files and folders | **Agreed** |',
+      ),
+    )
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports a superseded decision that keeps its file, links another last text or names no decision in force', () => {
+    write(
+      'docs/decisions.md',
+      index(
+        `| D1 | Files first | Superseded by [D2](decisions/d2-typed-expressions.md), ${lastText('d2-typed-expressions.md')} |`,
+        `| D2 | Typed expressions | Superseded by [D1](decisions/d1-files-first.md), ${lastText('d2-typed-expressions.md')} |`,
+      ),
+    )
+
+    assert.deepEqual(messages().sort(), [
+      "docs/decisions.md:5: D1 is superseded by D2, which is not a decision in force",
+      "docs/decisions.md:5: D1 is superseded, so delete docs/decisions/d1-files-first.md",
+      "docs/decisions.md:5: D1's last text links the file of D2",
+      "docs/decisions.md:6: D2 is superseded by D1, which is not a decision in force",
+      "docs/decisions.md:6: D2 is superseded, so delete docs/decisions/d2-typed-expressions.md",
+    ])
+  })
+})
+
+describe('planned markers', () => {
+  const roadmap = [
+    '# Roadmap',
+    '',
+    '| Milestone | Name | Status | Delivers |',
+    '| --- | --- | --- | --- |',
+    '| **M1** | Walking skeleton | Done | Entities. |',
+    '| **M2** | Data and rules | Planned | Rules. |',
+  ].join('\n')
+
+  beforeEach(() => {
+    write('docs/roadmap.md', roadmap + '\n')
+    write('docs/README.md', '# Documentation\n\n| [Decisions](decisions.md) | [Guide](reference/guide.md) | [Roadmap](roadmap.md) |\n')
+  })
+
+  test('passes a marker for a milestone that is not Done', () => {
+    write('docs/reference/guide.md', '# Guide\n\n## Rules _(planned for M2)_\n')
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports each Done milestone a marker names, alone or in a list', () => {
+    write('docs/reference/guide.md', '# Guide\n\n## Entities _(planned for M1)_\n\nText _(planned for M2 and M1)_.\n')
+
+    assert.deepEqual(messages(), [
+      'docs/reference/guide.md:3: planned for M1, which the roadmap calls Done: remove the marker, or move it to the milestone that builds the rest',
+      'docs/reference/guide.md:5: planned for M1, which the roadmap calls Done: remove the marker, or move it to the milestone that builds the rest',
+    ])
+  })
 })
 
 describe('ASVS table', () => {

@@ -186,6 +186,33 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
     }
 
     [Fact]
+    public async Task A_read_only_tenant_still_serves_its_routes_and_the_console_reports_its_status()
+    {
+        var role = NewRole();
+        var quiz = await PrepareTenantAsync("quiz", role);
+        var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector(), ("Console:OperatorRole", "console-operator"));
+        using var client = factory.CreateClient().SignedInAs("requester");
+        await ListAsync(client, "quiz.example.test");
+
+        await UpdateTenantAsync(platform, "quiz", row => row.Status = "readOnly");
+        await RefreshAsync(factory);
+
+        await ListAsync(client, "quiz.example.test");
+        using var console = factory.CreateClient().SignedInAs("operator-1");
+        using var response = await console.SendAsync(Request("/api/console/tenant", "quiz.example.test"), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal("readOnly", body.RootElement.GetProperty("status").GetString());
+
+        await UpdateTenantAsync(platform, "quiz", row => row.Status = "active");
+        await RefreshAsync(factory);
+        using var active = await console.SendAsync(Request("/api/console/tenant", "quiz.example.test"), CancellationToken);
+        using var activeBody = JsonDocument.Parse(await active.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal("active", activeBody.RootElement.GetProperty("status").GetString());
+    }
+
+    [Fact]
     public async Task A_host_removed_from_a_tenant_is_404_after_a_refresh_and_its_other_host_still_serves()
     {
         var role = NewRole();
@@ -500,7 +527,8 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
                 new TestIdentity("author", "Author User", "author"),
-                new TestIdentity("eve", "Eve Exporter", "exporter"));
+                new TestIdentity("eve", "Eve Exporter", "exporter"),
+                new TestIdentity("operator-1", "Console Operator", "console-operator"));
         });
 
     [Fact]

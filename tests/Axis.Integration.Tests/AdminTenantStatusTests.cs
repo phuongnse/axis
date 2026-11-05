@@ -73,6 +73,93 @@ public sealed class AdminTenantStatusTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Read_only_keeps_the_host_served_and_raises_the_version_by_one_and_repeating_it_changes_nothing()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, "shop.example.test")).Exit);
+        var created = await scenario.RowAsync(id);
+        await using var factory = AdminScenario.CreateServer(scenario.Platform);
+        using var client = factory.CreateClient().SignedInAs("requester");
+
+        var readOnly = await scenario.RunAsync(["tenant", "read-only", id]);
+        await RefreshAsync(factory);
+        var row = await scenario.RowAsync(id);
+        var snapshot = await scenario.SnapshotAsync();
+        var again = await scenario.RunAsync(["tenant", "read-only", id]);
+
+        Assert.Equal(0, readOnly.Exit);
+        Assert.Equal([$"{id} status ok"], readOnly.Output);
+        Assert.Equal("readOnly", row.Status);
+        Assert.Equal(created.Version + 1, row.Version);
+        Assert.Equal(HttpStatusCode.OK, await StatusAsync(client, "shop.example.test"));
+        Assert.Equal(0, again.Exit);
+        Assert.Equal([$"{id} status ok"], again.Output);
+        Assert.Equal(snapshot, await scenario.SnapshotAsync());
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Resume_and_suspend_each_leave_the_read_only_status_and_raise_the_version_by_one()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, "shop.example.test")).Exit);
+
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "read-only", id])).Exit);
+        var readOnly = await scenario.RowAsync(id);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", id])).Exit);
+        var resumed = await scenario.RowAsync(id);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "read-only", id])).Exit);
+        var readOnlyAgain = await scenario.RowAsync(id);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "suspend", id])).Exit);
+        var suspended = await scenario.RowAsync(id);
+
+        Assert.Equal("active", resumed.Status);
+        Assert.Equal(readOnly.Version + 1, resumed.Version);
+        Assert.Equal("readOnly", readOnlyAgain.Status);
+        Assert.Equal("suspended", suspended.Status);
+        Assert.Equal(readOnlyAgain.Version + 1, suspended.Version);
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Read_only_of_a_suspended_tenant_exits_1_and_an_unknown_tenant_exits_2_and_nothing_changes()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, "shop.example.test")).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "suspend", id])).Exit);
+        var before = await scenario.SnapshotAsync();
+
+        var suspended = await scenario.RunAsync(["tenant", "read-only", id]);
+        var unknown = await scenario.RunAsync(["tenant", "read-only", "t-unknown"]);
+
+        Assert.Equal(1, suspended.Exit);
+        Assert.Equal([$"{id} status failed: {TenantStatus.SuspendedMessage}"], suspended.Output);
+        Assert.Equal(2, unknown.Exit);
+        Assert.Equal(["The tenant does not exist."], unknown.Error);
+        Assert.Equal(before, await scenario.SnapshotAsync());
+        Assert.Equal("suspended", (await scenario.RowAsync(id)).Status);
+    }
+
+    [Fact]
+    public async Task List_prints_the_read_only_status()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, "shop.example.test")).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "read-only", id])).Exit);
+
+        var result = await scenario.RunAsync(["tenant", "list"]);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal([id, "readOnly"], Cells(result.Output[1]).Take(2));
+    }
+
+    [Fact]
     public async Task List_prints_every_tenant_in_id_order_with_status_hosts_and_schema_version_and_no_secret()
     {
         await using var scenario = await NewScenarioAsync();

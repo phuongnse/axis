@@ -2,7 +2,7 @@
 
 This is the target structure. Sections marked _(planned for Mx)_ describe work
 that has not been built yet, as defined in
-[delivery.md](delivery.md#keeping-the-docs-current). Decisions referenced as
+[writing the docs](writing-docs.md#planned-work). Decisions referenced as
 Dn are in [decisions.md](decisions.md). Detailed behaviour is in
 [reference/](reference/).
 

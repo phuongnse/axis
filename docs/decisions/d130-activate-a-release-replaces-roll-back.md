@@ -4,8 +4,8 @@ Status: **Proposed**
 
 The owner asked that the docs, the API and the UI use one word for making a release the live one. A release can be
 made live again whether it is older than the live one or newer, after an earlier one was made live, so "roll back"
-names only half of it. The Studio editors review ([D129](d129-rules-from-the-studio-editors-review.md)) already
-gives Studio's button the word Activate…. This decision proposes the same word everywhere else:
+names only half of it. Studio's
+[Releases](../reference/studio-workspace.md#releases) already give the button the word Activate…. This decision proposes the same word everywhere else:
 
 - **The concept.** Activating a release makes it the application's live release in the tenant, either way, back to
   an older release or forward to a newer one. The vocabulary in [concepts](../domain/concepts.md) says activate where
