@@ -141,7 +141,7 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("jobs", "platform", t =>
                         {
-                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export')");
+                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion')");
 
                             t.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
                         });
@@ -589,6 +589,10 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.Property<int>("DatabasePort")
                         .HasColumnType("integer")
                         .HasColumnName("database_port");
+
+                    b.Property<DateTimeOffset?>("DeleteAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delete_after");
 
                     b.Property<string>("EmailFrom")
                         .HasColumnType("text")

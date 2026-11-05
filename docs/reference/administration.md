@@ -860,8 +860,8 @@ admin host carries the same version in its OCI label, see
 
 ## Not built yet
 
-- Deleting a tenant, and an HTTP API for provisioning, _(planned for M31)_ in a cell, see
-  [tenant lifecycle in a cell](tenant-lifecycle.md).
+- The purge of a deleted tenant, and the other routes of the HTTP API for provisioning, _(planned for M31)_ in a cell, see
+  [tenant lifecycle in a cell](tenant-lifecycle.md). Scheduling a deletion and cancelling it in the grace window are built.
 - Moving a tenant to another database server.
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation. A cell keeps point-in-time recovery of its whole cluster, see

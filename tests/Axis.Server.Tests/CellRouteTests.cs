@@ -65,7 +65,7 @@ public sealed class CellRouteTests
     }
 
     [Fact]
-    public async Task The_provisioning_API_reads_the_tenants_and_jobs_sets_quotas_queues_create_suspend_and_resume_takes_host_requests_and_has_the_session_routes_sign_in_and_out()
+    public async Task The_provisioning_API_reads_the_tenants_and_jobs_sets_quotas_queues_create_suspend_resume_delete_and_cancel_deletion_takes_host_requests_and_has_the_session_routes_sign_in_and_out()
     {
         await using var factory = CreateFactory();
 
@@ -73,12 +73,14 @@ public sealed class CellRouteTests
 
         Assert.Equal(
             [
+                "DELETE /api/cell/tenants/{id}",
                 "GET /api/cell/auth/sign-in",
                 "GET /api/cell/jobs/{id:guid}",
                 "GET /api/cell/tenants",
                 "GET /api/cell/tenants/{id}",
                 "POST /api/cell/auth/sign-out",
                 "POST /api/cell/tenants",
+                "POST /api/cell/tenants/{id}/deletion/cancel",
                 "POST /api/cell/tenants/{id}/exports",
                 "POST /api/cell/tenants/{id}/hosts",
                 "POST /api/cell/tenants/{id}/resume",
