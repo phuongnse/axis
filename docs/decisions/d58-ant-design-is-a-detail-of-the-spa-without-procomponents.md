@@ -2,28 +2,31 @@
 
 Status: **Agreed**
 
-The SPA builds on Ant Design and drops ProComponents. The UI library is a
-detail of the SPA and never shows outside it. This replaces the frontend line
-of [D3](d3-technology-stack.md). The owner agreed these points on issue #928
-on 2026-10-22.
+## Context
 
-- **Base components:** the SPA builds on Ant Design for its base components.
-  It does not use ProComponents.
-- **A detail of the SPA:** configuration, page metadata, configurable theme
-  tokens and the custom widget API never name an Ant Design component, prop or
-  token.
-- **Custom widgets:** a custom widget of
-  [D8](d8-custom-ui-widgets-are-packaged-react-components.md) builds on Axis
-  widgets and Axis tokens. It never imports the UI library directly. So a major
-  Ant Design upgrade stays inside the SPA.
-- **Specialised libraries:** they are added when a widget needs one, as React
-  Flow and CodeMirror were. The same rule applies to them.
-- **No schema renderer:** no layer on top of Ant Design renders UI from a
-  schema. Rendering from metadata is the presentation runtime that Axis owns
-  ([D2](d2-axis-owns-its-engines.md)).
+The SPA needs a component library. Published applications and extension packages outlive any version
+of it, so a library name in configuration or in the custom widget API would let an upgrade break
+them. Axis already renders UI from metadata with its own presentation runtime
+([D2](d2-axis-owns-its-engines.md)).
 
-_Why:_ keeping the library out of configuration and out of the widget API means
-that upgrading or replacing it never breaks a published application or a
-package. ProComponents adds a second release cycle and its own schema
-rendering, which overlaps with the Axis presentation runtime. The cost is that
-the SPA wraps every Ant Design component that a widget needs.
+## Decision
+
+- **The SPA builds on Ant Design,** without ProComponents.
+- **The library never shows outside the SPA.** Configuration, page metadata, configurable theme tokens
+  and the custom widget API never name an Ant Design component, prop or token, and a custom widget
+  ([D8](d8-custom-ui-widgets-are-packaged-react-components.md)) builds on Axis widgets and tokens.
+- **A specialised library,** such as React Flow, is added when a widget needs one, under the same
+  rule.
+- **No schema renderer** on top of Ant Design.
+
+The rules for the SPA's code are in [frontend](../reference/frontend.md).
+
+## Consequences
+
+- An upgrade or a replacement of the library stays inside the SPA.
+- The SPA wraps every Ant Design component that a widget needs.
+
+## Alternatives
+
+- **ProComponents.** It adds a second release cycle, and its schema rendering overlaps with the Axis
+  presentation runtime.
