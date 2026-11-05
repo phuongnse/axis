@@ -414,15 +414,27 @@
     },
     {
       "concept": "Text resource",
-      "en": "text resource",
-      "vi": "bộ văn bản",
+      "en": "language",
+      "vi": "ngôn ngữ",
       "status": "approved",
-      "note": "An application's texts in one language: \"Bộ văn bản tiếng Việt\".",
+      "note": "An application's texts in one language. On screens it is named as a language, \"Languages\", \"Add language…\", \"Ngôn ngữ\", \"Thêm ngôn ngữ…\", and each one by its language's name, \"Tiếng Việt\", \"English\". The source language is one of them. \"text resource\" stays the kind's name in files, docs and the API.",
       "avoid": {
+        "en": [
+          "text resource"
+        ],
         "vi": [
-          "tài nguyên văn bản"
+          "tài nguyên văn bản",
+          "bộ văn bản",
+          "bản văn bản"
         ]
       }
+    },
+    {
+      "concept": "Translation",
+      "en": "translation",
+      "vi": "bản dịch",
+      "status": "approved",
+      "note": "One text in another language, as a label's Translations… dialog shows it. Not a whole language."
     },
     {
       "concept": "Role",
