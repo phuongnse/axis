@@ -125,9 +125,7 @@ A value reads the same in every widget: in an input, a read-only field, a table 
   KPI's dash carries a visually hidden `shell.kpi.empty` ("No value") for assistive technology. Words go where fields
   are read one by one, and a dash where values are read at a glance or compared. What tells an empty value from a
   typed one is the styling, in which no value is ever drawn, never the words.
-- **No identifiers.** No widget shows a GUID to a user, except where it has only an identifier to show: a data
-  source's file column, a reference whose label the user may not read, a creator field and a history entry without an
-  actor name.
+- **No identifiers.** No widget shows a GUID to a user.
 
 ## Text resolution
 
