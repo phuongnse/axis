@@ -28,7 +28,7 @@ issues that build each check.
   process, page or policy of its own.
 - **Installed with Axis.** `scripts/build.sh`, `scripts/dev.sh` and the E2E run install the modules
   under `artifacts/modules/`, next to the sample modules, and the built-in applications under
-  `artifacts/templates/`, next to the sample templates. The development images hold the modules in
+  `artifacts/templates/`. The development images hold the modules in
   `/modules` and the built-in applications in `/templates`. The production images `axis-server`,
   `axis-worker` and `axis-admin` do not yet, and a cell's operator fills its templates volume.
   Shipping them in every installation _(planned for M26)_ needs its own design, because the Helm
@@ -307,8 +307,8 @@ The samples become the built-in modules, as D102 agrees:
   sample declares `organization` too (`admin` to `operator`, `member` to `department-manager`) and
   seeds the same employees and departments, and a purchase request goes to the head of its department.
   `department-budgets` 1.2.0 depends on `organization`. The `departments` sample module is removed.
-- **The `request-approval` template** becomes the `approvals` application, and is removed. The
-  Studio journeys that create an application from it create one from the built-in application.
+- **The request approval sample template** became the `approvals` application and is removed. The
+  Studio journeys create an application from the built-in application.
 
 ## The journey
 

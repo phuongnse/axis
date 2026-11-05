@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Integration tests against real PostgreSQL and Keycloak containers (requires Docker).
-# The integration tests also run the test scenarios of every application under samples/apps/ and of
-# every sample template under samples/templates/.
+# The integration tests also run the test scenarios of every application under samples/apps/.
 # The Keycloak theme is built first, because the tests' Keycloak loads it.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
 # The integration tests and the scenarios are skipped when every path changed since NexKit's commit is
@@ -20,9 +19,8 @@
 # AXIS_INTEGRATION_SHARD, such as 2/3, runs one shard of Axis.Integration.Tests, so CI and NexKit's
 # checks can split the suite over parallel jobs. scripts/lib/integration-shard.mjs gives each shard its
 # test classes by their durations in tests/Axis.Integration.Tests/class-durations.json. A shard expects
-# the scenario suites only when it holds the class that writes them: ScenarioRunnerTests for the
-# applications, SampleTemplateTests for the templates. Shard 1 also runs the control plane suite. The
-# shard cannot be combined with arguments.
+# the scenario suites only when it holds the class that writes them: ScenarioRunnerTests. Shard 1 also
+# runs the control plane suite. The shard cannot be combined with arguments.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -53,13 +51,6 @@ holds() { [ -z "${AXIS_INTEGRATION_SHARD:-}" ] || grep -qx "Axis.Integration.Tes
 scenario_suites=()
 if holds ScenarioRunnerTests; then
   for manifest in samples/apps/*/application.json; do
-    name="$(node -p "JSON.parse(require('fs').readFileSync('$manifest','utf8')).name")"
-    scenario_suites+=("scenarios-$name")
-  done
-fi
-
-if holds SampleTemplateTests; then
-  for manifest in samples/templates/*/application.json; do
     name="$(node -p "JSON.parse(require('fs').readFileSync('$manifest','utf8')).name")"
     scenario_suites+=("scenarios-$name")
   done

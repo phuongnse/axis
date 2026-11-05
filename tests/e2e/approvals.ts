@@ -231,7 +231,11 @@ export async function expectHeadRequestGoesToAdmin(page: Page, sitePath: string,
   await waitInInbox(page, sitePath, title)
 
   await useJourneySession(page, 'employee')
+  const inboxLoad = page.waitForResponse(
+    (response) => /^\/api\/apps\/[^/]+\/tasks$/.test(new URL(response.url()).pathname),
+  )
   await page.goto(`${journeyURL}/${sitePath}/approvals/todecide`)
+  expect((await inboxLoad).ok()).toBe(true)
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
   await expect(page.getByRole('table')).toBeVisible()
   await expect(page.getByRole('row', { name: new RegExp(title) })).toHaveCount(0)
