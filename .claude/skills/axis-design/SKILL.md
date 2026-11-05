@@ -79,6 +79,12 @@ changes, and logic goes in `design-review.md` for the review's issue.
    previews it touches, by their names in
    [Widget previews](../../../docs/development.md#widget-previews). Ask the
    owner when the request is ambiguous.
+   Then search for what already does the job (the shared widget, its context,
+   the route that feeds it) and say which one the change extends. A change
+   that would add a second way, a copy or a caller-side workaround is made in
+   the shared place instead, as the "One concern has one mechanism" rule in
+   [AGENTS.md](../../../AGENTS.md#working-rules) says. When the change shows a
+   second mechanism already there, tell the owner and merge the two.
 2. Make it in the real code under `web/src/platform/` and
    `web/src/designSystem/`, so the artifact shows the real widgets. Mark each
    new behaviour with a short `Proposed:` comment, so the issue that builds
