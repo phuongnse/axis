@@ -122,11 +122,16 @@ export async function remapAdmin(page: Page, name: string) {
   await expectNoErrors(page, name)
 }
 
-/** Publishes the application `name` and waits until the publish succeeds and `expectedReleases` rows show. */
-export async function publish(page: Page, name: string, expectedReleases: number) {
+/** Opens Studio on the application `name` and confirms the Publish dialog, without waiting for the outcome. */
+export async function startPublish(page: Page, name: string) {
   await page.goto(`${journeyURL}/studio?app=${name}`)
   await page.getByRole('button', { name: 'Publish…', exact: true }).click()
   await confirmDialog(page, 'Publish')
+}
+
+/** Publishes the application `name` and waits until the publish succeeds and `expectedReleases` rows show. */
+export async function publish(page: Page, name: string, expectedReleases: number) {
+  await startPublish(page, name)
   await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
     timeout: 300_000,
   })
