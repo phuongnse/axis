@@ -154,6 +154,12 @@ owner is reviewing it one step at a time.
   to, by its label, as "Reference to Department" or "Child collection of Line item", from
   `shell.studio.entity.typeOf.<type>`. The label comes from `referenceOptions` and `useTextOfKey`, as the drawer's target
   picker gives it, and the name shows only where the entity has no label. Enum and every other type is its name alone.
+- **Required and Unique read Yes or No:** they are columns because every field has them and an author compares them down
+  the table, which fields must be filled and which tell records apart; a setting only some fields have is a tag under
+  Properties. A cell showed a check for yes and the dash for no, but the dash means a value that is not set (D96), and a
+  No is a value. Both answers now show as words, through `booleanText` in `platform/formatValue.ts`, the words a record's
+  boolean reads in every table and read-only form, which the schema form's read-only value takes too. Words are read the
+  same by a screen reader and are not mistaken for an empty cell.
 - **The target is a link:** in the Type cell, the entity a reference, references or child collection points to is a
   link that opens it, a module's entity at its module view. Only the label is the link; the field's name stays the row's
   button that opens the drawer. The address comes from `studioResourceAddress` in `platform/studio.ts`, which Uses, Used by

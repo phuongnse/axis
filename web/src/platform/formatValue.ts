@@ -148,6 +148,14 @@ export function referencesLabels(value: FieldValue | undefined, label: FieldLabe
 }
 
 /**
+ * A yes-or-no value in words, Yes or No, wherever one is read: a record's boolean, a setting in Studio's tables and forms.
+ * Both answers show, so a No is never mistaken for a value that is not set.
+ */
+export function booleanText(value: boolean, text: (key: string) => string): string {
+  return text(value ? 'shell.table.yes' : 'shell.table.no')
+}
+
+/**
  * Formats a record value for display. Formatting never changes the value: numbers keep every digit
  * the API wrote and gain the locale's grouping, a money amount adds its currency, and a reference shows
  * the label of the record it points to. `row` is the values of the record or row, where a money amount reads its currency.
@@ -165,7 +173,7 @@ export function formatValue(
   const { locale, timeZone, text } = options
   switch (field.type) {
     case 'boolean':
-      return text(value === true ? 'shell.table.yes' : 'shell.table.no')
+      return booleanText(value === true, text)
     case 'money':
       return moneyText(field, String(value), locale, row)
     case 'enum':

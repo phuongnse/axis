@@ -1,4 +1,4 @@
-import { ArrowDownOutlined, ArrowUpOutlined, CheckOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons'
+import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -52,6 +52,7 @@ import type { ChangeHandler } from './SchemaForm'
 import { setOwn } from '../platform/ownProperty'
 import { Link, useSearchParams } from 'react-router'
 import { studioResourceAddress } from '../platform/studio'
+import { booleanText } from '../platform/formatValue'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -418,12 +419,6 @@ function fieldTraits(field: Content): string[] {
   ].filter((key): key is string => key !== null)
 }
 
-/** A yes cell of Required or Unique: a check, named for screen readers. A no is the dash. */
-function Yes({ name }: { name: string }) {
-  const { colour } = useDesignTokens()
-  return <CheckOutlined aria-label={name} style={{ color: colour.primaryText }} />
-}
-
 /**
  * Proposed: the entity's fields as the standard table, in the order of the file, which is the order a default form
  * shows them in, so the table has no sort by column. Its columns are Name, a link that opens the field's drawer,
@@ -543,13 +538,14 @@ function EntityFields({
       kind: 'fixed',
       title: t('shell.studio.entity.required'),
       render: (_, row) =>
-        row.field.required === true ? <Yes name={t('shell.studio.entity.required')} /> : <EmptyDash />,
+        // Proposed: a yes-or-no setting reads Yes or No, as a record's boolean does, never a mark beside a dash.
+        booleanText(row.field.required === true, t),
     },
     {
       key: 'unique',
       kind: 'fixed',
       title: t('shell.studio.entity.unique'),
-      render: (_, row) => (row.field.unique === true ? <Yes name={t('shell.studio.entity.unique')} /> : <EmptyDash />),
+      render: (_, row) => booleanText(row.field.unique === true, t),
     },
     {
       key: 'properties',

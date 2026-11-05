@@ -50,6 +50,7 @@ import { StudioResourceTitle } from './studioResourceTitle'
 import { nameCollator } from './studioViews'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { SchemaLayerContext } from './schemaLayerContext'
+import { booleanText } from '../platform/formatValue'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -388,7 +389,7 @@ function CellValue({
     return count ? <>{count}</> : <EmptyDash />
   }
   if (typeof value === 'boolean') {
-    return <>{t(value ? 'shell.table.yes' : 'shell.table.no')}</>
+    return <>{booleanText(value === true, t)}</>
   }
   return value === undefined || value === null || value === '' ? <EmptyDash /> : <>{String(value)}</>
 }
