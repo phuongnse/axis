@@ -391,7 +391,9 @@ owner is reviewing it one step at a time.
 - **"Nơi sử dụng":** the Vietnamese tab reads "Nơi sử dụng", and the delete dialog's link "Xem nơi sử dụng". "Được dùng
   bởi" was a passive built on "bởi", as English says "Used by", which the owner found unnatural in an application, as the
   standard's rule against an English passive says. English keeps "Used by". The glossary's Used by is to read "Nơi sử
-  dụng", with "Được dùng bởi" avoided, in the next docs change.
+  dụng" in #2979, which also leaves the glossary with approved terms only: the owner rejects lists of words to avoid,
+  as no such list is ever complete; the standard holds by being followed, and #2972 checks only placeholders and
+  untranslated texts.
 - **Delete:** the Danger zone sat under the tabs, so every tab showed it. Delete… is now in a "…" menu at the right of
   the resource's heading, through a slot the page gives the editor, as the release page's Activate… is. Its dialog keeps
   the warning that the resource is used, with "See what uses it", which opens the Used by tab.
