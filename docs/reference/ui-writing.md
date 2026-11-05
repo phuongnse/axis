@@ -1,7 +1,7 @@
 # UI writing
 
-How the words of Axis's own screens are written: Studio, the operator console, the shell, the sign-in pages and the
-platform's messages. It covers the platform texts in `src/Axis.Presentation/Texts/<locale>.json`, in every locale, and
+This page says how the words of Axis's own screens are written: Studio, the operator console, the shell, the sign-in
+pages and the platform's messages. It covers the platform texts in `src/Axis.Presentation/Texts/<locale>.json`, in every locale, and
 every person or agent that adds or changes one. An application's own texts belong to its author, who may follow it.
 
 The terms each locale uses are in the [glossary](ui-glossary.json). This page says how to write; the glossary says which
@@ -9,7 +9,7 @@ word names which concept.
 
 ## Principles
 
-These hold in every language.
+These principles hold in every language.
 
 - **Write for the purpose, not from the English.** Each locale is written, not translated. Start from what the text is
   for, where it shows and what the person does next, then write it as a native writer of that language would. English
@@ -49,6 +49,8 @@ These hold in every language.
 
 ## Kinds of text
 
+Each kind of text has its own shape, the same on every screen:
+
 | Kind               | How it reads                                                                  | Example (en)                                                                  |
 | ------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Button, menu item  | A verb and its object, no period. A button that opens a dialog ends with "…". | Add field, New entity…, Publish…                                              |
@@ -71,6 +73,8 @@ accessible name that no visible heading explains, such as an input's `aria-label
 noun.
 
 ## Placeholders and numbers
+
+A text that holds a value reads as a whole sentence in every locale.
 
 - Keep every placeholder, such as `{count}` or `{entity}`, in every locale, and move it to where the language puts it.
 - A word Axis defines that a placeholder puts in a sentence, such as a type's or a kind's name, follows the sentence's
@@ -95,6 +99,8 @@ The glossary and this page are conventions. They hold by being followed when a t
 glossary says which word to use for a concept, and lists no words to avoid, as no list of wrong words is ever complete.
 
 ## English
+
+These rules add to the principles for the `en` texts.
 
 - Plain international English, with British spelling where it differs: "behaviour", "licence" for the noun.
 - Address the person as "you" only when a sentence needs a subject; most texts need none.
@@ -161,6 +167,8 @@ key in `tests/Axis.Server.Tests/TextCatalogBaseline.json`. That list only goes d
 from it, and a new break fails.
 
 ## Changing a text
+
+A change to a platform text takes these steps:
 
 1. Read the key's place on the screen and its purpose, then write every locale of the change from that purpose.
 2. A concept with no term yet, or a term to change, is added to the glossary as `proposed` in the same change, for the
