@@ -1,16 +1,18 @@
 import { ExpandAltOutlined } from '@ant-design/icons'
 import {
   autocompletion,
+  startCompletion,
   type Completion,
   type CompletionContext,
   type CompletionResult,
+  type CompletionSection,
 } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { Flex, Input, Modal, Typography } from 'antd'
+import { Flex, Input, Modal, Segmented, Tag, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { dialogWidth } from '../platform/dialogButtons'
@@ -18,7 +20,16 @@ import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
 import { useText } from '../platform/texts'
 import type { designTokensFor } from '../platform/designTokens'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
-import { expressionFunctionGroups, signatureOf, type ExpressionFunction } from './expressionFunctions'
+import {
+  expressionFunctionGroups,
+  expressionOperatorGroups,
+  expressionOperators,
+  givesType,
+  operatorSymbol,
+  signatureOf,
+  type ExpressionFunction,
+  type ExpressionOperator,
+} from './expressionFunctions'
 import { expressionLanguage } from './expressionLanguage'
 import type { ScopeOption } from './expressionScope'
 import { useTextOfKey } from './useTextOfKey'
@@ -91,6 +102,7 @@ export default function ExpressionEditor(props: ExpressionEditorProps) {
     value,
     describe,
     t,
+    expects,
     theme: editorTheme(tokens, mode, expanded),
     themeCompartment,
   })
@@ -103,6 +115,7 @@ export default function ExpressionEditor(props: ExpressionEditorProps) {
       value,
       describe,
       t,
+      expects,
       theme: editorTheme(tokens, mode, expanded),
       themeCompartment,
     }
@@ -133,8 +146,7 @@ export default function ExpressionEditor(props: ExpressionEditorProps) {
     }
 
     const initial = latest.current
-    const complete = (context: CompletionContext) =>
-      completeAt(context, latest.current.options, latest.current.describe, latest.current.t)
+    const complete = (context: CompletionContext) => completeAt(context, latest.current)
     const view = new EditorView({
       parent: hostRef.current!,
       state: EditorState.create({
@@ -160,6 +172,17 @@ export default function ExpressionEditor(props: ExpressionEditorProps) {
             if (!update.transactions.some((transaction) => transaction.annotation(external))) {
               const text = update.state.doc.toString()
               latest.current.onChange(path, text === '' && !latest.current.required ? undefined : text)
+              // Proposed: a space after a value opens the operators it takes, and a quote after an enum field its
+              // values, as an author needs them there and does not know their names yet.
+              const head = update.state.selection.main.head
+              const before = update.state.sliceDoc(0, head)
+              if (
+                update.transactions.some((transaction) => transaction.isUserEvent('input.type')) &&
+                ((before.endsWith(' ') && operandTypeBefore(before, latest.current.options) !== undefined) ||
+                  (before.endsWith("'") && openQuoteAt(before) === head - 1))
+              ) {
+                queueMicrotask(() => startCompletion(update.view))
+              }
             }
             timer = setTimeout(() => check(update.view), checkDelay)
           }),
@@ -191,15 +214,17 @@ export default function ExpressionEditor(props: ExpressionEditorProps) {
     }
   }, [value])
 
-  /** Puts a name at the cursor, in place of the selection, and gives the editor back its focus. */
-  function insert(option: ScopeOption) {
+  /** Puts text at the cursor, in place of the selection, the cursor `back` before its end, and gives back the focus. */
+  function insert(text: string, back = 0) {
     const view = viewRef.current
     if (!view) {
       return
     }
     const { from, to } = view.state.selection.main
-    const cursor = from + option.label.length - (option.cursorInside ? 1 : 0)
-    view.dispatch({ changes: { from, to, insert: option.label }, selection: { anchor: cursor } })
+    // A word goes after what is there with a space between them, as an author would type it.
+    const previous = view.state.sliceDoc(Math.max(from - 1, 0), from)
+    const spaced = previous !== '' && /[^\s(]/.test(previous) && /^[A-Za-z=!<>+*/-]/.test(text) ? ` ${text}` : text
+    view.dispatch({ changes: { from, to, insert: spaced }, selection: { anchor: from + spaced.length - back } })
     view.focus()
   }
 
@@ -325,9 +350,10 @@ function SignatureLine({ call }: { call: CallAt }) {
 }
 
 /**
- * Proposed: every name an expression may use here, in groups: the fields, with their labels and types, the rules, and
- * the functions by what they work on, each with what it does and an example. A search narrows them by name, label or
- * words, and a click inserts the name at the cursor.
+ * Proposed: everything an expression may use here, in three tabs: Fields, with their labels and types, and the rules;
+ * Operators, the comparisons, empty or not, And, Or and Not, the list test, arithmetic and the values; and Functions, by
+ * what they work on. Each one says what it does, with an example. A search looks in every tab, and a click inserts it
+ * at the cursor.
  */
 function ExpressionPanel({
   options,
@@ -336,36 +362,75 @@ function ExpressionPanel({
 }: {
   options: ScopeOption[]
   describe: (option: ScopeOption) => { detail: string; info: string | null }
-  onInsert: (option: ScopeOption) => void
+  onInsert: (text: string, back?: number) => void
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
+  const [tab, setTab] = useState<'fields' | 'operators' | 'functions'>('fields')
   const [search, setSearch] = useState('')
   const needle = search.trim().toLowerCase()
-  const shown = options.filter((option) => {
-    if (needle === '') {
-      return true
-    }
+  const item = (option: ScopeOption): PanelItem => {
     const { detail, info } = describe(option)
-    return `${option.label} ${detail} ${info ?? ''}`.toLowerCase().includes(needle)
+    return {
+      key: option.label,
+      code: option.label,
+      detail,
+      info,
+      example: option.fn?.example ?? null,
+      insert: () => onInsert(option.label, option.cursorInside ? 1 : 0),
+    }
+  }
+  const operatorItem = (operator: ExpressionOperator): PanelItem => ({
+    key: operator.id,
+    code: operatorLabel(operator),
+    detail: t(`shell.studio.expression.op.${operator.id}`),
+    info: null,
+    example: operator.example,
+    insert: () => onInsert(operator.insert, operator.cursorBack ?? 0),
   })
-  const groups: { key: string; title: string; items: ScopeOption[] }[] = [
+  const groups: { tab: typeof tab; title: string; items: PanelItem[] }[] = [
     {
-      key: 'fields',
+      tab: 'fields' as const,
       title: t('shell.studio.expression.group.fields'),
-      items: shown.filter((option) => option.type === 'field' || option.type === 'parameter'),
+      items: options.filter((option) => option.type === 'field' || option.type === 'parameter').map(item),
     },
     {
-      key: 'rules',
+      tab: 'fields' as const,
       title: t('shell.studio.expression.group.rules'),
-      items: shown.filter((option) => option.type === 'rule'),
+      items: options.filter((option) => option.type === 'rule').map(item),
     },
-    ...expressionFunctionGroups.map((group) => ({
-      key: group,
-      title: t(`shell.studio.expression.group.${group}`),
-      items: shown.filter((option) => option.fn?.group === group),
+    ...expressionOperatorGroups.map((group) => ({
+      tab: 'operators' as const,
+      title: t(`shell.studio.expression.opGroup.${group}`),
+      items: expressionOperators.filter((operator) => operator.group === group).map(operatorItem),
     })),
-  ].filter((group) => group.items.length > 0)
+    ...expressionFunctionGroups.map((group) => ({
+      tab: 'functions' as const,
+      title: t(`shell.studio.expression.group.${group}`),
+      items: options.filter((option) => option.fn?.group === group).map(item),
+    })),
+  ]
+  // Proposed: a search looks in every tab and lists what it finds in one list, best first: a name or symbol that starts
+  // with the words, then one that holds them, then one whose words hold them. Without a search, the chosen tab shows.
+  const shown =
+    needle === ''
+      ? groups.filter((group) => group.tab === tab && group.items.length > 0)
+      : [
+          {
+            tab,
+            title: t('shell.studio.expression.results'),
+            items: groups
+              .flatMap((group) =>
+                group.items.map((entry) => ({
+                  entry: { ...entry, group: group.title },
+                  score: matchScore(entry, needle),
+                })),
+              )
+              .filter((found) => found.score < 3)
+              .sort((a, b) => a.score - b.score)
+              .map((found) => found.entry),
+          },
+        ].filter((group) => group.items.length > 0)
 
   return (
     <Flex vertical gap={spacing.sm} data-testid="studio-expression-panel">
@@ -376,43 +441,100 @@ function ExpressionPanel({
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
+      {needle === '' && (
+        <Segmented
+          block
+          value={tab}
+          onChange={(next) => setTab(next as typeof tab)}
+          options={(['fields', 'operators', 'functions'] as const).map((value) => ({
+            value,
+            label: t(`shell.studio.expression.tab.${value}`),
+          }))}
+        />
+      )}
       <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-        {groups.map((group) => (
-          <section key={group.key} style={{ marginBottom: spacing.sm }}>
+        {shown.length === 0 && (
+          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.expression.none')}</Typography.Text>
+        )}
+        {shown.map((group) => (
+          <section key={`${group.tab}-${group.title}`} style={{ marginBottom: spacing.sm }}>
             <Typography.Text strong style={{ display: 'block', marginBottom: 4 }}>
               {group.title}
             </Typography.Text>
-            {group.items.map((option) => {
-              const { detail, info } = describe(option)
-              return (
-                <AxisButton
-                  key={option.label}
-                  role="plain"
-                  onClick={() => onInsert(option)}
-                  data-testid={`studio-expression-insert-${option.label}`}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    height: 'auto',
-                    textAlign: 'start',
-                    whiteSpace: 'normal',
-                    padding: `4px ${spacing.xs}px`,
-                  }}
-                >
-                  <code>{option.label}</code>
-                  <span style={{ display: 'block', fontSize: 12, color: colour.textMuted }}>{detail}</span>
-                  {info && <span style={{ display: 'block', fontSize: 12, color: colour.textMuted }}>{info}</span>}
-                  {option.fn && (
-                    <code style={{ display: 'block', fontSize: 12, color: colour.textMuted }}>{option.fn.example}</code>
-                  )}
-                </AxisButton>
-              )
-            })}
+            {group.items.map((entry) => (
+              <AxisButton
+                key={entry.key}
+                role="plain"
+                onClick={entry.insert}
+                data-testid={`studio-expression-insert-${entry.key}`}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  height: 'auto',
+                  textAlign: 'start',
+                  whiteSpace: 'normal',
+                  padding: `4px ${spacing.xs}px`,
+                }}
+              >
+                <Flex gap={spacing.xs} align="baseline" wrap>
+                  <code>{entry.code}</code>
+                  <span style={{ fontSize: 12, color: colour.textMuted }}>{entry.detail}</span>
+                  {entry.group && <Tag style={{ marginInlineStart: 'auto' }}>{entry.group}</Tag>}
+                </Flex>
+                {entry.info && (
+                  <span style={{ display: 'block', fontSize: 12, color: colour.textMuted }}>{entry.info}</span>
+                )}
+                {entry.example && (
+                  <code style={{ display: 'block', fontSize: 12, color: colour.textMuted }}>{entry.example}</code>
+                )}
+              </AxisButton>
+            ))}
           </section>
         ))}
       </div>
     </Flex>
   )
+}
+
+/** One thing the panel offers: what it reads as, what it is, and what a click inserts. */
+interface PanelItem {
+  key: string
+  /** The group a search result comes from. */
+  group?: string
+  code: string
+  detail: string
+  info: string | null
+  example: string | null
+  insert: () => void
+}
+
+/** How well an entry matches a search: -1 its name is it, 0 its name starts with it, 1 its name holds it, 2 its words do, 3 not at all. */
+function matchScore(entry: PanelItem, needle: string): number {
+  const code = entry.code.toLowerCase()
+  if (code === needle || code.replace(/\(\)$/, '') === needle) {
+    return -1
+  }
+  if (code.startsWith(needle)) {
+    return 0
+  }
+  if (code.includes(needle)) {
+    return 1
+  }
+  return `${entry.detail} ${entry.info ?? ''} ${entry.example ?? ''}`.toLowerCase().includes(needle) ? 2 : 3
+}
+
+/** How an operator reads in a list: its symbol or words, a text as `'text'` and a date as `date('…')`. */
+function operatorLabel(operator: ExpressionOperator): string {
+  if (operator.id === 'text') {
+    return "'text'"
+  }
+  if (operator.id === 'dateValue') {
+    return "date('yyyy-mm-dd')"
+  }
+  if (operator.id === 'in') {
+    return 'in (…)'
+  }
+  return operatorSymbol(operator)
 }
 
 /**
@@ -435,30 +557,127 @@ function completionDetail(
   }
 }
 
-/** Completes the word before the cursor, or opens the list at the cursor when Ctrl+Space asks for it. */
-function completeAt(
-  context: CompletionContext,
-  options: ScopeOption[],
-  describe: (option: ScopeOption) => { detail: string; info: string | null },
-  t: (key: string) => string,
-): CompletionResult | null {
+/** What completion reads from the editor: the scope of the place, how to describe a choice, the texts and the type. */
+interface CompletionScope {
+  options: ScopeOption[]
+  describe: (option: ScopeOption) => { detail: string; info: string | null }
+  t: (key: string) => string
+  expects?: string
+}
+
+const sections = (t: (key: string) => string) => {
+  const section = (name: string, rank: number): CompletionSection => ({ name, rank })
+  return {
+    fields: section(t('shell.studio.expression.group.fields'), 1),
+    values: section(t('shell.studio.expression.opGroup.value'), 2),
+    logic: section(t('shell.studio.expression.opGroup.logic'), 3),
+    rules: section(t('shell.studio.expression.group.rules'), 4),
+    functions: section(t('shell.studio.expression.tab.functions'), 5),
+    operators: section(t('shell.studio.expression.tab.operators'), 1),
+  }
+}
+
+/**
+ * Proposed: completion that knows where the cursor stands. After a value it offers the operators that value's type
+ * takes, then And and Or; inside quotes after an enum field, that field's values; elsewhere the fields, the values, Not,
+ * the rules and the functions, those that give the type the place needs first. It opens on a word, on Ctrl+Space, and by
+ * itself after a space that follows a value or a quote that follows an enum field.
+ */
+function completeAt(context: CompletionContext, scope: CompletionScope): CompletionResult | null {
+  const before = context.state.sliceDoc(0, context.pos)
+  const quote = openQuoteAt(before)
+  if (quote !== -1) {
+    const field = enumFieldBefore(before.slice(0, quote), scope.options)
+    if (!field?.values?.length) {
+      return null
+    }
+    return {
+      from: quote + 1,
+      validFor: /^[^']*$/,
+      options: field.values.map((value, index) => ({
+        label: value,
+        boost: -index,
+        type: 'enum',
+        detail: scope.describe(field).detail,
+        apply: (view, _completion, from, to) => {
+          const closed = view.state.sliceDoc(to, to + 1) === "'"
+          const insert = closed ? value : `${value}'`
+          view.dispatch({
+            changes: { from, to, insert },
+            selection: { anchor: from + insert.length + (closed ? 1 : 0) },
+          })
+        },
+      })),
+    }
+  }
   const word = context.matchBefore(/[A-Za-z][A-Za-z0-9-]*(:[A-Za-z0-9]*)?/)
   if (!word && !context.explicit) {
     return null
   }
-  return { from: word?.from ?? context.pos, options: options.map((option) => toCompletion(option, describe, t)) }
+  const from = word?.from ?? context.pos
+  const named = sections(scope.t)
+  const prefix = context.state.sliceDoc(0, from)
+  const operand = operandTypeBefore(prefix, scope.options)
+  if (operand !== undefined) {
+    // A clause that already compares, such as `total is null`, goes on with And or Or alone.
+    const complete = clauseCompares(prefix)
+    return {
+      from,
+      options: expressionOperators
+        .filter((operator) => operator.position === 'after')
+        .filter((operator) => !complete || operator.group === 'logic')
+        .filter((operator) => operand === 'any' || !operator.types || operator.types.includes(operand))
+        .map((operator, index) => operatorCompletion(operator, scope.t, named.operators, index)),
+    }
+  }
+  return {
+    from,
+    options: [
+      ...scope.options.map((option) => toCompletion(option, scope, named)),
+      ...expressionOperators
+        .filter((operator) => operator.position === 'operand')
+        .map((operator, index) =>
+          operatorCompletion(operator, scope.t, operator.group === 'logic' ? named.logic : named.values, index),
+        ),
+    ],
+  }
 }
 
-function toCompletion(
-  option: ScopeOption,
-  describe: (option: ScopeOption) => { detail: string; info: string | null },
+function operatorCompletion(
+  operator: ExpressionOperator,
   t: (key: string) => string,
+  section: CompletionSection,
+  index: number,
 ): Completion {
-  const { detail, info } = describe(option)
+  return {
+    label: operatorLabel(operator),
+    // Proposed: the list keeps the order of the language's words, the comparisons first, not the alphabet's.
+    boost: -index,
+    detail: t(`shell.studio.expression.op.${operator.id}`),
+    info: `${t('shell.studio.expression.example')} ${operator.example}`,
+    type: 'keyword',
+    section,
+    apply: (view, _completion, from, to) => {
+      view.dispatch({
+        changes: { from, to, insert: operator.insert },
+        selection: { anchor: from + operator.insert.length - (operator.cursorBack ?? 0) },
+      })
+    },
+  }
+}
+
+function toCompletion(option: ScopeOption, scope: CompletionScope, named: ReturnType<typeof sections>): Completion {
+  const { detail, info } = scope.describe(option)
+  const fits =
+    scope.expects !== undefined &&
+    (option.fn ? givesType(option.fn, scope.expects) : option.valueType === scope.expects)
   return {
     label: option.label,
     detail: option.fn ? undefined : detail,
     type: option.type === 'field' || option.type === 'parameter' ? 'variable' : 'function',
+    section: option.fn ? named.functions : option.type === 'rule' ? named.rules : named.fields,
+    // Proposed: what gives the type the place needs comes first.
+    boost: fits ? 10 : 0,
     // Proposed: a function's completion shows its signature, what it does and an example beside the list.
     info: option.fn
       ? () => {
@@ -468,7 +687,7 @@ function toCompletion(
           const words = document.createElement('div')
           words.textContent = info ?? ''
           const example = document.createElement('code')
-          example.textContent = `${t('shell.studio.expression.example')} ${option.fn!.example}`
+          example.textContent = `${scope.t('shell.studio.expression.example')} ${option.fn!.example}`
           box.append(signature, words, example)
           box.style.display = 'grid'
           box.style.gap = '4px'
@@ -481,6 +700,72 @@ function toCompletion(
       view.dispatch({ changes: { from, to, insert: completion.label }, selection: { anchor: cursor } })
     },
   }
+}
+
+/**
+ * The type of the value the text ends with, when it ends with one, so an operator may follow: a field's type, `text`
+ * after a closing quote, `decimal` after a number, `boolean` after true or false, and `any` after a bracket or a name it
+ * does not know. Undefined when a value is to start: at the start, after an operator, a bracket or a comma, or after
+ * And, Or, Not, Is or In.
+ */
+function operandTypeBefore(text: string, options: ScopeOption[]): string | undefined {
+  const trimmed = text.replace(/\s+$/, '')
+  if (trimmed === '') {
+    return undefined
+  }
+  if (trimmed.endsWith(')')) {
+    return 'any'
+  }
+  if (trimmed.endsWith("'") && openQuoteAt(trimmed) === -1) {
+    return 'text'
+  }
+  if (/\d$/.test(trimmed) && !/[A-Za-z][A-Za-z0-9]*$/.test(trimmed)) {
+    return 'decimal'
+  }
+  const name = /([A-Za-z][A-Za-z0-9]*)$/.exec(trimmed)?.[1]
+  if (name === undefined) {
+    return undefined
+  }
+  const lower = name.toLowerCase()
+  if (['and', 'or', 'not', 'is', 'in'].includes(lower)) {
+    return undefined
+  }
+  if (lower === 'true' || lower === 'false') {
+    return 'boolean'
+  }
+  if (lower === 'null') {
+    return 'any'
+  }
+  return options.find((option) => option.label.toLowerCase() === lower)?.valueType ?? 'any'
+}
+
+/**
+ * Whether the clause the text ends in already compares: after its last And, Or, Not or opening bracket it holds a
+ * comparison, `is null` or `in`. Text in quotes does not count.
+ */
+function clauseCompares(text: string): boolean {
+  const plain = text.replace(/'[^']*'/g, "''")
+  const clause = plain.split(/\b(?:and|or|not)\b|\(/i).pop() ?? ''
+  return /(==|!=|<=|>=|<|>|\bis\b|\bin\b)/i.test(clause)
+}
+
+/** Where the quote the text is inside opens, or -1 when the text is not inside quotes. Two quotes are one quote. */
+function openQuoteAt(text: string): number {
+  let open = -1
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] === "'") {
+      open = open === -1 ? index : -1
+    }
+  }
+  return open
+}
+
+/** The enum field a text value is compared with: `field ==`, `field !=` or `field in (` with values before it. */
+function enumFieldBefore(text: string, options: ScopeOption[]): ScopeOption | undefined {
+  const name =
+    /([A-Za-z][A-Za-z0-9]*)\s*(==|!=)\s*$/.exec(text)?.[1] ??
+    /([A-Za-z][A-Za-z0-9]*)\s+in\s*\((\s*'[^']*'\s*,)*\s*$/i.exec(text)?.[1]
+  return name === undefined ? undefined : options.find((option) => option.label.toLowerCase() === name.toLowerCase())
 }
 
 /**

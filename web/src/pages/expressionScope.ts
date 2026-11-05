@@ -19,6 +19,10 @@ export interface ScopeOption {
   detail?: string
   labelKey?: string | null
   fn?: ExpressionFunction
+  /** Proposed: a field's or a parameter's type, so completion offers the operators it takes. */
+  valueType?: string
+  /** Proposed: an enum field's values, which completion offers inside quotes after it. */
+  values?: readonly string[]
 }
 
 /**
@@ -112,7 +116,14 @@ function parameterOptions(kind: string, draft: Record<string, unknown>, pointer:
     (kind === 'dataSource' && pointer === '/filter') ||
     // A process without a subject has parameters in place of an entity.
     (kind === 'process' && !hasEntity(draft))
-  return offered ? namesOf(draft.parameters).map((name) => option(name, 'parameter', false)) : []
+  if (!offered || !Array.isArray(draft.parameters)) {
+    return []
+  }
+  return draft.parameters.flatMap((parameter) => {
+    const name = stringProperty(parameter, 'name')
+    const type = stringProperty(parameter, 'type')
+    return name === undefined ? [] : [{ ...option(name, 'parameter', false), detail: type, valueType: type }]
+  })
 }
 
 function hasEntity(draft: Record<string, unknown>): boolean {
@@ -135,7 +146,18 @@ function fieldOptions(
       const label = isRecord(field) && isRecord(field.label) ? stringProperty(field.label, 'textKey') : undefined
       return name === undefined
         ? []
-        : [{ ...option(name, 'field', false), detail: stringProperty(field, 'type'), labelKey: label ?? null }]
+        : [
+            {
+              ...option(name, 'field', false),
+              detail: stringProperty(field, 'type'),
+              valueType: stringProperty(field, 'type'),
+              values:
+                isRecord(field) && Array.isArray(field.values)
+                  ? field.values.filter((v): v is string => typeof v === 'string')
+                  : undefined,
+              labelKey: label ?? null,
+            },
+          ]
     })
   }
   const entity = (kind === 'process' ? itemEntity(draft, pointer, names) : undefined) ?? entityOf(kind, draft, pointer)
@@ -154,6 +176,8 @@ function fieldOptions(
       .map((field) => ({
         ...option(field.name, 'field', false),
         detail: field.type,
+        valueType: field.type,
+        values: field.values ?? undefined,
         labelKey: field.labelKey ?? null,
       })),
   ]
@@ -253,13 +277,6 @@ function ruleOption(rule: {
 
 function option(label: string, type: ScopeOption['type'], cursorInside: boolean): ScopeOption {
   return { label, type, cursorInside }
-}
-
-function namesOf(list: unknown): string[] {
-  if (!Array.isArray(list)) {
-    return []
-  }
-  return list.map((item) => stringProperty(item, 'name')).filter((name): name is string => name !== undefined)
 }
 
 function stringProperty(value: unknown, key: string): string | undefined {

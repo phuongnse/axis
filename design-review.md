@@ -322,6 +322,23 @@ owner is reviewing it one step at a time.
   (AXC0086), `currentUser()` only in a policy grant's or a data source's filter (AXC0095).
 - **One wrapper:** `ExpressionField.tsx` holds `Expression`, which the entity designer and the process editor each had a
   copy of.
+- **Step 1 missed the language's own words.** The owner searched for `is`, `null` and `or` and found nothing: the
+  editor offered fields and functions as long lists of technical names, and none of the operators a condition is made of.
+  An expression is a formula that gives a value of a type, yes or no only one of them, so a condition builder alone would
+  serve half the places; the code editor stays the one way, made easy for both.
+- **The language's words, built:** `expressionOperators` in `expressionFunctions.ts` lists the comparisons, `is null` and
+  `is not null`, `and`, `or`, `not`, `in (…)`, the arithmetic and the values (`true`, `false`, `null`, `'text'`,
+  `date('…')`), each with what it does, `shell.studio.expression.op.<id>`, and an example. The panel has three tabs,
+  Fields, Operators and Functions, and a search looks in all three and lists what it finds best first: a name that is the
+  words, then one that starts with them, then one that holds them, then one whose description does.
+- **Completion knows where the cursor stands, built:** after a value it offers the operators that value's type takes, in
+  the language's order, the comparisons first, and after a clause that already compares, only `and` and `or`; inside
+  quotes after an enum field, that field's values in their order, closing the quote; elsewhere the fields, the values,
+  `not`, the rules and the functions, those that give the type the place needs first. It opens by itself after a space
+  that follows a value and after a quote that follows an enum field. `totalAmount is null or totalAmount > 0` is typed
+  with completion alone.
+- **Next, agreed:** a line that reads the expression back in words with labels, then starting points by the type the place
+  needs. A condition builder, a mode for simple yes-or-no expressions only, is to be weighed after.
 - **For the issue:** the server answers the scope of a place, its fields with labels and types, the functions allowed with
   their words, and the type it needs, from `ExpressionFunctions`, so the client keeps no list. The check takes the draft,
   as a rule not yet saved is answered 400 today ("The path holds no expression"). Step 2 previews the result on a sample

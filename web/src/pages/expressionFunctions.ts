@@ -167,3 +167,98 @@ export const aggregateFunctions = new Set(
 export function signatureOf(entry: ExpressionFunction): string {
   return `${entry.name}(${entry.parameters.join(', ')}) → ${entry.result}`
 }
+
+/**
+ * Proposed: the operators, keywords and values of the language, as its grammar has them, each with what it does and an
+ * example, in `shell.studio.expression.op.<id>`. `after` ones follow a value, such as `>` or `is null`, and `operand`
+ * ones start one, such as `not` or `true`. `types` are the value types an `after` one takes; with none it takes any.
+ * `insert` is what goes in, and `cursorBack` puts the cursor that far before its end, inside a bracket or quotes.
+ */
+export interface ExpressionOperator {
+  id: string
+  insert: string
+  cursorBack?: number
+  group: 'compare' | 'empty' | 'logic' | 'list' | 'math' | 'value'
+  position: 'after' | 'operand'
+  types?: readonly string[]
+  example: string
+}
+
+const numeric = ['integer', 'decimal', 'money']
+const ordered = [...numeric, 'date', 'date-time']
+const comparable = ['text', 'enum', 'boolean', 'reference', ...ordered]
+
+export const expressionOperators: readonly ExpressionOperator[] = [
+  {
+    id: 'equals',
+    insert: '== ',
+    group: 'compare',
+    position: 'after',
+    types: comparable,
+    example: "status == 'Approved'",
+  },
+  {
+    id: 'differs',
+    insert: '!= ',
+    group: 'compare',
+    position: 'after',
+    types: comparable,
+    example: "status != 'Draft'",
+  },
+  { id: 'greater', insert: '> ', group: 'compare', position: 'after', types: ordered, example: 'totalAmount > 0' },
+  { id: 'atLeast', insert: '>= ', group: 'compare', position: 'after', types: ordered, example: 'quantity >= 1' },
+  { id: 'less', insert: '< ', group: 'compare', position: 'after', types: ordered, example: 'startDate < endDate' },
+  { id: 'atMost', insert: '<= ', group: 'compare', position: 'after', types: ordered, example: 'discount <= 50' },
+  { id: 'isNull', insert: 'is null', group: 'empty', position: 'after', example: 'totalAmount is null' },
+  { id: 'isNotNull', insert: 'is not null', group: 'empty', position: 'after', example: 'approvedAt is not null' },
+  {
+    id: 'in',
+    insert: 'in ()',
+    cursorBack: 1,
+    group: 'list',
+    position: 'after',
+    types: ['text', 'enum', ...ordered],
+    example: "status in ('Draft', 'Submitted')",
+  },
+  { id: 'and', insert: 'and ', group: 'logic', position: 'after', example: 'quantity > 0 and unitPrice > 0' },
+  { id: 'or', insert: 'or ', group: 'logic', position: 'after', example: 'totalAmount is null or totalAmount > 0' },
+  { id: 'not', insert: 'not ', group: 'logic', position: 'operand', example: "not (status == 'Closed')" },
+  { id: 'plus', insert: '+ ', group: 'math', position: 'after', types: numeric, example: 'subtotal + tax' },
+  { id: 'minus', insert: '- ', group: 'math', position: 'after', types: numeric, example: 'total - discount' },
+  { id: 'times', insert: '* ', group: 'math', position: 'after', types: numeric, example: 'quantity * unitPrice' },
+  { id: 'divide', insert: '/ ', group: 'math', position: 'after', types: numeric, example: 'total / quantity' },
+  { id: 'true', insert: 'true', group: 'value', position: 'operand', example: 'urgent == true' },
+  { id: 'false', insert: 'false', group: 'value', position: 'operand', example: 'archived == false' },
+  { id: 'null', insert: 'null', group: 'value', position: 'operand', example: 'coalesce(discount, null)' },
+  { id: 'text', insert: "''", cursorBack: 1, group: 'value', position: 'operand', example: "title == 'Laptop'" },
+  {
+    id: 'dateValue',
+    insert: "date('')",
+    cursorBack: 2,
+    group: 'value',
+    position: 'operand',
+    example: "startDate >= date('2026-01-01')",
+  },
+]
+
+/** The operator groups in the order the panel shows them. */
+export const expressionOperatorGroups = ['compare', 'empty', 'logic', 'list', 'math', 'value'] as const
+
+/** The symbol or words an operator reads as, without the space or brackets it inserts. */
+export function operatorSymbol(operator: ExpressionOperator): string {
+  return operator.insert.replace(/ $/, '')
+}
+
+/** Whether a function's result is the type a place needs, so completion lists it first. */
+export function givesType(entry: ExpressionFunction, type: string | undefined): boolean {
+  if (type === undefined) {
+    return false
+  }
+  if (entry.result === type) {
+    return true
+  }
+  return (
+    numeric.includes(type) &&
+    (entry.result === 'integer' || entry.result === 'decimal' || entry.result.startsWith('type of'))
+  )
+}
