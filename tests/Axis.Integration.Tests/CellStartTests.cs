@@ -188,7 +188,9 @@ public sealed class CellStartTests(PostgreSqlFixture database) : IClassFixture<P
         });
         builder.Configuration.AddInMemoryCollection(settings.Select(setting => new KeyValuePair<string, string?>(setting.Key, setting.Value)));
         builder.Services.AddAxisWorker(builder.Configuration, new HostingEnvironment { EnvironmentName = Environments.Development });
-        return builder.Build();
+        var app = builder.Build();
+        app.MapWorkerHealth();
+        return app;
     }
 
     // The tenant stays on the class database. Only the platform database is a separate one.

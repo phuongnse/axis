@@ -1,6 +1,6 @@
 # Values for the lint, the schema check and the render tests. They name every
 # Secret (the admin connection too), the server, identity and PgBouncer certificates, the identity host and every volume (the templates too), run two server replicas, turn Studio and its test controls on, name the
-# scenario connection Secret, name one proxy and one network and set every cell value, turn the wildcard certificate and PgBouncer on, and set the backup storage with its Secrets, so the checks cover every branch of the templates.
+# scenario connection Secret, name one proxy and one network and set every cell value, turn the wildcard certificate (with the HTTP-01 ingress class of the tenant hosts) and PgBouncer on, and set the backup storage with its Secrets, so the checks cover every branch of the templates.
 server:
   replicas: 2
 studio:
@@ -90,6 +90,8 @@ cell:
       dns01:
         tokenSecret:
           name: axis-dns
+    http01:
+      ingressClassName: nginx
   pgbouncer:
     enabled: true
     databaseHost: db.internal.example.com

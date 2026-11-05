@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
 namespace Axis.Admin;
@@ -34,6 +35,8 @@ internal static partial class AdminCommands
     public const string InlineRecomputeLimitSetting = "Activation:InlineRecomputeLimit";
 
     public const string HostCheckIntervalSetting = "Cell:HostCheckInterval";
+
+    public const string HostCertificateIssuerSetting = "Cell:HostCertificateIssuer";
 
     public static readonly TimeSpan DefaultHostCheckInterval = TimeSpan.FromMinutes(10);
 
@@ -120,7 +123,7 @@ internal static partial class AdminCommands
         CancellationToken cancellationToken) =>
         RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, null, cancellationToken);
 
-    // The publisher lease, the test limit, the identity provider handler and the DNS resolver are parameters so that tests can use short ones and a stub.
+    // The publisher lease, the test limit, the identity provider handler, the DNS resolver and the certificate writer are parameters so that tests can use short ones and a stub.
     // The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
@@ -132,7 +135,8 @@ internal static partial class AdminCommands
         TimeSpan publisherTestLimit,
         HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken,
-        IDnsTxtResolver? dnsResolver = null)
+        IDnsTxtResolver? dnsResolver = null,
+        ICertificateWriter? certificateWriter = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -174,7 +178,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken, dnsResolver));
+        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken, dnsResolver, certificateWriter));
     }
 
     /// <summary>
@@ -211,7 +215,7 @@ internal static partial class AdminCommands
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
-        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CancellationToken)),
+        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CertificateWriter, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
 
@@ -1274,6 +1278,7 @@ internal static partial class AdminCommands
         TimeSpan testLimit,
         HttpMessageHandler? identityProviderHandler,
         IDnsTxtResolver? dnsResolver,
+        ICertificateWriter? certificateWriter,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -1295,7 +1300,7 @@ internal static partial class AdminCommands
         }
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, dnsResolver, cancellationToken)
+            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, cancellationToken)
             : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
@@ -1308,6 +1313,7 @@ internal static partial class AdminCommands
         TimeSpan testLimit,
         HttpMessageHandler? identityProviderHandler,
         IDnsTxtResolver? dnsResolver,
+        ICertificateWriter? certificateWriter,
         CancellationToken cancellationToken)
     {
         TimeSpan refreshInterval;
@@ -1338,15 +1344,59 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        using var http = IdentityProviderClient(identityProviderHandler);
-        var jobs = ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString);
+        // A blank issuer is no certificate. A set one needs the service account of the pod, so a publisher outside a cluster stops here.
+        var certificateIssuer = configuration[HostCertificateIssuerSetting]?.Trim();
+        ICertificateWriter? certificates = null;
+        if (!string.IsNullOrEmpty(certificateIssuer))
+        {
+            certificates = certificateWriter ?? KubernetesCertificateWriter.InCluster(certificateIssuer);
+            if (certificates is null)
+            {
+                error.WriteLine($"The setting {HostCertificateIssuerSetting} is set, but the publisher has no Kubernetes service account.");
+                return 2;
+            }
+        }
 
-        // The create job runs in a cell only: outside one, the provisioning API answers 404, so no create job is queued.
+        // The export takes a concurrentImports lease, so in a cell the publisher reads the same quota defaults as the server and the worker.
+        QuotaDefaults? quotas = null;
         if (cell.IsCell)
         {
+            try
+            {
+                quotas = QuotaDefaults.Load(configuration, cell);
+            }
+            catch (InvalidOperationException exception)
+            {
+                error.WriteLine(exception.Message);
+                return 2;
+            }
+        }
+
+        using var http = IdentityProviderClient(identityProviderHandler);
+        await using var leaseSource = NpgsqlDataSource.Create(settings.Platform.PlatformConnectionString);
+        var sensitive = new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(settings.Platform.PlatformConnectionString, settings.Platform.Cipher)));
+        var storage = CellBackupStorage.Read(configuration, CellBackupStorage.ExportSection, out var storageProblem);
+        var jobs = new Dictionary<string, IReadOnlyList<JobStep>>(ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString))
+        {
+            ["export"] = TenantExport.Steps(new TenantExportSettings(
+                settings.Platform.PlatformConnectionString,
+                settings.Platform.Cipher,
+                settings.Packages.Versions,
+                sensitive,
+                storage is null ? JobSetting<CellBackupStorage>.Missing(storageProblem!) : JobSetting<CellBackupStorage>.Of(storage),
+                new TenantLeases(leaseSource, NullLogger<TenantLeases>.Instance),
+                quotas)),
+        };
+
+        // The create and purge jobs run in a cell only: outside one, the provisioning API answers 404, so no create job is queued and no delete job
+        // sets delete_after.
+        if (cell.IsCell)
+        {
+            var createSettings = ReadCreateJobSettings(configuration, cell, settings);
             jobs = new Dictionary<string, IReadOnlyList<JobStep>>(jobs)
             {
-                ["create"] = CreateJob.Steps(ReadCreateJobSettings(configuration, cell, settings), http, output, error),
+                ["create"] = CreateJob.Steps(createSettings, http, output, error),
+                [PurgeJob.Kind] = PurgeJob.Steps(createSettings.Create, createSettings.ApplicationsPath, settings.Platform.PlatformConnectionString, settings.Platform.Cipher, http),
             };
         }
 
@@ -1354,7 +1404,7 @@ internal static partial class AdminCommands
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit, settings.ActivationTimeout),
             scenarioServer,
             new DirectoryPublisherTenants(settings.Platform, settings.Mail, refreshInterval, http),
-            new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(settings.Platform.PlatformConnectionString, settings.Platform.Cipher))),
+            sensitive,
             lease,
             testLimit,
             output,
@@ -1366,7 +1416,9 @@ internal static partial class AdminCommands
                 settings.Platform.Cipher,
                 http,
                 dnsResolver ?? new DnsClientTxtResolver(),
-                hostCheckInterval)).RunAsync();
+                hostCheckInterval,
+                certificates),
+            storage is null ? null : new TenantExportSweep(storage)).RunAsync();
     }
 
     // A blank setting is the default. A setting's own value is never echoed, so the message says only which setting is wrong.

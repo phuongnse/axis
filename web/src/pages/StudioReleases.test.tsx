@@ -33,6 +33,7 @@ function item(
 const history: StudioReleases = {
   active: { releaseId: 'r2', number: 2, contentHash: 'hash-2' },
   folderContentHash: null,
+  changes: null,
   items: [
     item('r2', 2, '2026-05-02T10:00:00Z', { actor: 'startup', note: 'Second note' }),
     item('r4', 4, '2026-05-04T10:00:00Z', { actor: 'unknown' }),
@@ -141,7 +142,7 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('shows an empty text without releases', () => {
-    renderList({ history: { active: null, folderContentHash: null, items: [] } })
+    renderList({ history: { active: null, folderContentHash: null, changes: null, items: [] } })
 
     expect(screen.getByText('No release yet.')).toBeInTheDocument()
   })

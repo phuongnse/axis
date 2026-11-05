@@ -189,7 +189,7 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         },
       })
       assert.equal(result.status, 0, result.stderr)
-      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 28)
+      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 40)
       assert.match(result.stderr, /Attempt 1 of 4 failed with status 22/)
       const schemas = join(home, '.cache', 'axis-tools', `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
       assert.deepEqual(readdirSync(schemas).sort(), [
@@ -197,7 +197,10 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         'cronjob-batch-v1.json',
         'deployment-apps-v1.json',
         'job-batch-v1.json',
+        'role-rbac-v1.json',
+        'rolebinding-rbac-v1.json',
         'service-v1.json',
+        'serviceaccount-v1.json',
       ])
       const crd = join(home, '.cache', 'axis-tools', `crd-schemas-${version('CRDS_CATALOG_COMMIT')}`)
       assert.deepEqual(readdirSync(join(crd, 'cert-manager.io')).sort(), ['certificate_v1.json', 'issuer_v1.json'])
@@ -249,7 +252,16 @@ describe('scripts/lib/tools.sh fetches the schema files that a cached folder lac
     assert.equal(result.status, 0, result.stderr)
     assert.equal(result.requested.length, 1)
     assert.match(result.requested[0], /\/v1\.33\.0-standalone-strict\/configmap-v1\.json$/)
-    assert.deepEqual(result.schemas, ['configmap-v1.json', 'cronjob-batch-v1.json', 'deployment-apps-v1.json', 'job-batch-v1.json', 'service-v1.json'])
+    assert.deepEqual(result.schemas, [
+      'configmap-v1.json',
+      'cronjob-batch-v1.json',
+      'deployment-apps-v1.json',
+      'job-batch-v1.json',
+      'role-rbac-v1.json',
+      'rolebinding-rbac-v1.json',
+      'service-v1.json',
+      'serviceaccount-v1.json',
+    ])
     assert.deepEqual(result.leftovers, [])
   })
 

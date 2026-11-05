@@ -12,8 +12,8 @@ import {
   fetchStudioResources,
   moduleResources,
   resourceTitle,
-  studioApplicationDescription,
-  studioApplicationTitle,
+  studioAppDescription,
+  studioAppTitle,
   ServerUnreachableError,
   type StudioApplication,
   type StudioDiagnostic,
@@ -74,8 +74,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * and its description in the UI locale (`en` as the fallback, then the name), under the page heading "Studio", with a
  * solid New application… button on its right. A tile opens its application, and a single application is not opened by itself.
  * Every page of an open application heads its content with one level-4 `StudioPageHeading`, and no page has a
- * breadcrumb. The Overview's heading is the application's title, with its description under it, and it shows no
- * resources. A kind's sidebar entry, as `&kind=<kind>`, shows that kind's list under a heading with its name, then the module group of that kind when modules hold one.
+ * breadcrumb. The Overview's heading is the application's title, with its description under it, then the blocks of
+ * `StudioOverview`. A kind's sidebar entry, as `&kind=<kind>`, shows that kind's list under a heading with its name, then the module group of that kind when modules hold one.
  * A resource opens alone in the content, under a heading with its name and, for a scenario, Run scenario on its right:
  * its details, its editor, and its Uses and Used by lists. The band under the header holds the application's state and
  * its actions. Its errors and warnings are one button that opens the Problems panel beside the page, which lists
@@ -428,7 +428,7 @@ function StudioWorkspace() {
   // Proposed: every page heads its content with what it is about: the Overview with the application's title, as it is
   // the application's own page, another sidebar entry with its name, such as Settings or Entities, and an open resource
   // with its label, with its file or its module on a muted line under it. The band holds no title.
-  let title = openApp ? studioApplicationTitle(openApp, locale) : application
+  let title = openApp ? studioAppTitle(openApp, locale) : application
   if (selected?.kind === 'application') {
     title = t('shell.studio.nav.settings')
   } else if (selected) {
@@ -507,7 +507,7 @@ function StudioWorkspace() {
             : selectedModuleItem
               ? `${t('shell.studio.module')}: ${selectedModuleItem.module}`
               : view.name === 'overview' && openApp
-                ? studioApplicationDescription(openApp, locale)
+                ? (studioAppDescription(openApp, locale) ?? undefined)
                 : undefined
         }
         titleExtra={openRelease ? <ReleaseTags release={openRelease} /> : undefined}
@@ -687,12 +687,14 @@ function StudioWorkspace() {
             ) : view.name === 'overview' ? (
               <StudioOverview
                 application={application}
-                locale={locale}
+                title={openApp ? studioAppTitle(openApp, locale) : application}
+                description={openApp ? studioAppDescription(openApp, locale) : null}
                 resources={loaded.resources}
-                releases={releases?.application === application ? releases.history : undefined}
+                moduleKinds={new Set(moduleGroups.map((group) => group.kind))}
+                history={releases?.application === application ? releases.history : undefined}
                 addressOf={(target) =>
                   'resource' in target
-                    ? `/studio?${new URLSearchParams({ app: application, resource: target.resource, ...(target.path ? { path: target.path } : {}) })}`
+                    ? studioResourceAddress(application, target.resource, target.path)
                     : studioAddress(application, target)
                 }
               />
@@ -753,7 +755,7 @@ function StudioApplicationTiles({ applications }: { applications: readonly Studi
   const { spacing } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const sorted = [...applications].sort((a, b) =>
-    studioApplicationTitle(a, locale).localeCompare(studioApplicationTitle(b, locale), locale),
+    studioAppTitle(a, locale).localeCompare(studioAppTitle(b, locale), locale),
   )
   return (
     <div
@@ -765,14 +767,14 @@ function StudioApplicationTiles({ applications }: { applications: readonly Studi
       }}
     >
       {sorted.map((app) => {
-        const title = studioApplicationTitle(app, locale)
+        const title = studioAppTitle(app, locale)
         return (
           <HomeTile
             key={app.name}
             to={`/studio?app=${encodeURIComponent(app.name)}`}
             mark={<SiteMark title={title} size={32} />}
             title={title}
-            description={studioApplicationDescription(app, locale)}
+            description={studioAppDescription(app, locale) ?? undefined}
           />
         )
       })}

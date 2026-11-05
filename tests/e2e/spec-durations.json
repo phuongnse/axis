@@ -1,5 +1,7 @@
 {
   "specs/account-sessions.spec.ts": 6,
+  "specs/approvals-data-business.spec.ts": 53,
+  "specs/approvals-module-business.spec.ts": 52,
   "specs/asset-import.spec.ts": 7,
   "specs/asset-management-journey.spec.ts": 253,
   "specs/asset-register.spec.ts": 5,

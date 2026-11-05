@@ -154,7 +154,7 @@ and a JSON view, and shows the diagnostics.
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **In a cell.** The publisher also reads this setting for the create job, which copies a template into the tenant's folder. When `Cell:Id` is set, each tenant's applications are under
+- **In a cell.** The publisher also reads this setting for the create job, which copies a template into the tenant's folder, and for the purge job, which deletes it. When `Cell:Id` is set, each tenant's applications are under
   `<Studio:ApplicationsPath>/<tenant id>/`, and Studio on a tenant's host reads, writes and creates
   only there. Studio creates the folder the first time it uses it. Another tenant's application, by
   name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
@@ -524,11 +524,11 @@ for `tenant create` and `tenant restore`. `migrate`, `tenant suspend`, `tenant r
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`, and the publisher reads it in a cell for the create job. Outside Development and Testing, every command refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`, and the publisher reads it in a cell for the create and purge jobs. Outside Development and Testing, every command refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 
 As an environment variable it is `Admin__ConnectionString`.
 
-`tenant create` of a main tenant also reads three settings for the identity provider, and so does the publisher in a cell, for the create job. See
+`tenant create` of a main tenant also reads three settings for the identity provider, and so does the publisher in a cell, for the create and purge jobs. See
 [administration](administration.md#settings) and [Axis's identity provider](identity-provider.md#keeping-the-realm-in-step).
 A preview tenant reads none of them.
 
@@ -628,11 +628,12 @@ The runtime database address is the exception. Only the server and the worker re
 not a whole number from 1 to 65535, or a port with no host, stops their start and the message names
 the setting. `Axis.Admin` and the publisher never read them, so a wrong value does not stop them.
 
-In a cell the server and the worker also read and check `Quotas:Defaults`. Each child must be a
+In a cell the server, the worker and the publisher also read and check `Quotas:Defaults`. Each child must be a
 [quota](tenant-quotas.md#quotas) key and its value a whole number of zero or more. An unknown key or a
 wrong value stops the start, and the message names the setting, never its value. A quota with no setting
-takes the default of the quotas table, and `authoringRequests` has none, which is no limit. `Axis.Admin`
-does not read `Quotas:Defaults` yet.
+takes the default of the quotas table, and `authoringRequests` has none, which is no limit. The publisher
+uses them for the limit of an export that a tenant has no row for, so give it the same settings as the server and the worker. The other `Axis.Admin`
+commands do not read `Quotas:Defaults`.
 
 | Setting | Read by | Meaning |
 | --- | --- | --- |
@@ -640,10 +641,11 @@ does not read `Quotas:Defaults` yet.
 | `Cell:Region` | All hosts | The region code, such as `vn`. |
 | `Cell:TenantDomain` | Server, publisher | The domain of the tenant subdomains, such as `vn.example.com`. |
 | `Cell:InternalDomain` | Admin, publisher | A domain no ingress serves, for scratch tenants of the restore check. `cell restore-check` stops with exit code `2` when it is blank. |
+| `Cell:HostCertificateIssuer` | Publisher | The name of the cert-manager `Issuer` that the publisher uses for the `Certificate` of a verified tenant host, see [hosts and certificates](cells.md#hosts-and-certificates). The chart sets it to `<release>-tenant-hosts` when `cell.certificate.enabled` is on. Blank, the default, writes no `Certificate`. A value with no Kubernetes service account in the pod stops the publisher with exit code `2`, and the message names the setting. |
 | `Cell:HostCheckInterval` | Publisher | How often the publisher checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS, `00:10:00` by default. Zero, a negative value or one that is not a time span stops the publisher with exit code `2`, and the message names the setting. |
 | `Cell:TenantCap` | Server | The measured number of tenants the cell holds, see [cell size](cells.md#cell-size). |
 | `Cell:ConsoleHost` | Server | The host of the [cell console](cell-console.md). |
-| `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
+| `Cell:ConsoleAllowedNetworks` | Server | Address ranges in CIDR notation, such as `10.0.0.0/8`, that may reach the console host. Any other address gets `403`. Empty allows every address. A range that is not CIDR stops the start in a cell, and the message names the setting. |
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
@@ -656,6 +658,11 @@ does not read `Quotas:Defaults` yet.
 | `Cell:BackupStorage:Bucket` | Admin | The bucket that receives `<tenant id>/<yyyy-mm-dd>.axisbak`. |
 | `Cell:BackupStorage:AccessKeyId` | Admin | The access key id of the service. |
 | `Cell:BackupStorage:SecretAccessKey` | Admin | The secret access key of the service. It is never printed. |
+| `Cell:ExportStorage:ServiceUrl` | Publisher, Server | The address of the S3-compatible service that the `export` job of the publisher uploads the ZIP of a [tenant export](tenant-lifecycle.md#exporting-a-tenant) to. Only the `export` job and the hourly sweep of the publisher, and the server's download of an export, read the five `Cell:ExportStorage` settings. The server streams the ZIP from this storage. When one is blank, the publisher still starts and runs its other jobs, and the `export` job fails with a message that names the setting. The server still starts and the download answers `503`. |
+| `Cell:ExportStorage:Region` | Publisher, Server | The signing region of that service. |
+| `Cell:ExportStorage:Bucket` | Publisher, Server | The bucket that receives `exports/<tenant id>/<job id>.zip`, stored with server-side encryption (`AES256`). |
+| `Cell:ExportStorage:AccessKeyId` | Publisher, Server | The access key id of the service. |
+| `Cell:ExportStorage:SecretAccessKey` | Publisher, Server | The secret access key of the service. It is never printed. |
 | `Cell:RuntimeDatabaseHost` | Server, worker | The address of every tenant's runtime database connection, such as PgBouncer, see [connections](cells.md#connections). Those connections also take `Maximum Pool Size=5`, `Minimum Pool Size=0`, `Connection Idle Lifetime=60` and `Max Auto Prepare=0`. Without it each connection uses the host of the tenant's directory row. The schema role, the publisher, the worker's `LISTEN` connection and the platform connections never use it. |
 | `Cell:RuntimeDatabasePort` | Server, worker | The port of that address. It defaults to the port of the tenant's directory row. Setting it without `Cell:RuntimeDatabaseHost` stops the start. |
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |

@@ -3,7 +3,7 @@ import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
 import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
-import { kindSingular } from './studioKinds'
+import { kindSingular, studioKinds } from './studioKinds'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
@@ -115,21 +115,14 @@ export interface StudioApplication {
   descriptions?: Record<string, string> | null
 }
 
-/** Proposed: the application's title in `locale`, else in its first locale, else its name. */
-/** The name `main` gives it, for the files of `main` that still use it. */
+/** The title of an application in `locale`, then in `en`, then its name, by `textIn`, as every label reads. */
 export function studioAppTitle(app: StudioApplication, locale: string): string {
-  return studioApplicationTitle(app, locale)
+  return textIn(app.titles, locale) ?? app.name
 }
 
-export function studioApplicationTitle(app: StudioApplication, locale: string): string {
-  const titles = app.titles ?? {}
-  return titles[locale] ?? Object.values(titles)[0] ?? app.name
-}
-
-/** Proposed: the application's description in `locale`, else in its first locale, or undefined. */
-export function studioApplicationDescription(app: StudioApplication, locale: string): string | undefined {
-  const descriptions = app.descriptions ?? {}
-  return descriptions[locale] ?? Object.values(descriptions)[0]
+/** The description of an application in `locale`, then in `en`, or null when it has none. */
+export function studioAppDescription(app: StudioApplication, locale: string): string | null {
+  return textIn(app.descriptions, locale) ?? null
 }
 
 /**
@@ -1096,26 +1089,24 @@ export interface StudioReleaseItem {
 
 /**
  * The release history of `GET /api/studio/apps/{application}/releases`. `folderContentHash` is `null` when the folder
- * has errors, so it does not compile.
+ * has errors, so it does not compile. `changes` lists the files that differ from the live release, and is `null` when
+ * no release is live.
  */
 export interface StudioReleases {
   active: { releaseId: string; number: number; contentHash: string } | null
   folderContentHash: string | null
   items: StudioReleaseItem[]
-  /**
-   * Proposed: the files of the folder that differ from the live release, by path. A removed file, which the folder no
-   * longer holds, also has its kind, name, label in each locale and a text resource's locale, from the live release.
-   */
-  changes?:
-    | {
-        path: string
-        change: 'added' | 'changed' | 'removed'
-        kind?: string | null
-        name?: string | null
-        titles?: Record<string, string> | null
-        locale?: string | null
-      }[]
-    | null
+  changes: StudioReleaseChange[] | null
+}
+
+/** A file that differs from the live release. The other fields are set for a removed file only. */
+export interface StudioReleaseChange {
+  path: string
+  change: 'added' | 'changed' | 'removed'
+  kind: string | null
+  name: string | null
+  titles: Record<string, string> | null
+  locale: string | null
 }
 
 /**
@@ -1414,6 +1405,65 @@ export function folderDiffers(history: StudioReleases): boolean {
     history.folderContentHash !== null &&
     history.folderContentHash !== history.active.contentHash
   )
+}
+
+/** A row of the change list: its name, its kind when it has one, and the resource it opens, which a removed file lacks. */
+export interface StudioChangeRow {
+  key: string
+  name: string
+  kind: string | null
+  change: StudioReleaseChange['change']
+  resourceId: string | null
+}
+
+/**
+ * The rows of the change list, in the sidebar's kind order and then by name. The manifest is named Settings and comes
+ * first. A file the folder list lacks, or a removed file of a kind Studio does not name, is named by its path.
+ */
+export function changeRows(
+  changes: readonly StudioReleaseChange[],
+  items: readonly StudioResourceItem[],
+  locale: string,
+  t: (key: string) => string,
+): StudioChangeRow[] {
+  return changes
+    .map((change) => changeRow(change, items, locale, t))
+    .sort((left, right) => left.order - right.order || left.row.name.localeCompare(right.row.name, locale))
+    .map(({ row }) => row)
+}
+
+function changeRow(
+  change: StudioReleaseChange,
+  items: readonly StudioResourceItem[],
+  locale: string,
+  t: (key: string) => string,
+): { order: number; row: StudioChangeRow } {
+  const key = `${change.change}:${change.path}`
+  const item = change.change === 'removed' ? undefined : items.find((candidate) => candidate.file === change.path)
+  const kind = item?.kind ?? change.kind
+  const resourceId = item?.id ?? null
+  if (kind === 'application') {
+    return {
+      order: -1,
+      row: { key, name: t('shell.studio.nav.settings'), kind: null, change: change.change, resourceId },
+    }
+  }
+  const index = studioKinds.findIndex((entry) => entry.kind === kind)
+  const order = index === -1 ? studioKinds.length : index
+  if (kind === null) {
+    return { order, row: { key, name: change.path, kind: null, change: change.change, resourceId: null } }
+  }
+  const titled: StudioResourceItem = item ?? {
+    id: '',
+    kind,
+    name: change.name,
+    file: change.path,
+    version: '',
+    usedBy: 0,
+    titles: change.titles ?? {},
+    locale: change.locale,
+  }
+  return { order, row: { key, name: resourceTitle(titled, locale, t), kind, change: change.change, resourceId } }
 }
 
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */

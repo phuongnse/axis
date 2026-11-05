@@ -42,7 +42,8 @@ export interface StudioPublishingHandle {
  * band holds the `newResource` button, Validate, Preview, Run tests and Publish. On its left it shows the application's
  * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the `problems`
  * panel beside the page, then the release state, and `bandState` after it. The request status, test results and
- * preview links show at the top of the content, under the band, then `children`, then the release list. The release
+ * preview links show at the top of the content, under the band, then `children`, which is called with the release history
+ * when it is a function, then the release list. The release
  * list keeps its own title unless `releasesView`, where the page's heading names it. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the

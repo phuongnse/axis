@@ -168,6 +168,44 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Create_with_the_id_of_a_deleted_tenant_exits_2_at_the_entry_step_and_creates_nothing()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        await scenario.AddTombstoneAsync(id, 200);
+        var before = await scenario.SnapshotAsync();
+
+        var result = await scenario.CreateAsync(id, "shop.example.test");
+
+        Assert.Equal(2, result.Exit);
+        Assert.Equal([$"{id} entry failed: the id belonged to a deleted tenant"], result.Output);
+        Assert.Equal(before, await scenario.SnapshotAsync());
+        Assert.False(await scenario.DatabaseExistsAsync(id));
+        Assert.Equal(0L, await scenario.CountRolesAsync(id));
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Create_with_a_host_of_a_tenant_deleted_10_days_ago_exits_2_and_creates_nothing()
+    {
+        await using var scenario = await NewScenarioAsync();
+        await scenario.AddTombstoneAsync(scenario.NewTenantId(), 10, "gone.example.test");
+        var before = await scenario.SnapshotAsync();
+        var id = scenario.NewTenantId();
+
+        var result = await scenario.CreateAsync(id, "free.example.test", "GONE.Example.TEST");
+
+        Assert.Equal(2, result.Exit);
+        Assert.Equal([$"{id} entry failed: a host is held back after a tenant was deleted"], result.Output);
+        Assert.Equal(before, await scenario.SnapshotAsync());
+        Assert.False(await scenario.DatabaseExistsAsync(id));
+        Assert.Equal(0L, await scenario.CountRolesAsync(id));
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
     public async Task Create_with_a_superuser_admin_role_exits_2_and_writes_nothing()
     {
         await using var scenario = await NewScenarioAsync();

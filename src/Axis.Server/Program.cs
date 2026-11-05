@@ -93,6 +93,9 @@ if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaCo
 // The provisioning API's writes that need no job open this role's connection for the write alone, see CellPlatformWriter.
 builder.Services.AddSingleton(new CellPlatformWriter(platformSchemaConnectionString));
 
+// A download of a tenant export streams the ZIP from this storage. Without the settings the server starts and only a download answers 503.
+builder.Services.AddSingleton(new CellExportStorage(Axis.Administration.CellBackupStorage.Read(builder.Configuration, Axis.Administration.CellBackupStorage.ExportSection, out _)));
+
 var cipher = TenantSecretCipher.Load(builder.Configuration);
 builder.Services.AddSingleton(cipher);
 var platformMigration = new PlatformMigrationOptions(platformSchemaConnectionString, readerRole);
@@ -275,6 +278,10 @@ if (!forwardedHeaders.IsEmpty)
 {
     app.UseWhen(context => context.Connection.RemoteIpAddress is not null, branch => branch.UseForwardedHeaders());
 }
+
+// After the forwarded headers, so the client address is the real one, and before tenant resolution and sign-in, so a
+// refused request does no work.
+app.UseConsoleNetworks(cell);
 
 // Then tenant resolution, so API and SPA paths alike need a known tenant host, and a session is
 // checked against the resolved tenant.

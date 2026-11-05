@@ -7,10 +7,15 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// One step of a provisioning job. <paramref name="RunAsync"/> gets the tenant id and the job's input JSON, which may be null, and
+/// One step of a provisioning job. <paramref name="RunAsync"/> gets the job id, the tenant id and the job's input JSON, which may be null, and
 /// returns <see langword="null"/> on success or a refusal message. A refusal fails the job at once, and an exception that it throws ends only the claim.
+/// <paramref name="LeaseAsync"/>, when set, takes a lease of the tenant before the step runs and returns <see langword="null"/> when none is free. The runner
+/// frees the lease when the step returns or throws. A throw from <paramref name="LeaseAsync"/> ends the claim, as a throw from the step does.
 /// </summary>
-internal sealed record JobStep(string Name, Func<string, string?, CancellationToken, Task<string?>> RunAsync);
+internal sealed record JobStep(
+    string Name,
+    Func<Guid, string, string?, CancellationToken, Task<string?>> RunAsync,
+    Func<string, CancellationToken, Task<IAsyncDisposable?>>? LeaseAsync = null);
 
 /// <summary>
 /// The provisioning jobs of <c>platform.jobs</c>, which the publisher runs under <c>Tenancy:Source=directory</c>. A job is queued
@@ -18,12 +23,21 @@ internal sealed record JobStep(string Name, Func<string, string?, CancellationTo
 /// time for each tenant. It skips every step that already succeeded. A refusal from a step fails the job at once. A step that throws
 /// ends the claim, and the next round claims the job again, up to three claims. The third throw fails the job. A running job whose
 /// lease ran out after three claims is failed at the next claim. The <c>claims</c> count fences every update, so a publisher that lost
-/// its claim changes nothing. The runner renews the lease at each step boundary. When a job ends, one platform audit record that
-/// names the job's actor is written in the same transaction as its final state, whether it succeeded or failed.
+/// its claim changes nothing. A step may take a tenant lease first. When none is free, the job waits for about a second and runs again in a later
+/// round, and a wait does not use one of the three claims. The runner renews the lease at each step boundary. When a job ends, one platform audit record that
+/// names the job's actor is written in the same transaction as its final state, whether it succeeded or failed. A runner that knows the <c>purge</c> kind,
+/// which is the publisher in a cell, also queues a <c>purge</c> job in each claim for every main tenant whose <c>delete_after</c> has passed. See
+/// <see cref="QueueDuePurgesAsync"/>.
 /// </summary>
-internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnlyDictionary<string, IReadOnlyList<JobStep>> kinds, TimeSpan leaseDuration)
+internal sealed class ProvisioningJobs(
+    string platformConnectionString,
+    IReadOnlyDictionary<string, IReadOnlyList<JobStep>> kinds,
+    TimeSpan leaseDuration,
+    TimeSpan? waitInterval = null)
 {
     private const int MaxClaims = 3;
+
+    private static readonly TimeSpan _defaultWaitInterval = TimeSpan.FromSeconds(1);
 
     // Claims take this lock, so two publishers cannot both see no running job of a tenant.
     private const long ClaimLockKey = 0x4158_4953_4A4F_4253; // "AXISJOBS"
@@ -34,15 +48,37 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
 
     private const string Failed = "failed";
 
+    // A failed purge is queued again no sooner than this after it ended, so a lasting fault adds one failed job and one audit record an hour.
+    private static readonly TimeSpan _purgeRetryInterval = TimeSpan.FromHours(1);
+
     private static readonly string _claimedBy = $"{Environment.MachineName}-{Environment.ProcessId}";
 
     private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
+
+    // The purge's actor is the actor of the tenant's latest succeeded delete job, which is the one that set delete_after. A cancelled deletion clears
+    // delete_after, so its tenant is not a candidate. A preview tenant is purged with its main tenant and never alone.
+    private const string DuePurgesSql =
+        """
+        SELECT t.id,
+               (SELECT d.actor FROM platform.jobs d WHERE d.tenant_id = t.id AND d.kind = 'delete' AND d.state = 'succeeded' ORDER BY d.finished_at DESC, d.id DESC LIMIT 1) AS actor
+        FROM platform.tenants t
+        WHERE t.preview_of IS NULL AND t.delete_after IS NOT NULL AND t.delete_after <= clock_timestamp()
+          AND NOT EXISTS (SELECT 1 FROM platform.jobs p WHERE p.tenant_id = t.id AND p.kind = 'purge' AND p.state IN ('queued', 'running'))
+          AND NOT EXISTS (SELECT 1 FROM platform.jobs p WHERE p.tenant_id = t.id AND p.kind = 'purge' AND p.state = 'failed' AND p.finished_at > clock_timestamp() - @retry)
+        ORDER BY t.id
+        """;
+
+    private const string InsertPurgeSql =
+        """
+        INSERT INTO platform.jobs (id, kind, tenant_id, state, steps, actor, input, created_at)
+        VALUES (@id, 'purge', @tenant, 'queued', @steps, @actor, @input, clock_timestamp())
+        """;
 
     private const string ExhaustedSql =
         """
         UPDATE platform.jobs
         SET state = 'failed', finished_at = clock_timestamp(), error = @message
-        WHERE state = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        WHERE state = 'running' AND lease_until < clock_timestamp() AND claims - waits >= @max
         RETURNING id, kind, tenant_id, actor
         """;
 
@@ -51,7 +87,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         """
         WITH next AS (
           SELECT j.id FROM platform.jobs j
-          WHERE (j.state = 'queued' OR (j.state = 'running' AND j.lease_until < clock_timestamp() AND j.claims < @max))
+          WHERE (j.state = 'queued' OR (j.state = 'running' AND j.lease_until < clock_timestamp() AND j.claims - j.waits < @max))
             AND NOT EXISTS (SELECT 1 FROM platform.jobs o WHERE o.tenant_id = j.tenant_id AND o.state = 'running' AND o.id <> j.id)
           ORDER BY j.created_at, j.id LIMIT 1
           FOR UPDATE SKIP LOCKED)
@@ -59,7 +95,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         SET state = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.kind, p.tenant_id, p.steps::text, p.actor, p.claims, p.input::text
+        RETURNING p.id, p.kind, p.tenant_id, p.steps::text, p.actor, p.claims, p.input::text, p.waits
         """;
 
     // The claims count is the fencing token: it goes up on every claim, so a publisher that lost its claim changes no row.
@@ -70,6 +106,25 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         WHERE id = @id AND state = 'running' AND claims = @claims
         """;
 
+    // Keeps the job running but not claimable for the wait interval, and counts the wait. A failure to do so leaves the lease to run out.
+    private async Task WaitAsync(ClaimedJob job, TextWriter output)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(platformConnectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(WaitSql, connection);
+            command.Parameters.AddWithValue("wait", waitInterval ?? _defaultWaitInterval);
+            command.Parameters.AddWithValue("id", job.Id);
+            command.Parameters.AddWithValue("claims", job.Claims);
+            await command.ExecuteNonQueryAsync();
+        }
+        catch (Exception exception)
+        {
+            output.WriteLine($"{job.TenantId} claim failed: {TenantDatabaseSteps.Safe(exception)}");
+        }
+    }
+
     // Ends the lease at once, so the next round claims the job again. The claims count still limits it to three.
     private const string ReleaseSql =
         """
@@ -78,12 +133,26 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         WHERE id = @id AND state = 'running' AND claims = @claims
         """;
 
-    /// <summary>The kinds that the CLI commands also have: <c>suspend</c> and <c>resume</c>, each with one <c>status</c> step.</summary>
+    // A job that waits for a lease stays running and cannot be claimed again until the wait ends. A wait is not a claim.
+    private const string WaitSql =
+        """
+        UPDATE platform.jobs
+        SET waits = waits + 1, lease_until = clock_timestamp() + @wait
+        WHERE id = @id AND state = 'running' AND claims = @claims
+        """;
+
+    /// <summary>
+    /// The kinds that need only the platform connection: <c>suspend</c> and <c>resume</c>, which the CLI commands also have, each with one
+    /// <c>status</c> step, and <c>delete</c> and <c>cancel-deletion</c>, with one <c>schedule</c> and one <c>cancel</c> step. The <c>purge</c> kind is not
+    /// here: only the publisher in a cell knows it, and the runners that know it queue it.
+    /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<JobStep>> Builtin(string platformConnectionString) =>
         new Dictionary<string, IReadOnlyList<JobStep>>
         {
-            ["suspend"] = [new JobStep("status", (tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.SuspendChangeAsync, tenantId, cancellationToken))],
-            ["resume"] = [new JobStep("status", (tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.ResumeChangeAsync, tenantId, cancellationToken))],
+            ["suspend"] = [new JobStep("status", (_, tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.SuspendChangeAsync, tenantId, cancellationToken))],
+            ["resume"] = [new JobStep("status", (_, tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.ResumeChangeAsync, tenantId, cancellationToken))],
+            ["delete"] = [new JobStep("schedule", (_, tenantId, _, cancellationToken) => TenantDeletion.ScheduleAsync(platformConnectionString, tenantId, cancellationToken))],
+            ["cancel-deletion"] = [new JobStep("cancel", (_, tenantId, _, cancellationToken) => TenantDeletion.CancelAsync(platformConnectionString, tenantId, cancellationToken))],
         };
 
     /// <summary>Adds a <c>queued</c> job with every step of <paramref name="kind"/> <c>pending</c>, and returns its id.</summary>
@@ -112,7 +181,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             Kind = kind,
             TenantId = tenantId,
             State = "queued",
-            Steps = JsonSerializer.Serialize(steps.Select(step => new StoredStep(step.Name, Pending, null)), _json),
+            Steps = PendingSteps(steps),
             Actor = actor,
             Input = input,
             IdempotencyKey = idempotencyKey,
@@ -122,6 +191,9 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         await platform.SaveChangesAsync(cancellationToken);
         return id;
     }
+
+    private static string PendingSteps(IReadOnlyList<JobStep> steps) =>
+        JsonSerializer.Serialize(steps.Select(step => new StoredStep(step.Name, Pending, null)), _json);
 
     /// <summary>Claims and runs one job. Returns whether one was claimed.</summary>
     public async Task<bool> RunNextAsync(TextWriter output, CancellationToken cancellationToken)
@@ -174,6 +246,10 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         }
 
         await FailExhaustedAsync(connection, transaction, output, cancellationToken);
+        if (kinds.TryGetValue(PurgeJob.Kind, out var purgeSteps))
+        {
+            await QueueDuePurgesAsync(connection, transaction, purgeSteps, output, cancellationToken);
+        }
 
         ClaimedJob? claimed = null;
         await using (var command = new NpgsqlCommand(ClaimSql, connection, transaction))
@@ -184,12 +260,51 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
-                claimed = new ClaimedJob(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetString(6));
+                claimed = new ClaimedJob(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetInt32(7));
             }
         }
 
         await transaction.CommitAsync(cancellationToken);
         return claimed;
+    }
+
+    // Queues one purge job for each main tenant whose deletion window has ended and that has no queued or running purge job. A purge that failed is
+    // queued again an hour after it ended. It runs in the claim's transaction, under the claim lock, so two publishers never both queue a purge for
+    // one tenant. A tenant with no succeeded delete job has no actor to name and gets none.
+    private static async Task QueueDuePurgesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        IReadOnlyList<JobStep> purgeSteps,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        var due = new List<(string TenantId, string Actor)>();
+        await using (var command = new NpgsqlCommand(DuePurgesSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("retry", _purgeRetryInterval);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (!reader.IsDBNull(1))
+                {
+                    due.Add((reader.GetString(0), reader.GetString(1)));
+                }
+            }
+        }
+
+        var steps = PendingSteps(purgeSteps);
+        foreach (var (tenantId, actor) in due)
+        {
+            var id = Guid.CreateVersion7();
+            await using var insert = new NpgsqlCommand(InsertPurgeSql, connection, transaction);
+            insert.Parameters.AddWithValue("id", id);
+            insert.Parameters.AddWithValue("tenant", tenantId);
+            insert.Parameters.Add(new NpgsqlParameter("steps", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = steps });
+            insert.Parameters.AddWithValue("actor", actor);
+            insert.Parameters.Add(new NpgsqlParameter("input", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = JsonSerializer.Serialize(new { actor }, _json) });
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+            output.WriteLine($"{tenantId} purge queued: job {id:D}");
+        }
     }
 
     // A running job that was claimed three times and whose lease ran out again ends failed, with its audit record.
@@ -246,13 +361,24 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             string? refusal;
             try
             {
-                refusal = await defined[index].RunAsync(job.TenantId, job.Input, cancellationToken);
+                var lease = defined[index].LeaseAsync is { } take ? await take(job.TenantId, cancellationToken) : NoLease.Instance;
+                if (lease is null)
+                {
+                    output.WriteLine($"{job.TenantId} {defined[index].Name} waiting: the tenant has no lease free. The job runs again in a later round.");
+                    await WaitAsync(job, output);
+                    return;
+                }
+
+                await using (lease)
+                {
+                    refusal = await defined[index].RunAsync(job.Id, job.TenantId, job.Input, cancellationToken);
+                }
             }
             catch (Exception exception)
             {
                 var message = TenantDatabaseSteps.Safe(exception);
                 output.WriteLine($"{job.TenantId} {defined[index].Name} failed: {message}");
-                if (job.Claims < MaxClaims)
+                if (job.Claims - job.Waits < MaxClaims)
                 {
                     await ReleaseAsync(job, output);
                     return;
@@ -349,7 +475,14 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private sealed record ClaimedJob(Guid Id, string Kind, string TenantId, string Steps, string Actor, int Claims, string? Input);
+    private sealed record ClaimedJob(Guid Id, string Kind, string TenantId, string Steps, string Actor, int Claims, string? Input, int Waits);
+
+    private sealed class NoLease : IAsyncDisposable
+    {
+        public static readonly NoLease Instance = new();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private sealed record StoredStep(string Name, string State, string? Error);
 }

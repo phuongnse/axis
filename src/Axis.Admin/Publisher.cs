@@ -57,7 +57,8 @@ namespace Axis.Admin;
 /// as a schedule trigger that is past due, the publisher sends the wake signal for that tenant, and a failure to send it fails nothing.
 /// Under the directory source it also runs the provisioning jobs of <c>platform.jobs</c> in a third loop, see <see cref="ProvisioningJobs"/>.
 /// A stop lets a running job finish. In a fourth loop it also checks the pending host requests of <c>platform.tenant_host_requests</c> every
-/// <c>Cell:HostCheckInterval</c>, see <see cref="TenantHostVerification"/>. A failed round writes one line, and the next round tries again.
+/// <c>Cell:HostCheckInterval</c>, see <see cref="TenantHostVerification"/>. In a fifth loop it deletes the stored tenant exports that are older
+/// than 7 days every hour, see <see cref="TenantExportSweep"/>, and only with the export storage settings. A failed round writes one line, and the next round tries again.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -70,7 +71,8 @@ internal sealed class Publisher(
     TextWriter error,
     CancellationToken stopping,
     ProvisioningJobs? jobs = null,
-    TenantHostVerification? hosts = null)
+    TenantHostVerification? hosts = null,
+    TenantExportSweep? exports = null)
 {
     // Both loops write to these.
     private readonly TextWriter _output = TextWriter.Synchronized(output);
@@ -167,12 +169,13 @@ internal sealed class Publisher(
         }
 
         // Two loops, so a long test holds up no publish. Only the first reads the tenants again. A third runs the provisioning jobs,
-        // and a fourth checks the host requests.
+        // a fourth checks the host requests and a fifth deletes the old tenant exports.
         await Task.WhenAll(
             LoopAsync(tests: false),
             LoopAsync(tests: true),
             jobs is null ? Task.CompletedTask : JobsLoopAsync(jobs),
-            hosts is null ? Task.CompletedTask : HostsLoopAsync(hosts));
+            hosts is null ? Task.CompletedTask : HostsLoopAsync(hosts),
+            exports is null ? Task.CompletedTask : ExportsLoopAsync(exports));
         return 0;
     }
 
@@ -193,6 +196,31 @@ internal sealed class Publisher(
             try
             {
                 await Task.Delay(verification.Interval, stopping);
+            }
+            catch (OperationCanceledException)
+            {
+                // A stop ends the loop.
+            }
+        }
+    }
+
+    // Deletes the old tenant exports once each interval. A stop is checked between rounds, so a running round finishes.
+    private async Task ExportsLoopAsync(TenantExportSweep sweep)
+    {
+        while (!stopping.IsCancellationRequested)
+        {
+            try
+            {
+                await sweep.RunRoundAsync(DateTimeOffset.UtcNow, _output, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                _output.WriteLine($"platform export sweep failed: {TenantDatabaseSteps.Safe(exception)}");
+            }
+
+            try
+            {
+                await Task.Delay(TenantExportSweep.Interval, stopping);
             }
             catch (OperationCanceledException)
             {

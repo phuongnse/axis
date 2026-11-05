@@ -1,0 +1,45 @@
+{{- /* The publisher creates the Certificate of a verified tenant host, and nothing else, in the release namespace. */}}
+{{- if and .Values.cell.id .Values.cell.certificate.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-publisher
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: publisher
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-publisher-certificates
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: publisher
+rules:
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-publisher-certificates
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: publisher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-publisher-certificates
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-publisher
+    namespace: {{ .Release.Namespace }}
+{{- end }}

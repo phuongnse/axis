@@ -14,7 +14,8 @@ public static class TenantHostCommands
     private const string Conflict = "A host belongs to another tenant.";
 
     /// <summary>
-    /// Adds a host to a tenant. A host that any tenant holds is refused. With <paramref name="sitePath"/> the host belongs to that site,
+    /// Adds a host to a tenant. A host that any tenant holds is refused, and so is a host that a tenant deleted less than
+    /// <see cref="DeletedTenantHolds.HostHoldBackDays"/> days ago had. With <paramref name="sitePath"/> the host belongs to that site,
     /// stored in lower case. A path with bad syntax, a reserved path, or a site that the tenant already has a host for is refused.
     /// The command does not check that a release has the site.
     /// </summary>
@@ -74,6 +75,11 @@ public static class TenantHostCommands
         if (await platform.TenantHosts.AnyAsync(row => keys.Contains(row.Host.ToLower()), cancellationToken))
         {
             return TenantSettingResult.Refused($"The host '{host}' belongs to a tenant.");
+        }
+
+        if (await DeletedTenantHolds.IsHostHeldBackAsync(platform, keys, cancellationToken))
+        {
+            return TenantSettingResult.Refused($"The host '{host}' was used by a deleted tenant and is held back for {DeletedTenantHolds.HostHoldBackDays} days.");
         }
 
         if (path is not null && await platform.TenantHosts.AnyAsync(row => row.TenantId == tenantId && row.SitePath == path, cancellationToken))
@@ -160,6 +166,7 @@ public static class TenantHostCommands
     /// Moves a host to another tenant in one transaction. It writes one record, on the target tenant, that names the host and the
     /// tenant it came from. The host keeps its site, so a target tenant that already has a host for that site is refused.
     /// The source tenant may be left with no hosts.
+    /// A host that a tenant deleted less than <see cref="DeletedTenantHolds.HostHoldBackDays"/> days ago had is refused.
     /// </summary>
     public static async Task<TenantSettingResult> MoveAsync(
         PlatformDbContext platform,
@@ -189,6 +196,11 @@ public static class TenantHostCommands
         if (existing is null)
         {
             return TenantSettingResult.Refused($"No tenant holds the host '{host}'.");
+        }
+
+        if (await DeletedTenantHolds.IsHostHeldBackAsync(platform, keys, cancellationToken))
+        {
+            return TenantSettingResult.Refused($"The host '{host}' was used by a deleted tenant and is held back for {DeletedTenantHolds.HostHoldBackDays} days.");
         }
 
         if (existing.TenantId == toTenantId)

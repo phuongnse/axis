@@ -7,7 +7,7 @@ import { sizeTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
 import { useClaimedShellSidebar } from '../platform/shellSidebarContext'
 import { SiteMark } from '../platform/SiteMark'
-import { studioApplicationTitle, type StudioApplication, type StudioResourceItem } from '../platform/studio'
+import { studioAppTitle, type StudioApplication, type StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { PlatformContext } from './context'
@@ -59,7 +59,7 @@ export function StudioNavigation({
   const { mode } = useThemeMode()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const current = applications.find((app) => app.name === application)
-  const currentTitle = current ? studioApplicationTitle(current, locale) : application
+  const currentTitle = current ? studioAppTitle(current, locale) : application
 
   const counts = new Map<string, number>()
   for (const item of resources) {
@@ -126,7 +126,7 @@ export function StudioNavigation({
           // the selected tint, which stays readable in dark mode.
           ...applications.map((app) => ({
             key: app.name,
-            label: studioApplicationTitle(app, locale),
+            label: studioAppTitle(app, locale),
             style:
               app.name === application ? { color: colour.primaryText, background: selectedItemTint(mode) } : undefined,
             'aria-current': app.name === application ? ('true' as const) : undefined,

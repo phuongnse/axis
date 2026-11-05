@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts, the requests for hosts of their own,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the tombstones of purged tenants, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -47,6 +47,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
     public DbSet<JobRow> Jobs => Set<JobRow>();
+
+    public DbSet<DeletedTenantRow> DeletedTenants => Set<DeletedTenantRow>();
 
     public DbSet<PlatformAuditRecordRow> AuditRecords => Set<PlatformAuditRecordRow>();
 
@@ -106,6 +108,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.RealmActivationClientSecret).HasColumnName("realm_activation_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.RealmUsersClientSecret).HasColumnName("realm_users_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.EmailFrom).HasColumnName("email_from");
+            tenant.Property(t => t.DeleteAfter).HasColumnName("delete_after");
             tenant.Property(t => t.PrivacyUrl).HasColumnName("privacy_url");
             tenant.Property(t => t.TermsUrl).HasColumnName("terms_url");
             tenant.Property(t => t.TermsVersion).HasColumnName("terms_version");
@@ -378,6 +381,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             key.Property(k => k.Xml).HasColumnName("xml").HasColumnType("bytea");
         });
 
+        modelBuilder.Entity<DeletedTenantRow>(deleted =>
+        {
+            deleted.ToTable("deleted_tenants");
+            deleted.HasKey(d => d.Id).HasName("pk_deleted_tenants");
+            deleted.Property(d => d.Id).HasColumnName("id").ValueGeneratedNever();
+            deleted.Property(d => d.DeletedAt).HasColumnName("deleted_at").HasColumnType("timestamp with time zone");
+            deleted.Property(d => d.Actor).HasColumnName("actor");
+            deleted.Property(d => d.Hosts).HasColumnName("hosts").HasColumnType("text[]");
+        });
+
         modelBuilder.Entity<PlatformAuditRecordRow>(record =>
         {
             record.ToTable("audit_records");
@@ -396,7 +409,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         {
             job.ToTable("jobs", table =>
             {
-                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create')");
+                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion', 'purge')");
                 table.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
             });
             job.HasKey(j => j.Id).HasName("pk_jobs");
@@ -416,6 +429,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             job.Property(j => j.ClaimedBy).HasColumnName("claimed_by");
             job.Property(j => j.LeaseUntil).HasColumnName("lease_until").HasColumnType("timestamp with time zone");
             job.Property(j => j.Claims).HasColumnName("claims").HasDefaultValue(0);
+            job.Property(j => j.Waits).HasColumnName("waits").HasDefaultValue(0);
             job.HasIndex(j => new { j.State, j.CreatedAt }).HasDatabaseName("ix_jobs_state_created_at");
             job.HasIndex(j => j.IdempotencyKey).HasDatabaseName("ix_jobs_idempotency_key");
         });

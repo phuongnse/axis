@@ -16,17 +16,19 @@ namespace Axis.Admin;
 /// request twice, and a restart does not repeat a lookup before the interval is up. For each claimed request it reads the <c>TXT</c> records
 /// of <c>_axis-verify.</c> and the host. A wrong token, no record or a failed lookup leaves the request <c>pending</c> and writes one line.
 /// When a record equals the token, the host is added to the tenant with the platform audit record <c>tenant host verify</c> that names the
-/// operator who asked for it, then the realm's redirect addresses are written, and last the request becomes <c>verified</c>. A host that the tenant
+/// operator who asked for it, then the realm's redirect addresses are written, then the certificate of the host is written when the publisher has a writer, and last the request
+/// becomes <c>verified</c>. A host that the tenant
 /// already holds is not added again, but only a request whose record still matches is verified. A host that another tenant holds, a
-/// tenant that is still provisioning and a realm that fails leave the request <c>pending</c>, and the next round repeats only the steps that
-/// did not finish. The certificate of the host is not part of this check.
+/// tenant that is still provisioning, a realm that fails and a certificate that fails leave the request <c>pending</c>, and the next round
+/// repeats only the steps that did not finish. A certificate that exists counts as written, so a repeat is safe.
 /// </summary>
 internal sealed class TenantHostVerification(
     string platformConnectionString,
     TenantSecretCipher cipher,
     HttpClient http,
     IDnsTxtResolver resolver,
-    TimeSpan interval)
+    TimeSpan interval,
+    ICertificateWriter? certificates)
 {
     internal const string Command = "tenant host verify";
 
@@ -167,6 +169,19 @@ internal sealed class TenantHostVerification(
         if (!await SyncRealmAsync(request.TenantId, output, cancellationToken))
         {
             return;
+        }
+
+        if (certificates is not null)
+        {
+            try
+            {
+                await certificates.WriteAsync(request.TenantId, request.Host, cancellationToken);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or IOException)
+            {
+                output.WriteLine($"{request.TenantId} certificate failed: {TenantDatabaseSteps.Safe(exception)}");
+                return;
+            }
         }
 
         await using var connection = new NpgsqlConnection(platformConnectionString);

@@ -3,7 +3,8 @@ namespace Axis.Tenancy.Platform;
 /// <summary>
 /// A row of <c>platform.jobs</c>: one provisioning job that the publisher runs, such as a tenant suspend. A job is
 /// <c>queued</c>, <c>running</c> under a lease, and then <c>succeeded</c> or <c>failed</c>. The <see cref="Claims"/> count
-/// goes up on every claim and fences the final update. The table has no foreign key to the tenants, so a job outlives its tenant.
+/// goes up on every claim and fences the final update. A job that waits for a tenant lease adds to <see cref="Waits"/>
+/// too, and a wait does not count toward the limit of three claims. The table has no foreign key to the tenants, so a job outlives its tenant.
 /// </summary>
 public sealed class JobRow
 {
@@ -44,4 +45,7 @@ public sealed class JobRow
     public DateTimeOffset? LeaseUntil { get; set; }
 
     public int Claims { get; set; }
+
+    /// <summary>The times the job waited for a tenant lease. They are part of <see cref="Claims"/> and do not count as claims.</summary>
+    public int Waits { get; set; }
 }

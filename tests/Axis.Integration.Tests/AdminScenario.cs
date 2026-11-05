@@ -168,7 +168,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         TimeSpan? publisherTestLimit = null,
         string? input = null,
         HttpMessageHandler? identityProvider = null,
-        IDnsTxtResolver? dnsResolver = null)
+        IDnsTxtResolver? dnsResolver = null,
+        ICertificateWriter? certificateWriter = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -204,7 +205,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             publisherTestLimit ?? Publisher.DefaultTestLimit,
             identityProvider ?? IdentityProvider,
             stop?.Token ?? CancellationToken,
-            dnsResolver);
+            dnsResolver,
+            certificateWriter);
         var text = output.ToString()!;
         _texts.Add(text);
         _texts.Add(error.ToString());
@@ -357,6 +359,14 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await using var context = NewContext();
         var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
         row.SchemaVersion = schemaVersion;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
+    /// <summary>Adds the tombstone of a tenant purged <paramref name="daysAgo"/> days ago, with the hosts it had.</summary>
+    public async Task AddTombstoneAsync(string id, int daysAgo, params string[] hosts)
+    {
+        await using var context = NewContext();
+        context.DeletedTenants.Add(new DeletedTenantRow { Id = id, DeletedAt = DateTimeOffset.UtcNow.AddDays(-daysAgo), Actor = "test", Hosts = hosts });
         await context.SaveChangesAsync(CancellationToken);
     }
 

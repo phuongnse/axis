@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace Axis.Tenancy;
@@ -46,6 +47,14 @@ public static partial class CellOptionsValidator
         {
             var region = hasRegion ? $" and start with Cell:Region '{options.Region}'" : string.Empty;
             problems.Add($"Cell:Id '{id}' must be the region and a number, such as 'vn-1'{region}.");
+        }
+
+        foreach (var network in options.ConsoleAllowedNetworks)
+        {
+            if (!IPNetwork.TryParse(network, out _))
+            {
+                problems.Add($"Cell:ConsoleAllowedNetworks has an entry that is not a CIDR range: '{network}'.");
+            }
         }
 
         return problems;

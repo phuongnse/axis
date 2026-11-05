@@ -331,7 +331,7 @@ format and the steps above stay, with the changes below.
   that holds Studio files. A restore outside a cell skips them with a warning. An archive without `studio/` entries restores as
   before.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
-  key. Its archives stay in object storage until their lock ends, and nothing can read them. One
+  key. The purge's `keys` step does this _(built)_, and queuing the purge is _(planned for M31)_. Its archives stay in object storage until their lock ends, and nothing can read them. One
   leaked tenant key opens only that tenant's archives.
 - **Daily job** _(built)_. In a cell with `backup.bucket` set, the chart's CronJob runs
   `cell backup` at 01:00 in `backup.timeZone`, never two at once, with no retry and a deadline of

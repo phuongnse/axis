@@ -6,7 +6,7 @@ no test changes on this branch, and logic left to the review's issue.
 Topic: Studio's Entities page.
 
 The prototype starts from the tag `design-review/2026-11-03-studio-settings`, so the owner keeps seeing the workspace and
-the resource form that `main` has not built yet, with `main` merged in, first at 624ab6e1, then at fd1bf541 and at 7d171005 (2026-11-05). Its own diff starts at the first merge.
+the resource form that `main` has not built yet, with `main` merged in, first at 624ab6e1, then at fd1bf541, 7d171005 and 102b96d3 (2026-11-05). Its own diff starts at the first merge.
 Each entry is one agreed change: what the owner asked, in English, and what was built, for the docs change at the end
 of the review.
 
@@ -472,6 +472,30 @@ place of the request-approval template, and the cell's DNS check of tenant hosts
 - **One action row:** the prototype's `ActionRow` is gone, as it was a second way to `AxisActionRow`. `AxisActionRow` takes
   `wrap` (Proposed), false on the band, whose fold measures whether its actions overflow. `FormWidget`'s footer and the entity
   migration dialogs are `main`'s again (`AxisActionRow`, and `FooterRow` where a form has no solid button).
+
+### Merge of `main` at 102b96d3, 2026-11-05
+
+`main` built, since 7d171005: Studio's Overview (#2957) with Live, Changes since the live release and More you can add,
+the change list's rows (`StudioReleaseChange`, `changeRows`) and the site tiles (`SiteTiles`), the UI writing standard
+and its glossary (#2971, #2974, #2979), the design runbook's step without screenshots (#2973), and the tenant export,
+purge and console work of the cell. How each conflict went:
+
+- **Overview:** `main`'s is the base: its props (`title`, `description`, `resources`, `moduleKinds`, `history`), when each
+  block shows, a module's kinds counting as present, the change rows from `changeRows`, the live sites through
+  `SiteTiles`, and its texts. The prototype's look is put back on it: each block a panel on `surface`, Get started's steps
+  numbered, the changes in `StudioChangeList`, and More you can add grouped by the sidebar's groups. `addressOf` stays an
+  optional prop for the prototype's workspace addresses; without it the Overview builds `main`'s.
+- **One way each:** the prototype's `SiteTile` and `TileFocusStyle` go for `main`'s `SiteTiles` and `HomeTileStyle`; its
+  `useTileGrid` goes for `main`'s `useHomeGrid`; its `studioApplicationTitle` and `studioApplicationDescription` go for
+  `main`'s `studioAppTitle` and `studioAppDescription`, now through `textIn`. `HomePage` is `main`'s. The workspace
+  builds a resource's address with `studioResourceAddress`.
+- **Kept from the prototype:** `StudioPage`'s workspace and `StudioPublishing`'s band, slots and history; `main`'s
+  `children` of `StudioPublishing`, which hands the history to its Overview, is not used.
+- **Texts:** 60 keys the prototype's Overview had are gone, as `main`'s keys name the same. `main`'s new Vietnamese texts
+  of the Overview and 17 others are rewritten to the standard: "đối tượng", "phát hành", no "của nó", "Không phát hành
+  được".
+- **Known differences from `main`'s tests:** two Overview tests look for `studio-change-row`, where the prototype's
+  change list names its rows `studio-overview-changes-row`.
 
 ### Lost in merges
 

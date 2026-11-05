@@ -4,8 +4,8 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, the route that requests a host of a tenant's own, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend, resume and create described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the export read and download route, the route that requests a host of a tenant's own, and the job read of the
+[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete, cancel-deletion and purge described under it, the purge of [deleting a tenant](#deleting-a-tenant), and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -21,7 +21,7 @@ implementation.
   every path outside `/api/cell/` answers `404`, the page at `/` included. A tenant host answers `404`
   for every path under `/api/cell/`, before any sign-in work. A self-hosted installation has no
   platform host, so every `/api/cell/` path answers `404`. The server opens no separate internal
-  listener yet, and `Cell:ConsoleAllowedNetworks` is not enforced yet _(planned for M31)_.
+  listener yet _(planned for M31)_.
 - **Who may call.** A caller signs in through the cell's [operator realm](cell-console.md#sign-in):
   the cell console with the operator's session, and a machine caller, such as the
   control plane or a script, with a bearer token of a client of that realm. The server finds the realm at
@@ -39,31 +39,35 @@ implementation.
   code as the `Axis.Admin` command, over the schema role. `GET /api/cell/jobs/{id}` answers the job,
   with `state` `queued`, `running`, `succeeded` or `failed`, its steps, and the error of a failed
   step. A failed job can be run again, and it skips the steps already done, as `tenant create` does.
-  The `platform.jobs` table and the runner in the publisher are built for the `suspend` and `resume` kinds, each with one
-  `status` step. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
+  The `platform.jobs` table and the runner in the publisher are built for the `suspend`, `resume`, `delete`, `cancel-deletion` and `purge` kinds. The first two have one
+  `status` step each, `delete` has one `schedule` step, `cancel-deletion` has one `cancel` step and `purge` has the eight steps of [deleting a tenant](#deleting-a-tenant). No route queues a `purge` job: the publisher does. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
-  The `suspend` and `resume` routes and the job read are built: the server only queues the job, over the platform reader role,
+  A step may take a lease of the tenant first, as the `export` step does. A wait for a lease uses no claim: it adds to the
+  job's `waits` count, and the limit of three is `claims` minus `waits`.
+  The `suspend`, `resume`, `DELETE` and `deletion/cancel` routes, the job read and the job list are built: the server only queues the job, over the platform reader role,
   which may insert into `platform.jobs` and nothing else there, and answers `202` with a `Location` header of `/api/cell/jobs/{id}`.
   The job's actor is the operator's id, the subject of the token or the session. The create route is built too: it queues a `create` job with the five steps of
   [creating a tenant](#creating-a-tenant), all `pending`, and keeps the request's `application` and `administrator` in the job's
   `input`, which the job read never returns. The publisher runs the `create` job in a cell with the five steps, see the
-  [create job](administration.md#create-job). The routes for the other kinds and the run again of a failed job are _(planned for M31)_.
+  [create job](administration.md#create-job). The exports route is built too: it queues an `export` job with the one step `export`, see
+  [exporting a tenant](#exporting-a-tenant). The routes for the other kinds and the run again of a failed job are _(planned for M31)_.
 - **Idempotency.** Each `POST` that queues a job needs an `Idempotency-Key` header of 1 to 255 characters, and the answer is `400`
   without one, with no job queued. The same key with the same request answers the first job again for 24 hours. The request is the kind,
   the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.
   A key is shared across the cell, not kept for each caller. A lock on the key keeps two parallel retries from queuing two jobs.
 - **Audit.** Each job writes one platform audit record when it ends, with the operator or the
-  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend` and `resume` is built: it writes the
+  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend`, `resume`, `delete`, `cancel-deletion` and `purge` is built: it writes the
   record in the same transaction as the job's final state, whether the job succeeded or failed, with the command name of the
   matching `Axis.Admin` command and `job:<id>` in `changed`. A refused call writes a log
   event, not a record _(planned for M31)_.
 
 | Route | What it does |
 | --- | --- |
+| `GET /api/cell` | Answers the cell as `{ "id", "region", "tenants", "cap" }`. `tenants` counts the cell's tenants whatever their status and leaves out preview tenants. `cap` is `Cell:TenantCap`, see [cell size](cells.md#cell-size), or `null` when it is not set. |
 | `GET /api/cell/auth/sign-in` | Sends the operator to the operator realm's login page, see [sign-in](cell-console.md#sign-in). It needs no session and answers `404` on any host but the console host, and when the console offers no sign-in. |
 | `POST /api/cell/auth/sign-out` | Deletes the operator's session and answers `204`. It needs the CSRF header. |
-| `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application` and `hosts`, read from the platform tables. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. Usage, quotas and failed work counts, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
-| `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
+| `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application` and `hosts`, read from the platform tables. `status` is `deleting` while a deletion is scheduled, though the stored status stays `suspended`. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. Usage, quotas and failed work counts, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
+| `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, `deleting` included, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
 | `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does, through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`. |
 | `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does, through a job. It answers as `suspend` does. |
@@ -71,10 +75,11 @@ implementation.
 | `GET /api/cell/tenants/{id}/administrators` | _(planned for M33)_ Lists the accounts that hold the [administrator role](user-administration.md#the-administrator-role) in the tenant's realm: email, display name and language. The [control plane](control-plane.md) mails them. |
 | `PUT /api/cell/tenants/{id}/quotas` | Sets or clears the tenant's quota rows, see [quotas](tenant-quotas.md#quotas). The body is `{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }`. A set value of `null` is no limit, a removed key goes back to the cell's default, and a key the body does not name stays as it is. It applies at once, with no job, and answers `200` with the tenant's `quotas` as the tenant read does. An unknown key, a negative value, a key both set and removed, or a body that names no key answers `400` and writes nothing. An unknown tenant id or a preview tenant's id answers `404`. It writes the rows and one [platform audit record](tenant-setting-commands.md#platform-audit-records), `tenant quotas set`, in one transaction, over the schema role: the server opens a connection for the write alone and keeps none in a pool. The hosts apply the new values at their next `Tenancy:RefreshInterval`. |
 | `POST /api/cell/tenants/{id}/hosts` | Asks for a host of the tenant's own, see [hosts](#hosts). |
-| `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant). |
-| `GET /api/cell/tenants/{id}/exports/{exportId}` | Answers the export, and its download while it is kept. |
-| `DELETE /api/cell/tenants/{id}` | Schedules the deletion, see [deleting a tenant](#deleting-a-tenant). |
-| `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window. |
+| `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant), through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`, and `202` with a `Location` header. A tenant that is still `provisioning` makes the job fail. |
+| `GET /api/cell/tenants/{id}/exports/{exportId}` | Answers the [tenant export](#exporting-a-tenant) as JSON: `id`, `tenantId`, `state`, `createdAt` and `expiresAt`, which is 7 days after the job finished and `null` until it succeeded. The same route streams the ZIP when the request sends `Accept: application/zip`, and answers the JSON to every other request. The server streams the ZIP from the export storage itself and never redirects to a storage address. A download before the job succeeded answers `409`. An export past its `expiresAt`, or whose ZIP the storage no longer holds, answers `410` on both forms. An unknown tenant, a preview tenant or an id that is not an export of that tenant answers `404`. A download on a server without the five `Cell:ExportStorage` settings answers `503`, and the JSON read still works there. Each download writes the platform audit record `tenant export download`, see [platform audit records](tenant-setting-commands.md#platform-audit-records). |
+| `DELETE /api/cell/tenants/{id}` | Schedules the deletion through a `delete` job, see [deleting a tenant](#deleting-a-tenant). It answers `202` as `suspend` does. |
+| `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window through a `cancel-deletion` job. It answers as `suspend` does. |
+| `GET /api/cell/jobs` | Lists the cell's jobs as `{ "items": [...] }`, newest first by `createdAt`, then by id. Each item is a job as the job read answers it, with its `steps` and `error`. The `actor` and the `input` of a job are never returned. `tenant` keeps one tenant's jobs, and an unknown tenant answers an empty list. `limit` is a whole number from 1 to 200 and is 50 when missing. Any other value answers `400`. There is no paging past `limit`. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
 ## Creating a tenant
@@ -86,7 +91,7 @@ an optional `quotas`, which the `tenant` step writes as the tenant's quota rows,
 - `id` follows the rule of [`tenant create`](administration.md#tenant-create): 1 to 50 lowercase letters,
   digits and hyphens, and not `master`. A bad id answers `400`. An id that a directory row holds, in any
   status and a preview tenant's included, or that a `queued` or `running` create job holds, answers `409`.
-  An id that a deleted tenant had answers `409` too _(planned for M31, once deletion adds `platform.deleted_tenants`)_.
+  An id that a deleted tenant has a tombstone for answers `409` too.
 - `application` names an installed [application template](modules-and-templates.md#application-templates),
   such as the built-in `approvals`. An id that is not an installed template answers `400`. The job keeps the id, and its `application` step takes the newest version.
 - `administrator` is the email of the person invited as the tenant's first administrator. A value that is
@@ -128,8 +133,8 @@ The route is built as far as the request:
   passed the request is no longer pending, and a new request stores a new row with a new token. A
   transaction lock on the tenant and host keeps two parallel retries from storing two tokens.
 - **A host that is held.** A host that `platform.tenant_hosts` holds, for any tenant, answers `409`,
-  and the message does not say which tenant holds it. The held back check after a deletion is
-  _(planned for M31)_, with tenant deletion.
+  and the message does not say which tenant holds it. A host that a tenant deleted less than 90 days ago had
+  answers `409` too, see [deleting a tenant](#deleting-a-tenant), and its message names no tenant either.
 - **A pending request holds nothing.** The request is a row of `platform.tenant_host_requests`, see
   [storage](storage.md#platform-database), and another tenant may request the same host. The host is
   not in `platform.tenant_hosts`, so it still answers `404` for every path. The server stores the
@@ -145,17 +150,20 @@ The [publisher](administration.md#publisher) checks the customer's DNS records, 
   and skips the rows that another publisher holds. A request is not checked twice in one interval,
   also across restarts and several publishers.
 - **Verified.** When a `TXT` record of `_axis-verify.<host>` equals the token, the host joins the
-  tenant, the realm's redirect addresses gain it, and the request becomes `verified`. The
+  tenant, the realm's redirect addresses gain it, the publisher creates the host's cert-manager
+  `Certificate` when the cell has certificates on, and the request becomes `verified`. The
   [platform audit record](tenant-setting-commands.md#platform-audit-records) is named
   `tenant host verify` and names the operator who asked for the host as its actor. The request is
-  marked last, so a stop or a failed realm update is retried in the next round, and a host that the
+  marked last, so a stop, a failed realm update or a failed certificate write is retried in the
+  next round (a `Certificate` that exists counts as written), and a host that the
   tenant already holds is not added or audited twice. A host is never verified without a matching
   record.
 - **Pending.** A wrong token, no record or a DNS failure leaves the request pending, and the failure
   only writes a line. The request also stays pending when another tenant holds the host.
 
-The certificate of a verified host is _(planned for M31)_. Until it exists the host is in the
-directory, but the ingress has no route or certificate for it.
+The [certificate](cells.md#hosts-and-certificates) of a verified host is built. The route of the
+ingress for the host is _(planned for M31)_. Until it exists the host is in the directory and has a
+certificate, but the ingress has no route for it.
 
 ## Exporting a tenant
 
@@ -163,12 +171,26 @@ An export gives a tenant's data to its owner in a form that any tool reads. It i
 restore takes an [archive](tenant-backup-and-restore.md), never an export. It is built so that a
 tenant administrator can run it in M33.
 
-- **When.** For a tenant in any status but `provisioning`. One export of a tenant runs at a time, and
-  it takes a lease of the tenant's `concurrentImports` quota.
-- **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does.
+- **When.** For a tenant in any status but `provisioning`. A job for a `provisioning` tenant fails with the
+  refusal that `suspend` gives. The `export` job of the publisher is built, and an operator starts it with the
+  exports route. In a cell the job holds one lease of the tenant's `concurrentImports` quota while it reads the tenant and
+  uploads the ZIP, so an import that runs at the same time competes for the same leases. When none is free, the job stays
+  `running` with its step `pending`, and the publisher tries again about a second later. A wait does not use one of the
+  three claims, so a busy tenant never fails an export. A tenant with no `concurrentImports` limit, and a publisher outside
+  a cell, export without a lease. One export of a tenant runs at a time, because the publisher runs one job of a tenant at a
+  time.
+- **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does: one `RepeatableRead`
+  transaction for the active releases and every record.
 - **Kept.** The ZIP is stored in the cell's object storage, encrypted at rest, for 7 days, then
   deleted. The download answers it to a caller of the provisioning API, and to nobody else. Each
-  download writes a platform audit record.
+  download writes a platform audit record. The job stores the ZIP at `exports/<tenant>/<job id>.zip` in the bucket of
+  the five [`Cell:ExportStorage`](host-settings.md#cell-settings) settings, with S3 server-side encryption (`AES256`), so that the owner
+  can open the downloaded ZIP without a key of the cell. The export id is the job id. A publisher without these
+  settings still runs every other job, and the `export` job fails with a message that names the missing setting.
+  The download, its audit record and the sweep are built. The [publisher](administration.md#publisher) sweeps the export bucket every hour and
+  deletes each ZIP under `exports/` that was stored more than 7 days ago, so a ZIP can outlive its `expiresAt` by up to an hour, and the
+  route answers `410` from `expiresAt` in that time. The download is the [exports route](#provisioning-api) with `Accept: application/zip`,
+  and its audit record names the operator as actor and `export:<id>` in `changed`.
 - **Sensitive fields.** The export holds their values in clear, because the data is the owner's. The
   ZIP is [restricted](keys-and-data-protection.md#restricted) data, and the console says so before
   the download.
@@ -196,15 +218,17 @@ same job and the same ZIP as the provisioning API, as
 
 | Entry | What it holds |
 | --- | --- |
-| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application with its name, its active release number and its entities. |
-| `applications/<application>/` | The application folder from the tenant's Studio folder, as Studio writes it, its `customizations/` included. |
-| `data/<application>/<entity>.jsonl` | One JSON object per line for each record, in the shape of the [record API](record-api.md#record-shape), with child rows inside the record. |
-| `data/<application>/<entity>.csv` | The same records in the CSV form of [export](import-export.md#export), one file per entity, child rows in a file of their own named `<entity>.<field>.csv`. |
-| `files/<application>/<entity>/<record id>/<field>/<file name>` | Each stored file, under its record and field. |
-| `users.csv` | The realm's accounts: user name, email, display name, roles, enabled, created. No credential. |
+| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application, ordered by name, with its `name`, its `folder`, its active `release` number and its `entities`, each `{ name, file }` with the original entity name and the file name without its extension. |
+| `applications/<application>/` | _(planned for M31)_ The application folder from the tenant's Studio folder, as Studio writes it, its `customizations/` included. |
+| `data/<application>/<entity>.jsonl` | One JSON object per line for each record, in the shape of the [record API](record-api.md#record-shape), with child rows inside the record. A child entity has no file of its own. |
+| `data/<application>/<entity>.csv` | The same records in the CSV form of [export](import-export.md#export), one file per entity. Its first column is `id`, the record id, which entity export does not write. Child rows go in a file of their own named `<entity>.<field>.csv`, whose first column is `recordId`, the id of the record that owns the row, so a row can be joined to its record. |
+| `files/<application>/<entity>/<record id>/<field>/<file name>` | _(planned for M31)_ Each stored file, under its record and field. |
+| `users.csv` | _(planned for M31)_ The realm's accounts: user name, email, display name, roles, enabled, created. No credential. |
 
 An entity name or a file name that is not a safe file name is written with its unsafe characters
-replaced by `_`, and `export.json` lists the original name.
+replaced by `_`, and `export.json` lists the original name. The safe characters are letters, digits, `.`, `_` and `-`, so the
+module entity `organization/Department` is written as `organization_Department`. When two names become the same file name
+in one application, the later one gets `_2`, `_3` and so on.
 
 ## Deleting a tenant
 
@@ -212,22 +236,33 @@ A deletion can be undone during its grace window, and not after.
 
 1. **Schedule.** `DELETE /api/cell/tenants/{id}` suspends the tenant, as `tenant suspend` does, and
    records `delete_after`, 7 days later. Its hosts answer `503`. The tenant shows as
-   `deleting` in the console. A deletion of a tenant that has a preview tenant deletes the preview too.
+   `deleting` in the console and in the tenant reads, though its stored status stays `suspended`. A rerun of the job keeps the first
+   date. A deletion of a tenant that has a preview tenant deletes the preview too.
 2. **Grace window.** `POST /api/cell/tenants/{id}/deletion/cancel` clears `delete_after`, and the
-   tenant stays `suspended` until it is resumed. An export can still run in the window.
-3. **Purge.** After `delete_after`, a job removes, in this order, and each step can run again:
-   1. the tenant's hosts from the directory, its realm redirect addresses and its cert-manager
-      certificates;
+   tenant stays `suspended` until it is resumed. A cancel after `delete_after` has passed fails its job and keeps the date. A cancel
+   of a tenant with no scheduled deletion succeeds and changes nothing. An export can still run in the window.
+3. **Purge**. After `delete_after`, the [publisher](administration.md#publisher) in a cell queues a `purge` job for each main tenant, never for a preview tenant, and
+   runs it, see the [purge job](administration.md#purge-job). The job's actor is the actor of the tenant's latest succeeded `delete` job, and the tombstone names
+   them. A tenant whose deletion was cancelled has no `delete_after` and is never purged. A purge that failed is queued again no sooner than an hour after it ended,
+   and a tenant has one `purge` job at a time. The job has the eight steps below, the named steps `hosts`, `database`, `realm`, `files`, `studio`, `keys`, `rows` and
+   `directory`. They run in this order, and each step can run again, so a purge that
+   stopped finishes when it runs again. When the tenant has a preview tenant, each step removes the preview's part first, and the preview gets a tombstone of its own:
+   1. the tenant's hosts from the directory and its realm redirect addresses, and its cert-manager
+      certificates _(planned for M31)_. This step first writes the tombstone, and it takes the actor from the job input `{ "actor" }`, and refuses a job that has none;
    2. the tenant database, then its schema and runtime roles;
    3. its realm in the identity provider;
-   4. its files in object storage, when a storage binding holds them outside the database;
+   4. its files in object storage, when a storage binding holds them outside the database _(planned for M31)_. The step does nothing yet;
    5. its Studio folder;
    6. its data keys, lookup keys and backup key, see [crypto-shredding](tenant-backup-and-restore.md#backups-in-a-cell);
    7. its quota, lease, usage and counter rows;
    8. its directory entry, replaced by a tombstone in `platform.deleted_tenants`: the id, the time,
       the actor and the hosts, with no other data.
-4. **After.** The id is never used again in the cell. Each host is held back for 90 days, so a new
-   tenant does not receive the old tenant's links and emails. The platform audit records stay.
+4. **After.** The id is never used again in the cell. Each host is held back for 90 days, counted from the tombstone's
+   `deleted_at` on the database clock, so a new tenant does not receive the old tenant's links and emails. The check
+   ignores letter case. `tenant create` refuses the id and the hosts with exit code 2, `tenant host add` and `move`
+   refuse the hosts with exit code 2, and `POST /api/cell/tenants` and `POST /api/cell/tenants/{id}/hosts` answer `409`.
+   No message names the deleted tenant. A host request whose DNS check passed stays pending for the same reason. The
+   platform audit records stay.
 
 **What remains, and for how long.**
 

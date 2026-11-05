@@ -151,9 +151,14 @@ test.describe("Studio edits a process in the process editor", () => {
     );
     const status = page.getByTestId("studio-field-/steps/9/set/status");
     await expect(status.locator(".cm-editor")).toBeVisible();
-    await status
-      .getByRole("textbox", { name: "Expression", exact: true })
-      .fill("'returned'");
+    const expression = status.getByRole("textbox", {
+      name: "Expression",
+      exact: true,
+    });
+    await expression.click();
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.type("'returned'");
+    await expect(expression).toHaveText("'returned'");
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
     await expect(page.getByTestId("studio-saved")).toBeVisible();

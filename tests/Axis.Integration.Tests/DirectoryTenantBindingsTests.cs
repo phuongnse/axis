@@ -65,6 +65,9 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
             var instanceB = await fixtureB.StartAsync("Order", subjectB, fixtureB.FirstReleaseId);
 
             await app.StartAsync(CancellationToken);
+            var address = new Uri(Assert.Single(app.Urls));
+            Assert.Equal("127.0.0.1", address.Host);
+            Assert.NotEqual(5000, address.Port);
             await WaitUntilAsync(
                 async () => await fixtureA.ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", ("id", instanceA)) is not null
                     && await fixtureB.ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", ("id", instanceB)) is not null
@@ -211,7 +214,9 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
 
         // Development, so that the worker accepts the stub's http address.
         builder.Services.AddAxisWorker(builder.Configuration, new HostingEnvironment { EnvironmentName = Environments.Development });
-        return builder.Build();
+        var app = builder.Build();
+        app.MapWorkerHealth();
+        return app;
     }
 
     private static TenantBindingRow Url(string name, string url) => new() { Name = name, Kind = DeploymentBindingKinds.Url, Url = url };

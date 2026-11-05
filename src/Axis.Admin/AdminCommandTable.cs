@@ -33,4 +33,5 @@ internal sealed record AdminRun(
     TimeSpan PublisherTestLimit,
     HttpMessageHandler? IdentityProviderHandler,
     CancellationToken CancellationToken,
-    IDnsTxtResolver? DnsResolver = null);
+    IDnsTxtResolver? DnsResolver = null,
+    ICertificateWriter? CertificateWriter = null);

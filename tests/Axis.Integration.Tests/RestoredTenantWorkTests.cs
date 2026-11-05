@@ -192,6 +192,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
             builder.Configuration,
             new HostingEnvironment { EnvironmentName = Environments.Development, ContentRootPath = AppContext.BaseDirectory });
         var app = builder.Build();
+        app.MapWorkerHealth();
         await app.StartAsync(CancellationToken);
         return app;
     }

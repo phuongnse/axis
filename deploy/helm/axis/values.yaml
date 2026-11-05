@@ -76,7 +76,12 @@ cell:
   # token Secret name. cert-manager writes the certificate into the TLS Secret
   # named by secretName, which the cell's ingress serves. The DNS provider's
   # token is a reference to an existing Secret and never a value. provider is
-  # "cloudflare" or "digitalocean".
+  # "cloudflare" or "digitalocean". It also renders the Issuer <release>-tenant-hosts
+  # with the HTTP-01 challenge, for the certificate of each tenant's own host, and in
+  # a cell a ServiceAccount, Role and RoleBinding that let the publisher create those
+  # Certificates in the release namespace. http01.ingressClassName is the ingress
+  # class that cert-manager's temporary challenge Ingress uses. Blank leaves it to
+  # the cluster's default class.
   certificate:
     enabled: false
     secretName: ""
@@ -88,6 +93,8 @@ cell:
         tokenSecret:
           name: ""
           key: api-token
+    http01:
+      ingressClassName: ""
   # PgBouncer in transaction mode in front of PostgreSQL, so a cell's tenant databases fit within
   # PostgreSQL's connection limit. Turning it on renders a ConfigMap, a Deployment of one replica
   # and a Service named <release>-pgbouncer, and sends the runtime connections of the server and

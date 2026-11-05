@@ -1,139 +1,160 @@
-import { Flex, Typography } from 'antd'
-import { useEffect, useState, type ReactNode } from 'react'
+import { Flex, Spin, Typography } from 'antd'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { fetchSites, siteTitle, type SiteListItem } from '../platform/site'
-import {
-  folderDiffers,
-  releaseGroups,
-  resourceTitle,
-  type StudioReleases,
-  type StudioResourceItem,
-} from '../platform/studio'
+import { fetchSites, type SiteListItem } from '../platform/site'
+import { changeRows, type StudioReleases, type StudioResourceItem } from '../platform/studio'
+import { kindGroupNames, kindName, kindSingular, studioKinds } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
-import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
-import { useTileGrid } from './homeGrid'
-import { SiteTile, TileFocusStyle } from './SiteTile'
+import { PlatformContext } from './context'
+import { HomeTileStyle } from './HomeTileStyle'
+import { SiteTiles } from './SiteTiles'
 import { StudioChangeList } from './StudioChangeList'
-import { kindName, kindOrder, studioKindGroups, type StudioView } from './studioViews'
+import type { StudioView } from './studioViews'
+
+/** The kinds that Get started leads to, which More you can add leaves out while Get started shows. */
+const getStartedKinds = ['entity', 'page', 'site']
 
 /**
- * Proposed: the first view of an open application, which says what to do next rather than what the application
- * holds. An application with no entity yet starts with the steps that build one, each a link to where it is done.
- * Then, once it has a live release, what is live: its sites, each opening where it runs. Then what differs from the
- * live release, file by file, each opening its resource, or that everything is live, with a link to every release. Problems are not listed here: the band's problems panel
- * lists them on every page. Last, the kinds the application has none of yet, each with what it is for and when one is
- * needed.
+ * The Overview of an open application: Get started while it has no entity, Live with its live sites, the changes since
+ * the live release, then More you can add for each kind it lacks, a module's kinds counting as present. Live and the
+ * changes wait for the release history, and show nothing while it loads or when it fails. Proposed, the look: each block
+ * is a panel on `surface`, Get started's steps are numbered, the changes are Studio's change list, and More you can add
+ * groups its kinds as the sidebar does.
  */
 export function StudioOverview({
   application,
-  locale,
   resources,
-  releases,
-  addressOf,
+  moduleKinds,
+  history,
+  addressOf = mainAddress(application),
 }: {
   application: string
-  locale: string
+  /** The application's title and description, which the workspace's page heading shows above the Overview. */
+  title: string
+  description: string | null
   resources: readonly StudioResourceItem[]
+  moduleKinds: ReadonlySet<string>
   /** The release history, `failed` when it did not load, or undefined while it loads. */
-  releases: StudioReleases | 'failed' | undefined
-  /** The workspace address of a view, or of a resource, at a path inside it. */
-  addressOf: (target: StudioView | { resource: string; path?: string }) => string
+  history: StudioReleases | 'failed' | undefined
+  /** Proposed: the workspace address of a view, or of a resource, as the prototype's workspace builds them. */
+  addressOf?: (target: StudioView | { resource: string; path?: string }) => string
 }) {
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const releases = history
   const t = useText()
   const { colour, spacing } = useDesignTokens()
-  const starting = !resources.some((item) => item.kind === 'entity')
-  const active = releases !== undefined && releases !== 'failed' ? releases.active : null
-  const published = active !== null
-  const site = resources.find((item) => item.kind === 'site')
+  const loaded = releases === undefined || releases === 'failed' ? undefined : releases
+  const releaseId = loaded?.active?.releaseId ?? null
+  const present = new Set([...resources.map((item) => item.kind), ...moduleKinds])
+  const getStarted = !present.has('entity')
+  const missing = studioKinds.filter(
+    (entry) =>
+      entry.group !== 'other' && !present.has(entry.kind) && !(getStarted && getStartedKinds.includes(entry.kind)),
+  )
+  const steps: { name: string; to: string }[] = [
+    { name: 'entity', to: addressOf({ name: 'kind', kind: 'entity' }) },
+    { name: 'page', to: addressOf({ name: 'kind', kind: 'page' }) },
+    { name: 'site', to: addressOf({ name: 'kind', kind: 'site' }) },
+    { name: 'publish', to: addressOf({ name: 'releases' }) },
+  ]
 
   return (
     <Flex vertical gap={spacing.md} data-testid="studio-overview">
-      {starting && (
-        <Panel title={t('shell.studio.overview.start.title')} testId="studio-overview-start">
-          <Typography.Text style={{ color: colour.textMuted }}>
-            {t('shell.studio.overview.start.message')}
-          </Typography.Text>
+      <HomeTileStyle />
+      {getStarted && (
+        <Panel title={t('shell.studio.overview.getStarted')} testId="studio-overview-start">
           <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.sm }}>
-            <Step number={1} to={addressOf({ name: 'kind', kind: 'entity' })} name="entity" />
-            <Step number={2} to={addressOf({ name: 'kind', kind: 'page' })} name="page" />
-            <Step
-              number={3}
-              to={site ? addressOf({ resource: site.id }) : addressOf({ name: 'kind', kind: 'site' })}
-              name="site"
-            />
-            <Step number={4} name="try" />
+            {steps.map((step, index) => (
+              <li key={step.name} style={{ display: 'flex', gap: spacing.xs }}>
+                <Typography.Text style={{ color: colour.textMuted, minWidth: 16 }}>{index + 1}.</Typography.Text>
+                <Link to={step.to} style={{ color: colour.primaryText }}>
+                  {t(`shell.studio.overview.start.${step.name}`)}
+                </Link>
+              </li>
+            ))}
           </ol>
         </Panel>
       )}
-      {active !== null && <Live application={application} releaseId={active.releaseId} locale={locale} />}
-      {(!starting || published) && releases !== undefined && (
-        <Release releases={releases} resources={resources} locale={locale} addressOf={addressOf} />
+      {releaseId !== null && (
+        <Panel title={t('shell.studio.overview.live')} testId="studio-overview-live">
+          <LiveSites application={application} locale={locale} releaseId={releaseId} />
+        </Panel>
       )}
-      <More resources={resources} skip={starting ? startKinds : []} addressOf={addressOf} />
+      {loaded !== undefined && (
+        <Panel title={t('shell.studio.overview.changes')} testId="studio-overview-release">
+          {loaded.changes === null ? (
+            <Typography.Text style={{ color: colour.textMuted }}>
+              {t('shell.studio.overview.changes.notPublished')}
+            </Typography.Text>
+          ) : loaded.changes.length === 0 ? (
+            <Typography.Text style={{ color: colour.textMuted }}>
+              {t('shell.studio.overview.changes.allLive')}
+            </Typography.Text>
+          ) : (
+            <StudioChangeList
+              testId="studio-overview-changes"
+              rows={changeRows(loaded.changes, [...resources], locale, t).map((row, index) => ({
+                key: row.key,
+                name: row.name,
+                kind: row.kind === null ? '' : kindSingular(row.kind, t),
+                change: t(`shell.studio.overview.change.${row.change}`),
+                to: row.resourceId === null ? undefined : addressOf({ resource: row.resourceId }),
+                // The rows come in the order `changeRows` gives them.
+                order: index,
+              }))}
+            />
+          )}
+          <Link to={addressOf({ name: 'releases' })} style={{ color: colour.primaryText, alignSelf: 'flex-start' }}>
+            {t('shell.studio.overview.changes.releases')}
+          </Link>
+        </Panel>
+      )}
+      {missing.length > 0 && (
+        <Panel title={t('shell.studio.overview.more')} testId="studio-overview-more">
+          {kindGroupNames
+            .map((group) => ({ group, kinds: missing.filter((entry) => entry.group === group) }))
+            .filter(({ kinds }) => kinds.length > 0)
+            .map(({ group, kinds }) => (
+              <Flex key={group} vertical gap={spacing.xs}>
+                <Typography.Text strong>{t(`shell.studio.nav.group.${group}`)}</Typography.Text>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.sm }}>
+                  {kinds.map((entry) => (
+                    <li key={entry.kind} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <Link to={addressOf({ name: 'kind', kind: entry.kind })} style={{ color: colour.primaryText }}>
+                        {kindName(entry.kind, t)}
+                      </Link>
+                      <Typography.Text>{t(`shell.studio.overview.more.${entry.kind}.purpose`)}</Typography.Text>
+                      <Typography.Text style={{ color: colour.textMuted }}>
+                        {t(`shell.studio.overview.more.${entry.kind}.when`)}
+                      </Typography.Text>
+                    </li>
+                  ))}
+                </ul>
+              </Flex>
+            ))}
+        </Panel>
+      )}
     </Flex>
   )
 }
 
-/** The kinds that Get started already leads to. */
-const startKinds = ['entity', 'page', 'site']
-
-/**
- * Proposed: every kind the application has no resource of yet, by the sidebar's groups: the kind as a link to its
- * list, where New resource… starts with it, what it is for, and in textMuted when one is needed. Every kind the
- * dialog offers is here, a migration too, which the entity designer usually writes itself.
- */
-function More({
-  resources,
-  skip,
-  addressOf,
-}: {
-  resources: readonly StudioResourceItem[]
-  skip: readonly string[]
-  addressOf: (target: StudioView) => string
-}) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const present = new Set(resources.map((item) => item.kind))
-  const groups = studioKindGroups
-    .map((group) => ({
-      key: group.key,
-      kinds: group.kinds
-        .map((entry) => entry.kind)
-        .filter((kind) => starterKinds.includes(kind) && !present.has(kind) && !skip.includes(kind)),
-    }))
-    .filter((group) => group.kinds.length > 0)
-  if (groups.length === 0) {
-    return null
+/** The addresses `main`'s workspace reads: a kind's list by `kind`, the releases by `view`, a resource by `resource`. */
+function mainAddress(application: string) {
+  return (target: StudioView | { resource: string; path?: string }) => {
+    const extra: Record<string, string> =
+      'resource' in target
+        ? { resource: target.resource }
+        : target.name === 'kind'
+          ? { kind: target.kind }
+          : target.name === 'releases'
+            ? { view: 'releases' }
+            : {}
+    return `/studio?${new URLSearchParams({ app: application, ...extra })}`
   }
-  return (
-    <Panel title={t('shell.studio.overview.more.title')} testId="studio-overview-more">
-      <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.more.message')}</Typography.Text>
-      {groups.map((group) => (
-        <Flex key={group.key} vertical gap={spacing.xs}>
-          <Typography.Text strong>{t(`shell.studio.nav.${group.key}`)}</Typography.Text>
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.sm }}>
-            {group.kinds.map((kind) => (
-              // Proposed: each kind on lines of its own, as a site tile reads: the kind as the link, what it is for under
-              // it, and when one is needed in textMuted. No separator joins them on one line.
-              <li key={kind} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <Link to={addressOf({ name: 'kind', kind })} style={{ color: colour.primaryText }}>
-                  {t(`shell.studio.kind.${kind}`)}
-                </Link>
-                <Typography.Text>{t(`shell.studio.overview.kind.${kind}`)}</Typography.Text>
-                <Typography.Text style={{ color: colour.textMuted }}>
-                  {t(`shell.studio.overview.when.${kind}`)}
-                </Typography.Text>
-              </li>
-            ))}
-          </ul>
-        </Flex>
-      ))}
-    </Panel>
-  )
 }
 
-/** A block of the overview: a `heading5` title over its content, on `surface`. */
+/** Proposed: a block of the overview: a `heading5` title over its content, on `surface`. */
 function Panel({ title, testId, children }: { title: string; testId: string; children: ReactNode }) {
   const { colour, spacing, radius } = useDesignTokens()
   return (
@@ -158,162 +179,38 @@ function Panel({ title, testId, children }: { title: string; testId: string; chi
   )
 }
 
-/** One step of building a new application: its number, its title as the link to where it is done, and one line. */
-function Step({ number, to, name }: { number: number; to?: string; name: string }) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const title = t(`shell.studio.overview.start.${name}.title`)
-  return (
-    <li style={{ display: 'flex', gap: spacing.xs }}>
-      <Typography.Text style={{ color: colour.textMuted, minWidth: 16 }}>{number}.</Typography.Text>
-      <Flex vertical>
-        {to ? (
-          <Link to={to} style={{ color: colour.primaryText, fontWeight: 500 }}>
-            {title}
-          </Link>
-        ) : (
-          <Typography.Text style={{ fontWeight: 500 }}>{title}</Typography.Text>
-        )}
-        <Typography.Text style={{ color: colour.textMuted }}>
-          {t(`shell.studio.overview.start.${name}.text`)}
-        </Typography.Text>
-      </Flex>
-    </li>
-  )
-}
-
-/**
- * Proposed: what differs from the live release, which is what a publish would change: one row per file that
- * differs, its resource's label as the link that opens it, its kind and whether it was added, changed or removed, or
- * one line that everything is live. Then a link to every release.
- */
-function Release({
-  releases,
-  resources,
-  locale,
-  addressOf,
-}: {
-  releases: StudioReleases | 'failed'
-  resources: readonly StudioResourceItem[]
-  locale: string
-  addressOf: (target: StudioView | { resource: string }) => string
-}) {
+/** The application's live sites as the home page shows them, each opening in a new tab, so Studio stays open. */
+function LiveSites({ application, locale, releaseId }: { application: string; locale: string; releaseId: string }) {
   const t = useText()
   const { colour } = useDesignTokens()
-  let body: ReactNode
-  if (releases === 'failed') {
-    body = <Typography.Text type="danger">{t('shell.studio.releases.loadFailed')}</Typography.Text>
-  } else {
-    // Proposed: no line names the live release or says that changes are not live: the band says both, beside
-    // Publish…, and the Releases list says who published it and when.
-    const live = releaseGroups(releases).find((release) => release.live)
-    if (!live) {
-      body = (
-        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.release.none')}</Typography.Text>
-      )
-    } else {
-      const changes = releases.changes ?? []
-      body = (
-        <>
-          {folderDiffers(releases) ? (
-            <StudioChangeList
-              testId="studio-overview-changes"
-              rows={changes.map((change) => {
-                const item = resources.find((resource) => resource.file === change.path)
-                // Proposed: a removed file is named from the live release, as the folder no longer holds it, and is
-                // not a link, as there is nothing left to open.
-                const kind = item?.kind ?? change.kind
-                return {
-                  key: change.path,
-                  name: item
-                    ? resourceTitle(item, locale, t)
-                    : resourceTitle(
-                        {
-                          file: change.path,
-                          name: change.name ?? null,
-                          titles: change.titles ?? null,
-                          locale: change.locale ?? null,
-                        },
-                        locale,
-                      ),
-                  kind: kind ? kindName(kind, t) : '',
-                  change: t(`shell.studio.overview.change.${change.change}`),
-                  to: item ? addressOf({ resource: item.id }) : undefined,
-                  order: kindOrder(kind),
-                }
-              })}
-            />
-          ) : (
-            <Typography.Text style={{ color: colour.textMuted }}>
-              {t('shell.studio.overview.release.allLive')}
-            </Typography.Text>
-          )}
-          <Link to={addressOf({ name: 'releases' })} style={{ color: colour.primaryText, alignSelf: 'flex-start' }}>
-            {t('shell.studio.overview.release.history')}
-          </Link>
-        </>
-      )
-    }
-  }
-  return (
-    <Panel title={t('shell.studio.overview.changes.title')} testId="studio-overview-release">
-      {body}
-    </Panel>
-  )
-}
-
-/** Proposed: a kind's name for one resource, in the singular, such as Entity, where the sidebar's list says Entities. */
-
-/**
- * Proposed: what runs now, the application's live sites as the home page shows them, each its mark, its title as the
- * link and its description, in the home page's grid and order. They come from the sites list, which holds only what is live, so a
- * site added since the live release is not here, and a site's title and description are the live release's. Each opens
- * in a new tab, so Studio stays open. The block shows once the application has a live release.
- */
-function Live({ application, releaseId, locale }: { application: string; releaseId: string; locale: string }) {
-  const t = useText()
-  const { colour } = useDesignTokens()
-  const grid = useTileGrid()
   const [sites, setSites] = useState<SiteListItem[] | 'failed'>()
+
   useEffect(() => {
     const controller = new AbortController()
     fetchSites(controller.signal).then(
-      (list) =>
-        setSites(
-          (list ?? [])
-            .filter((site) => site.application.name === application)
-            .sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale)),
-        ),
-      () => !controller.signal.aborted && setSites('failed'),
+      (answer) => setSites(answer ?? 'failed'),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        console.warn('Loading the sites failed', error)
+        setSites('failed')
+      },
     )
     return () => controller.abort()
-  }, [application, releaseId, locale])
+  }, [releaseId])
+
   if (sites === undefined) {
-    return null
+    return <Spin />
   }
-  let body: ReactNode
   if (sites === 'failed') {
-    body = <Typography.Text type="danger">{t('shell.studio.overview.live.failed')}</Typography.Text>
-  } else if (sites.length === 0) {
-    body = <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.live.none')}</Typography.Text>
-  } else {
-    body = (
-      <div data-testid="studio-overview-sites" style={grid}>
-        <TileFocusStyle />
-        {sites.map((site) => (
-          <SiteTile
-            key={site.path}
-            site={site}
-            locale={locale}
-            newTab={t('shell.studio.overview.site.opens').replace('{site}', siteTitle(site, locale))}
-          />
-        ))}
-      </div>
+    return (
+      <Typography.Text style={{ color: colour.warningText }}>{t('shell.studio.overview.live.failed')}</Typography.Text>
     )
   }
-  return (
-    <Panel title={t('shell.studio.overview.live.title')} testId="studio-overview-live">
-      {body}
-    </Panel>
-  )
+  const own = sites.filter((site) => site.application.name === application)
+  if (own.length === 0) {
+    return <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.live.none')}</Typography.Text>
+  }
+  return <SiteTiles sites={own} locale={locale} newTab />
 }
