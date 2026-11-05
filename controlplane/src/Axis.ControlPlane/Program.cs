@@ -1,4 +1,5 @@
 using Axis.ControlPlane;
+using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
@@ -27,6 +28,9 @@ builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(options.ConnectionStr
 builder.Services.AddSingleton(new JobRunnerOptions());
 builder.Services.AddSingleton<IJobHandler, SendEmailJobHandler>();
 builder.Services.AddHostedService<JobRunner>();
+
+// The clients of the region's cells. With no cell listed they hold nothing and the service starts as before.
+builder.Services.AddCellClients(options);
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])

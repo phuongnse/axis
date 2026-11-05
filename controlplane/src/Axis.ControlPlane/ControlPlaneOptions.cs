@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
+using Axis.ControlPlane.Cells;
 using MimeKit;
 using Npgsql;
 
@@ -6,8 +8,9 @@ namespace Axis.ControlPlane;
 
 /// <summary>
 /// The <c>ControlPlane</c> settings of the service, see the settings table in
-/// <c>docs/reference/control-plane.md#operators</c>. Every setting is required, except the mail relay's user name, and a bad value stops the start.
-/// A message names the setting and never holds its value.
+/// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
+/// and the mail relay are required, except the relay's user name. The cell settings are optional, and once a cell is
+/// listed, all of them are required. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
 {
@@ -21,6 +24,24 @@ public sealed partial class ControlPlaneOptions
 
     /// <summary>The connection string of the control plane database.</summary>
     public string? ConnectionString { get; set; }
+
+    /// <summary>The cells of the region. Each is reached over mutual TLS, see <see cref="CellOptions"/>.</summary>
+    public List<CellOptions> Cells { get; } = [];
+
+    /// <summary>
+    /// The client secret of each cell's operator realm client, by cell id. It comes from the key-per-file secret
+    /// <c>ControlPlane__CellSecrets__&lt;cell id&gt;</c>, never from a plain setting.
+    /// </summary>
+    public Dictionary<string, string> CellSecrets { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The PEM certificate and private key that the control plane presents to every cell.</summary>
+    public CellClientCertificateOptions? CellClientCertificate { get; set; }
+
+    /// <summary>
+    /// The PEM file of the region's internal certificate authority, which the cells' server certificates must chain to.
+    /// Without it the system trust store decides.
+    /// </summary>
+    public string? CellCertificateAuthorityPath { get; set; }
 
     /// <summary>The address that every email of the control plane comes from, such as <c>no-reply@mail.example.com</c>.</summary>
     public string? MailFrom { get; set; }
@@ -68,6 +89,11 @@ public sealed partial class ControlPlaneOptions
             problems.Add(problem);
         }
 
+        if (options.Cells.Count > 0)
+        {
+            problems.AddRange(CellProblems(options));
+        }
+
         if (string.IsNullOrWhiteSpace(options.MailFrom))
         {
             problems.Add(Required(nameof(MailFrom)));
@@ -106,6 +132,80 @@ public sealed partial class ControlPlaneOptions
         return options;
     }
 
+    private static List<string> CellProblems(ControlPlaneOptions options)
+    {
+        var problems = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < options.Cells.Count; index++)
+        {
+            var cell = options.Cells[index];
+            var prefix = $"{SectionName}:{nameof(Cells)}:{index.ToString(CultureInfo.InvariantCulture)}";
+            var idIsValid = false;
+            if (string.IsNullOrWhiteSpace(cell?.Id))
+            {
+                problems.Add($"The setting {prefix}:{nameof(CellOptions.Id)} is required.");
+            }
+            else if (!CellId().IsMatch(cell.Id))
+            {
+                problems.Add($"The setting {prefix}:{nameof(CellOptions.Id)} must be lowercase letters and digits, joined by single hyphens.");
+            }
+            else if (!seen.Add(cell.Id))
+            {
+                problems.Add($"The setting {prefix}:{nameof(CellOptions.Id)} repeats the id of an earlier cell.");
+            }
+            else
+            {
+                idIsValid = true;
+            }
+
+            AddHttpsUrlProblem(problems, $"{prefix}:{nameof(CellOptions.InternalUrl)}", cell?.InternalUrl);
+            AddHttpsUrlProblem(problems, $"{prefix}:{nameof(CellOptions.TokenUrl)}", cell?.TokenUrl);
+            if (string.IsNullOrWhiteSpace(cell?.ClientId))
+            {
+                problems.Add($"The setting {prefix}:{nameof(CellOptions.ClientId)} is required.");
+            }
+
+            if (idIsValid && !(options.CellSecrets.TryGetValue(cell!.Id!, out var secret) && !string.IsNullOrWhiteSpace(secret)))
+            {
+                problems.Add($"The setting {SectionName}:{nameof(CellSecrets)}:{cell.Id} is required.");
+            }
+        }
+
+        var certificate = $"{SectionName}:{nameof(CellClientCertificate)}";
+        AddFileProblem(problems, $"{certificate}:{nameof(CellClientCertificateOptions.Path)}", options.CellClientCertificate?.Path);
+        AddFileProblem(problems, $"{certificate}:{nameof(CellClientCertificateOptions.KeyPath)}", options.CellClientCertificate?.KeyPath);
+        if (!string.IsNullOrWhiteSpace(options.CellCertificateAuthorityPath) && !File.Exists(options.CellCertificateAuthorityPath))
+        {
+            problems.Add($"The file of the setting {SectionName}:{nameof(CellCertificateAuthorityPath)} does not exist.");
+        }
+
+        return problems;
+    }
+
+    private static void AddHttpsUrlProblem(List<string> problems, string setting, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            problems.Add($"The setting {setting} is required.");
+        }
+        else if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+        {
+            problems.Add($"The setting {setting} must be an absolute https URL.");
+        }
+    }
+
+    private static void AddFileProblem(List<string> problems, string setting, string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            problems.Add($"The setting {setting} is required when a cell is listed.");
+        }
+        else if (!File.Exists(path))
+        {
+            problems.Add($"The file of the setting {setting} does not exist.");
+        }
+    }
+
     private static string Required(string name) => $"The setting {SectionName}:{name} is required.";
 
     // The rule of the platform's hosts for their own databases: every environment except Development and Testing.
@@ -134,4 +234,7 @@ public sealed partial class ControlPlaneOptions
 
     [GeneratedRegex("^[a-z0-9]+$")]
     private static partial Regex RegionCode();
+
+    [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
+    private static partial Regex CellId();
 }

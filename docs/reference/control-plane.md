@@ -6,12 +6,13 @@ Detailed reference for the control plane: the service that runs Axis's own busin
 [D126](../decisions/d126-sign-up-trials-and-the-control-plane.md) and
 [D127](../decisions/d127-plans-payments-and-invoices.md). Everything in this file is _(planned for
 M33)_, except the parts that billing adds, _(planned for M34)_, and except the service itself, its
-settings, its health, its [durable jobs](#its-own-work), its audit records, its image and its Helm chart, which
-are built: `controlplane/src/Axis.ControlPlane` starts, checks its `ControlPlane:` settings, applies its own
-migrations, runs its job queue and answers `/health/live` and `/health/ready`, the `axis-controlplane` image
-packs it, and `deploy/helm/axis-controlplane` installs it. The only job kind so far is `sendEmail`, see
-[emails](#its-own-work). The job runner takes the other kinds as the issues that add provisioning and the
-subscription clock register their handlers. The conventions of [architecture.md](../architecture.md) apply.
+settings, its health, its [durable jobs](#its-own-work), its audit records, its [clients of the cells](#reaching-the-cells),
+its image and its Helm chart, which are built: `controlplane/src/Axis.ControlPlane` starts, checks its `ControlPlane:`
+settings, applies its own migrations, runs its job queue, holds one client for each listed cell and answers
+`/health/live` and `/health/ready`, the `axis-controlplane` image packs it, and `deploy/helm/axis-controlplane`
+installs it. The only job kind so far is `sendEmail`, see [emails](#its-own-work). The job runner takes the other kinds
+as the issues that add provisioning and the subscription clock register their handlers, and no job uses a cell client
+yet. The conventions of [architecture.md](../architecture.md) apply.
 
 ## What it is
 
@@ -43,14 +44,29 @@ subscription clock register their handlers. The conventions of [architecture.md]
 
 - **One client for each cell.** The cell's [operator realm](cell-console.md#sign-in) has a client for
   the control plane, with the client credentials grant and the role `Cell:OperatorRole`. Its secret is
-  a Kubernetes Secret of the control plane, never a setting.
-- **Private network.** The control plane calls `Cell:InternalUrl`, never the public console host. The
-  cluster of the control plane and the cells of its region share a private network, and the calls use
-  mutual TLS: the cell accepts on its internal listener only a client certificate that the region's
-  internal certificate authority issued to the control plane.
+  a Kubernetes Secret of the control plane, never a setting. The client gets a token from the realm's
+  `TokenUrl` with that grant, keeps it until one minute before it expires, and sends it as a bearer
+  token. When the cell answers `401`, it drops the token, gets a new one and sends the call once more.
+  A second `401` is an error.
+- **Private network.** The control plane calls the cell's `InternalUrl` (the cell's `Cell:InternalUrl`), never the
+  public console host. The cluster of the control plane and the cells of its region share a private network, and
+  the calls use mutual TLS: the cell accepts on its internal listener only a client certificate that the region's
+  internal certificate authority issued to the control plane. Every call, the token request included, presents
+  the control plane's client certificate, follows no redirect and goes over `https` only: a cell address that is
+  not `https` stops the start. With `ControlPlane:CellCertificateAuthorityPath` the client trusts only a
+  server certificate that chains to that authority, and checks no revocation list.
 - **Idempotent.** Every `POST` to a cell carries an `Idempotency-Key` that the control plane derives
-  from its own record, such as the sign-up id, so a retried call never makes a second tenant.
+  from its own record, such as the sign-up id, so a retried call never makes a second tenant. The key is
+  `<operation>:<record id>`, such as `tenant-create:3f2a…`, and a retry must send the same body, because the cell
+  answers `422` for the same key with another body.
 - **Jobs.** The control plane polls a cell job until it ends, see [jobs](tenant-lifecycle.md#provisioning-api).
+  It reads `GET /api/cell/jobs/{id}` after 1 s, then after twice the wait each time up to 30 s, until the job is
+  `succeeded` or `failed`, and returns its steps and error. Following a job for more than 30 minutes throws, and so
+  does a failed call, so the job runner of the control plane retries the handler with the same key and finds the
+  same cell job. These timings are code defaults and not `ControlPlane:` settings.
+- **Built, not wired.** The Helm chart does not mount the client certificate, the authority file or the cells'
+  secrets yet, and the cell's internal listener is _(planned for M31)_. So a real region cannot use the clients
+  until the chart wiring exists.
 
 ## Its own work
 
@@ -133,11 +149,13 @@ subscription clock register their handlers. The conventions of [architecture.md]
   the mail settings, the [plans](plans.md) and the providers' non-secret values. Secrets are
   Kubernetes Secrets.
 
-The service reads these settings at start, and the rest are _(planned for M33)_. Every one is required,
-except `ControlPlane:Mail:UserName`. A missing or wrong value stops the start, and the message names the
-setting and never its value. The connection string and the mail password may also come from the
-key-per-file secrets `/run/secrets/ControlPlane__ConnectionString` and
-`/run/secrets/ControlPlane__Mail__Password`.
+The service reads these settings at start, and the rest are _(planned for M33)_. The region, the tenant domain, the
+connection string, the mail sender and the mail relay are required, except `ControlPlane:Mail:UserName`. The cell
+settings are optional, and once a cell is listed, all of its settings, its secret and the client certificate are
+required. A missing or wrong value stops the start, and the message names the setting, with the index of a cell, and
+never its value. The connection string, the mail password and the cells' secrets may also come from the key-per-file
+secrets `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__Mail__Password` and
+`/run/secrets/ControlPlane__CellSecrets__<cell id>`.
 
 | Setting | Meaning | Start check |
 | --- | --- | --- |
@@ -150,6 +168,13 @@ key-per-file secrets `/run/secrets/ControlPlane__ConnectionString` and
 | `ControlPlane:Mail:UseTls` | Whether the relay connection uses TLS. Default on | Outside Development and Testing it must be on |
 | `ControlPlane:Mail:UserName` | The user name to sign in to the relay. Optional | When set, `ControlPlane:Mail:Password` is required |
 | `ControlPlane:Mail:Password` | The password of the user name, from the secret `ControlPlane__Mail__Password` | Never a value in a setting file or a message |
+| `ControlPlane:Cells:<n>:Id` | The cell id, such as `vn-1` | Lowercase letters and digits, joined by single hyphens, and unique |
+| `ControlPlane:Cells:<n>:InternalUrl` | The address of the cell's internal listener | An absolute `https` URL |
+| `ControlPlane:Cells:<n>:TokenUrl` | The token endpoint of the cell's operator realm | An absolute `https` URL |
+| `ControlPlane:Cells:<n>:ClientId` | The id of the realm's client for the control plane | Not empty |
+| `ControlPlane:CellSecrets:<cell id>` | The client secret of that cell's client, a key-per-file secret | Not empty for every listed cell |
+| `ControlPlane:CellClientCertificate:Path` and `:KeyPath` | The PEM certificate and private key that the control plane presents to every cell | Both set and both files exist, when a cell is listed |
+| `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
 At start the service applies its migrations to the `control_plane` schema, with the history table
 `control_plane.__control_plane_migrations`. A failed migration stops the start. One database role runs
