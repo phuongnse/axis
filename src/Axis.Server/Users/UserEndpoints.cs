@@ -19,7 +19,8 @@ namespace Axis.Server.Users;
 /// <c>Studio:Tests</c> is on. For a user of Studio it also gives the host of the tenant's preview tenant, when the
 /// server serves one. It also says whether the user may use the operator console: the user holds the role that
 /// <c>Console:OperatorRole</c> names. It also says whether the user may administer users: the user holds the role that
-/// <c>Users:AdministratorRole</c> names and the tenant is not a preview tenant, which has no users page.
+/// <c>Users:AdministratorRole</c> names and the tenant is not a preview tenant, which has no users page. It also says the
+/// tenant's status and, for an administrator in a cell, the address of the tenant's page in the billing portal.
 /// <para>
 /// <c>GET /api/users?search=&amp;page=&amp;pageSize=</c> lists the users of the tenant's realm to an administrator. It reads
 /// them through the realm's users client and joins <c>axis.user_profiles</c> for the status and the last sign-in. The search
@@ -175,7 +176,7 @@ internal static partial class UserEndpoints
 
     // It takes the request rather than the context, so it binds as a route handler and its result is written.
     private static async Task<IResult> GetCurrentUserAsync(
-        HttpRequest request, StudioOptions studio, ConsoleSettings console, UsersSettings users, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
+        HttpRequest request, StudioOptions studio, ConsoleSettings console, UsersSettings users, CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         await CurrentUsers.FindAsync(request.HttpContext) is { } user
             ? Results.Ok(new CurrentUserMeResponse(
                 user.Id,
@@ -187,8 +188,15 @@ internal static partial class UserEndpoints
                 studio.AllowsCreate(user.Roles),
                 PreviewHost(studio.Allows(user.Roles), catalog, tenants),
                 console.Allows(user.Roles),
-                users.Allows(user.Roles) && !IsPreview(catalog, tenants)))
+                users.Allows(user.Roles) && !IsPreview(catalog, tenants),
+                tenants.Current is { ReadOnly: true } ? "readOnly" : "active",
+                BillingUrl(users.Allows(user.Roles), cell, catalog, tenants)))
             : Grants.SignInRequired();
+
+    private static string? BillingUrl(bool administrator, CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
+        cell.IsCell && administrator && !IsPreview(catalog, tenants) && tenants.Current is { } tenant
+            ? $"https://account.{cell.TenantDomain}/tenants/{Uri.EscapeDataString(tenant.TenantId)}"
+            : null;
 
     private static bool IsPreview(ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         tenants.Current is { } tenant && catalog.Find(tenant.TenantId)?.PreviewOf is not null;
@@ -254,6 +262,10 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// the tenant's preview tenant. <c>StudioPreviewHost</c> is <c>null</c> when the user may not use Studio or the tenant has
 /// no served preview tenant. <c>Console</c> is true when the user holds the operator console role.
 /// <c>Users</c> is true when the user holds the administrator role and the tenant is not a preview tenant.
+/// <c>TenantStatus</c> is <c>readOnly</c> while the tenant is read-only, otherwise <c>active</c>. <c>BillingUrl</c> is the
+/// tenant's page in the billing portal, <c>https://account.{Cell:TenantDomain}/tenants/{tenant id}</c>, and is <c>null</c>
+/// outside a cell, for a user without the administrator role and in a preview tenant.
 /// </summary>
 internal sealed record CurrentUserMeResponse(
-    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, string? StudioPreviewHost, bool Console, bool Users);
+    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, string? StudioPreviewHost, bool Console, bool Users,
+    string TenantStatus, string? BillingUrl);
