@@ -338,8 +338,8 @@ through role membership.
   `samples/postgres/init-roles.sql`. PostgreSQL runs that file only on an empty
   volume, so an existing Compose volume has no `axis_scenario` and a `test`
   request fails there until `docker compose down -v`, which deletes the local
-  data. Only the publisher holds
-  it, through the setting `Scenarios:ServerConnectionString`. It creates one
+  data. Only the publisher and `cell restore-check` hold
+  it, through the setting `Scenarios:ServerConnectionString`. Each creates one
   database `axis_scenario_<uuid>` for each scenario, owns it and drops it after
   the scenario. The server holds no right to create databases, and neither does
   the worker. They hold no role that may. On a shared PostgreSQL server every

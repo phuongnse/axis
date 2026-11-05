@@ -93,9 +93,9 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
 ### Planned work
 
 Work that is agreed but not built yet is marked `_(planned for Mx)_`, where Mx is the milestone that
-builds it, in one of two places: on a line of its own under the heading of a section that is planned
-as a whole, so that the heading's anchor never changes, or right after the bold lead-in of a single
-planned rule in a list. A marker never sits in the middle of a sentence, and nothing else on a page
+builds it, in one of two places: on a line of its own under the title of a page or the heading of a
+section that is planned as a whole, so that no anchor ever changes, or right after the bold lead-in of
+a single planned rule in a list. A marker never sits in the middle of a sentence, and nothing else on a page
 says what is built.
 
 A planned rule describes the agreed result. It does not also describe what Axis does until then: the
