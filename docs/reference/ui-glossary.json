@@ -5,20 +5,23 @@
     "vi"
   ],
   "keep": [
-    "Axis",
-    "Studio",
-    "JSON",
     "API",
-    "ID",
-    "URL",
-    "CSV",
-    "XLSX",
-    "ZIP",
-    "PDF",
-    "webhook",
     "AXC codes such as AXC0035",
+    "Axis",
+    "CSV",
+    "HTML",
+    "ID",
+    "JSON",
+    "names an author gave",
+    "PDF",
+    "PIN",
     "placeholders such as {count}",
-    "names an author gave"
+    "Studio",
+    "TOTP",
+    "URL",
+    "webhook",
+    "XLSX",
+    "ZIP"
   ],
   "terms": [
     {
@@ -171,13 +174,13 @@
       },
       "options": {
         "vi": [
-          "thực thể",
           "đối tượng",
-          "bảng dữ liệu",
+          "bảng",
+          "thực thể",
           "entity"
         ]
       },
-      "note": "Today \"thực thể\" and \"entity\" are mixed, 25 to 20. \"Đối tượng\" is Salesforce's Vietnamese; \"bảng\" is Dataverse's."
+      "note": "Today \"thực thể\" and \"entity\" are mixed, 25 to 20. Microsoft Dataverse says \"Bảng\", which would clash with the table widget's \"bảng\"; Odoo says \"Mô hình\" and \"Đối tượng\". No product shows \"thực thể\"."
     },
     {
       "concept": "Field",
@@ -188,7 +191,8 @@
         "vi": [
           "field"
         ]
-      }
+      },
+      "note": "Odoo says \"Trường\"; Microsoft Dataverse says \"Cột\"."
     },
     {
       "concept": "Record",
@@ -199,7 +203,8 @@
         "vi": [
           "record"
         ]
-      }
+      },
+      "note": "Odoo says \"Bản ghi\"; Microsoft Dataverse mixes \"Hàng\" and \"Bản ghi\"."
     },
     {
       "concept": "Display field",
@@ -240,20 +245,15 @@
     {
       "concept": "Enum (field type)",
       "en": "Enum",
-      "vi": "Danh sách chọn",
-      "status": "decide",
+      "vi": "Lựa chọn",
+      "status": "proposed",
       "avoid": {
         "vi": [
-          "enum"
+          "enum",
+          "danh sách chọn"
         ]
       },
-      "options": {
-        "vi": [
-          "Danh sách chọn",
-          "Lựa chọn",
-          "Enum"
-        ]
-      }
+      "note": "Microsoft Dataverse and Odoo both name it \"Lựa chọn\"."
     },
     {
       "concept": "Reference (field type)",
@@ -520,17 +520,17 @@
       "avoid": {
         "vi": [
           "Xoá",
-          "Loại bỏ"
+          "Xóa bỏ"
         ]
       },
-      "note": "Destroys a thing. \"Remove\" takes it out of a list and destroys nothing."
+      "note": "Destroys a thing. Microsoft's products say \"Xóa\"; \"Remove\" is \"Loại bỏ\"."
     },
     {
       "concept": "Action: Remove",
       "en": "Remove",
-      "vi": "Bỏ",
+      "vi": "Loại bỏ",
       "status": "proposed",
-      "note": "Takes a thing out of a list or a setting; the thing itself stays."
+      "note": "Takes a thing out of a list or a setting; the thing itself stays. Microsoft's Vietnamese guide: Remove is \"Loại bỏ\"."
     },
     {
       "concept": "Action: Add",
@@ -627,6 +627,20 @@
       "en": "Done",
       "vi": "Xong",
       "status": "proposed"
+    },
+    {
+      "concept": "Action: Clear",
+      "en": "Clear",
+      "vi": "Xóa",
+      "status": "proposed",
+      "note": "Empties a value or a search; destroys nothing that was saved."
+    },
+    {
+      "concept": "Error",
+      "en": "Error",
+      "vi": "lỗi",
+      "status": "proposed",
+      "note": "Every error message says \"lỗi\", as Microsoft's guide asks."
     }
   ]
 }

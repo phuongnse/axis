@@ -31,7 +31,7 @@ These hold in every language.
   diagnostic codes (`AXC0035`), names an author gave (a field name, a resource name) and placeholders such as `{count}`
   stay as they are. The glossary's `keep` list holds them.
 - **Plain, polite and neutral.** Axis is software for companies: no slang, no jokes, no exclamation marks, and no
-  familiar tone. Polite does not mean wordy.
+  familiar tone. Polite does not mean wordy. How a text addresses the person is each language's own rule, below.
 - **Short.** A button is one to three words. A label is a noun phrase. A help text is one sentence, two at most. Leave
   room for languages that run longer: Vietnamese often takes a third more space than English.
 
@@ -79,20 +79,46 @@ and the verbs of the common actions, with the term of each locale. A term has a 
 
 ## Vietnamese
 
-- **Neutral, without a pronoun.** Most texts need no subject: "Nhập tên.", "Không thể lưu bản ghi." Use "bạn" only when a
-  sentence cannot do without one. Never "quý khách", "mình", or a familiar tone.
+Where this section is silent, follow Microsoft's [Vietnamese Localization Style Guide][ms-vi], whose voice it shares:
+the meaning rewritten as a Vietnamese writer would say it, in short, everyday, modern words.
+
+- **"Bạn" when speaking to the person, no subject otherwise.** Most texts need no subject: "Nhập tên.", "Không lưu được
+  bản ghi.". A question or advice addressed to the person says "bạn": "Bạn có muốn xóa vai trò này không?", "Bạn nên
+  sao lưu trước khi khôi phục.". Axis speaking of itself says "chúng tôi", rarely. Never "người dùng" for the person
+  reading, and never "quý khách", "mình" or a familiar tone.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
-- **Validation messages as plain imperatives.** "Nhập tên.", "Chọn loại." Not "Vui lòng…" or "Hãy…", which only add
-  length.
+- **"Hãy" and "Vui lòng" only where they belong.** A validation message, a button or a tooltip takes the bare verb:
+  "Nhập tên.", "Chọn loại.". A sentence of guidance may start with "Hãy": "Hãy đăng nhập lại để đổi vai trò.". "Vui lòng"
+  is for a real request where English says "please", and is rare.
+- **Error messages in one pattern.** Declarative, active, without "bị", ending with a period. The same meaning always
+  takes the same phrase:
+
+  | English                                        | Vietnamese          | Not                            |
+  | ---------------------------------------------- | ------------------- | ------------------------------ |
+  | Could not save…, Failed to save…, Cannot save… | Không lưu được…     | Lưu … thất bại, Không thể lưu… |
+  | Cannot find…, Unable to find…, … not found     | Không tìm thấy…     | Không thể tìm thấy…            |
+  | Not enough…, Insufficient…                     | Không đủ…           |                                |
+  | An error occurred.                             | Có lỗi.             | Đã xảy ra lỗi.                 |
+  | You do not have access to…                     | Bạn không có quyền… |                                |
+
+  "Không thể" stays for what cannot be done at all, by rule, not for a failure: "Không thể xóa vai trò đang được dùng.".
+
+- **Modern words over old or stiff ones.** "Không tải được", not "Tải về không thành công"; "Xin chờ", not "Vui lòng đợi";
+  "ẩn", not "giấu"; "ID", not "mã định danh"; a fragment where it reads better: "Nếu còn sự cố", not "Nếu bạn vẫn còn
+  sự cố".
 - **Not the English sentence's shape.**
   - No "của nó" for "its": name the thing, or leave it out. "Hiện dữ liệu" or "Hiện dữ liệu của nguồn", not "Hiện dữ
     liệu của nó".
   - No passive built on "được" or "bị" where English is passive: "Đã xóa vai trò", not "Vai trò đã được xóa".
-  - No "thực hiện việc", "tiến hành", "thao tác" wrapped around a verb: "Xóa", not "Thực hiện việc xóa".
-  - No literal noun piles from English: "Độ rộng (trên 12 cột)", not "Độ rộng theo phần mười hai của hàng".
-- **One spelling.** The modern placement of tone marks: "xóa", "hủy", "hòa". The glossary's verbs follow it.
-- **English terms the glossary keeps** stay in English and are not mixed with a translation of the same concept in one
-  screen.
+  - No "việc", "thực hiện việc", "tiến hành" or "thao tác" wrapped around a verb: "Xóa", not "Thực hiện việc xóa".
+  - No literal noun piles from English: "Độ rộng (trên 12 cột)", not "Độ rộng theo phần mười hai của hàng". A compound
+    reads in Vietnamese order: "Tài khoản Internet", not "Internet tài khoản".
+- **Capital on the first word only**, on buttons and titles too: "Chọn tất cả", not "Chọn Tất Cả". A proper name keeps its
+  capitals: "Việt Nam".
+- **One spelling and spacing.** The modern placement of tone marks: "xóa", "hủy", "hòa". No space before `. , : ; ? ! )`
+  and one after; a non-breaking space between a number and its unit, "250 GB", and none before "%": "80%".
+- **Acronyms stay in English**, ID, URL, PIN, JSON, and an English term the glossary keeps is not mixed with a
+  translation of the same concept on one screen.
 
 ## Checks _(planned)_
 
@@ -109,3 +135,5 @@ A check in `scripts/lint.sh` reads the texts and the glossary and fails when:
    owner to approve.
 3. A change that rewrites many texts of one locale goes area by area, with the owner reviewing the first area before
    the rest follow.
+
+[ms-vi]: https://download.microsoft.com/download/b/f/e/bfecb1b4-21ab-48fd-a48c-c2471b026f8f/vie-vnm-StyleGuide.pdf
