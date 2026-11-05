@@ -59,7 +59,10 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
                 Text(user, "lastName"),
                 Text(user, "email"),
                 user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
-                aliases[index]))],
+                aliases[index],
+                user.TryGetProperty("createdTimestamp", out var created) && created.ValueKind == JsonValueKind.Number && created.TryGetInt64(out var milliseconds)
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(milliseconds)
+                    : null))],
             total);
     }
 
@@ -394,8 +397,17 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 /// <summary>One page of a tenant's realm users and the number of all users that match the search.</summary>
 public sealed record RealmUserPage(IReadOnlyList<RealmUser> Users, int TotalCount);
 
-/// <summary>A user of a tenant's realm. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
-public sealed record RealmUser(string Id, string Username, string? FirstName, string? LastName, string? Email, bool Enabled, string? ProviderAlias);
+/// <summary>
+/// A user of a tenant's realm. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.
+/// <c>CreatedAt</c> is when the realm created the user, or <c>null</c> when it names none.
+/// </summary>
+public sealed record RealmUser(
+    string Id, string Username, string? FirstName, string? LastName, string? Email, bool Enabled, string? ProviderAlias, DateTimeOffset? CreatedAt)
+{
+    /// <summary>The first and last name, or the username when the user has neither.</summary>
+    public string DisplayName =>
+        string.Join(' ', new[] { FirstName, LastName }.Where(name => name is not null)) is { Length: > 0 } name ? name : Username;
+}
 
 /// <summary>The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
 public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias);

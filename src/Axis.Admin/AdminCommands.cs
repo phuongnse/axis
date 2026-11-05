@@ -1384,6 +1384,7 @@ internal static partial class AdminCommands
                 settings.Packages.Versions,
                 sensitive,
                 storage is null ? JobSetting<CellBackupStorage>.Missing(storageProblem!) : JobSetting<CellBackupStorage>.Of(storage),
+                http,
                 new TenantLeases(leaseSource, NullLogger<TenantLeases>.Instance),
                 quotas)),
         };

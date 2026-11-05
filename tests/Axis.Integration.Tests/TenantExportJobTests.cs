@@ -26,13 +26,21 @@ namespace Axis.Integration.Tests;
 /// provisioning is refused and nothing is uploaded. In a cell the job holds a <c>concurrentImports</c> lease of the tenant until the ZIP is
 /// stored, and waits without using a claim while none is free. The server of the fixture activates the purchase request and leave request samples.
 /// </summary>
-public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixture minio) : IClassFixture<AdminBackupFixture>, IClassFixture<MinioFixture>, IAsyncDisposable
+public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixture minio) : IClassFixture<AdminBackupFixture>, IClassFixture<MinioFixture>, IAsyncLifetime
 {
     private static readonly TimeSpan _lease = TimeSpan.FromMinutes(5);
 
     private readonly NpgsqlDataSource _leaseSource = NpgsqlDataSource.Create(fixture.Scenario.Platform);
+    private readonly HttpClient _identityProvider = AdminCommands.IdentityProviderClient(null);
 
-    public ValueTask DisposeAsync() => _leaseSource.DisposeAsync();
+    // A tenant made by tenant create has a realm, and the stub that answers in its place is not reached here. The fixture's tenant is made to be one without.
+    public async ValueTask InitializeAsync() => await fixture.Scenario.ForgetRealmUsersAsync(fixture.TenantId);
+
+    public async ValueTask DisposeAsync()
+    {
+        _identityProvider.Dispose();
+        await _leaseSource.DisposeAsync();
+    }
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -56,6 +64,7 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         Assert.Equal(ServerSideEncryptionMethod.AES256, metadata.ServerSideEncryptionMethod);
 
         var files = await ReadZipAsync(s3, bucket, key);
+        Assert.DoesNotContain("users.csv", files.Keys);
         using var manifest = JsonDocument.Parse(files["export.json"]);
         var root = manifest.RootElement;
         Assert.Equal(1, root.GetProperty("format").GetInt32());
@@ -243,7 +252,7 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         var platform = fixture.Scenario.Platform;
         var sensitive = new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(platform, AdminScenario.Cipher)));
         var leases = new TenantLeases(_leaseSource, NullLogger<TenantLeases>.Instance);
-        var steps = TenantExport.Steps(new TenantExportSettings(platform, AdminScenario.Cipher, PackageCatalog.Load(SamplePackages.Path).Versions, sensitive, storage, leases, quotas));
+        var steps = TenantExport.Steps(new TenantExportSettings(platform, AdminScenario.Cipher, PackageCatalog.Load(SamplePackages.Path).Versions, sensitive, storage, _identityProvider, leases, quotas));
         return new Dictionary<string, IReadOnlyList<JobStep>>
         {
             ["export"] = wrap is null ? steps : [.. steps.Select(wrap)],

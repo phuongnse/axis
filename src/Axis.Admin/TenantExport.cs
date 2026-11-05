@@ -15,8 +15,10 @@ using Axis.Configuration.Storage;
 using Axis.Data.Exports;
 using Axis.Data.Naming;
 using Axis.Data.Records;
+using Axis.Data.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -24,7 +26,7 @@ namespace Axis.Admin;
 
 /// <summary>
 /// The settings of the <c>export</c> job: the platform database, the key of the tenant secrets, the installed package versions, the
-/// service that decrypts sensitive values and the storage of the exports. A publisher without the storage setting still runs
+/// service that decrypts sensitive values, the storage of the exports and the client that reaches the identity provider. A publisher without the storage setting still runs
 /// every other job, and only the export refuses with the problem that names the setting. <paramref name="Leases"/> takes the tenant's
 /// <c>concurrentImports</c> lease, with the limit from <paramref name="Quotas"/> when the tenant has no row of its own.
 /// <paramref name="Quotas"/> is <see langword="null"/> outside a cell, where no quota applies and the export takes no lease.
@@ -35,6 +37,7 @@ internal sealed record TenantExportSettings(
     IReadOnlyCollection<PackageVersion> Packages,
     SensitiveValues Sensitive,
     JobSetting<CellBackupStorage> Storage,
+    HttpClient IdentityProvider,
     TenantLeases Leases,
     QuotaDefaults? Quotas);
 
@@ -46,6 +49,10 @@ internal sealed record TenantExportSettings(
 /// The rows of a child collection go to <c>&lt;entity&gt;.&lt;field&gt;.csv</c>, whose columns start with <c>recordId</c>. A character of a name that is not a
 /// letter, a digit, <c>.</c>, <c>_</c> or <c>-</c> is written as <c>_</c>, and <c>export.json</c> lists the original name. The ZIP goes to
 /// <c>exports/&lt;tenant&gt;/&lt;job id&gt;.zip</c> in the export storage with server-side encryption, so its owner can open it after the download.
+/// A tenant with its own realm also gets <c>users.csv</c>, written last: one row for each user of the realm, read as <c>axis-users</c>
+/// without service accounts, with the person's given roles from the same snapshot and no credential. A platform role is written by its
+/// kind and an application role as <c>&lt;application name&gt;:&lt;role&gt;</c>. A tenant without its own realm gets no <c>users.csv</c>,
+/// and a realm that cannot be read fails the step, so a ZIP never leaves out the users unannounced.
 /// The ZIP and the CSV parts are written to a folder that only its owner can use, which is deleted at the end. In a cell the job holds one
 /// <c>concurrentImports</c> lease of the tenant until the ZIP is stored, and when none is free the job waits, see <see cref="JobStep"/>.
 /// </summary>
@@ -58,6 +65,8 @@ internal static class TenantExport
         WriteIndented = true,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
+
+    private static readonly string[] _userColumns = ["userName", "email", "displayName", "roles", "enabled", "created"];
 
     public static IReadOnlyList<JobStep> Steps(TenantExportSettings settings) =>
         [new JobStep(
@@ -165,6 +174,11 @@ internal static class TenantExport
         };
         TenantDatabaseTls.From(settings.PlatformConnectionString).ApplyTo(builder);
 
+        // The realm is read before the snapshot opens, so a slow identity provider does not hold a transaction. A failed read throws and fails the step.
+        var realmUsers = DirectoryTenantCatalog.RealmUsers(row, settings.Cipher) is { } access
+            ? await ReadRealmUsersAsync(new RealmUsers(settings.IdentityProvider, access), cancellationToken)
+            : null;
+
         await using var connection = new NpgsqlConnection(builder.ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -185,7 +199,71 @@ internal static class TenantExport
             }
         }
 
+        if (realmUsers is not null)
+        {
+            await WriteUsersAsync(zip, realmUsers, applications, await GivenRoles.ListAllAsync(connection, transaction, cancellationToken), cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    // Every user of the realm by user name. A page shorter than the page size is the last one.
+    private static async Task<List<RealmUser>> ReadRealmUsersAsync(RealmUsers realm, CancellationToken cancellationToken)
+    {
+        const int pageSize = 100;
+        var users = new List<RealmUser>();
+        for (var first = 0; ; first += pageSize)
+        {
+            var page = await realm.ListAsync(null, first, pageSize, cancellationToken);
+            users.AddRange(page.Users);
+            if (page.Users.Count < pageSize)
+            {
+                break;
+            }
+        }
+
+        users.Sort((left, right) => string.CompareOrdinal(left.Username, right.Username));
+        return users;
+    }
+
+    // One row for each realm user. A role of an application with no active release is written with the application id, because the name is kept with the release.
+    private static async Task WriteUsersAsync(
+        ZipArchive zip,
+        List<RealmUser> users,
+        List<ExportApplication> applications,
+        IReadOnlyList<(string UserId, GivenRole Role)> givenRoles,
+        CancellationToken cancellationToken)
+    {
+        var names = applications.ToDictionary(application => application.ApplicationId, application => application.Name);
+        var rolesByUser = givenRoles.ToLookup(given => given.UserId, given => given.Role);
+
+        await using var stream = zip.CreateEntry("users.csv", CompressionLevel.Optimal).Open();
+        using var writer = new CsvExportWriter(stream);
+        writer.WriteHeader([.. _userColumns.Select(name => new ExportColumn(name, FieldType.Text))]);
+        foreach (var user in users)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var roles = rolesByUser[user.Id]
+                .Select(role => role.ApplicationId is { } id
+                    ? (Platform: false, Application: names.GetValueOrDefault(id) ?? id.ToString("D"), role.Role)
+                    : (Platform: true, Application: "", role.Role))
+                .OrderByDescending(role => role.Platform)
+                .ThenBy(role => role.Application, StringComparer.Ordinal)
+                .ThenBy(role => role.Role, StringComparer.Ordinal)
+                .Select(role => role.Platform ? role.Role : $"{role.Application}:{role.Role}");
+            writer.WriteRow(
+            [
+                user.Username,
+                user.Email,
+                user.DisplayName,
+                string.Join("; ", roles),
+                user.Enabled ? "true" : "false",
+                user.CreatedAt?.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+            ]);
+        }
+
+        writer.Complete();
     }
 
     // The applications by name, each with its entity files named. A name that is not a safe file name is written with _, and a clash gets _2, _3 and so on.
@@ -236,7 +314,7 @@ internal static class TenantExport
                 entities.Add(new ExportEntity(entity, ReserveStem(SafeName(entity.Name), collections, files), collections));
             }
 
-            applications.Add(new ExportApplication(active.Name, folder, number, model, entities));
+            applications.Add(new ExportApplication(active.ApplicationId, active.Name, folder, number, model, entities));
         }
 
         return applications;
@@ -402,7 +480,7 @@ internal static class TenantExport
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private sealed record ExportApplication(string Name, string Folder, int? Release, ApplicationModel Model, List<ExportEntity> Entities);
+    private sealed record ExportApplication(Guid ApplicationId, string Name, string Folder, int? Release, ApplicationModel Model, List<ExportEntity> Entities);
 
     private sealed record ExportEntity(EntityModel Entity, string Stem, List<ExportCollection> Collections);
 

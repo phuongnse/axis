@@ -222,6 +222,15 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         return await context.Tenants.AsNoTracking().SingleAsync(tenant => tenant.Id == id, CancellationToken);
     }
 
+    /// <summary>Removes the users client secret from the tenant's row, as the row of a tenant that signs in through an outside identity provider has none, so it has no realm of its own.</summary>
+    public async Task ForgetRealmUsersAsync(string id)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.RealmUsersClientSecret = null;
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
     /// <summary>The platform providers of a tenant, ordered by name.</summary>
     public async Task<List<TenantPlatformProviderRow>> PlatformProvidersAsync(string id)
     {

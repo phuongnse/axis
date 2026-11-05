@@ -101,7 +101,7 @@ internal static partial class UserEndpoints
         return Results.Ok(new UserListResponse(
             [.. listed.Users.Select(realmUser => new UserListItem(
                 realmUser.Id,
-                DisplayName(realmUser),
+                realmUser.DisplayName,
                 realmUser.Email,
                 realmUser.ProviderAlias,
                 Status(realmUser.Enabled, signIns.ContainsKey(realmUser.Id)),
@@ -166,10 +166,6 @@ internal static partial class UserEndpoints
     /// <summary><c>disabled</c> for a disabled realm user, otherwise <c>invited</c> without a profile and <c>active</c> with one.</summary>
     internal static string Status(bool enabled, bool hasProfile) =>
         !enabled ? "disabled" : hasProfile ? "active" : "invited";
-
-    // The first and last name, or the username when the user has neither.
-    private static string DisplayName(RealmUser user) =>
-        string.Join(' ', new[] { user.FirstName, user.LastName }.Where(name => name is not null)) is { Length: > 0 } name ? name : user.Username;
 
     [LoggerMessage(LogLevel.Warning, "The users of tenant {TenantId} could not be listed. {Reason}")]
     private static partial void LogListFailed(ILogger logger, string tenantId, string reason);
