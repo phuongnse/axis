@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Axis.Admin;
@@ -9,7 +10,12 @@ using Axis.Administration;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Axis.Data.Records;
+using Axis.Tenancy;
 using Axis.Tenancy.Keys;
+using Axis.Tenancy.Platform;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -17,11 +23,16 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The <c>export</c> job writes the records of every application of a tenant into a ZIP of JSON Lines and CSV files, with the sensitive
 /// values in clear, and stores it with server-side encryption at <c>exports/&lt;tenant&gt;/&lt;job id&gt;.zip</c>. A tenant that is still
-/// provisioning is refused and nothing is uploaded. The server of the fixture activates the purchase request and leave request samples.
+/// provisioning is refused and nothing is uploaded. In a cell the job holds a <c>concurrentImports</c> lease of the tenant until the ZIP is
+/// stored, and waits without using a claim while none is free. The server of the fixture activates the purchase request and leave request samples.
 /// </summary>
-public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixture minio) : IClassFixture<AdminBackupFixture>, IClassFixture<MinioFixture>
+public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixture minio) : IClassFixture<AdminBackupFixture>, IClassFixture<MinioFixture>, IAsyncDisposable
 {
     private static readonly TimeSpan _lease = TimeSpan.FromMinutes(5);
+
+    private readonly NpgsqlDataSource _leaseSource = NpgsqlDataSource.Create(fixture.Scenario.Platform);
+
+    public ValueTask DisposeAsync() => _leaseSource.DisposeAsync();
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -143,14 +154,120 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         return (job, output.ToString());
     }
 
-    private Dictionary<string, IReadOnlyList<JobStep>> Kinds(JobSetting<CellBackupStorage> storage)
+    [Fact]
+    public async Task A_second_export_of_a_tenant_waits_for_the_first_and_then_succeeds()
+    {
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+        var storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = 1;
+        var kinds = Kinds(
+            JobSetting<CellBackupStorage>.Of(storage),
+            CellDefaults(),
+            step => step with
+            {
+                RunAsync = async (job, tenant, input, cancellationToken) =>
+                {
+                    if (Interlocked.Exchange(ref first, 0) == 1)
+                    {
+                        started.SetResult();
+                        await gate.Task.WaitAsync(cancellationToken);
+                    }
+
+                    return await step.RunAsync(job, tenant, input, cancellationToken);
+                },
+            });
+        var jobA = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
+        var jobB = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
+        using var outputA = new StringWriter();
+        using var outputB = new StringWriter();
+
+        var runnerA = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease).RunNextAsync(outputA, CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
+
+        Assert.Equal(1, await LeaseCountAsync(fixture.TenantId));
+        Assert.False(await new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease).RunNextAsync(outputB, CancellationToken));
+        Assert.Equal("queued", await StateAsync(jobB));
+
+        gate.SetResult();
+        Assert.True(await runnerA);
+        Assert.Equal("succeeded", await StateAsync(jobA));
+        Assert.Equal(0, await LeaseCountAsync(fixture.TenantId));
+
+        Assert.True(await new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease).RunNextAsync(outputB, CancellationToken));
+        Assert.Equal("succeeded", await StateAsync(jobB));
+        Assert.Equal(new[] { $"exports/{fixture.TenantId}/{jobA:D}.zip", $"exports/{fixture.TenantId}/{jobB:D}.zip" }.Order(StringComparer.Ordinal), await KeysAsync(s3, bucket));
+    }
+
+    [Fact]
+    public async Task An_export_waits_while_an_import_holds_the_only_concurrentImports_lease_and_runs_after_it_is_freed()
+    {
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+        var storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
+        var kinds = Kinds(JobSetting<CellBackupStorage>.Of(storage), CellDefaults(("Quotas:Defaults:concurrentImports", "1")));
+        var job = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
+        var runner = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease, TimeSpan.Zero);
+        using var output = new StringWriter();
+        await using var source = NpgsqlDataSource.Create(fixture.Scenario.Platform);
+        var import = await new TenantLeases(source, NullLogger<TenantLeases>.Instance).TryTakeAsync(fixture.TenantId, QuotaKeys.ConcurrentImports, 1, CancellationToken);
+        Assert.NotNull(import);
+
+        for (var round = 1; round <= 4; round++)
+        {
+            Assert.True(await runner.RunNextAsync(output, CancellationToken));
+            Assert.Equal("running", await StateAsync(job));
+            Assert.Empty(await KeysAsync(s3, bucket));
+        }
+
+        Assert.Equal(4, Regex.Count(output.ToString(), $"{fixture.TenantId} export waiting"));
+        Assert.Equal((4, 0), await ClaimsAsync(job));
+
+        await import.DisposeAsync();
+        Assert.True(await runner.RunNextAsync(output, CancellationToken));
+
+        Assert.Equal("succeeded", await StateAsync(job));
+        Assert.Equal([$"exports/{fixture.TenantId}/{job:D}.zip"], await KeysAsync(s3, bucket));
+        Assert.Contains($"{fixture.TenantId} export ok", output.ToString(), StringComparison.Ordinal);
+    }
+
+    private static QuotaDefaults CellDefaults(params (string Setting, string Value)[] settings) =>
+        QuotaDefaults.Load(
+            new ConfigurationBuilder().AddInMemoryCollection(settings.ToDictionary(setting => setting.Setting, setting => (string?)setting.Value)).Build(),
+            new CellOptions { Id = "vn-1" });
+
+    private Dictionary<string, IReadOnlyList<JobStep>> Kinds(JobSetting<CellBackupStorage> storage, QuotaDefaults? quotas = null, Func<JobStep, JobStep>? wrap = null)
     {
         var platform = fixture.Scenario.Platform;
         var sensitive = new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(platform, AdminScenario.Cipher)));
+        var leases = new TenantLeases(_leaseSource, NullLogger<TenantLeases>.Instance);
+        var steps = TenantExport.Steps(new TenantExportSettings(platform, AdminScenario.Cipher, PackageCatalog.Load(SamplePackages.Path).Versions, sensitive, storage, leases, quotas));
         return new Dictionary<string, IReadOnlyList<JobStep>>
         {
-            ["export"] = TenantExport.Steps(new TenantExportSettings(platform, AdminScenario.Cipher, PackageCatalog.Load(SamplePackages.Path).Versions, sensitive, storage)),
+            ["export"] = wrap is null ? steps : [.. steps.Select(wrap)],
         };
+    }
+
+    private async Task<long> LeaseCountAsync(string tenantId)
+    {
+        await using var connection = new NpgsqlConnection(fixture.Scenario.Platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM platform.tenant_leases WHERE tenant_id = @tenant AND quota = 'concurrentImports'", connection);
+        command.Parameters.AddWithValue("tenant", tenantId);
+        return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
+    private async Task<(int Waits, int Claimable)> ClaimsAsync(Guid job)
+    {
+        await using var connection = new NpgsqlConnection(fixture.Scenario.Platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT waits, claims - waits FROM platform.jobs WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", job);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        return (reader.GetInt32(0), reader.GetInt32(1));
     }
 
     private async Task<string?> StateAsync(Guid job)

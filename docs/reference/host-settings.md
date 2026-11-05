@@ -628,11 +628,12 @@ The runtime database address is the exception. Only the server and the worker re
 not a whole number from 1 to 65535, or a port with no host, stops their start and the message names
 the setting. `Axis.Admin` and the publisher never read them, so a wrong value does not stop them.
 
-In a cell the server and the worker also read and check `Quotas:Defaults`. Each child must be a
+In a cell the server, the worker and the publisher also read and check `Quotas:Defaults`. Each child must be a
 [quota](tenant-quotas.md#quotas) key and its value a whole number of zero or more. An unknown key or a
 wrong value stops the start, and the message names the setting, never its value. A quota with no setting
-takes the default of the quotas table, and `authoringRequests` has none, which is no limit. `Axis.Admin`
-does not read `Quotas:Defaults` yet.
+takes the default of the quotas table, and `authoringRequests` has none, which is no limit. The publisher
+uses them for the limit of an export that a tenant has no row for, so give it the same settings as the server and the worker. The other `Axis.Admin`
+commands do not read `Quotas:Defaults`.
 
 | Setting | Read by | Meaning |
 | --- | --- | --- |

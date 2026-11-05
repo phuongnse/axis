@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
 namespace Axis.Admin;
@@ -1356,7 +1357,23 @@ internal static partial class AdminCommands
             }
         }
 
+        // The export takes a concurrentImports lease, so in a cell the publisher reads the same quota defaults as the server and the worker.
+        QuotaDefaults? quotas = null;
+        if (cell.IsCell)
+        {
+            try
+            {
+                quotas = QuotaDefaults.Load(configuration, cell);
+            }
+            catch (InvalidOperationException exception)
+            {
+                error.WriteLine(exception.Message);
+                return 2;
+            }
+        }
+
         using var http = IdentityProviderClient(identityProviderHandler);
+        await using var leaseSource = NpgsqlDataSource.Create(settings.Platform.PlatformConnectionString);
         var sensitive = new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(settings.Platform.PlatformConnectionString, settings.Platform.Cipher)));
         var storage = CellBackupStorage.Read(configuration, CellBackupStorage.ExportSection, out var storageProblem);
         var jobs = new Dictionary<string, IReadOnlyList<JobStep>>(ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString))
@@ -1366,7 +1383,9 @@ internal static partial class AdminCommands
                 settings.Platform.Cipher,
                 settings.Packages.Versions,
                 sensitive,
-                storage is null ? JobSetting<CellBackupStorage>.Missing(storageProblem!) : JobSetting<CellBackupStorage>.Of(storage))),
+                storage is null ? JobSetting<CellBackupStorage>.Missing(storageProblem!) : JobSetting<CellBackupStorage>.Of(storage),
+                new TenantLeases(leaseSource, NullLogger<TenantLeases>.Instance),
+                quotas)),
         };
 
         // The create job runs in a cell only: outside one, the provisioning API answers 404, so no create job is queued.

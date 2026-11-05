@@ -747,7 +747,10 @@ The publisher runs the `export` job that `POST /api/cell/tenants/{id}/exports` q
 queues it. The job has one step, `export`. It reads the tenant's active releases and records in one snapshot, writes the ZIP of
 [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) to a folder that only its owner can use, uploads it to the
 `Cell:ExportStorage` bucket and deletes the folder. A tenant that is `provisioning`, unknown or a preview tenant fails the job at once. A
-missing `Cell:ExportStorage` setting does the same and names the setting. An upload that fails ends the claim, and the job runs again. The publisher deletes the ZIP 7 days after it was stored, see [publisher](#publisher).
+missing `Cell:ExportStorage` setting does the same and names the setting. In a cell the job takes a `concurrentImports` lease of the tenant
+before it reads anything and holds it until the ZIP is stored. When none is free it waits and runs in a later round, without using one of its
+three claims, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant). An upload that fails ends the claim, and the job runs again.
+The publisher deletes the ZIP 7 days after it was stored, see [publisher](#publisher).
 
 ## What else to back up
 

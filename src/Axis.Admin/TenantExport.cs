@@ -25,14 +25,18 @@ namespace Axis.Admin;
 /// <summary>
 /// The settings of the <c>export</c> job: the platform database, the key of the tenant secrets, the installed package versions, the
 /// service that decrypts sensitive values and the storage of the exports. A publisher without the storage setting still runs
-/// every other job, and only the export refuses with the problem that names the setting.
+/// every other job, and only the export refuses with the problem that names the setting. <paramref name="Leases"/> takes the tenant's
+/// <c>concurrentImports</c> lease, with the limit from <paramref name="Quotas"/> when the tenant has no row of its own.
+/// <paramref name="Quotas"/> is <see langword="null"/> outside a cell, where no quota applies and the export takes no lease.
 /// </summary>
 internal sealed record TenantExportSettings(
     string PlatformConnectionString,
     TenantSecretCipher Cipher,
     IReadOnlyCollection<PackageVersion> Packages,
     SensitiveValues Sensitive,
-    JobSetting<CellBackupStorage> Storage);
+    JobSetting<CellBackupStorage> Storage,
+    TenantLeases Leases,
+    QuotaDefaults? Quotas);
 
 /// <summary>
 /// The <c>export</c> job of the publisher, with one <c>export</c> step. It reads every application's active release and its records in one
@@ -42,7 +46,8 @@ internal sealed record TenantExportSettings(
 /// The rows of a child collection go to <c>&lt;entity&gt;.&lt;field&gt;.csv</c>, whose columns start with <c>recordId</c>. A character of a name that is not a
 /// letter, a digit, <c>.</c>, <c>_</c> or <c>-</c> is written as <c>_</c>, and <c>export.json</c> lists the original name. The ZIP goes to
 /// <c>exports/&lt;tenant&gt;/&lt;job id&gt;.zip</c> in the export storage with server-side encryption, so its owner can open it after the download.
-/// The ZIP and the CSV parts are written to a folder that only its owner can use, which is deleted at the end.
+/// The ZIP and the CSV parts are written to a folder that only its owner can use, which is deleted at the end. In a cell the job holds one
+/// <c>concurrentImports</c> lease of the tenant until the ZIP is stored, and when none is free the job waits, see <see cref="JobStep"/>.
 /// </summary>
 internal static class TenantExport
 {
@@ -55,7 +60,10 @@ internal static class TenantExport
     };
 
     public static IReadOnlyList<JobStep> Steps(TenantExportSettings settings) =>
-        [new JobStep("export", (jobId, tenantId, _, cancellationToken) => ExportAsync(settings, jobId, tenantId, cancellationToken))];
+        [new JobStep(
+            "export",
+            (jobId, tenantId, _, cancellationToken) => ExportAsync(settings, jobId, tenantId, cancellationToken),
+            (tenantId, cancellationToken) => LeaseAsync(settings, tenantId, cancellationToken))];
 
     /// <summary>A file or folder name for <paramref name="name"/>: every character outside <c>A-Z a-z 0-9 . _ -</c> becomes <c>_</c>.</summary>
     internal static string SafeName(string name)
@@ -69,6 +77,30 @@ internal static class TenantExport
             }
         });
         return safe is "" or "." or ".." ? "_" : safe;
+    }
+
+    // The tenant's own limit, read fresh, or the cell's default when it has no row. A tenant with no limit, or a publisher outside a cell, takes no lease.
+    // A platform database that cannot be reached throws, so the claim ends and the export never runs without a lease.
+    private static async Task<IAsyncDisposable?> LeaseAsync(TenantExportSettings settings, string tenantId, CancellationToken cancellationToken)
+    {
+        if (settings.Quotas is null)
+        {
+            return NoLease.Instance;
+        }
+
+        TenantQuotaRow? row;
+        await using (var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(settings.PlatformConnectionString).Options))
+        {
+            row = await platform.TenantQuotas.AsNoTracking()
+                .FirstOrDefaultAsync(quota => quota.TenantId == tenantId && quota.Quota == QuotaKeys.ConcurrentImports, cancellationToken);
+        }
+
+        if ((row is null ? settings.Quotas[QuotaKeys.ConcurrentImports] : row.Value) is not { } limit)
+        {
+            return NoLease.Instance;
+        }
+
+        return await settings.Leases.TryTakeAsync(tenantId, QuotaKeys.ConcurrentImports, limit, cancellationToken);
     }
 
     private static async Task<string?> ExportAsync(TenantExportSettings settings, Guid jobId, string tenantId, CancellationToken cancellationToken)
@@ -361,6 +393,13 @@ internal static class TenantExport
         await using var source = new FileStream(part.Path, FileMode.Open, FileAccess.Read, FileShare.None);
         await using var target = zip.CreateEntry(part.EntryName, CompressionLevel.Optimal).Open();
         await source.CopyToAsync(target, cancellationToken);
+    }
+
+    private sealed class NoLease : IAsyncDisposable
+    {
+        public static readonly NoLease Instance = new();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed record ExportApplication(string Name, string Folder, int? Release, ApplicationModel Model, List<ExportEntity> Entities);
