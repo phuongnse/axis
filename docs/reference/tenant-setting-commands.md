@@ -1,20 +1,14 @@
 # Tenant setting commands
 
-Detailed reference for the `Axis.Admin` commands that change a tenant after it is created, rotate
-keys and passwords, and the platform audit records they write. The other commands are in
-[administration](administration.md). The conventions of [architecture.md](../architecture.md) apply:
-sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
-
-The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). The
-`platform.audit_records` table, `PlatformAuditRecords.WriteAsync` and the records of the commands
-that already exist are built, see [platform audit records](#platform-audit-records). The database
-password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The key rotation is
-built, see [installation key](#installation-key). The
-[deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
-[`tenant oidc set`](#sign-in-settings), with its client key options, and the
-[mail settings](#mail-settings) commands. So is ending [sessions](#sessions), and so is storing the [platform sign-in](#platform-sign-in).
+The `Axis.Admin` commands on this page change a tenant after it is created: its bindings, sign-in,
+mail, legal links and hosts. They also end sessions, rotate the database passwords and the
+installation key, and write the platform audit records that every command leaves. The reasons are in
+[D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md), and the other commands are in
+[administration](administration.md).
 
 ## Common rules
+
+These rules hold for every command on this page unless its section says otherwise.
 
 - **Directory only.** Every command here needs `Tenancy:Source=directory`, because it writes the
   [tenant directory](../architecture.md#tenant-directory). Under `configuration` the host settings
@@ -28,31 +22,34 @@ built, see [installation key](#installation-key). The
   standard input, never from an argument. No command prints a secret.
 - **Exit codes.** As in [output and exit codes](administration.md#output-and-exit-codes). An unknown
   tenant exits with code 2, and nothing changes.
-- **One library.** The command line calls a library that holds the rules. A later web console calls
+- **One library.** The command line calls a library that holds the rules, so a web console can call
   the same library.
 - **Audited.** Every command writes a [platform audit record](#platform-audit-records).
 
 ## Deployment bindings
 
-- `tenant binding list <id>` prints a table of each binding's name, kind and value, ordered by
-  name. A `url` binding shows its URL and a `storage` binding shows its value, `database`. A `secret` binding shows `(hidden)` when it has a value and
-  `(not set)` when it has none, never the value. It also lists a tenant that is still
-  `provisioning`.
-- `tenant binding set <id> <name> --url <value>` adds or replaces a `url` binding. The value is an
-  absolute `http` or `https` URL.
-- `tenant binding set <id> <name> --storage database` adds or replaces a `storage` binding. Its only
-  value is `database`. Any other value exits with code 2 and writes nothing, not even an audit
-  record.
-- `tenant binding set <id> <name> --secret` adds or replaces a `secret` binding. The value comes from
-  `AXIS_BINDING_SECRET`, or from standard input when the variable is not set. The value is stored
-  encrypted and never printed. An empty value exits with code 2. With the variable unset and a
-  terminal for input, the command waits for end of input and shows no prompt.
-- `tenant binding remove <id> <name>` removes a binding. A binding that does not exist exits with
-  code 2.
-- Names are unique per tenant, ignoring letter case, as in
-  [platform database](storage.md#platform-database).
-- A preview tenant's bindings are set the same way. Its main tenant's bindings stay untouched.
-- Replacing a binding whose name differs only in letter case keeps the stored name.
+A tenant's [deployment bindings](integration-resources.md#deployment-bindings) hold the values that
+its releases resolve at run time: URLs, storage and secrets. These commands list and change them.
+
+| Command                                              | What it does                                                                                                                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tenant binding list <id>`                           | Prints a table of each binding's name, kind and value, ordered by name. It also lists a tenant that is still `provisioning`.                                                                                |
+| `tenant binding set <id> <name> --url <value>`       | Adds or replaces a `url` binding. The value is an absolute `http` or `https` URL.                                                                                                                            |
+| `tenant binding set <id> <name> --storage database`  | Adds or replaces a `storage` binding. Its only value is `database`, and any other value exits with code 2 and writes nothing, not even an audit record.                                                      |
+| `tenant binding set <id> <name> --secret`            | Adds or replaces a `secret` binding. The value comes from `AXIS_BINDING_SECRET`, or from standard input when the variable is not set.                                                                        |
+| `tenant binding remove <id> <name>`                  | Removes a binding. A binding that does not exist exits with code 2.                                                                                                                                          |
+
+- **What the list shows.** A `url` binding shows its URL and a `storage` binding its value, `database`.
+  A `secret` binding shows `(hidden)` when it has a value and `(not set)` when it has none, never the
+  value.
+- **A secret value.** It is stored encrypted and never printed. An empty value exits with code 2. With
+  the variable unset and a terminal for input, the command waits for the end of input and shows no
+  prompt.
+- **Names.** Names are unique per tenant, ignoring letter case, as in
+  [platform database](storage.md#platform-database). Replacing a binding whose name differs only in
+  letter case keeps the stored name.
+- **A preview tenant.** Its bindings are set the same way, and its main tenant's bindings stay
+  untouched.
 - **Settings.** Only `tenant binding set --secret` needs `Platform:SecretKey`. The other commands
   need `ConnectionStrings:PlatformSchema` and `Tenancy:Source=directory`.
 - **A provisioning tenant.** The commands that change something exit with code 2 for a tenant that
@@ -63,7 +60,8 @@ built, see [installation key](#installation-key). The
 
 ## Sign-in settings
 
-`tenant oidc set <id>` changes one or more sign-in settings of a main tenant:
+`tenant oidc set <id>` changes how a main tenant's server signs people in: the audiences it accepts,
+the sign-in profile and the client keys. It takes one or more of these options:
 
 | Option                         | Meaning                                                                                       |
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
@@ -125,20 +123,16 @@ and the public key as a PEM.
   tenant is a preview tenant, which has no sign-in settings of its own, no setting is given, the
   profile is unknown, the tenant would be `fapi2` without a client key, the client key is empty or
   not an EC P-256 private key, the tenant would hold a third client key, the key is already held, the
-  key id to retire is unknown or blank, or an option is given twice or is unknown. The removed
-  `--authority`, `--client-id`, `--client-secret` and `--claim` are unknown options. The `version`
+  key id to retire is unknown or blank, or an option is given twice or is unknown. The `version`
   stays and no audit record is written.
 - **Exit code 1 when the realm cannot be updated.** The command prints `<id> realm failed: <message>`.
   The message names the identity provider step and its status code, never a body or a secret. The
   tenant's keys, profile and `version` stay as they were, so running the command again completes the
   change. The audit record is already written.
-
-- The command no longer takes `--authority`, `--client-id`, `--client-secret` or `--claim`, because the
-  realm that `tenant create` sets up in [Axis's identity provider](identity-provider.md) gives the
-  authority and the clients. The audiences, the profile and the client keys stay.
-- Every tenant that `tenant create` makes signs in through its realm, and each `identityProvider` resource
-  names its own claims. Axis registers a client key in the realm itself, as `tenant oidc set` does
-  today for a tenant with a realm.
+- **No authority, client or claim.** `tenant create` points every main tenant it makes at its own realm in
+  [Axis's identity provider](identity-provider.md), which gives the authority and the clients, and each
+  `identityProvider` resource names its own claims. So `--authority`, `--client-id`, `--client-secret`
+  and `--claim` are unknown options, which exit with code 2.
 
 ### Platform sign-in
 
@@ -198,8 +192,7 @@ resource.
   `<id> realm failed:` and the identity provider step and its status, and exits with code 1. The stored sign-in stays,
   and the next activation brings the realm in step. An activation that runs between the command's checks and its commit
   can still leave a clashing pair, which the next activation of that application refuses.
-- **Used by activation.** `tenant create` and `tenant restore` set accounts on, and a migration set it on for the
-  tenants that existed. Every activation, `Axis.Admin` `activate`, `publish` and `rollback` and the server's startup
+- **Used by activation.** `tenant create` and `tenant restore` set accounts on. Every activation, `Axis.Admin` `activate`, `publish` and `rollback` and the server's startup
   activation, keeps the stored platform providers in the realm. The server's sign-in callback checks the sign-in against the realm, see
   [platform sign-in](identity-provider.md#platform-sign-in). `tenant backup` does not carry the providers, so a restored tenant has accounts on and no provider
   until the command runs again.
@@ -304,7 +297,11 @@ command prints `<id> legal ok`.
 
 ## Hosts
 
-- `tenant host add <id> <host>` adds a host. A host already used by any tenant exits with code 2. So does a host that a tenant deleted less than 90 days ago had, see
+A tenant's hosts are the names its server answers on. These commands add, remove and move them, and
+keep the tenant's realm in step.
+
+- `tenant host add <id> <host>` adds a host. A host already used by any tenant exits with code 2. So
+  does a host that a tenant deleted less than 90 days ago had, see
   [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
 - `tenant host add <id> <host> --site <path>` gives the host to one site of the tenant. The path is stored in lower
   case in `platform.tenant_hosts.site_path`. A path with bad syntax, or a reserved path such as `api`, exits with
@@ -337,6 +334,8 @@ command prints `<id> legal ok`.
 
 ## Sessions
 
+These commands sign people out of a tenant at once, on every replica.
+
 `tenant session end <id> --user <user>` deletes every session of one person in the tenant.
 `tenant session end <id> --all` deletes every session of the tenant. The next request on each
 deleted session answers 401, on every replica, because every request reads its row in
@@ -361,6 +360,8 @@ code 0, also when `n` is 0. A failure prints `<id> sessions failed: <message>` a
   once through the identity provider.
 
 ## Database passwords
+
+A tenant's two database roles get new passwords without a restart of any host.
 
 `tenant rotate-passwords <id>` sets new generated passwords for the tenant's runtime and schema
 database roles, `axis_<id>_runtime` and `axis_<id>_schema`, with `ALTER ROLE`, and stores them
@@ -405,7 +406,7 @@ keys. It can be rotated without signing anyone out.
 - **Settings.** `platform rekey` needs both keys. Without `Platform:PreviousSecretKey` it exits with
   code 2. A value that fails to decrypt with both keys stops the command, and nothing changes.
 - **Data protection keys.** Rekey is the one action that updates rows of
-  `platform.data_protection_keys`. The server's role still only inserts them.
+  `platform.data_protection_keys`. The server's role only inserts them.
 - **Both tenancy sources.** `platform rekey` does not read `Tenancy:Source`. The server keeps its
   data protection keys in the platform database under both sources, so both need the rotation.
   Under `configuration` the tenant directory is just empty.
@@ -435,51 +436,71 @@ keys. It can be rotated without signing anyone out.
 
 ## Platform audit records
 
+A platform audit record says which command changed the tenant directory, a tenant's keys, passwords
+or sessions, or took a tenant's data, and who ran it. The records live in the platform database,
+apart from every tenant, and nothing can change them.
+
 - **Table.** `platform.audit_records` is append-only. The database rejects every update, delete and
-  truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database. The table is
-  built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
-- **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
-  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant sign-in set`, `tenant backup`,
-  `tenant restore`, `migrate` and `activate` are built. So is `tenant session end`. So are `tenant data-key rotate` and `tenant data-key retire`. `tenant backup` writes one because an
-  archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
-  `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
-  and `tenant email clear`, which name the [mail settings](#mail-settings) they changed, and `tenant legal set` and
-  `tenant legal clear`, which name the [legal links](#legal-links) they changed. `tenant quotas set` is built too. The quotas route of the
-  [provisioning API](tenant-lifecycle.md#provisioning-api), `PUT /api/cell/tenants/{id}/quotas`, writes it with the quota keys it was given
-  in `changed`, in one transaction with the rows, and the record has no operator or machine caller. `platform rekey` is
-  built and writes one record for the whole run, with no tenant. The [publisher](administration.md#publisher) writes
-  `tenant host verify` when it verifies a host request and the host joins the tenant, with the actor of the request. A `suspend` or `resume` job that the
-  [publisher](administration.md#publisher) runs writes one record when it ends, with the command name of `tenant suspend` or
-  `tenant resume`, `job:<id>` in `changed` and the job's actor, in the same transaction as the job's final state. The exports route, `GET /api/cell/tenants/{id}/exports/{exportId}`, writes
-  `tenant export download` for each download of the ZIP, with the operator as actor and `export:<id>` in `changed`. A refused call and a read of the JSON write none. `tenant list`, `tenant binding list`, `version` and `publisher`
-  write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
-  writing one record per tenant, one per run or none. A command without a mark fails a test.
-- **When.** One record per tenant, when tenant work starts: after the checks of the command and
-  before its first change for that tenant. `platform rekey` writes its one record after every value
-  has decrypted and before the first update, and `changed` holds the counts. A usage error, a missing setting, an unknown tenant or a
-  host that another tenant holds writes none, because nothing started. A record means the command
-  started work for the tenant, not that the work succeeded. The `changed` names of these commands
-  are empty, because the command already says what changed. `tenant rotate-passwords`,
-  `tenant oidc set`, `tenant session end`, `tenant data-key rotate` and `tenant data-key retire` are the exceptions. The record of `tenant rotate-passwords` names both roles,
-  `axis_<id>_runtime` and `axis_<id>_schema`, and never a password. The record of `tenant oidc set`
-  names the [settings](#sign-in-settings) it was given and never a value. `tenant oidc set` writes
-  its record after its checks and before the change. The record of `tenant sign-in set` names `accounts` and
-  `provider:<name>`, and never a value. The record of `tenant session end` holds
-  `user:<user>` or `all`, and is written after its checks and before the delete.
-  The record of `tenant data-key rotate` holds `data_key:<n>` and `lookup_key:<k>`, the numbers it adds, and is written
-  before it adds them. The record of `tenant data-key retire` holds `data_key:<i>` and `lookup_key:<j>` for each key it
-  deletes, and is written after its count passes and before the delete. A refused `retire`, and one with nothing to delete,
-  writes none. Neither holds a key.
-  The binding and host commands differ: each is one small transaction that writes its record and
-  makes its change together, so a record means the change was made. A command that is refused or
-  fails rolls its record back too.
-- **A record that cannot be written.** That tenant stops with an `audit` step, and nothing changes
-  for it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other
-  tenants of `migrate` and `activate` go on. A record that is written prints no line.
+  truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database.
+  `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
 - **A record.** The time, the command, the tenant id, the operating system user and the machine that
-  ran it, the `actor` (empty unless a job wrote it, see above), and the names of what changed, such as a binding name or a setting name. It never holds a
-  secret value. The binding and host commands write the names as `binding:<name>` and
-  `host:<host>`, so one record can name things of more than one kind. `tenant host move` writes one
-  record, on the target tenant, with `host:<host>` and `from:<source id>`.
-- **Who writes.** Only `Axis.Admin`, over `ConnectionStrings:PlatformSchema`. The read-only role of
-  the server and the worker gets no `SELECT` on this table, so neither host reads it.
+  ran it, the `actor`, and in `changed` the names of what changed, such as a binding name or a setting
+  name. It never holds a secret value. The `actor` names the operator or the machine caller of a
+  provisioning job or a request, and is empty for a command run from the command line.
+- **Who writes.** `Axis.Admin` writes records over `ConnectionStrings:PlatformSchema`. The server writes
+  the records of the provisioning API's routes over a connection of the schema role that it opens for
+  that write alone. The read-only role of the server and the worker gets no `SELECT` on the table, so
+  neither host reads it.
+- **Every command is marked.** The dispatcher of `Axis.Admin` reads a table of commands, and each is
+  marked as writing one record per tenant, one per run or none. A command without a mark fails a test.
+
+### When a record is written
+
+A command writes its record either when its work for a tenant starts or together with its change.
+
+- **When the work starts.** One record per tenant, after the checks of the command and before its first
+  change for that tenant. Such a record means that the command started work for the tenant, not that
+  the work succeeded. A usage error, a missing setting, an unknown tenant or a host that another tenant
+  holds writes none, because nothing started.
+- **With the change.** The commands that the table marks so write their record and make their change
+  in one small transaction, so a record means the change was made. A command that is
+  refused or fails rolls its record back too.
+- **A record that cannot be written.** That tenant stops with an `audit` step, and nothing changes for
+  it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other tenants of
+  `migrate` and `activate` go on. A record that is written prints no line.
+
+| Command                                                                                                                         | When                                                                                                  | `changed`                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `tenant create`, `tenant suspend`, `tenant resume`, `tenant read-only`, `tenant backup`, `tenant restore`, `migrate`, `activate` | When the work starts. `tenant backup` writes one because an archive holds a tenant's data             | Empty, because the command already says what changed                                                             |
+| `tenant rotate-passwords`                                                                                                       | When the work starts                                                                                  | Both roles, `axis_<id>_runtime` and `axis_<id>_schema`, never a password                                         |
+| `tenant oidc set`                                                                                                               | After its checks and before the change                                                                | The [settings](#sign-in-settings) it was given and the client key ids, never a value                             |
+| `tenant session end`                                                                                                            | After its checks and before the delete                                                                | `user:<user>` or `all`                                                                                           |
+| `tenant data-key rotate`                                                                                                        | Before it adds the keys                                                                               | `data_key:<n>` and `lookup_key:<k>`, the numbers it adds                                                         |
+| `tenant data-key retire`                                                                                                        | After its count passes and before the delete. A refused run, and one with nothing to delete, write none | `data_key:<i>` and `lookup_key:<j>` for each key it deletes                                                    |
+| `tenant sign-in set`                                                                                                            | With the change                                                                                       | `accounts`, then `provider:<name>` for each provider, never a value                                              |
+| `tenant binding set`, `tenant binding remove`                                                                                   | With the change                                                                                       | `binding:<name>`                                                                                                 |
+| `tenant host add`, `tenant host remove`                                                                                         | With the change                                                                                       | `host:<host>`, and `site:<path>` for a site's host                                                               |
+| `tenant host move`                                                                                                              | With the change, one record on the target tenant                                                      | `host:<host>` and `from:<source id>`                                                                             |
+| `tenant email set`, `tenant email clear`                                                                                        | With the change                                                                                       | The [mail settings](#mail-settings) it was given, or `email`                                                     |
+| `tenant legal set`, `tenant legal clear`                                                                                        | With the change                                                                                       | The [legal links](#legal-links) options it was given, or `legal`, then `site:<path>` with `--site`               |
+| `platform rekey`                                                                                                                | One per run, with no tenant, after every value has decrypted and before the first update             | `tenant secrets: <n>` and `data protection keys: <m>`                                                            |
+| `cell backup`, `cell restore-check`, `cell operator invite`                                                                     | See [cell backup](administration.md#cell-backup), [cell restore check](administration.md#cell-restore-check) and [cell operator invite](administration.md#cell-operator-invite) | As those sections say |
+| `tenant list`, `tenant binding list`, `version`, `publisher`                                                                    | None of their own                                                                                     |                                                                                                                  |
+
+The publisher and the server also write records for the operator's work in a cell:
+
+- **Provisioning jobs.** Each job of the [provisioning API](tenant-lifecycle.md#provisioning-api) that
+  the [publisher](administration.md#publisher) runs writes one record when it ends, succeeded or failed,
+  in the same transaction as the job's final state. Its command is `tenant <kind>` after the job's kind,
+  such as `tenant suspend` or `tenant purge`, its `changed` holds `job:<id>` and its actor is the job's.
+- **Host verification.** When the publisher verifies a [host request](tenant-lifecycle.md#hosts) and the
+  host joins the tenant, it writes `tenant host verify` as `tenant host add` writes its record, with the
+  operator who asked for the host as actor.
+- **Quotas.** The quotas route of the provisioning API, `PUT /api/cell/tenants/{id}/quotas`, writes
+  `tenant quotas set` in one transaction with the quota rows, with the quota keys it was given in
+  `changed`.
+- **The actor of a quota change** _(planned for M31)_. The record of the quotas route names the operator
+  or the machine caller as its actor.
+- **Export downloads.** The exports route, `GET /api/cell/tenants/{id}/exports/{exportId}`, writes
+  `tenant export download` for each download of the ZIP, with the operator as actor and `export:<id>` in
+  `changed`. A refused call and a read of the JSON write none.

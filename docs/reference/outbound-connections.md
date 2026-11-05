@@ -1,7 +1,12 @@
 # Outbound connections
 
-Every connection that the server and the worker open, with the setting that
-names its address. The TLS rule of each is under [TLS](installation.md#tls).
+This page lists every connection that the hosts of an installation open, with the setting that names
+its address, and the rules that keep that list closed. The TLS rule of each connection is under
+[TLS](installation.md#tls).
+
+## Connections
+
+The server and the worker open these connections:
 
 | Host | Destination | Named by | TLS |
 | --- | --- | --- | --- |
@@ -16,23 +21,26 @@ names its address. The TLS rule of each is under [TLS](installation.md#tls).
 | worker | The mail server | `Email:Smtp:Host`, or the tenant's email settings, see [notifications](notifications.md) | [Mail](installation.md#tls) |
 
 The publisher connects to PostgreSQL only, with `ConnectionStrings:PlatformSchema` and
-`Scenarios:ServerConnectionString`. It calls no HTTP address. The admin host connects to PostgreSQL with
-`Admin:ConnectionString` and `ConnectionStrings:PlatformSchema`. Only `tenant create` of a main tenant also calls an
-HTTP address: the identity provider's admin API, at `IdentityProvider:Url`, over HTTPS outside `Development` and
-`Testing`. The address is an operator setting, so it is on the allowlist below.
+`Scenarios:ServerConnectionString`, and calls no HTTP address. The admin host connects to PostgreSQL
+with `Admin:ConnectionString` and `ConnectionStrings:PlatformSchema`. Only `tenant create` of a main
+tenant also calls an HTTP address: the identity provider's admin API, at `IdentityProvider:Url`, over
+HTTPS outside `Development` and `Testing`. That address is an operator setting, so it is on the
+allowlist below.
 
-- **The allowlist.** Every address comes from an operator setting or from a
-  deployment binding. The operator sets both, and a release holds only binding
-  names, never an address. So the settings and the bindings are the allowlist
-  of the server and the worker.
-- **No user names an address.** No user, author or API caller can give an
-  address in a request, a form, a release or a record. A connector or a package
-  operation can reach only the host of the binding it names.
-- **No redirects.** A connector call never follows one. A `3xx` fails the call,
-  see [call outcomes](process-execution.md#call-outcomes).
-- **No network rule in the examples.** The Compose example and the Helm chart
-  set no egress rule. An operator may add one that allows only the destinations
-  of this table.
-- **Extension packages are trusted code.** A package runs in the worker's
-  process, so installing one means trusting its code. The `url` binding limits
-  the client that Axis hands to it, not the package's own code.
+## Rules
+
+These rules keep every destination in the hands of the operator:
+
+- **The allowlist.** Every address comes from an operator setting or from a deployment binding. The
+  operator sets both, and a release holds only binding names, never an address. So the settings and
+  the bindings are the allowlist of the server and the worker.
+- **No user names an address.** No user, author or API caller can give an address in a request, a
+  form, a release or a record. A connector or a package operation can reach only the host of the
+  binding it names.
+- **No redirects.** A connector call never follows one. A `3xx` fails the call, see
+  [call outcomes](process-execution.md#call-outcomes).
+- **No network rule in the examples.** The Compose example and the Helm chart set no egress rule. An
+  operator may add one that allows only the destinations of this page.
+- **Extension packages are trusted code.** A package runs in the worker's process, so installing one
+  means trusting its code. The `url` binding limits the client that Axis hands to it, not the
+  package's own code.
