@@ -812,53 +812,38 @@ command makes neither the realm nor the role.
 
 ## Cell backup
 
-`cell backup` is the daily backup of a cell: it backs up every `active` and `suspended` tenant, four
-at a time, and uploads each archive to object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`. It runs
-only in a cell, where `Cell:Id` is set. The behaviour is in
-[backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+`cell backup` is the daily backup of a cell: it backs up every tenant once and uploads each archive to
+object storage. It takes no argument and runs only in a cell, where `Cell:Id` is set. What it backs
+up, its output, its audit records and its metric are in
+[daily backup](tenant-backup-and-restore.md#daily-backup).
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Cell:BackupKeyFile`, the
   five `Cell:BackupStorage` settings and `PATH`, to find `pg_dump`. It needs no
   `Admin:ConnectionString`.
-- **Output.** Each line starts with the tenant id, then the step and `ok` or `failed: <message>`. A
-  tenant that fails is tried once more, so its failed line comes twice.
-- **Exit codes.** `0` when every tenant succeeded, `1` when a tenant failed or the run reached its
-  6-hour limit, and `2` outside a cell, for a missing setting or `pg_dump`, or for an OTLP endpoint
-  setting that is not an `https` URL outside Development, with nothing uploaded.
-- **Last success.** After an upload, the tenant's time goes to `platform.tenant_backups`. At the end
-  of the run the command records the gauge `axis.backup.last_success` and, when an OTLP endpoint is
-  set, exports it, see [telemetry export](host-settings.md#telemetry-export).
-- **Audit.** One platform audit record for each tenant, written before its first try. A retry writes
-  no second record.
+- **Exit codes.** `0` when every tenant succeeded. `1` when a tenant failed, the run reached its
+  6-hour limit or the gauge could not be recorded. `2`, before anything is uploaded or audited,
+  outside a cell, with an argument, for a missing setting or `pg_dump`, or for an OTLP endpoint
+  setting that is not an absolute `https` URL outside Development.
 
 ## Cell restore check
 
 `cell restore-check` checks once that a recent archive restores: it restores the newest archive of a
-random tenant into a scratch tenant, compares its row counts and users with the archive, runs the test
-scenarios of its Studio applications, removes the scratch tenant and records the result. It runs only
-in a cell, where `Cell:Id` is set. The behaviour is in
-[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell), and the weekly job is the
+random tenant into a scratch tenant, checks it and removes it. It takes no argument and runs only in
+a cell, where `Cell:Id` is set. Its steps, output, audit record and metric are in
+[weekly restore check](tenant-backup-and-restore.md#weekly-restore-check), and the weekly job is the
 chart's [cell restore-check CronJob](installation.md#settings-and-secrets).
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Admin:ConnectionString`,
   `Cell:BackupKeyFile`, `Cell:InternalDomain`, the five `Cell:BackupStorage` settings, the
-  `IdentityProvider` settings, `Studio:ApplicationsPath` when an archive holds Studio files,
-  `Scenarios:ServerConnectionString`, which a tenant with a Studio application needs,
-  `Extensions:Path` and `Modules:Path`, and `PATH`, to find `pg_restore`.
-- **Output.** Each line starts with a tenant id, then the step and `ok` or `failed: <message>`. The
-  last line is `<source tenant> restore-check passed` or `failed`. A table or a number is named, never
-  a row or a username.
+  `IdentityProvider` settings, `IdentityProvider:Url` included, `Studio:ApplicationsPath` when an
+  archive holds Studio files, `Scenarios:ServerConnectionString`, which a tenant with a Studio
+  application needs, `Extensions:Path` and `Modules:Path`, and `PATH`, to find `pg_restore`.
 - **Exit codes.** `0` when the check passed. `1` when any step after the pick failed or no tenant has
-  an archive of today or yesterday. `2`, with nothing changed, outside a cell, with an argument, for a
-  missing setting or `pg_restore`, for a `Scenarios:ServerConnectionString` that is not a connection
-  string or an `Extensions:Path` or `Modules:Path` folder that does not exist, or for an OTLP endpoint
-  setting that is not an `https` URL outside Development.
-- **Metric.** The gauge `axis.backup.restore_check` is `1` for a pass and `0` for a failure, tagged
-  with the source tenant. When an OTLP endpoint is set the command exports it, see
-  [telemetry export](host-settings.md#telemetry-export).
-- **Audit.** One platform audit record, for the source tenant, written before the first change. It
-  lists `tenant: <scratch tenant id>`. It does not hold the result, which goes to the metric and the
-  output. A run that picks no tenant, or exits `2`, writes none.
+  an archive of today or yesterday. `2`, with nothing changed and no audit record written, outside a
+  cell, with an argument, for a missing setting or `pg_restore`, for a
+  `Scenarios:ServerConnectionString` that is not a connection string or an `Extensions:Path` or
+  `Modules:Path` folder that does not exist, or for an OTLP endpoint setting that is not an absolute
+  `https` URL outside Development.
 
 ## Version
 
