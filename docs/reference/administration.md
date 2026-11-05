@@ -745,7 +745,7 @@ A tenant archive is not a backup of the installation. The operator also keeps th
   marks `required`.
 
 Point-in-time recovery and restoring into another installation are out of scope, see
-[not built yet](#not-built-yet).
+[out of scope](#out-of-scope).
 
 ## Platform rekey
 
@@ -866,7 +866,7 @@ chart's [cell restore-check CronJob](installation.md#settings-and-secrets).
 `0`. The production image of the admin host carries the same version in its OCI label, see
 [installation](installation.md#images).
 
-## Not built yet
+## Out of scope
 
 These operations are outside what `Axis.Admin` does. An operator who needs one uses the database
 server's own tools.
