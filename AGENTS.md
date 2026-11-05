@@ -25,7 +25,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
   write in Vietnamese.
 - Docs are the source of truth. An issue links to the doc section it implements and does not copy
   it. A change that alters agreed behaviour, or makes any doc statement false, fixes the docs in the
-  same change. Follow [keeping the docs current](docs/delivery.md#keeping-the-docs-current).
+  same change. Follow [writing the docs](docs/writing-docs.md): one home for each rule, the current
+  rule and never the change, no progress or history, and leave nothing of a rule it replaces.
 - Keep the decision status words exact: **Agreed** means agreed and **Proposed** means still open.
   Never present a proposal as agreed.
 - One issue is one behaviour that fits one agent session, with 2–5 acceptance criteria that a test

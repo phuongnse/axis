@@ -102,8 +102,7 @@ lists the instances of the process, whatever release they are pinned to.
 - `step` is the step the instance runs next, or waits on. `endedAt` is `null`
   until the instance is `completed` or `failed`.
 - Each item also has `subjectLabel` and `releaseNumber`, so the
-  [process inspector widget](process-inspector-widget.md) shows no identifier
-  ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+  [process inspector widget](process-inspector-widget.md) shows no identifier.
   `subjectLabel` is the value of the subject record's display field, such as
   `"Replace the worn carpet tiles"`. It is `null` in these cases: the process
   has no subject, the entity has no display field, the user's field grants on

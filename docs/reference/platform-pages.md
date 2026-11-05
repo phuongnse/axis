@@ -44,8 +44,7 @@ so their paths are reserved site paths.
 
 ## Account page
 
-The sessions screen at `/account` is the person's account page, which replaces Keycloak's account console, as
-[D128](../decisions/d128-rules-from-the-studio-review.md) agrees. It also loads `GET /api/me/authenticators`. While
+The sessions screen at `/account` is the person's account page, which replaces Keycloak's account console. It also loads `GET /api/me/authenticators`. While
 that call is loading or has failed, the page shows neither action, and a failure shows an error message. When `account`
 is `false`, the person is a user of a brokered provider, and the page shows the sessions only.
 

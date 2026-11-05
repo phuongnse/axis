@@ -37,8 +37,7 @@ administrator and the users page are in [user administration](user-administratio
 - The realm also has its people, its brokered identity providers and a client for each site.
 - The realm's display name is the organization's name, which every sign-in page shows above its card, see
   [theme](#theme). `tenant create` gives the realm no display name until it takes the organization's name, and a rerun
-  clears one that holds the tenant id. The pages then name Axis, never the tenant id
-  ([D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md)).
+  clears one that holds the tenant id. The pages then name Axis, never the tenant id.
 - A preview tenant has no realm. It signs people in through its main tenant's realm, see
   [preview tenants](#preview-tenants).
 
@@ -415,7 +414,8 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 - Every page of Axis's identity provider has one frame: the organization's mark and name above one card in the middle
   of the page on `canvas`, and below it the [legal line](legal.md#legal-line), as wide as the card. The shell's gear button, named "Language and theme", sits at the
   page's top right, level with the organization's heading and as far from the top edge as from the right one. It opens
-  the shell's language and theme menu, every language named in its own language, then System, Light and Dark. Picking a
+  the shell's language and theme menu, every language named in its own language, then System, Light and Dark, so
+  another language only adds a row. Picking a
   language reloads the page in it, and picking a theme switches light or dark mode at once. A theme choice is kept in
   the browser per origin, so one made on the identity provider's host does not carry over to Axis on another host.
   The page follows light and dark mode and the Axis tokens and fonts, as the SPA does. The mark is 32 px, the first letter of the name on a `primary` tile as a

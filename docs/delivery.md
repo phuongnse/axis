@@ -8,7 +8,7 @@ own docs and skills, at the version that `.github/workflows/nexkit.yml` pins:
 [troubleshooting][nexkit-troubleshooting], and the [`request`][nexkit-request]
 and [`drive`][nexkit-drive] skills. This file holds only what is Axis's own:
 who decides what, the settings Axis chooses and why, its rules for issues and
-milestones, design changes, the docs, and writing on GitHub. It puts
+milestones, design changes, and writing on GitHub. It puts
 [D13](decisions/d13-delivery-workflow.md) into practice. Values that NexKit or
 the repository settings own, such as protected paths, required checks and the
 profiles' models, are not copied here. Look them up where they live.
@@ -252,6 +252,9 @@ follows NexKit's rules too. Axis adds these rules for writing it.
      concept was not delivered;
    - every *(planned for Mx)* marker for this milestone in any doc, removed
      when the work was built and moved to a later milestone when it was not;
+   - the doc sections that the milestone's pull requests changed: what is
+     said twice is merged into its one home, what a later rule replaced is
+     deleted, and the decisions they link hold only choices still in force;
    - the rows of [docs/README.md](README.md), which still say what each file
      holds;
    - every skill under `.claude/skills/`: its links still resolve and its
@@ -303,8 +306,10 @@ owner.
   the review's issue is merged, so nothing else in the artifact differs from
   the repository.
 - **A review ends in one docs change and one issue.** When the owner has
-  agreed the changes, one hand-made docs pull request records the rules and
-  any decision, including every change to configuration, an API or a decision.
+  agreed the changes, one hand-made docs pull request rewrites the rules where
+  they live, in the reference pages, configuration and APIs included, as
+  [writing the docs](writing-docs.md#how-the-docs-stay-correct) says. It adds
+  a decision only for a choice between real alternatives.
   One NexKit issue then builds all of it and links the docs, the artifact and
   the prototype's tag. NexKit splits it if it needs to: the owner does not.
 - **A sync follows the repository.** After a merged change to the tokens or a
@@ -323,88 +328,10 @@ owner.
 The steps for a requested change, a design review and a sync are in the
 [`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
 
-## Keeping the docs current
+## The docs
 
-- **The roadmap is the only place for milestone status.**
-  [roadmap.md](roadmap.md) records each milestone's status and what it
-  delivers. Other docs link to it instead of repeating it.
-- **One marker for planned work.** Any doc text that describes something not
-  built yet carries *(planned for Mx)*, where Mx is the milestone that builds
-  it. This applies to every doc, not only the architecture. The docs sweep
-  removes or moves these markers when a milestone closes.
-- **No false statements left behind.** A change that makes any doc statement
-  false fixes it in the same change. The rule is in the
-  [AGENTS.md working rules](../AGENTS.md#working-rules), so the NexKit review
-  applies it to every pull request.
-- **The threat model follows new trust boundaries.** A
-  change that adds a new kind of route, host, caller, stored secret or
-  integration updates [the threat model](reference/threat-model.md) in the same change, and each docs
-  sweep reviews it, see [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md).
-- **Rules and reasons, not incident history.** Docs state each rule and why
-  it exists. They do not retell incidents or cite issue or pull request
-  numbers as examples. That history belongs in issues, pull requests and git.
-  Links to decisions and doc sections stay, and so do links that track work,
-  such as the roadmap's link to a GitHub milestone.
-
-### How the docs are structured
-
-Agents read the docs in every plan, implement and review round, so the docs
-are built to be read in parts: small files, one topic each, found from an
-index. The same split keeps two pull requests from editing the same lines.
-
-- **One home per topic.** Each topic lives in one file, and
-  [docs/README.md](README.md) lists every file with what it holds. Other docs
-  link to that home and do not copy it. A new file gets its row in
-  `docs/README.md` in the same change.
-- **One home per kind of content.** A rule and its reason live in `docs/`. How
-  to apply a rule lives in a skill under `.claude/skills/`, which links to the
-  rule and does not restate it. A value that a tool or a setting owns lives
-  only there, and the doc or skill says where to look it up. History lives in
-  issues, pull requests and git. A skill does not describe an external tool's
-  behaviour that the tool's own docs, at the version the repository pins,
-  already cover, because the next release of the tool makes that copy stale.
-- **One decision per file.** Each decision is a file
-  `docs/decisions/d<n>-<slug>.md`. It starts with `# D<n>. <title>` and a
-  `Status: **Agreed**` or `Status: **Proposed**` line, and the slug is the
-  title's anchor. [decisions.md](decisions.md) is the index: one row per
-  decision, in number order, with the same title and status as its file. A new
-  decision takes the next free number and adds its row at the end. A status
-  change edits the file and its row together.
-- **Small files.** A doc under `docs/` stays at or under 1,000 lines. A
-  change that grows a doc past 900 lines splits it, so two changes that each
-  add a few lines to the same doc both still pass. The split moves whole `##`
-  sections, unchanged, to a new file in the same folder, named after its topic,
-  and links them. The base for "grows" is the `NEXKIT_BASE_SHA` commit when
-  NexKit sets it, else the merge base with `origin/main`. With neither, only
-  the 1,000-line limit applies. A new
-  topic that needs more than a few sections starts in a file of its own. A
-  table that many changes add rows to, such as the
-  [diagnostic codes](reference/diagnostic-codes.md), lives in a file of its
-  own.
-- **Short agent instructions.** [AGENTS.md](../AGENTS.md) holds only where to
-  look, the working rules and the commands, in at most 100 lines, and no rule
-  takes more than five. `CLAUDE.md` only imports it. Anything longer goes to the doc it belongs to,
-  such as [development.md](development.md), and AGENTS.md links to it. A
-  skill's `SKILL.md` stays at or under 250 lines and holds only how to apply
-  the rules it links.
-- **Stable links.** Link to a file, or to a heading in it, and never to text
-  that changes with status. A link to a decision links its file. Renaming or
-  moving a heading changes its anchor, so the same change fixes every link to
-  it.
-- **Checked on every change.** `scripts/lint.sh` runs two checks.
-  [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every
-  relative link and anchor in the repository.
-  [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that
-  `docs/README.md` lists every doc, that the decisions index matches the
-  decision files, that the [ASVS](reference/asvs.md#requirements) requirements
-  table has a valid row for each listed id, that the
-  [development users](reference/security.md#development-users) table lists the
-  same users and roles as the development realm file, and the size limits:
-  1,000 lines for a doc and 900 for a doc a change grows, 100 for AGENTS.md
-  and 250 for a `SKILL.md` under `.claude/skills/`. A doc fact that
-  code can check, such as the diagnostic code table, has a unit test that
-  compares the two and finds the table under `docs/` by its header, wherever
-  it moves.
+The docs follow [writing the docs](writing-docs.md): what goes in which doc, how to write it, and
+how the docs stay correct while the work goes on.
 
 ## Writing on GitHub
 

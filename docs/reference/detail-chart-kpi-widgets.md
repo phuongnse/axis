@@ -48,8 +48,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `text`. The labels and the values follow the form widget's **Field look**,
     and an empty value shows "Not set". The fields follow the form sections' widths,
     see [fields in columns](form-widget.md). A label and its value are no
-    longer drawn side by side
-    ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+    longer drawn side by side.
   - **Actions.** A `startProcess` button follows the form widget's **Start
     process action**, without a save first. It is the region's main action,
     outlined at the *main* level of [buttons](actions-and-controls.md#buttons). A `navigate` action sees the
@@ -174,8 +173,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     comparison's label and its value, the value is in tabular figures, and the
     "—" of an empty measure is weight 400. An empty measure is a muted "—" with
     a visually hidden `shell.kpi.empty`, see **Shown values** in
-    [frontend.md](frontend.md)
-    ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+    [frontend.md](frontend.md).
   - **Click and reading**. With a `navigate`, the tile is a link to the target
     page. The navigate label is the tile's last line, inside the link. The
     tile reads as `<label>: <value>`, and a comparison adds

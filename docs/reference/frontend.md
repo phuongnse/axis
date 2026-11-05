@@ -40,8 +40,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   xs to xl, and radius has the base radius. The size group holds `bar`, 48 px, the height of the
   shell's header, a page's band and Studio's application row, `smallControl`, 24 px, a small icon button and the line of
   text beside it, and `tableRow`, 40 px, a table's row and header. _(planned for M31)_: the dialog sizes `small`, `medium` and `large`, see [dialogs](actions-and-controls.md#dialogs). No size, space, type, radius or colour is a number of
-  its own in a component; a layout technique, such as a column's 1 % width, takes its size from a token, see
-  [D129](../decisions/d129-rules-from-the-studio-editors-review.md). The body font is IBM Plex Sans, a variable font for
+  its own in a component; a layout technique, such as a column's 1 % width, takes its size from a token, so a value
+  changed once is changed everywhere. The body font is IBM Plex Sans, a variable font for
   weights 100 to 700, and the code font is IBM Plex Mono at weight 400. The SPA ships the Google Fonts files from the
   Fontsource npm packages unchanged. Only the Latin, Latin Extended and Vietnamese subsets ship, each with a
   `unicode-range` in `web/src/fonts.css`, so a browser downloads only the subsets a page uses. The fonts are under the
@@ -87,8 +87,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   entry, and every form places field errors the same way, see
   [actions and controls](actions-and-controls.md).
 - **Shown values**. A value reads the same in every widget: in an
-  input, a read-only field, a table cell, a detail and a KPI
-  ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+  input, a read-only field, a table cell, a detail and a KPI.
   - **Dates and times.** One format per locale. A date is the locale's short
     numeric date from `Intl`, such as 03/18/2026 in `en` and 18/03/2026 in
     `vi`. A date-time is the date, then the time to the minute on the locale's
@@ -934,8 +933,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     catalog has the same keys, so the development rule never hides a
     platform text behind a site that lacks it.
 
-- **Narrow width.** Axis has one layout breakpoint, at 992 px, Ant Design's `lg`, the smallest desktop
-  ([D96](../decisions/d96-rules-from-the-design-system-review.md)). Below it is narrow width: columns stack in file order, tab
+- **Narrow width.** Axis has one layout breakpoint, at 992 px, Ant Design's `lg`, the smallest desktop, so every
+  desktop gets the desktop layout and everything smaller the narrow one. Below it is narrow width: columns stack in file order, tab
   headers scroll, a row's actions fold into one menu and the shell navigation collapses. Its value is one token in
   `web/src/platform/designTokens.ts` as `breakpointTokens.narrowWidth`. The narrow-width hook reads it, and each card's
   marker in the Design System artifact sets that width, see [widget previews](../development.md#widget-previews).

@@ -1,9 +1,8 @@
 # Documentation
 
 This is the map of the Axis docs. Each topic has one home, and other docs link to it rather than
-repeat it. Find the file for your topic here, then read only the sections you need. How the docs are
-kept current and how they are split is in
-[keeping the docs current](delivery.md#keeping-the-docs-current).
+repeat it. Find the file for your topic here, then read only the sections you need. What goes in
+which doc, how to write it and how the docs stay correct is in [writing the docs](writing-docs.md).
 
 ## Product and design
 
@@ -95,7 +94,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
 | [Studio workspace](reference/studio-workspace.md)                      | Studio's list of applications, an open application's sidebar, band and Overview       |
 | [Studio resource form](reference/studio-resource-form.md)              | The form that edits a resource, its save bar, its references and its JSON view        |
-| [Entity designer](reference/entity-designer.md)                        | The Form tab of the entity editor: fields, settings, indexes, validations                 |
+| [Entity designer](reference/entity-designer.md)                        | The Form tab of the entity editor: fields, settings, indexes, validations, migrations     |
 | [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |
 | [Process designer](reference/process-designer.md)                      | The Design tab of the process editor: palette, transitions, removes, keyboard         |
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
@@ -131,4 +130,5 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | ----------------------------- | ---------------------------------------------------------------------------- |
 | [AGENTS.md](../AGENTS.md)     | The working rules and the commands, for people and agents                    |
 | [Development](development.md) | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users |
-| [Delivery](delivery.md)       | How work flows through NexKit, and how the docs are kept current             |
+| [Delivery](delivery.md)       | How work flows through NexKit                                                |
+| [Writing the docs](writing-docs.md) | What goes in which doc, how to write it, and how the docs stay correct |

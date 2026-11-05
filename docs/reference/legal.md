@@ -3,7 +3,7 @@
 Detailed reference for the privacy policy and terms of service links, the legal line that shows them, the page that
 lists the licences of what Axis ships, and the step where a person accepts the terms. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
-[decisions.md](../decisions.md). The rules come from [D128](../decisions/d128-rules-from-the-studio-review.md).
+[decisions.md](../decisions.md).
 
 ## Legal settings
 
