@@ -2,61 +2,44 @@
 
 Status: **Agreed**
 
-M15 lets users export records to CSV and spreadsheet files, and import records
-from them, under the same policies as the record API. The owner agreed these
-points on 2026-10-25. It is built in M15. See
-[import and export](../reference/import-export.md). It adds two grant actions
-to the entity grants of [D24](d24-roles-and-policies.md), and one to data
-source grants.
+## Context
 
-- **Grant actions:**
-  - An `entity` grant takes `export` and `import`. A `dataSource` grant takes
-    `export`.
-  - `export` needs `read` as well, and exports only what `read` reaches.
-  - `import` needs `create` as well, and `update` too for an import that
-    updates existing records.
-- **Export:**
-  - A data source and an entity each have an export route that takes the
-    query of their rows route and `format=csv` or `format=xlsx`.
-  - It runs the same query, grants, read filters and field checks as the rows
-    route, and writes every matching row, up to `Data:ExportMaxRows`.
-  - Values are written in machine form: ISO dates, decimals as text, enum
-    values rather than labels, and the display value of a reference.
-  - A text-like CSV cell that starts with `=`, `+`, `-`, `@`, a tab or a
-    carriage return gets a leading `'`, so a spreadsheet never runs it as a
-    formula. A number cell never does, because a number cannot be a formula
-    and a prefix would break its machine form.
-  - Spreadsheets are written with DocumentFormat.OpenXml, which is MIT
-    licensed.
-  - Each export writes an audit record `records.exported` with the source, the
-    row count and the user, and no values.
-- **Import:**
-  - A user uploads a CSV or spreadsheet file for one entity. The first row
-    names the fields. The worker runs the import, never the request thread.
-  - A dry run comes first. It reports every error by row and column, keyed
-    `/rows/{n}/values/{field}`, and writes nothing.
-  - A commit writes every row in one transaction, or none. An import holds at
-    most 10,000 rows, `Data:ImportMaxRows`.
-  - Each row goes through the record command as the user who uploaded it. So
-    field grants, filters, validations, defaults, sequences, the creator
-    field and audit records all apply.
-  - An import that names a unique field as its key updates the record with
-    that key and creates the others.
-  - A reference column takes a record id or the target's unique display value.
-  - Imported records fire data change triggers, as any write through the
-    record command does. Async triggers go through event delivery and its
-    retry limit.
-  - The import writes an audit record `records.imported` with the counts.
-  - M15 imports no child rows, no `references` and no files.
-- **SPA:** a table whose user holds `export` shows an Export button with the
-  two formats. An entity table whose user holds `import` shows an Import
-  button that runs the dry run, shows its errors and then commits.
-- **Studio:** the policy matrix shows the new actions.
+Every business application imports a first data set and exports data for reports. An export is a
+read that leaves the platform, and an import is a burst of writes, so both must stay under the same
+policies, validations and triggers as the record API of [D24](d24-roles-and-policies.md), with no
+second path to secure.
 
-_Why:_ every business application imports a first data set and exports for
-reports, and an export is a read that leaves the platform, so it gets its own
-grant and an audit record. Separate actions let an auditor read without
-downloading everything. Going through the data source query and the record
-command keeps one place for policies, validations and triggers, with no
-second path to secure. A dry run and an all-or-nothing commit leave no half
-import to clean up. Neutralising formula cells closes the usual CSV injection.
+## Decision
+
+- **Their own grant actions.** An `entity` grant takes `export` and `import`, and a `dataSource`
+  grant takes `export`. `export` needs `read` and reaches only what `read` reaches. `import` needs
+  `create`, and `update` too for an import that updates records by a key.
+- **An export runs the rows query.** A data source or an entity exports to CSV or `xlsx` with the
+  same query, grants, read filters and field checks as its rows route, up to a row limit. Values are
+  written in machine form, and a text cell that a spreadsheet could run as a formula is neutralised.
+  Spreadsheets are written and read with DocumentFormat.OpenXml, which is MIT licensed.
+- **An import goes through the record command.** The worker runs it, never the request thread. Each
+  row is written as the user who uploaded the file, so field grants, filters, validations, defaults,
+  sequences and data change triggers all apply.
+- **A dry run first, then all or nothing.** The dry run reports every error by row and column and
+  writes nothing. The commit writes every row in one transaction, or none, up to a row limit.
+- **Both are audited,** with counts and never values.
+
+The detail is in [import and export](../reference/import-export.md) and
+[roles and policies](../reference/roles-and-policies.md).
+
+## Consequences
+
+- An auditor can read records without being able to download them all.
+- Policies, validations and triggers have one home, whichever way the data comes in or goes out.
+- A failed import leaves nothing half done to clean up.
+- An import is bounded by what one transaction can hold, so a larger data set is imported in parts.
+- The usual CSV injection is closed, at the cost of a leading `'` on text that starts like a
+  formula.
+
+## Alternatives
+
+- **Export as part of `read`.** Anyone who may read a record could then take every record out of the
+  platform.
+- **Write rows one by one and keep the good ones.** The user would be left to find and repair a half
+  import.
