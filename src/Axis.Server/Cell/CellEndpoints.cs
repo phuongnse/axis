@@ -42,8 +42,9 @@ namespace Axis.Server.CellApi;
 /// </para>
 /// <para>
 /// <c>GET /api/cell/tenants</c> answers <c>{ "items": [...] }</c>, ordered by id, with each tenant's <c>id</c>,
-/// <c>status</c>, <c>application</c> and <c>hosts</c>. <c>GET /api/cell/tenants/{id}</c> answers one such tenant. Both read the
-/// platform tables over the reader role. The <c>status</c> is <c>deleting</c> while the tenant has a scheduled deletion, whatever
+/// <c>status</c>, <c>application</c>, <c>hosts</c> and <c>failedWork</c>. <c>GET /api/cell/tenants/{id}</c> answers one such tenant. Both read the
+/// platform tables over the reader role. The <c>failedWork</c> is <c>{ instances, unknownCalls, deadLetters }</c>, the counts of the worker's
+/// latest hourly sample in <c>platform.tenant_usage_latest</c>, and <see langword="null"/> until the worker has counted the tenant. The <c>status</c> is <c>deleting</c> while the tenant has a scheduled deletion, whatever
 /// its stored status, which stays <c>suspended</c>. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
 /// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is <see langword="null"/> until the
 /// create job records it. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
@@ -212,12 +213,15 @@ internal static class CellEndpoints
             .Where(tenant => tenant.PreviewOf == null)
             .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status })
             .ToListAsync(cancellationToken);
-        var hosts = await ReadHostsAsync(platform, tenants.Select(tenant => tenant.Id).ToList(), cancellationToken);
+        var ids = tenants.Select(tenant => tenant.Id).ToList();
+        var hosts = await ReadHostsAsync(platform, ids, cancellationToken);
+        var failedWork = await ReadFailedWorkAsync(platform, ids, cancellationToken);
 
         return Results.Ok(new CellTenantListResponse(
             [.. tenants
                 .OrderBy(tenant => tenant.Id, StringComparer.Ordinal)
-                .Select(tenant => new CellTenantResponse(tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id)))]));
+                .Select(tenant => new CellTenantResponse(
+                    tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id), failedWork.GetValueOrDefault(tenant.Id)))]));
     }
 
     private static async Task<IResult> GetTenantAsync(
@@ -237,8 +241,10 @@ internal static class CellEndpoints
         }
 
         var hosts = await ReadHostsAsync(platform, [tenant.Id], cancellationToken);
+        var failedWork = await ReadFailedWorkAsync(platform, [tenant.Id], cancellationToken);
         var quotas = await ReadQuotasAsync(platform, tenant.Id, defaults, cancellationToken);
-        return Results.Ok(new CellTenantDetailResponse(tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id), quotas));
+        return Results.Ok(new CellTenantDetailResponse(
+            tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id), failedWork.GetValueOrDefault(tenant.Id), quotas));
     }
 
     private static async Task<IResult> SetQuotasAsync(
@@ -776,6 +782,23 @@ internal static class CellEndpoints
         return rows.ToLookup(row => row.TenantId, row => row.Host, StringComparer.Ordinal);
     }
 
+    // A tenant without a row, or with a row the worker wrote before it counted failed work, has no entry.
+    private static async Task<Dictionary<string, CellFailedWorkResponse>> ReadFailedWorkAsync(
+        PlatformDbContext platform,
+        List<string> tenantIds,
+        CancellationToken cancellationToken)
+    {
+        var rows = await platform.TenantUsageLatest.AsNoTracking()
+            .Where(row => tenantIds.Contains(row.TenantId)
+                && row.FailedInstances != null && row.UnknownCalls != null && row.OpenDeadLetters != null)
+            .Select(row => new { row.TenantId, row.FailedInstances, row.UnknownCalls, row.OpenDeadLetters })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(
+            row => row.TenantId,
+            row => new CellFailedWorkResponse(row.FailedInstances!.Value, row.UnknownCalls!.Value, row.OpenDeadLetters!.Value),
+            StringComparer.Ordinal);
+    }
+
     private static string[] HostsOf(ILookup<string, string> hosts, string tenantId) =>
         [.. hosts[tenantId].Order(StringComparer.Ordinal)];
 }
@@ -783,8 +806,19 @@ internal static class CellEndpoints
 /// <summary>The cell: its id and region, the number of its tenants without preview tenants, and its tenant cap or null.</summary>
 internal sealed record CellResponse(string Id, string Region, int Tenants, int? Cap);
 
-/// <summary>One tenant of the cell. <c>Application</c> is null until the create job records it.</summary>
-internal sealed record CellTenantResponse(string Id, string Status, string? Application, IReadOnlyList<string> Hosts);
+/// <summary>The counts of a tenant's failed work: numbers only, with no ids, inputs or errors.</summary>
+internal sealed record CellFailedWorkResponse(long Instances, long UnknownCalls, long DeadLetters);
+
+/// <summary>
+/// One tenant of the cell. <c>Application</c> is null until the create job records it. <c>FailedWork</c> is null until the
+/// worker has counted the tenant.
+/// </summary>
+internal sealed record CellTenantResponse(
+    string Id,
+    string Status,
+    string? Application,
+    IReadOnlyList<string> Hosts,
+    CellFailedWorkResponse? FailedWork);
 
 /// <summary>The tenants of the cell, ordered by id.</summary>
 internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items);
@@ -795,6 +829,7 @@ internal sealed record CellTenantDetailResponse(
     string Status,
     string? Application,
     IReadOnlyList<string> Hosts,
+    CellFailedWorkResponse? FailedWork,
     IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
 
 /// <summary>The body of the quotas write: the quotas to set, where <c>null</c> is no limit, and the quotas to take back to the default.</summary>

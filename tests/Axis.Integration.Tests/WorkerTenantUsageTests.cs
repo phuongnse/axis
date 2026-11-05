@@ -73,6 +73,22 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
     }
 
     [Fact]
+    public async Task A_worker_in_a_cell_counts_the_failed_instances_unknown_calls_and_open_dead_letters_of_a_tenant()
+    {
+        var tenant = await PrepareTenantAsync("a");
+        await SeedFailedWorkAsync(tenant);
+        var platform = await database.CreateDatabaseAsync("usage_platform", CancellationToken);
+        await SeedPlatformAsync(platform, tenant);
+        await using var app = BuildWorker(platform, new ManualClock(), _cellSettings);
+
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await LatestAsync(platform, "a") is not null, "The worker did not sample the tenant.");
+
+        // A completed instance, a pending call and a discarded dead letter are not failed work.
+        Assert.Equal(new TenantFailedWorkCounts(1, 1, 1), (await LatestAsync(platform, "a"))!.Value.FailedWork);
+    }
+
+    [Fact]
     public async Task A_second_sample_the_same_day_replaces_the_latest_row_and_the_day_keeps_the_larger_total()
     {
         var clock = new ManualClock();
@@ -113,12 +129,12 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         await GrantPlatformAsync(platform);
         var now = new DateTimeOffset(2026, 6, 15, 8, 0, 0, TimeSpan.Zero);
 
-        await store.RecordSampleAsync("a", 100, 50, now, CancellationToken);
-        await store.RecordSampleAsync("a", 10, 5, now.AddHours(1), CancellationToken);
+        await store.RecordSampleAsync("a", 100, 50, default, now, CancellationToken);
+        await store.RecordSampleAsync("a", 10, 5, default, now.AddHours(1), CancellationToken);
         Assert.Equal((100L, 50L), DayTotals((await DayAsync(platform, "a", DateOnly.FromDateTime(now.UtcDateTime))).Single()));
         Assert.Equal((10L, 5L), (await LatestAsync(platform, "a"))!.Value.Totals);
 
-        await store.RecordSampleAsync("a", 200, 60, now.AddHours(2), CancellationToken);
+        await store.RecordSampleAsync("a", 200, 60, default, now.AddHours(2), CancellationToken);
         Assert.Equal((200L, 60L), DayTotals((await DayAsync(platform, "a", DateOnly.FromDateTime(now.UtcDateTime))).Single()));
     }
 
@@ -176,7 +192,7 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         }
 
         await new TenantUsageStore(NpgsqlDataSource.Create(PostgreSqlServer.RuntimeConnectionString(platform)))
-            .RecordSampleAsync("a", 1, 1, now, CancellationToken);
+            .RecordSampleAsync("a", 1, 1, default, now, CancellationToken);
 
         Assert.Equal([newer, today], (await DayAsync(platform, "a", null)).Select(row => row.Day).Order());
 
@@ -228,7 +244,7 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         }
 
         Assert.Equal(["tenant_usage", "tenant_usage_latest"], columns.Select(column => column.Table).Distinct().Order());
-        Assert.Equal(13, columns.Count);
+        Assert.Equal(16, columns.Count);
         string[] freeForm = ["text", "character varying", "character", "json", "jsonb", "bytea", "ARRAY", "USER-DEFINED"];
         Assert.All(columns.Where(column => freeForm.Contains(column.Type)), column => Assert.Equal("tenant_id", column.Column));
         Assert.All(columns.Where(column => column.Column == "tenant_id"), column => Assert.Equal("text", column.Type));
@@ -440,6 +456,64 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
             CancellationToken);
     }
 
+    // One failed and one completed instance, one unknown and one pending call of the completed instance, and one open and one discarded
+    // dead letter. The rows name no release, as the tenant has none. A running or waiting instance would make the worker's start check
+    // look for its release, so the instance that is not failed has ended.
+    private static async Task SeedFailedWorkAsync(UsageTenant tenant)
+    {
+        var application = Guid.NewGuid();
+        var release = Guid.NewGuid();
+        var completed = Guid.NewGuid();
+        await using var connection = new NpgsqlConnection(tenant.SchemaConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        foreach (var (id, state) in new[] { (Guid.NewGuid(), ProcessStarts.Failed), (completed, ProcessStarts.Completed) })
+        {
+            await using var instance = new NpgsqlCommand(
+                """
+                INSERT INTO axis.process_instances (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step)
+                VALUES (@id, @application, @process, @entity, @subject, @release, @state, 1, 'start')
+                """,
+                connection);
+            instance.Parameters.AddWithValue("id", id);
+            instance.Parameters.AddWithValue("application", application);
+            instance.Parameters.AddWithValue("process", Guid.NewGuid());
+            instance.Parameters.AddWithValue("entity", Guid.NewGuid());
+            instance.Parameters.AddWithValue("subject", Guid.NewGuid());
+            instance.Parameters.AddWithValue("release", release);
+            instance.Parameters.AddWithValue("state", state);
+            await instance.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        foreach (var state in new[] { ConnectorCalls.Unknown, ConnectorCalls.Pending })
+        {
+            await using var call = new NpgsqlCommand(
+                """
+                INSERT INTO axis.connector_calls (id, process_instance_id, step, staged_revision, release_id, connector, operation, state, attempts)
+                VALUES (@id, @instance, @state, 1, @release, 'Purchasing', 'createOrder', @state, 0)
+                """,
+                connection);
+            call.Parameters.AddWithValue("id", Guid.NewGuid());
+            call.Parameters.AddWithValue("instance", completed);
+            call.Parameters.AddWithValue("release", release);
+            call.Parameters.AddWithValue("state", state);
+            await call.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        foreach (var state in new[] { DeadLetters.Open, "discarded" })
+        {
+            await using var letter = new NpgsqlCommand(
+                """
+                INSERT INTO axis.dead_letters (id, kind, application_id, attempts, last_error, state, created_at)
+                VALUES (@id, 'webhook.deliver', @application, 5, 'failed', @state, now())
+                """,
+                connection);
+            letter.Parameters.AddWithValue("id", Guid.NewGuid());
+            letter.Parameters.AddWithValue("application", application);
+            letter.Parameters.AddWithValue("state", state);
+            await letter.ExecuteNonQueryAsync(CancellationToken);
+        }
+    }
+
     private static async Task<Guid> EnqueueAsync(UsageTenant tenant, string kind)
     {
         await using var connection = new NpgsqlConnection(tenant.SchemaConnectionString);
@@ -452,12 +526,19 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         await using var connection = new NpgsqlConnection(platform);
         await connection.OpenAsync(CancellationToken);
         await using var command = new NpgsqlCommand(
-            "SELECT database_bytes, file_bytes, sampled_at FROM platform.tenant_usage_latest WHERE tenant_id = @tenant",
+            """
+            SELECT database_bytes, file_bytes, sampled_at, failed_instances, unknown_calls, open_dead_letters
+            FROM platform.tenant_usage_latest WHERE tenant_id = @tenant
+            """,
             connection);
         command.Parameters.AddWithValue("tenant", tenantId);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         return await reader.ReadAsync(CancellationToken)
-            ? new LatestUsage(reader.GetInt64(0), reader.GetInt64(1), reader.GetFieldValue<DateTimeOffset>(2))
+            ? new LatestUsage(
+                reader.GetInt64(0),
+                reader.GetInt64(1),
+                reader.GetFieldValue<DateTimeOffset>(2),
+                new TenantFailedWorkCounts(reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5)))
             : null;
     }
 
@@ -496,7 +577,7 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
 
     private sealed record UsageTenant(string Id, string DatabaseHost, int DatabasePort, string DatabaseName, string Role, string Password, string SchemaConnectionString);
 
-    private readonly record struct LatestUsage(long DatabaseBytes, long FileBytes, DateTimeOffset SampledAt)
+    private readonly record struct LatestUsage(long DatabaseBytes, long FileBytes, DateTimeOffset SampledAt, TenantFailedWorkCounts FailedWork)
     {
         public (long DatabaseBytes, long FileBytes) Totals => (DatabaseBytes, FileBytes);
     }
