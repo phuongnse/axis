@@ -5,6 +5,32 @@ import type { ReferenceMark } from './studioSchemas'
 /** The names the application defines, or `undefined` until they load. */
 export const StudioNamesContext = createContext<StudioNames | undefined>(undefined)
 
+/**
+ * Proposed: one choice of a picker: the name the file keeps, and the text key of the label people know it by, which
+ * `ReferencePicker` resolves. Every picker gets its choices from {@link referenceOptions}, so none builds a label itself.
+ */
+export interface ReferenceChoice {
+  name: string
+  labelKey?: string | null
+}
+
+function choice(name: string, labelKey?: string | null): ReferenceChoice {
+  return { name, labelKey: labelKey ?? null }
+}
+
+/** What a picker takes: a choice, or a plain name, which is a choice with no label. */
+export type ReferenceOption = string | ReferenceChoice
+
+/** The choice of an option. */
+export function asChoice(option: ReferenceOption): ReferenceChoice {
+  return typeof option === 'string' ? { name: option, labelKey: null } : option
+}
+
+/** The names of options, for a caller that works on names alone. */
+export function choiceNames(options: readonly ReferenceOption[]): string[] {
+  return options.map((option) => asChoice(option).name)
+}
+
 /** The JSON Pointer that a part mark's `of` names, given the pointer of the property that holds the mark. */
 export function referencePointer(pointer: string, of: string): string {
   const relative = /^(\d+)(\/.*)$/.exec(of)
@@ -33,7 +59,12 @@ export function getAt(root: unknown, pointer: string): unknown {
  * process, the parameters or columns of a data source, the operations of a connector or the outcomes of the task
  * steps with that name. Names match without regard to case.
  */
-export function referenceOptions(names: StudioNames, mark: ReferenceMark, draft: unknown, pointer: string): string[] {
+export function referenceOptions(
+  names: StudioNames,
+  mark: ReferenceMark,
+  draft: unknown,
+  pointer: string,
+): ReferenceChoice[] {
   if (typeof mark === 'string') {
     return kindNames(names, mark)
   }
@@ -45,21 +76,21 @@ export function referenceOptions(names: StudioNames, mark: ReferenceMark, draft:
   const named = (item: { name: string }) => item.name.toLowerCase() === wanted
   switch (mark.part) {
     case 'field':
-      return names.entities.find(named)?.fields.map((field) => field.name) ?? []
+      return names.entities.find(named)?.fields.map((field) => choice(field.name, field.labelKey)) ?? []
     case 'step':
-      return names.processes.find(named)?.steps.map((step) => step.name) ?? []
+      return names.processes.find(named)?.steps.map((step) => choice(step.name, step.labelKey)) ?? []
     case 'parameter':
-      return names.dataSources.find(named)?.parameters.map((parameter) => parameter.name) ?? []
+      return names.dataSources.find(named)?.parameters.map((parameter) => choice(parameter.name)) ?? []
     case 'processParameter':
-      return names.processes.find(named)?.parameters.map((parameter) => parameter.name) ?? []
+      return names.processes.find(named)?.parameters.map((parameter) => choice(parameter.name)) ?? []
     case 'column':
-      return names.dataSources.find(named)?.columns.map((column) => column.name) ?? []
+      return names.dataSources.find(named)?.columns.map((column) => choice(column.name)) ?? []
     case 'operation':
-      return names.connectors.find(named)?.operations.map((operation) => operation.name) ?? []
+      return names.connectors.find(named)?.operations.map((operation) => choice(operation.name)) ?? []
     case 'outcome':
       return [
         ...new Set(names.processes.flatMap((process) => process.steps.filter(named).flatMap((step) => step.outcomes))),
-      ]
+      ].map((outcome) => choice(outcome))
   }
 }
 
@@ -86,30 +117,32 @@ export function parameterType(
     ?.parameters.find((parameter) => parameter.name.toLowerCase() === key.toLowerCase())?.type
 }
 
-function kindNames(names: StudioNames, kind: string): string[] {
+function kindNames(names: StudioNames, kind: string): ReferenceChoice[] {
+  const named = (items: { name: string; labelKey?: string | null }[]) =>
+    items.map((item) => choice(item.name, item.labelKey))
   switch (kind) {
     case 'entity':
-      return names.entities.map((item) => item.name)
+      return named(names.entities)
     case 'dataSource':
-      return names.dataSources.map((item) => item.name)
+      return named(names.dataSources)
     case 'process':
-      return names.processes.map((item) => item.name)
+      return named(names.processes)
     case 'role':
-      return names.roles.map((item) => item.name)
+      return named(names.roles)
     case 'rule':
-      return names.rules.map((item) => item.name)
+      return named(names.rules)
     case 'connector':
-      return names.connectors.map((item) => item.name)
+      return named(names.connectors)
     case 'event':
-      return names.events.map((item) => item.name)
+      return named(names.events)
     case 'sequence':
-      return names.sequences.map((item) => item.name)
+      return named(names.sequences)
     case 'form':
-      return names.forms.map((item) => item.name)
+      return named(names.forms)
     case 'page':
-      return names.pages.map((item) => item.name)
+      return named(names.pages)
     case 'text':
-      return names.texts.map((item) => item.key)
+      return names.texts.map((item) => choice(item.key))
     default:
       return []
   }

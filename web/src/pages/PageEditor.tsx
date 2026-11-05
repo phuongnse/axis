@@ -21,7 +21,7 @@ import {
   widgetSummary,
   widgetTypes,
 } from '../platform/pageWidgets'
-import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import { asChoice, referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -508,7 +508,8 @@ function NameField({
     names === undefined
       ? []
       : (choices ?? referenceOptions(names, kind, undefined, pointer)).filter(
-          (option) => without === undefined || without === '' || option.toLowerCase() !== without.toLowerCase(),
+          (option) =>
+            without === undefined || without === '' || asChoice(option).name.toLowerCase() !== without.toLowerCase(),
         )
 
   return (

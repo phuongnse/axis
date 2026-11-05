@@ -27,8 +27,7 @@ Last updated 2026-11-05 (merged `main` at fd1bf541; Display field names fields b
   1. Step 3: Add field opens a choice of type first, a grid of the types, each with an icon and one line, then the drawer.
   2. Step 4: the entity's Validations section as `AxisField` boxes like the drawer's rules, with a Field column or label,
      and Indexes the same way.
-  3. The rule "A picker names by the label" for the rest: the Field picker of Validations, the multi-choice of fields in
-     Indexes, then the pickers of resources (process, page, scenario and the others that use `ReferencePicker`).
+  3. The rule "A picker names by the label" is built for every `ReferencePicker`. Left: the multi-choice of fields in Indexes.
   4. Then the review's End, as the `axis-design` skill says: one docs change, the tag, one NexKit issue.
 - **To pick it up on another machine:**
   - `git fetch && git switch design/2026-11-04-entities`, then `scripts/setup.sh` once and `scripts/dev.sh`.
@@ -192,8 +191,14 @@ Last updated 2026-11-05 (merged `main` at fd1bf541; Display field names fields b
 - **Asked:** wherever a person picks a field or a resource, the choices show its label as text, as the tables do, not its
   name. The name shows only where it is needed: instead of a missing label, and in textMuted after the label of options
   that share one. The search finds either, and the file keeps the name.
-- **Built:** `ReferencePicker` takes `labelOf`. The entity's Display field uses it first. The pickers of Validations and
-  Indexes and the other pickers of fields and resources are left to follow it.
+- **Built:** one mechanism. `GET .../names` answers a `labelKey` with each name it lists that has a label or title (entity,
+  field, process, step, data source, rule, connector, event, role, page, policy and the module resources), in
+  `DefinedNames`. `referenceOptions` gives each choice as `{ name, labelKey }`, and `ReferencePicker` resolves the key
+  through `useTextOfKey`, the one way Studio turns a text key into words, which the entity designer's label text uses too.
+  Every picker gets the rule with no change of its own, and the slot pickers of `SchemaForm` use `ReferencePicker` again in
+  place of their own labelled select.
+- **For the issue:** the names route gains `labelKey`, so `docs/reference` for the route says so. A choice the picker is given
+  as a plain name has no label and shows the name. Columns, parameters and operations have no label in their format.
 
 ### Second mechanisms found by the audit of 2026-11-05
 
@@ -206,8 +211,8 @@ concern has one mechanism" says. Found by reading, not yet run.
    `SchemaForm.tsx`, which fall back differently (first locale, or `en`).
 3. Sorting names: `nameCollator` in `pages/studioViews.ts` against inline collators and bare `localeCompare` calls. It moves
    to `platform/`.
-4. The label of an option: `labelOf` of `ReferencePicker`, `StudioResourceTitle`, and the label built in `SchemaForm`. The
-   target is the names route answering a label key with each name.
+4. The label of an option: done in this review, see "A picker names by the label". `StudioResourceTitle` stays for the
+   places that are not pickers.
 5. A status as a tag: raw colour names in `UsersPage`, `ConsolePublishing`, `StudioReleases`, `StudioTestResults` and
    `StudioPolicyMatrix`, against the colour tokens.
 6. Empty states drawn with Ant Design's `Empty` in `HomePage`, `ProcessInstancePage` and `RecordHistory`, against

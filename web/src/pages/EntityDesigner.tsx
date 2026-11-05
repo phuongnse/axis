@@ -23,7 +23,6 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import { searchRows } from '../platform/tableControls'
 import { useDesignTokens } from '../platform/themeMode'
-import { PlatformContext } from './context'
 import {
   changeFieldType,
   editableSettings,
@@ -33,13 +32,19 @@ import {
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
-import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import {
+  referenceOptions,
+  StudioNamesContext,
+  type ReferenceChoice,
+  type ReferenceOption,
+} from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import { useTextOfKey } from './useTextOfKey'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
@@ -121,7 +126,7 @@ function PickerControl({
   pointer: string
   label: string
   kind?: string
-  options?: string[]
+  options?: readonly ReferenceOption[]
   value: unknown
   required: boolean
   /** Fills its row, as a field of a drawer does. */
@@ -187,8 +192,17 @@ export function EntityDesigner(props: EntityParts) {
   const { spacing } = useDesignTokens()
   const { value, onChange, readOnly = false } = props
   const fields = Array.isArray(value.fields) ? value.fields : undefined
-  const fieldNames = (fields ?? []).flatMap((field) =>
-    isContent(field) && typeof field.name === 'string' && field.name !== '' ? [field.name] : [],
+  // Proposed: the entity's own fields as choices of a picker: the name the file keeps and the label's text key, so every
+  // picker of a field names it by its label, as `ReferencePicker` does for any choice.
+  const fieldChoices: ReferenceChoice[] = (fields ?? []).flatMap((field) =>
+    isContent(field) && typeof field.name === 'string' && field.name !== ''
+      ? [
+          {
+            name: field.name,
+            labelKey: isContent(field.label) && typeof field.label.textKey === 'string' ? field.label.textKey : null,
+          },
+        ]
+      : [],
   )
   const section = (key: string) => ({
     title: t(`shell.studio.section.entity.${key}`),
@@ -207,7 +221,7 @@ export function EntityDesigner(props: EntityParts) {
   const designer = (
     <Flex vertical gap={spacing.md} data-testid="studio-entity-designer">
       <SectionPanel {...section('general')}>
-        <EntityGeneral value={value} onChange={onChange} readOnly={readOnly} fieldNames={fieldNames} />
+        <EntityGeneral value={value} onChange={onChange} readOnly={readOnly} fieldChoices={fieldChoices} />
       </SectionPanel>
       <SectionPanel
         {...section('fields')}
@@ -235,7 +249,7 @@ export function EntityDesigner(props: EntityParts) {
       <SectionPanel {...section('validations')}>
         <Validations
           validations={value.validations}
-          fieldNames={fieldNames}
+          fieldChoices={fieldChoices}
           readOnly={readOnly}
           layer={props.layer}
           onChange={onChange}
@@ -257,20 +271,13 @@ export function EntityDesigner(props: EntityParts) {
 
 /** The text of a label or description in the interface's language, else in the folder's first, else its text key. */
 function useLabelText(): (value: unknown) => string | null {
-  const names = useContext(StudioNamesContext)
-  const resource = useContext(LabelTextsContext)
-  const uiLocale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const textOfKey = useTextOfKey()
   return (value) => {
     const key = isContent(value) && typeof value.textKey === 'string' ? value.textKey : null
     if (key === null || key === '') {
       return null
     }
-    const texts = resource?.pending?.[key] ?? names?.texts.find((entry) => entry.key === key)?.texts
-    if (!texts) {
-      return key
-    }
-    const locale = names?.locales.includes(uiLocale) ? uiLocale : names?.locales[0]
-    return (locale && texts[locale]?.trim()) || key
+    return textOfKey(key) ?? key
   }
 }
 
@@ -287,25 +294,17 @@ function EntityGeneral({
   value,
   onChange,
   readOnly,
-  fieldNames,
+  fieldChoices,
 }: {
   value: Content
   onChange: ChangeHandler
   readOnly: boolean
-  fieldNames: string[]
+  fieldChoices: readonly ReferenceChoice[]
 }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const label = useContext(LabelTextsContext)
   const texts = names !== undefined && label !== null && !readOnly
-  const labelText = useLabelText()
-  // Proposed: a field is named by its label, as a person knows it, and by its name only beside it.
-  const labelOf = (option: string) => {
-    const found = (Array.isArray(value.fields) ? value.fields : []).find(
-      (item) => isContent(item) && item.name === option,
-    )
-    return isContent(found) ? labelText(found.label) : null
-  }
   const field = (name: string) => ({
     testId: `studio-field-/${name}`,
     label: t(`shell.studio.field.entity.${name}`),
@@ -351,8 +350,7 @@ function EntityGeneral({
           name={t('shell.studio.field.entity.displayField')}
           value={typeof value.displayField === 'string' ? value.displayField : undefined}
           required={false}
-          options={fieldNames}
-          labelOf={labelOf}
+          options={fieldChoices}
           block
           onChange={(next) => onChange('/displayField', next)}
         />
@@ -1488,13 +1486,13 @@ function Indexes({
 /** The validations of the entity as rows of a name, an expression, a message key and a field. */
 function Validations({
   validations,
-  fieldNames,
+  fieldChoices,
   readOnly,
   layer,
   onChange,
 }: {
   validations: unknown
-  fieldNames: string[]
+  fieldChoices: readonly ReferenceChoice[]
   readOnly: boolean
   layer: DesignerLayer | undefined
   onChange: ChangeHandler
@@ -1545,7 +1543,7 @@ function Validations({
               <Picker
                 pointer={`${pointer}/field`}
                 label={t('shell.studio.entity.validationField')}
-                options={fieldNames}
+                options={fieldChoices}
                 value={content.field}
                 required
                 onPick={(next) => onChange(`${pointer}/field`, next ?? '')}

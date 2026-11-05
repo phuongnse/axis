@@ -328,6 +328,8 @@ export interface StudioNameField {
   type: string
   target: string | null
   values: string[] | null
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /** The names of one kind in `GET .../names`. `module` is the module id, or `null` for the application's own. */
@@ -336,6 +338,8 @@ export interface StudioNameEntity {
   name: string
   module: string | null
   fields: StudioNameField[]
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /**
@@ -349,6 +353,8 @@ export interface StudioNameDataSource {
   parameters: { name: string; type: string }[]
   columns: { name: string; type: string | null }[]
   groupBy: string[] | null
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /** A process step in `GET .../names`. `outcomes` is empty for a step that is not a task. */
@@ -356,12 +362,16 @@ export interface StudioNameStep {
   name: string
   type: string
   outcomes: string[]
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /** A named resource in `GET .../names`, such as a role. */
 export interface StudioNameResource {
   id: string
   name: string
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /**
@@ -372,6 +382,8 @@ export interface StudioNameModuleResource {
   id: string
   name: string
   module: string | null
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /** A page in `GET .../names`, with the parameters it declares. `module` is the module id, or `null` for the application's own. */
@@ -380,6 +392,8 @@ export interface StudioNamePage {
   name: string
   module: string | null
   parameters: { name: string; type: string; required: boolean }[]
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /** A policy in `GET .../names`. `module` is the module id, or `null` for the application's own. */
@@ -387,6 +401,8 @@ export interface StudioNamePolicy {
   id: string
   name: string
   module: string | null
+  /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
+  labelKey?: string | null
 }
 
 /** A text key in `GET .../names`, with its text in each locale that has it. */
@@ -408,6 +424,7 @@ export interface StudioNames {
     entity: string | null
     parameters: { name: string; type: string }[]
     steps: StudioNameStep[]
+    labelKey?: string | null
   }[]
   rules: {
     id: string
@@ -415,14 +432,16 @@ export interface StudioNames {
     module: string | null
     parameters: { name: string; type: string }[]
     resultType: string
+    labelKey?: string | null
   }[]
-  connectors: { id: string; name: string; operations: { name: string }[] }[]
+  connectors: { id: string; name: string; operations: { name: string }[]; labelKey?: string | null }[]
   events: {
     id: string
     name: string
     module: string | null
     entity: string
     fields: { name: string; type: string }[]
+    labelKey?: string | null
   }[]
   roles: StudioNameResource[]
   sequences: StudioNameModuleResource[]

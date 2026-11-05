@@ -16,7 +16,13 @@ import {
   type StudioRelaxedPoint,
 } from '../platform/studio'
 import { keyPropertyOf, type KeyedLists } from '../platform/layerMarks'
-import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import {
+  choiceNames,
+  parameterType,
+  referenceOptions,
+  StudioNamesContext,
+  type ReferenceChoice,
+} from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -744,14 +750,13 @@ function SlotMap({
   const { colour, spacing, type } = useDesignTokens()
   const catalog = useContext(StudioCatalogContext)
   const names = useContext(StudioNamesContext)
-  const titleOf = useContext(StudioResourceTitle)
   const locale = document.documentElement.lang || 'en'
   const moduleId = getAt(rootValue, `${pointer.slice(0, pointer.lastIndexOf('/'))}/id`)
   const module = catalog?.modules.find((entry) => entry.id === moduleId)
   const map = typeof value === 'object' && value !== null ? (value as Record<string, string>) : {}
-  const options = (slots === 'roles' ? names?.roles : names?.connectors)?.map((entry) => ({
-    value: entry.name,
-    label: titleOf?.(entry.id) ?? entry.name,
+  const options = (slots === 'roles' ? names?.roles : names?.connectors)?.map((entry): ReferenceChoice => ({
+    name: entry.name,
+    labelKey: entry.labelKey,
   }))
   if (!module || module[slots].length === 0) {
     return (
@@ -788,13 +793,13 @@ function SlotMap({
             >
               {label}
             </label>
-            <Select
+            <ReferencePicker
               id={id}
-              allowClear
-              showSearch
-              optionFilterProp="label"
+              name={label}
               value={map[slot.name]}
-              options={options}
+              required={false}
+              options={options ?? []}
+              block
               onChange={(next) => {
                 const rest = Object.fromEntries(Object.entries(map).filter(([key]) => key !== slot.name))
                 const updated = next === undefined ? rest : { ...rest, [slot.name]: next }
@@ -1220,7 +1225,7 @@ function MarkedMap({
   }
   const unused = (key: string) => {
     const used = new Set(entries.map(([other]) => other.toLowerCase()))
-    return options(key).filter((option) => !used.has(option.toLowerCase()))
+    return choiceNames(options(key)).filter((option) => !used.has(option.toLowerCase()))
   }
   const next = unused('')[0]
 
@@ -1253,7 +1258,8 @@ function MarkedMap({
             value={key}
             required
             options={options(key).filter(
-              (option) => option === key || !entries.some(([other]) => other.toLowerCase() === option.toLowerCase()),
+              (option) =>
+                option.name === key || !entries.some(([other]) => other.toLowerCase() === option.name.toLowerCase()),
             )}
             onChange={(to) => rename(key, to)}
           />

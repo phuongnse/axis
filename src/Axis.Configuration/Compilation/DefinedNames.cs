@@ -3,7 +3,8 @@ namespace Axis.Configuration.Compilation;
 /// <summary>
 /// Every name an application defines, by kind, as the authoring API's names route answers it. A name is written
 /// as a reference writes it, so a module entity is <c>&lt;module id&gt;/&lt;name&gt;</c> and a module rule is
-/// <c>&lt;module id&gt;:&lt;name&gt;</c>.
+/// <c>&lt;module id&gt;:&lt;name&gt;</c>. Proposed: every entry that the format gives a label or title also answers its
+/// <c>LabelKey</c>, the text key of that label, which Studio resolves in <c>Texts</c> to name the entry by its label.
 /// </summary>
 public sealed record DefinedNames(
     IReadOnlyList<string> Locales,
@@ -29,10 +30,12 @@ public sealed record DefinedNames(
 }
 
 /// <summary>An entity and its fields. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
-public sealed record DefinedEntity(Guid Id, string Name, string? Module, IReadOnlyList<DefinedField> Fields);
+public sealed record DefinedEntity(
+    Guid Id, string Name, string? Module, IReadOnlyList<DefinedField> Fields, string? LabelKey = null);
 
 /// <summary>A field as written. <paramref name="Target"/> and <paramref name="Values"/> are null when the field has none.</summary>
-public sealed record DefinedField(string Name, string Type, string? Target, IReadOnlyList<string>? Values);
+public sealed record DefinedField(
+    string Name, string Type, string? Target, IReadOnlyList<string>? Values, string? LabelKey = null);
 
 /// <summary>
 /// A data source with its parameters and the columns a row of it carries. <paramref name="GroupBy"/> is the group
@@ -44,7 +47,8 @@ public sealed record DefinedDataSource(
     string? Module,
     IReadOnlyList<DefinedTyped> Parameters,
     IReadOnlyList<DefinedColumn> Columns,
-    IReadOnlyList<string>? GroupBy);
+    IReadOnlyList<string>? GroupBy,
+    string? LabelKey = null);
 
 /// <summary>A name with a type: a rule or data source parameter, or an event field.</summary>
 public sealed record DefinedTyped(string Name, string Type);
@@ -64,19 +68,22 @@ public sealed record DefinedProcess(
     string? Module,
     string? Entity,
     IReadOnlyList<DefinedTyped> Parameters,
-    IReadOnlyList<DefinedStep> Steps);
+    IReadOnlyList<DefinedStep> Steps,
+    string? LabelKey = null);
 
 /// <summary>A process step. <paramref name="Outcomes"/> is empty for a step that is not a task.</summary>
-public sealed record DefinedStep(string Name, string Type, IReadOnlyList<string> Outcomes);
+public sealed record DefinedStep(string Name, string Type, IReadOnlyList<string> Outcomes, string? LabelKey = null);
 
 public sealed record DefinedRule(
     Guid Id,
     string Name,
     string? Module,
     IReadOnlyList<DefinedTyped> Parameters,
-    string ResultType);
+    string ResultType,
+    string? LabelKey = null);
 
-public sealed record DefinedConnector(Guid Id, string Name, IReadOnlyList<DefinedOperation> Operations);
+public sealed record DefinedConnector(
+    Guid Id, string Name, IReadOnlyList<DefinedOperation> Operations, string? LabelKey = null);
 
 public sealed record DefinedOperation(string Name);
 
@@ -85,22 +92,24 @@ public sealed record DefinedOperation(string Name);
 /// writes it, so a module event's own-module entity is <c>&lt;module id&gt;/&lt;name&gt;</c>.
 /// <paramref name="Module"/> is the module id, or null for the application's own.
 /// </summary>
-public sealed record DefinedEvent(Guid Id, string Name, string? Module, string Entity, IReadOnlyList<DefinedTyped> Fields);
+public sealed record DefinedEvent(
+    Guid Id, string Name, string? Module, string Entity, IReadOnlyList<DefinedTyped> Fields, string? LabelKey = null);
 
 /// <summary>A role.</summary>
-public sealed record DefinedResource(Guid Id, string Name);
+public sealed record DefinedResource(Guid Id, string Name, string? LabelKey = null);
 
 /// <summary>
 /// A sequence, form, seed, trigger, scenario or text resource. <paramref name="Module"/> is the module id, or null
 /// for the application's own. A module resource's <paramref name="Name"/> is <c>&lt;module id&gt;/&lt;name&gt;</c>.
 /// </summary>
-public sealed record DefinedModuleResource(Guid Id, string Name, string? Module);
+public sealed record DefinedModuleResource(Guid Id, string Name, string? Module, string? LabelKey = null);
 
 /// <summary>A page and the parameters it declares. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
-public sealed record DefinedPage(Guid Id, string Name, string? Module, IReadOnlyList<DefinedPageParameter> Parameters);
+public sealed record DefinedPage(
+    Guid Id, string Name, string? Module, IReadOnlyList<DefinedPageParameter> Parameters, string? LabelKey = null);
 
 /// <summary>A policy. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
-public sealed record DefinedPolicy(Guid Id, string Name, string? Module);
+public sealed record DefinedPolicy(Guid Id, string Name, string? Module, string? LabelKey = null);
 
 /// <summary>
 /// A module contract. Only modules have contracts, so <paramref name="Module"/> is always the module id, and

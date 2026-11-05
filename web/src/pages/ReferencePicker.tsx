@@ -1,39 +1,43 @@
 import { Select, Tag } from 'antd'
+import { asChoice, choiceNames, type ReferenceChoice, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useTextOfKey } from './useTextOfKey'
 
 /**
  * A searchable choice of the names an application defines. A value that is not one of them stays visible and is
- * tagged unknown, so a file that names something gone still shows it. The picker takes no other text.
+ * tagged unknown, so a file that names something gone still shows it. Proposed: a choice shows the label people know it
+ * by, which it resolves from the choice's `labelKey`, alone, and the name only in place of a missing label and after the
+ * label of choices that share one. The search finds the label or the name, and the value stays the name.
  */
 export function ReferencePicker({
+  id,
   name,
   value,
   required,
   options,
   block = false,
-  labelOf,
   onChange,
 }: {
+  /** Proposed: the id a label's `htmlFor` names. */
+  id?: string
   name: string
   value: string | undefined
   required: boolean
-  options: string[]
+  options: readonly ReferenceOption[]
   /** Proposed: fills its column, as an input beside it does, rather than its 240 px. */
   block?: boolean
-  /**
-   * Proposed: the text people know an option by, such as a field's label. The picker shows it alone, and the search finds
-   * the label or the name. The name shows after the label, in textMuted, only for options that share one label. The value
-   * stays the name. An option with no text shows its name.
-   */
-  labelOf?: (option: string) => string | null
   onChange: (next: string | undefined) => void
 }) {
   const t = useText()
+  const textOfKey = useTextOfKey()
   const { colour, spacing } = useDesignTokens()
   const current = value === undefined || value === '' ? undefined : value
+  const names = choiceNames(options)
+  const all = options.map(asChoice)
+  const labelOf = (option: ReferenceChoice) => textOfKey(option.labelKey)
   const match =
-    current === undefined ? undefined : options.find((option) => option.toLowerCase() === current.toLowerCase())
+    current === undefined ? undefined : names.find((option) => option.toLowerCase() === current.toLowerCase())
   const choices = [
     ...(current !== undefined && match === undefined
       ? [
@@ -47,21 +51,21 @@ export function ReferencePicker({
           },
         ]
       : []),
-    ...options.map((option) => {
-      const text = labelOf?.(option) || null
+    ...all.map((option) => {
+      const text = labelOf(option)
       // The name shows beside the label only where the label alone would leave two options alike.
-      const alike = text !== null && options.some((other) => other !== option && labelOf?.(other) === text)
+      const alike = text !== null && all.some((other) => other !== option && labelOf(other) === text)
       return {
-        value: option,
-        search: text ? `${text} ${option}` : option,
+        value: option.name,
+        search: text ? `${text} ${option.name}` : option.name,
         label:
-          text !== null && text !== option ? (
+          text !== null && text !== option.name ? (
             <span>
               {text}
-              {alike && <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>{option}</span>}
+              {alike && <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>{option.name}</span>}
             </span>
           ) : (
-            option
+            option.name
           ),
       }
     }),
@@ -69,6 +73,7 @@ export function ReferencePicker({
 
   return (
     <Select
+      id={id}
       aria-label={name}
       showSearch
       virtual={false}
