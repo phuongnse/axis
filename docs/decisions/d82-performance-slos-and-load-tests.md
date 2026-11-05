@@ -49,11 +49,10 @@ detail. The owner agreed these points on 2026-10-25.
     CI machine varies too much to block a pull request.
   - The `*PerformanceTests` classes stay as they are. They guard single
     requests on every run of CI on `main`.
-    - [D97](d97-reliable-test-runs.md) replaces this line: they run in a
-      workflow of their own, every night since
-      [D104](d104-codeql-and-the-performance-tests-run-every-night.md), and
-      once every 62 merges by NexKit since
-      [D112](d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md).
+    - They run in a workflow of their own, as [D97](d97-reliable-test-runs.md)
+      agrees, once every 62 merges by NexKit, as
+      [D112](d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
+      agrees.
 - **Scope:** the scenarios cover the routes that exist when M16 starts. A
   milestone that adds a route in a group above adds it to the load test.
 

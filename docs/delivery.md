@@ -1,337 +1,287 @@
 # Delivery workflow
 
-Axis is built through NexKit. NexKit runs one issue per agent session, and its
-autopilot moves issues on by itself, from plan to merge. How NexKit works, what
-each setting does, and what a person does where NexKit stops are in NexKit's
-own docs and skills, at the version that `.github/workflows/nexkit.yml` pins:
-[how it works][nexkit-how], [configuration][nexkit-config],
-[troubleshooting][nexkit-troubleshooting], and the [`request`][nexkit-request]
-and [`drive`][nexkit-drive] skills. This file holds only what is Axis's own:
-who decides what, the settings Axis chooses and why, its rules for issues and
-milestones, design changes, and writing on GitHub. It puts
-[D13](decisions/d13-delivery-workflow.md) into practice. Values that NexKit or
-the repository settings own, such as protected paths, required checks and the
-profiles' models, are not copied here. Look them up where they live.
+Axis is built through NexKit. NexKit runs one issue per agent session, and its autopilot moves issues
+on by itself, from plan to merge. How NexKit works, what each setting does, and what a person does
+where NexKit stops are in NexKit's own docs and skills, at the version that
+`.github/workflows/nexkit.yml` pins: [how it works][nexkit-how], [configuration][nexkit-config],
+[troubleshooting][nexkit-troubleshooting], and the [`request`][nexkit-request] and
+[`drive`][nexkit-drive] skills. This page holds only what is Axis's own: who decides what, the
+settings Axis chooses and why, its rules for issues and milestones, design changes, and writing on
+GitHub. The reasons for the workflow are in [D13](decisions/d13-delivery-workflow.md). Values that
+NexKit or the repository settings own, such as protected paths, required checks and the profiles'
+models, are not copied here: look them up where they live.
 
 ## Who does what
 
-- **The owner** decides **Proposed** design points, questions that nothing in
-  the plan, the issue or the docs settles, whether NexKit merges its own pull
-  requests, and when a milestone closes. The owner merges hand-made pull
-  requests, with an admin bypass of the rules on `main` once the CI workflow
-  passes. NexKit mentions the owner when a run needs a person; the owner's
-  login is in NexKit's `notify` setting.
-- **The local agent session** works for the owner when the owner asks. It
-  writes issues and their order, checks whether a milestone is ready and
-  breaks it down, proposes changes to
-  the NexKit settings as hand-made pull requests, runs design reviews and
-  publishes the Design System artifact in Claude from the repository, as
-  [Design changes](#design-changes) describes. Its runbooks are the
+Four actors take part in the work, and each has its own part.
+
+- **The owner** decides **Proposed** design points, questions that nothing in the plan, the issue or
+  the docs settles, whether NexKit merges its own pull requests, and when a milestone closes. The
+  owner merges hand-made pull requests, with an admin bypass of the rules on `main` once the CI
+  workflow passes. NexKit mentions the owner when a run needs a person, through its `notify` setting.
+- **The local agent session** works for the owner when the owner asks. It writes issues and their
+  order, checks whether a milestone is ready and breaks it down, proposes changes to the NexKit
+  settings as hand-made pull requests, runs design reviews and publishes the Design System artifact in
+  Claude from the repository, as [design changes](#design-changes) describes. Its runbooks are the
   [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and the
-  [`axis-design` skill](../.claude/skills/axis-design/SKILL.md). It does not
-  review plans or merged pull requests: NexKit's review stage does.
-- **The hourly driver** is a Claude Code routine that follows NexKit's
-  [`drive` skill][nexkit-drive] with the
-  [`axis-nexkit-routine` skill](../.claude/skills/axis-nexkit-routine/SKILL.md).
-  It acts for the owner where NexKit stops for a person: the owner has
-  confirmed in advance every option that NexKit, the plan, the issue or the
-  docs recommend or support. It pushes the hand merges NexKit cannot push,
-  makes the hand-made changes that a plan puts in paths NexKit may not change
-  and opens their pull requests. It never approves or merges, and it hands the
-  owner only what the owner alone can decide.
-- **NexKit's agents** plan, implement, fix and review inside the NexKit
-  pipeline. They read [AGENTS.md](../AGENTS.md). They do not read or write
-  Claude Design.
+  [`axis-design` skill](../.claude/skills/axis-design/SKILL.md). It does not review plans or merged
+  pull requests, because NexKit's review stage does.
+- **The hourly driver** is a Claude Code routine that follows NexKit's [`drive` skill][nexkit-drive]
+  with the [`axis-nexkit-routine` skill](../.claude/skills/axis-nexkit-routine/SKILL.md). It acts for
+  the owner where NexKit stops for a person, and may take every option that NexKit, the plan, the
+  issue or the docs recommend or support, because the owner has accepted those in advance. It pushes
+  the hand merges NexKit cannot push, makes the hand-made changes that a plan puts in paths NexKit may
+  not change, and opens their pull requests. It never approves or merges, and it hands the owner only
+  what the owner alone can decide.
+- **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read
+  [AGENTS.md](../AGENTS.md), and they neither read nor write Claude Design.
 
 ## Decisions
 
-These are the settings Axis chooses in `.nexkit/config.json` and on GitHub,
-with the reasons. What each one does is in NexKit's
-[configuration][nexkit-config].
+These are the settings Axis chooses in `.nexkit/config.json` and on GitHub, each with its reason.
+What each setting does is in NexKit's [configuration][nexkit-config], and its value is in the file
+that holds it.
+
+### How issues run
 
 - **Autopilot takes every open issue,** as
-  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees.
-  NexKit's [`autopilot`][nexkit-autopilot] setting is on with its scope set to
-  every open issue, so no person posts `/nexkit plan` or `/nexkit go`.
-  Milestones group the work and do not order it: the issues of several
-  milestones run at once, and only *blocked by* marks make one issue wait for
-  another, in the same milestone or across milestones. A `bug` issue for CI on
-  `main` is in no milestone.
-- **Autopilot answers with the recommended option,** with `answer` set to
-  `recommended`, even when the recommendation rests on a **Proposed**
-  decision. The owner sees the answers on the issue and can change one with a
-  comment before `/nexkit go`, or with `/nexkit fix` on the pull request.
-- **Issues run in parallel unless one needs another.** Marks follow the rules
-  of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
-  marked *blocked by* every other issue of the milestone, with no reason line
-  for each. At most three issues run at once, with `max_parallel` at 3, as
-  [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md)
-  agrees. Each round of checks takes ten runner jobs, of the twenty that
-  GitHub Free runs at once.
-- **NexKit merges a pull request once it passes,** with
-  [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
-  are the gate Axis relies on. The owner turns the setting off to decide each
-  merge again, and then only the owner merges. The switch is in `.nexkit/`, so
-  changing it is a hand-made pull request.
-- **NexKit resolves conflicts with `main` by itself,** with
-  `conflicts.auto_resolve` on. The rules on `main` do not want a branch to be
-  up to date, as
-  [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md)
-  agrees, so a pull request merges once its checks pass on its own branch,
-  and a merge does not send the waiting pull requests through another round.
-  Two pull requests that pass alone can break `main` together, and CI on
-  `main` finds it. `conflicts.max_rounds` is 6 instead of 3, so a pull request
-  that conflicts with several merges in a row still merges by itself.
-- **A second Claude subscription takes over at the usage limit.** NexKit
-  pauses only when both are at their limit.
-- **A parent issue closes when its last part does,** with
-  `close_parent_issues` on.
-- **The rules on `main` let NexKit merge.** They require NexKit's own checks
-  and no approval from a person, and not a branch that is up to date. They do not require the CI workflow, which
-  runs on pushes to `main` and to hand-made branches but not on NexKit's
-  branches. NexKit's checks run the same scripts there.
-  - [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) adds one approval, by a hand-made `.github/CODEOWNERS` and
-    a rule the owner sets: a pull request that touches the files that define
-    the security checks needs the owner's review. NexKit cannot merge it, so it
-    waits, and the owner approves and merges it. The owner checks one thing:
-    whether the change adds an exception to a check, or loosens one, and why.
-- **There is no push token.** NexKit pushes with the Actions token, so it
-  cannot push a merge that brings changes to `.github/workflows/`. The hourly
-  driver merges those by hand.
-- **CI runs on `main` once every 5 merges.** A merge by NexKit starts no
-  `push` workflow, so NexKit's `merge.after_workflows` setting starts CI on
-  `main` once every 5 of its merges, CodeQL once every 32 and the performance
-  workflow once every 62, as
-  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
-  agrees. None of them has a schedule. CI also runs on a person's push and on
-  demand. Each of the three ends with a job that starts a NexKit sweep, so a
-  failure is noticed when its run ends. A dispatch that GitHub's API keeps
-  rejecting leaves a warning on the run and does not fail it, so that run waits
-  for the next sweep. A CI run on `main` always finishes: a
-  newer run replaces only one that is still waiting to start. On any other branch a newer push stops the older
-  run. CI runs the lint and unit tests, the smoke tests, three shards of the
-  integration tests and three shards of the E2E tests as eight parallel jobs,
-  so a run takes as long as its slowest job.
-- **The slow checks run in full only in NexKit's checks.** The smoke, integration
-  and E2E checks are marked `slow`. The test, smoke, integration and E2E checks name
-  their `results`: `artifacts/test-results`, and for E2E also `artifacts/logs`
-  and the Playwright traces in `tests/e2e/test-results`. NexKit's
-  [`evidence`][nexkit-evidence] setting names the CI workflow's
-  `test-results-e2e-1` to `test-results-e2e-3`, `test-results-integration-1`
-  to `test-results-integration-3`, `test-results-smoke` and `test-results-unit` artifacts, which hold the Playwright traces and
-  `error-context.md` files, and the performance workflow's
-  `test-results-performance`.
-- **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
-  checks in nine jobs at once, with `parallel_checks` on: the build and lint
-  in one job, the group `build-lint`, and the unit tests, the smoke tests and
-  each of three integration shards and three E2E shards in their own. A check round
-  then takes about as long as its slowest job, instead of all of them in a
-  row, which took 20 to 50 minutes. A check gets a job of its own when
-  sharing one made that job the slowest: the smoke tests after the build,
-  lint and unit tests took about 25 minutes, the whole E2E suite in one job
-  about 20, the unit tests after the build and lint about 12, and the whole
-  integration suite in one job 28 minutes or more, so on a slow runner it
-  passed the check's 30-minute limit with no test failed. The checks `e2e-1` to
-  `e2e-3` and `integration-1` to `integration-3` run the same commands as the
-  CI workflow's E2E and integration shards, so NexKit matches a failed check
-  with the shard that failed on `main`.
-  A suite that no file changed since NexKit's commit can affect is skipped,
-  and any doubt runs it. The commit is the one on which that check last
-  passed with its current command and setup (`NEXKIT_CHECK_VERIFIED_SHA`),
-  else the merge base (`NEXKIT_BASE_SHA`). The last green round
-  (`NEXKIT_VERIFIED_SHA`) is never used, because NexKit does not record which
-  checks or commands it ran, so a check added or changed since would skip. So
-  after `main` moves, a check that passed before reruns its suite only when
-  the new commits can affect it.
-  In the automatic review that brings a branch up to date, NexKit goes
-  further: the smoke, integration and E2E checks name the paths they never
-  read in NexKit's [`unaffected_by`][nexkit-unaffected] setting, and a check
-  whose paths did not change since it passed gets no job at all. The round's
-  comment, the run summary and a notice name it as skipped. The lists name
-  the same paths as the safe lists of the scripts, which a test checks.
-  CI on `main` sets no base and runs every
-  suite, so a slowdown shows at its next run. The integration performance
-  tests, whose class names end in `PerformanceTests`, run neither in NexKit's
-  checks nor in CI's integration job, because they depend on the runner's
-  load. The performance workflow runs them on `main` once every 62 merges, as
-  [D97](decisions/d97-reliable-test-runs.md) and
-  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
-  say. Which suite skips
-  when is in [test runs and reports](development.md#test-runs-and-reports).
-- **NexKit restores the dependency caches that CI on `main` saves:** NuGet,
-  npm and the Playwright browsers. The entries are in NexKit's
-  [`cache`][nexkit-caches] setting, and the CI workflow has one
-  `actions/cache` step for each, with the same paths and key files in the
-  same order. A change to what setup downloads updates both in the same
+  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees. NexKit's
+  [`autopilot`][nexkit-autopilot] setting is on with its scope set to every open issue, so no person
+  posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
+  several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
+  same milestone or across milestones. A `bug` issue for CI on `main` is in no milestone.
+- **Autopilot answers with the recommended option,** with its `answer` setting, even when the
+  recommendation rests on a **Proposed** decision, so a question never stops an issue. The owner sees
+  the answers on the issue and can change one with a comment before `/nexkit go`, or with
+  `/nexkit fix` on the pull request.
+- **Issues run in parallel unless one needs another.** Marks follow the rules of NexKit's
+  [`request` skill][nexkit-request]. The milestone's docs sweep is marked *blocked by* every other
+  issue of the milestone, with no reason line for each. Autopilot's `max_parallel` setting caps how
+  many issues run at once, as
+  [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) agrees, so
+  that their rounds of checks fit in the runner jobs that GitHub Free runs at once.
+- **A second Claude subscription takes over at the usage limit,** as the fallback agent in
+  `agents`, so NexKit pauses only when both are at their limit.
+- **A parent issue closes when its last part does,** with `close_parent_issues` on.
+
+### How pull requests merge
+
+- **NexKit merges a pull request once it passes,** with [`merge.auto`][nexkit-auto-merge] on, because
+  the AI review and the checks are the gate Axis relies on. The owner turns the setting off to decide
+  each merge again, and then only the owner merges. The switch is in `.nexkit/`, so changing it is a
   hand-made pull request.
-- **Everything goes through NexKit, except changes in paths NexKit may not
-  change.** Those paths are set by NexKit's `protected_paths` setting. Such
-  changes are hand-made pull requests on any branch name, for example a
-  NexKit version bump. Hand-made pull requests are only for those paths and
-  for the docs change that ends a design review, so a design change is never
-  one; see [Design changes](#design-changes). The owner
-  or the hourly driver opens them, and the owner merges them.
+- **NexKit resolves conflicts with `main` by itself,** with `conflicts.auto_resolve` on. The rules on
+  `main` do not want a branch to be up to date, as
+  [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) agrees, so a
+  pull request merges once its checks pass on its own branch, and a merge does not send the waiting
+  pull requests through another round. Two pull requests that pass alone can break `main` together,
+  and CI on `main` finds it. `conflicts.max_rounds` is raised above NexKit's default, so a pull
+  request that conflicts with several merges in a row still merges by itself.
+- **The rules on `main` let NexKit merge.** They require NexKit's own checks, no approval from a
+  person and no branch that is up to date. They do not require the CI workflow, which runs on pushes
+  to `main` and to hand-made branches but not on NexKit's branches, where NexKit's checks run the same
+  scripts.
+- **The owner guards the security checks.** A hand-made `.github/CODEOWNERS` and a rule the owner sets
+  make a pull request that touches the files that define the security checks need the owner's review,
+  as [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md)
+  agrees. NexKit cannot merge it, so it waits, and the owner approves and merges it. The owner checks
+  one thing: whether the change adds an exception to a check, or loosens one, and why.
+- **There is no push token.** NexKit pushes with the Actions token, so it cannot push a merge that
+  brings changes to `.github/workflows/`. The hourly driver merges those by hand.
+
+### CI on main
+
+- **NexKit starts CI, CodeQL and the performance workflow on `main` every few merges,** with its
+  `merge.after_workflows` setting, which holds how many merges each waits, as
+  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) agrees.
+  A merge by NexKit starts no `push` workflow, and none of them has a schedule of its own for this,
+  so without the setting nothing would test `main`. CI also runs on a person's push and on demand.
+- **A failure on `main` is noticed when its run ends.** Each of the three workflows ends with a job
+  that starts a NexKit sweep. A dispatch that GitHub's API keeps rejecting leaves a warning on the run
+  and does not fail it, so that run waits for the next sweep.
+- **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to
+  start. On any other branch a newer push stops the older run.
+- **CI runs its jobs in parallel:** the lint and unit tests, the smoke tests, three shards of the
+  integration tests and three shards of the E2E tests, so a run takes as long as its slowest job.
+
+### NexKit's checks
+
+- **The checks run in parallel jobs,** with `parallel_checks` on: the build and lint share one job,
+  the group `build-lint`, and the unit tests, the smoke tests and each integration and E2E shard get
+  one each. A check round then takes about as long as its slowest job, instead of all of them in a
+  row. A check gets a job of its own when sharing one made that job the slowest, and the integration
+  and E2E suites are split into shards because one job for either came close to the check's
+  30-minute limit. The checks `e2e-1` to `e2e-3` and `integration-1` to `integration-3` run the same
+  commands as the CI workflow's E2E and integration shards, so NexKit matches a failed check with the
+  shard that failed on `main`.
+- **The slow checks are marked `slow`, and the checks name their `results`,** so NexKit keeps what a
+  failure needs: the JUnit files, and for E2E the logs and the Playwright traces.
+- **NexKit reads CI's evidence.** Its [`evidence`][nexkit-evidence] setting names the test result
+  artifacts of the CI and performance workflows, which hold the Playwright traces and
+  `error-context.md` files, so a fix sees why `main` failed.
+- **A check skips the suites that a change cannot affect,** so a round after a small change is short.
+  A suite runs unless no file changed since the check last passed can affect it, and any doubt runs
+  it. In the automatic review that brings a branch up to date, NexKit goes further: the smoke,
+  integration and E2E checks name the paths they never read in NexKit's
+  [`unaffected_by`][nexkit-unaffected] setting, and a check whose paths did not change since it passed
+  gets no job at all. CI on `main` sets no base and runs every suite, so a slowdown shows at its next
+  run. Which suite skips when, and the commit it compares with, are in
+  [test runs and reports](development.md#skipped-suites).
+- **The performance tests run on `main` only,** in the performance workflow, and neither in NexKit's
+  checks nor in CI's integration jobs, because they depend on the runner's load, as
+  [D97](decisions/d97-reliable-test-runs.md) says.
+- **NexKit restores the dependency caches that CI on `main` saves:** NuGet, npm and the Playwright
+  browsers. The entries are in NexKit's [`cache`][nexkit-caches] setting, and the CI workflow has one
+  `actions/cache` step for each, with the same paths and key files in the same order. A change to
+  what setup downloads updates both in the same hand-made pull request.
+
+### Hand-made pull requests
+
+- **Everything goes through NexKit, except changes in paths NexKit may not change.** NexKit's
+  `protected_paths` setting names those paths. Such changes are hand-made pull requests on any branch
+  name, for example a NexKit version bump. Hand-made pull requests are only for those paths and for
+  the docs change that ends a design review, so a design change is never one, see
+  [design changes](#design-changes). The owner or the hourly driver opens them, and the owner merges
+  them.
 
 ## Profiles
 
-Each issue runs on one NexKit profile, which triage chooses when
-`/nexkit plan` starts. The profiles, their `when` texts and their models are
-in NexKit's [`profiles`][nexkit-profiles] setting, and how to write profiles is
-in NexKit's configuration doc. These are Axis's choices.
+Each issue runs on one NexKit profile, which triage chooses when `/nexkit plan` starts. The profiles,
+their `when` texts and their models are in NexKit's [`profiles`][nexkit-profiles] setting, and how to
+write profiles is in NexKit's configuration doc. These are Axis's choices.
 
-- **Two profiles, `standard` and `hard`, by risk and novelty.** The more a
-  mistake would cost, or the less the platform has done such work before, the
-  stronger the profile. `hard` is the default profile, so an issue whose
-  triage fails runs on it. The cost is that more issues run on the stronger,
-  dearer models.
-- **`standard` names only work that repeats what the platform already does,**
-  and `hard` is the rest. So the concepts and kinds of work that a new
-  milestone brings land on `hard` with no change to the `when` texts. A `when`
-  text may name concepts from [concepts.md](domain/concepts.md) as examples.
-- **Plan and review are at least as strong as implement,** and review runs on
-  a different model from implement in every profile. Triage runs on a strong
-  model, because it is one call that reads only the issue, so it costs little,
-  and a wrong choice does not fail: the issue just runs on the wrong profile.
-  When unsure, triage chooses the stronger profile.
-- **Profile changes are hand-made pull requests,** because `.nexkit/` is a
-  path NexKit may not change.
+- **Two profiles, `standard` and `hard`, by risk and novelty.** The more a mistake would cost, or the
+  less the platform has done such work before, the stronger the profile. `hard` is the default
+  profile, so an issue whose triage fails runs on it. The cost is that more issues run on the
+  stronger, dearer models.
+- **`standard` names only work that repeats what the platform already does,** and `hard` is the rest.
+  So the concepts and kinds of work that a new milestone brings land on `hard` with no change to the
+  `when` texts. A `when` text may name concepts from [concepts.md](domain/concepts.md) as examples.
+- **Plan and review are at least as strong as implement,** and review runs on a different model from
+  implement in every profile. Triage runs on a strong model, because it is one call that reads only
+  the issue, so it costs little, and a wrong choice does not fail: the issue just runs on the wrong
+  profile. When unsure, triage chooses the stronger profile.
+- **Profile changes are hand-made pull requests,** because `.nexkit/` is a path NexKit may not change.
 
 ## The life of an issue
 
-An issue then follows NexKit's life of an issue: plan, questions and splits,
-implement, pull request, fix and merge, as NexKit's
-[how it works][nexkit-how] describes. Changing a plan after it is posted
+An issue follows NexKit's life of an issue: plan, questions and splits, implement, pull request, fix
+and merge, as NexKit's [how it works][nexkit-how] describes. Changing a plan after it is posted
 follows NexKit's rules too. Axis adds these rules for writing it.
 
-- **One behaviour.** One issue is one behaviour, aiming for 2–5 acceptance
-  criteria that a test or command can check, as
-  [D13](decisions/d13-delivery-workflow.md) says.
-- **Docs and concepts.** The issue links to the doc sections it implements, is
-  in the milestone that delivers it, and names the concepts it touches in its
-  own text,
-  in the terms of [concepts.md](domain/concepts.md), so triage can choose the
-  [profile](#profiles).
-- **Labels.** It gets at least one label, and every repository label whose
-  description on GitHub fits its content. There is no fixed list, because the
-  owner adds and removes labels.
-- **Who opens it.** The owner or the local agent opens it, because autopilot
-  takes only issues opened by someone with write access. It marks the issue
-  *blocked by* what it must wait for, by the rules under
-  [Decisions](#decisions).
-- **Design.** It may link a Design artifact as a picture, while the docs stay
-  the source of behaviour.
-- **Exceptions.** Changes whose purpose is to edit paths NexKit may not change
-  are hand-made pull requests, as described under Decisions.
+- **One behaviour.** One issue is one behaviour, aiming for 2–5 acceptance criteria that a test or
+  command can check, as [D13](decisions/d13-delivery-workflow.md) says. More than five is a signal to
+  check whether the issue holds more than one behaviour, and if it does, it is split. If every
+  criterion checks the same behaviour, more are fine. A plan is not revised only to cut the number of
+  criteria.
+- **Docs and concepts.** The issue links to the doc sections it implements, is in the milestone that
+  delivers it, and names the concepts it touches in its own text, in the terms of
+  [concepts.md](domain/concepts.md), so triage can choose the [profile](#profiles).
+- **Labels.** It gets at least one label, and every repository label whose description on GitHub fits
+  its content. There is no fixed list, because the owner adds and removes labels.
+- **Who opens it.** The owner or the local agent opens it, because autopilot takes only issues opened
+  by someone with write access. It marks the issue *blocked by* what it must wait for, by the rules
+  under [Decisions](#decisions).
+- **Design.** It may link a Design artifact as a picture, while the docs stay the source of
+  behaviour.
+- **Exceptions.** Changes whose purpose is to edit paths NexKit may not change are hand-made pull
+  requests, as [hand-made pull requests](#hand-made-pull-requests) says.
 
 ## The life of a milestone
 
-1. **Check it is ready.** When the owner asks whether a milestone can be
-   broken down, the local agent runs the readiness check of
-   [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) and answers
-   with its verdict for that milestone and the other planned ones of the
-   current phase of the [roadmap](roadmap.md#milestones), as
-   [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md)
-   agrees. A milestone of a later phase is checked only when the owner asks. A milestone
-   that is not ready first gets the decisions and doc sections it lacks. That
-   work needs no NexKit, so it can go on while other milestones run.
-2. **Break it down.** On a *ready* verdict, the local agent breaks the
-   milestone into issues, as the [roadmap](roadmap.md#how-work-is-planned)
-   describes, and checks the [profiles](#profiles) against the new milestone's
-   concepts and the models now available. Profile fixes are hand-made pull
-   requests.
-3. **Deliver the issues.** Each one follows the life of an issue above.
-   Autopilot runs every ready issue of every milestone at once.
-4. **Docs sweep.** Before the owner closes the milestone, one issue in it
-   checks the docs and fixes what the milestone made stale. It is marked
-   *blocked by* every other issue of the milestone, so it runs last. It
-   leaves what other milestones are still building to their own sweeps. It
-   checks at least:
+A milestone goes from a readiness check to its close in five steps.
+
+1. **Check it is ready.** When the owner asks whether a milestone can be broken down, the local agent
+   runs the readiness check of [D68](decisions/d68-issues-of-several-milestones-run-at-once.md). It
+   checks that every item of the milestone's "Done when" text has **Agreed** decisions and doc
+   sections that issues can link to; whether each thing the milestone needs is in the code, built by
+   an open issue, or built by nobody; and which concepts, docs and code it shares with the milestones
+   that have open issues. It answers *ready*, *ready with waits*, naming which issues wait for which,
+   or *not ready*, naming what has to exist first. It gives this verdict for that milestone and the
+   other planned ones of the current phase of the [roadmap](roadmap.md#milestones), because the
+   roadmap lets them change order. A milestone of a later phase is checked only when the owner asks.
+   A milestone that is not ready first gets the decisions and doc sections it lacks. That work needs
+   no NexKit, so it can go on while other milestones run.
+2. **Break it down.** On a *ready* verdict, the local agent breaks the milestone into issues, as the
+   [roadmap](roadmap.md#how-work-is-planned) describes, and checks the [profiles](#profiles) against
+   the new milestone's concepts and the models available. Profile fixes are hand-made pull requests.
+3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
+   issue of every milestone at once.
+4. **Docs sweep.** Before the owner closes the milestone, one issue in it checks the docs and fixes
+   what the milestone made stale. It is marked *blocked by* every other issue of the milestone, so it
+   runs last. It leaves what other milestones are still building to their own sweeps. It checks at
+   least:
    - the roadmap status of this milestone and the next one;
-   - the **From** column of [concepts.md](domain/concepts.md) for every
-     concept listed for this milestone, moved to a later milestone when the
-     concept was not delivered;
-   - every *(planned for Mx)* marker for this milestone in any doc, removed
-     when the work was built and moved to a later milestone when it was not;
-   - the doc sections that the milestone's pull requests changed: what is
-     said twice is merged into its one home, what a later rule replaced is
-     deleted, and the decisions they link hold only choices still in force;
-   - the rows of [docs/README.md](README.md), which still say what each file
-     holds;
-   - every skill under `.claude/skills/`: its links still resolve and its
-     statements still hold.
-5. **Close.** When the last issue of the milestone closes, NexKit mentions
-   the owner once. The owner closes the milestone on GitHub once the docs
-   sweep is merged. Nothing waits for the close.
+   - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
+     milestone, moved to a later milestone when the concept was not delivered;
+   - every *(planned for Mx)* marker for this milestone in any doc, removed when the work was built
+     and moved to a later milestone when it was not;
+   - the doc sections that the milestone's pull requests changed: what is said twice is merged into
+     its one home, what a later rule replaced is deleted, and the decisions they link hold only
+     choices still in force;
+   - the rows of [docs/README.md](README.md), which still say what each file holds;
+   - every skill under `.claude/skills/`: its links still resolve and its statements still hold.
+5. **Close.** When the last issue of the milestone closes, NexKit mentions the owner once. The owner
+   closes the milestone on GitHub once the docs sweep is merged. Nothing waits for the close.
 
 ## Design changes
 
-The repository is the source of truth for the Axis design system, and the
-local agent session publishes it to Claude as a Design System artifact, as
-[D57](decisions/d57-a-design-system-published-from-the-repository.md) agrees.
-The token file and the preview pages are in the
-[frontend reference](reference/frontend.md). The Design System artifact is at
-<https://claude.ai/artifact/N1E4ohLThxhhYtnCCsJgyc>. It is private to the
-owner.
+The repository is the source of truth for the Axis design system, and the local agent session
+publishes it to Claude as a Design System artifact, as
+[D57](decisions/d57-a-design-system-published-from-the-repository.md) agrees. The token file and the
+preview pages are in the [frontend reference](reference/frontend.md) and
+[widget previews](development.md#widget-previews). The Design System artifact is at
+<https://claude.ai/artifact/N1E4ohLThxhhYtnCCsJgyc>, private to the owner. The steps for a requested
+change, a design review and a sync are in the
+[`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
 
 - **A design change is a NexKit issue.** It links the artifact and follows the
-  [life of an issue](#the-life-of-an-issue). It is never a hand-made pull
-  request, because the token file and the widgets are not paths NexKit may
-  not change.
-- **A design change starts with the owner.** The owner asks the local session
-  in words, for example "make the primary colour darker". The session changes
-  the artifact first, so the owner sees the result. Then it writes a NexKit
-  issue that links the artifact and states the change in Axis terms: tokens
-  such as `primary` and `spacing-md`, and widgets such as `table`, `form` and
-  `section`. The docs stay the source of behaviour.
-- **Several changes are a design review.** When the owner reviews the design
-  in words, one change at a time, the session runs a design review. Each
-  change is prototyped in the real widget code on a
-  `design/<yyyy-mm-dd>-<topic>` branch,
-  which holds only what the design needs, and the owner sees it on the local
-  stack. The branch is pushed, so the review can go on from any machine, and is never
-  merged. CI leaves `design/` branches out, because a prototype changes the
-  widgets without their tests. Before the review's issue its last
-  commit gets a `design-review/<yyyy-mm-dd>-<topic>` tag with the same date
-  and topic, and the tag is pushed: it starts no CI run, and it is never
-  deleted, so the links to the prototype never break. The branch is then
+  [life of an issue](#the-life-of-an-issue). It is never a hand-made pull request, because the token
+  file and the widgets are not paths NexKit may not change.
+- **A design change starts with the owner.** The owner asks the local session in words, for example
+  "make the primary colour darker". The session changes the artifact first, so the owner sees the
+  result. Then it writes a NexKit issue that links the artifact and states the change in Axis terms:
+  tokens such as `primary` and `spacing-md`, and widgets such as `table`, `form` and `section`. The
+  docs stay the source of behaviour.
+- **Several changes are a design review.** When the owner reviews the design in words, one change at
+  a time, the session prototypes each change in the real widget code on a
+  `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
+  on the local stack. The branch is pushed, so the review can go on from any machine, and is never
+  merged. CI leaves `design/` branches out, because a prototype changes the widgets without their
+  tests. Before the review's issue is written, the branch's last commit gets a
+  `design-review/<yyyy-mm-dd>-<topic>` tag with the same date and topic, which is pushed and never
+  deleted, so the links to the prototype never break. A tag starts no CI run. The branch is then
   deleted, locally and on GitHub.
-- **A prototype follows `main` by merging it.** When design issues have merged, or `main` has changed code the prototype
-  touches, the session merges `main` into the newest `design/` branch, never rebasing it. `main` is the standard for
-  behaviour and the prototype for look: where both built the same thing, `main`'s API, data shape, texts and logic are
-  the base and the prototype's look and agreed additions go back on it, and `main`'s logic is never changed to suit the
-  prototype. What a merge made the prototype lose is brought back, and the review's `design-review.md` records each merge.
-- **The design runs ahead of the repository only by open issues.** While a
-  design issue is open, the artifact holds its change and its last change note
-  names the issue. A review does not change the artifact: it is published once
-  the review's issue is merged, so nothing else in the artifact differs from
-  the repository.
-- **A review ends in one docs change and one issue.** When the owner has
-  agreed the changes, one hand-made docs pull request rewrites the rules where
-  they live, in the reference pages, configuration and APIs included, as
-  [writing the docs](writing-docs.md#how-the-docs-stay-correct) says. It adds
-  a decision only for a choice between real alternatives.
-  One NexKit issue then builds all of it and links the docs, the artifact and
-  the prototype's tag. NexKit splits it if it needs to: the owner does not.
-- **A sync follows the repository.** After a merged change to the tokens or a
-  widget, or whenever the owner asks, the session renders the previews again
-  with `scripts/design-system.sh`, reads the tokens from
-  `web/src/platform/designTokens.ts` and publishes both to the same artifact.
-  It keeps the changes of open design issues, and the card groups and their
-  order. Before it removes anything, it lists every other difference it
-  overwrote and every token the code no longer defines. A review's issue,
-  once merged, is followed by a sync.
-- **Only the owner and Claude edit in Claude Design.** NexKit's agents neither
-  read nor write it. New screens may be drawn as Design artifacts, and an
-  issue may link one as a picture, while the docs stay the source of
-  behaviour.
-
-The steps for a requested change, a design review and a sync are in the
-[`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
+- **A prototype follows `main` by merging it.** When design issues have merged, or `main` has changed
+  code the prototype touches, the session merges `main` into the newest `design/` branch, and never
+  rebases it. `main` is the standard for behaviour and the prototype for look: where both built the
+  same thing, `main`'s API, data shape, texts and logic are the base, the prototype's look and agreed
+  additions go back on it, and `main`'s logic is never changed to suit the prototype. What a merge
+  made the prototype lose is brought back, and the review's `design-review.md` records each merge.
+- **The design runs ahead of the repository only by open issues.** While a design issue is open, the
+  artifact holds its change and its last change note names the issue. A review does not change the
+  artifact: it is published once the review's issue is merged, so nothing else in the artifact
+  differs from the repository.
+- **A review ends in one docs change and one issue.** When the owner has agreed the changes, one
+  hand-made docs pull request rewrites the rules where they live, in the reference pages,
+  configuration and APIs included, as [writing the docs](writing-docs.md#how-the-docs-stay-correct)
+  says. It adds a decision only for a choice between real alternatives. One NexKit issue then builds
+  all of it and links the docs, the artifact and the prototype's tag. NexKit splits it if it needs
+  to, not the owner.
+- **A sync follows the repository.** After a merged change to the tokens or a widget, or whenever the
+  owner asks, the session renders the previews again with `scripts/design-system.sh`, reads the
+  tokens from `web/src/platform/designTokens.ts`, and publishes both to the same artifact. It keeps
+  the changes of open design issues, and the card groups and their order. Before it removes anything,
+  it lists every other difference it overwrote and every token the code does not define. A review's
+  issue, once merged, is followed by a sync.
+- **Only the owner and Claude edit in Claude Design.** NexKit's agents neither read nor write it. New
+  screens may be drawn as Design artifacts, and an issue may link one as a picture, while the docs
+  stay the source of behaviour.
 
 ## The docs
 
-The docs follow [writing the docs](writing-docs.md): what goes in which doc, how to write it, and
-how the docs stay correct while the work goes on.
+The docs follow [writing the docs](writing-docs.md): what goes in which doc, how to write it, and how
+the docs stay correct while the work goes on.
 
 ## Writing on GitHub
 
@@ -341,31 +291,33 @@ issues, pull requests and sub-issues.
 - Lead with the point. Use short sentences and one idea per bullet.
 - Say what changes in behaviour, and why, before naming classes or files.
 - Put decisions and risks the owner must judge in their own short section.
-- Keep implementation detail (signatures, SQL, file-by-file steps) out of the
-  main text, or put it in a collapsed `<details>` block.
+- Keep implementation detail (signatures, SQL, file-by-file steps) out of the main text, or put it in
+  a collapsed `<details>` block.
 - Name the role that acts, in the terms of [concepts.md](domain/concepts.md), never a development
   user. This covers doc text that describes behaviour, and titles too. User names appear only in test
-  code, test scenarios, the realm file and the [development users table](reference/security.md#development-users).
-- Name a branch or a tag by what it holds. NexKit names its own branches
-  `nexkit/issue-<number>`, and a Claude session in the cloud names its own,
-  such as `claude/<words>`: nobody names a branch like those by hand. A
-  hand-made pull request comes from `docs/<topic>` for a docs change, or from
-  `ops/<topic>` for a change in a path NexKit may not change, such as a NexKit
-  upgrade. A design review's prototype is a
-  `design/<yyyy-mm-dd>-<topic>` branch, and its tag is
-  `design-review/<yyyy-mm-dd>-<topic>`, with the same date and topic.
-  `<topic>` is a few lower-case English words joined by hyphens, such as
-  `widget-review`. Release tags, once Axis has them, start with `v`, so no
-  other tag does.
-- Keep branches from piling up. GitHub's automatic deletion of head branches
-  is on, but it deletes neither the branches of the pull requests NexKit
-  merges nor those of cloud sessions that push nothing. When the owner asks,
-  the local session lists every `nexkit/` branch whose pull request is merged
-  or that NexKit closed as `already_on_base`, because `main` already holds its
-  change, every `claude/` branch with no pull request and no commit that
-  `main` lacks, and every `design/` branch whose `design-review/` tag exists,
-  and the owner deletes them. A branch with an open pull
-  request, or any other closed one that was not merged, stays.
+  code, test scenarios, the realm file and the
+  [development users table](reference/security.md#development-users).
+- Name a branch or a tag by what it holds:
+
+  | Branch or tag                         | What it holds                                              | Who names it   |
+  | ------------------------------------- | ---------------------------------------------------------- | -------------- |
+  | `nexkit/issue-<number>`               | A NexKit issue's work                                      | NexKit         |
+  | `claude/<words>`                      | A Claude session in the cloud                              | The session    |
+  | `docs/<topic>`                        | A hand-made docs change                                    | A person       |
+  | `ops/<topic>`                         | A change in a path NexKit may not change, such as a NexKit upgrade | A person |
+  | `design/<yyyy-mm-dd>-<topic>`         | A design review's prototype                                | The local session |
+  | `design-review/<yyyy-mm-dd>-<topic>`  | The tag on a prototype's last commit, same date and topic  | The local session |
+  | `v<version>`                          | A release tag, once Axis has releases                      |                |
+
+  Nobody names a branch like NexKit's or a cloud session's by hand. `<topic>` is a few lower-case
+  English words joined by hyphens, such as `widget-review`. Only release tags start with `v`.
+- Keep branches from piling up. GitHub's automatic deletion of head branches is on, but it deletes
+  neither the branches of the pull requests NexKit merges nor those of cloud sessions that push
+  nothing. When the owner asks, the local session lists every `nexkit/` branch whose pull request is
+  merged or that NexKit closed as `already_on_base`, because `main` already holds its change, every
+  `claude/` branch with no pull request and no commit that `main` lacks, and every `design/` branch
+  whose `design-review/` tag exists, and the owner deletes them. A branch with an open pull request,
+  or any other closed one that was not merged, stays.
 
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md

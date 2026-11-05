@@ -1,12 +1,15 @@
 # Axis architecture
 
-This is the target structure. Sections marked _(planned for Mx)_ describe work
-that has not been built yet, as defined in
-[writing the docs](writing-docs.md#planned-work). Decisions referenced as
-Dn are in [decisions.md](decisions.md). Detailed behaviour is in
-[reference/](reference/).
+This page says how the parts of Axis fit together: the hosts and databases, tenancy, security, the
+process engine and how Axis is tested. The detailed behaviour of each part is in
+[reference/](reference/), and decisions named as Dn are in [decisions.md](decisions.md). Work that is
+agreed but not built yet is marked as [writing the docs](writing-docs.md#planned-work) says.
 
 ## Overview
+
+Axis runs as a few hosts over one platform database and one database per tenant. The server answers
+people and other systems, the worker runs durable work, and the admin tool and its publisher change
+the databases.
 
 ```mermaid
 flowchart LR
@@ -23,101 +26,80 @@ flowchart LR
     Publisher --> TenantDb
 ```
 
-- **Axis.Server** serves the SPA and hosts the authoring and runtime APIs.
-  It is the BFF: the OIDC client and the cookie session. The record API, the
-  data source endpoint, the process start endpoint, the task API and the site
-  endpoints require a session.
-  It also hosts Studio's
-  [authoring API](reference/authoring.md), which works on the application
-  folders that `Studio:Folders` lists and needs a session and the author role.
-  Its routes that list applications, list, read, patch, create and delete resources, give
-  diagnostics and answer where a resource or text key is used are built.
-  Its routes that validate, publish and roll back are built too. They store a
-  publish request in the tenant database over the runtime role. The server
-  never activates a release in its own process, see
-  [D47](decisions/d47-publishing-from-studio.md).
-- **Axis.Worker** executes durable work. It serves health endpoints on its own
-  address, see [health checks](#health-checks).
-  It runs work items, and through them
-  the `decision`, `task`, `operation`, `subProcess`, `end` and `timer` steps of process instances.
-  Operation steps include `updateRecord`, `createRecord`, `callConnector` calls with their
-  retries and reconciliation, and package operations. `raiseEvent` steps raise
-  events. Sub-process steps start a child and resume the parent when it
-  completes. A `timer` step waits for a time and a `process.timer` item resumes
-  it. It runs wait for event steps, which event delivery wakes, task
-  escalations and deadlines, and email sending, see
-  [process flow](reference/process-flow.md). It
-  delivers raised events to async event triggers, see
-  [events and triggers](reference/process-events.md). It also
-  runs the backfill of pending computed fields, see
-  [recomputing computed fields](reference/migrations.md#recomputing-computed-fields).
-  It runs the occurrences of schedule triggers and their fan-out over the records
-  of the trigger's data source, see [schedules](reference/process-events.md#schedules).
-  It loads the installed extension packages at startup, as the server does.
-  It runs the package operations that process steps call, see
-  [extension packages](reference/extension-packages.md).
-  It loads the same modules as the server.
-- **Axis.PackageHost** _(planned for M21)_ runs package operations in package
-  runners, outside the worker, in its own `package-host` container. The worker
-  sends each attempt to a runner, and no longer loads package code outside
-  Development. See [package runners](reference/extension-packages.md#package-runners)
-  and [D90](decisions/d90-extension-packages-run-out-of-process.md).
-- **Axis.Admin** is the console host that the platform
-  operator runs. It creates tenants, migrates tenant databases, activates
-  releases, and backs up and restores tenants. It is the only host that writes
-  the [tenant directory](#tenant-directory), holds an admin connection to the
-  database server, and holds the schema database role of a tenant under
-  `Tenancy:Source=directory`. See
-  [administration](reference/administration.md) and
-  [D43](decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
-  and [D45](decisions/d45-tenant-backup-and-restore.md).
-  Its `publisher` command is a long-running part of the
-  same host. It reads the tenants as the server does, connects to each tenant
-  database with that tenant's schema role, and runs the publish requests that
-  Studio stores. It has no HTTP endpoint, and the server holds no tenant schema
-  connection. The production installs, `scripts/dev.sh`, Docker Compose and the E2E
-  script each start one. See
-  [publisher](reference/administration.md#publisher) and
-  [D47](decisions/d47-publishing-from-studio.md).
-- **Platform database** stores installation-level data: the
-  [tenant directory](#tenant-directory) in its `platform` schema, and platform
-  settings _(both hosts read the tenant directory again every refresh
-  interval, and the worker also reads the schema versions every poll round)_.
-- **Tenant databases** hold everything else for one tenant: releases, system
-  tables, process state, audit and the generated entity tables (D10).
+- **Axis.Server** serves the SPA and hosts the runtime and authoring APIs. It is the BFF: the OIDC
+  client and the cookie session. The record API, the data source endpoint, the process start
+  endpoint, the task API and the site endpoints require a session. It also hosts Studio's
+  [authoring API](reference/authoring.md), which works on the application folders that
+  `Studio:Folders` lists and needs a session and the author role. Validating, publishing and rolling
+  back store a publish request in the tenant database over the runtime role, so the server never
+  activates a release in its own process, see [D47](decisions/d47-publishing-from-studio.md).
+- **Axis.Worker** runs durable work: the steps of process instances, connector and package calls,
+  task escalations and deadlines, email, event delivery to async triggers, schedule triggers and
+  their fan-out, and the backfill of pending computed fields. The work is described in
+  [process execution](reference/process-execution.md), [process flow](reference/process-flow.md),
+  [events and triggers](reference/process-events.md) and
+  [recomputing computed fields](reference/migrations.md#recomputing-computed-fields). It loads the
+  same modules and installed [extension packages](reference/extension-packages.md) as the server, and
+  serves its own [health checks](#health-checks).
+- **Axis.PackageHost** _(planned for M21)_. It runs package operations in package runners, outside
+  the worker, in its own `package-host` container. The worker sends each attempt to a runner, and
+  loads package code itself only in Development. See
+  [package runners](reference/extension-packages.md#package-runners) and
+  [D90](decisions/d90-extension-packages-run-out-of-process.md).
+- **Axis.Admin** is the console host that the platform operator runs. It creates tenants, migrates
+  tenant databases, activates releases, and backs up and restores tenants. It is the only host that
+  writes the [tenant directory](#tenant-directory), holds an admin connection to the database server,
+  and holds a tenant's schema database role under `Tenancy:Source=directory`. See
+  [administration](reference/administration.md),
+  [D43](decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) and
+  [D45](decisions/d45-tenant-backup-and-restore.md).
+- **The publisher**, `axis-admin publisher`, is a long-running command of `Axis.Admin`. It reads the
+  tenants as the server does, connects to each tenant database with that tenant's schema role, and
+  runs the publish requests that Studio stores. It has no HTTP endpoint, and the server holds no
+  tenant schema connection. The production installs, `scripts/dev.sh`, Docker Compose and the E2E
+  script each start one. See [publisher](reference/administration.md#publisher).
+- **The platform database** holds installation-level data: the
+  [tenant directory](#tenant-directory) in its `platform` schema, and platform settings.
+- **A tenant database** holds everything else of one tenant: releases, system tables, process
+  state, audit and the generated entity tables (D10).
 
 ## Repository layout and module rules
 
-The [repository layout](repository-layout.md#repository-layout) and the [module rules](repository-layout.md#module-rules) are in their own doc.
+The [repository layout](repository-layout.md#repository-layout) and the
+[module rules](repository-layout.md#module-rules) are in their own doc.
 
 ## Configuration pipeline
 
-Moved to [reference/configuration.md](reference/configuration.md).
+How an application folder is loaded, checked, compiled into a release and activated is in
+[configuration](reference/configuration.md).
 
 ## Storage
 
-Moved to [reference/storage.md](reference/storage.md).
+Physical names, column types, database roles, schema planning and audit are in
+[storage](reference/storage.md).
 
 ## Record API
 
-Moved to [reference/record-api.md](reference/record-api.md).
+The record routes, values, paging and errors are in [record API](reference/record-api.md).
 
 ## Tenancy (D10)
 
-- **Resolution.** `TenantContext` is resolved from the request host. For
-  background work it is set from the work item's tenant ID.
-- **Connections.** A connection factory returns connections only for the
-  current tenant. Without a tenant context, data access fails.
-- **Scoping.** Cache keys, file storage paths, job records and log scopes all
-  include the tenant.
-- **Tenant source.** The setting `Tenancy:Source` chooses between server
-  configuration, the default, and the [tenant directory](#tenant-directory).
-  Both hosts read the directory at start and again at every refresh. Under
-  `directory` both ignore a `Tenants` section.
+Every request and every piece of work runs for exactly one tenant, and nothing reaches another
+tenant's data.
+
+- **Resolution.** `TenantContext` is resolved from the request host, see
+  [request resolution](#request-resolution). For background work it is set from the work item's
+  tenant id.
+- **Connections.** A connection factory returns connections only for the current tenant. Without a
+  tenant context, data access fails, see [tenant connections](#tenant-connections).
+- **Scoping.** Cache keys, file storage paths, job records and log scopes all include the tenant.
+- **Tenant source.** The setting `Tenancy:Source` chooses where the tenants come from: the server
+  configuration, which is the default, or the [tenant directory](#tenant-directory).
 
 ### Tenant configuration
 
-The `Tenants` section of the server configuration is keyed by tenant id:
+Under `Tenancy:Source=configuration` the tenants are the `Tenants` section of the host
+configuration, keyed by tenant id:
 
 ```json
 "Tenants": {
@@ -125,309 +107,251 @@ The `Tenants` section of the server configuration is keyed by tenant id:
 }
 ```
 
-Environment variables override it in the usual form, such as
-`Tenants__default__ConnectionString` or `Tenants__default__Hosts__0`.
+Environment variables override it in the usual form, such as `Tenants__default__ConnectionString`
+or `Tenants__default__Hosts__0`.
 
-Each tenant also gets `SchemaConnectionString`, or
-`Tenants__default__SchemaConnectionString` as an environment variable.
-`ConnectionString` is for the runtime database role, and
-`SchemaConnectionString` is for the schema database role. The server reads
-both, and only startup activation uses `SchemaConnectionString`. The worker
-never uses it and starts with only `ConnectionString`. This is a breaking
-setting change: every installation must add the setting, and there is no
-fallback to one connection string. `appsettings.Development.json`,
-Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
-`SchemaConnectionString` and `axis_runtime` in the other settings. See [database roles](reference/storage.md#database-roles) and
-[D31](decisions/d31-separate-database-roles.md).
-Under `Tenancy:Source=directory` there is no `SchemaConnectionString`: the
-server and the worker hold only runtime database roles for tenant databases.
-In those environments the server's `ConnectionStrings:PlatformSchema` also
-uses `axis_schema`, for the platform migrations and the quotas write of the provisioning API.
-The server builds none from the directory.
-`appsettings.Development.json` maps `localhost` to tenant `default` on the
-compose database, and `preview.localhost` to its preview tenant `default-preview`
-on the `axis_preview` database. The E2E server maps `127.0.0.1` to a tenant on the E2E
-database, and `localhost` to its preview tenant. The E2E run maps `127.0.0.2` to the journey tenant on its own server. See
-[preview tenants](reference/host-settings.md#preview-tenants). The `Platform` connection string is separate and still serves the
-readiness check.
+`ConnectionString` is for the tenant's runtime database role, and `SchemaConnectionString` for its
+schema database role. Every tenant needs both in the server, which uses the schema role only for
+startup activation, and there is no fallback to one connection string. The worker never uses
+`SchemaConnectionString` and starts with only `ConnectionString`. Which step uses which role is in
+[database roles](reference/storage.md#database-roles), and the reasons in
+[D31](decisions/d31-separate-database-roles.md). Under `Tenancy:Source=directory` there is no
+`SchemaConnectionString`: the server and the worker hold only runtime roles for tenant databases.
+The server's `ConnectionStrings:PlatformSchema` serves the platform migrations and the quotas write of
+the provisioning API, see [tenancy settings](reference/host-settings.md#tenancy-settings).
 
-Startup fails with an `InvalidOperationException` naming every problem when:
+The development settings, Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
+`SchemaConnectionString` and `ConnectionStrings:PlatformSchema`, and `axis_runtime` in the other
+settings. `appsettings.Development.json` maps `localhost` to the tenant `default` on the Compose
+database, and `preview.localhost` to its preview tenant `default-preview` on the `axis_preview`
+database. The E2E server maps `127.0.0.1` to a tenant on the E2E database and `localhost` to its
+preview tenant, and the E2E run maps `127.0.0.2` to the journey tenant on a server of its own, see
+[the E2E stack](#the-e2e-stack). The `Platform` connection string is separate, and the readiness
+check uses it.
+
+Startup fails with an `InvalidOperationException` that names every problem when:
 
 - no tenant is configured;
-- a tenant id contains anything other than lowercase letters, digits and
-  hyphens;
+- a tenant id contains anything other than lowercase letters, digits and hyphens;
 - a tenant has no hosts, or a host entry that is blank or only whitespace;
 - a tenant has no connection string, or one that is only whitespace;
 - the same host is listed under two tenants, compared ignoring letter case;
-- in the server, a tenant has no `SchemaConnectionString`, or one that is only
-  whitespace. This applies even when no application folder is activated at
-  startup;
+- in the server, a tenant has no `SchemaConnectionString`, or one that is only whitespace, even when
+  no application folder is activated at startup;
 - in the server, both connection strings name the same user;
-- in the server and the worker, the runtime database role
-  is a superuser, owns the `axis` or `entities` schema, or may create objects
-  in either, or is a member of a role that is or may;
-- a binding has a missing `Kind` or one other than `url`, `secret` or `storage`, a blank
-  `Value`, is a `url` binding whose value is not an absolute `http` or
-  `https` URL, or is a `storage` binding whose value is not `database`. The message names the tenant and the binding, never the value;
-- outside Development, the configuration source that wins for a `secret`
-  binding's `Value` is a file, such as `appsettings.json`. Environment
-  variables, command-line arguments, mounted secret files and in-memory
-  sources are allowed. The message names the tenant, the binding and the file,
-  never the value;
-- `PreviewOf` names a tenant that is not configured, or a
-  tenant that is itself a preview tenant, or two tenants name the same main
-  tenant, or a preview tenant has its own `Oidc` block. See
-  [preview tenants](#preview-tenants).
+- in the server and the worker, the runtime database role is a superuser, owns the `axis` or
+  `entities` schema, may create objects in either, or is a member of a role that is or may;
+- a binding fails the startup check or the secret source check of
+  [deployment bindings](reference/integration-resources.md#deployment-bindings). The message names the
+  tenant and the binding, never the value;
+- the preview tenant rules of [preview tenants](reference/host-settings.md#preview-tenants) are
+  broken: `PreviewOf` names a tenant that is not configured or is itself a preview tenant, two
+  tenants name the same main tenant, or a preview tenant has its own `Oidc` block.
 
-A tenant also holds its deployment bindings under `Bindings`, keyed by name
-and matched ignoring letter case. A release names a binding and never holds
-its value. The server and the worker both read this section, so both must hold
-the same bindings. `IDeploymentBindings` resolves a binding for the tenant of
-the current request or work item only. Its `Resolve` returns a `url` binding,
-and its `ResolveSecret` returns a `secret` binding as a `SecretValue`. A
-`SecretValue` shows `[secret]` as text, as JSON and in logs. Its `Reveal`
-returns the plain value at the moment of a call, and it is never read from
-JSON. Without a tenant context, for a name the tenant lacks, or for a binding
-of the other kind, both throw an `InvalidOperationException` that names the
-binding and no value. So `Resolve` never hands out a plain secret. A secret's
-`Value` comes from the environment, such as
-`Tenants__default__Bindings__PurchasingSystemClientSecret__Value`. See
-[connectors and deployment bindings](reference/integration-resources.md#connectors-and-deployment-bindings)
-and [D25](decisions/d25-connectors-deployment-bindings-and-secrets.md).
-
-```json
-"Bindings": {
-  "PurchasingSystemUrl": { "Kind": "url", "Value": "https://purchasing.example.test/api" },
-  "PurchasingSystemTokenUrl": { "Kind": "url", "Value": "https://auth.purchasing.example.test/oauth/token" },
-  "PurchasingSystemClientId": { "Kind": "secret", "Value": "<from environment>" },
-  "PurchasingSystemClientSecret": { "Kind": "secret", "Value": "<from environment>" }
-}
-```
+A tenant holds its deployment bindings under `Bindings`, keyed by name and matched ignoring letter
+case. A release names a binding and never holds its value, and the server and the worker must hold
+the same bindings. `IDeploymentBindings` resolves a binding only for the tenant of the current
+request or work item: `Resolve` returns a `url` binding, and `ResolveSecret` returns a `secret`
+binding as a `SecretValue`, which shows `[secret]` as text, as JSON and in logs, gives its plain value
+only through `Reveal` at the moment of a call, and is never read from JSON. Without a tenant context,
+for a name the tenant lacks, or for a binding of the other kind, both throw an
+`InvalidOperationException` that names the binding and no value, so `Resolve` never hands out a plain
+secret. The kinds, where values live and the checks are in
+[deployment bindings](reference/integration-resources.md#deployment-bindings), and the reasons in
+[D25](decisions/d25-connectors-deployment-bindings-and-secrets.md).
 
 ### Tenant directory
 
-It follows
-[D42](decisions/d42-tenant-directory-in-the-platform-database.md).
-The server creates the `platform`
-tables at start under both tenant sources. Under `Tenancy:Source=directory` it
-then reads the tenants, their hosts, database settings, OIDC
-settings and bindings from the `platform` schema over
-`ConnectionStrings:Platform`. It uses the `active` tenants for host matching,
-tenant connections, deployment bindings and sign-in. A password, the client secret
-and a `secret` binding stay encrypted in memory and are decrypted only when a
-connection opens, the sign-in client is set up or a binding is resolved. The
-binding check runs on each read. On failure it names the tenant and the binding,
-never the value. If the first load fails, the start stops with an error that names
-`ConnectionStrings:Platform` and holds no password. An empty directory starts,
-and every host answers `404` until a tenant is added and a refresh serves it.
-Under `directory`, a non-empty `ActivateOnStartup` stops the start. Under
-`directory` the worker reads the `active` tenants over
-`ConnectionStrings:Platform` and runs their work on each tenant's own database,
-with its decrypted runtime password. It never reads
-`ConnectionStrings:PlatformSchema`. It stops at start when
-`ConnectionStrings:Platform` is missing or `Tenancy:RefreshInterval` is invalid.
-If the first read fails, it logs the failure once, retries every
-`Worker:PollInterval` and is not ready until a read works. It ignores a
-`Tenants` section and logs a warning. It also reads the schema version of every
-tenant again at each poll round, and claims no work for a tenant whose version
-is not its own, see the table below.
+The tenant directory is the list of tenants in the `platform` schema of the platform database, with
+each tenant's status, hosts, database settings, OIDC settings and bindings, as
+[D42](decisions/d42-tenant-directory-in-the-platform-database.md) agrees.
+[`Axis.Admin`](reference/administration.md) writes it, and the server and the worker read it under
+`Tenancy:Source=directory`. The server creates the `platform` tables at start under both tenant
+sources. The settings are in [tenancy settings](reference/host-settings.md#tenancy-settings), and the
+tables in [platform database](reference/storage.md#platform-database).
 
-Both hosts read the directory again every `Tenancy:RefreshInterval`, without a
-restart. A tenant added as `active` is served after the next refresh, once its
-runtime database role check passes. A host of a `suspended` or `provisioning`
-tenant answers `503`, and a removed host answers `404`. A changed database
-setting gets a new connection pool. A tenant whose schema version is not the
-server's is not served, see the table below. A refresh also updates sign-in. A tenant
-added at a refresh gets its OIDC client and its endpoint caller scheme, a
-changed OIDC setting applies at the next refresh, and a tenant that is no
-longer served loses both. A failed refresh keeps the last good directory and
-makes readiness Degraded. The worker claims no new work item of a tenant that
-is no longer `active`, and a work item already claimed finishes. The worker runs
-the refresh in its poll. It pauses its loops and waits for the work items already running.
-
-- **Two sources, one contract.** `Tenancy:Source` is `configuration`, the
-  default, or `directory`. Both answer through one tenant catalog contract, so
-  request resolution, tenant connections, deployment bindings and sign-in do
-  not know the source. Under `directory` both hosts read tenants only from the
-  `platform` schema of the platform database, see
-  [platform database](reference/storage.md#platform-database), and a `Tenants`
-  section is ignored. The start logs a warning when one is present.
-- **Refresh.** Both hosts read the directory again every
-  `Tenancy:RefreshInterval`, 30 seconds by default, see
-  [tenancy settings](reference/host-settings.md#tenancy-settings). A changed
-  host, database setting or OIDC setting applies at the next refresh.
-- **Read only.** The hosts read the directory over a database role that may
-  read the `platform` schema, and the server may also insert its data
-  protection keys. [`Axis.Admin`](reference/administration.md)
-  writes it, see
-  [D43](decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md).
-
-What a host answers for a tenant, once the directory is in use:
-
-| Case                                            | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| An `active` tenant                              | The tenant is served after the next refresh, once the runtime database role check passes. Its OIDC client and its endpoint caller scheme are registered then.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| A `suspended` or `provisioning` tenant          | `503` problem details (`application/problem+json`) titled "This tenant is not available.". It names no tenant and no host. The worker claims none of its new work, and work already claimed finishes.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| A tenant whose schema version is not the host's | `503`, like a suspended tenant, from the first directory refresh that reads the other version. The server logs one warning when a tenant joins this state. The worker re-reads the schema versions at each poll round and claims none of its work, new or old. It starts again once `Axis.Admin migrate` has brought the tenant to the worker's version, with no restart. The schema version is the newest EF Core migration that `Axis.Admin migrate` applied, see [administration](reference/administration.md#migrate). The server registers its sign-in client when the refresh serves it, so it can sign people in without a restart. |
-| A removed or unknown host                       | `404`, as today.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| A refresh that fails                            | The last good directory stays in use and one error is logged for each run of failed refreshes. Readiness is Degraded until a refresh works, see [health checks](#health-checks). A tenant suspended during the outage keeps running until a refresh works.                                                                                                                                                                                                                                                                                                                                                                                 |
-| The first load fails                            | The server stops its start. The worker waits and retries, and is not ready until the first load works.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-
-- **New tenants.** A tenant that first appears at a refresh is served only
-  after the runtime database role check passes, see
-  [database roles](reference/storage.md#database-roles). Until then it answers
-  `503`, like a suspended tenant, and the check runs again at each refresh. The
-  worker skips such a tenant, logs an error and runs the check again at each
-  refresh. A failed check does not stop the worker.
-  The same holds for a tenant that becomes `active` again, and for a served
-  tenant whose database host, port, name, runtime user or runtime password
-  changes. It answers `503` until the check passes on the new settings. Then
-  the server drops its old connection pool, and the next request opens one
-  with the new settings. The check runs only when the directory changes, so
-  privileges granted inside the database with no directory change are not
-  caught until a restart. A tenant whose `Oidc` authority, client id or client
-  secret is blank at a refresh is withheld in the same way. It answers `503`,
-  the server logs the missing setting, and the other tenants keep working.
-  `Axis.Admin` creates, migrates, grants and activates the database of a
-  tenant, and the server does none of it, see
-  [administration](reference/administration.md).
+- **Two sources, one contract.** `Tenancy:Source` is `configuration`, the default, or `directory`.
+  Both answer through one tenant catalog contract, so request resolution, tenant connections,
+  deployment bindings and sign-in do not know the source. Under `directory` both hosts ignore a
+  `Tenants` section and log a warning when one is present, and a non-empty `ActivateOnStartup` stops
+  the server's start.
+- **Read only.** The hosts read the directory over `ConnectionStrings:Platform`, a role that may read
+  the `platform` schema, and the server may also insert its data protection keys. The worker never
+  reads `ConnectionStrings:PlatformSchema`.
+- **Served tenants.** The hosts use the `active` tenants for host matching, tenant connections,
+  deployment bindings and sign-in. The worker runs each tenant's work on the tenant's own database,
+  with its decrypted runtime password.
+- **Secrets in memory.** A password, the client secret and a `secret` binding stay encrypted in
+  memory, and are decrypted only when a connection opens, the sign-in client is set up or a binding is
+  resolved. The binding check runs on each read, and a failure names the tenant and the binding,
+  never the value.
+- **Refresh.** Both hosts read the directory again every `Tenancy:RefreshInterval`, 30 seconds by
+  default, without a restart. A changed host, database setting or OIDC setting applies at the next
+  refresh, and a changed database setting gets a new connection pool. A tenant added at a refresh gets
+  its OIDC client and its endpoint caller scheme, and a tenant that is no longer served loses both.
+  The worker runs the refresh in its poll: it pauses its loops and waits for the work items already
+  running.
+- **Schema versions.** The worker also reads the schema version of every tenant again at each poll
+  round, and claims no work of a tenant whose version is not its own.
+- **Empty directory.** An empty directory starts, and every host answers `404` until a tenant is added
+  and a refresh serves it.
 - **Health exemption.** Paths under `/health` stay exempt from resolution.
+
+What a host answers for a tenant under the directory:
+
+| Case                                            | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An `active` tenant                              | Served after the next refresh, once the runtime database role check passes. Its OIDC client and its endpoint caller scheme are registered then.                                                                                                                                                                                                                                                                                                       |
+| A `suspended` or `provisioning` tenant          | `503` problem details (`application/problem+json`) titled "This tenant is not available.", naming no tenant and no host. The worker claims none of its new work, and work already claimed finishes.                                                                                                                                                                                                                                                  |
+| A tenant whose schema version is not the host's | `503`, like a suspended tenant, from the first refresh that reads the other version. The server logs one warning when a tenant joins this state. The worker claims none of its work, new or old, and starts again with no restart once `Axis.Admin migrate` has brought the tenant to its version. The schema version is the newest EF Core migration that [`migrate`](reference/administration.md#migrate) applied. The server registers the tenant's sign-in client when a refresh serves it. |
+| A removed or unknown host                       | `404`.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| A refresh that fails                            | The last good directory stays in use, and one error is logged for each run of failed refreshes. Readiness is Degraded until a refresh works, see [health checks](#health-checks). A tenant suspended during the outage keeps running until then.                                                                                                                                                                                                      |
+| The first load fails                            | The server stops its start with an error that names `ConnectionStrings:Platform` and holds no password. The worker logs the failure once, retries every `Worker:PollInterval` and is not ready until a read works. The worker also stops at start when `ConnectionStrings:Platform` is missing or `Tenancy:RefreshInterval` is invalid.                                                                                                                 |
+
+- **New tenants.** A tenant that first appears at a refresh is served only after the runtime
+  database role check passes, see [database roles](reference/storage.md#database-roles). Until then
+  it answers `503`, like a suspended tenant, and the check runs again at each refresh. The worker
+  skips such a tenant, logs an error and runs the check again at each refresh, and a failed check
+  does not stop it. The same holds for a tenant that becomes `active` again, and for a served tenant
+  whose database host, port, name, runtime user or runtime password changes: it answers `503` until
+  the check passes on the new settings, then the server drops its old connection pool and the next
+  request opens one with the new settings. The check runs only when the directory changes, so
+  privileges granted inside the database with no directory change are caught only at a restart.
+- **Missing sign-in settings.** A tenant whose `Oidc` authority, client id or client secret is blank
+  at a refresh is withheld in the same way: it answers `503`, the server logs the missing setting, and
+  the other tenants keep working.
+- **No provisioning in the server.** `Axis.Admin` creates, migrates, grants and activates the
+  database of a tenant, and the server does none of it, see
+  [administration](reference/administration.md).
 
 ### Preview tenants
 
-A preview tenant is a tenant that belongs to one main
-tenant. An author tries an application there before publishing it to the main
-tenant. See [D48](decisions/d48-preview-tenants.md). Under
-`Tenancy:Source=configuration` and under `directory`, `PreviewOf`, sign-in and
-bindings work. Status rules and publishing are built too.
+A preview tenant belongs to one main tenant, and an author tries an application there before
+publishing it to the main tenant, as [D48](decisions/d48-preview-tenants.md) agrees. It works under
+both tenant sources. Its settings are in
+[preview tenants](reference/host-settings.md#preview-tenants).
 
-- **One main tenant, one preview.** A preview tenant belongs to one main tenant,
-  and a main tenant has at most one preview tenant. A preview tenant has no
-  preview of its own.
-- **A tenant like any other.** A preview tenant has its own database, database
-  roles, hosts and bindings. Its data never mixes with the main tenant's. Hosts
-  resolve it like any tenant's, and a session is still bound to the tenant it
-  signed in on, see [tenant binding](reference/security.md#sign-in-and-the-session).
-- **Where it is set.** Under `configuration`, the tenant setting `PreviewOf`
-  names the main tenant, see
-  [preview tenants](reference/host-settings.md#preview-tenants). Under
-  `directory`, the entry names it in `platform.tenants.preview_of`, and the
-  operator creates it with
-  [`tenant create --preview-of`](reference/administration.md#tenant-create). The
-  entry stores no sign-in settings. The catalog copies the main tenant's at each
-  refresh.
-- **Sign-in.** A preview tenant uses its main tenant's authority, client id, client secret and claim names. It uses
-  neither `Oidc:EndpointAudience` nor `Oidc:ServiceAudience`, so it accepts no machine-caller or service account token.
-  The operator registers the preview host's redirect address at the identity provider. A session there reads its main
-  tenant's given roles, see [preview tenants](reference/identity-provider.md#preview-tenants).
-- **Bindings.** A preview tenant's bindings are its own and empty by default.
-  A missing binding is a warning at activation there, not an error, see
+- **One main tenant, one preview.** A preview tenant belongs to one main tenant, a main tenant has at
+  most one preview tenant, and a preview tenant has no preview of its own.
+- **A tenant like any other.** A preview tenant has its own database, database roles, hosts and
+  bindings, and its data never mixes with the main tenant's. Hosts resolve it like any tenant's, and a
+  session is bound to the tenant it signed in on, see
+  [tenant binding](reference/security.md#sign-in-and-the-session).
+- **Where it is set.** Under `configuration`, the tenant setting `PreviewOf` names the main tenant.
+  Under `directory`, the entry names it in `platform.tenants.preview_of`, and the operator creates it
+  with [`tenant create --preview-of`](reference/administration.md#tenant-create). The entry stores no
+  sign-in settings, and the catalog copies the main tenant's at each refresh.
+- **Sign-in.** A preview tenant uses its main tenant's authority, client id, client secret and claim
+  names. It uses neither `Oidc:EndpointAudience` nor `Oidc:ServiceAudience`, so it accepts no
+  machine-caller or service account token. The operator registers the preview host's redirect
+  address at the identity provider. A session there reads its main tenant's given roles, see
+  [preview tenants](reference/identity-provider.md#preview-tenants).
+- **Bindings.** A preview tenant's bindings are its own and empty by default. A missing binding is a
+  warning at activation there, not an error, see
   [deployment bindings](reference/integration-resources.md#deployment-bindings).
-- **Status.** Each tenant keeps its own status. Suspending a main tenant does
-  not suspend its preview tenant.
-- **Publishing.** Studio on the main tenant's host stores a preview request in
-  the main tenant's database. The publisher runs it against the preview tenant.
-  The server opens no connection to another tenant's database, except that a
-  preview session reads its main tenant's given roles. See
+- **Status.** Each tenant keeps its own status, so suspending a main tenant does not suspend its
+  preview tenant.
+- **Publishing.** Studio on the main tenant's host stores a preview request in the main tenant's
+  database, and the publisher runs it against the preview tenant. The server opens no connection to
+  another tenant's database, except that a preview session reads its main tenant's given roles. See
   [preview](reference/authoring.md#preview).
 
 ### Request resolution
 
-- **Host matching.** Middleware in `Axis.Server` runs before static files and
-  endpoints. It matches `Request.Host.Host` against the configured hosts,
-  ignoring letter case. The port is ignored, so `A.Example.TEST:8443` matches
-  `a.example.test`.
+The server finds the tenant of each request from its host, before static files and endpoints run.
+
+- **Host matching.** Middleware in `Axis.Server` matches `Request.Host.Host` against the configured
+  hosts, ignoring letter case and the port, so `A.Example.TEST:8443` matches `a.example.test`.
 - **Behind a proxy.** From a proxy named in the
-  [forwarded headers settings](reference/host-settings.md#forwarded-headers),
-  the host matched is the forwarded host. From any other address it is the
-  request's own `Host`.
-- **Unknown host.** The response is `404` problem details
-  (`application/problem+json`) titled "No tenant is configured for this
-  host." It names neither the requested host nor any configured tenant or
-  host. This covers API and SPA paths alike.
-- **Health exemption.** Paths under `/health` are not resolved, so
-  `/health/live` and `/health/ready` answer for any host.
-- **Tenant not available.** Under `Tenancy:Source=directory`, a host of a tenant that is not `active` answers
-  `503` problem details titled "This tenant is not available.". It names
-  neither the tenant nor the host. See [tenant directory](#tenant-directory).
-- **Log scope.** While a resolved request runs, the logging scope carries
-  `TenantId` with the tenant id.
+  [forwarded headers settings](reference/host-settings.md#forwarded-headers), the host matched is the
+  forwarded host. From any other address it is the request's own `Host`.
+- **Unknown host.** The response is `404` problem details (`application/problem+json`) titled "No
+  tenant is configured for this host." It names neither the requested host nor any configured tenant
+  or host. This covers API and SPA paths alike.
+- **Health exemption.** Paths under `/health` are not resolved, so `/health/live` and
+  `/health/ready` answer for any host.
+- **Tenant not available.** Under `Tenancy:Source=directory`, a host of a tenant that is not served
+  answers `503`, as the [tenant directory](#tenant-directory) table says.
+- **Log scope.** While a resolved request runs, the logging scope carries `TenantId` with the tenant
+  id.
 
 ### Tenant connections
 
-- `ITenantConnectionFactory` opens connections to the current tenant's
-  database only. Without a tenant context it throws
-  `InvalidOperationException`.
-- There is one `NpgsqlDataSource` per tenant. It is created on first use and
-  disposed with the host. A [cell](reference/cells.md#connections) reaches them through PgBouncer _(planned for M31)_.
-- The current tenant is held per asynchronous flow (`AsyncLocal`), so
-  concurrent requests never see each other's tenant.
-- In the server, a request scope holds one tenant connection, opened on first
-  use and disposed with the scope. The module contexts and raw commands share
-  it.
+A tenant's database is reached only through the current tenant.
+
+- `ITenantConnectionFactory` opens connections to the current tenant's database only. Without a
+  tenant context it throws `InvalidOperationException`.
+- There is one `NpgsqlDataSource` per tenant, created on first use and disposed with the host.
+- **Through PgBouncer** _(planned for M31)_. In a [cell](reference/cells.md#connections) the hosts
+  reach the tenant databases through PgBouncer.
+- The current tenant is held per asynchronous flow (`AsyncLocal`), so concurrent requests never see
+  each other's tenant.
+- In the server, a request scope holds one tenant connection, opened on first use and disposed with
+  the scope. The module contexts and raw commands share it.
 
 ## Authentication and authorization
 
+The server signs people in, accepts tokens from other systems, and checks every access on the
+server against the application's policies. The detail is in [security](reference/security.md).
+
 - **Authentication (D9, D23).**
-  - The server is the OIDC confidential client.
-  - The browser gets a secure, HttpOnly, SameSite cookie session.
-  - API writes are protected against CSRF by a required header.
-  - Tests and local development use Keycloak in a container.
-  - See [Sign-in and the session](reference/security.md#sign-in-and-the-session).
-  - Other systems call inbound endpoints with a bearer token instead of the
-    session. See [Machine callers](reference/security.md#machine-callers).
-  - Service accounts call the record API, data source rows, process start,
-    process inspection and the operator commands with a bearer token (D86). See
+  - The server is the OIDC confidential client, and the browser gets a secure, HttpOnly, SameSite
+    cookie session. API writes are protected against CSRF by a required header. See
+    [sign-in and the session](reference/security.md#sign-in-and-the-session).
+  - The session state is in the tenant database, so sign-out revokes it at once (D84).
+  - Other systems call inbound endpoints with a bearer token instead of the session, see
+    [machine callers](reference/security.md#machine-callers).
+  - Service accounts call the record API, data source rows, process start, process inspection and
+    the operator commands with a bearer token (D86), see
     [service accounts](reference/security.md#service-accounts).
-  - The session state is in the tenant database, so sign-out revokes it at once
-    (D84). A tenant can turn on the FAPI 2.0 profile (D83). See
-    [service accounts](reference/security.md#service-accounts) and
+  - A tenant can turn on the FAPI 2.0 profile (D83), see
     [FAPI 2.0 profile](reference/fapi2-profile.md).
+  - Tests and local development use Keycloak in a container.
 - **Hardening (D82, D84, D85).**
   - The server sets security headers on every response and rate limits the routes a caller can
-    repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
+    repeat, see [security headers](reference/headers-and-rate-limits.md#security-headers) and
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
-  - Axis is checked against ASVS 5.0 Level 2, tracked in [ASVS](reference/asvs.md).
-    The final sign-off is _(planned for M32)_.
-  - Authentication by default (D111), `.github/CODEOWNERS` and a threat model (D106) are built, see
-    [authorization](reference/security.md#authorization) and [ASVS](reference/asvs.md#other-evidence).
-  - Performance objectives, the load test and its weekly CI run are built.
-    See [performance](reference/performance.md).
+  - Every route needs a signed-in user or a valid caller token unless it is listed as open (D111),
+    see [authorization](reference/security.md#authorization).
+  - Axis is checked against ASVS 5.0 Level 2, tracked in [ASVS](reference/asvs.md), with
+    `.github/CODEOWNERS` and a threat model (D106) among its
+    [other evidence](reference/asvs.md#other-evidence).
+  - **The final ASVS sign-off** _(planned for M32)_.
+  - Performance objectives and the load test are in [performance](reference/performance.md).
 - **Authorization (D12, D24).**
-  - The record API, the data source endpoint and the process start endpoint
-    call the policy module with the entity, data source or process and the
-    action. The task API calls it for the fields a task shows. The site
-    endpoints call it to shape navigation and page metadata. `GET /api/me`,
-    `GET /api/site`, `GET /api/texts/{locale}` and the `/api/auth` endpoints
-    carry no application content and call no policy. Worker steps run as `system`,
-    outside policies.
-  - The [authoring API](reference/authoring.md) checks
-    `Studio:AuthorRole`, an installation-level role outside application
-    policies, and calls no policy. An author can change every policy of an
+  - The record API, the data source endpoint and the process start endpoint call the policy module
+    with the entity, data source or process and the action. The task API calls it for the fields a
+    task shows, and the site endpoints call it to shape navigation and page metadata.
+    `GET /api/me`, `GET /api/site`, `GET /api/texts/{locale}` and the `/api/auth` endpoints carry no
+    application content and call no policy. Worker steps run as `system`, outside policies.
+  - The [authoring API](reference/authoring.md) checks `Studio:AuthorRole`, an installation-level
+    role outside application policies, and calls no policy. An author can change every policy of an
     application, so a policy cannot guard authoring. See
     [Studio settings](reference/host-settings.md#studio-settings).
-  - Record filters from policies limit every record list and single-record
-    check of the record API, data source queries and the subject record of a
-    process start.
-  - Field policies leave out fields from record API results, data source
-    rows, task forms and page metadata, and reject record API writes to
-    protected fields.
-  - See [Authorization](reference/security.md#authorization).
+  - Record filters from policies limit every record list and single-record check of the record API,
+    data source queries and the subject record of a process start.
+  - Field policies leave out fields from record API results, data source rows, task forms and page
+    metadata, and reject record API writes to protected fields.
+  - See [authorization](reference/security.md#authorization).
 - **Details.** Sign-in, machine callers, authorization and the
   [development users](reference/security.md#development-users) are in
-  [security.md](reference/security.md).
+  [security](reference/security.md).
 
 ## Process engine (D11)
 
-- **Release pinning.** New work starts on the active
-  release, and running work keeps its steps, tasks, forms, texts and package
-  versions until it ends. Roles and policies use the active release, see
-  [releases and running work](reference/processes.md#releases-and-running-work)
-  and [D29](decisions/d29-release-pinning-and-text-resources.md).
-- **State.** Instances and step occurrences are rows in the tenant database.
-  There is no in-memory state that matters after a crash.
-- **Step transactions.** A step transition loads the instance at its current
-  revision, executes, and in one transaction writes:
+The process engine keeps all process state in the tenant database and moves an instance on one
+step transaction at a time, so a crash loses nothing that was committed. The process resource, the
+start endpoint, the states, the task API, the worker settings and the tables are in
+[processes](reference/processes.md) and [running a step](reference/process-execution.md#running-a-step).
+
+- **Release pinning.** New work starts on the active release, and running work keeps its steps,
+  tasks, forms, texts and package versions until it ends. Roles and policies use the active release,
+  see [releases and running work](reference/processes.md#releases-and-running-work) and
+  [D29](decisions/d29-release-pinning-and-text-resources.md).
+- **State.** Instances and step occurrences are rows in the tenant database. No in-memory state
+  matters after a crash.
+- **Step transactions.** A step transition loads the instance at its current revision, executes, and
+  in one transaction writes:
   - business writes
   - the new instance state and revision
   - the step history
@@ -438,64 +362,52 @@ bindings work. Status rules and publishing are built too.
 
   A revision mismatch aborts the transaction.
 
-- **Workers.** Workers claim ready work with `FOR UPDATE SKIP LOCKED` and a
-  lease. Commits check the claim token (fencing). Claims and fencing are
-  built for work items and publish requests.
-- **External operations.** These run outside the transaction, using the
-  operation identity as their idempotency key. The result is recorded by a
-  following transaction. A `callConnector` step stages its call in its
-  transaction, and the worker sends it and records its result in a
-  following transaction. An attempt that is safe to retry is retried under
-  the step's retry policy, with the same identity. An unknown outcome is
-  reconciled through the operation's lookup. See
-  [connector calls](reference/process-execution.md#connector-calls). A package
-  operation step is staged and run the same way, see
+- **Workers.** Workers claim ready work items and publish requests with `FOR UPDATE SKIP LOCKED` and
+  a lease. Commits check the claim token (fencing).
+- **External operations.** These run outside the transaction, with the operation identity as their
+  idempotency key, and a following transaction records the result. A `callConnector` step stages its
+  call in its transaction, and the worker sends it and records its result in a following
+  transaction. An attempt that is safe to retry is retried under the step's retry policy, with the
+  same identity, and an unknown outcome is reconciled through the operation's lookup. See
+  [connector calls](reference/process-execution.md#connector-calls). A package operation step is
+  staged and run the same way, see
   [package operations](reference/process-execution.md#package-operations).
-- **History.** Every attempt, input, output, decision and error is recorded
-  for inspection.
-
-The step transactions, the revision check and the history are built for
-`decision`, `task`, `operation`, `end` and `timer` steps, for the staging and the call
-of `callConnector` steps, for `raiseEvent` steps with their sync trigger
-starts, and for package operation steps, see
-[Running a step](reference/process-execution.md#running-a-step).
-The process resource, the start endpoint, the instance and task states, the
-task API, the worker settings and the tables are in
-[reference/processes.md](reference/processes.md).
+- **History.** Every attempt, input, output, decision and error is recorded for inspection.
 
 ## Telemetry
 
-Moved to [reference/telemetry.md](reference/telemetry.md).
+Correlated logs, metrics and traces, the OTLP export and what telemetry never holds are in
+[telemetry](reference/telemetry.md).
 
 ## Health checks
 
-Moved to [reference/health-checks.md](reference/health-checks.md).
+The `/health/live` and `/health/ready` answers of the server and the worker are in
+[health checks](reference/health-checks.md).
 
 ## Installation
 
-Axis ships as three production images, as
-[D44](decisions/d44-packaging-for-on-premises-and-cloud-installation.md)
-says. The images, the Compose example and the chart are built.
+Axis ships as production images, as
+[D44](decisions/d44-packaging-for-on-premises-and-cloud-installation.md) agrees.
 
-- `axis-server` and `axis-worker` run the hosts. They hold no sample and no
-  development setting.
-- `axis-admin` runs `Axis.Admin` and holds the PostgreSQL 18 client tools.
-  It also runs the publisher, `axis-admin publisher`.
-- `deploy/compose/` and `deploy/helm/axis/` install them on one machine and on
-  Kubernetes.
+- `axis-server` and `axis-worker` run the hosts. They hold no sample and no development setting.
+- `axis-admin` runs `Axis.Admin` and the publisher, `axis-admin publisher`, and holds the
+  PostgreSQL 18 client tools.
+- `deploy/compose/` and `deploy/helm/axis/` install them on one machine and on Kubernetes.
 
-See the [installation guide](reference/installation.md) for the steps, every
-setting and the upgrade order.
+The steps, every setting and the upgrade order are in the
+[installation guide](reference/installation.md).
 
 ## Frontend
 
-Moved to [reference/frontend.md](reference/frontend.md).
-
-Ant Design is a detail of the SPA. It never shows in configuration, page
-metadata, theme tokens or the custom widget API, see
+The SPA, sites, pages and widgets are in [frontend](reference/frontend.md). Ant Design is a detail
+of the SPA. It never shows in configuration, page metadata, theme tokens or the custom widget API, see
 [D58](decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md).
 
 ## Testing
+
+Every acceptance criterion maps to at least one of these levels. The commands that run them are in
+[AGENTS.md](../AGENTS.md#commands), and how the runs are split and reported is in
+[test runs and reports](development.md#test-runs-and-reports).
 
 | Level         | Tooling                                                   | Scope                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -505,279 +417,317 @@ metadata, theme tokens or the custom widget API, see
 | End to end    | Playwright                                                | Real server + real database + SPA, user journeys and denied access                                                                                                                                                                                                                                                                                                          |
 | Scenario      | Axis.Scenarios + Testcontainers PostgreSQL                | Configuration-level tests of an application. Record actions, process starts, task completions and the `expect` steps run, with `now` fixing the time. Stubs answer the calls to connectors and packages. Event deliveries run, so `async` event triggers start their processes. Schedule triggers run through `advanceTime`, which moves `now` and runs every due work item |
 
-Every acceptance criterion maps to at least one of these. The exact commands
-are fixed in M0 and listed in [AGENTS.md](../AGENTS.md).
+### Rules for tests
 
-Playwright specs find elements by role, accessible name and ARIA state, and never
-select a class of the UI library. `scripts/lint.sh` fails when a file under
-`tests/` names a class that starts with `ant-`. Specs pick select options only through the helpers in `tests/e2e/select.ts`. The helpers never click an option, because a click can land without choosing it when the open list is placed again between the mouse going down and up. They type the option into an editable select, then move to the option with ArrowDown and press Enter. `pickOption` makes a pick that did not land again, for up to 20 seconds. Then it fails, naming the select and the option. `pickOptions` presses Enter only for an option that is not yet chosen, because Enter switches an option of a select that allows several on or off. It makes its picks again only when a step throws, for up to 20 seconds. It then waits up to 5 seconds for each option to show as chosen, and it does not pick again. A pick that did not land fails, naming the select and the option. Specs use `pickAction` for selects that act and then clear themselves.
+These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a machine can check.
 
-Playwright specs match accessible names and texts exactly. A string name or text passed to
-`getByRole`, `getByLabel`, `getByText` or `getByTitle` comes with `exact: true`. Only a regular
-expression matches part of a name. `scripts/lint.sh` fails on a call that breaks this.
+- **Locators.** Playwright specs find elements by role, accessible name and ARIA state, and never
+  select a class of the UI library. `scripts/lint.sh` fails when a file under `tests/` names a class
+  that starts with `ant-`.
+- **Exact names.** A string name or text passed to `getByRole`, `getByLabel`, `getByText` or
+  `getByTitle` comes with `exact: true`, and only a regular expression matches part of a name.
+  `scripts/lint.sh` fails on a call that breaks this.
+- **Selects.** Specs pick select options only through the helpers in `tests/e2e/select.ts`. The
+  helpers never click an option, because a click can land without choosing it when the open list is
+  placed again between the mouse going down and up. They type the option into an editable select,
+  move to it with ArrowDown and press Enter.
+  - `pickOption` makes a pick that did not land again, for up to 20 seconds, then fails, naming the
+    select and the option.
+  - `pickOptions` presses Enter only for an option that is not chosen yet, because Enter switches an
+    option of a select that allows several on or off. It makes its picks again only when a step
+    throws, for up to 20 seconds, then waits up to 5 seconds for each option to show as chosen, and
+    does not pick again. A pick that did not land fails, naming the select and the option.
+  - `pickAction` serves selects that act and then clear themselves.
+- **Dialogs.** Specs reach a dialog only through `waitForDialog` and `confirmDialog` in
+  `tests/e2e/dialogs.ts`. A dialog zooms in when it opens, and a click during the zoom is lost, so
+  `waitForDialog` returns the dialog once it is fully opaque and its opening animation has ended.
+  `confirmDialog` waits the same way before it clicks its button, and retries until the dialog
+  closes. `scripts/lint.sh` fails when a file under `tests/e2e/specs/` calls `getByRole('dialog')`
+  itself.
+- **Elapsed time.** Only `*PerformanceTests` classes may assert on elapsed time, because they run
+  alone. Other tests prove a bound with a count, such as the steps used or the nodes inlined, and show
+  that nothing waited through an outcome. `scripts/lint.sh` fails when a test file that is not named
+  `*PerformanceTests.cs` uses `Stopwatch`, `.Elapsed` or `GetElapsedTime`. A polling deadline built on
+  `DateTime.UtcNow` only ends a wait and is allowed.
+- **Absent values.** A test that asserts a value is absent from a log entry or a message uses a
+  marker that cannot appear there by chance. Record ids are UUIDv7 hex, so a short number or a hex
+  word can match one: use a number of ten or more digits.
+- **Policy violations.** Every spec imports `test` and `expect` from `tests/e2e/test.ts`. Its `test`
+  has an automatic fixture that listens for `securitypolicyviolation` on every page of the test,
+  including pages in browser contexts that the spec opens itself, and fails the test that caused a
+  violation. `tests/e2e/policy-violations.test.ts` checks the listener, and fails when a spec imports
+  `test` from `@playwright/test` instead.
+- **Hang guard.** A step that once hung the browser until the test timeout can run through
+  `guardStep` in `tests/e2e/hang-guard.ts`. It fails the step after its own limit, and attaches a
+  screenshot and a text to the test: the page URL, the console output, the page errors and the failed
+  requests since the step began, the load of the machine and its busiest processes. In
+  `purchase-request-release.spec.ts` it wraps `editInStudio`, the edit of `texts/en.json` through
+  Studio's JSON view in the edit-to-rollback journey, and `openStudio`, which opens Studio before a
+  publish, each with a limit of 60 seconds. The other journeys of that spec write their changed files
+  through the Studio resource API, without the browser.
 
-Specs reach a dialog only through `waitForDialog` and `confirmDialog` in `tests/e2e/dialogs.ts`. A dialog zooms in when it opens, and a click during the zoom is lost. So `waitForDialog` returns the dialog once it is fully opaque and its opening animation has ended. `confirmDialog` waits the same way before it clicks its button, and it retries until the dialog closes. `scripts/lint.sh` fails when a file under `tests/e2e/specs/` calls `getByRole('dialog')` itself.
+### Shared test services
 
-Only `*PerformanceTests` classes may assert on elapsed time, because they run alone.
-Other tests prove a bound with a count, such as the steps used or the nodes inlined, and
-show that nothing waited through an outcome. `scripts/lint.sh` fails when a test file
-that is not named `*PerformanceTests.cs` uses `Stopwatch`, `.Elapsed` or `GetElapsedTime`.
-A polling deadline built on `DateTime.UtcNow` only ends a wait and is allowed.
+The integration tests share their containers, so a run starts each service at most once.
 
-A test that asserts a value is absent from a log entry or a message uses a marker that
-cannot appear there by chance. Record ids are UUIDv7 hex, so a short number or a hex word
-can match one. Use a number of ten or more digits as the marker.
+- **Keycloak.** The integration tests share one Keycloak container with the development realm per
+  run. It starts the first time a test needs it, so a run with no such test starts none, and it is
+  removed when the run ends. A test class never starts its own Keycloak. A test that changes realm
+  state must not use the shared container: it keeps its data in a PostgreSQL container of its own,
+  with a read-only role that has `SELECT` on the `credential` table.
+- **PostgreSQL.** The integration tests share one PostgreSQL 18 container per run, started and
+  removed the same way. Each test class works in its own new database on that server, and every
+  database a fixture creates has a name unique in the run. A fixture never starts its own container.
+  Tenant isolation tests still use one tenant database per tenant. Tests that read
+  `pg_stat_activity` filter on `current_database()`, so they neither see nor end other classes'
+  sessions.
+- **Scenarios.** `scripts/integration.sh` runs the scenarios of every application under
+  `samples/apps/` from the integration tests, on their PostgreSQL container, see
+  [test scenarios](reference/test-scenarios.md).
+- **Doc facts.** `scripts/lint.sh` checks every relative Markdown link and `#anchor` in the
+  repository. Unit tests in `Axis.Configuration.Tests` compare the diagnostic code table and the
+  resource kinds in the [configuration pipeline](reference/configuration.md#configuration-pipeline)
+  with `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by heading or table
+  header, so the sections may move within `docs/`.
 
-`scripts/integration.sh` runs the scenarios of every application under
-`samples/apps/` from the
-integration tests, on their Testcontainers PostgreSQL. See
-[test scenarios](reference/test-scenarios.md).
+### The E2E stack
 
-The integration tests share one Keycloak container with the development realm
-per run. It starts the first time a test needs it, so a run with no such test
-starts none. It is removed when the run ends. A test class never starts its own
-Keycloak. A test that changes realm state must not use the shared container. It keeps its data in a PostgreSQL container of its own, with a read-only role that has `SELECT` on the `credential` table.
+`scripts/e2e.sh` starts the whole stack that the Playwright journeys run against: a main server, a
+journey server, the worker, the publisher and the purchasing system stub.
 
-The integration tests also share one PostgreSQL 18 container per run. It starts
-the first time a test needs it, so a run with no such test starts none, and it is
-removed when the run ends. Each test class works in its own new database on that
-server, and every database a fixture creates has a name unique in the run. A
-fixture never starts its own container. Tenant isolation tests still use one
-tenant database per tenant. Tests that read `pg_stat_activity` must filter on
-`current_database()`, so they do not see or end other classes' sessions.
+The main E2E server activates these applications in `ActivateOnStartup`, see
+[startup activation](reference/host-settings.md#startup-activation), so the journeys run against real
+metadata and records:
 
-Some doc facts are checked by machine. `scripts/lint.sh` checks every relative
-Markdown link and `#anchor` in the repository. Unit tests in
-`Axis.Configuration.Tests` compare the diagnostic code table and the resource
-kinds in the [configuration pipeline](reference/configuration.md#configuration-pipeline) with
-`DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by
-heading or table header, so the sections may move within `docs/`.
+| Application                                | For                                                                                                 |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `tests/e2e/fixtures/e2e-app`               | The platform journeys                                                                               |
+| `samples/apps/purchase-requests`           | The purchase request journeys                                                                       |
+| `samples/apps/leave-requests`              | The leave request journeys                                                                          |
+| `samples/apps/service-desk`                | The service desk journeys                                                                           |
+| `samples/apps/asset-management`            | The asset register and import journeys                                                              |
+| `tests/e2e/fixtures/subprocess-app`        | The process inspector's sub-process journey: a parent that starts a child on a 24-hour timer, both without a subject |
+| `tests/e2e/fixtures/host-site-app`         | The journey that opens a site at its own host's root                                                |
+| `tests/e2e/fixtures/organization-app`      | The pages of `organization`, which it declares                                                      |
+| `tests/e2e/fixtures/approvals-app`         | The pages of `approvals`, which it declares with `organization`                                     |
 
-The E2E server starts with eight applications listed in `ActivateOnStartup` (see
-[Startup activation](reference/host-settings.md#startup-activation)), so Playwright journeys run against
-real metadata and records:
+**Studio folders.** No spec writes a committed folder, so a spec that saves a resource in Studio never
+changes a file under `samples/`.
 
-- the generic test application in `tests/e2e/fixtures/e2e-app`, for the
-  platform journeys;
-- the purchase request sample in `samples/apps/purchase-requests`, for the
-  purchase request skeleton journeys;
-- the leave request sample in `samples/apps/leave-requests`, for the leave
-  request journeys;
-- the service desk sample in `samples/apps/service-desk`, for the service desk journeys;
-- the asset management sample in `samples/apps/asset-management`, which no journey uses yet;
-- the sub-process fixture in `tests/e2e/fixtures/subprocess-app`, a parent process that starts a child on a 24-hour
-  timer, both without a subject, for the process inspector's sub-process journey;
-- the host site fixture in `tests/e2e/fixtures/host-site-app`, for the journey that opens a site at its own host's root;
-- the organization fixture in `tests/e2e/fixtures/organization-app`, which declares `organization`, for its pages' journey;
-- the approvals fixture in `tests/e2e/fixtures/approvals-app`, which declares `organization` and `approvals`, for the approvals pages' journey.
-
-The E2E server's `Studio:Folders` does not list that sample. It lists a copy
-that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on
-exit, and passes in `AXIS_E2E_STUDIO_FOLDER`. The E2E
-settings blank the other entries that `appsettings.Development.json` lists, so
-the server lists only that copy. No spec writes to that copy, so a spec that
-saves a resource in Studio never changes a file under `samples/`.
-
-A spec that writes a Studio folder gives it a folder of its own. It copies the
-committed sample, or another folder it made, into a temporary folder, starts a
-server over that folder with `startServer`, and deletes the folder and stops the
-server when it ends. Tests in one file that change the same folder run in order,
-in one worker, under `test.describe.configure({ mode: 'default' })` or
-`serial`. No spec opens Studio on the main E2E server or names its folder,
-except `studio-new-application`. That spec only reads the main folder, to check
-that the main server offers no New application button.
+- The main server's `Studio:Folders` lists only a copy of the purchase request sample, which
+  `scripts/e2e.sh` makes in a temporary folder for each run, passes in `AXIS_E2E_STUDIO_FOLDER` and
+  deletes on exit. The E2E settings blank the other entries of `appsettings.Development.json`. No spec
+  writes to that copy.
+- A spec that writes a Studio folder gives it a folder of its own. It copies the committed sample, or
+  another folder it made, into a temporary folder, starts a server over it with `startServer`, and
+  deletes the folder and stops the server when it ends. Tests in one file that change the same folder
+  run in order, in one worker, under `test.describe.configure({ mode: 'default' })` or `serial`.
+- No spec opens Studio on the main E2E server or names its folder, except `studio-new-application`,
+  which only reads it to check that the main server offers no New application button.
 
 The Studio specs use these folders:
 
-- `studio`, `studio-form-editor`, `studio-page-editor`, `studio-process-editor`,
-  `studio-process-redraw`, `studio-scenario`, `studio-new-resource` (without `texts/vi.json`) and
-  `studio-tests`: a temporary copy of `samples/apps/purchase-requests`.
-  `studio-tests` also copies it again for its server with `Studio:Tests` off.
-- `studio-module-entity`: a temporary copy of `samples/apps/leave-requests`.
-- `studio-module-pickers`: a temporary copy of `tests/e2e/fixtures/module-app` and a temporary `Modules:Path` with the sample modules and the fixture module `checklists`.
-- `studio-new-application`, `studio-page-containers` and `studio-page-parameters`: a temporary `Studio:ApplicationsPath`.
-- `studio-entity-migrations` and `purchase-request-release`: folders under the
-  test's output path.
-- `service-desk-journey`, `asset-management-journey`, `approvals-application-journey` and `journey-tenant`: each its own application under
-  the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`.
+| Specs                                                                                                                                                         | Folder                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `studio`, `studio-form-editor`, `studio-page-editor`, `studio-process-editor`, `studio-process-redraw`, `studio-scenario`, `studio-new-resource` and `studio-tests` | A temporary copy of `samples/apps/purchase-requests`, without `texts/vi.json` for `studio-new-resource`. `studio-tests` also copies it again for its server with `Studio:Tests` off |
+| `studio-module-entity`                                                                                                                                        | A temporary copy of `samples/apps/leave-requests`                                                                            |
+| `studio-module-pickers`                                                                                                                                       | A temporary copy of `tests/e2e/fixtures/module-app`, and a temporary `Modules:Path` with the sample modules and the fixture module `checklists` |
+| `studio-new-application`, `studio-page-containers` and `studio-page-parameters`                                                                              | A temporary `Studio:ApplicationsPath`                                                                                        |
+| `studio-entity-migrations` and `purchase-request-release`                                                                                                     | Folders under the test's output path                                                                                         |
+| `service-desk-journey`, `asset-management-journey`, `approvals-application-journey` and `journey-tenant`                                                      | Each its own application under the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`                     |
 
-A spec can also activate another folder during the run, to test releases. The
-helper `tests/e2e/activate.ts` starts the built server once more on a spare
-port, with the same settings as the E2E server and that folder in
-`ActivateOnStartup`. It waits until `/health/ready` answers, then stops that
-server. The E2E server reads the active release on each request, so it serves
-the new release at once. The helper throws an error with the server output when
-the folder does not activate. Only the spec that needs it uses
-`tests/e2e/fixtures/release-app`, so the other specs see no change. A spec's own server
-activates `ActivateOnStartup__0` in every tenant, the preview one included, so only `purchase-request-release` may leave it unset. `startup-activation.test.ts` checks this.
+**Activating another folder.** A spec can activate another folder during the run, to test releases.
+The helper `tests/e2e/activate.ts` starts the built server once more on a spare port, with the same
+settings as the E2E server and that folder in `ActivateOnStartup`, waits until `/health/ready`
+answers, then stops that server. The E2E server reads the active release on each request, so it
+serves the new release at once. The helper throws an error with the server output when the folder
+does not activate. Only the spec that needs it uses `tests/e2e/fixtures/release-app`, so the other
+specs see no change. A spec's own server activates `ActivateOnStartup__0` in every tenant, the
+preview one included, so only `purchase-request-release` may leave it unset, and
+`startup-activation.test.ts` checks this.
 
-A step that once hung the browser until the test timeout can run through `guardStep` in
-`tests/e2e/hang-guard.ts`. It fails the step after its own limit, and attaches a screenshot and a
-text to the test. The text holds the page URL, the console output, the page errors and the failed
-requests since the step began, the load of the machine and its busiest processes.
-In `purchase-request-release.spec.ts` it wraps `editInStudio`, the edit of `texts/en.json` through Studio's JSON
-view in the edit-to-rollback journey, and `openStudio`, which opens Studio before a publish. Each has a limit of 60
-seconds. The other journeys in that spec write their changed files through the Studio resource API, without the
-browser.
+**The worker.** The E2E run starts the worker against the same database, with a 5 second lease and a
+delivery limit of 2, so that a failing webhook becomes a dead letter after one 30 second backoff
+instead of about 7.5 minutes. A spec can restart the worker: it writes the restart file that
+`scripts/e2e.sh` names, then stops the worker process, and the script starts a new one. A worker that
+stops with no restart request fails the run.
 
-Every spec imports `test` and `expect` from `tests/e2e/test.ts`. Its `test` has an automatic fixture that
-listens for `securitypolicyviolation` on every page of the test, including pages in browser contexts that the
-spec opens itself, and fails the test that caused a violation. `tests/e2e/policy-violations.test.ts` checks the
-listener and fails when a spec imports `test` from `@playwright/test` instead.
+**The journey tenant.** The E2E run also serves a third tenant, `journey`, so that a Studio journey
+builds a whole application and publishes it with no clash with the committed samples on the main
+tenant.
 
-The E2E run also starts the worker against the same database, with a 5 second
-lease and a delivery limit of 2, so that a failing webhook becomes a dead letter after one 30 second
-backoff instead of about 7.5 minutes. Its output goes to `artifacts/logs/e2e-worker.log`. A spec can restart
-the worker: it writes the restart file that `scripts/e2e.sh` names, then stops
-the worker process, and the script starts a new one. A worker that stops with
-no restart request fails the run.
+- `scripts/e2e.sh` creates its database `axis_journey` and its roles `axis_journey_schema` and
+  `axis_journey_runtime` through `psql`, so Docker Compose, `scripts/dev.sh` and `init-roles.sql`
+  stay as they are.
+- A second server serves it on the loopback address `127.0.0.2`, because the worker and the publisher
+  reject two tenants that share a host. Playwright starts it after the main server, so the platform
+  migrations of the two never race, and the two share the platform database.
+- The journey server runs in the `Testing` environment, because `appsettings.Development.json` would
+  add the `default` tenant, the startup activation and the Studio folders. It sets
+  `Studio:ApplicationsPath` to a temporary folder, has no preview tenant or bindings, and sets
+  `Console:OperatorRole` to `platform-operator`, so the operator console answers there.
+- Only startup activation migrates a tenant database, so the journey server activates one
+  application at start, `tests/e2e/fixtures/journey-base`, which holds only a manifest and clashes
+  with no sample.
+- The setup step signs in, on the journey host, the author, the requester, the service desk lead,
+  the agent, the approver, the asset manager, the employee, the auditor, the department managers and
+  the platform operator, and saves those sessions apart from the sessions of the main host.
+- The worker and the publisher serve the journey tenant too, and the run fails when the worker log
+  lacks `Tenant journey is ready for work` or the publisher log lacks `journey ready`.
 
-The E2E run also serves a third tenant, `journey`, for Studio journeys. `scripts/e2e.sh` creates its
-database `axis_journey` and its roles `axis_journey_schema` and `axis_journey_runtime` through `psql`, so Docker
-Compose, `scripts/dev.sh` and `init-roles.sql` stay as they are. A second server serves it on the loopback
-address `127.0.0.2`, because the worker and the publisher reject two tenants that share a host. Playwright
-starts that server after the main one, so the platform migrations of the two never race, and the two share the
-platform database. The journey server runs in the `Testing` environment, because
-`appsettings.Development.json` would add the `default` tenant, the startup activation and the Studio folders.
-It sets `Studio:ApplicationsPath` to a temporary folder and has no preview tenant or bindings. Only startup
-activation migrates a tenant database, so it activates one application at start,
-`tests/e2e/fixtures/journey-base`, which holds only a manifest. It clashes with no sample. A journey therefore builds a whole application in Studio and publishes it, with no clash with
-the committed samples on the main tenant. The setup step signs the author, the requester, the service desk lead,
-the agent, the approver, the asset manager, the employee, the auditor, the department managers and the platform operator in on the journey host and saves those sessions apart from the sessions of the main host. The journey server sets `Console:OperatorRole` to `platform-operator`, so the operator console answers there. The
-worker and the publisher serve the journey tenant too, and the run fails when the worker log lacks
-`Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
-`artifacts/logs/e2e-journey-server.log`.
+**The tenant create spec** serves the tenant it creates. After `tenant create` it starts one more
+server in `Testing` with `Tenancy:Source=directory`, which reads `operator-made` from the tenant
+directory. The server listens on https at `AXIS_E2E_TENANT_HTTPS_PORT`, with a certificate that
+`scripts/e2e.sh` makes for each run, and stops when the test ends. The spec's browser maps
+`operator-made.localhost` on port 443 to that port and accepts the certificate, so a person signs in
+on the tenant host with no port in the address. No redirect address is added by hand: only
+`tenant create` writes them.
 
-The tenant create spec also serves the tenant it creates: after `tenant create` it starts one more server in `Testing` with `Tenancy:Source=directory`, which reads `operator-made` from the tenant directory. It listens on https at `AXIS_E2E_TENANT_HTTPS_PORT` with a certificate that `scripts/e2e.sh` makes for each run, and stops when the test ends. The spec's browser maps `operator-made.localhost` on port 443 to that port and accepts the certificate, so a person signs in on the tenant host with no port in the address. No redirect address is added by hand: only `tenant create` writes them.
+**The purchasing system.** The E2E run starts the [purchasing system stub](#purchasing-system-stub)
+from the build output, and fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`.
+The E2E server and worker run in the `Development` environment, because only Development lets a
+connector call an `http` URL. Their `PurchasingSystemUrl`, `PurchasingSystemTokenUrl`,
+`PurchasingSystemClientId` and `PurchasingSystemClientSecret` bindings point at the stub and hold its
+default credentials, so an approved purchase request signs in and creates its purchase order there.
+The E2E server, worker and publisher also hold the `PurchaseRequestApprovedWebhookUrl` and
+`PurchaseRequestApprovedWebhookSecret` bindings, which point at the stub, where the sample's approval
+webhook delivers.
 
-`tests/e2e/specs/service-desk-journey.spec.ts` builds the service desk on the journey tenant with Studio only, and
-never opens the JSON view. It builds the whole data
-model: the application and its `Asia/Ho_Chi_Minh` time zone, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` and
-`Ticket` entities and the `Categories` seed. The entity designer asks a migration question even for a new entity,
-because the starter field `name` is renamed to `number`. The journey answers Drop data, then deletes the `Ticket`
-migration in Studio, because the sample has no migration and release 1 is the first release, so it needs none. The built
-`migrations` folder must be empty at the end. Studio cannot remove a text key yet, and the starter keys of a blank
-application are not in the sample. So the journey deletes the starter `en` text resource and creates it again.
-The journey then builds the `MyTicketList` and `AllTicketList` data sources and the three aggregate data sources of the dashboard,
-`OpenTicketTotals`, `UrgentTicketTotals` and `OpenTicketsByCategory`, in the generic data source form. The form writes the
-`filter` and the `aggregate`, and it writes the empty `groupBy` of the two totals when the author adds an entry and removes it.
-The journey then lays out the `TicketEdit` form on the form's Design tab. It drags the first field of each section from the field palette onto the outline and clicks the others, names the sections in the Name box, adds the two steps with Add step and the second section with Add section, and writes `visibleWhen` and `requiredWhen` on `resolution` in the property panel. It builds the `TicketTriage`, `TicketResolution` and `TicketConfirmation` forms on the Form tab, and the `TicketHandling` process
-in the process editor, with the two escalations of the `resolve` task and the `tellRequester` notify step. The escalations notify the `service-desk-lead` role when the task is due and reassign it to that role a day later. The notify step goes to the requester in-app and by email. Every expression is typed in the expression editor. It then builds the six pages. The page editor makes `TicketForm`, `MyTasks`, `TicketDetail`, the two table pages and the `Dashboard` page with its title. The form widget of the `TicketForm` page names `TicketEdit`. The `TicketDetail` page has a required `ticket`
-reference parameter, built with the parameter editor. The View row actions of
-the two table pages set `ticket` to `id`. The journey then finishes the site that the blank
-application already has: the `vi` locale and four navigation entries, the last one for `Dashboard`. It deletes the starter `Home` page, because the sample has
-none. The Design tab of a page draws nothing while any file has an error, and the starter `Home` page and its navigation entry have errors until this step, so the journey lays out the two pages afterwards. It builds `TicketDetail` on the page's Design tab: it drops the `Ticket` entity from the data panel onto the canvas, picks a detail widget, which binds itself to the `ticket` parameter, and removes the starter task inbox in the widget tree. It builds `Dashboard` there too: it drops a `columns` widget from the palette, the two `kpi` tiles in a column of 4 and the `chart` in a column of 8 from the three aggregate data sources in the data panel, and the `AllTicketList` table below the columns. It then drags the table into the chart's column by mistake and presses Undo once, which puts the table back below the columns, because a move is one edit. The journey saves the page with the table below the columns. It then adds the open page to `tellRequester`, because the page picker offers only pages that exist, and sets its `ticket` parameter to `id`. It then builds the `DailyOverdueReminder` and `TellLeadTicketDeleted` processes in the process editor, each as a process with parameters whose one `notify` step goes in-app to the `service-desk-lead` role, and the `EveryMorning` schedule trigger and the `TicketDeleted` delete trigger. A new trigger starts with an empty `event`, and Studio removes that key only when the author picks an event and clears it. The sample has no event, so the journey creates a temporary `Placeholder` event first and deletes it after the two triggers, which leaves the built folder equal to the sample. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
-the requester from editing `resolution`, the read grants of the lead on the three aggregate data sources and the lead's `reassign` grant on `TicketHandling`. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the twelve test scenarios in the scenario editor, each with its users, time and steps. A step that expects a notification names the recipient, the channel and the placeholder values, an `advanceTime` step names its `by`, and an `expectTask` step names a user or a role. The late ticket scenario moves time in two steps, `P2D` and `P1D`, so that the weekday reminder runs before the escalation and the escalation's notification is the newest one the lead has. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
-The journey then runs the twelve scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, the requester creates and submits a ticket, pressing Next to reach step 2, the `lead` user assigns it to the `agent` user, who resolves it, and the requester opens the ticket detail page from a row of the requester's bell and confirms it, until the ticket's status is `closed`. The resolution holds the ticket's unique title, so that the bell row is found by it. The journey also opens the bell of the `lead` user and checks that it has no row for that ticket.
+**Logs.** The worker output goes to `artifacts/logs/e2e-worker.log`, the journey server output to
+`artifacts/logs/e2e-journey-server.log` and the stub output to `artifacts/logs/e2e-purchasing.log`.
 
-`tests/e2e/specs/module-contract-journey.spec.ts` creates a blank application on the journey tenant and writes its pins through the Studio API: the built-in module `organization` and the sample module `department-budgets`. The member and approver slots map to a new `department-manager` role, and the admin and administrator slots to a `department-administrator` role. The application also grants `department-manager` the start of `BudgetApproval`, adds an `Engineering` department seed and a Budgets navigation entry, with their texts. The publish must succeed, and the release must not be off-standard. The `manager` user then creates a budget on the Budgets page, and the budget reads `draft`. Release 1 also holds the application's `QuickBudgetApproval` process, whose first step sets a budget's `status` to `approved`. The author creates it in Studio and fills it on its JSON tab. A `BudgetStarters` policy lets `department-manager` start it. When `manager` starts it on a new budget, the contract's `approve` guard refuses the step. The `platform-operator` user sees the instance in the light-mode console's Failed work with `named point Budget/transitions/approve`, and the budget still reads `draft`. The same user gets Studio's forbidden page with no Relax button, and a PATCH that adds a relax entry to `application.json` answers 403. The author then opens `department-budgets/BudgetContract` in Studio, relaxes `Budget/transitions/approve` with a reason, and publishes with a label. Studio's release history row and the `platform-operator` console's Publishing row, both in light mode, show Off-standard with the module, the point and the reason. `manager` then starts `QuickBudgetApproval` on a second budget, and within 30 seconds that budget reads `approved` on the Budgets page.
+### Journeys on the journey tenant
 
-`tests/e2e/specs/approvals-data-business.spec.ts` creates an application from the built-in `approvals` application on the journey tenant. It maps the `admin` slot of both modules, `organization` and `approvals`, to a new `department-manager` role, and publishes release 1, which must be the one active row. The `manager` user then creates the employees, a department that `employee` heads, and a request type with one `departmentHead` step. The `employee` user creates and submits a request of that type on the site. The request is absent from the employee's To decide list, and `manager` approves it there, so the request reads Approved for the employee. `manager` then adds a `Purchase` request type on the Request types page, with a line-manager step and a named-employee step from 1000. A 1500 request by `employee` stays Submitted at step 1 of 2 after `manager` approves it, with `manager-2` as the approver's account, on behalf of `approver`. `manager-2` approves it from To decide, and the request reads Approved with two decisions, the second by `manager-2` on behalf of `approver`.
+These journeys build or change an application on the journey tenant and use it on its site. Each spec
+file holds its steps. This section says what each proves and what it must not do.
 
-`tests/e2e/specs/approvals-module-business.spec.ts` creates an application from the built-in `approvals` application on the journey tenant. The `author` user adds a `costCenter` field to `approvals/Request` in Studio's entity designer, and Studio saves it as a customization layer, `customizations/approvals/Request.json`, in the application's folder. The spec maps the admin slots as the first business does and publishes release 1, which must be the one active row. The `manager` user then creates a "Travel advance" request type on the Request types page, with one `departmentHead` step. A department head's own Travel advance request is absent from their To decide list, and `manager` approves it there. Last, `author` saves a step that sets `approved` right after `submit` through the module resource save route. The publish fails with `AXC0342`, at least one contract scenario result reads failed, and the release history keeps its one row.
+- **`service-desk-journey.spec.ts`** builds the whole service desk with Studio only, as the
+  [product brief](product-brief.md#third-application-service-desk) asks. It never opens the JSON
+  view and uses no file edit. It builds the data model, the data sources of the lists and the dashboard, the
+  two-step ticket form on the form's Design tab, the forms of the tasks, the `TicketHandling` process
+  with its escalations and its notify step, the pages, the site, the notify processes and their
+  schedule and delete triggers, the policies in the policy matrix, and the twelve test scenarios in
+  the scenario editor, typing every expression in the expression editor. Each save must report no
+  error diagnostic. At the end the built folder must match `samples/apps/service-desk` with no error
+  diagnostic: only resource ids, seed record ids (paired by position) and key order may differ, and
+  the `migrations` folder must be empty, because the sample has none. Run tests must pass all twelve
+  scenarios, and the release history must show release 1 as the one active row. On the
+  `service-desk` site the requester, the service desk lead and the agent take one ticket to `closed`,
+  the requester opening it from the bell, and the lead's bell has no row for that ticket.
+- **`module-contract-journey.spec.ts`** creates a blank application that pins the built-in module
+  `organization` and the sample module `department-budgets`, through the Studio API. The publish
+  succeeds and the release is not off-standard. A process step that approves a budget is refused by
+  the contract's `approve` guard, and the platform operator sees the instance in the console's Failed
+  work with `named point Budget/transitions/approve`. The platform operator gets Studio's forbidden
+  page with no Relax button, and a PATCH that adds a relax entry answers `403`. The author
+  relaxes the point with a reason in Studio and publishes, Studio's release history and the console's
+  Publishing row both show Off-standard with the module, the point and the reason, and the same step
+  then approves a budget within 30 seconds.
+- **`approvals-data-business.spec.ts`** creates an application from the built-in `approvals`
+  application and maps the `admin` slot of `organization` and `approvals` to a new role. An
+  administrator sets up employees, a department and request types in the running application. A
+  request never shows in its requester's own To decide list, a one-step request is approved by the
+  department head, and a two-step request is decided by a delegate on behalf of the approver, with
+  both decisions recorded.
+- **`approvals-module-business.spec.ts`** creates an application from the built-in `approvals`
+  application, adds a `costCenter` field to `approvals/Request` in the entity designer, and checks
+  that Studio saves it as the layer `customizations/approvals/Request.json`. A request type made in
+  the running application works, and a department head's own request is absent from their To decide
+  list. A step that sets `approved` right after `submit`, saved through the module resource save
+  route, fails the publish with `AXC0342` and a failed contract scenario, and the release history
+  keeps its one row.
+- **`asset-management-journey.spec.ts`** builds the asset management application with Studio only. It
+  opens the JSON view only to write the `AssetWithMaintenanceAndSoftware` scenario, because the
+  scenario editor cannot add a value to a child collection. Every migration that a save asks about is
+  answered, and the `migrations` folder must be empty at the end. It checks the built folder against
+  `samples/apps/asset-management` in parts as it goes, and at the end the whole folder must match with
+  no error diagnostic and Run tests must pass all six scenarios. It publishes release 1. On the
+  `asset-management` site the asset manager registers an asset with an attachment, software and a
+  maintenance entry, and imports `tests/e2e/fixtures/asset-management-import.csv` with a dry run that
+  shows no row error. The auditor exports the register to CSV, whose data rows must equal the
+  `totalCount` that the record API gives the auditor, and to Excel, whose file must have the `.xlsx`
+  name and start with the zip signature. The auditor has no New or Import button, and the employee
+  sees only the asset it holds and no Export, Import or New button.
+- **`approvals-application-journey.spec.ts`** creates `OfficeApprovals` from the built-in Approvals
+  application in the New application dialog, with no file edit and no error diagnostic, and publishes
+  release 1, the one active row. On the `office-approvals` site an employee opens My requests and is
+  refused All requests, by the menu and by a `403` from the page API.
 
-`tests/e2e/specs/asset-management-journey.spec.ts` builds the `AssetManagement` application on the journey tenant with Studio only, and opens the JSON view only to write the maintenance scenario, because the scenario editor cannot add a child-collection value. It creates the application's `Asia/Ho_Chi_Minh` time zone, its `en` and `vi` texts, the three roles, the `AssetNumber` sequence, the `Category`, `Location`, `Vendor` and `Software` entities, the `Attachment` and `MaintenanceEntry` child entities, the `Asset` entity with its enum status and currency fields, and the `Categories` and `Locations` seeds. Every migration that a save asks is answered, and the built `migrations` folder must be empty at the end, because the sample has none. It then builds the `AssetValueByLocation`, `AssetsByStatus` and `WarrantiesEndingSoon` data sources in the generic data source form, with the filter and the empty `groupBy` of the warranties count written as the service desk journey writes them. It lays out the `AssetEdit` form on the form's Design tab: it adds the five sections with Add section, names them in the Name box and fills them from the field palette. It builds the `AssetForm`, `AssetDetail`, `Assets` and `Dashboard` pages in the page editor, with the required `asset` parameter and the Open, View and New actions of `Assets`. It finishes the site that the blank application already has, with the `vi` locale and two navigation entries, and deletes the starter `Home` page. It then lays out `AssetDetail` and `Dashboard` on the page's Design tab by dropping data from the data panel. The `Dashboard` gets a columns widget of 4 and 8 with the warranties `kpi` and the status `chart`, and the value by location table below it, and after a reload its Design tab must show the three widgets. The built folder must then match `samples/apps/asset-management` in its `application.json`, `roles`, `sequences`, `entities`, `seeds` and `texts` parts, and the Studio diagnostics must show no error for those files. The nine files of the three data sources, the form, the four pages and the site must match the sample too. It then opens the policy matrix and builds `AssetManagerAccess`, `EmployeeAccess` and `AuditorAccess` cell by cell, with `export` and `import` for `asset-manager`, `export` for `auditor`, neither for `employee`, and the employee's `holder == currentUser()` filter on `Asset`. It checks that the `Asset` row shows `export` for `auditor` and `asset-manager`, `import` only for `asset-manager`, and neither for `employee`. It writes the five asset scenarios in the scenario editor, where a money value is a number box that stores a number, and the sixth, `AssetWithMaintenanceAndSoftware`, through the JSON view. Each save must report no error diagnostic for its file. The three policy files and the six scenario files must match the sample too. The journey then builds the `AssetsWithWarrantyEndingSoon` data source in the same form, and the `WarrantyReminder` process in the process editor: a process on `Asset` whose one `notify` step goes in-app to the `asset-manager` role and opens `AssetDetail` with its `asset` parameter set to `id`. It builds the `WarrantyReminderWeekdays` schedule trigger over that data source. A new trigger starts with an empty `event`, and Studio removes that key only when the author picks an event and clears it, so the journey creates a temporary `Placeholder` event first and deletes it after the trigger is saved. The whole built folder must then match `samples/apps/asset-management` with no error diagnostic, and Run tests must pass all six scenarios. The author then publishes release 1, and the release history must show that one row, active. On the `asset-management` site of the journey tenant, the `asset-manager` user registers an asset with its holder `employee`. The asset has an invoice PDF on an attachment row, two software records from the lookup, and a maintenance entry with a date, a vendor and a cost. The Software and Vendor records are made through the record API first, because the sample has no page for them. The asset's detail page must show an `AS-` number, the label `In stock` and the cost with its currency, with the invoice link, both software names and the vendor. The `asset-manager` user then imports `tests/e2e/fixtures/asset-management-import.csv`, which names the category as its display value. The dry run must show no row error, and the register must list both imported assets. The `auditor` user exports the register to CSV and to Excel. The CSV's data rows must equal the `totalCount` that the record API gives the `auditor` user, and the Excel file must have the `.xlsx` name and start with the zip signature. The journey does not read the workbook's cells. The `auditor` user sees the dashboard and has no New or Import button. The `employee` user sees the asset it holds, none of the imported assets, and no Export, Import or New button.
-
-`tests/e2e/specs/approvals-application-journey.spec.ts` creates `OfficeApprovals` on the journey tenant from the built-in Approvals application in the New application dialog, with no file edit, and its diagnostics show no error. It publishes release 1, and the release history must show that one row, active. On the `office-approvals` site, an employee opens My requests and is refused All requests, by the menu and by a `403` from the page API.
-
-The E2E run also starts the purchasing system stub from the build output, and
-fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
-output goes to `artifacts/logs/e2e-purchasing.log`.
-
-The E2E server and worker run in the `Development` environment, because only
-Development lets a connector call an `http` URL. Their `PurchasingSystemUrl`,
-`PurchasingSystemTokenUrl`, `PurchasingSystemClientId` and
-`PurchasingSystemClientSecret` bindings point at the stub and hold its default
-credentials, so an approved purchase request signs in and creates its purchase
-order there. The E2E server, worker and publisher also hold the
-`PurchaseRequestApprovedWebhookUrl` and `PurchaseRequestApprovedWebhookSecret`
-bindings, which point at the stub, where the sample's approval webhook delivers.
+A new trigger starts with an empty `event`, see [new resource](reference/studio.md#new-resource). So a
+journey that builds a trigger and must match a sample with no event creates
+a temporary event first, and deletes it once the triggers are saved.
 
 ### Purchasing system stub
 
-`tests/Axis.PurchasingStub` stands in for the external purchasing system that
-the purchase request sample's connector calls. It is a test fixture, not
-platform code, and references nothing under `src/`. The E2E run,
-`scripts/dev.sh` and Docker Compose start it. Its orders and webhook deliveries
+`tests/Axis.PurchasingStub` stands in for the external purchasing system that the purchase request
+sample's connector calls. It is a test fixture, not platform code, and references nothing under
+`src/`. The E2E run, `scripts/dev.sh` and Docker Compose start it. Its orders and webhook deliveries
 live in memory only.
 
-- `POST /oauth/token` is the token route of the OAuth2 client credentials
-  grant. It reads the form field `grant_type` and the client from the
-  `Authorization: Basic` header, as the worker sends them. Any other grant
-  type is a `400` with `unsupported_grant_type`. A missing or wrong client is a
-  `401` with `invalid_client`. Otherwise it answers `200` with `access_token`,
-  `token_type` `Bearer` and `expires_in`, and `Cache-Control: no-store`. The
-  stub knows one client, `axis-purchasing` with the secret
-  `axis-development-purchasing-secret`. The settings `Purchasing:ClientId` and
-  `Purchasing:ClientSecret` change them, but every development and test setting
-  uses these defaults. A token lives 120 seconds, and the setting
-  `Purchasing:TokenLifetime`, in seconds, changes that.
-- `POST /purchase-orders` and `GET /purchase-orders/by-key/{idempotencyKey}`
-  need an `Authorization: Bearer` header with a token the stub issued and that
-  has not expired. Without one the stub answers `401` with
-  `WWW-Authenticate: Bearer error="invalid_token"` and stores nothing. The
-  order list, the webhook routes, `/health` and the `/test/*` switches need no
-  token.
-- `POST /purchase-orders` with an `Idempotency-Key` header and a body with
-  `requestNumber`, `supplierCode`, `amount` and `lines` creates an order. Each
-  line has a `description`, a `quantity`, a `unitPrice` and an `amount`. It
-  answers `201` with an `orderNumber` such as `PO-2026-0001`. A repeat with the
-  same key answers `200` with the same order and stores nothing new. A create
-  without the key, `requestNumber`, `amount` or `lines`, with an empty `lines`,
-  or with a line that lacks a field is a `400`.
-- `GET /purchase-orders/by-key/{idempotencyKey}` answers `200` with the
-  `orderNumber`, or `404` when the key is unknown.
-- `GET /purchase-orders` lists every stored order in creation order. Each
-  order shows its `lines` in the order sent and the `clientId` of the token
-  that created it, so a test can tell that the order came after a token request
-  with the sample's credentials.
+**Tokens.** `POST /oauth/token` is the token route of the OAuth2 client credentials grant. It reads
+the form field `grant_type`, and the client from the `Authorization: Basic` header, as the worker
+sends them.
+
+- Any other grant type is a `400` with `unsupported_grant_type`, and a missing or wrong client is a
+  `401` with `invalid_client`. Otherwise it answers `200` with `access_token`, `token_type` `Bearer`
+  and `expires_in`, and `Cache-Control: no-store`.
+- The stub knows one client, `axis-purchasing` with the secret `axis-development-purchasing-secret`.
+  The settings `Purchasing:ClientId` and `Purchasing:ClientSecret` change them, but every development
+  and test setting uses these defaults.
+- A token lives 120 seconds, and the setting `Purchasing:TokenLifetime`, in seconds, changes that.
+- `POST /purchase-orders` and `GET /purchase-orders/by-key/{idempotencyKey}` need an
+  `Authorization: Bearer` header with a token the stub issued that has not expired. Without one the
+  stub answers `401` with `WWW-Authenticate: Bearer error="invalid_token"` and stores nothing. The
+  order list, the webhook routes, `/health` and the `/test/*` switches need no token.
+
+**Orders.**
+
+- `POST /purchase-orders` with an `Idempotency-Key` header and a body with `requestNumber`,
+  `supplierCode`, `amount` and `lines` creates an order. Each line has a `description`, a
+  `quantity`, a `unitPrice` and an `amount`. It answers `201` with an `orderNumber` such as
+  `PO-2026-0001`. A repeat with the same key answers `200` with the same order and stores nothing new.
+  A create without the key, `requestNumber`, `amount` or `lines`, with an empty `lines`, or with a
+  line that lacks a field is a `400`.
+- `GET /purchase-orders/by-key/{idempotencyKey}` answers `200` with the `orderNumber`, or `404` when
+  the key is unknown.
+- `GET /purchase-orders` lists every stored order in creation order. Each order shows its `lines` in
+  the order sent and the `clientId` of the token that created it, so a test can tell that the order
+  came after a token request with the sample's credentials.
+
+**Webhooks.**
+
 - `POST /webhooks/purchase-request-approved` receives a
-  [webhook delivery](reference/outbound-webhooks.md#webhook-delivery) and
-  checks its Standard Webhooks signature. The headers `webhook-id`,
-  `webhook-timestamp` and `webhook-signature` are all required. A missing
-  header, a signature that matches no secret, or a timestamp more than 5 minutes
-  from the stub's clock is a `401` and stores nothing. The header may hold two
-  signatures separated by a space, and one matching signature is enough.
-- The body must be JSON with a string at `data.fields.number`. Otherwise the
-  route answers `400`. A valid delivery is stored once per `webhook-id` and
-  answers `204`. A repeat with the same `webhook-id` also answers `204` and
-  stores nothing new.
-- The stub checks the signature against the secret of the `Webhook:Secret`
-  setting. Its default is `whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA==`,
-  and a `whsec_` secret is the key after base64-decoding the rest.
-- `GET /webhooks/purchase-request-approved` lists the stored deliveries in
-  arrival order. Each shows its `webhookId`, its `type`, its `requestNumber`,
-  taken from `data.fields.number`, and its `receivedAt` time.
-- `POST /test/fail-webhook/{requestNumber}` makes every delivery for that
-  request number answer `500` and store nothing, while other request numbers
-  are unaffected. `POST /test/accept-webhook/{requestNumber}` turns that switch
-  off, so the deliveries for that request number are accepted again.
-- `POST /test/drop-next` drops the response of the next create.
-  `POST /test/drop/{idempotencyKey}` drops the response of the first create
-  with that key. A dropped create stores the order, then closes the connection
-  without answering. Each drop happens once, so the retry gets the stored order
-  back, as in the [lost response](reference/process-execution.md#lost-response) flow.
-  `drop-next` affects the whole stub, so specs that run in parallel should drop
-  by key or by request number.
-- `POST /test/drop-request/{requestNumber}` drops the response of the first
-  create for that `requestNumber`, such as `PR-2026-00042`. A spec knows the
-  request number as soon as it creates the request, but not the idempotency
-  key, which only the worker knows. Specs that run in parallel can use it,
-  since each request has its own number.
-- `POST /test/hold-request/{requestNumber}` holds back the response of the
-  first create for that `requestNumber`. The held create stores its order
-  first, then answers only when
-  `POST /test/release-request/{requestNumber}` is called or the caller hangs
-  up. Tests use it to stop or overtake a worker while its call is still
-  running.
-- `POST /test/unknown-request/{requestNumber}` makes the purchase order call
-  for that `requestNumber` end `unknown` and stay so. The first create stores
-  its order but answers `201` without an `orderNumber`, and every lookup for
-  the request answers `503`. A dropped response would not do, because the
-  connector declares `idempotency`, so the worker sends the call again under
-  the same key and it succeeds. Only a `2xx` body that does not fit the output
-  goes straight to reconciliation. An operator then
-  [resolves](reference/process-inspection.md#resolve) the call. The switch has no off
-  endpoint, since each spec uses its own request number.
-- Each drop and each hold happens once. Each test endpoint answers `204`.
-- `GET /health` answers `200`.
+  [webhook delivery](reference/outbound-webhooks.md#webhook-delivery) and checks its Standard
+  Webhooks signature. The headers `webhook-id`, `webhook-timestamp` and `webhook-signature` are all
+  required. A missing header, a signature that matches no secret, or a timestamp more than 5 minutes
+  from the stub's clock is a `401` and stores nothing. The header may hold two signatures separated
+  by a space, and one matching signature is enough.
+- The body must be JSON with a string at `data.fields.number`, or the route answers `400`. A valid
+  delivery is stored once per `webhook-id` and answers `204`. A repeat with the same `webhook-id` also
+  answers `204` and stores nothing new.
+- The stub checks the signature against the secret of the `Webhook:Secret` setting. Its default is
+  `whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA==`, and a `whsec_` secret is the key after
+  base64-decoding the rest.
+- `GET /webhooks/purchase-request-approved` lists the stored deliveries in arrival order. Each shows
+  its `webhookId`, its `type`, its `requestNumber`, taken from `data.fields.number`, and its
+  `receivedAt` time.
+
+**Test switches.** Each switch answers `204`, and each drop and each hold happens once.
+
+| Route                                          | Effect                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /test/fail-webhook/{requestNumber}`      | Every delivery for that request number answers `500` and stores nothing. Other request numbers are unaffected.                                                                                                                                                                                                                                                                              |
+| `POST /test/accept-webhook/{requestNumber}`    | Turns `fail-webhook` off, so the deliveries for that request number are accepted again.                                                                                                                                                                                                                                                                                                     |
+| `POST /test/drop-next`                         | Drops the response of the next create. It affects the whole stub, so specs that run in parallel drop by key or by request number.                                                                                                                                                                                                                                                          |
+| `POST /test/drop/{idempotencyKey}`             | Drops the response of the first create with that key.                                                                                                                                                                                                                                                                                                                                       |
+| `POST /test/drop-request/{requestNumber}`      | Drops the response of the first create for that `requestNumber`, such as `PR-2026-00042`. A spec knows the request number as soon as it creates the request, but not the idempotency key, which only the worker knows, so specs that run in parallel can use it.                                                                                                                           |
+| `POST /test/hold-request/{requestNumber}`      | Holds back the response of the first create for that `requestNumber`. The create stores its order first, then answers only when `POST /test/release-request/{requestNumber}` is called or the caller hangs up. Tests use it to stop or overtake a worker while its call is still running.                                                                                                  |
+| `POST /test/unknown-request/{requestNumber}`   | Makes the purchase order call for that `requestNumber` end `unknown` and stay so: the first create stores its order but answers `201` without an `orderNumber`, and every lookup for the request answers `503`. An operator then [resolves](reference/process-inspection.md#resolve) the call. The switch has no off route, since each spec uses its own request number. |
+
+A dropped create stores the order, then closes the connection without answering, so the retry gets
+the stored order back, as in the [lost response](reference/process-execution.md#lost-response) flow.
+A dropped response cannot make a call `unknown`, because the connector declares `idempotency`, so
+the worker sends the call again under the same key and it succeeds. Only a `2xx` body that does not
+fit the output goes straight to reconciliation, which is why `unknown-request` answers one.
+
+`GET /health` answers `200`.

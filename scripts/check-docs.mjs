@@ -9,7 +9,7 @@
 //   Agreed or Proposed.
 // - docs/decisions.md has one row per decision, numbered from 1 with no gaps, in order. The row of a
 //   decision file has the file's title and status. The row of a superseded decision has no file: it
-//   names the live decision that superseded it and links the last text of its file at a commit on
+//   names the live decisions that superseded it and links the last text of its file at a commit on
 //   GitHub.
 // - No '(planned for Mx)' marker under docs/ names a milestone that docs/roadmap.md calls Done.
 // - docs/reference/asvs.md, when it exists, has one row for each requirement of the committed ASVS list
@@ -52,7 +52,8 @@ const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
 const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
 const supersededRowPattern =
-  /^\| D(\d+) \| (.+?) \| Superseded by \[D(\d+)\]\(decisions\/([^)]+)\), \[last text\]\((https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/blob\/[0-9a-f]{40}\/docs\/decisions\/d(\d+)-[a-z0-9-]+\.md)\) \|$/
+  /^\| D(\d+) \| (.+?) \| Superseded by ((?:\[D\d+\]\(decisions\/[^)]+\)(?:, | and ))*\[D\d+\]\(decisions\/[^)]+\)), \[last text\]\((https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/blob\/[0-9a-f]{40}\/docs\/decisions\/d(\d+)-[a-z0-9-]+\.md)\) \|$/
+const successorPattern = /\[D(\d+)\]\(decisions\/([^)]+)\)/g
 const roadmapRowPattern = /^\| \*\*(M\d+)\*\* \| [^|]+\| ([^|]+?) \|/
 const plannedPattern = /planned for (M\d+(?:(?:, | and )M\d+)*)/g
 const asvsFile = 'docs/reference/asvs.md'
@@ -370,9 +371,8 @@ export function checkDocs(root, { baseLineCount } = {}) {
         line: i + 1,
         number: Number(superseded[1]),
         title: superseded[2],
-        by: Number(superseded[3]),
-        byName: superseded[4],
-        lastTextNumber: Number(superseded[6]),
+        by: [...superseded[3].matchAll(successorPattern)].map((match) => ({ number: Number(match[1]), name: match[2] })),
+        lastTextNumber: Number(superseded[5]),
       })
     }
   })
@@ -383,11 +383,13 @@ export function checkDocs(root, { baseLineCount } = {}) {
     if (row.by !== undefined) {
       if (decision) report(index, row.line, `D${row.number} is superseded, so delete ${relative(decision.file)}`)
       if (row.lastTextNumber !== row.number) report(index, row.line, `D${row.number}'s last text links the file of D${row.lastTextNumber}`)
-      const successor = decisions.get(row.by)
-      if (!successor || rowByNumber.get(row.by)?.by !== undefined) {
-        report(index, row.line, `D${row.number} is superseded by D${row.by}, which is not a decision in force`)
-      } else if (row.byName !== successor.name) {
-        report(index, row.line, `D${row.number} links ${row.byName} for D${row.by}, the file is ${successor.name}`)
+      for (const by of row.by) {
+        const successor = decisions.get(by.number)
+        if (!successor || rowByNumber.get(by.number)?.by !== undefined) {
+          report(index, row.line, `D${row.number} is superseded by D${by.number}, which is not a decision in force`)
+        } else if (by.name !== successor.name) {
+          report(index, row.line, `D${row.number} links ${by.name} for D${by.number}, the file is ${successor.name}`)
+        }
       }
       return
     }

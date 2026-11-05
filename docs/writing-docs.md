@@ -69,7 +69,8 @@ it change. It never holds progress, dates, names or issue numbers.
   fixed, but a change to the choice is a new decision.
 - **A new decision that changes an agreed one replaces it whole.** It restates the parts that still
   hold, so the old file is never half valid. In the same change the old file is deleted, its row in
-  the index says `Superseded by Dn` with a link to its last text in git, and every reference page and
+  the index names the decision, or decisions, that superseded it, as `Superseded by Dn`, with a link to
+  its last text in git, and every reference page and
   link follows the new decision. A number is never used again.
 
 ## Reference pages
@@ -168,8 +169,8 @@ each of them.
    sweep reads the sections that the milestone's pull requests changed, merges what is said twice,
    deletes what a later rule replaced, and checks that the decisions they link still hold only live
    choices. Its checklist is in [the life of a milestone](delivery.md#the-life-of-a-milestone).
-7. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A check is added
-   only once the whole tree passes it: there are no baselines and no lists of exceptions.
+7. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
+   added only once the whole tree passes it: there are no baselines and no lists of exceptions.
    - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in
      the repository.
    - [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that `docs/README.md` lists every
