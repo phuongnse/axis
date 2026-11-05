@@ -39,7 +39,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
 
   - Each section has a `name`, a `title` label and its `fields`, in the order shown. A
     [customization layer](customization-layers.md#list-keys) finds a section by its `name`.
-    Each entry names a `field` of the entity. `readOnly` is optional and
+    Each entry names a `field` of the entity, and a [customization layer](customization-layers.md#list-keys) finds it by that `field`. `readOnly` is optional and
     `false` by default.
   - **Fields in columns**. A field entry may have `width`, a whole
     number from 1 to 12, in twelfths of the section. It is 12 when left out.

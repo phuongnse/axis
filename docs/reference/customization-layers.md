@@ -5,17 +5,16 @@ resource of the module and holds only what the application changes in it. Compil
 layers to the pinned module version, then checks the result, the [module contract](module-contracts.md)
 included. [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees
 the idea, and [D122](../decisions/d122-how-a-customization-layer-is-written-and-applied.md) agrees
-the shapes below. The layer resource and the checks of [the layer resource](#the-layer-resource)
-and [applying a layer](#applying-a-layer) are built: compilation merges the `changes` of a layer
-into its module resource before any check, and the release stores the layer and the module's own
-files side by side, a layer places an element with `after` and `before`, and a diagnostic about a part
-that a layer changed is reported in the layer file. A layer on a `contract` adds states and transitions
-to its lifecycle, see [extending a lifecycle](#extending-a-lifecycle). A layer on a module entity adds
-fields and validations, see [module entities](#module-entities). A layer removes a whole resource,
-see [applying a layer](#applying-a-layer). The [authoring API](authoring.md#routes) reads a module resource
-with the layer applied, its marks and its removed elements, and saves a module resource as a layer, see
-[in Studio](#in-studio). The rest of Studio's support for layers and the sections below that are
-not about applying are _(planned for M25)_. Module upgrades, the three-way merge and eject are _(planned for M29)_.
+the shapes below. The layer resource, applying a layer, list keys, extending a lifecycle and Studio
+are built: compilation merges the `changes` of a layer into its module resource before any check, and
+the release stores the layer and the module's own files side by side, a layer places an element with
+`after` and `before`, and a diagnostic about a part that a layer changed is reported in the layer file.
+A layer on a `contract` adds states and transitions to its lifecycle, see
+[extending a lifecycle](#extending-a-lifecycle). A layer on a module entity adds fields and validations,
+see [module entities](#module-entities), but changing a field is _(planned for M26)_. A layer removes a
+whole resource, see [applying a layer](#applying-a-layer). The [authoring API](authoring.md#routes) reads
+a module resource with the layer applied, its marks and its removed elements, and saves a module resource
+as a layer, see [in Studio](#in-studio). Module upgrades, the three-way merge and eject are _(planned for M29)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -150,7 +149,6 @@ Compilation applies each layer to the resource of the pinned module version, bef
   resource that a layer removes, see _Removing a whole resource_ above.
 - **Keys and names.** Keys are matched ignoring letter case, and a changed element keeps the
   module's spelling of its key. The root `id`, `kind`, `name` and `formatVersion` are never merged.
-  A layer on a `scenario` is stored and not applied _(planned for M25)_.
 - **Checks of the layer itself.** A key in `changes` that the module's resource does not have, as a
   change, a remove or an anchor of `after` or `before`, is a diagnostic. So is a property that the
   kind does not have. A layer never matches by position. The checks are `AXC0364` for an unknown key
@@ -201,11 +199,11 @@ A layer on a module entity changes the application's copy of it, which is the ap
 table. Adding fields and adding validations are built: activation adds the column of an added field
 to the copy, and the record API reads and writes the field. Refusing a removed field that the module
 still reads is built, and an application [migration](migrations.md#migrations) drops the column of a removed field.
-Changing a field is _(planned for M25)_.
+Changing a field is _(planned for M26)_.
 
 - **Adding fields** adds columns to the copy. A new field is the application's, and the module's
   forms, pages and processes do not show it until a layer on them adds it.
-- **Changing a field** _(planned for M25)_. A layer may change a label, a default, `required`, a length, a range or an
+- **Changing a field** _(planned for M26)_. A layer may change a label, a default, `required`, a length, a range or an
   enum's `values`. A change of type, and a field removed, follow the
   [migration](migrations.md#migrations) rules of the application's own entities. The
   application's `migration` names the entity as `<module id>/<entity>`. Without it, activation is

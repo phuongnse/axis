@@ -94,7 +94,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`entity`.** The root entity. In M2 it cannot be a child entity
   (`AXC0064`).
 - **`fields`.** The projection, in order. Each entry has a `name`, which is
-  the key in a row, and a `path` to a value of the root entity.
+  the key in a row, and a `path` to a value of the root entity. A [customization layer](customization-layers.md#list-keys) finds a field by its `name`.
 - **`path`.** A field name of the root entity, or a dotted path through
   `reference` fields such as `department.name`, with at most 3 hops, as in
   [expressions.md](expressions.md#names-and-references). Each name matches
@@ -102,7 +102,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   `child-collection`. A `null` reference along the path gives `null` and the
   row is kept, because each hop is a left join.
 - **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a
-  `type` and `required`, which defaults to `false`. The types are the scalar
+  `type` and `required`, which defaults to `false`. A [customization layer](customization-layers.md#list-keys) finds a parameter by its `name`. The types are the scalar
   field types plus `enum` and `reference`. An `enum` needs `values`, and a
   `reference` needs `target`. An `enum` may also take `valueLabels`. They are
   checked by the same rules as entity fields, see
@@ -145,7 +145,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 
 - **`groupBy`.** A list of entries. An entry is a name from `fields`, or
   `{ "field": "<name>", "bucket": "day" }` with `day`, `week`, `month` or
-  `year` on a date or date-time field. A field appears once in the list, in
+  `year` on a date or date-time field. A [customization layer](customization-layers.md#list-keys) finds an object entry by its `field`. A field appears once in the list, in
   either form. An empty list gives one total row.
 - **Date buckets.** A bucketed group value in a row is the first date of the
   bucket, as a date such as `2026-11-01`. A week starts on Monday. A date is

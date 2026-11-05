@@ -58,7 +58,7 @@ A task step may add `escalations` and a `deadline`:
 - **Escalation.** Each has a `name`, `after` and at least one of `reassign` and
   `notify`, otherwise `AXC0280` at `/steps/{i}/escalations/{j}`. A missing `name`
   is `AXC0004`, and a later escalation with a name already used in the task,
-  ignoring letter case, is `AXC0359` at `/steps/{i}/escalations/{j}/name`. `reassign` has
+  ignoring letter case, is `AXC0359` at `/steps/{i}/escalations/{j}/name`. A [customization layer](customization-layers.md#list-keys) finds an escalation by its `name`. `reassign` has
   the shape and the checks of `assignee`, reported under `.../reassign`. `notify`
   has the shape and the checks of the
   [`notify` operation](notifications.md#notify-operation), without `next`,
