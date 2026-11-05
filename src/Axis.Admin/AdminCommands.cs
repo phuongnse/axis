@@ -101,6 +101,7 @@ internal static partial class AdminCommands
                tenant host move <host> --to <id>
                platform rekey
                cell operator invite <email>
+               cell operator client add <name>
                cell backup
                cell restore-check
                publisher
@@ -215,6 +216,7 @@ internal static partial class AdminCommands
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
+        new("cell operator client add", AuditMark.OnePerRun, CellOperatorClient.AddAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CertificateWriter, run.CancellationToken)),

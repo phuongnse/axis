@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Axis.Tenancy.Realms;
 
@@ -9,8 +10,8 @@ namespace Axis.Admin;
 /// Creates a cell's operator realm in Axis's identity provider through its admin API, or brings an existing one up to date, and invites
 /// a platform operator to it. The realm has the account rules of a tenant's realm, which <see cref="TenantRealm"/> sets: an authenticator
 /// code at every sign-in, the password policy, the lockout, the Axis login theme and the mail server. It has no brokered identity
-/// provider, so a provider that a run finds is removed, and it has no client, because the cell console's sign-in client comes later. It has
-/// one realm role, the operator role. The invited account gets the actions to set a password and an authenticator, and the role. Every
+/// provider, so a provider that a run finds is removed. It has one realm role, the operator role, and it has the machine clients that
+/// <see cref="EnsureMachineClientAsync"/> makes. The cell console's sign-in client comes later. The invited account gets the actions to set a password and an authenticator, and the role. Every
 /// call signs in as the admin client of the master realm. An error names the step and the status code, never a response body or a secret.
 /// </summary>
 internal sealed class OperatorRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -84,6 +85,53 @@ internal sealed class OperatorRealm(HttpClient http, IdentityProviderAdmin admin
             token, HttpMethod.Post, $"{path}/users/{Uri.EscapeDataString(userId)}/role-mappings/realm", new[] { representation }, cancellationToken);
         TenantRealm.EnsureSuccess(given, "give the operator role");
         return (userId, created);
+    }
+
+    /// <summary>
+    /// Creates a confidential client that signs in with the client credentials grant, or resets the settings of the one that has this client
+    /// id, and gives its service account the role. The realm and the role must exist. Returns the secret when this call made the client and
+    /// null when it updated one, because an update sends no secret and the identity provider keeps the current one.
+    /// </summary>
+    public async Task<string?> EnsureMachineClientAsync(string realm, string role, string clientId, CancellationToken cancellationToken)
+    {
+        var token = await _realm.AdminTokenAsync(cancellationToken);
+        var path = RealmPath(realm);
+
+        using var found = await _realm.SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
+        if (found.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException("The identity provider found no realm. Run cell operator invite first.");
+        }
+
+        TenantRealm.EnsureSuccess(found, "read the realm");
+        var representation = await ReadRoleAsync(token, path, role, cancellationToken)
+            ?? throw new InvalidOperationException("The identity provider found no operator role. Run cell operator invite first.");
+
+        string? secret = null;
+        var uuid = await _realm.ClientUuidAsync(token, path, clientId, cancellationToken);
+        if (uuid is null)
+        {
+            secret = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+            using var created = await _realm.SendAsync(token, HttpMethod.Post, $"{path}/clients", TenantRealm.ServiceClient(clientId, secret), cancellationToken);
+            TenantRealm.EnsureSuccess(created, "create the client");
+            uuid = await _realm.ClientUuidAsync(token, path, clientId, cancellationToken)
+                ?? throw new InvalidOperationException("The identity provider step 'find the created client' found no client.");
+        }
+        else
+        {
+            var settings = TenantRealm.ServiceClient(clientId, string.Empty);
+            settings.Remove("secret");
+            using var updated = await _realm.SendAsync(token, HttpMethod.Put, $"{path}/clients/{uuid}", settings, cancellationToken);
+            TenantRealm.EnsureSuccess(updated, "update the client");
+        }
+
+        using var userResponse = await _realm.SendAsync(token, HttpMethod.Get, $"{path}/clients/{uuid}/service-account-user", null, cancellationToken);
+        TenantRealm.EnsureSuccess(userResponse, "find the service account user");
+        var userId = (await userResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetString()!;
+        using var given = await _realm.SendAsync(
+            token, HttpMethod.Post, $"{path}/users/{Uri.EscapeDataString(userId)}/role-mappings/realm", new[] { representation }, cancellationToken);
+        TenantRealm.EnsureSuccess(given, "give the operator role");
+        return secret;
     }
 
     /// <summary>Whether the account has set a password.</summary>
