@@ -5,7 +5,8 @@ import { useText } from '../platform/texts'
 import { LabelTextsContext } from './labelTextsContext'
 import { LabelTexts } from './LabelTexts'
 import { MappingRows } from './MappingRows'
-import { Expression, NamePicker } from './ProcessFields'
+import { Expression } from './ExpressionField'
+import { NamePicker } from './ProcessFields'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>

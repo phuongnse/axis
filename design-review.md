@@ -295,6 +295,39 @@ owner is reviewing it one step at a time.
 - **For the issue:** the names route gains `labelKey`, so `docs/reference` for the route says so. A choice the picker is given
   as a plain name has no label and shows the name. Columns, parameters and operations have no label in their format.
 
+### Writing an expression, step 1
+
+- **Asked:** an author writes expressions in about twelve places, rules, computed fields, defaults, process conditions,
+  form conditions, policy filters, endpoint values and more, and needs the guide and the context to write one right.
+  The owner asked how other products do it. Salesforce's advanced formula editor has Insert Field, Insert Function and
+  Check Syntax; Power Fx shows a function's description and arguments as you type, with errors inline; Notion's editor
+  previews the result on the row it was opened from, with a list of fields and functions to click; Airtable completes
+  fields and functions with their parameters. An author needs to know what the place needs, what there is to use, and
+  whether what they wrote is right.
+- **Built, in `ExpressionEditor`, the one editor every place draws, so every place has it:**
+  - a line under the box says what the place needs, "Needs to give yes or no", until the expression gives a type, then
+    "Gives yes or no", in the words the designer names types by; `expressionExpectation` in `expressionScope.ts` says what
+    a place needs (a validation, a condition or a filter a boolean, a computed field or a default the field's type);
+  - an error reads first in words, its code after it, small;
+  - completion names each choice: a field by its label and type, a rule by its signature, a function by its signature,
+    with what it does and an example beside the list;
+  - inside a call, a line shows the function's signature with the parameter at the cursor in bold, and what it does;
+  - Expand, an icon beside the box, opens the expression in a large dialog with a panel of every field, rule and function
+    allowed there, in groups (Fields, Rules, Text, Numbers, Dates, Logic, Lists, User), searchable, where a click inserts
+    the name at the cursor;
+  - the box wraps long lines and grows with them; an empty expression is no longer sent to be checked.
+- **One list of functions:** `expressionFunctions.ts` holds each function's parameters, result, group and example, and its
+  words are `shell.studio.expression.fn.<name>`. It replaces the names `expressionScope` kept, and the scope offers only
+  those allowed at the place: no aggregate in a default, no `now()`, `today()` or `toDate()` in a computed field
+  (AXC0086), `currentUser()` only in a policy grant's or a data source's filter (AXC0095).
+- **One wrapper:** `ExpressionField.tsx` holds `Expression`, which the entity designer and the process editor each had a
+  copy of.
+- **For the issue:** the server answers the scope of a place, its fields with labels and types, the functions allowed with
+  their words, and the type it needs, from `ExpressionFunctions`, so the client keeps no list. The check takes the draft,
+  as a rule not yet saved is answered 400 today ("The path holds no expression"). Step 2 previews the result on a sample
+  record, as Notion does, through `ExpressionInterpreter`. A "Did you mean" for an unknown name. `ExpressionEditor`'s
+  tests change: the type reads in words, the code follows the message, and Tab stops at Expand before it leaves.
+
 ### Second mechanisms found by the audit of 2026-11-05
 
 Each is one concern with more than one way to do it. The issue merges each into the first one named, as the rule "One

@@ -2,7 +2,7 @@ import { Button, Flex, Input, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { expressionExpectation, expressionScope } from './expressionScope'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -118,6 +118,7 @@ export function MappingRows({
                         value={text}
                         required
                         options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
+                        expects={expressionExpectation(check.kind, check.draft, rowPointer)}
                         onChange={onChange}
                       />
                     </Suspense>

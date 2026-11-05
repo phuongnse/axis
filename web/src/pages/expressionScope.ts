@@ -1,42 +1,51 @@
+import {
+  aggregateFunctions,
+  expressionFunctions,
+  signatureOf,
+  timeFunctions,
+  type ExpressionFunction,
+} from './expressionFunctions'
 import type { StudioNames } from '../platform/studio'
 
-/** A name an expression can use. `cursorInside` puts the cursor between the brackets of a call. */
+/**
+ * A name an expression can use. `label` is what completion inserts, and `cursorInside` puts the cursor between the
+ * brackets of a call. Proposed: `detail` is its type, or a function's signature, `labelKey` the text key of a field's
+ * label, and `fn` the function, so completion, the signature line and the panel tell an author what each one is.
+ */
 export interface ScopeOption {
   label: string
   type: 'field' | 'parameter' | 'rule' | 'function'
   cursorInside: boolean
+  detail?: string
+  labelKey?: string | null
+  fn?: ExpressionFunction
 }
 
-const functionNames = [
-  'length',
-  'contains',
-  'startsWith',
-  'endsWith',
-  'concat',
-  'lower',
-  'upper',
-  'trim',
-  'abs',
-  'round',
-  'floor',
-  'ceiling',
-  'year',
-  'month',
-  'day',
-  'addDays',
-  'daysBetween',
-  'coalesce',
-  'if',
-  'date',
-  'dateTime',
-  'now',
-  'today',
-  'toDate',
-]
-
-const aggregateNames = ['count', 'sum', 'avg', 'min', 'max', 'any', 'all', 'first']
-
-const zeroArgumentFunctions = ['now', 'today', 'currentUser']
+/**
+ * Proposed: the type an expression must give at a JSON Pointer, when the place says: a validation, a condition or a
+ * filter gives a boolean, and a computed field or a default gives the field's type. Undefined where the place does not
+ * fix it here.
+ */
+export function expressionExpectation(
+  kind: string,
+  draft: Record<string, unknown>,
+  pointer: string,
+): string | undefined {
+  if (kind === 'entity') {
+    if (/^\/validations\/\d+\/expression$/.test(pointer)) {
+      return 'boolean'
+    }
+    const field = /^\/fields\/(\d+)\/(expression|default)$/.exec(pointer)
+    if (field !== null && Array.isArray(draft.fields)) {
+      return stringProperty(draft.fields[Number(field[1])], 'type')
+    }
+    return undefined
+  }
+  if (/(When|\/when|\/condition|\/filter|\/guard)$/.test(pointer)) {
+    return 'boolean'
+  }
+  return undefined
+}
 
 const fieldDefault = /^\/fields\/\d+\/default$/
 const grantFilter = /^\/grants\/\d+\/filter$/
@@ -62,14 +71,14 @@ export function expressionScope(
   if (payload !== undefined) {
     return [
       ...payload.map((name) => option(name, 'field', false)),
-      ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
+      ...names.rules.map((rule) => ruleOption(rule)),
       ...functions,
     ]
   }
   return [
     ...parameterOptions(kind, draft, pointer),
     ...fieldOptions(kind, draft, pointer, names),
-    ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
+    ...names.rules.map((rule) => ruleOption(rule)),
     ...functions,
   ]
 }
@@ -121,7 +130,13 @@ function fieldOptions(
     if (fieldDefault.test(pointer)) {
       return []
     }
-    return namesOf(draft.fields).map((name) => option(name, 'field', false))
+    return (Array.isArray(draft.fields) ? draft.fields : []).flatMap((field) => {
+      const name = stringProperty(field, 'name')
+      const label = isRecord(field) && isRecord(field.label) ? stringProperty(field.label, 'textKey') : undefined
+      return name === undefined
+        ? []
+        : [{ ...option(name, 'field', false), detail: stringProperty(field, 'type'), labelKey: label ?? null }]
+    })
   }
   const entity = (kind === 'process' ? itemEntity(draft, pointer, names) : undefined) ?? entityOf(kind, draft, pointer)
   const found = names.entities.find((item) => item.name.toLowerCase() === entity?.toLowerCase())
@@ -136,7 +151,11 @@ function fieldOptions(
     ...id,
     ...found.fields
       .filter((field) => listed === undefined || listed.has(field.name.toLowerCase()))
-      .map((field) => option(field.name, 'field', false)),
+      .map((field) => ({
+        ...option(field.name, 'field', false),
+        detail: field.type,
+        labelKey: field.labelKey ?? null,
+      })),
   ]
 }
 
@@ -198,14 +217,38 @@ function entityOf(kind: string, draft: Record<string, unknown>, pointer: string)
   return undefined
 }
 
+/**
+ * The functions an expression may call here, from the one list of functions. A default sees no child collections, so it
+ * is offered no aggregate; a computed field may not read the time (AXC0086); only a policy grant's filter and a data
+ * source's filter may call `currentUser()` (AXC0095).
+ */
 function functionOptions(kind: string, pointer: string): ScopeOption[] {
-  // A default sees no child collections, so an aggregate can never be valid in it.
-  const names =
-    kind === 'entity' && fieldDefault.test(pointer) ? [...functionNames] : [...functionNames, ...aggregateNames]
-  if ((kind === 'policy' && grantFilter.test(pointer)) || (kind === 'dataSource' && pointer === '/filter')) {
-    names.push('currentUser')
+  const isDefault = kind === 'entity' && fieldDefault.test(pointer)
+  const isComputed = kind === 'entity' && /^\/fields\/\d+\/expression$/.test(pointer)
+  const userAllowed =
+    (kind === 'policy' && grantFilter.test(pointer)) || (kind === 'dataSource' && pointer === '/filter')
+  return expressionFunctions
+    .filter((entry) => !(isDefault && aggregateFunctions.has(entry.name)))
+    .filter((entry) => !(isComputed && timeFunctions.has(entry.name)))
+    .filter((entry) => entry.name !== 'currentUser' || userAllowed)
+    .map((entry) => ({
+      ...option(`${entry.name}()`, 'function', entry.parameters.length > 0),
+      detail: signatureOf(entry),
+      fn: entry,
+    }))
+}
+
+function ruleOption(rule: {
+  name: string
+  parameters: { name: string; type: string }[]
+  resultType: string
+  labelKey?: string | null
+}): ScopeOption {
+  return {
+    ...option(`${rule.name}()`, 'rule', true),
+    detail: `${rule.name}(${rule.parameters.map((parameter) => `${parameter.name} ${parameter.type}`).join(', ')}) → ${rule.resultType}`,
+    labelKey: rule.labelKey ?? null,
   }
-  return names.map((name) => option(`${name}()`, 'function', !zeroArgumentFunctions.includes(name)))
 }
 
 function option(label: string, type: ScopeOption['type'], cursorInside: boolean): ScopeOption {

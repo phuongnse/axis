@@ -1,53 +1,10 @@
 import { Input } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
+import { useContext } from 'react'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
-import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
 import { ReferencePicker } from './ReferencePicker'
-import type { ChangeHandler } from './SchemaForm'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
-}
-
-/** The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. */
-export function Expression({
-  pointer,
-  name,
-  value,
-  required = true,
-  onChange,
-}: {
-  pointer: string
-  name: string
-  value: string
-  required?: boolean
-  onChange: ChangeHandler
-}) {
-  const check = useContext(ExpressionCheckContext)
-
-  return check ? (
-    <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
-      <LazyExpressionEditor
-        application={check.application}
-        resourceId={check.resourceId}
-        path={pointer}
-        name={name}
-        value={value}
-        required={required}
-        options={expressionScope(check.kind, check.draft, pointer, check.names)}
-        onChange={onChange}
-      />
-    </Suspense>
-  ) : (
-    <Input
-      aria-label={name}
-      value={value}
-      onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
-    />
-  )
 }
 
 /** A picker over the application's names of one kind, or a plain box while the names have not loaded. */

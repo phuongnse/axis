@@ -2,7 +2,7 @@ import { Button, Flex, Input, Radio, Typography } from 'antd'
 import { useContext } from 'react'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { Expression } from './ProcessFields'
+import { Expression } from './ExpressionField'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 

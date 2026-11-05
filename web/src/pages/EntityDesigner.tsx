@@ -15,7 +15,7 @@ import {
   DatePicker,
 } from 'antd'
 import dayjs from 'dayjs'
-import { Fragment, lazy, Suspense, useContext, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { Fragment, useContext, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField, AxisChoiceField, AxisField, AxisFieldGroup, AxisFieldRow } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -41,8 +41,7 @@ import {
   type ReferenceOption,
 } from '../platform/studioNames'
 import { useText } from '../platform/texts'
-import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { Expression } from './ExpressionField'
 import { SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
@@ -55,8 +54,6 @@ import { setOwn } from '../platform/ownProperty'
 import { Link, useSearchParams } from 'react-router'
 import { studioResourceAddress } from '../platform/studio'
 import { booleanText } from '../platform/formatValue'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
 
@@ -72,46 +69,6 @@ function text(value: unknown): string {
 function JsonOnly() {
   const t = useText()
   return <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
-}
-
-/** The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. */
-function Expression({
-  pointer,
-  name,
-  value,
-  required,
-  readOnly,
-  onChange,
-}: {
-  pointer: string
-  name: string
-  value: string
-  required: boolean
-  readOnly: boolean
-  onChange: ChangeHandler
-}) {
-  const check = useContext(ExpressionCheckContext)
-
-  return check && !readOnly ? (
-    <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
-      <LazyExpressionEditor
-        application={check.application}
-        resourceId={check.resourceId}
-        path={pointer}
-        name={name}
-        value={value}
-        required={required}
-        options={expressionScope(check.kind, check.draft, pointer, check.names)}
-        onChange={onChange}
-      />
-    </Suspense>
-  ) : (
-    <Input
-      aria-label={name}
-      value={value}
-      onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
-    />
-  )
 }
 
 /**

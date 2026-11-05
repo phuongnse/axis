@@ -6,7 +6,7 @@ import type { FieldMetadata } from '../platform/site'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { expressionExpectation, expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { moveSectionTo, removeField, removeSectionAt, removeStepAt } from './formPaletteSupport'
 import { LabelTextsContext } from './labelTextsContext'
@@ -406,6 +406,7 @@ function ConditionBox({
             value={value}
             required={false}
             options={expressionScope('form', draft, path, check.names)}
+            expects={expressionExpectation('form', draft, path)}
             onChange={onChange}
           />
         </Suspense>

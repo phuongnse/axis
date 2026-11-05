@@ -27,7 +27,7 @@ import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { expressionExpectation, expressionScope } from './expressionScope'
 import { AxisFieldHeading } from '../platform/AxisField'
 import { SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
@@ -1047,6 +1047,7 @@ function SchemaNode({
           value={text}
           required={required}
           options={expressionScope(check.kind, check.draft, pointer, check.names)}
+          expects={expressionExpectation(check.kind, check.draft, pointer)}
           onChange={onChange}
         />
       </Suspense>

@@ -29,7 +29,7 @@ import { LabelTexts } from './LabelTexts'
 import { ResourceDescription } from './ResourceDescription'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { expressionExpectation, expressionScope } from './expressionScope'
 import { LabelTextsContext } from './labelTextsContext'
 import { MappingRows } from './MappingRows'
 import { stepLabels, usePartLabel } from './pagePaletteSupport'
@@ -1465,6 +1465,7 @@ function ParameterExpressions({
             value={current}
             required={false}
             options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
+            expects={expressionExpectation(check.kind, check.draft, rowPointer)}
             onChange={onChange}
           />
         </Suspense>

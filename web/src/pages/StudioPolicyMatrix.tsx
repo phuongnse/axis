@@ -18,7 +18,7 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
-import { expressionScope } from './expressionScope'
+import { expressionExpectation, expressionScope } from './expressionScope'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
@@ -485,6 +485,7 @@ function OwnGrants({
                       value={filter}
                       required={false}
                       options={expressionScope('policy', draft, filterPath, names)}
+                      expects={expressionExpectation('policy', draft, filterPath)}
                       onChange={(path, next) => edit(path, next)}
                     />
                   </Suspense>
