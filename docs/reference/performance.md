@@ -151,24 +151,43 @@ _(planned for M31)_ The cell load test measures how many tenants a [cell](cells.
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md)
 agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
 
-- **Where it runs.** On demand, against a staging cell built like a production cell of the region:
+- **Where it runs.** _(Built.)_ On demand, against a staging cell built like a production cell of the region:
   managed Kubernetes, managed PostgreSQL with PgBouncer, the identity provider and object storage. It
-  does not run on a CI runner, because a runner is not a cell. `scripts/load-cell.sh` drives it, with
-  the address of the staging cell.
+  does not run on a CI runner, because a runner is not a cell, and NexKit does not run it. An operator runs
+  `scripts/load-cell.sh <cell address>`, where the address is that of the provisioning API. It runs k6 in Docker, from
+  the pinned image of the load test, on the operator's machine. The script needs these settings in the environment:
+  - the settings of `scripts/lib/load-cell-tenants.mjs`, listed in its header: the tenant domain, the identity
+    provider's address, the operator realm and client, the admin secret, the template and the administrator;
+  - `AXIS_LOAD_BACKLOG_COMMAND`, which gives the tenant `load-backlog` its 100,000 due work items. No platform
+    API creates due work items, so the operator supplies it. The command gets `AXIS_LOAD_BACKLOG_TENANT`,
+    `AXIS_LOAD_BACKLOG_URL` and `AXIS_LOAD_BACKLOG_ITEMS`;
+  - `AXIS_LOAD_METRICS_COMMAND` and `AXIS_LOAD_USAGE_COMMAND`, which write the worker metrics of the step and the
+    cell's peak usage to the file in `AXIS_LOAD_OUTPUT`. The chart sets no telemetry export, so only the operator
+    knows where the metrics and the provider's CPU, memory and connection peaks are. They also get
+    `AXIS_LOAD_STARTED` and `AXIS_LOAD_ENDED`, the ISO times of the k6 run. The usage file has the form of the usage
+    file below.
+
+  Without an address the script prints its usage and exits with code 2, as it does for a missing setting.
 - **Tenants.** It creates 1,000 tenants through the [provisioning API](tenant-lifecycle.md#provisioning-api),
   each with its realm and the application of the [load test](#load-test) at its typical size:
   - 50 busy tenants, each with 10 users that run the loop of the objectives;
-  - 1 tenant with a backlog of 100,000 due work items, made before the run starts;
+  - 1 tenant, `load-backlog`, with a backlog of 100,000 due work items, made before each run starts;
   - 949 idle tenants, each with one user who signs in once an hour and reads one page every
     10 minutes.
 
   _(Built.)_ `scripts/lib/load-cell-tenants.mjs` creates the busy and idle tenants through the provisioning API with
   one idempotency key each, polls each create job, adds the users and the machine callers of the busy tenants, and writes
-  the file that `AXIS_LOAD_TENANTS` names. The tenant with the backlog stays planned.
+  the file that `AXIS_LOAD_TENANTS` names. `load-backlog` gets the application but no users, because nobody signs in to
+  it, and the file names it as `backlog` with its `id` and `url`. `scripts/load-cell.sh` creates the tenants once, when
+  `artifacts/load-cell/k6/tenants.json` is missing, because provisioning 1,000 tenants takes hours and the identity
+  provider refuses users that exist. A rerun reuses them and first resumes the tenants listed in
+  `artifacts/load-cell/suspended.json`.
 - **Scenarios.** _(Built.)_ `tests/load/cell.js` holds the two k6 scenarios: the busy tenants run the loop of the
   objectives, and each idle tenant signs in once an hour and reads a page every 10 minutes. The scenarios read the
   tenants from the JSON file named by `AXIS_LOAD_TENANTS`. The file has a `busy` list, with each tenant's `url`,
-  `tokenUrl`, `caller` and 10 `users`, and an `idle` list, with each tenant's `url`, `tokenUrl` and one user. Each
+  `tokenUrl`, `caller` and 10 `users`, and an `idle` list, with each tenant's `url`, `tokenUrl` and one user.
+  `AXIS_LOAD_IDLE_TENANTS` sets the number of idle tenants the file must list, 949 when it is not set, so a
+  step below 1,000 tenants runs the same scenario with fewer idle tenants. Each
   sample is tagged `phase:warmup` or `phase:run`, and the thresholds read only `phase:run`. `scripts/load-cell.test.mjs`
   keeps the numbers of this section equal to the scenario.
 - **Pass.** _(Built.)_ The run passes when, over one hour after a warm-up of 10 minutes:
@@ -180,8 +199,21 @@ agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
   - `scripts/lib/load-cell-criteria.mjs` checks the k6 summary, the worker metrics and the usage file
     against these criteria, and names each criterion it misses. The usage file holds the peak fraction
     of each limit, for example `{ "cpu": 0.62, "memory": 0.55, "connections": 0.71 }`.
-- **Finding the number.** _(Built.)_ `findCap` in `scripts/lib/load-cell-criteria.mjs` does the
-  step-down: it runs at 1,000 tenants, then at each lower count by steps of 100, and returns the first
-  count that passes. It finds no cap when even 100 fails. The highest passing number is the cap, set as
-  `Cell:TenantCap`. The run keeps its k6
-  summary and worker metrics in `artifacts/load-results`, as the load test does.
+- **Finding the number.** _(Built.)_ `scripts/load-cell.sh` does the step-down with `findCap` in
+  `scripts/lib/load-cell-criteria.mjs`: it runs at 1,000 tenants, then at each lower count by steps of 100, and
+  stops at the first count that passes. It finds no cap when even 100 fails. The highest passing number is the cap,
+  set as `Cell:TenantCap`. Each step:
+  1. At a count below 1,000, suspends the idle tenants with the highest numbers through the provisioning API's
+     `suspend` route and lists them in `suspended.json`, so the cell serves only that count. It does not delete them,
+     because a deletion has a grace window and cannot be undone, and it does not leave them active, which would
+     measure 1,000 tenants at every step. A suspended tenant still keeps its database and realm, so the cap may be a
+     little higher than on a cell that holds only that many tenants.
+  2. Runs the backlog command, then k6 with `tests/load/cell.js` and `AXIS_LOAD_IDLE_TENANTS` set to the
+     number of idle tenants of the step, then the metrics and the usage commands.
+  3. Prints each pass criterion with its value, and keeps `summary.json`, `worker-metrics.json`, `usage.json` and
+     `result.txt` in `artifacts/load-results/cell-<count>/`.
+
+  A run prints `Cell:TenantCap=<count>` and exits 0 when a count passes. It prints that no count passed and exits 1
+  when none does. A step with no k6 summary, or with an operator command that fails, stops the run with exit code 1
+  and is not counted as a failed count, because a broken tool is not a measurement. A full run can last more than 12
+  hours: up to 10 steps of about 75 minutes each, and the first provisioning.
