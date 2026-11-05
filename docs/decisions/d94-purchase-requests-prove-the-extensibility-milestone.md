@@ -2,50 +2,36 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-10-25. The end-to-end journey of the
-extensibility milestone extends the purchase request sample. It needs no new
-sample. [D101](d101-the-extensibility-milestone-is-split-into-six.md) splits
-that milestone into M19 to M23, and each one ends with its own step of the
-journey. The module with a dependency, the OAuth2 connector and the webhook are
-built. The rest is planned, and each point below names the milestone that
-builds it. See [extensibility](../product-brief.md#extensibility) in the
-product brief.
+## Context
 
-- **Why this sample:** purchase requests already have a connector, an
-  extension package, line items and an approval process, which M19 to M23
-  extend.
-  The service desk ([D56](d56-a-service-desk-as-the-third-sample-application.md))
-  and asset management
-  ([D81](d81-asset-management-as-the-fourth-sample-application.md)) are built
-  through Studio only. The journey's packages are installed by the
-  operator and its modules are not edited in Studio
-  ([D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)),
-  so a Studio-only journey cannot hold them. A new sample would add a journey
-  that proves nothing more. This is the exception to
-  [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)'s
-  rule that each milestone extends a sample of a new shape: M19 to M23 extend
-  the platform's reach into code and operations, not into a new kind of
-  application.
-- **A module with a dependency** _(built)_: a new sample module,
-  `department-budgets`, under `samples/modules/`, depends on the
-  `departments` module that leave requests already use. It holds a budget
-  entity, a process, a page and a policy, and declares an `approver` role slot. Purchase requests declare it
-  and map the slot to their manager role.
-- **A custom widget** _(planned for M22)_: a new sample package under
-  `samples/packages/` provides a "budget usage" widget
-  ([D88](d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md)).
-  The author drags it from the palette onto a purchase request page in Studio.
-  This is the only Studio step of the journey.
-- **OAuth2 and a structured payload** _(built)_: the purchasing
-  system connector signs in with client credentials and sends the approved
-  order with its line items as a list
-  ([D91](d91-connector-oauth2-and-structured-payloads.md)). The
-  purchasing system stub checks the token and the list.
-- **A package out of process** _(planned for M21)_: the payment reference
-  package runs in the package host ([D90](d90-extension-packages-run-out-of-process.md)).
-- **A webhook** _(built)_: an approved request raises an event that
-  a webhook delivers, signed ([D92](d92-outbound-webhooks.md)). In the journey
-  the receiver first fails, so the delivery becomes a dead letter.
-- **The console** _(built)_: the platform operator finds that dead
-  letter in the console, redelivers it and sees it delivered
-  ([D93](d93-an-operator-web-console.md)).
+The extensibility milestones extend the platform's reach into code and operations: modules with a
+dependency, custom widgets, connectors with OAuth2, packages out of process, webhooks and the
+operator console. [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) asks
+each milestone to extend a sample of a new shape, but these milestones add no new kind of
+application. Their journey needs packages that the operator installs and modules that are not edited
+in Studio, see
+[D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md), so the
+samples that Studio builds, the service desk and asset management, cannot hold it.
+
+## Decision
+
+- **The extensibility milestones extend the purchase request sample,** which already has a
+  connector, an extension package, line items and an approval process. No new sample is added.
+- **One journey, a step for each milestone.** Each milestone that
+  [D101](d101-the-extensibility-milestone-is-split-into-six.md) splits out ends with its own step: a
+  module with a dependency, a packaged widget that the author drags onto a page in Studio, which is
+  the only Studio step, a connector with OAuth2 and a structured payload, a package out of process,
+  and a webhook whose dead letter the platform operator redelivers from the console.
+
+The journey is in the [product brief](../product-brief.md#extensibility), and the sample module in
+[modules and templates](../reference/modules-and-templates.md).
+
+## Consequences
+
+- This is the one exception to D46's rule of a new shape for each milestone.
+- The purchase request sample grows with every extensibility milestone, and its journey with it.
+
+## Alternatives
+
+- **A new sample for extensibility.** It would add a sample and a journey that prove nothing the
+  purchase request sample cannot.

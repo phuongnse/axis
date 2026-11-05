@@ -1,25 +1,13 @@
 # Notifications
 
-Detailed reference for the `notify` operation, in-app and email
-notifications, user profiles and the mail settings. The conventions of
-[architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
-are not built yet, and Dn refers to [decisions.md](../decisions.md).
-
-The [user profiles](#user-profiles) section, the compile checks of the notify
-operation and of placeholders, the run of the notify step and of a task
-escalation's `notify`, the storage of in-app notifications, the routes that
-list them and mark them read, their retention, the staging of emails in the
-outbox and their sending over SMTP are built, and so are the dead letter of a
-failed email and the bell in the site shell and on the platform site. The mail settings in the tenant
-directory are built, and so is the mail server in Docker Compose and
-`scripts/dev.sh`. The design
-follows
-[D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
-application time zone of
-[D75](../decisions/d75-the-application-time-zone.md). New compile problems are
-listed as new diagnostics.
+This page describes how a process tells people what happened: the `notify` operation and the
+placeholders of its texts, in-app notifications with their bell, emails, the user profiles that give
+the addresses and locales, and the mail settings.
 
 ## Notify operation
+
+A `notify` operation step sends one message to its recipients, in the application, by email or both.
+It is a step of the [process resource](processes.md), and it looks like this:
 
 ```json
 {
@@ -38,264 +26,256 @@ listed as new diagnostics.
 }
 ```
 
-- `to` is a non-empty list (`AXC0266` at `/steps/{i}/to`). Each recipient has
-  exactly one of (`AXC0267` at `/steps/{i}/to/{j}`):
+- **`to`** is a non-empty list (`AXC0266` at `/steps/{i}/to`). Each recipient has exactly one of these
+  (`AXC0267` at `/steps/{i}/to/{j}`):
   - `user`, an expression that gives a user id, as a task's `user` assignee;
-  - `role`, a declared role name, compared exactly (`AXC0268` at
-    `/steps/{i}/to/{j}/role` for an unknown one). A role whose file failed to
-    load is not reported again;
-  - `email`, an expression that gives an address. It is for the `email`
-    channel only.
-- `user` and `email` are `text` expressions with the scope of a `when`. A
+  - `role`, a declared role name, compared exactly (`AXC0268` at `/steps/{i}/to/{j}/role` for an
+    unknown one). A role whose file failed to load is not reported again;
+  - `email`, an expression that gives an address, for the `email` channel only.
+- **Recipient expressions.** `user` and `email` are `text` expressions with the scope of a `when`. A
   problem is reported with its expression code at `/steps/{i}/to/{j}/user` or
   `/steps/{i}/to/{j}/email`.
-- `channels` is a non-empty list of `inApp` and `email` (`AXC0269` at
-  `/steps/{i}/channels`). A channel named twice is a schema violation
-  (`AXC0004`).
-- A `role` recipient with the `email` channel is `AXC0270` at
-  `/steps/{i}/to/{j}/role`. Axis has no directory to expand a role into
-  addresses.
-- `message.subject` and `message.body` are text keys, checked as a label is at
-  `/steps/{i}/message/subject` and `/steps/{i}/message/body`. `values` maps
-  each placeholder name to an expression with the scope of a `when`. A problem
-  is reported at `/steps/{i}/message/values/{name}`. A value may have any type,
-  because it is formatted by its type, so only its syntax, names and rules are
-  checked.
-- `open` is optional. It names a page of the application and maps its page
-  parameters, as a navigate action does (`AXC0232` to `AXC0234`, at
-  `/steps/{i}/open`). The page is a `navigate page` edge in the reference
-  index. The in-app notification opens it.
-- The step stores the notification and stages its emails in its own
-  transaction, then goes to `next`. A step that rolls back sends nothing. Its
-  history output is `{ "next", "notificationId" }`.
-- A process without a subject may notify too. A task escalation's `notify`
-  has the same shape, without `next`.
-- Studio's operation panel edits the step without the JSON view. See the
+- **`channels`** is a non-empty list of `inApp` and `email` (`AXC0269` at `/steps/{i}/channels`). A
+  channel named twice is a schema violation (`AXC0004`).
+- **No role by email.** A `role` recipient with the `email` channel is `AXC0270` at
+  `/steps/{i}/to/{j}/role`, because Axis has no directory to expand a role into addresses.
+- **`message`.** `message.subject` and `message.body` are text keys, checked as a label is at
+  `/steps/{i}/message/subject` and `/steps/{i}/message/body`. `values` maps each placeholder name to an
+  expression with the scope of a `when`, and a problem is reported at
+  `/steps/{i}/message/values/{name}`. A value may have any type, because it is formatted by its type,
+  so only its syntax, names and rules are checked.
+- **`open`** is optional. It names a page of the application and maps its page parameters, as a
+  navigate action does (`AXC0232` to `AXC0234`, at `/steps/{i}/open`). The page is a `navigate page`
+  edge in the reference index, and the in-app notification opens it.
+- **The step's transaction.** The step stores the notification and stages its emails in its own
+  transaction, then goes to `next`, as [Running a step](process-execution.md#running-a-step) describes.
+  A step that rolls back sends nothing. Its history output is `{ "next", "notificationId" }`.
+- **Other places.** A process without a subject may notify too. A task escalation's `notify` has the
+  same shape, without `next`, see [task deadlines](task-deadlines.md#escalations-and-deadline).
+- **In Studio.** Studio's operation panel edits the step without the JSON view, see the
   [`notify` panel](process-designer.md).
 
 ## Placeholders
 
-A text value may hold named placeholders, such as
-`"Ticket {number} is resolved: {resolution}"`.
+A text value may hold named placeholders, such as `"Ticket {number} is resolved: {resolution}"`, which
+the notification fills from its `values`.
 
-- A name is ASCII letters and digits. `{{` and `}}` write a brace. A name and a
-  `values` key match exactly, letter case included.
-- Each placeholder of a message's texts needs a key in `values` (`AXC0271`),
-  and each key of `values` must appear in the subject or the body (`AXC0272`),
-  in every locale that has both texts. Each mismatch is reported at
-  `/steps/{i}/message`, naming the locale and the name.
-- A lone or invalid brace is `AXC0273` at `/steps/{i}/message`. A locale with
-  one is reported for that brace only.
-- A value whose expression reads a field marked `sensitive` is `AXC0282` at
-  `/steps/{i}/message/values/{key}`, naming the field. It covers a field of the
-  subject, a field reached through a path such as `assignee.salary`, one read
-  inside an aggregate and one passed to a rule. A notification never carries a
-  sensitive value. Only `values` is checked, not a page parameter or a
-  recipient expression. The check uses the release being compiled.
-- Values are formatted for the reader when the notification is read. A built-in
-  table gives the formats, because the backend runs with invariant
-  globalization and cannot load the data of a locale. A locale whose language
-  is `vi` uses `vi`, and every other locale uses `en`.
+- **Names.** A name is ASCII letters and digits. `{{` and `}}` write a brace. A name and a `values` key
+  match exactly, letter case included.
+- **Every name has a value.** Each placeholder of a message's texts needs a key in `values`
+  (`AXC0271`), and each key of `values` must appear in the subject or the body (`AXC0272`), in every
+  locale that has both texts. Each mismatch is reported at `/steps/{i}/message`, naming the locale and
+  the name.
+- **Braces.** A lone or invalid brace is `AXC0273` at `/steps/{i}/message`. A locale with one is
+  reported for that brace only.
+- **No sensitive values.** A value whose expression reads a field marked `sensitive` is `AXC0282` at
+  `/steps/{i}/message/values/{key}`, naming the field. It covers a field of the subject, a field reached
+  through a path such as `assignee.salary`, one read inside an aggregate and one passed to a rule, so a
+  notification never carries a sensitive value. Only `values` is checked, not a page parameter or a
+  recipient expression, and the check uses the release being compiled.
 
-  | Value type | `en` | `vi` |
-  | ---------- | ---- | ---- |
-  | `integer`, `decimal` | `1,234.5` | `1.234,5` |
-  | `date` | `Jan 1, 2027` | `01/01/2027` |
-  | `date-time` | `Jan 1, 2027, 1:00 AM` | `01/01/2027 01:00` |
+Values are formatted for the reader when the notification is read. A built-in table gives the formats,
+because the backend runs with invariant globalization and cannot load the data of a locale. A locale
+whose language is `vi` uses `vi`, and every other locale uses `en`.
 
-  Every digit of a number is kept, so formatting never rounds. A `date-time`
-  shows in the time zone of the release the notification was stored with, so
-  `2026-12-31T18:00:00Z` in an `Asia/Ho_Chi_Minh` application shows on
-  1 January 2027 at 01:00. A `date` shows as a local date with no shift. Text,
-  enum, boolean, id and reference values show as written. The locale is the
-  user's profile locale, even when the release has no texts in it. Without a
-  profile locale, it is the locale of the texts that were chosen.
+| Value type           | `en`                   | `vi`               |
+| -------------------- | ---------------------- | ------------------ |
+| `integer`, `decimal` | `1,234.5`              | `1.234,5`          |
+| `date`               | `Jan 1, 2027`          | `01/01/2027`       |
+| `date-time`          | `Jan 1, 2027, 1:00 AM` | `01/01/2027 01:00` |
+
+Every digit of a number is kept, so formatting never rounds. A `date-time` shows in the time zone of
+the release the notification was stored with, so `2026-12-31T18:00:00Z` in an `Asia/Ho_Chi_Minh`
+application shows on 1 January 2027 at 01:00. A `date` shows as a local date with no shift. Text, enum,
+boolean, id and reference values show as written. The locale is the user's profile locale, even when
+the release has no texts in it. Without a profile locale, it is the locale of the texts that were
+chosen.
 
 ## In-app notifications
 
-- **Storage.** `axis.notifications` holds one row per notification and
-  recipient: the application, the release, the recipient kind and recipient,
-  the text keys, the raw evaluated values with the type of each (`text`,
-  `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` or `reference`),
-  the declared name of the page to open with its raw parameters, and the time. All the rows of one step run
-  share the notification's id. A role recipient is one row for the role. A
-  `user` expression that gives `null` or blank text adds no row, and two
-  recipients of one kind and name add one row. The values are stored as an
-  event payload is, with dates as ISO text, and are formatted when the
-  notification is read, because a role row reaches users with different
-  locales. A notification stored before the types were kept has none, so its
-  numbers are still formatted and its text shows as written. A step with only the `email` channel stores no row.
-  A tenant notice, which the worker stores for the tenant's administrators, has no application and no release.
-  It uses platform text keys and the recipient kind `platformRole`, see
-  [D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md). Applications never list it. The
-  [routes](#in-app-notifications) show it to the administrators. The [bell of the platform site](#in-app-notifications) shows it.
-- **Who sees one.** A user sees the notifications addressed to their user id,
-  and those addressed to a role they hold that the active release declares,
-  checked when read, as a role task is.
-- **Read state.** `axis.notification_reads` holds one row per notification
-  and user who read it.
-- **Speed.** The list answers within 300 ms for a user with 1,000
-  notifications, to the user and to a role they hold, half of them read, and its
-  count reads through the notification index. This is the Reads objective of
-  [performance](performance.md#objectives). `TaskInboxPerformanceTests` fails
-  when the best of three calls takes 300 ms or more.
-- **Routes.**
-  - `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the
-    user's notifications, newest first. It answers `items`, `page`, `pageSize`,
-    `totalCount` and `unreadCount`. With `unread=true` the items and
-    `totalCount` are the unread ones only, and `unreadCount` always counts
-    every unread one. An item has `id`, `releaseId`, `subject`, `body`, `open`,
-    `read` and `createdAt`. `open` is `{ "page", "parameters" }` with the
-    stored raw parameters, or null when the notification opens no page. A
-    notification sent to the user and to a role the user holds is listed once.
-    A bad `page`, `pageSize` or `unread` (`true` or `false`) is a 400 that
-    lists every bad parameter.
-  - Texts come from the notification's release, in the user's profile locale
-    when that release has texts for it, otherwise its first locale in ordinal
-    order, as for [email](#email). Each `{name}` is filled with the stored value
-    formatted as [placeholders](#placeholders) says: a number, a date and a
-    date-time in the user's locale, a string as it is, a boolean as JSON writes
-    it and null as empty text. A text key the locale does not have shows as the
-    key.
-  - `POST /api/apps/{app}/notifications/{id}/read` marks one read, and
-    `POST /api/apps/{app}/notifications/read-all` marks every notification the
-    user sees now read. Both write read rows for the caller only, so another
-    recipient's unread count does not change. Both answer 204 with no body, and
-    so does marking a notification that is already read. A notification the
-    user does not see, or that does not exist, is a 404.
-  - Nobody deletes a notification. The routes need a session (401), and the
-    POSTs follow the CSRF rule.
-  - `GET /api/notifications?page=&pageSize=&unread=`,
-    `POST /api/notifications/{id}/read` and `POST /api/notifications/read-all`
-    list and mark read the [tenant notices](../decisions/d131-tenant-notices-live-in-axisnotifications.md).
-    They answer in the same shape as the application routes, with `releaseId`
-    and `open` always null. A user sees a notice for the `administrator` kind
-    only while they hold the role that `Users:AdministratorRole` names. Anyone
-    else gets an empty list with zero counts, a 404 when marking a notice read,
-    and read-all writes nothing for them. The texts are platform texts in the
-    user's profile locale, matched by the whole tag ignoring letter case, with
-    `en` as the fallback, so `vi-VN` shows `en`. Numbers are formatted in the
-    profile locale, and a `date-time` shows in UTC, because a notice has no
-    release time zone. The routes are served on the tenant's platform host only,
-    and need a session (401). The POSTs follow the CSRF rule.
-- **Kept for.** `Notifications:RetentionDays`, default 90, a whole number of at
-  least 1. The worker reads and checks it at start. It deletes the notifications
-  whose `created_at` is older than that by its own clock, with their
-  `axis.notification_reads` rows in one transaction, when the tenant becomes
-  ready and then every 24 hours.
-- **Site shell.** A bell in the header of an application site shows the
-  signed-in user's unread count for that application, and no count when
-  nothing is unread. `GET /api/sites/{path}`
-  gives the address of the notification routes as `notificationsPath`.
-  - The platform site shows the bell when `GET /api/me` answers `users: true`. It reads `/api/notifications`. A
-    notice has no page, so a row only marks it read. Anyone else, and a visitor who is not signed in, gets no bell.
-  - The bell is a button with the accessible name "Notifications, 2 unread", or
-    "Notifications" with no count. A polite live region announces a change of
-    the count.
-  - The bell opens a panel that lists the notifications newest first, 10 to a
-    page, each with its subject, body and time. Unread rows are marked. A Mark
-    all read button sits at the top.
-  - A row opens its page, if it has one, with its parameters and marks the
-    notification read. A row without a page only marks it read.
-  - The count reloads when the site loads, on every page navigation, when the
-    panel opens and after any mark read. There is no timer. A failure to read
-    the list hides the bell and never shows the sign-in prompt.
+An in-app notification is a message that a user reads in the application, under the bell of its site.
+It is stored once for each recipient, read by each user on their own, and deleted after a retention
+period.
+
+- **Storage.** `axis.notifications` holds one row per notification and recipient: the application, the
+  release, the recipient kind and recipient, the text keys, the raw evaluated values with the type of
+  each (`text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` or `reference`), the
+  declared name of the page to open with its raw parameters, and the time. All the rows of one step run
+  share the notification's id. A step with only the `email` channel stores no row.
+- **Recipients.** A role recipient is one row for the role. A `user` expression that gives `null` or
+  blank text adds no row, and two recipients of one kind and name add one row.
+- **Values.** The values are stored as an event payload is, with dates as ISO text, and are formatted
+  when the notification is read, because a role row reaches users with different locales. A
+  notification stored before the types were kept has none, so its numbers are still formatted and its
+  text shows as written.
+- **Who sees one.** A user sees the notifications addressed to their user id, and those addressed to a
+  role they hold that the active release declares, checked when read, as a role task is.
+- **Read state.** `axis.notification_reads` holds one row per notification and user who read it.
+- **Kept for.** The worker deletes the notifications whose `created_at` is older than
+  `Notifications:RetentionDays`, a [worker setting](process-execution.md#worker-settings) of 90 days
+  by default, by its own clock. It deletes their `axis.notification_reads` rows in the same
+  transaction, when the tenant becomes ready and then every 24 hours. Nobody else deletes a
+  notification.
+- **Speed.** The list answers within 300 ms for a user with 1,000 notifications, to the user and to a
+  role they hold, half of them read, and its count reads through the notification index. This is the
+  Reads objective of [performance](performance.md#objectives). `TaskInboxPerformanceTests` fails when
+  the best of three calls takes 300 ms or more.
+
+### Notification routes
+
+The routes list a user's notifications of one application and mark them read. They need a session
+(`401`), and the POSTs follow the CSRF rule.
+
+- **List.** `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the user's
+  notifications, newest first. It answers `items`, `page`, `pageSize`, `totalCount` and `unreadCount`.
+  With `unread=true` the items and `totalCount` are the unread ones only, and `unreadCount` always
+  counts every unread one. A notification sent to the user and to a role the user holds is listed once.
+  A bad `page`, `pageSize` or `unread` (`true` or `false`) is a `400` that lists every bad parameter.
+- **Item.** An item has `id`, `releaseId`, `subject`, `body`, `open`, `read` and `createdAt`. `open` is
+  `{ "page", "parameters" }` with the stored raw parameters, or null when the notification opens no
+  page.
+- **Texts.** Texts come from the notification's release, in the user's profile locale when that release
+  has texts for it, otherwise its first locale in ordinal order, as for [email](#email). Each `{name}`
+  is filled with the stored value formatted as [placeholders](#placeholders) says: a number, a date and
+  a date-time in the user's locale, a string as it is, a boolean as JSON writes it and null as empty
+  text. A text key the locale does not have shows as the key.
+- **Mark read.** `POST /api/apps/{app}/notifications/{id}/read` marks one read, and
+  `POST /api/apps/{app}/notifications/read-all` marks every notification the user sees now read. Both
+  write read rows for the caller only, so another recipient's unread count does not change. Both answer
+  `204` with no body, and so does marking a notification that is already read. A notification the user
+  does not see, or that does not exist, is a `404`.
+
+### Tenant notices
+
+A tenant notice is an in-app notification, in `axis.notifications`, that the worker stores for the
+tenant's administrators. It has no application and no release, uses platform text keys and the
+recipient kind `platformRole`, and no application lists it.
+
+- **Routes.** `GET /api/notifications?page=&pageSize=&unread=`, `POST /api/notifications/{id}/read`
+  and `POST /api/notifications/read-all` list tenant notices and mark them read. They answer in the
+  same shape as the [application routes](#notification-routes), with `releaseId` and `open` always
+  null. They are served on the tenant's platform host only, need a session (`401`), and the POSTs
+  follow the CSRF rule.
+- **Who sees one.** A user sees a notice for the `administrator` kind only while they hold the role
+  that `Users:AdministratorRole` names. Anyone else gets an empty list with zero counts and a `404`
+  when marking a notice read, and read-all writes nothing for them.
+- **Texts.** The texts are platform texts in the user's profile locale, matched by the whole tag
+  ignoring letter case, with `en` as the fallback, so `vi-VN` shows `en`. Numbers are formatted in the
+  profile locale, and a `date-time` shows in UTC, because a notice has no release time zone.
+
+### The bell
+
+A bell in the header shows the signed-in user's unread count and opens their notifications.
+
+- **Application sites.** On an application site the bell shows the unread count for that application,
+  and no count when nothing is unread. `GET /api/sites/{path}` gives the address of the notification
+  routes as `notificationsPath`.
+- **Platform site.** The platform site shows the bell when `GET /api/me` answers `users: true`, and it
+  reads the [tenant notices](#tenant-notices) from `/api/notifications`. Anyone else, and a visitor
+  who is not signed in, gets no bell.
+- **Name.** The bell is a button with the accessible name "Notifications, 2 unread", or "Notifications"
+  with no count. A polite live region announces a change of the count.
+- **Panel.** The bell opens a panel that lists the notifications newest first, 10 to a page, each with
+  its subject, body and time. Unread rows are marked, and a Mark all read button sits at the top.
+- **Rows.** A row opens its page, if it has one, with its parameters and marks the notification read.
+  A row without a page, such as a tenant notice, only marks it read.
+- **Reloads.** The count reloads when the site loads, on every page navigation, when the panel opens
+  and after any mark read. There is no timer. A failure to read the list hides the bell and never
+  shows the sign-in prompt.
 
 ## Email
 
-- **Outbox.** For each email recipient, the transaction of the step, or of a task
-  escalation with the `email` channel, renders the
-  subject and body from the pinned release's texts in the recipient's locale,
-  and stores them in `axis.email_outbox` with the address and a stable
-  `Message-ID`. It queues one `notification.email` work item per row. The
-  `Message-ID` is `<{row id}@{host}>`, with the tenant's first host, or
-  `<{row id}@axis.invalid>` when the tenant has no host. A step run stages at
-  most one email per address, ignoring letter case, with the locale of the
-  first recipient that gave it. The row also keeps the raw placeholder values
-  of the step run in `values`, so a test scenario can check them. The worker
-  runs the items, as Sending says. An escalation stages its emails in its own
-  transaction, so one that rolls back, such as one whose `notify` expression
-  fails, stages none. Its rows name the task step in `step`, and share the
-  `notificationId` of the escalation's history row. The sending, the failure
-  count and the dead letter are the same as for a `notify` step. A dead letter
-  names the task's process instance. A role recipient gets no email.
-- **Sending.** The worker sends each email as plain text over SMTP, outside any
-  transaction, with the stored subject, body and `Message-ID`. It uses the
-  [mail settings](#mail-settings) of the tenant. One transaction then marks the
-  row `sent` and deletes the item, and checks the claim. A row that is already
-  `sent` has its item deleted and nothing is sent. The SMTP client gives up
-  after half of the item's lease, so a send ends before another worker can
-  claim the item. With no `Email:Smtp:Host`, the item is made due again after
-  one lease and no failure is counted. A failed send is counted in
-  `axis.delivery_failures` with the exception type only, and the item is tried
-  again with the backoff of [dead letters](process-events.md#dead-letters).
-  After `Worker:DeliveryAttempts` failures, default 5, the item is deleted, the
-  row stays `pending` and an `open` dead letter of kind `notification.email` is
-  written. Nothing more is sent until an operator redelivers it, which queues
-  the same row again. In a cell the worker takes a slot of the tenant's
-  [emails a day](tenant-quotas.md#emails-a-day) just before the send. With no slot
-  left the row stays `pending` and the item is due at the next 00:00 UTC.
-- **At least once.** A crash after the send and before the mark sends again.
-  The same `Message-ID` lets a receiver drop the repeat.
-- **Locale.** The recipient's profile locale when the release has texts for
-  it, otherwise the first locale of the release in ordinal order.
-- **Body.** Plain text, with the page link as an absolute URL on the tenant's
-  first host when `open` is set. The link is on its own line after a blank line.
-  It is `https://{host}/{site}/{page}`, the address form of
-  the routing of [frontend.md](frontend.md), with the page name in lower
-  case and the page parameters as query values. The site is the first site
-  whose navigation lists the page, otherwise the application's first site. An
-  email has no link when the tenant has no host or the application has no
-  site. In a test scenario the tenant has no host, so its emails have no link.
-- **Logs.** A `user` recipient without a profile or an email gets no email.
-  The step logs it at Information level with the step and the user id,
-  never the address. An escalation logs it with the task and the escalation
-  index.
-- **Scenarios.** In a test scenario, `advanceTime` runs the `notification.email`
-  items with no mail host, so each stays queued and nothing is sent. Each
-  scenario user has a profile with the address `<user>@scenario.invalid`, so a
-  `user` recipient gets an email. An `expectNotification` step checks the
-  recipient, the channel and the values of a notification. It reads in-app
-  notifications from `axis.notifications` and emails from `axis.email_outbox`,
-  pending or not. See [test scenarios](test-scenarios.md).
+A `notify` step or a task escalation with the `email` channel stages one email for each address in its
+own transaction, and the worker sends it later over SMTP, at least once.
+
+- **Outbox.** For each email recipient, the step's transaction renders the subject and body from the
+  pinned release's texts in the recipient's locale, and stores them in `axis.email_outbox` with the
+  address and a stable `Message-ID`. It queues one `notification.email` work item per row. The
+  `Message-ID` is `<{row id}@{host}>`, with the tenant's first host, or `<{row id}@axis.invalid>` when
+  the tenant has no host. A step run stages at most one email per address, ignoring letter case, with
+  the locale of the first recipient that gave it. The row also keeps the raw placeholder values of the
+  step run in `values`, so a test scenario can check them. A role recipient gets no email.
+- **Escalations.** A task escalation stages its emails in its own transaction, so one that rolls back,
+  such as one whose `notify` expression fails, stages none. Its rows name the task step in `step`, and
+  share the `notificationId` of the escalation's history row. The sending, the failure count and the
+  dead letter are the same as for a `notify` step, and a dead letter names the task's process
+  instance.
+- **Sending.** The worker sends each email as plain text over SMTP, outside any transaction, with the
+  stored subject, body and `Message-ID`, using the [mail settings](#mail-settings) of the tenant. One
+  transaction then marks the row `sent`, deletes the item and checks the claim. A row that is already
+  `sent` has its item deleted and nothing is sent. The SMTP client gives up after half of the item's
+  lease, so a send ends before another worker can claim the item. With no `Email:Smtp:Host`, the item
+  is made due again after one lease and no failure is counted.
+- **Failures.** A failed send is counted in `axis.delivery_failures` with the exception type only, and
+  the item is tried again with the backoff of [dead letters](process-events.md#dead-letters). After
+  `Worker:DeliveryAttempts` failures the email becomes an `open` dead letter of kind
+  `notification.email`, the row stays `pending` and nothing more is sent until an operator redelivers
+  it, which queues the same row again.
+- **Quota.** In a cell the worker takes a slot of the tenant's
+  [emails a day](tenant-quotas.md#emails-a-day) just before the send. With no slot left the row stays
+  `pending` and the item is due at the next 00:00 UTC.
+- **At least once.** A crash after the send and before the mark sends again. The same `Message-ID`
+  lets a receiver drop the repeat.
+- **Locale.** The recipient's profile locale when the release has texts for it, otherwise the first
+  locale of the release in ordinal order.
+- **Body.** Plain text, with the page link as an absolute URL on the tenant's first host when `open`
+  is set. The link is on its own line after a blank line. It is `https://{host}/{site}/{page}`, the
+  address form of the routing of [frontend.md](frontend.md), with the page name in lower case and the
+  page parameters as query values. The site is the first site whose navigation lists the page,
+  otherwise the application's first site. An email has no link when the tenant has no host or the
+  application has no site, so in a test scenario, where the tenant has no host, emails have no link.
+- **Logs.** A `user` recipient without a profile or an email gets no email. The step logs it at
+  Information level with the step and the user id, never the address. An escalation logs it with the
+  task and the escalation index.
+- **Scenarios.** In a test scenario, `advanceTime` runs the `notification.email` items with no mail
+  host, so each stays queued and nothing is sent. Each scenario user has a profile with the address
+  `<user>@scenario.invalid`, so a `user` recipient gets an email. An `expectNotification` step checks
+  the recipient, the channel and the values of a notification. It reads in-app notifications from
+  `axis.notifications` and emails from `axis.email_outbox`, pending or not. See
+  [test scenarios](test-scenarios.md).
 
 ## User profiles
 
-Each sign-in writes the user's profile to `axis.user_profiles` in the tenant
-database: the user id, the display name, the email, the locale, the first
-sign-in and the last sign-in. A later sign-in updates it.
+A user profile gives Axis a user's display name, email address and locale, which notifications and a
+few pickers need. Each sign-in writes the user's profile to `axis.user_profiles` in the tenant
+database: the user id, the display name, the email, the locale, the first sign-in and the last
+sign-in. A later sign-in updates it.
 
-- The email and locale come from the claims the tenant names in
-  `Oidc:Claims:Email` and `Oidc:Claims:Locale`, by default `email` and
-  `locale`. A missing claim leaves the value null. Sign-in asks the identity
-  provider for the `email` scope, so providers other than Keycloak put the
-  email in the ID token.
-- A failure to write the profile does not refuse the sign-in. The server logs a
-  warning that does not include the email.
-- The profiles are not a directory. They serve email addresses, locales, the
-  user picker of a [reassign](task-deadlines.md#reassign), the search route of a
-  [`userId` field](resource-files.md#entity-field-types-and-constraints) and the
-  actor names of the history views, and no other route lists them.
+- **Claims.** The email and locale come from the claims the tenant names in `Oidc:Claims:Email` and
+  `Oidc:Claims:Locale`, by default `email` and `locale`. A missing claim leaves the value null. Sign-in
+  asks the identity provider for the `email` scope, so providers other than Keycloak put the email in
+  the ID token.
+- **Failures.** A failure to write the profile does not refuse the sign-in. The server logs a warning
+  that does not include the email.
+- **Not a directory.** The profiles serve email addresses, locales, the user picker of a
+  [reassign](task-deadlines.md#reassign), the search route of a
+  [`userId` field](resource-files.md#entity-field-types-and-constraints) and the actor names of the
+  history views, and no other route lists them.
 
 ## Mail settings
 
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| `Email:Smtp:Host` | none | The SMTP server. Without it, no email is sent, the items stay queued and the worker logs a warning once per tenant. |
-| `Email:Smtp:Port` | `587` | The SMTP port. A value that is not a whole number from 1 to 65535 stops the worker at start. |
-| `Email:Smtp:UseTls` | `true` | Use STARTTLS, or TLS on port 465. A value other than `true` or `false` stops the worker at start. Only a worker that runs in Development sends email with it `false`. Elsewhere the worker sends nothing for that tenant, the items stay queued, no failure is counted, and the worker logs a warning once per tenant that names the setting. `tenant email set --tls false` is refused too, see [tenant setting commands](tenant-setting-commands.md#mail-settings). |
-| `Email:Smtp:UserName` | none | The SMTP user. |
-| `Email:Smtp:Password` | none | The SMTP password, from the environment. |
-| `Email:From` | none | The sender address. Required when a host is set. |
-| `Notifications:RetentionDays` | `90` | How long in-app notifications are kept. A value that is not a whole number of at least 1 stops the worker at start. |
+The mail settings tell the worker which SMTP server sends a tenant's emails and as whom. The host's
+settings apply to every tenant that does not override them.
 
-A tenant may override `Email` in its `Tenants` block. The block replaces the
-host's settings as a whole, and keys are never merged one by one, so a tenant
-that sets only its own host never sends the host's user name and password to
-that server. A host with no `From` is refused at start, naming the setting.
-Under `Tenancy:Source=directory` a tenant overrides `Email` in the tenant
-directory, where the password is encrypted as the OIDC client secret is. The
-[`tenant email set`](tenant-setting-commands.md#mail-settings) command sets it,
-and a tenant without it uses the host's settings. MailKit sends the email. The integration tests run Mailpit as the mail server.
-Docker Compose and `scripts/dev.sh` run Mailpit too, see
-[development](../development.md).
+| Setting               | Default | Meaning                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Email:Smtp:Host`     | none    | The SMTP server. Without it, no email is sent, the items stay queued and the worker logs a warning once per tenant.                                                                                                                                                                                                                                                                         |
+| `Email:Smtp:Port`     | `587`   | The SMTP port. A value that is not a whole number from 1 to 65535 stops the worker at start.                                                                                                                                                                                                                                                                                                 |
+| `Email:Smtp:UseTls`   | `true`  | Use STARTTLS, or TLS on port 465. A value other than `true` or `false` stops the worker at start. Only a worker that runs in Development sends email with it `false`. Elsewhere the worker sends nothing for that tenant, the items stay queued, no failure is counted, and the worker logs a warning once per tenant that names the setting. `tenant email set --tls false` is refused too, see [tenant setting commands](tenant-setting-commands.md#mail-settings). |
+| `Email:Smtp:UserName` | none    | The SMTP user.                                                                                                                                                                                                                                                                                                                                                                                |
+| `Email:Smtp:Password` | none    | The SMTP password, from the environment.                                                                                                                                                                                                                                                                                                                                                      |
+| `Email:From`          | none    | The sender address. Required when a host is set.                                                                                                                                                                                                                                                                                                                                              |
+
+How long in-app notifications are kept is the `Notifications:RetentionDays`
+[worker setting](process-execution.md#worker-settings).
+
+A tenant may override `Email` in its `Tenants` block. The block replaces the host's settings as a
+whole, and keys are never merged one by one, so a tenant that sets only its own host never sends the
+host's user name and password to that server. A host with no `From` is refused at start, naming the
+setting. Under `Tenancy:Source=directory` a tenant overrides `Email` in the tenant directory, where the
+password is encrypted as the OIDC client secret is. The
+[`tenant email set`](tenant-setting-commands.md#mail-settings) command sets it, and a tenant without it
+uses the host's settings.
+
+MailKit sends the email. The integration tests run Mailpit as the mail server, and so do Docker
+Compose and `scripts/dev.sh`, see [development](../development.md).

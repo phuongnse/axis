@@ -1,17 +1,16 @@
 # Child collections in storage
 
-How a `child-collection` field and a computed field are stored, moved out of [storage.md](storage.md), which holds
-the physical names, the column types, the database roles and the schema planning. The conventions of
-[architecture.md](../architecture.md) apply: Dn refers to [decisions.md](../decisions.md).
+This page says how a `child-collection` field and a computed field are stored. The physical names,
+the column types, the database roles and the schema planning are in [storage](storage.md).
 
 ## Child tables and computed columns
 
-Child tables and computed columns are built (D17). The planning rules of
-child tables are in [Schema planning](storage.md#schema-planning).
+A child entity has a table of its own whose rows belong to one owner record, and a computed field
+is an ordinary column that Axis writes. How activation creates and checks child tables is in
+[schema planning](storage.md#schema-planning).
 
-- **Child table.** The entity that a `child-collection` field names has a
-  table with the usual names. Besides `id` (`uuid`) and its field columns, it
-  has two system columns:
+- **Child table.** The entity that a `child-collection` field names has a table with the usual
+  names. Besides `id` (`uuid`) and its field columns, it has two system columns:
 
   | Column     | Type               | Meaning                                                                                                                              |
   | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -20,14 +19,11 @@ child tables are in [Schema planning](storage.md#schema-planning).
 
   Rows are deleted with their owner.
 
-- **No version.** A child table has no `version` column. Its rows live under
-  the owner's version, and a write to the rows increments the owner's
-  `version`.
-- **Computed column.** A computed field is an ordinary
-  column of its type. It is never `NOT NULL`, because a computed field cannot
-  be `required`. It is written in the same transaction as the record, and for
-  a child row before the owner's computed fields.
-- **Existing rows.** A computed field added to a table that has rows is
-  filled at activation through
-  [Recomputing computed fields](migrations.md#recomputing-computed-fields). A row whose
+- **No version.** A child table has no `version` column. Its rows live under the owner's version,
+  so a write to the rows increments the owner's `version`.
+- **Computed column.** A computed field is an ordinary column of its type. It is never `NOT NULL`,
+  because a computed field cannot be `required`. It is written in the same transaction as the
+  record, and for a child row before the owner's computed fields.
+- **Existing rows.** A computed field added to a table that has rows is filled at activation, as
+  [recomputing computed fields](migrations.md#recomputing-computed-fields) says. A row whose
   expression fails gets `NULL` and an error row, and activation goes on.

@@ -1,27 +1,15 @@
 # Process flow
 
-Detailed reference for the steps that make a process wait, call another
-process or loop, for the `createRecord` operation, and for processes without a
-subject. The process resource and the first four step types are in
-[processes.md](processes.md). The conventions of
-[architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
-are not built yet, and Dn refers to [decisions.md](../decisions.md).
-
-Everything in this file is built: the [Timer step](#timer-step), [Loops](#loops),
-the [sub-process step](#sub-process-step), the
-[create record operation](#create-record-operation), the
-[wait for event step](#wait-for-event-step) with its _Which occurrence_, _When the
-step runs_, _Waking_, _One use_ and _Timeout_ parts, and
-[processes without a subject](#processes-without-a-subject). The design follows
-[D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
-and
-[D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
-Each compile problem of this file is a diagnostic with its own code in the
-[diagnostic code table](diagnostic-codes.md).
+Most processes run straight from step to step. This page covers the steps that make a process wait
+for a time, wait for an event or run another process, the loops that such waiting steps allow, the
+`createRecord` operation, and processes that run without a subject record. The process resource and
+its other steps are in [processes](processes.md), and each compile problem on this page is a
+diagnostic with its own code in the [diagnostic code table](diagnostic-codes.md).
 
 ## Timer step
 
-A `timer` step waits for a time, then goes on to `next`:
+A `timer` step waits for a time, then goes on to `next`. The time is either a fixed length after the
+step runs or a moment that an expression gives:
 
 ```json
 { "name": "coolDown", "type": "timer", "wait": "PT4H", "next": "remind" }
@@ -35,8 +23,9 @@ A `timer` step waits for a time, then goes on to `next`:
 - `wait` is a positive fixed-length duration, by the rule of a task's `dueIn`
   (`AXC0084`, reported at `/steps/{i}/wait`). The time is the step's
   transaction time plus `wait`.
-- `until` is an expression that gives a `date-time`, with the scope of a
-  `when`. A time in the past is due at once. A `null` fails the step.
+- `until` is an expression that gives a `date-time`, with the scope of a `when`. A problem in it is
+  reported at `/steps/{i}/until` with its expression code, such as `AXC0048` for text. A time in the
+  past is due at once, and a `null` fails the step.
 - The step's transaction sets the instance `waiting` and queues a
   `process.timer` work item due at the time. The item stores the revision the
   step left in its `revision` column. Its history output is
@@ -47,17 +36,18 @@ A `timer` step waits for a time, then goes on to `next`:
   `process.stepCompleted` audit record, and queues the instance's next
   `process.step` item. An item whose instance moved on, or was cancelled, is
   deleted with no other write.
-- If the resume itself throws, the waiting instance is marked `failed`, with a
-  history error and a `process.failed` audit record. Otherwise the deleted item
-  would leave the instance waiting for ever. An operator retry then runs the
-  timer step again.
+- If the resume itself throws, the waiting instance is marked `failed`, with a history error and a
+  `process.failed` audit record, because the deleted item would otherwise leave the instance waiting
+  for ever. An operator retry then runs the timer step again.
 - A test scenario's `advanceTime` runs due `process.timer` items, as it runs
   other due work. A timer also runs after an action when its time has already
   passed on the scenario clock. A scenario never makes a timer due early.
 
 ## Wait for event step
 
-A `waitEvent` step waits until an event about the subject record is raised:
+A `waitEvent` step waits until an event about the subject record is raised, or until its timeout.
+Events are raised by `raiseEvent` steps and by an inbound endpoint call that names an `event`, see
+[inbound endpoint calls](inbound-endpoints.md#the-call).
 
 ```json
 {
@@ -70,12 +60,6 @@ A `waitEvent` step waits until an event about the subject record is raised:
 }
 ```
 
-- **Built.** The compiler checks and builds the step, and the instance graph
-  shows it as `waitEvent`, with a transition to `next` and one marked
-  `timeout`. The worker runs the step: it goes on with an earlier
-  occurrence or waits, and a `process.timer` item resumes it at its timeout.
-  Event delivery wakes a waiting instance, see Waking below. Studio's palette
-  offers the step, and a new step starts with an empty `event` and `next`.
 - `event` names an `event` whose entity is the subject entity. An unknown
   event is `AXC0125` and an event about another entity is `AXC0283`, both at
   `/steps/{i}/event`.
@@ -99,7 +83,7 @@ A `waitEvent` step waits until an event about the subject record is raised:
   one, it sets the instance `waiting` and writes no audit record. With a
   `timeout`, it queues a `process.timer` item due at the step's time plus
   `after`, with the revision the step left.
-- **Waking**. [Event delivery](process-events.md#event-delivery) also delivers
+- **Waking.** [Event delivery](process-events.md#event-delivery) also delivers
   each occurrence to the instances that wait for its event on its record. Each
   instance gets its own transaction. It locks the instance, checks that it
   still waits in this step at the same revision, evaluates `when`, records the
@@ -112,24 +96,20 @@ A `waitEvent` step waits until an event about the subject record is raised:
   `process.stepCompleted` audit record as a timer resume does. An item that
   finds the instance moved on changes nothing. The event and the timeout race,
   and the first to commit wins.
-- History output: `{ "state": "waiting" }` when it waits, `{ "next",
-  "eventId" }` for a match and `{ "next", "timeout": true }` for a timeout.
-
-Events are raised by `raiseEvent` steps and by an inbound endpoint call that
-names an `event`, see [inbound endpoint calls](inbound-endpoints.md#the-call).
+- History output: `{ "state": "waiting" }` when it waits, `{ "next", "eventId" }` for a match and
+  `{ "next", "timeout": true }` for a timeout.
+- **Graph and Studio.** The instance graph shows the step as `waitEvent`, with a transition to `next`
+  and one marked `timeout`. Studio's palette offers the step, and a new step starts with an empty
+  `event` and `next`.
 
 ## Sub-process step
 
-A `subProcess` step starts another process and waits until it ends:
+A `subProcess` step starts another process, its child, and waits until the child ends:
 
 ```json
 { "name": "fulfil", "type": "subProcess", "process": "OrderFulfilment", "subject": "order", "next": "close" }
 ```
 
-- **Built.** The compiler checks and builds the
-  step, and the engine runs it: Start, Cannot start, End, Failure, Cancel and
-  the history output below are built. The instance detail graph shows the step as an
-  `operation` step.
 - `process` names a process of the same application, ignoring letter case,
   otherwise it is `AXC0250` at `/steps/{i}/process`. A process may not reach
   itself through sub-process steps, directly or through others. Each step that
@@ -183,15 +163,15 @@ A `subProcess` step starts another process and waits until it ends:
 - History output: `{ "state": "waiting", "childInstanceId" }`, then
   `{ "next", "childInstanceId" }`, or `{ "childInstanceId" }` with the error
   when a cancelled child fails the step.
+- The instance detail graph shows the step as an `operation` step.
 
 ## Loops
 
-A process may loop back to an earlier step when every cycle passes through a
-waiting step. A `task`, a `timer` and a `waitEvent` are waiting steps for the
-compiler. `AXC0073` reports only a
-cycle with no waiting step, which would run for ever. A cycle of `decision` and
-`operation` steps is reported, and so is a cycle through a call step with no
-task in it. See [Compile checks](processes.md#compile-checks).
+A process may loop back to an earlier step when every cycle passes through a waiting step, so that a
+reopened case can go round again. A `task`, a `timer` and a `waitEvent` are waiting steps for the
+compiler. `AXC0073` reports only a cycle with no waiting step, which would run for ever: a cycle of
+`decision` and `operation` steps is reported, and so is a cycle through a call step with no task in
+it. See [Compile checks](processes.md#compile-checks).
 
 - Each pass writes its own history rows, told apart by `revision`.
 - **Calls in a loop.** A step stages one connector call or one package call
@@ -207,7 +187,7 @@ task in it. See [Compile checks](processes.md#compile-checks).
 
 ## Create record operation
 
-A `createRecord` operation creates a record of another entity:
+A `createRecord` operation creates a record of another entity, such as a note on a ticket:
 
 ```json
 {
@@ -256,11 +236,9 @@ A `createRecord` operation creates a record of another entity:
 
 ## Processes without a subject
 
-A process may leave out `entity`. It then declares typed `parameters`. The
-compile checks in this section are built, and so are the instance storage,
-running such an instance on the engine, the start endpoint, the inspection
-list and detail and the operator commands cancel, retry and resolve, which check
-only the user's grant. So are the other starts described below.
+A process may leave out `entity` and declare typed `parameters` instead, for work that concerns no
+single record, such as a daily reminder. It has no subject record, and its instances run on the
+values they started with.
 
 ```json
 {
@@ -302,10 +280,8 @@ only the user's grant. So are the other starts described below.
   `timer`, `subProcess`, `notify` and `end` are allowed. `updateRecord`,
   `raiseEvent`, `task` and `waitEvent` need a subject and are `AXC0246`. So is
   the `output` of a `callConnector` or package operation step, because it
-  writes the subject. Only the step types that exist today are checked: `task`,
-  `waitEvent`, `updateRecord`, `raiseEvent` and the outputs. A `waitEvent` is
-  reported at `/steps/{i}/type`, as a `task` is. The compiler reports no other
-  problem in such a step.
+  writes the subject. A `waitEvent` is reported at `/steps/{i}/type`, as a `task` is, and the
+  compiler reports no other problem in such a step.
 - **Triggers and other starts by name.** An event, data change or schedule
   trigger that names a process without a subject is `AXC0247`, except a
   schedule trigger without a data source, which must name one (`AXC0249`

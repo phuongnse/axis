@@ -1,37 +1,37 @@
 # Record API
 
-Detailed reference for the record API: routes, record shape, paging, writes,
-concurrency, errors and request bodies. How another system calls an inbound endpoint is in
+The record API reads and writes the records of an application's entities over HTTP, under the
+user's policies. This page covers its routes, the record shape, paging, writes, concurrency, errors,
+request bodies and the form state endpoint. How another system calls an inbound endpoint is in
 [inbound-endpoints.md](inbound-endpoints.md), and the audit records and history of a record are in
-[record-audit.md](record-audit.md). The conventions of
-[architecture.md](../architecture.md) apply: sections marked
-*(planned for Mx)* are not built yet, and Dn refers to
-[decisions.md](../decisions.md).
+[record-audit.md](record-audit.md).
 
-Records of an entity are read and written through the record API. It serves
-the entities of the active release of an application, in the tenant that the
-request host resolves to. A record of another tenant does not exist for the
-request, so it is a 404 like any unknown record.
+## Access
 
-Every record endpoint needs a session, or a bearer token of a
-[service account](security.md#service-accounts), and a policy grant for the
-action on the entity, as [Authorization](security.md#authorization) describes.
-A request with an `Authorization: Bearer` header is a service account request.
-It is judged by the token alone, never reads or renews the session cookie and
-needs no CSRF header. Its caller id is the audit actor and the creator of a new
-record. Without a session or with a bad token the answer is a `401`, with
-`WWW-Authenticate: Bearer` for a token, and without a grant a `403`. A
-grant with a `filter` reaches only the records that match it, so a record
-outside every read filter is a `404`. A grant with a `fields` list covers
-only those fields: fields the user may not read are left out, and a write of
-a field no grant covers is a `403`.
+The record API serves the entities of the active release of an application, in the tenant that the
+request host resolves to, to a caller with a session or a service account token and a grant for the
+action.
 
-[Inbound endpoints](inbound-endpoints.md) are the one exception to the
-session rule. Another system calls them with a bearer token, and they take
-no session. The bearer token check, the endpoint call with its `output` and
-`wait`, the call's `Idempotency-Key` and the status location are built.
+- **Tenant.** A record of another tenant does not exist for the request, so it is a `404` like any
+  unknown record.
+- **Caller.** Every record endpoint needs a session, or a bearer token of a
+  [service account](security.md#service-accounts). A request with an `Authorization: Bearer` header
+  is a service account request. It is judged by the token alone, never reads or renews the session
+  cookie and needs no CSRF header, and its caller id is the audit actor and the creator of a new
+  record. Without a session or with a bad token the answer is a `401`, with
+  `WWW-Authenticate: Bearer` for a token.
+- **Grant.** The caller needs a policy grant for the action on the entity, as
+  [Authorization](security.md#authorization) describes, or the answer is a `403`. A grant with a
+  `filter` reaches only the records that match it, so a record outside every read filter is a `404`.
+  A grant with a `fields` list covers only those fields: fields the user may not read are left out,
+  and a write of a field no grant covers is a `403`.
+- **Inbound endpoints.** [Inbound endpoints](inbound-endpoints.md) are the one exception to the
+  session rule. Another system calls them with a bearer token, and they take no session.
 
 ## Routes
+
+The records of an entity are listed, read, created, updated and deleted through these routes, and a
+record's audit records are read through its history route.
 
 | Method and path | Response |
 | --- | --- |
@@ -40,7 +40,7 @@ no session. The bearer token check, the endpoint call with its `output` and
 | `POST /api/apps/{app}/entities/{entity}/records` | `201` with the new record and a `Location` header |
 | `PATCH /api/apps/{app}/entities/{entity}/records/{id}` | `200` with the updated record |
 | `DELETE /api/apps/{app}/entities/{entity}/records/{id}` | `204` with no body |
-| `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=` | `200` with one page of the record's audit records. See [Audit records and history](record-audit.md#audit-records-and-history) |
+| `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=` | `200` with one page of the record's audit records. See [the history route](record-audit.md#the-history-route) |
 
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the
@@ -53,6 +53,9 @@ the application has one segment. A module entity named `records` cannot be liste
 or created, because the route that reads a record by id takes that URL.
 
 ## Record shape
+
+A record answers its id, its version, the values the user may read and the labels of its
+references:
 
 ```json
 {
@@ -134,6 +137,8 @@ covers reads the whole entity table.
 
 ## Reading values
 
+Each field type has one JSON form in a read:
+
 | Field type | JSON value |
 | --- | --- |
 | `text`, `enum` | A string |
@@ -149,6 +154,8 @@ covers reads the whole entity table.
 | `references` | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
 
 ## Paging and sorting
+
+A list takes a page, a page size, a sort and a search text in its query.
 
 - **`page`.** An integer of at least 1. It defaults to 1.
 - **`pageSize`.** An integer from 1 to 100. It defaults to 20.
@@ -171,8 +178,7 @@ covers reads the whole entity table.
   invalid. A text shorter than three characters has no trigrams, so the index
   does not speed it up. A search over 100,000 records with two searched fields
   answers a page within 2 s, and `SearchPerformanceTests` fails when it takes
-  2 s or more. See
-  [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
+  2 s or more.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -214,8 +220,8 @@ HTTP also call. The record API maps its outcome to the responses below.
   is written. The same holds for a record the record command creates as
   `system`. A field filled from its default is not checked against the
   user's field grants, because the server sets it. Rows of a child collection
-  get no defaults yet: a field a row leaves out is SQL `NULL`, and its
-  required fields stay required. The response is `201` with the record, and `Location` is
+  get no defaults: a field a row leaves out is SQL `NULL`, and its required
+  fields stay required. The response is `201` with the record, and `Location` is
   `/api/apps/{app}/entities/{entity}/records/{id}`. It uses the application
   and entity names from the active model, not the letter case of the request,
   so a record always has one URL. The id is in the lowercase hyphenated form.
@@ -248,8 +254,7 @@ HTTP also call. The record API maps its outcome to the responses below.
   other value or a repeated header is a `403` too. `GET` requests and paths
   outside `/api` need no header. A cross-site page cannot
   set a custom header without a CORS preflight, which Axis does not allow.
-  This adds to the content type rule and the SameSite session cookie. See
-  [D23](../decisions/d23-sign-in-through-oidc-and-the-bff-session.md).
+  This adds to the content type rule and the SameSite session cookie.
   `POST /api/apps/{app}/endpoints/{name}` is exempt from the header and
   takes no session. See [Inbound endpoints](inbound-endpoints.md). A
   [service account](security.md#service-accounts) request, which carries a
@@ -260,8 +265,7 @@ HTTP also call. The record API maps its outcome to the responses below.
   transaction. Each write commits its
   [audit record](record-audit.md#audit-records-and-history) in the same transaction. The
   validations run in the write's transaction, so `now()` in a validation is
-  that transaction's start time
-  ([D22](../decisions/d22-current-time-and-time-zones.md)).
+  that transaction's start time.
 - **References.** Before the write, each non-null `reference` value is looked
   up in the target table by id, in the write's transaction. The check does not
   lock the target. The foreign key is the backstop: a target removed in
@@ -283,7 +287,6 @@ HTTP also call. The record API maps its outcome to the responses below.
 - **Matched reference fields.** A `reference` field with
   [`match`](resource-files.md#matched-references) is set by the server, so a body that sets it on
   create or update, even to `null`, is a `400` at its pointer with the message "Cannot be set.".
-
 - **Form conditions.** `POST` and `PATCH` take an optional query
   `?form=<name>`. The name must be a `form` resource over the entity. A name
   that is not, and an empty or repeated `form`, is a `400` keyed `form` with
@@ -317,54 +320,36 @@ Every error is problem details (`application/problem+json`). The titles are
 fixed and never contain text from the request.
 
 A request is checked in this order, and the first failure is the response:
-the path (`404`), the content type (`415`), the body (`400`), then storage
-(`400`, `404` or `409`). A request with the wrong content type is answered
-before its body is read. Validations are a step between the body and
-storage: see
-[Child rows, computed fields and validations](#child-rows-computed-fields-and-validations). A delete has no body, so it is checked for the path,
-then for a running process (`409`), then in storage (`404` or `409`).
 
-A write without the [CSRF header](#create-update-and-delete) is a `403`
-before any of these checks. A service account request has no such check. The
-session comes next: a request without a session, or with a bad bearer token, is
-a `401`, before the path. So a caller without a session cannot
-find out which applications or records exist. See
-[Sign-in and the session](security.md#sign-in-and-the-session).
-In a cell, a create or an update of a tenant at or over its storage quota is a `403` right after that, before the
-path. See [Refusals](tenant-quotas.md#refusals).
-After the path, the user needs a grant for the action on the entity, or the
-answer is a `403` before the query or body is read.
-`POST /api/apps/{app}/endpoints/{name}` is exempt from the CSRF header and
-takes no session. Its own order is in [Inbound endpoints](inbound-endpoints.md).
-
-Policies add more checks. The full order is:
-
-1. The CSRF header, `403`.
-2. The session or the bearer token, `401`. On create and update in a cell, the
-   tenant's storage quota follows, `403` with `reason: quota-exceeded`.
+1. The [CSRF header](#create-update-and-delete) of a write, `403`. A service account request has no
+   such check.
+2. The session or the bearer token, `401`, before the path, so a caller without a session cannot
+   find out which applications or records exist. See
+   [Sign-in and the session](security.md#sign-in-and-the-session). On create and update in a cell,
+   the tenant's storage quota follows, `403` with `reason: quota-exceeded`, see
+   [Refusals](tenant-quotas.md#refusals).
 3. The path, `404`.
-4. A grant for the action on the entity, `403`.
-5. The stored record: unknown or outside every read filter, `404`. On
-   update and delete, a user with no `read` grant on the entity cannot see
-   the record either, so it is a `404`. A read filter that reads a pending field
-   is a `409` first, before the `404`. That holds for a list too, and for a
-   history.
-6. On update and delete, the stored record outside every `update` or
-   `delete` filter, `403`. An `update` or `delete` filter that reads a pending
-   field of the stored record is a `409` first, before the `403`.
-   On delete, a stored record that is the subject of a running or waiting
-   process instance is a `409`, after the `403` and before storage.
-7. The content type, `415`.
-8. The query of a list, or the body, `400`. Then, on a list, a `sort` or
-   `search` on a pending field, `409`.
+4. A grant for the action on the entity, `403`, before the query or body is read.
+5. The stored record: unknown or outside every read filter, `404`. On update and delete, a user
+   with no `read` grant on the entity cannot see the record either, so it is a `404`. A read filter
+   that reads a pending field is a `409` first, before the `404`. That holds for a list too, and for
+   a history.
+6. On update and delete, the stored record outside every `update` or `delete` filter, `403`. An
+   `update` or `delete` filter that reads a pending field of the stored record is a `409` first,
+   before the `403`. On delete, a stored record that is the subject of a running or waiting process
+   instance is a `409`, after the `403` and before storage.
+7. The content type, `415`, answered before the body is read.
+8. The query of a list, or the body, `400`. Then, on a list, a `sort` or `search` on a pending
+   field, `409`.
 9. Fields the user may not write, `403`.
-10. The matched references, then the computed fields and the validations, `400`, then storage.
-11. On create and update, the new record outside every `create` or `update`
-    filter, `403`.
+10. The matched references, then the computed fields and the validations, `400`, as
+    [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations)
+    says, then storage (`400`, `404` or `409`).
+11. On create and update, the new record outside every `create` or `update` filter, `403`.
 
-The `503` below is not a check of its own. It can follow any check that passed
-on a create or update, because the request runs those checks again on the new
-release.
+A delete has no body, so after the record checks it goes to storage.
+`POST /api/apps/{app}/endpoints/{name}` is exempt from the CSRF header and takes no session, and
+its own order is in [Inbound endpoints](inbound-endpoints.md).
 
 So a caller learns that a record exists only once they may read it. The field
 and value checks need the parsed body, so they come after it. The new record
@@ -374,6 +359,10 @@ filters, the write is rolled back and nothing is stored. On update, the
 `version` in the body must be the version the checks in steps 5 and 6 saw,
 otherwise the answer is the stale-version `409`. See
 [Authorization](security.md#authorization).
+
+The `503` below is not a check of its own. It can follow any check that passed
+on a create or update, because the request runs those checks again on the new
+release.
 
 - **`403` for the CSRF header.** A `POST`, `PUT`, `PATCH` or `DELETE`
   without `X-Axis-Csrf: 1`.
@@ -413,9 +402,8 @@ otherwise the answer is the stale-version `409`. See
   It covers a list, a single read and a history. An `update` or `delete`
   filter does the same on the stored record. A filter that reads a field of
   another entity through a reference counts when that entity is pending.
-  Nothing is written. Read filters fail closed, as
-  [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md) requires, because a
-  stale value could allow or deny wrongly. The title is fixed: "Your access to
+  Nothing is written. Read filters fail closed, because a stale value could
+  allow or deny wrongly. The title is fixed: "Your access to
   this entity cannot be checked while a field is being recomputed." There is no
   `errors`, and the response names no field or policy. The server logs the
   policy name and the grant's index, never a record value. The answer comes
@@ -433,8 +421,8 @@ otherwise the answer is the stale-version `409`. See
 - **`400`.** An invalid `page`, `pageSize`, `sort` or `search` is a
   validation problem whose `errors` is keyed by the parameter's name. Every invalid
   parameter is reported in the same response.
-- **`400` for a body.** A body the parser rejects (see "Request bodies and
-  values") is a validation problem whose `errors` is keyed by JSON Pointer. A
+- **`400` for a body.** A body the parser rejects, as
+  [request bodies and values](#request-bodies-and-values) says, is a validation problem whose `errors` is keyed by JSON Pointer. A
   `reference` value that names no record of the target entity is an error at
   `/values/<field>`.
 - **`400` for a validation.** A record that breaks one of its entity's
@@ -501,7 +489,7 @@ otherwise the answer is the stale-version `409`. See
   record or user. An operator uses it to find the request and its run, see
   [Telemetry](../architecture.md#telemetry).
 
-**No leaks.** No response body, including `title`, `detail` and the `errors`
+No response body, including `title`, `detail` and the `errors`
 messages, ever contains SQL, the `entities` schema, a table, column or
 constraint name, an exception type or a stack trace. The `traceId` member is
 allowed. The `errors` keys repeat
@@ -598,7 +586,7 @@ value is never checked against a limit.
 - An endpoint `input` field has no limits of its own. An endpoint that writes
   a record is still checked by the entity field's limits.
 
-**Errors** are a dictionary from RFC 6901 JSON Pointer into the body to its
+The errors of a body are a dictionary from RFC 6901 JSON Pointer into the body to its
 messages, in ordinal key order, usable as is for a validation problem
 response. The keys are `""` for the body, `/<property>` for a body property,
 `/values`, `/values/<field>`, `/values/<collection>/<index>`,
@@ -613,9 +601,9 @@ text from the request; the key already says where the problem is.
 
 ## Child rows, computed fields and validations
 
-Child rows, computed fields and validations are built (D17): the record shape
-and the bodies described above include them. Computed fields and validations
-can [aggregate](expressions.md#aggregates) over the child rows.
+A record may hold child rows, computed fields and validations, which the record
+shape and the bodies above include. Computed fields and validations can
+[aggregate](expressions.md#aggregates) over the child rows.
 
 A record with a child collection holds its rows inside `values`:
 
@@ -665,8 +653,7 @@ A record with a child collection holds its rows inside `values`:
   be set.". The server calculates the value on every create and update of the
   record, including an update with no values, and stores it in the same
   statement as the other values. Child rows are calculated before the owner.
-  A record stored before its computed field existed reads `null` until its
-  next write. A single read, and the response of an update, return a pending
+  A single read, and the response of an update, return a pending
   field computed with the active release when the row's stamp is out of date.
   A create always computes with the active release, so its response needs no
   such step. A run-time error there reads `null`, and the read answers `200`.
@@ -681,7 +668,7 @@ A record with a child collection holds its rows inside `values`:
   `/values/lineItems/0/amount`, with "Cannot be evaluated exactly.".
 - **Delete.** Deleting the owner deletes its rows.
 
-**Validations.** The order for a write is:
+A write runs its computed fields and validations in this order:
 
 1. Computed fields and validations run only on a body that parsed cleanly.
    A body with parse errors is answered with those errors alone.
@@ -744,9 +731,9 @@ answered with `400`:
 
 ## Form state
 
-The form state endpoint answers what a form shows for a draft record, and which messages the user's input earns so far. It writes
-nothing ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
-The conditions are in [Form conditions and steps](form-conditions.md#form-conditions-and-steps).
+The form state endpoint answers what a form shows for a draft record, and which messages the
+user's input earns so far, and writes nothing. The conditions are in
+[Form conditions and steps](form-conditions.md#form-conditions-and-steps).
 
 `POST /api/apps/{app}/forms/{form}/state` needs `Content-Type: application/json`
 and the [CSRF header](#create-update-and-delete). `{form}` is a form name in
@@ -848,4 +835,4 @@ The problem details are as in [Errors](#errors).
 
 ## Inbound endpoints
 
-How another system calls an inbound endpoint is in [inbound-endpoints.md](inbound-endpoints.md).
+Inbound endpoints are not record routes: how another system calls an inbound endpoint is in [inbound-endpoints.md](inbound-endpoints.md).

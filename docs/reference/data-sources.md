@@ -1,41 +1,17 @@
 # Data sources
 
-Detailed reference for data sources: the resource shape, the compile checks,
-the read endpoint, the response and the errors. Parts of this file are built:
-
-- the `dataSource` resource with `entity`, `fields` whose `path` may go
-  through `reference` fields, `parameters`, `filter`, `aggregate`, `sort`,
-  `pageSize` and `search`
-- the read endpoint with `page`, `pageSize`, `sort`, `search` and the data
-  source parameters, for plain and grouped data sources
-- `labels` for projected `reference` fields
-- the `table` widget binding, with the data source's schema in page metadata,
-  its columns, paging and sorting
-- the filter inputs of a bound table, with their values in the URL
-- the page parameter binding of a table, with the not-found page for a
-  required page parameter that is missing or malformed
-- the table binding of grouped data sources
-- date buckets: a `groupBy` entry that groups a date or date-time field into
-  days, weeks, months or years
-- record and field policies: the root entity's read filters in the query,
-  the field check on every projected field, and labels limited to readable
-  target display fields
-
-Dn refers to
-[decisions.md](../decisions.md). The design follows
-[D18](../decisions/d18-data-sources.md). The reason to query instead
-of denormalize is in
-[knowledge](../domain/knowledge.md#authoring-and-packaging).
-
-A data source is a read-only, named query over one root entity. It projects
-fields, filters rows with typed parameters, sorts, pages and can group. A
-table widget shows its rows. A chart or KPI widget shows its groups.
-Filters use the expression language of
-[expressions.md](expressions.md) and become parameterized SQL.
+A data source is a read-only, named query over one root entity. It projects fields, filters rows
+with typed parameters, sorts, pages and can group. A table widget shows its rows, and a chart or a
+KPI widget shows its groups. Its filters use the [expression language](expressions.md) and become
+parameterized SQL. Applications query related records through data sources rather than copy their
+values, for the reasons in [knowledge](../domain/knowledge.md#authoring-and-packaging). This page
+gives the resource shape, the compile checks, the read endpoint, its response and errors, and how
+widgets bind a data source.
 
 ## Resource shape
 
-A `dataSource` resource looks like this:
+A data source is a `dataSource` resource file. A plain data source returns one row per record of
+its root entity:
 
 ```json
 {
@@ -66,7 +42,7 @@ A `dataSource` resource looks like this:
 }
 ```
 
-A grouped data source adds `aggregate`. Its rows are groups, not records:
+A grouped data source adds `aggregate`, and its rows are groups, not records:
 
 ```json
 {
@@ -91,358 +67,317 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 }
 ```
 
-- **`entity`.** The root entity. In M2 it cannot be a child entity
-  (`AXC0064`).
-- **`fields`.** The projection, in order. Each entry has a `name`, which is
-  the key in a row, and a `path` to a value of the root entity. A [customization layer](customization-layers.md#list-keys) finds a field by its `name`.
-- **`path`.** A field name of the root entity, or a dotted path through
-  `reference` fields such as `department.name`, with at most 3 hops, as in
-  [expressions.md](expressions.md#names-and-references). Each name matches
-  ignoring letter case. A path cannot go through or end at a
-  `child-collection`. A `null` reference along the path gives `null` and the
-  row is kept, because each hop is a left join.
-- **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a
-  `type` and `required`, which defaults to `false`. A [customization layer](customization-layers.md#list-keys) finds a parameter by its `name`. The types are the scalar
-  field types plus `enum` and `reference`. An `enum` needs `values`, and a
-  `reference` needs `target`. An `enum` may also take `valueLabels`. They are
+- **`entity`.** The root entity. It cannot be a child entity (`AXC0064`).
+- **`fields`.** The projection, in order. Each entry has a `name`, which is the key in a row, and a
+  `path` to a value of the root entity. A [customization layer](customization-layers.md#list-keys)
+  finds a field by its `name`.
+- **`path`.** A field name of the root entity, or a dotted path through `reference` fields such as
+  `department.name`, with at most 3 hops, as in
+  [expressions](expressions.md#names-and-references). Each name matches ignoring letter case. A
+  path cannot go through or end at a `child-collection`. A `null` reference along the path gives
+  `null` and the row is kept, because each hop is a left join.
+- **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a `type` and `required`,
+  which defaults to `false`. A [customization layer](customization-layers.md#list-keys) finds a
+  parameter by its `name`. The types are the scalar field types plus `enum` and `reference`. An
+  `enum` needs `values` and may take `valueLabels`, and a `reference` needs `target`. They are
   checked by the same rules as entity fields, see
   [Entity field types and constraints](resource-files.md#entity-field-types-and-constraints).
-- **Parameter `label`.** Optional, with the `{ "textKey" }` shape of a field
-  label. A table shows it on the parameter's filter input.
-- **Missing parameter.** An optional parameter that is not given is `null` in
-  the filter. The idiom is `p is null or field == p`, as in the first example.
-- **`filter`.** A boolean expression. It sees the root entity's fields and
-  the parameters as plain names, ignoring letter case, and paths through
-  `reference` fields such as `department.name`, with at most 3 hops. A path
-  starts at a field, never at a parameter, because a reference parameter is
-  an id and not a row. `any(list, condition)`, `count(list)` and
-  `count(list, condition)` test a child collection or a `references` field of
-  the root entity, such as `any(lines, product.name == 'Desk')`, and each is a
-  subquery, so a row is never repeated. It can call named
-  [rules](resource-files.md#resource-file-shape), and its SQL inlines each
-  rule's expression in place of the call. With every rule inlined, the filter
-  may have at most 2,000 syntax nodes. It uses the syntax of
-  [expressions.md](expressions.md#grammar) and only the
-  [SQL subset](expressions.md#sql-subset). Values are always sent as SQL
-  parameters and never spliced into the SQL text. A row is kept only when the
-  filter is `true`, so a `null` result drops it. Without a `filter`, every
-  row passes. The `filter` may call
-  [`currentUser()`](expressions.md#current-user), such as
-  `requester == currentUser()`, so a page lists only the signed-in user's own
-  records. A measure `filter` may not.
-- **`sort`.** The default order, in the syntax of the query `sort`: a name, or
-  `-` and a name for descending order. Without it, rows are ordered by the
-  tie-break below.
+- **Parameter `label`.** Optional, with the `{ "textKey" }` shape of a field label. A table shows it
+  on the parameter's filter input.
+- **Missing parameter.** An optional parameter that is not given is `null` in the filter. The idiom
+  is `p is null or field == p`, as in the first example.
+- **`filter`.** A boolean expression over the root entity's fields, the parameters, paths through
+  `reference` fields, `any` and `count` over a child collection or a `references` field, and the
+  named [rules](resource-files.md#resource-file-shape), as the
+  [scope of a data source filter](expressions.md#names-and-references) says. It stays inside the
+  [SQL subset](expressions.md#sql-subset), and its values are always sent as SQL parameters. A row
+  is kept only when the filter is `true`, so a `null` result drops it, and without a `filter` every
+  row passes. The `filter` may call [`currentUser()`](expressions.md#current-user), such as
+  `requester == currentUser()`, so that a page lists only the signed-in user's own records.
+- **`sort`.** The default order, in the syntax of the query `sort`: a name, or `-` and a name for
+  descending order. Without it, rows are ordered by the tie-break in
+  [Query parameters](#query-parameters).
 - **`pageSize`.** The default page size, from 1 to 100. It defaults to 20.
-- **`search`.** `true` lets the rows route take `search`, see
-  [Query parameters](#query-parameters). Without it, or with `false`, the
-  route refuses `search`. Page metadata gives it as `search`, and a table over
-  the data source then shows a search box, see the
-  [table widget](frontend.md). At least one projected field must be searched, see
-  [Compile checks](#compile-checks).
+- **`search`.** `true` lets the rows route take `search`, see [Query parameters](#query-parameters).
+  Without it, or with `false`, the route refuses `search`. Page metadata gives it as `search`, and a
+  table over the data source then shows a search box, see the [table widget](frontend.md). At least
+  one projected field must be searched, see [Compile checks](#compile-checks).
 
 ### Aggregates
 
+An `aggregate` groups the rows by some of the projected fields and computes measures over each
+group.
+
 - **`groupBy`.** A list of entries. An entry is a name from `fields`, or
-  `{ "field": "<name>", "bucket": "day" }` with `day`, `week`, `month` or
-  `year` on a date or date-time field. A [customization layer](customization-layers.md#list-keys) finds an object entry by its `field`. A field appears once in the list, in
-  either form. An empty list gives one total row.
-- **Date buckets.** A bucketed group value in a row is the first date of the
-  bucket, as a date such as `2026-11-01`. A week starts on Monday. A date is
-  bucketed as it is. A date-time is bucketed in the application time zone of
-  [D75](../decisions/d75-the-application-time-zone.md), so each record counts
-  on the local day it happened, even when that day differs in UTC. In SQL the
-  bucket is `date_trunc('<bucket>', col::timestamp)::date` for a date and
-  `date_trunc('<bucket>', col AT TIME ZONE @tz)::date` for a date-time, where
-  `@tz` is the time zone id as a text parameter. The same expression is used
-  for the select list, the grouping, the tie-break order and a sort by that
-  group field. A measure over the same field reads the raw values, so `max`
-  of a date-time stays a date-time. Page metadata, export and Studio's names
-  give a bucketed group the type `date`.
-- **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min`,
-  `max`, `avg` or `countDistinct`. It may also have a `filter`.
+  `{ "field": "<name>", "bucket": "day" }` with `day`, `week`, `month` or `year` on a date or
+  date-time field. A [customization layer](customization-layers.md#list-keys) finds an object entry
+  by its `field`. A field appears once in the list, in either form. An empty list gives one total
+  row.
+- **Date buckets.** A bucketed group value in a row is the first date of the bucket, as a date such
+  as `2026-11-01`, and a week starts on Monday. A date is bucketed as it is. A date-time is bucketed
+  in the [application time zone](resource-files.md#application-time-zone), so each record counts on
+  the local day it happened, even when that day differs in UTC.
+  - In SQL the bucket is `date_trunc('<bucket>', col::timestamp)::date` for a date and
+    `date_trunc('<bucket>', col AT TIME ZONE @tz)::date` for a date-time, where `@tz` is the time
+    zone id as a text parameter. The same expression is used for the select list, the grouping, the
+    tie-break order and a sort by that group field.
+  - A measure over the same field reads the raw values, so `max` of a date-time stays a date-time.
+  - Page metadata, export and Studio's names give a bucketed group the type `date`.
+- **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min`, `max`, `avg` or
+  `countDistinct`. It may also have a `filter`.
 - **`count`.** It takes no `field` and counts rows.
-- **`sum`, `min`, `max`, `avg` and `countDistinct`.** They need a `field` that
-  names an entry of `fields`. `sum` and `avg` take an integer, a decimal or a
-  money field. `min` and `max` take an integer, a decimal, a money field, a
-  date or a date-time. `countDistinct` takes any field except a `file` field.
-- **Result types.** `count` and `countDistinct` are integers. `sum` and `avg`
-  are written like a decimal, except that over a money field they are money.
-  `min` and `max` keep the type of their field.
-- **`avg` rounding.** An `avg` is rounded to the field's `scale`. An integer
-  field rounds to 6 digits. A decimal with a `precision` but no `scale`
-  rounds to 0 digits, and a decimal with neither rounds to 6 digits.
-- **Money.** A `sum`, `avg`, `min` or `max` over a `money` field whose currency
-  comes from a `currencyField` must group by that field, or the data source
-  mixes currencies. The group field is a projected field whose path reaches
-  the money field's `currencyField` on the same record, through the same
-  reference fields. A root `currency` field does not cover `order.amount`,
-  whose currency is `order.currency`. Without it the compile fails with
-  `AXC0248`. A `count`, a `countDistinct` and a money field with a fixed
-  `currency` need no currency group. A grouped row keeps the currency with
-  each amount: the currency code is in the group column, and the total is
+- **`sum`, `min`, `max`, `avg` and `countDistinct`.** They need a `field` that names an entry of
+  `fields`. `sum` and `avg` take an integer, a decimal or a money field. `min` and `max` take an
+  integer, a decimal, a money field, a date or a date-time. `countDistinct` takes any field except a
+  `file` field.
+- **Result types.** `count` and `countDistinct` are integers. `sum` and `avg` are written like a
+  decimal, except that over a money field they are money. `min` and `max` keep the type of their
+  field.
+- **`avg` rounding.** An `avg` is rounded to the field's `scale`. An integer field rounds to 6
+  digits. A decimal with a `precision` but no `scale` rounds to 0 digits, and a decimal with neither
+  rounds to 6 digits.
+- **Money.** A `sum`, `avg`, `min` or `max` over a `money` field whose currency comes from a
+  `currencyField` must group by that field, or the data source would mix currencies. The group field
+  is a projected field whose path reaches the money field's `currencyField` on the same record,
+  through the same reference fields, so a root `currency` field does not cover `order.amount`, whose
+  currency is `order.currency`. Without it the compile fails with `AXC0248`. A `count`, a
+  `countDistinct` and a money field with a fixed `currency` need no currency group. A grouped row
+  keeps the currency with each amount: the currency code is in the group column, and the total is
   summed in PostgreSQL `numeric`, so no digit is lost.
-- **`null` values.** `sum`, `avg`, `min` and `max` skip `null` values. Over
-  only `null` values they are `null`, not 0, as in SQL. This tells "no values"
-  apart from a real zero. `countDistinct` skips `null` values and is 0 over
-  only `null` values. `count` counts every row, whatever its values.
-- **Measure `filter`.** A measure takes an optional `filter`, a boolean
-  expression that sees the same names as the data source `filter`: the root
-  entity's fields, the parameters, paths through `reference` fields and named
-  rules. It stays inside the [SQL subset](expressions.md#sql-subset) and runs
-  as SQL `FILTER (WHERE ...)`. The measure reads only the rows where it is
-  `true`, and a `null` result leaves the row out, as in SQL. The data source
-  `filter` and the user's read filters still apply first. So one data source
-  can count open and closed tickets side by side. Equality is
-  [null-safe](expressions.md#null-semantics), so `status != 'open'` also keeps a row
-  whose `status` is `null`, but `quantity > 5` is `null` and drops a row with no
-  `quantity`. Two opposite comparisons of a field that can be `null` may
-  therefore not add up to the number of rows. A `sort` by the measure orders
-  the groups by the filtered value. Like the data source `filter`, a measure
-  filter may compare a field that the user cannot read. Unlike the data source
-  `filter`, it cannot call `currentUser()` (`AXC0095`).
-- **`null` groups.** Rows whose group field is `null`, such as items with no
-  department, form one group of their own.
-- **Row values.** A grouped row holds the group fields in `groupBy` order,
-  then the measures. A group field is keyed by its field name, bucketed or not. The other `fields` are only inputs of the measures.
-- **Names.** Group fields name entries of `fields`, and measure names are
-  keys of a grouped row. Both match exactly, so letter case matters, as for
-  projected names.
-- **Empty `groupBy`.** The data source has one total row, even when no row
-  passes the filter. Then `count` and `countDistinct` are 0 and the other
-  measures are `null`.
+- **`null` values.** `sum`, `avg`, `min` and `max` skip `null` values, and over only `null` values
+  they are `null`, not 0, as in SQL, which tells "no values" apart from a real zero.
+  `countDistinct` skips `null` values and is 0 over only `null` values. `count` counts every row,
+  whatever its values.
+- **Measure `filter`.** An optional boolean expression that sees the same names as the data source
+  `filter`, stays inside the [SQL subset](expressions.md#sql-subset) and runs as SQL
+  `FILTER (WHERE ...)`. The measure reads only the rows where it is `true`, and a `null` result
+  leaves the row out, as in SQL. So one data source can count open and closed tickets side by side.
+  - The data source `filter` and the user's read filters still apply first.
+  - Equality is [null-safe](expressions.md#null-semantics), so `status != 'open'` also keeps a row
+    whose `status` is `null`, but `quantity > 5` is `null` and drops a row with no `quantity`. Two
+    opposite comparisons of a field that can be `null` may therefore not add up to the number of
+    rows.
+  - A `sort` by the measure orders the groups by the filtered value.
+  - Like the data source `filter`, a measure filter may compare a field that the user cannot read.
+    Unlike it, a measure filter cannot call `currentUser()` (`AXC0095`).
+- **`null` groups.** Rows whose group field is `null`, such as items with no department, form one
+  group of their own.
+- **Row values.** A grouped row holds the group fields in `groupBy` order, then the measures. A
+  group field is keyed by its field name, bucketed or not. The other `fields` are only inputs of the
+  measures.
+- **Names.** Group fields name entries of `fields`, and measure names are keys of a grouped row.
+  Both match exactly, so letter case matters, as for projected names.
+- **Empty `groupBy`.** The data source has one total row, even when no row passes the filter. Then
+  `count` and `countDistinct` are 0 and the other measures are `null`.
 
 ### Added in M15
 
-See
-[D76](../decisions/d76-file-money-and-enum-label-field-types.md) and
-[D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
+Data sources handle enum labels and file fields, and can be exported:
 
-- **Enum labels and files.** Rows hold enum values, and page metadata gives
-  their labels. A `file` field cannot be a group field or a measure field.
+- **Enum labels and files.** Rows hold enum values, and page metadata gives their labels. A `file`
+  field cannot be a group field or a measure field.
 - **Export.** A data source can be exported to CSV or a spreadsheet, see
   [import and export](import-export.md#export).
 
 ## Compile checks
 
-A data source is checked when the application is compiled. Any failure is a
-compile error and no release is produced. The built checks have their codes,
-see the Data sources bullet of the Resolve step in
-[configuration.md](configuration.md):
+A data source is checked when the application is compiled. Any failure is a compile error and no
+release is produced. Every code is in the [diagnostic codes](diagnostic-codes.md) table.
+
+The root entity, the projection and the default order:
 
 - `entity` names a loaded entity (`AXC0042`).
-- `entity` is not a child entity (`AXC0064`). A child entity's rows are read
-  only through its owner's child collection.
-- Each `path` names a field of the root entity, or goes through `reference`
-  fields only, takes at most 3 hops, and does not end at a
-  `child-collection` or a `references` field. A path through a field that is not a `reference`, an
-  unknown field and more than 3 hops are each `AXC0043` at
+- `entity` is not a child entity (`AXC0064`), because a child entity's rows are read only through
+  its owner's child collection.
+- Each `path` names a field of the root entity, or goes through `reference` fields only, takes at
+  most 3 hops, and does not end at a `child-collection` or a `references` field. A path through a
+  field that is not a `reference`, an unknown field and more than 3 hops are each `AXC0043` at
   `/fields/{i}/path`, with a message that says which.
 - Field names are unique, compared exactly (`AXC0044`).
-- `sort` names a projected field whose path does not end at a `reference`
-  (`AXC0045`).
-- `pageSize` is from 1 to 100. The JSON Schema checks it (`AXC0004`).
-- A data source with `"search": true` projects at least one searched field:
-  a field whose path ends at a `searchable` text field, or the root's display
-  field projected directly. Otherwise it is `AXC0279` at `/search`. It is not
-  reported while a projected path is already `AXC0043`, because the broken
-  path may have been the searchable one. The display field of a reference's
-  target counts only when it is `searchable`.
-- A parameter name differs from every field of the root entity, because the
-  filter reads both as plain names. Parameter names are unique, and `page`,
-  `pageSize`, `sort` and `search` are reserved. All four compare ignoring
-  letter case, so `Page` and `SORT` are reserved too. A bad name is `AXC0054` at
-  `/parameters/{i}/name`.
-- A parameter's type is valid for its properties, as for entity fields, with
-  the same codes at `/parameters/{i}/...`: `AXC0013` for a property its type
-  does not take, `AXC0014` for an `enum` without `values` or a `reference`
-  without `target`, `AXC0012` for an unknown target, `AXC0040` for a child
-  entity target and `AXC0030` for a target without a display field.
-- A parameter's `valueLabels` follow the entity field rules: a missing or
-  unknown value is `AXC0242` and a text key that no locale has is `AXC0028`,
-  at `/parameters/{i}/valueLabels/...`.
-- A parameter label's text key is in some locale (`AXC0028`), as for field
-  labels. See the Labels bullet of the Resolve step in
-  [configuration.md](configuration.md).
-- The `filter` parses, is a boolean expression over the root entity's
-  fields, the parameters, paths through `reference` fields and the named
-  rules, and stays inside the SQL subset. Its first problem is reported at `/filter` with its
-  [expression diagnostic](expressions.md#diagnostics) code: for example
-  `AXC0048` when it is not boolean, `AXC0046` for an unknown name, also after
-  a `.`, `AXC0047` for a `.` after a field that is not a `reference` or after
-  a parameter, `AXC0058` for a path of more than 3 hops and `AXC0053` for
-  anything outside the SQL subset, such as an
-  [aggregate](expressions.md#aggregates) over a child collection other than
-  `any` and `count`, or a call to a rule whose expression uses `lower`.
-- An enum parameter compares with an enum field only when every value in the
-  parameter's `values` is also in the field's `values`. Otherwise the filter
-  is `AXC0047`. See [Types](expressions.md#types).
+- `sort` names a projected field whose path does not end at a `reference` (`AXC0045`).
+- `pageSize` is from 1 to 100, which the JSON Schema checks (`AXC0004`).
+- A data source with `"search": true` projects at least one searched field: a field whose path ends
+  at a `searchable` text field, or the root's display field projected directly. Otherwise it is
+  `AXC0279` at `/search`. The display field of a reference's target counts only when it is
+  `searchable`. It is not reported while a projected path is already `AXC0043`, because the broken
+  path may have been the searchable one.
+
+The parameters and the filters:
+
+- A parameter name differs from every field of the root entity, because the filter reads both as
+  plain names. Parameter names are unique, and `page`, `pageSize`, `sort` and `search` are reserved.
+  All four compare ignoring letter case, so `Page` and `SORT` are reserved too. A bad name is
+  `AXC0054` at `/parameters/{i}/name`.
+- A parameter's type is valid for its properties, as for entity fields, with the same codes at
+  `/parameters/{i}/...`: `AXC0013` for a property its type does not take, `AXC0014` for an `enum`
+  without `values` or a `reference` without `target`, `AXC0012` for an unknown target, `AXC0040` for
+  a child entity target and `AXC0030` for a target without a display field.
+- A parameter's `valueLabels` follow the entity field rules: a missing or unknown value is
+  `AXC0242` and a text key that no locale has is `AXC0028`, at `/parameters/{i}/valueLabels/...`.
+- A parameter label's text key is in some locale (`AXC0028`), as for field labels.
+- The `filter` parses, is a boolean expression in the
+  [scope of a data source filter](expressions.md#names-and-references), and stays inside the SQL
+  subset. Its first problem is reported at `/filter` with its
+  [expression diagnostic](expressions.md#diagnostics) code: for example `AXC0048` when it is not
+  boolean, `AXC0046` for an unknown name, also after a `.`, `AXC0047` for a `.` after a field that
+  is not a `reference` or after a parameter, `AXC0058` for a path of more than 3 hops and `AXC0053`
+  for anything outside the SQL subset, such as an [aggregate](expressions.md#aggregates) over a
+  child collection other than `any` and `count`, or a call to a rule whose expression uses `lower`.
+- An enum parameter compares with an enum field only when every value in the parameter's `values` is
+  also in the field's `values`. Otherwise the filter is `AXC0047`. See
+  [Types](expressions.md#types).
 - Each measure `filter` is checked like the `filter`, with the same codes, at
   `/aggregate/measures/{i}/filter`. For example `AXC0053` is a call to `lower`.
-- `currentUser()` is allowed in the `filter` and not in a measure `filter`,
-  where it is `AXC0095` at `/aggregate/measures/{i}/filter`. A schedule trigger
-  over a data source whose `filter` calls it is `AXC0363`, see
-  [integration resources](integration-resources.md).
-- No `filter` is checked while a parameter of the data source has a
-  diagnostic, because that parameter may have no usable type.
+- `currentUser()` is allowed in the `filter` and not in a measure `filter`, where it is `AXC0095` at
+  `/aggregate/measures/{i}/filter`. A schedule trigger over a data source whose `filter` calls it is
+  `AXC0363`, see [integration resources](integration-resources.md).
+- No `filter` is checked while a parameter of the data source has a diagnostic, because that
+  parameter may have no usable type.
 
-- `groupBy` names entries of `fields`, compared exactly. An unknown name is
-  `AXC0061` at `/aggregate/groupBy/{i}`, or at `/aggregate/groupBy/{i}/field`
-  for the object form. A field that is already grouped by an earlier entry,
-  in either form, is `AXC0061` at the later entry. A `bucket` on a field that
-  is not a date or a date-time is `AXC0061` at
-  `/aggregate/groupBy/{i}/bucket`. A field whose path is already `AXC0043`, or
-  a `file` field (`AXC0259`), is not reported a second time.
-- Measure names are unique. A measure name also differs from every group
-  field, because both are keys of one row. A clash is `AXC0062` at
-  `/aggregate/measures/{i}/name`.
-- `count` takes no `field`, and every other function needs one. Otherwise
-  it is `AXC0063` at `/aggregate/measures/{i}`.
+The aggregate:
+
+- `groupBy` names entries of `fields`, compared exactly. An unknown name is `AXC0061` at
+  `/aggregate/groupBy/{i}`, or at `/aggregate/groupBy/{i}/field` for the object form. A field that
+  is already grouped by an earlier entry, in either form, is `AXC0061` at the later entry. A
+  `bucket` on a field that is not a date or a date-time is `AXC0061` at
+  `/aggregate/groupBy/{i}/bucket`. A field whose path is already `AXC0043`, or a `file` field
+  (`AXC0259`), is not reported a second time.
+- Measure names are unique. A measure name also differs from every group field, because both are
+  keys of one row. A clash is `AXC0062` at `/aggregate/measures/{i}/name`.
+- `count` takes no `field`, and every other function needs one. Otherwise it is `AXC0063` at
+  `/aggregate/measures/{i}`.
 - A measure `field` names an entry of `fields`, and its type follows the
-  aggregate rules above. Otherwise it is `AXC0063` at
-  `/aggregate/measures/{i}/field`. A field whose path is already `AXC0043`
-  is not reported again.
-- A `sum`, `avg`, `min` or `max` over a money field with a `currencyField`
-  needs a group field that reaches that currency field on the same record.
-  Otherwise it is `AXC0248` at `/aggregate/measures/{i}/field`. A `count`, a
-  `countDistinct`, a money field with a fixed `currency`, and a money field
-  whose `currencyField` is already `AXC0243` are not reported.
-- When the data source is grouped, `sort` names a group field whose path
-  does not end at a `reference`, or a measure, instead of a projected field
-  (`AXC0045`).
-- `sort` and a `groupBy` entry cannot name a projected `file` field
-  (`AXC0259`, at `/sort` or `/aggregate/groupBy/{i}`).
-- `sort`, a `groupBy` entry and a measure's `field` cannot name a projected
-  field whose path ends at a `sensitive` field, and neither can a `filter`
-  or a measure's `filter` read one (`AXC0308`, at `/sort`,
-  `/aggregate/groupBy/{i}`, `/aggregate/measures/{i}/field`, `/filter` or
-  `/aggregate/measures/{i}/filter`). A `filter` or a measure's `filter` may
-  test an exact lookup field of the root entity with `==` or `!=` against a
-  literal or a parameter, which Axis matches by the stored hashes, see
-  [exact lookup](data-encryption.md#exact-lookup).
+  [aggregate rules](#aggregates). Otherwise it is `AXC0063` at `/aggregate/measures/{i}/field`. A
+  field whose path is already `AXC0043` is not reported again.
+- A `sum`, `avg`, `min` or `max` over a money field with a `currencyField` needs a group field that
+  reaches that currency field on the same record, as [Aggregates](#aggregates) says. Otherwise it is
+  `AXC0248` at `/aggregate/measures/{i}/field`. A money field whose `currencyField` is already
+  `AXC0243` is not reported.
+- When the data source is grouped, `sort` names a group field whose path does not end at a
+  `reference`, or a measure, instead of a projected field (`AXC0045`).
+
+The fields that may not be sorted, grouped or filtered:
+
+- `sort` and a `groupBy` entry cannot name a projected `file` field (`AXC0259`, at `/sort` or
+  `/aggregate/groupBy/{i}`).
+- `sort`, a `groupBy` entry and a measure's `field` cannot name a projected field whose path ends at
+  a `sensitive` field, and neither can a `filter` or a measure's `filter` read one (`AXC0308`, at
+  `/sort`, `/aggregate/groupBy/{i}`, `/aggregate/measures/{i}/field`, `/filter` or
+  `/aggregate/measures/{i}/filter`). A `filter` or a measure's `filter` may test an exact lookup
+  field of the root entity with `==` or `!=` against a literal or a parameter, which Axis matches by
+  the stored hashes, see [exact lookup](data-encryption.md#exact-lookup).
 
 ## Endpoint
 
-| Method and path | Response |
-| --- | --- |
+One read-only route returns a page of a data source's rows:
+
+| Method and path                                                                     | Response                    |
+| ----------------------------------------------------------------------------------- | --------------------------- |
 | `GET /api/apps/{app}/data-sources/{dataSource}/rows?page=&pageSize=&sort=&search=` | `200` with one page of rows |
 
-The endpoint is read-only, and only `GET` is routed. `{app}` is the name of an
-active release, and `{dataSource}` a data source in that release. Both match
-ignoring letter case, as in the record API.
+Only `GET` is routed. `{app}` is the name of an active release, and `{dataSource}` a data source in
+that release. Both match ignoring letter case, as in the record API.
 
-A module data source's `{dataSource}` is written `{module id}/{data source name}`,
-for example `data-sources/organization/Departments/rows`. It matches ignoring
-letter case, is two path segments, and only that form reaches a module data
-source. A data source of the application has one segment. This is how the
-[record API routes](record-api.md#routes) name module entities. A module data
-source has the same checks as any other.
+A module data source's `{dataSource}` is written `{module id}/{data source name}`, for example
+`data-sources/organization/Departments/rows`. It matches ignoring letter case and is two path
+segments, and only that form reaches a module data source, while a data source of the application
+has one segment. The [record API routes](record-api.md#routes) name module entities the same way.
+A module data source has the same checks as any other.
 
 ### Authorization
 
-It follows [Authorization](security.md#authorization). The session, the
-grants, the record filters, the fields and the joined targets are built.
+A data source read follows [Authorization](security.md#authorization): the caller needs grants on
+the data source and its root entity, sees only the records its read filters allow, and may read
+every projected field.
 
-- **Session or bearer token.** A request needs a session, or a bearer token of
-  a [service account](security.md#service-accounts), which is judged by the
-  token alone. A request with neither, or with a bad token, is a `401`, before
-  the path. A bad token gets `WWW-Authenticate: Bearer`.
-- **Grants.** The user needs a `read` grant on the data source and a `read`
-  grant on its root entity, otherwise `403`. Only roles claim values that
-  name a declared role count. An entity grant with a `filter` or a `fields`
-  list counts, and then limits the rows or the fields as described below.
-- **Record filters.** The root entity's read filters are combined with OR and
-  added to the data source's own `filter` with AND, in SQL, before any
-  grouping. So rows, groups, measures and `totalCount` cover only the
-  records the user may read. A root read filter that reads a
-  [pending field](migrations.md#recomputing-computed-fields) is a `409` and no
-  rows come back. It is checked right after the grants, before the query, so
-  a bad `sort` does not hide it. See [Errors](#errors).
-- **Current user.** `currentUser()` in the data source's own `filter` is the
-  session's user id, for the rows route and for the export. It is bound once,
-  also when a read filter of the root entity calls it. So two users who read
-  the same data source get only the rows that match themselves, even when
-  neither has a read filter.
-- **Fields.** Every projected field must be one the user may read, otherwise
-  the whole data source is a `403`. This covers every entry of `fields`,
-  also in a grouped data source, and so every field that a measure
-  aggregates. For a path through `reference` fields, every field along the
-  path must be readable on its own entity, not only the field it ends at. So
-  `department.name` needs `department` on the root entity and `name` on the
-  target. The path also shows which record is referenced, so the stricter
-  rule cannot leak. There are no partial rows, so authors make one data
+- **Session or bearer token.** A request needs a session, or a bearer token of a
+  [service account](security.md#service-accounts), which is judged by the token alone. A request
+  with neither, or with a bad token, is a `401`, before the path. A bad token gets
+  `WWW-Authenticate: Bearer`.
+- **Grants.** The user needs a `read` grant on the data source and a `read` grant on its root
+  entity, otherwise `403`. Only roles claim values that name a declared role count. An entity grant
+  with a `filter` or a `fields` list counts, and then limits the rows or the fields as described
+  below.
+- **Record filters.** The root entity's read filters are combined with OR and added to the data
+  source's own `filter` with AND, in SQL, before any grouping. So rows, groups, measures and
+  `totalCount` cover only the records the user may read. A root read filter that reads a
+  [pending field](migrations.md#recomputing-computed-fields) is a `409` and no rows come back. It is
+  checked right after the grants, before the query, so a bad `sort` does not hide it. See
+  [Errors](#errors).
+- **Current user.** `currentUser()` in the data source's own `filter` is the session's user id, for
+  the rows route and for the export. It is bound once, also when a read filter of the root entity
+  calls it. So two users who read the same data source get only the rows that match themselves,
+  even when neither has a read filter.
+- **Fields.** Every projected field must be one the user may read, otherwise the whole data source
+  is a `403`. This covers every entry of `fields`, also in a grouped data source, and so every field
+  that a measure aggregates. For a path through `reference` fields, every field along the path must
+  be readable on its own entity, not only the field it ends at, so `department.name` needs
+  `department` on the root entity and `name` on the target. The path also shows which record is
+  referenced, so the stricter rule cannot leak. There are no partial rows, so authors make one data
   source per audience.
-- **Joined targets.** The record filters of a target that a path joins, or
-  that `any` or `count` reads through a `references` field, do not apply. A label in `labels` shows when the user may read the target's display
-  field, as for the record API's [labels](record-api.md#record-shape).
-- **Limit.** The all-or-nothing rule covers only projected and aggregated
-  fields. A data source `filter` or a parameter can still compare a field the
-  user may not read. A parameter can then probe that field's value, by
-  checking which rows come back. Authors keep such fields out of the filters
-  of data sources that users without access to them can read.
+- **Joined targets.** The record filters of a target that a path joins, or that `any` or `count`
+  reads through a `references` field, do not apply. A label in `labels` shows when the user may read
+  the target's display field, as for the record API's [labels](record-api.md#record-shape).
+- **Limit.** The all-or-nothing rule covers only projected and aggregated fields. A data source
+  `filter` or a parameter can still compare a field the user may not read, and a parameter can then
+  probe that field's value by checking which rows come back. Authors keep such fields out of the
+  filters of data sources that users without access to them can read.
 
 ## Query parameters
 
-- **`page`, `pageSize` and `sort`.** They follow
-  [record-api.md](record-api.md#paging-and-sorting), except that the
-  `pageSize` default is the data source's own. `sort` names an entry of
-  `fields`, or a group field or measure when the data source is grouped. It
-  matches exactly, so letter case matters. A `sort` cannot name a projected
-  field whose path ends at a `reference` or at a `sensitive` field.
-- **`search`.** It needs `"search": true`. It keeps only the rows where a
-  searched field contains the text, ignoring letter case, and follows the
-  [record API's rules](record-api.md#paging-and-sorting): given at most once,
-  at most 200 characters, no U+0000, and an empty value means no search. The
-  searched fields are the projected fields whose path ends at a `searchable`
-  text field, and the root's display field when it is projected directly. On
-  a grouped data source the search filters the root records before grouping,
-  so groups, counts and measures cover only matching records. Without the
-  option, a non-empty or repeated `search` is a `400`, and an empty one is
-  ignored.
-- **Data source parameters.** They are query parameters under their declared
-  names. The names match exactly, so a declared name in another letter case
-  is an unknown parameter.
+The query string pages and sorts the rows, searches them, and gives the data source's parameters.
+
+- **`page`, `pageSize` and `sort`.** They follow [the record API](record-api.md#paging-and-sorting),
+  except that the `pageSize` default is the data source's own. `sort` names an entry of `fields`, or
+  a group field or measure when the data source is grouped. It matches exactly, so letter case
+  matters. A `sort` cannot name a projected field whose path ends at a `reference` or at a
+  `sensitive` field.
+- **`search`.** It needs `"search": true`. It keeps only the rows where a searched field contains
+  the text, ignoring letter case, and follows the
+  [record API's rules](record-api.md#paging-and-sorting): given at most once, at most 200
+  characters, no U+0000, and an empty value means no search. The searched fields are the projected
+  fields whose path ends at a `searchable` text field, and the root's display field when it is
+  projected directly. On a grouped data source the search filters the root records before grouping,
+  so groups, counts and measures cover only matching records. Without the option, a non-empty or
+  repeated `search` is a `400`, and an empty one is ignored.
+- **Data source parameters.** They are query parameters under their declared names. The names
+  match exactly, so a declared name in another letter case is an unknown parameter.
 - **Empty value.** An empty value means the parameter was not given.
-- **Repeated parameter.** A parameter given twice, such as `page=1&page=2`, is
-  invalid.
+- **Repeated parameter.** A parameter given twice, such as `page=1&page=2`, is invalid.
 - **Unknown parameters.** They are ignored.
 - **Required parameter.** A required parameter that is not given is invalid.
-- **Pending fields.** A data source has no single read. A
-  projected [pending field](migrations.md#recomputing-computed-fields) shows its
-  stored value, which may come from an older expression. A query is refused
-  with the `409` in [Errors](#errors) when its `sort`, its default `sort`,
-  its `filter`, its `groupBy` field, its measure or a measure `filter` reads
-  a pending field, or a searched field of a given `search` is a pending field.
-  That includes a path through references, a filter that inlines a rule, a
-  `count` whose `filter` reads one and a field of a child row or a linked
-  record that `any` or `count` reads. The
-  record API computes the pending field on a single read.
-- **Order.** Ties are broken by the root `id` ascending, or by the group
-  fields in `groupBy` order, each ascending, when the data source is
-  grouped. A bucketed group field orders by its bucket. `NULL` ordering and the count statement work as in the record
-  API. Without a `sort`, grouped rows are in group field order.
+- **Pending fields.** A projected [pending field](migrations.md#recomputing-computed-fields) shows
+  its stored value, which may come from an older expression, because a data source has no single
+  read on which the record API would compute it. A query is refused with the `409` in
+  [Errors](#errors) when its `sort`, its default `sort`, its `filter`, its `groupBy` field, its
+  measure or a measure `filter` reads a pending field, or a searched field of a given `search` is a
+  pending field. That includes a path through references, a filter that inlines a rule, a `count`
+  whose `filter` reads one and a field of a child row or a linked record that `any` or `count`
+  reads.
+- **Order.** Ties are broken by the root `id` ascending, or by the group fields in `groupBy` order,
+  each ascending, when the data source is grouped. A bucketed group field orders by its bucket.
+  `NULL` ordering and the count statement work as in the record API. Without a `sort`, grouped rows
+  are in group field order.
 
-Query strings have no JSON types, so each parameter type has a plain text
-form. A value is only ever sent as a typed SQL parameter, so no value can
-change the query:
+Query strings have no JSON types, so each parameter type has a plain text form. A value is only
+ever sent as a typed SQL parameter, so no value can change the query:
 
-| Parameter type | Query value |
-| --- | --- |
-| `text` | The text as it is, with no U+0000 |
-| `integer` | An optional `-` and digits, within 64 bits |
-| `decimal` | Plain number text with no exponent, such as `1250.50` |
-| `boolean` | `true` or `false` |
-| `date` | `yyyy-MM-dd` |
-| `date-time` | RFC 3339, as in the record API |
-| `enum` | One of the parameter's `values` |
-| `reference` | A hyphenated UUID |
+| Parameter type | Query value                                           |
+| -------------- | ----------------------------------------------------- |
+| `text`         | The text as it is, with no U+0000                     |
+| `integer`      | An optional `-` and digits, within 64 bits            |
+| `decimal`      | Plain number text with no exponent, such as `1250.50` |
+| `boolean`      | `true` or `false`                                     |
+| `date`         | `yyyy-MM-dd`                                          |
+| `date-time`    | RFC 3339, as in the record API                        |
+| `enum`         | One of the parameter's `values`                       |
+| `reference`    | A hyphenated UUID                                     |
 
 ## Response shape
 
-A response is `{ "items": [ ... ], "page": 1, "pageSize": 20, "totalCount": 42 }`.
-`page` and `pageSize` are the values used, and `totalCount` counts every row
-that passes the filter. It is `null` when only the count runs past
-`Data:QueryTimeout`, and then the items are still there.
+A response is `{ "items": [ ... ], "page": 1, "pageSize": 20, "totalCount": 42 }`. `page` and
+`pageSize` are the values used, and `totalCount` counts every row that passes the filter. It is
+`null` when only the count runs past `Data:QueryTimeout`, and then the items are still there.
 
 Each item is `{ "id", "values", "labels" }`:
 
@@ -468,27 +403,22 @@ Each item is `{ "id", "values", "labels" }`:
 ```
 
 - **`id`.** The id of the root record.
-- **`values`.** Every projected field under its name, in `fields` order. The
-  value forms are those of
-  [record-api.md](record-api.md#reading-values). A field that is `NULL`,
-  including one behind a `null` reference, is `null`. A projected `sensitive`
-  field reads as its plain value, also through a reference path, see
-  [data encryption](data-encryption.md#sensitive-field-values).
-- **`labels`.** Each projected field whose path ends at a non-null
-  `reference` maps to the display field value of the target. It is `{}`
-  otherwise. Like the record API, the labels come from the same SQL statement
-  as the rows.
-- **Joins.** Each distinct path through `reference` fields is one left join
-  on the target's `id`, shared by the projection, the labels, the sort and
-  the filter. A page is one SQL statement plus the count statement, whatever
-  the page size. The count statement uses the same joins, and each join
-  matches at most one row, so it counts root rows.
+- **`values`.** Every projected field under its name, in `fields` order, in the value forms of
+  [the record API](record-api.md#reading-values). A field that is `NULL`, including one behind a
+  `null` reference, is `null`. A projected `sensitive` field reads as its plain value, also through
+  a reference path, see [data encryption](data-encryption.md#sensitive-field-values).
+- **`labels`.** Each projected field whose path ends at a non-null `reference` maps to the display
+  field value of the target, and it is `{}` otherwise. As in the record API, the labels come from
+  the same SQL statement as the rows.
+- **Joins.** Each distinct path through `reference` fields is one left join on the target's `id`,
+  shared by the projection, the labels, the sort and the filter. A page is one SQL statement plus
+  the count statement, whatever the page size. The count statement uses the same joins, and each
+  join matches at most one row, so it counts root rows.
 
-A grouped row has `id: null`. Its `values` holds the group fields in
-`groupBy` order, then the measures. `totalCount` counts groups. A group field
-whose path ends at a non-null `reference` has its label in `labels`, as in an
-ungrouped row. The count statement wraps the grouped statement, so it counts
-groups, and it is 1 for an empty `groupBy`.
+A grouped row has `id: null`, and its `values` holds the group fields in `groupBy` order, then the
+measures. A group field whose path ends at a non-null `reference` has its label in `labels`, as in
+an ungrouped row. `totalCount` counts groups: the count statement wraps the grouped statement, and
+it is 1 for an empty `groupBy`.
 
 ```json
 {
@@ -507,168 +437,124 @@ groups, and it is 1 for an empty `groupBy`.
 
 ## Errors
 
-Every error is problem details (`application/problem+json`). The titles are
-fixed and never contain text from the request.
+Every error is problem details (`application/problem+json`), with a fixed title that never contains
+text from the request.
 
-A request is checked in this order, and the first failure is the response:
-the session, then the path, then the grants, then the query, then the
-database. The readable fields are checked with the grants. A root read filter
-that reads a pending field is checked right after the grants, before the
-query. The pending fields of the `sort`, `filter`, `aggregate` and `search` are
-checked after the query and before the database.
+A request is checked in this order, and the first failure is the response: the session, then the
+path, then the grants with the readable fields, then a root read filter that reads a pending field,
+then the query, then the pending fields of the `sort`, `filter`, `aggregate` and `search`, then the
+database.
 
-- **`401`.** A request without a session, or with a session from another
-  tenant. A request with a bearer token that fails the checks of
-  [service accounts](security.md#service-accounts) is a `401` too, with
-  `WWW-Authenticate: Bearer`. It comes before the path, so it is a `401` even for an unknown
-  application. The title is fixed.
-- **`403`.** The user has no `read` grant on the data source or on its root
-  entity, or may not read one of its projected or aggregated fields. The
-  title is fixed and names no data source or field. See
+- **`401`.** A request without a session, or with a session from another tenant. A request with a
+  bearer token that fails the checks of [service accounts](security.md#service-accounts) is a `401`
+  too, with `WWW-Authenticate: Bearer`. It comes before the path, so it is a `401` even for an
+  unknown application.
+- **`403`.** The user has no `read` grant on the data source or on its root entity, or may not read
+  one of its projected or aggregated fields. The title names no data source or field. See
   [Authorization](#authorization).
-- **`404`.** An unknown application, an application with no active release
-  and an unknown data source. The path is resolved before the query is
-  checked, so a path that names nothing is a 404 whatever its query.
-- **`400` for the query.** A validation problem whose `errors` is keyed
-  `page`, `pageSize`, `sort`, `search` and the parameter names. It covers a
-  bad value, a missing required value, a repeated parameter and a `search` on
-  a data source without the option. Every invalid parameter is
-  reported in the same response.
-- **`409` for a pending field.** The `sort`, default
-  `sort`, `filter`, `groupBy` field, measure or measure `filter` reads a field
-  that is being recomputed, or a given `search` matches one. The title is
-  fixed: "A field is being recomputed." `errors` is keyed `sort`, `filter`,
-  `aggregate` or `search`, with a message that names the field. A measure
-  `filter` is keyed `aggregate` and names the path it reads.
-  The request is valid, so this is a state conflict, not a `400`. A sum over
-  stale totals would be the same silent failure.
-- **`409` for a policy that reads a pending field.** A root
-  read filter of the user's grants reads a field that is being recomputed. No
-  rows come back. The title is fixed: "Your access to this entity cannot be
-  checked while a field is being recomputed." There is no `errors`, and the
-  response names no field or policy. The server logs the policy and grant
-  index, never a record value. It fails closed, as a failing read filter
-  does.
-- **`400` for the database.** A database data exception while evaluating the
-  filter, such as an integer overflow or a date out of range from `addDays`.
-  The title is fixed, and the response holds no SQL. Any other database
-  error is a `500`. A run-time failure in a policy read filter is the same
-  `400`, and no rows are returned. PostgreSQL cannot fail one branch of an
-  `or`, so the whole query fails closed. The server logs the policy and grant
-  index of each of the user's read filters on the root entity, never a
-  record value.
-- **`503` for a busy tenant.** A rows read in a cell, when the tenant's `concurrentQueries` quota has no
-  free lease for 5 seconds, after the sign-in, path and grant checks. The title is "This tenant is busy.
-  Try again in a moment.", the answer carries `Retry-After: 1` and nothing was queried. See
-  [work at once](tenant-quotas.md#work-at-once).
-- **`503` for a query timeout.** The rows query runs past
-  `Data:QueryTimeout` and PostgreSQL cancels it. The title is the record API's:
-  "The query took too long. Try again or narrow it." The server logs the data
-  source name and the duration, never a value, and counts it in
-  `axis.queries.timeouts`. A count alone that runs past the limit is no error:
-  the answer is `200` with `totalCount: null`. See
-  [data settings](host-settings.md#data-settings).
-- **`500`.** An unexpected error is caught by the exception handler. The
-  response has no exception type, message or stack trace.
+- **`404`.** An unknown application, an application with no active release and an unknown data
+  source. The path is resolved before the query is checked, so a path that names nothing is a `404`
+  whatever its query.
+- **`400` for the query.** A validation problem whose `errors` is keyed `page`, `pageSize`, `sort`,
+  `search` and the parameter names. It covers a bad value, a missing required value, a repeated
+  parameter and a `search` on a data source without the option. Every invalid parameter is reported
+  in the same response.
+- **`409` for a pending field.** The `sort`, default `sort`, `filter`, `groupBy` field, measure or
+  measure `filter` reads a field that is being recomputed, or a given `search` matches one. The
+  title is "A field is being recomputed." `errors` is keyed `sort`, `filter`, `aggregate` or
+  `search`, with a message that names the field, and a measure `filter` is keyed `aggregate` and
+  names the path it reads. The request is valid, so this is a state conflict, not a `400`, and a sum
+  over stale totals would be a silent failure.
+- **`409` for a policy that reads a pending field.** A root read filter of the user's grants reads a
+  field that is being recomputed, and no rows come back. The title is "Your access to this entity
+  cannot be checked while a field is being recomputed." There is no `errors`, and the response
+  names no field or policy. The server logs the policy and grant index, never a record value. It
+  fails closed, as a failing read filter does.
+- **`400` for the database.** A database data exception while evaluating the filter, such as an
+  integer overflow or a date out of range from `addDays`. The response holds no SQL, and any other
+  database error is a `500`. A run-time failure in a policy read filter is the same `400`, and no
+  rows are returned: PostgreSQL cannot fail one branch of an `or`, so the whole query fails closed.
+  The server logs the policy and grant index of each of the user's read filters on the root entity,
+  never a record value.
+- **`503` for a busy tenant.** A rows read in a cell, when the tenant's `concurrentQueries` quota
+  has no free lease for 5 seconds, after the sign-in, path and grant checks. The title is "This
+  tenant is busy. Try again in a moment.", the answer carries `Retry-After: 1` and nothing was
+  queried. See [work at once](tenant-quotas.md#work-at-once).
+- **`503` for a query timeout.** The rows query runs past `Data:QueryTimeout` and PostgreSQL cancels
+  it. The title is the record API's: "The query took too long. Try again or narrow it." The server
+  logs the data source name and the duration, never a value, and counts it in
+  `axis.queries.timeouts`. A count alone that runs past the limit is no error: the answer is `200`
+  with `totalCount: null`. See [data settings](host-settings.md#data-settings).
+- **`500`.** The exception handler catches an unexpected error. The response has no exception type,
+  message or stack trace.
 
-**No leaks.** The no-leaks rule of the
-[record API](record-api.md#errors) applies. No response body ever contains
-SQL, a table, column or constraint name, an exception type or a stack trace.
-The `errors` keys repeat the request's parameter names by design.
+The no-leaks rule of the [record API](record-api.md#errors) applies: no response body ever contains
+SQL, a table, column or constraint name, an exception type or a stack trace. The `errors` keys
+repeat the request's parameter names by design.
 
 ## Widget binding
 
-The table binding and its filter inputs are built, for plain and grouped
-data sources.
+A `table`, a `chart` and a `kpi` widget read their rows from a data source, and the compiler checks
+each binding.
 
-- **Widgets.** The `table` widget binds to a data source, and so does the
-  `kpi` widget, and so does the `chart` widget. A `form` that
-  names a `dataSource` is `AXC0060`. A table names an `entity` or a
-  `dataSource`, never both and never neither (`AXC0060`). `entity` stays as
-  shorthand for all records of an entity. A `dataSource` that names no
-  loaded data source is `AXC0059`.
-- **Parameters.** A bound table needs every parameter of its data source to be
-  optional, otherwise it is `AXC0060` at `/widgets/{i}/dataSource`, naming the
-  parameter, unless the parameter is bound to a required page parameter. It
-  shows one filter input per unbound parameter and sends their values from the
-  URL. See [Table widget](frontend.md) for the details.
-- **Grouped data sources.** A table may bind a data source with an
-  `aggregate`. Each row is a group. Its columns are the group fields in
-  `groupBy` order, then the measures. A group row has `id: null`, so it has
-  no id to open. It has no row actions either: `rowActions` on such a table is
-  `AXC0060` at `/widgets/{i}/rowActions`.
-- **Opening a row.** Each row carries the id of its root record. A row
-  `navigate` action with `record: id` opens a form over the root entity, and the
-  `record` rule of the action checks it (`AXC0235`). A table over a data source
-  with an `aggregate` has no row actions, because a group is not a record.
-- **Page parameters.** A table, a chart or a KPI binds a page parameter to a
-  data source parameter with a name map on the widget:
-  `"parameters": { "<data source parameter>": "<page parameter>" }`. The two
-  types must match. A required data source parameter is allowed only when it
-  is bound to a required page parameter. A bound parameter has no filter
-  input, and its value comes from the page parameter in the URL. A chart or a
-  KPI sends the value with its request for the rows, and reads again when the
-  value changes. The data source's read grant and record filters apply as
-  they do to a table. See
-  [D63](../decisions/d63-navigate-actions-and-page-parameters.md). The compile
+- **Widgets.** A table names an `entity` or a `dataSource`, never both and never neither
+  (`AXC0060`), and `entity` is shorthand for all records of an entity. A chart and a KPI name a
+  `dataSource`. A `dataSource` that names no loaded data source is `AXC0059`, and a `form` that
+  names a `dataSource` is `AXC0060`.
+- **Parameters.** A bound table needs every parameter of its data source to be optional, unless the
+  parameter is bound to a required page parameter, otherwise it is `AXC0060` at
+  `/widgets/{i}/dataSource`, naming the parameter. It shows one filter input per unbound parameter
+  and sends their values from the URL. See the [table widget](frontend.md).
+- **Grouped data sources.** A table may bind a data source with an `aggregate`. Each row is a group,
+  and its columns are the group fields in `groupBy` order, then the measures. A group row has
+  `id: null`, so it has no id to open, and a group is not a record, so `rowActions` on such a table
+  is `AXC0060` at `/widgets/{i}/rowActions`.
+- **Opening a row.** Each row of a plain data source carries the id of its root record. A row
+  `navigate` action with `record: id` opens a form over the root entity, and the `record` rule of the
+  action checks it (`AXC0235`).
+- **Page parameters.** A table, a chart or a KPI binds a page parameter to a data source parameter
+  with a name map on the widget: `"parameters": { "<data source parameter>": "<page parameter>" }`.
+  A bound parameter has no filter input, and its value comes from the page parameter in the URL. A
+  chart or a KPI sends the value with its request for the rows, and reads again when the value
+  changes. The data source's read grant and record filters apply as they do to a table. The compile
   checks:
-  - Each entry is checked at `/widgets/{i}/parameters/{key}` and every problem
-    is `AXC0060`: the key names no data source parameter, a key repeats
-    ignoring letter case, the value names no page parameter, the types differ,
-    or the data source parameter is required and the page parameter is not.
-    Names match ignoring letter case, and the compiled model keeps the
-    declared names.
-  - The types match when the type names are equal and a `reference` has the
-    same target. For an `enum`, every value of the page parameter must also be
-    a value of the data source parameter.
-  - A required data source parameter that is not bound is `AXC0060` at
-    `/widgets/{i}/dataSource`. A chart or a KPI has no filter input, so every
-    parameter that its `parameters` leaves unbound must be optional.
-  - A page parameter named `page`, `pageSize`, `sort` or `search`, or with the same name as an unbound parameter of its table,
-    ignoring letter case, is `AXC0231` at `/parameters/{i}/name`, because both
-    live in the same URL query. A chart and a KPI have no filter input, so this
-    check applies only to a table.
-  - `parameters` on any widget that is not a table, a chart or a KPI over a
-    data source is `AXC0060` at `/widgets/{i}/parameters`.
-- **Chart binding.** A `chart` names a `dataSource` and
-  reads only grouped data. See
-  [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The compile checks:
-  - A `dataSource` that names no loaded data source is `AXC0059`.
-  - The data source has an `aggregate` with exactly one `groupBy` entry, and
-    the chart's `category` equals the entry's field, ignoring letter case,
-    otherwise it is
-    `AXC0240` at `/widgets/{i}/dataSource` or `/widgets/{i}/category`.
-  - Each chart measure names a measure of the data source, ignoring letter
-    case, and it is numeric, otherwise it is `AXC0241` at
-    `/widgets/{i}/measures/{j}/name`. A `count` and a `sum` are numeric. A
-    `min` or `max` is numeric over an integer, a decimal or a money field, not
-    over a date or a date-time. A `pie` has exactly one measure, otherwise it is `AXC0241` at
-    `/widgets/{i}/measures`.
-  - `parameters` binds page parameters with the table's name map, under the
-    same type and required rules as above.
-  - A data source parameter that `parameters` leaves unbound must be optional
-    (`AXC0060` at `/widgets/{i}/dataSource`, naming the parameter), because a
-    chart has no filter bar.
+  - Each entry is checked at `/widgets/{i}/parameters/{key}`, and every problem is `AXC0060`: the
+    key names no data source parameter, a key repeats ignoring letter case, the value names no page
+    parameter, the types differ, or the data source parameter is required and the page parameter is
+    not. Names match ignoring letter case, and the compiled model keeps the declared names.
+  - The types match when the type names are equal and a `reference` has the same target. For an
+    `enum`, every value of the page parameter must also be a value of the data source parameter.
+  - A required data source parameter that is not bound is `AXC0060` at `/widgets/{i}/dataSource`.
+    A chart or a KPI has no filter input, so every parameter that its `parameters` leaves unbound
+    must be optional, otherwise it is `AXC0060` at `/widgets/{i}/dataSource`, naming the parameter.
+  - A page parameter named `page`, `pageSize`, `sort` or `search`, or with the same name as an
+    unbound parameter of its table, ignoring letter case, is `AXC0231` at `/parameters/{i}/name`,
+    because both live in the same URL query. A chart and a KPI have no filter input, so this check
+    applies only to a table.
+  - `parameters` on any widget that is not a table, a chart or a KPI over a data source is
+    `AXC0060` at `/widgets/{i}/parameters`.
+- **Chart binding.** A [chart](detail-chart-kpi-widgets.md) reads only grouped data. Besides the
+  page parameter checks, the compiler checks these:
+  - The data source has an `aggregate` with exactly one `groupBy` entry, and the chart's `category`
+    equals the entry's field, ignoring letter case, otherwise it is `AXC0240` at
+    `/widgets/{i}/dataSource` or `/widgets/{i}/category`.
+  - Each chart measure names a measure of the data source, ignoring letter case, and it is numeric,
+    otherwise it is `AXC0241` at `/widgets/{i}/measures/{j}/name`. A `count` and a `sum` are
+    numeric, and a `min` or `max` is numeric over an integer, a decimal or a money field, not over a
+    date or a date-time.
+  - A `pie` has exactly one measure, otherwise it is `AXC0241` at `/widgets/{i}/measures`.
   - The `title` and the measure labels join `AXC0028`.
-- **KPI binding.** A `kpi` names a `dataSource` and reads
-  its one total row. The compile checks:
-  - A `dataSource` that names no loaded data source is `AXC0059`.
-  - The data source has an `aggregate` with an empty `groupBy`, otherwise it
-    is `AXC0237` at `/widgets/{i}/dataSource`.
-  - `measure` and `comparison.measure` each name a measure of the data source,
-    ignoring letter case, otherwise it is `AXC0238` at that property.
-  - `parameters` binds page parameters with the table's name map, under the
-    same type and required rules as above.
-  - A data source parameter that `parameters` leaves unbound must be optional
-    (`AXC0060` at `/widgets/{i}/dataSource`, naming the parameter), because a
-    KPI has no filter bar.
-  - The `label` and the `comparison` label join `AXC0028`. A `navigate`
-    follows the checks of
-    [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
-- **Schema.** The data source's schema reaches the SPA in page metadata, in
-  the widget's `dataSource` object. There is no separate schema endpoint. A
-  money column or measure has the type `money`. It also has `currency`, the
-  fixed currency code, or `currencyColumn`, the name of the column that holds
-  the code. A measure's `currencyColumn` is a group column. A projected or
-  group column's is the sibling column that reads the currency field on the
-  same record. Both are left out of the JSON when they do not apply.
+- **KPI binding.** A [KPI](detail-chart-kpi-widgets.md) reads its data source's one total row.
+  Besides the page parameter checks, the compiler checks these:
+  - The data source has an `aggregate` with an empty `groupBy`, otherwise it is `AXC0237` at
+    `/widgets/{i}/dataSource`.
+  - `measure` and `comparison.measure` each name a measure of the data source, ignoring letter
+    case, otherwise it is `AXC0238` at that property.
+  - The `label` and the `comparison` label join `AXC0028`. A `navigate` follows the checks of a
+    [navigate action](resource-files.md#resource-file-shape).
+- **Schema.** The data source's schema reaches the SPA in page metadata, in the widget's
+  `dataSource` object, and there is no separate schema endpoint. A money column or measure has the
+  type `money`, and also `currency`, the fixed currency code, or `currencyColumn`, the name of the
+  column that holds the code. A measure's `currencyColumn` is a group column, and a projected or
+  group column's is the sibling column that reads the currency field on the same record. Both are
+  left out of the JSON when they do not apply.

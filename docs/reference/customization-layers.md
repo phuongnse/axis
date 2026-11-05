@@ -1,23 +1,11 @@
 # Customization layers
 
 A customization layer is an application's changes to a module it declares. Each layer file names one
-resource of the module and holds only what the application changes in it. Compilation applies the
-layers to the pinned module version, then checks the result, the [module contract](module-contracts.md)
-included. [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees
-the idea, and [D122](../decisions/d122-how-a-customization-layer-is-written-and-applied.md) agrees
-the shapes below. The layer resource, applying a layer, list keys, extending a lifecycle and Studio
-are built: compilation merges the `changes` of a layer into its module resource before any check, and
-the release stores the layer and the module's own files side by side, a layer places an element with
-`after` and `before`, and a diagnostic about a part that a layer changed is reported in the layer file.
-A layer on a `contract` adds states and transitions to its lifecycle, see
-[extending a lifecycle](#extending-a-lifecycle). A layer on a module entity adds fields and validations,
-see [module entities](#module-entities), but changing a field is _(planned for M26)_. A layer removes a
-whole resource, see [applying a layer](#applying-a-layer). The [authoring API](authoring.md#routes) reads
-a module resource with the layer applied, its marks and its removed elements, and saves a module resource
-as a layer, see [in Studio](#in-studio). Module upgrades, the three-way merge and eject are _(planned for M29)_.
-
-The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
-issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
+resource of the module and holds only what the application changes in it, so the module's own files
+stay as the module wrote them. Compilation applies the layers to the pinned module version, then
+checks the result, the [module contract](module-contracts.md) included. Why a module is open to change
+this way is in [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md),
+and what each diagnostic code means is in [diagnostic codes](diagnostic-codes.md).
 
 ## The layer resource
 
@@ -25,8 +13,8 @@ A layer is a resource of the kind `layer`. One file changes one module resource,
 `customizations/<module id>/<resource name>.json` in the application folder.
 
 This layer adds a director's approval above a threshold to the `RequestApproval` process of the
-`approvals` module. The manager's approval now goes to a decision step, and the step above the
-threshold is new:
+`approvals` module. It sends the manager's approval to a new decision step, which leads to the
+director's step above the threshold:
 
 ```json
 {
@@ -78,8 +66,8 @@ threshold is new:
   the module has no resource named `module`, and it is not allowed, see below.
 - **An ambiguous target.** Names are unique only within one kind, so a module may hold a data
   source and a page that share a name, and `<module id>/<name>` cannot tell them apart. The compiler
-  does not guess: such a target is `AXC0352`. A resource whose name another kind in the module
-  shares cannot be targeted yet. The lasting fix, such as a `targetKind` property, is open.
+  does not guess: such a target is `AXC0352`, so a resource whose name another kind in the module
+  shares cannot be targeted.
 - **What a layer may target.** Every kind a module holds, except `scenario` and `module.json`, which
   are `AXC0348`. A layer in a module folder is refused like any kind a module may not hold,
   `AXC0202`. A
@@ -96,7 +84,9 @@ threshold is new:
 
 ## Applying a layer
 
-Compilation applies each layer to the resource of the pinned module version, before any check.
+Compilation applies each layer to the resource of the pinned module version, before any check, and
+then reports each diagnostic where the author made the change. The release stores the layer and the
+module's own files side by side.
 
 - **Objects** merge property by property. A property in `changes` replaces the module's value. A
   property that `changes` leaves out keeps the module's value.
@@ -162,11 +152,9 @@ Compilation applies each layer to the resource of the pinned module version, bef
 
 ## List keys
 
-Every element of a list that a layer can change has a key. Most lists use `name`, which becomes
-required where it is not yet, in modules and applications alike, as the one-format rule of
-[D46](../decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) asks.
-Studio gives each new element a name. The samples, templates and built-in modules get theirs in the
-same change.
+A layer never matches an element by its position, so every element of a list that a layer can change
+has a key. Most lists use `name`, which is required in modules and applications alike, so one format
+serves both, and Studio gives each new element a name.
 
 | Kind | List | Key |
 | --- | --- | --- |
@@ -184,37 +172,46 @@ same change.
 `Axis.Configuration` holds this table in code, and a unit test checks it against the resource
 schemas.
 
-- A key is unique in its list, ignoring letter case. An entity's `validations` and `indexes` require
-  `name` (`AXC0004` when it is missing) and report a repeated name as `AXC0343`. A policy's `grants` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0353`. A decision's `branches` and a task's `escalations` require `name` as well (`AXC0004` when it is missing) and report a repeated name as `AXC0359`, and a form's `steps` do the same and report it as `AXC0360`. A form's `sections` require `name` too (`AXC0004` when it is missing) and report a repeated name as `AXC0227`. Each of these names is unique in its own list: one decision's branches, one task's escalations, one form's steps or one form's sections. A widget's `name` is unique on its page,
-  whatever its depth, so a layer finds a widget inside a section or a tab by its name. A repeated name on a page, in a widget's own list of actions, columns or tabs, is `AXC0361`. A page's widgets, actions, row actions, toolbar actions, columns and tabs require `name` (`AXC0004` when it is missing).
-- An element of a list that the table does not name is part of a value list.
-- A wizard step's `sections` is a list of section names. It merges by the name itself: a layer adds a
-  name to the end of the list, or removes one with `{ "name": "x", "remove": true }`.
-- A text's `texts` is a map, so a layer on a module text changes or adds keys as an object merges.
-  A business that wants another label changes the text, never a name.
+- **A key is unique** in its list, ignoring letter case, and a missing required `name` is `AXC0004`.
+  A repeated name has a code of its own in these lists:
+
+  | List                                                                  | Repeated name |
+  | --------------------------------------------------------------------- | ------------- |
+  | An entity's `validations` and `indexes`                               | `AXC0343`     |
+  | A policy's `grants`                                                   | `AXC0353`     |
+  | One decision's `branches`, one task's `escalations`                   | `AXC0359`     |
+  | One form's `steps`                                                    | `AXC0360`     |
+  | One form's `sections`                                                 | `AXC0227`     |
+  | A page's widgets, and a widget's own actions, columns or tabs         | `AXC0361`     |
+
+- **Widgets.** A widget's `name` is unique on its page, whatever its depth, so a layer finds a widget
+  inside a section or a tab by its name.
+- **Other lists.** An element of a list that the table does not name is part of a value list.
+- **A wizard step's `sections`** is a list of section names. It merges by the name itself: a layer adds
+  a name to the end of the list, or removes one with `{ "name": "x", "remove": true }`.
+- **Texts.** A text's `texts` is a map, so a layer on a module text changes or adds keys as an object
+  merges. A business that wants another label changes the text, never a name.
 
 ## Module entities
 
 A layer on a module entity changes the application's copy of it, which is the application's own
-table. Adding fields and adding validations are built: activation adds the column of an added field
-to the copy, and the record API reads and writes the field. Refusing a removed field that the module
-still reads is built, and an application [migration](migrations.md#migrations) drops the column of a removed field.
-Changing a field is _(planned for M26)_.
+table, so activation changes the copy's columns as it changes those of the application's own entities.
 
-- **Adding fields** adds columns to the copy. A new field is the application's, and the module's
-  forms, pages and processes do not show it until a layer on them adds it.
-- **Changing a field** _(planned for M26)_. A layer may change a label, a default, `required`, a length, a range or an
+- **Adding fields** adds columns to the copy, and the record API reads and writes them. A new field is
+  the application's, and the module's forms, pages and processes do not show it unless a layer on them
+  adds it.
+- **Changing a field.** A layer may change a label, a default, `required`, a length, a range or an
   enum's `values`. A change of type, and a field removed, follow the
-  [migration](migrations.md#migrations) rules of the application's own entities. The
-  application's `migration` names the entity as `<module id>/<entity>`. Without it, activation is
-  refused, and the schema diagnostic (`AXC0015` for a column with no field, `AXC0016` for an
-  incompatible change) is reported in the layer file at the remove or at the changed property.
-  The active release stays.
-- **Removing a field** that the module still reads is refused with `AXC0375` at the remove, `/changes/fields/{i}`
-  of the layer file. The readers are the entity's contract, and the module's data sources and forms on the entity
-  that the application does not also layer, because a layer of its own can stop the reading. The names match
-  ignoring letter case. The message names the first reader's file. The application's
-  [migration](migrations.md#migrations) drops the column of the removed field, by naming `<module id>/<entity>`.
+  [migration](migrations.md#migrations) rules of the application's own entities: the application's
+  `migration` names the entity as `<module id>/<entity>` and converts or drops the column. Without it,
+  activation is refused and the active release stays, and the schema diagnostic, `AXC0015` for a column
+  with no field or `AXC0016` for an incompatible change, is reported in the layer file at the remove or
+  at the changed property.
+- **Removing a field** that the module still reads is refused with `AXC0375` at the remove,
+  `/changes/fields/{i}` of the layer file. The readers are the entity's contract, and the module's data
+  sources and forms on the entity that the application does not also layer, because a layer of their
+  own can stop the reading. The names match ignoring letter case, and the message names the first
+  reader's file.
 - **Validations** that the layer adds run with the entity's own, before the core validations.
 
 ## Extending a lifecycle
@@ -247,76 +244,77 @@ the module's.
 
 ## In Studio
 
-Studio shows each module resource with the application's layer applied, and an author changes it
-as they change any resource of their own. The [authoring API](authoring.md) reads the resource with the layer
-applied, its marks and its removed elements, its [save route](module-resource-saves.md) writes the layer, and its
-[reset route](module-resource-saves.md#element-reset) takes one element out of it. All three are built. The module entity editor,
-the module process editor and the module page editor are built, with their Customized tag, **Reset all**, the element marks and
-**Reset to module**. The module process opens in the [process designer](process-designer.md), and
-its marks and resets are on steps. A module text opens in the text table with the layer applied, with Added and Changed marks on
-its keys, **Reset to module** and **Reset all**. A module policy opens in the module editor, built with the policy matrix's
-action checkboxes, and its marks and resets are on grants, keyed by `name`. It edits a grant's actions and removes grants, and
-shows a grant's filter and fields read-only, and there is no way yet to add a grant. A grant past the module contract's ceiling
-(`AXC0334`) shows in the Problems panel after the save. A module form opens in the [form designer](form-designer.md) with the layer applied. Its marks and resets are
-on sections and steps, keyed by `name`, and on a section's fields, keyed by `field`, all in the outline. A module contract opens in its contract editor, where the author adds and removes
-the application's own states and transitions, marked **Added**, and **Save** writes the contract's layer. The module page opens in the [page designer](studio.md), and its marks
-and resets are on widgets, actions, row actions, toolbar actions, columns and tabs. The canvas draws the saved page
-with the layer, so it changes after a save or a reset. A module data source, rule, trigger, sequence and event open in their
-schema form editors, and a module seed in the seed grid, with the layer applied, the Customized tag, **Reset all** and **Save**.
-The data source's `fields`, `parameters` and `aggregate.groupBy` and the seed's `records` carry the element marks and
-**Reset to module**. A `groupBy` entry written as a plain name is keyed by that name. A rule, trigger, sequence or event has no
-keyed list, so it shows only the Customized tag and **Reset all**. In these forms `name` shows as text, because the save route
-refuses a renamed module resource.
+Studio shows each module resource with the application's layer applied, and an author changes it as
+they change a resource of their own. The [authoring API](authoring.md#routes) reads the resource with
+the layer applied, its marks and its removed elements, its [save route](module-resource-saves.md)
+writes the layer, and its [reset route](module-resource-saves.md#element-reset) takes one element out
+of it.
 
-- **Editable.** The module groups list every resource of the modules the application uses, by
-  `<module id>/<name>`, and each opens in the editor of its kind instead of the read-only view.
-  Only module scenarios stay read-only, as their content in JSON. A contract opens in its editor: the author adds and removes the
-  application's own states and transitions, marked **Added**, and the module's own stay read-only. **Save**
-  writes the contract's layer, see [module contracts in Studio](module-contracts.md#in-studio).
-- **Marks.** An element the layer added shows **Added**, one it changed **Changed**, and the
-  editor's header shows that the resource has a layer. A removed element stays listed as **Removed**
-  in a muted row.
-- **Module pages.** A module page opens in the [page designer](studio.md) with every input on and a
-  Save button, and with no Form tab, JSON tab, Undo or Delete. A widget, action, row action, toolbar
-  action, column or tab that the layer added or changed is marked on its tree row, its card or its
-  row in the container's panel. A change inside a nested widget also marks every container that holds
-  it as **Changed**. A label is a plain text key, with no box for each locale, so a save writes no
-  text. The canvas draws the saved page from the [module page route](draft-page-metadata.md), so it
-  changes after **Save** or a reset and not while the author types.
-- **Reset.** Each added, changed or removed element has **Reset to module**, which takes it out of
-  the layer with the [reset route](module-resource-saves.md#element-reset) and keeps the rest of the layer.
-  The resource's header has **Reset all**, which deletes the layer file with the
-  [delete of the layer resource](authoring.md#routes).
-- **Saving writes the difference.** Studio sends the edited resource whole. The authoring API
-  compares it with the pinned module version, by the list keys, and writes the layer that holds
-  only the difference: changed properties, added elements with their place, and removes. A save
-  that leaves no difference deletes the layer file. The file is never edited by hand to save from
-  Studio. A save is refused when it changes `id`, `kind`, `name` or `formatVersion`, drops a
-  property of the module, leaves a keyed element without a key, repeats a key or changes only the
-  letter case of one.
-- **Drawing a draft form.** For the form designer's canvas, the authoring API turns an unsaved module form into
-  the layer in memory and answers its widget without writing anything, see
+The module groups list every resource of the modules that the application uses, by
+`<module id>/<name>`, and each opens in the editor of its kind:
+
+| Kind                                   | Editor                                                                                          | Marks and Reset to module on                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `entity`                               | The [entity designer](entity-designer.md#module-entities)                                       | Fields, indexes and validations                                                                  |
+| `process`                              | The [process designer](process-designer.md#module-processes)                                    | Steps                                                                                            |
+| `form`                                 | The [form designer](form-designer.md#module-forms)                                              | Sections and steps, keyed by `name`, and a section's fields, keyed by `field`, in the outline    |
+| `page`                                 | The [page designer](studio.md#page-designer), see module pages below                           | Widgets, actions, row actions, toolbar actions, columns and tabs                                 |
+| `policy`                               | The module editor, with the policy matrix's action checkboxes                                   | Grants, keyed by `name`                                                                          |
+| `text`                                 | The text table                                                                                  | Keys, with Added and Changed marks                                                               |
+| `contract`                             | The [contract editor](module-contracts.md#in-studio)                                            | The application's own states and transitions, marked **Added**                                   |
+| `dataSource`                           | Its schema form editor                                                                          | `fields`, `parameters` and `aggregate.groupBy`, where an entry written as a plain name is keyed by it |
+| `seed`                                 | The seed grid                                                                                   | `records`                                                                                        |
+| `rule`, `trigger`, `sequence`, `event` | Its schema form editor                                                                          | None, because these have no keyed list                                                           |
+| `scenario`                             | None: it stays read-only, as its content in JSON                                                |                                                                                                  |
+
+- **Marks.** An element that the layer added shows **Added**, one it changed **Changed**, and one it
+  removed stays listed as **Removed**, in a muted row. When the resource has a layer, its header shows
+  a Customized tag and **Reset all**.
+- **Names.** In the schema form editors `name` shows as text, because the save route refuses a renamed
+  module resource.
+- **Module policies.** The module editor edits a grant's actions and removes grants, and shows a
+  grant's filter and fields read-only. It does not add a grant. A grant past the module contract's
+  ceiling (`AXC0334`) shows in the Problems panel after the save.
+- **Module pages.** A module page opens in the page designer with every input on and a Save
+  button, and with no Form tab, JSON tab, Undo or Delete. A widget, action, row action, toolbar action,
+  column or tab that the layer added or changed is marked on its tree row, its card or its row in the
+  container's panel, and a change inside a nested widget also marks every container that holds it as
+  **Changed**. A label is a plain text key, with no box for each locale, so a save writes no text. The
+  canvas draws the saved page from the [module page route](draft-page-metadata.md), so it changes after
+  **Save** or a reset and not while the author types.
+- **Reset.** Each added, changed or removed element has **Reset to module**, which takes it out of the
+  layer with the reset route and keeps the rest of the layer. **Reset all** deletes the layer file with
+  the [delete of the layer resource](authoring.md#routes).
+- **Saving writes the difference.** Studio sends the edited resource whole. The authoring API compares
+  it with the pinned module version, by the list keys, and writes the layer that holds only the
+  difference: changed properties, added elements with their place, and removes. A save that leaves no
+  difference deletes the layer file, so nobody edits the file by hand to save from Studio. A save is
+  refused when it changes `id`, `kind`, `name` or `formatVersion`, drops a property of the module,
+  leaves a keyed element without a key, repeats a key or changes only the letter case of one.
+- **Drawing a draft form.** For the form designer's canvas, the authoring API turns an unsaved module
+  form into the layer in memory and answers its widget without writing anything, see
   [a module form draft](draft-page-metadata.md).
-- **Refused changes.** A save is checked like any save. A change that breaks the contract, such as
-  a step that moves a request to `approved` past its guard, publishes as a failed contract scenario
-  or a refused write, and a change that adds a transition into a protected state is a diagnostic in
-  the editor.
+- **Refused changes.** A save is checked like any save. A change that breaks the contract, such as a
+  step that moves a request to `approved` past its guard, publishes as a failed contract scenario or a
+  refused write, and a change that adds a transition into a protected state is a diagnostic in the
+  editor.
 
 ## Versions until M29
 
-- **Pinning.** A layer applies to the module version the application pins. Until module upgrades
-  _(planned for M29)_ merge three ways, a newer installed version in range is applied with the same
-  layer, by keys.
+A layer applies to the module version that the application pins, and a newer installed version in
+range is applied with the same layer, by keys. The three-way merge that replaces this is in
+[upgrades with module migrations](modules-and-templates.md#upgrades-with-module-migrations).
+
 - **A key the new version lacks.** The compile compares the version it picks with the copy of the
-  module in the application's active release. A layer element that changes a key which the old
-  version has and the new one lacks is `AXC0372` at that key in the layer file, and the element is not
-  added. A missing anchor (`AXC0368`) or a removed target after a version change fails the same way.
-  Each affected module also gets one `AXC0373` on its entry in `application.json`. It names the
-  module, the version in the active release, the new version and the layer files that no longer apply.
-  The publish, `axis-admin activate` or startup stores no release, the release in use stays active and
-  the failed request carries these diagnostics. With no active release, or with the same version as the
-  active release, the compare does not run and an element whose key the module lacks is an added
-  element. Only the step from the active version to the new one is compared.
-- **Built-in modules.** No new version of a built-in module ships to a business that has a layer
-  over it before M29, as
-  [D117](../decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees.
+  module in the application's active release. A layer element that changes a key which the old version
+  has and the new one lacks is `AXC0372` at that key in the layer file, and the element is not added. A
+  missing anchor (`AXC0368`) or a removed target after a version change fails the same way.
+- **The module entry.** Each affected module also gets one `AXC0373` on its entry in
+  `application.json`, which names the module, the version in the active release, the new version and
+  the layer files that do not apply to it. The publish, `axis-admin activate` or startup stores no
+  release, the release in use stays active, and the failed request carries these diagnostics.
+- **When nothing is compared.** With no active release, or with the same version as the active release,
+  the compare does not run, and an element whose key the module lacks is an added element. Only the
+  step from the active version to the new one is compared.
+- **Built-in modules.** A new version of a built-in module ships to a business that has a layer over it
+  only with the three-way merge, so the layer is merged and not applied again by keys.

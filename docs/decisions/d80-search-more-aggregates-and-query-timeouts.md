@@ -2,63 +2,45 @@
 
 Status: **Agreed**
 
-M15 makes search use an index and reach more fields, adds aggregates to data
-sources, and bounds every interactive query by a timeout. The owner agreed
-these points on 2026-10-25. It is built in M15. See
-[paging and sorting](../reference/record-api.md#paging-and-sorting),
-[data source aggregates](../reference/data-sources.md#aggregates) and
-[data settings](../reference/host-settings.md#data-settings).
+## Context
 
-- **Search:**
-  - A `text` field takes `searchable: true`. Each such field gets a `pg_trgm`
-    GIN index on `lower()` of its column. The display field is searchable
-    whether or not it says so.
-  - `search` keeps the records where any searchable field that the user may
-    read contains the text, ignoring letter case. It stays a substring match
-    with no wildcards, so it works the same in Vietnamese and every other
-    language, with no stemming.
-  - The query and its rules do not change: one `search` parameter, at most
-    200 characters, and a `409` when a searchable field is pending.
-  - A data source takes `"search": true` to accept `search` over its
-    projected searchable fields.
-  - `Axis.Admin` creates the `pg_trgm` extension at `tenant create`, and
-    `migrate` creates it in existing tenant databases.
-  - Ranked word search waits.
-- **More aggregates:**
-  - Data source measures add `avg` and `countDistinct`, and each measure takes
-    an optional `filter` that keeps only the rows it counts.
-  - A `groupBy` entry on a date or date-time field takes a bucket: `day`,
-    `week`, `month` or `year`. Date-time buckets use the application time zone
-    of [D75](d75-the-application-time-zone.md).
-  - Expressions add `avg(list, item)`.
-  - A data source over a child entity stays refused (`AXC0064`).
-- **Query timeouts:**
-  - Every interactive read runs with `SET LOCAL statement_timeout` from
-    `Data:QueryTimeout`, 10 seconds by default. Exports use
-    `Data:ExportQueryTimeout`. Every work item on the worker, imports among
-    them, runs under `Worker:StatementTimeout`, one minute by default. The
-    write transaction of record create, update and delete, process start, task
-    complete and an inbound endpoint call runs with
-    `SET LOCAL statement_timeout` from `Data:WriteTimeout`, 15 seconds by
-    default.
-  - Activation runs with `SET LOCAL statement_timeout` from
-    `Data:ActivationTimeout`, 30 minutes by default. An activation past it
-    rolls back and keeps the previous release.
-  - A statement that runs past it, SQLSTATE `57014`, is a `503` with a fixed
-    title. A write that ran past its limit rolled back and wrote nothing, and
-    its title says to try again. The server logs the data source or entity name and the duration,
-    never a value, and counts timeouts in a metric.
-  - When only the count statement of a list times out, the answer is `200`
-    with `totalCount: null`.
-  - The limits are set against the SLOs of [D82](d82-performance-slos-and-load-tests.md).
-    Each is about 30 times the p95 objective of its group, 10 seconds for
-    reads (300 ms) and 15 seconds for writes (500 ms), so it stops only a
-    runaway statement. M15 ships the mechanism and the read defaults.
+Search on the display field alone misses what users type, and a scan of the whole table does not
+scale to the typical application size. Dashboards first ask for averages, distinct counts, filtered
+measures and totals by month. And one slow query can hold a database connection that every other
+user needs.
 
-_Why:_ search on the display field alone misses what users type, and a scan
-of the whole table does not scale to the typical application size. Trigram
-indexes serve substring search in any language, which suits Vietnamese
-better than word stemming. Averages, distinct counts, filtered measures and
-date buckets are what dashboards ask for first. A timeout keeps one slow
-query from holding a connection for everyone, and a fixed `503` tells the
-client to try again without leaking the query.
+## Decision
+
+- **Search is a substring match over searchable fields.** A `text` field takes `searchable`, and
+  `search` keeps the records where the display field or any searchable field the user may read
+  contains the text, ignoring letter case, with no wildcards and no stemming. Each searched column
+  gets a `pg_trgm` index, and a data source opts in with `"search": true`.
+- **Data sources get more aggregates.** Measures add `avg` and `countDistinct`, each measure takes an
+  optional `filter`, and a `groupBy` entry on a date or date-time field takes a `day`, `week`,
+  `month` or `year` bucket in the [application time zone](d75-the-application-time-zone.md).
+  Expressions add `avg(list, item)`.
+- **Every statement runs under a timeout.** Interactive reads, exports, writes, worker items and
+  activation each run with `SET LOCAL statement_timeout` from a setting of their own. Each default
+  is about 30 times the p95 objective of its group in the [SLOs](d82-performance-slos-and-load-tests.md),
+  so it stops only a runaway statement.
+- **A timeout is a fixed `503`.** Its title tells the client to try again and names no query, and a
+  write that timed out wrote nothing. The server logs the source and the duration, never a value,
+  and counts timeouts in a metric. When only a list's count times out, the list still answers, with
+  no total.
+
+The detail is in [paging and sorting](../reference/record-api.md#paging-and-sorting),
+[data source aggregates](../reference/data-sources.md#aggregates),
+[data settings](../reference/host-settings.md#data-settings) and the
+[performance targets](../reference/performance.md).
+
+## Consequences
+
+- Search works the same in Vietnamese and every other language, and finds no word forms.
+- A slow query fails for its own user instead of slowing everyone, and the client learns nothing of
+  the query.
+
+## Alternatives
+
+- **Word search with stemming.** It ranks results, but stemming suits Vietnamese worse than a
+  substring match does.
+- **No timeout.** One runaway query would hold a connection for everyone.

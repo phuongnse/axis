@@ -2,50 +2,34 @@
 
 Status: **Agreed**
 
-Asset management is the fourth sample application. It proves M15 the way the
-service desk of
-[D56](d56-a-service-desk-as-the-third-sample-application.md) proved M11 to
-M13, as [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
-planned. The owner agreed these points on 2026-10-25. The data, security, pages,
-dashboard, and import and export are built in M15. The maintenance and software
-scenario is built. The import and attachment scenarios, and the denied cases they
-lack, are _(planned for M30)_. See the
-[Fourth application section](../product-brief.md#fourth-application-asset-management)
-of the product brief for the data, security, pages and scenarios.
+## Context
 
-- **Application:** asset management, in `samples/apps/asset-management`. An
-  asset manager keeps a register of the company's assets, who holds them and
-  their maintenance. Its shape is a register with a dashboard, not a request
-  and an approval.
-- **Data:**
-  - An asset has a number from the sequence `AS-{n:6}`, a name, a category, a
-    status with labelled values, a location, a holder, a purchase cost in
-    money with a currency field, a purchase date and a warranty end date. Its
-    attachments are a child collection of files. Its software is a
-    `references` field.
-  - Maintenance entries are child rows that point to a vendor.
-  - Category, location, vendor and software are root entities. Categories and
-    locations are seeded.
-- **Import and export:** an asset manager imports assets from a CSV file, and
-  an auditor exports the asset register.
-- **Dashboard:** asset value by location in each currency, assets by status,
-  and a KPI of warranties that end within 30 days.
-- **Security:** the roles are `asset-manager`, `employee` and `auditor`. An
-  asset manager reads and writes everything. An employee reads only the
-  assets they hold. An auditor reads and exports everything and writes
-  nothing.
-- **Warranty reminders:** a scheduled job reminds the asset manager of
-  warranties that end soon, with the notifications of
-  [D73](d73-in-app-and-email-notifications.md). The process and its weekday
-  trigger exist, and the reminder is sent in the site. It goes to the
-  `asset-manager` role, so it is in-app only, because email to a role is a
-  compile error under [D73](d73-in-app-and-email-notifications.md).
-- **Built through Studio:** a Playwright journey builds the application through
-  Studio only, compares its six parts with the committed folder, runs its
-  scenarios from Studio, publishes it, imports assets and exports the register
-  on the site, as the service desk journey does.
+The data modeling milestone adds files, money, labelled enum values, many-to-many, references from
+child rows, import and export, and dashboards. The existing samples are two approvals and a service
+desk, and none of them has the shape of a register.
+[D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) named asset management
+as the sample for it.
 
-_Why:_ the existing samples are two approvals and a service desk. A register
-with files, money, many-to-many, import and a dashboard is a shape none of
-them has, and it is the shape D46 named for M15. Building it through Studio
-only proves that an author can use every new field type without JSON.
+## Decision
+
+- **Asset management is the fourth sample,** in `samples/apps/asset-management`. An asset manager
+  keeps a register of the company's assets, who holds them and their maintenance. Its shape is a
+  register with a dashboard, not a request and an approval.
+- **It uses every new kind of field:** files on child rows, money with a currency field, labelled
+  status values, a `references` field, and child rows that point to another entity.
+- **It imports and exports.** An asset manager imports assets from a CSV file, and an auditor
+  exports the register.
+- **It has its own roles,** `asset-manager`, `employee` and `auditor`, where the auditor reads and
+  exports everything and writes nothing.
+- **A Playwright journey builds it through Studio,** as the service desk journey does in
+  [D56](d56-a-service-desk-as-the-third-sample-application.md), compares it with the committed
+  folder, runs its scenarios from Studio, publishes it, and imports and exports on the site.
+
+Its data, flow, security, pages, scenarios and journey are in the
+[product brief](../product-brief.md#fourth-application-asset-management).
+
+## Consequences
+
+- Building it through Studio proves that an author can use every new field type without JSON.
+- Its warranty reminder goes to a role, so it is sent in-app only, because email to a role is
+  refused, see [notifications](../reference/notifications.md).
