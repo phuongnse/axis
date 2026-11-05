@@ -37,8 +37,8 @@ session.
   or by `Axis.Admin cell operator invite <email>` for the first one. That command makes the realm, or
   brings it up to date, and removes any brokered provider that it finds, see
   [cell operator invite](administration.md#cell-operator-invite).
-- **Second factor.** Every sign-in needs a password and a second factor: an authenticator app or a
-  passkey. The realm's required action sets one up at the first sign-in, and an account without one
+- **Second factor.** Every sign-in needs a password and a code from an authenticator app. The realm's
+  required action sets one up at the first sign-in, and an account without one
   cannot finish signing in.
 - **Session.** The console uses a BFF session: the server holds the session and the browser holds
   only a cookie that names it. The session is a row of `platform.operator_sessions`, because it

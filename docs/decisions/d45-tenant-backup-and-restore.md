@@ -35,5 +35,5 @@ and the effect on running work in [execution](../domain/knowledge.md#execution).
 - Restoring never overwrites live data.
 - A call staged after the backup gets a new idempotency key, so an external system may act twice.
 - Point-in-time recovery of one tenant and restoring into another installation are not offered, as
-  the [product brief](../product-brief.md#out-of-scope-for-now) keeps migrating live data out of
+  the [product brief](../product-brief.md#out-of-scope) keeps migrating live data out of
   scope.

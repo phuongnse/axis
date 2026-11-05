@@ -113,7 +113,7 @@ These are the qualities that Axis aims for in everything it builds.
 6. **Author-friendly.** Resources are readable files with stable identities, so people and AI agents
    can review, diff and edit them. Studio edits the same files through the same contracts.
 
-## Out of scope for now
+## Out of scope
 
 These are expected later. They must not shape the milestones before them beyond keeping the agreed
 extension points.

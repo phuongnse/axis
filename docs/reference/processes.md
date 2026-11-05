@@ -529,7 +529,7 @@ raises `FinanceThreshold()` to 15000.
 6. After the R1 instance ends, `?release=<R1>` still answers with R1's texts, because R1 is still a
    stored release of the site's application.
 
-## Limits in M3
+## Limits
 
 Two limits apply to every process, and an author should know them when writing one.
 

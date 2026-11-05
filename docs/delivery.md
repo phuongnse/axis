@@ -204,7 +204,8 @@ A milestone goes from a readiness check to its close in five steps.
    no NexKit, so it can go on while other milestones run.
 2. **Break it down.** On a *ready* verdict, the local agent breaks the milestone into issues, as the
    [roadmap](roadmap.md#how-work-is-planned) describes, and checks the [profiles](#profiles) against
-   the new milestone's concepts and the models available. Profile fixes are hand-made pull requests.
+   the new milestone's concepts and the models available, and sets the milestone's roadmap status to
+   In progress, in a hand-made docs change. Profile fixes are hand-made pull requests.
 3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
    issue of every milestone at once.
 4. **Docs sweep.** Before the owner closes the milestone, one issue in it checks the docs and fixes

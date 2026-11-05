@@ -170,7 +170,7 @@ group.
 - **Empty `groupBy`.** The data source has one total row, even when no row passes the filter. Then
   `count` and `countDistinct` are 0 and the other measures are `null`.
 
-### Added in M15
+### Enum labels, files and export
 
 Data sources handle enum labels and file fields, and can be exported:
 

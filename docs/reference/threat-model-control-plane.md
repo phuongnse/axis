@@ -1,11 +1,11 @@
 # Threat model: the control plane
 
+_(planned for M33)_
+
 This page holds the threats to the control plane, the **C** scope of the
 [threat model](threat-model.md). The control plane runs sign-up, trials and billing for Axis SaaS,
 apart from the cells. How its rows are found, rated and checked is in
 [threat model method](threat-model-method.md).
-
-_(planned for M33)_
 
 ## The control plane
 
