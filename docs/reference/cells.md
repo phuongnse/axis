@@ -50,9 +50,13 @@ A host runs as a cell when `Cell:Id` is set, see [cell settings](host-settings.m
      a match the request expires. Step 2 is built.
   3. Only then does the cell create a cert-manager `Certificate` for the host, with the HTTP-01
      challenge, and add the host to the tenant, which keeps the realm's redirect addresses in step
-     as `tenant host add` does. The adding and the redirect addresses are built, and the
-     certificate is _(planned for M31)_. A verified host is in the directory, but the ingress has no
-     route or certificate for it yet.
+     as `tenant host add` does. The adding, the redirect addresses and the certificate are built.
+     The publisher creates the `Certificate` through the Kubernetes API with its own service account,
+     named after the host, with the Issuer `<release>-tenant-hosts` that the chart renders for the
+     HTTP-01 challenge. It does so before it marks the request `verified`, and a `Certificate` that
+     exists counts as done. A cell without `cell.certificate.enabled` writes none. A verified host is
+     in the directory and has a certificate, but the ingress has no route for it yet, which is
+     _(planned for M31)_.
   4. A host that is not verified is never served: the ingress has no route for it, and the server
      answers `404` for it, as for any unknown host.
   - A host that a deleted tenant used is held back for 90 days, see

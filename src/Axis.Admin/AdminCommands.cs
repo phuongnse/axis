@@ -35,6 +35,8 @@ internal static partial class AdminCommands
 
     public const string HostCheckIntervalSetting = "Cell:HostCheckInterval";
 
+    public const string HostCertificateIssuerSetting = "Cell:HostCertificateIssuer";
+
     public static readonly TimeSpan DefaultHostCheckInterval = TimeSpan.FromMinutes(10);
 
     public const string ScenarioServerSetting = "Scenarios:ServerConnectionString";
@@ -120,7 +122,7 @@ internal static partial class AdminCommands
         CancellationToken cancellationToken) =>
         RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, null, cancellationToken);
 
-    // The publisher lease, the test limit, the identity provider handler and the DNS resolver are parameters so that tests can use short ones and a stub.
+    // The publisher lease, the test limit, the identity provider handler, the DNS resolver and the certificate writer are parameters so that tests can use short ones and a stub.
     // The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
@@ -132,7 +134,8 @@ internal static partial class AdminCommands
         TimeSpan publisherTestLimit,
         HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken,
-        IDnsTxtResolver? dnsResolver = null)
+        IDnsTxtResolver? dnsResolver = null,
+        ICertificateWriter? certificateWriter = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -174,7 +177,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken, dnsResolver));
+        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken, dnsResolver, certificateWriter));
     }
 
     /// <summary>
@@ -211,7 +214,7 @@ internal static partial class AdminCommands
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
-        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CancellationToken)),
+        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CertificateWriter, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
 
@@ -1274,6 +1277,7 @@ internal static partial class AdminCommands
         TimeSpan testLimit,
         HttpMessageHandler? identityProviderHandler,
         IDnsTxtResolver? dnsResolver,
+        ICertificateWriter? certificateWriter,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -1295,7 +1299,7 @@ internal static partial class AdminCommands
         }
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, dnsResolver, cancellationToken)
+            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, cancellationToken)
             : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
@@ -1308,6 +1312,7 @@ internal static partial class AdminCommands
         TimeSpan testLimit,
         HttpMessageHandler? identityProviderHandler,
         IDnsTxtResolver? dnsResolver,
+        ICertificateWriter? certificateWriter,
         CancellationToken cancellationToken)
     {
         TimeSpan refreshInterval;
@@ -1338,6 +1343,19 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        // A blank issuer is no certificate. A set one needs the service account of the pod, so a publisher outside a cluster stops here.
+        var certificateIssuer = configuration[HostCertificateIssuerSetting]?.Trim();
+        ICertificateWriter? certificates = null;
+        if (!string.IsNullOrEmpty(certificateIssuer))
+        {
+            certificates = certificateWriter ?? KubernetesCertificateWriter.InCluster(certificateIssuer);
+            if (certificates is null)
+            {
+                error.WriteLine($"The setting {HostCertificateIssuerSetting} is set, but the publisher has no Kubernetes service account.");
+                return 2;
+            }
+        }
+
         using var http = IdentityProviderClient(identityProviderHandler);
         var jobs = ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString);
 
@@ -1366,7 +1384,8 @@ internal static partial class AdminCommands
                 settings.Platform.Cipher,
                 http,
                 dnsResolver ?? new DnsClientTxtResolver(),
-                hostCheckInterval)).RunAsync();
+                hostCheckInterval,
+                certificates)).RunAsync();
     }
 
     // A blank setting is the default. A setting's own value is never echoed, so the message says only which setting is wrong.

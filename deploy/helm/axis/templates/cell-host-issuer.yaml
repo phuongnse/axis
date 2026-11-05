@@ -1,0 +1,26 @@
+{{- if .Values.cell.certificate.enabled }}
+{{- $issuer := .Values.cell.certificate.issuer }}
+{{- $class := .Values.cell.certificate.http01.ingressClassName }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Release.Name }}-tenant-hosts
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+spec:
+  acme:
+    server: {{ required "cell.certificate.issuer.server is required: the ACME directory URL" $issuer.server | quote }}
+    {{- if $issuer.email }}
+    email: {{ $issuer.email | quote }}
+    {{- end }}
+    privateKeySecretRef:
+      name: {{ .Release.Name }}-tenant-hosts-acme-account
+    solvers:
+      - http01:
+          {{- if $class }}
+          ingress:
+            ingressClassName: {{ $class | quote }}
+          {{- else }}
+          ingress: {}
+          {{- end }}
+{{- end }}

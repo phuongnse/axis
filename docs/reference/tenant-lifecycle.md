@@ -145,17 +145,20 @@ The [publisher](administration.md#publisher) checks the customer's DNS records, 
   and skips the rows that another publisher holds. A request is not checked twice in one interval,
   also across restarts and several publishers.
 - **Verified.** When a `TXT` record of `_axis-verify.<host>` equals the token, the host joins the
-  tenant, the realm's redirect addresses gain it, and the request becomes `verified`. The
+  tenant, the realm's redirect addresses gain it, the publisher creates the host's cert-manager
+  `Certificate` when the cell has certificates on, and the request becomes `verified`. The
   [platform audit record](tenant-setting-commands.md#platform-audit-records) is named
   `tenant host verify` and names the operator who asked for the host as its actor. The request is
-  marked last, so a stop or a failed realm update is retried in the next round, and a host that the
+  marked last, so a stop, a failed realm update or a failed certificate write is retried in the
+  next round (a `Certificate` that exists counts as written), and a host that the
   tenant already holds is not added or audited twice. A host is never verified without a matching
   record.
 - **Pending.** A wrong token, no record or a DNS failure leaves the request pending, and the failure
   only writes a line. The request also stays pending when another tenant holds the host.
 
-The certificate of a verified host is _(planned for M31)_. Until it exists the host is in the
-directory, but the ingress has no route or certificate for it.
+The [certificate](cells.md#hosts-and-certificates) of a verified host is built. The route of the
+ingress for the host is _(planned for M31)_. Until it exists the host is in the directory and has a
+certificate, but the ingress has no route for it.
 
 ## Exporting a tenant
 
