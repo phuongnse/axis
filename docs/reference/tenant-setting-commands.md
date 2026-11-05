@@ -445,7 +445,8 @@ keys. It can be rotated without signing anyone out.
   `tenant legal clear`, which name the [legal links](#legal-links) they changed. `tenant quotas set` is built too. The quotas route of the
   [provisioning API](tenant-lifecycle.md#provisioning-api), `PUT /api/cell/tenants/{id}/quotas`, writes it with the quota keys it was given
   in `changed`, in one transaction with the rows, and the record has no operator or machine caller. `platform rekey` is
-  built and writes one record for the whole run, with no tenant. A `suspend` or `resume` job that the
+  built and writes one record for the whole run, with no tenant. The [publisher](administration.md#publisher) writes
+  `tenant host verify` when it verifies a host request and the host joins the tenant, with the actor of the request. A `suspend` or `resume` job that the
   [publisher](administration.md#publisher) runs writes one record when it ends, with the command name of `tenant suspend` or
   `tenant resume`, `job:<id>` in `changed` and the job's actor, in the same transaction as the job's final state. `tenant list`, `tenant binding list`, `version` and `publisher`
   write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as

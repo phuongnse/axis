@@ -70,14 +70,15 @@ internal static class TenantSettingWrites
         IReadOnlyList<string> tenantIds,
         Func<CancellationToken, Task<TenantSettingResult?>> change,
         string conflictMessage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? actor = null)
     {
         try
         {
             await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
             try
             {
-                await PlatformAuditRecords.WriteAsync(platform, command, auditTenantId, changed, cancellationToken);
+                await PlatformAuditRecords.WriteAsync(platform, command, auditTenantId, changed, actor, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

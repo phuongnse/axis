@@ -33,6 +33,10 @@ internal static partial class AdminCommands
 
     public const string InlineRecomputeLimitSetting = "Activation:InlineRecomputeLimit";
 
+    public const string HostCheckIntervalSetting = "Cell:HostCheckInterval";
+
+    public static readonly TimeSpan DefaultHostCheckInterval = TimeSpan.FromMinutes(10);
+
     public const string ScenarioServerSetting = "Scenarios:ServerConnectionString";
 
     public const string DotnetEnvironmentSetting = "DOTNET_ENVIRONMENT";
@@ -116,7 +120,7 @@ internal static partial class AdminCommands
         CancellationToken cancellationToken) =>
         RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, null, cancellationToken);
 
-    // The publisher lease, the test limit and the identity provider handler are parameters so that tests can use short ones and a stub.
+    // The publisher lease, the test limit, the identity provider handler and the DNS resolver are parameters so that tests can use short ones and a stub.
     // The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
@@ -127,7 +131,8 @@ internal static partial class AdminCommands
         TimeSpan publisherLease,
         TimeSpan publisherTestLimit,
         HttpMessageHandler? identityProviderHandler,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IDnsTxtResolver? dnsResolver = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -169,7 +174,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken));
+        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken, dnsResolver));
     }
 
     /// <summary>
@@ -206,7 +211,7 @@ internal static partial class AdminCommands
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
-        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
+        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
 
@@ -1268,6 +1273,7 @@ internal static partial class AdminCommands
         TimeSpan lease,
         TimeSpan testLimit,
         HttpMessageHandler? identityProviderHandler,
+        IDnsTxtResolver? dnsResolver,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -1289,7 +1295,7 @@ internal static partial class AdminCommands
         }
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, cancellationToken)
+            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, dnsResolver, cancellationToken)
             : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
@@ -1301,6 +1307,7 @@ internal static partial class AdminCommands
         TimeSpan lease,
         TimeSpan testLimit,
         HttpMessageHandler? identityProviderHandler,
+        IDnsTxtResolver? dnsResolver,
         CancellationToken cancellationToken)
     {
         TimeSpan refreshInterval;
@@ -1311,6 +1318,11 @@ internal static partial class AdminCommands
         catch (InvalidOperationException)
         {
             error.WriteLine($"The setting {TenancySettings.RefreshIntervalSetting} must be a positive time span, such as 00:00:30.");
+            return 2;
+        }
+
+        if (!TryReadHostCheckInterval(configuration, error, out var hostCheckInterval))
+        {
             return 2;
         }
 
@@ -1348,7 +1360,32 @@ internal static partial class AdminCommands
             output,
             error,
             cancellationToken,
-            new ProvisioningJobs(settings.Platform.PlatformConnectionString, jobs, lease)).RunAsync();
+            new ProvisioningJobs(settings.Platform.PlatformConnectionString, jobs, lease),
+            new TenantHostVerification(
+                settings.Platform.PlatformConnectionString,
+                settings.Platform.Cipher,
+                http,
+                dnsResolver ?? new DnsClientTxtResolver(),
+                hostCheckInterval)).RunAsync();
+    }
+
+    // A blank setting is the default. A setting's own value is never echoed, so the message says only which setting is wrong.
+    private static bool TryReadHostCheckInterval(IConfiguration configuration, TextWriter error, out TimeSpan interval)
+    {
+        var value = configuration[HostCheckIntervalSetting];
+        interval = DefaultHostCheckInterval;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out interval) && interval > TimeSpan.Zero)
+        {
+            return true;
+        }
+
+        error.WriteLine($"The setting {HostCheckIntervalSetting} must be a positive time span, such as 00:10:00.");
+        return false;
     }
 
     // Reads each part of the create job's settings without stopping, and keeps the first problem of each part. A part that is wrong
