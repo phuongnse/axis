@@ -1,4 +1,6 @@
-import { Alert, Button, ConfigProvider, Flex, Modal, Tabs, Typography, message } from 'antd'
+import { EllipsisOutlined } from '@ant-design/icons'
+import { Alert, Button, ConfigProvider, Dropdown, Flex, Modal, Tabs, message } from 'antd'
+import { createPortal } from 'react-dom'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAnswers,
@@ -52,7 +54,7 @@ import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { JsonEditor } from './JsonEditor'
 import { SchemaForm } from './SchemaForm'
-import { RemovedNoticeContext, StudioCatalogContext } from './schemaFormSections'
+import { neverUsed, RemovedNoticeContext, StudioCatalogContext } from './schemaFormSections'
 import { SaveBar } from '../platform/SaveBar'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
@@ -180,6 +182,7 @@ export function StudioEditor({
   onDeleted,
   onOpen,
   references,
+  headingSlot,
 }: {
   application: string
   item: StudioResourceItem
@@ -191,10 +194,12 @@ export function StudioEditor({
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
   /** Proposed: the resource's Uses and Used by, which sit after its form and before its Danger zone. */
   references?: ReactNode
+  /** Proposed: the right side of the page heading, where the editor puts its "…" menu with Delete…. */
+  headingSlot?: HTMLElement | null
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
+  const { spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -227,7 +232,7 @@ export function StudioEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
-  const [tab, setTab] = useState<'design' | 'form' | 'json' | 'dependencies'>(
+  const [tab, setTab] = useState<'design' | 'form' | 'json' | 'usedBy'>(
     item.kind === 'page' || item.kind === 'form' || item.kind === 'process' ? 'design' : 'form',
   )
   const [formDrawn, setFormDrawn] = useState(false)
@@ -854,7 +859,7 @@ export function StudioEditor({
             <RemovedNoticeContext.Provider value={notifyRemoved}>
               <Tabs
                 activeKey={tab}
-                onChange={(key) => setTab(key as 'design' | 'form' | 'json' | 'dependencies')}
+                onChange={(key) => setTab(key as 'design' | 'form' | 'json' | 'usedBy')}
                 // Proposed: the JSON view's actions end the tab bar, so they take no height from it.
                 tabBarExtraContent={tab === 'json' ? <div ref={setJsonActions} /> : undefined}
                 items={[
@@ -1055,10 +1060,12 @@ export function StudioEditor({
                       </Flex>
                     ),
                   },
-                  // Proposed: what uses the resource and what it uses are a tab of their own, Dependencies, opened when
-                  // they are needed, such as before a rename or a delete, rather than a list at the foot of every page.
-                  ...(references
-                    ? [{ key: 'dependencies', label: t('shell.studio.tab.dependencies'), children: references }]
+                  // Proposed: what uses the resource is a tab of its own, Used by, opened when it is needed, before a
+                  // rename or a delete, rather than a list at the foot of every page. What the resource uses is not
+                  // listed: its editor shows it, and deleting this resource breaks nothing it uses. A kind nothing can
+                  // use has no such tab.
+                  ...(references && !neverUsed.has(item.kind)
+                    ? [{ key: 'usedBy', label: t('shell.studio.usedBy'), children: references }]
                     : []),
                 ]}
               />
@@ -1079,31 +1086,35 @@ export function StudioEditor({
       <Flex gap="small" align="center">
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
-      {item.kind !== 'application' && (
-        // Proposed: deleting a resource is the last section of its page, a Danger zone as GitHub's settings have, so the
-        // one destructive action is apart from every edit and says what it does before its dialog asks again.
-        <section
-          data-testid="studio-danger-zone"
-          style={{
-            border: `1px solid ${colour.dangerText}`,
-            borderRadius: radius.base,
-            padding: spacing.lg,
-            display: 'flex',
-            alignItems: 'center',
-            gap: spacing.md,
-          }}
-        >
-          <Flex vertical gap={4} style={{ flex: 1 }}>
-            <Typography.Title level={5} style={{ margin: 0 }}>
-              {t('shell.studio.dangerZone')}
-            </Typography.Title>
-            <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.dangerZone.delete')}</Typography.Text>
-          </Flex>
-          <AxisButton role="destructive" disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
-            {t('shell.studio.deleteResource')}
-          </AxisButton>
-        </section>
-      )}
+      {item.kind !== 'application' &&
+        (() => {
+          // Proposed: Delete… is in a "…" menu at the right of the page heading, as a tool's page puts its commands,
+          // apart from every edit and on every tab alike, rather than a Danger zone under the tabs.
+          const more = (
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  {
+                    key: 'delete',
+                    label: t('shell.studio.deleteResource'),
+                    danger: true,
+                    disabled: reconnecting,
+                    onClick: () => setDeleteOpen(true),
+                  },
+                ],
+              }}
+            >
+              <AxisButton
+                role="icon"
+                nameKey="shell.studio.moreActions"
+                icon={<EllipsisOutlined />}
+                data-testid="studio-resource-more"
+              />
+            </Dropdown>
+          )
+          return headingSlot ? createPortal(more, headingSlot) : more
+        })()}
       {messageHolder}
       <SaveBar
         // Proposed: JSON that does not parse is an unsaved change too, or the bar would leave just as it is needed.
@@ -1143,6 +1154,20 @@ export function StudioEditor({
               <>
                 {t('shell.studio.deleteUsedBy')} <strong>{item.usedBy}</strong>
               </>
+            }
+            action={
+              // Proposed: the warning leads to the Used by tab, which lists what the delete breaks.
+              !neverUsed.has(item.kind) && references ? (
+                <AxisButton
+                  role="plain"
+                  onClick={() => {
+                    setDeleteOpen(false)
+                    setTab('usedBy')
+                  }}
+                >
+                  {t('shell.studio.deleteShowUsedBy')}
+                </AxisButton>
+              ) : undefined
             }
           />
         )}

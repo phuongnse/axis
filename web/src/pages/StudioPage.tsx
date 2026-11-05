@@ -512,14 +512,21 @@ function StudioWorkspace() {
         }
         titleExtra={openRelease ? <ReleaseTags release={openRelease} /> : undefined}
         headingExtra={
-          selected && canTest && selected.kind === 'scenario' && selected.name ? (
-            <Button
-              data-testid="studio-run-scenario"
-              disabled={requestBusy || reconnecting}
-              onClick={() => publishing.current?.runTests([selected.name!])}
-            >
-              {t('shell.studio.runScenario')}
-            </Button>
+          selected ? (
+            // Proposed: a resource's heading holds its actions on the right: Run scenario for a scenario, then the "…"
+            // menu that the editor puts in the slot, with Delete….
+            <Flex gap="small" align="center">
+              {canTest && selected.kind === 'scenario' && selected.name && (
+                <Button
+                  data-testid="studio-run-scenario"
+                  disabled={requestBusy || reconnecting}
+                  onClick={() => publishing.current?.runTests([selected.name!])}
+                >
+                  {t('shell.studio.runScenario')}
+                </Button>
+              )}
+              <div ref={setHeadingSlot} style={{ display: 'contents' }} />
+            </Flex>
           ) : view.name === 'kind' &&
             !selected &&
             loaded &&
@@ -596,10 +603,10 @@ function StudioWorkspace() {
                         key={`references-${selected.id}`}
                         application={application!}
                         resourceId={selected.id}
-                        kind={selected.kind}
                       />
                     }
                     key={`editor-${selected.id}`}
+                    headingSlot={headingSlot}
                     application={application!}
                     item={selected}
                     resources={loaded.resources}

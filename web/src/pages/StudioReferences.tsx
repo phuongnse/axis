@@ -1,4 +1,4 @@
-import { Alert, Flex, Input, Segmented } from 'antd'
+import { Alert, Flex, Input } from 'antd'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { TableFilterButton, TableFilterChips } from '../platform/TableFilter'
@@ -13,9 +13,8 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
-import { EmptyState } from '../platform/EmptyState'
 import { useDesignTokens } from '../platform/themeMode'
-import { neverUsed, StudioCatalogContext, usesShownByForm } from './schemaFormSections'
+import { StudioCatalogContext } from './schemaFormSections'
 import { type StudioChangeRow } from './StudioChangeList'
 import { StudioResourceTitle } from './studioResourceTitle'
 import { kindName, kindOrder, nameCollator } from './studioViews'
@@ -26,18 +25,10 @@ type Direction = 'uses' | 'usedBy'
 export type OpenResource = (id: string, path: string | null) => void
 
 /**
- * The Dependencies of a selected resource: what uses it and what it uses, each entry a name that opens it. A load
- * failure shows an alert in their place.
+ * The Used by tab of a selected resource: what uses it, each entry a name that opens it at the reference. A load
+ * failure shows an alert in its place.
  */
-export function StudioReferences({
-  application,
-  resourceId,
-  kind,
-}: {
-  application: string
-  resourceId: string
-  kind: string
-}) {
+export function StudioReferences({ application, resourceId }: { application: string; resourceId: string }) {
   const t = useText()
   const { generation, lost } = useStudioConnection()
   const [references, setReferences] = useState<StudioResourceReferences>()
@@ -65,47 +56,23 @@ export function StudioReferences({
   if (!references) {
     return null
   }
-  // Proposed: the Dependencies tab of a resource, as low-code tools show a component's dependencies: one table at a time,
-  // Used by or Uses, chosen above it. Uses leaves out what the kind's form already shows, its labels' texts on every kind,
-  // and Used by is left out for a kind nothing can refer to, as it never applies. The same resource used the same way
-  // shows once.
-  const shownByForm = usesShownByForm[kind] ?? new Set(['text'])
-  const uses = references.uses.filter(
-    (entry) => !shownByForm.has(entry.node.type === 'resource' ? entry.node.kind : entry.node.type),
-  )
-  const directions: Direction[] = [
-    ...(neverUsed.has(kind) ? [] : (['usedBy'] as const)),
-    ...(usesShownByForm[kind] && uses.length === 0 ? [] : (['uses'] as const)),
-  ]
-  if (directions.length === 0) {
-    return <EmptyState text={t('shell.studio.usedBy.none')} />
-  }
-  return (
-    <ReferenceTable application={application} directions={directions} entries={{ uses, usedBy: references.usedBy }} />
-  )
+  // Proposed: the Used by tab of a resource lists what uses it, the references a delete or a rename breaks. What the
+  // resource uses is not listed: its editor shows it, and nothing it uses breaks when it goes. The same resource used the
+  // same way shows once.
+  return <ReferenceTable application={application} entries={references.usedBy} />
 }
 
 /**
- * Proposed: the entries of one direction as the standard table, `AxisTable`: the other resource by its label, the link
- * that opens it, its kind, and how the one uses the other, sorted by kind in the sidebar's order, then by name. Search
- * looks in all three, and the filter picks kinds, as every list's do. A choice above the table switches between Used by
- * and Uses, when both apply.
+ * Proposed: what uses a resource as the standard table, `AxisTable`: the other resource by its label, the link that
+ * opens it at the reference, its kind, and how it uses this one, sorted by kind in the sidebar's order, then by name.
+ * Search looks in all three, and the filter picks kinds, as every list's do.
  */
-function ReferenceTable({
-  application,
-  directions,
-  entries,
-}: {
-  application: string
-  directions: Direction[]
-  entries: Record<Direction, StudioReference[]>
-}) {
+function ReferenceTable({ application, entries }: { application: string; entries: StudioReference[] }) {
   const t = useText()
   const { colour } = useDesignTokens()
-  const [direction, setDirection] = useState<Direction>(directions[0])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterGroup>(emptyFilter)
-  const rows = useReferenceRows(entries[direction], application, direction)
+  const rows = useReferenceRows(entries, application, 'usedBy')
   const collator = nameCollator()
   const sorted = [...rows].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || collator.compare(a.name, b.name))
   const kinds = [...new Set(sorted.map((row) => row.kind))]
@@ -150,48 +117,31 @@ function ReferenceTable({
   const shown = searchRows(sorted, columns, search).filter((row) =>
     matchesFilter(filter, (field) => (field === 'kind' ? row.kind : null)),
   )
-  const testId = direction === 'usedBy' ? 'studio-used-by' : 'studio-uses'
   return (
-    <Flex vertical gap="middle" data-testid="studio-dependencies">
-      {directions.length > 1 && (
-        <Segmented
-          value={direction}
-          onChange={(next) => {
-            setDirection(next as Direction)
-            setFilter(emptyFilter)
-          }}
-          options={directions.map((value) => ({
-            value,
-            label: t(value === 'usedBy' ? 'shell.studio.usedBy' : 'shell.studio.uses'),
-          }))}
-          style={{ alignSelf: 'flex-start' }}
-        />
-      )}
-      <AxisTable<StudioChangeRow>
-        testId={testId}
-        dataSource={shown}
-        rowKey={(row) => row.key}
-        columns={columns}
-        emptyText={t(direction === 'usedBy' ? 'shell.studio.usedBy.none' : 'shell.studio.uses.none')}
-        pagination={false}
-        toolbar={{
-          view: (
-            <Flex gap="small" align="center">
-              <Input.Search
-                allowClear
-                aria-label={t('shell.studio.search')}
-                placeholder={t('shell.studio.search')}
-                style={{ maxWidth: 320 }}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              <TableFilterButton fields={filterFields} filter={filter} onApply={setFilter} />
-            </Flex>
-          ),
-        }}
-        below={<TableFilterChips fields={filterFields} filter={filter} onChange={setFilter} />}
-      />
-    </Flex>
+    <AxisTable<StudioChangeRow>
+      testId="studio-used-by"
+      dataSource={shown}
+      rowKey={(row) => row.key}
+      columns={columns}
+      emptyText={t('shell.studio.usedBy.none')}
+      pagination={false}
+      toolbar={{
+        view: (
+          <Flex gap="small" align="center">
+            <Input.Search
+              allowClear
+              aria-label={t('shell.studio.search')}
+              placeholder={t('shell.studio.search')}
+              style={{ maxWidth: 320 }}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <TableFilterButton fields={filterFields} filter={filter} onApply={setFilter} />
+          </Flex>
+        ),
+      }}
+      below={<TableFilterChips fields={filterFields} filter={filter} onChange={setFilter} />}
+    />
   )
 }
 

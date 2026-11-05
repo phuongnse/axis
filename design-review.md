@@ -378,15 +378,19 @@ owner is reviewing it one step at a time.
 
 - **Asked:** the owner found the relation words poor, "Sửa bản ghi của nó", "Cấp quyền trên nó", and the flat list hard to
   read. The headings "Sử dụng" and "Được dùng bởi" stay: they read clearly.
-- **Built:** what uses a resource and what it uses leave the foot of its page for a tab of their own, **Dependencies**
-  ("Phụ thuộc"), beside Design, Form and JSON, opened when it is needed, before a rename or a delete, as low-code tools
-  show a component's dependencies. A choice above it switches between Used by and Uses, when both apply. Each is the
-  standard table, `AxisTable`, flat: Name, the other resource by its label as the link that opens it, Kind and How it
-  is used, sorted by kind in the sidebar's order, then by name, with the search and the kind filter every list has
-  (`searchRows`, `TableFilterButton`, `TableFilterChips`). No count, no group rows. Two tries came first: grouped lists
-  of their own, then the table with group rows, which the owner found poor. `StudioChangeList` stays for the change lists
-  of a release and of the Overview.
-- **For the issue:** Delete in the Danger zone lists what uses the resource before it asks, as a "blocked by" list does.
+- **Built:** what uses a resource leaves the foot of its page for a tab of its own, **Used by** ("Được dùng bởi"), beside
+  Design, Form and JSON, opened when it is needed, before a rename or a delete. A kind nothing can use, the application,
+  has no such tab. It is the standard table, `AxisTable`, flat: Name, the other resource by its label as the link that
+  opens it at the reference, Kind and How it is used, sorted by kind in the sidebar's order, then by name, with the search
+  and the kind filter every list has (`searchRows`, `TableFilterButton`, `TableFilterChips`). The columns keep the table
+  rule: Kind is a fixed set, so it is as wide as its content, and the two free-text columns share the rest.
+- **Uses is gone:** what a resource uses is shown by its own editor, and deleting it breaks nothing it uses, so only Used
+  by blocks a delete. `usesShownByForm`, which kept Uses from repeating the form, goes with it. Tries that came first: a
+  Dependencies tab with a Used by / Uses switch inside it, a tab within a tab; grouped lists; a table with group rows.
+  The glossary's "Phụ thuộc" and "Sử dụng" are to leave it in the next docs change.
+- **Delete:** the Danger zone sat under the tabs, so every tab showed it. Delete… is now in a "…" menu at the right of
+  the resource's heading, through a slot the page gives the editor, as the release page's Activate… is. Its dialog keeps
+  the warning that the resource is used, with "See what uses it", which opens the Used by tab.
 - **Words:** each relation is a verb and its object, with no "nó": "Sửa bản ghi", "Đọc bản ghi", "Cấp quyền", "Gọi",
   "Khởi chạy", "Hiện dữ liệu". The English relations stay. The rule, no "nó" for "it", is in #2974, and the other 39
   texts that said "nó" are rewritten, with "phát hành", "trang web", "thành phần", "cam kết" and "bộ kết nối" where they

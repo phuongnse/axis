@@ -84,14 +84,6 @@ export const setLists = new Set(['application.modules', 'application.packages'])
 /** Proposed: tells the editor a row was removed, by its name, so it offers Undo in a notice. */
 export const RemovedNoticeContext = createContext<((name: string) => void) | null>(null)
 
-/**
- * Proposed: the references a kind's form already shows, by the kind of the other end, which Uses leaves out so nothing
- * shows twice: every form shows its labels' texts, and Settings shows its modules and packages as tables.
- */
-export const usesShownByForm: Record<string, ReadonlySet<string>> = {
-  application: new Set(['text', 'module', 'package']),
-}
-
 /** Proposed: the kinds nothing can refer to, which have no Used by, as it never applies to them. */
 export const neverUsed = new Set(['application'])
 
