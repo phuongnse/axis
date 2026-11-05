@@ -42,6 +42,8 @@ implementation.
   The `platform.jobs` table and the runner in the publisher are built for the `suspend` and `resume` kinds, each with one
   `status` step. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
+  A step may take a lease of the tenant first, as the `export` step does. A wait for a lease uses no claim: it adds to the
+  job's `waits` count, and the limit of three is `claims` minus `waits`.
   The `suspend` and `resume` routes and the job read are built: the server only queues the job, over the platform reader role,
   which may insert into `platform.jobs` and nothing else there, and answers `202` with a `Location` header of `/api/cell/jobs/{id}`.
   The job's actor is the operator's id, the subject of the token or the session. The create route is built too: it queues a `create` job with the five steps of
@@ -169,8 +171,12 @@ tenant administrator can run it in M33.
 
 - **When.** For a tenant in any status but `provisioning`. A job for a `provisioning` tenant fails with the
   refusal that `suspend` gives. The `export` job of the publisher is built, and an operator starts it with the
-  exports route. One export of a tenant runs at a time, and it takes a lease of the tenant's `concurrentImports`
-  quota _(planned for M31)_.
+  exports route. In a cell the job holds one lease of the tenant's `concurrentImports` quota while it reads the tenant and
+  uploads the ZIP, so an import that runs at the same time competes for the same leases. When none is free, the job stays
+  `running` with its step `pending`, and the publisher tries again about a second later. A wait does not use one of the
+  three claims, so a busy tenant never fails an export. A tenant with no `concurrentImports` limit, and a publisher outside
+  a cell, export without a lease. One export of a tenant runs at a time, because the publisher runs one job of a tenant at a
+  time.
 - **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does: one `RepeatableRead`
   transaction for the active releases and every record.
 - **Kept.** The ZIP is stored in the cell's object storage, encrypted at rest, for 7 days, then

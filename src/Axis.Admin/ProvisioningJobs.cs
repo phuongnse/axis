@@ -9,8 +9,13 @@ namespace Axis.Admin;
 /// <summary>
 /// One step of a provisioning job. <paramref name="RunAsync"/> gets the job id, the tenant id and the job's input JSON, which may be null, and
 /// returns <see langword="null"/> on success or a refusal message. A refusal fails the job at once, and an exception that it throws ends only the claim.
+/// <paramref name="LeaseAsync"/>, when set, takes a lease of the tenant before the step runs and returns <see langword="null"/> when none is free. The runner
+/// frees the lease when the step returns or throws. A throw from <paramref name="LeaseAsync"/> ends the claim, as a throw from the step does.
 /// </summary>
-internal sealed record JobStep(string Name, Func<Guid, string, string?, CancellationToken, Task<string?>> RunAsync);
+internal sealed record JobStep(
+    string Name,
+    Func<Guid, string, string?, CancellationToken, Task<string?>> RunAsync,
+    Func<string, CancellationToken, Task<IAsyncDisposable?>>? LeaseAsync = null);
 
 /// <summary>
 /// The provisioning jobs of <c>platform.jobs</c>, which the publisher runs under <c>Tenancy:Source=directory</c>. A job is queued
@@ -18,12 +23,19 @@ internal sealed record JobStep(string Name, Func<Guid, string, string?, Cancella
 /// time for each tenant. It skips every step that already succeeded. A refusal from a step fails the job at once. A step that throws
 /// ends the claim, and the next round claims the job again, up to three claims. The third throw fails the job. A running job whose
 /// lease ran out after three claims is failed at the next claim. The <c>claims</c> count fences every update, so a publisher that lost
-/// its claim changes nothing. The runner renews the lease at each step boundary. When a job ends, one platform audit record that
+/// its claim changes nothing. A step may take a tenant lease first. When none is free, the job waits for about a second and runs again in a later
+/// round, and a wait does not use one of the three claims. The runner renews the lease at each step boundary. When a job ends, one platform audit record that
 /// names the job's actor is written in the same transaction as its final state, whether it succeeded or failed.
 /// </summary>
-internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnlyDictionary<string, IReadOnlyList<JobStep>> kinds, TimeSpan leaseDuration)
+internal sealed class ProvisioningJobs(
+    string platformConnectionString,
+    IReadOnlyDictionary<string, IReadOnlyList<JobStep>> kinds,
+    TimeSpan leaseDuration,
+    TimeSpan? waitInterval = null)
 {
     private const int MaxClaims = 3;
+
+    private static readonly TimeSpan _defaultWaitInterval = TimeSpan.FromSeconds(1);
 
     // Claims take this lock, so two publishers cannot both see no running job of a tenant.
     private const long ClaimLockKey = 0x4158_4953_4A4F_4253; // "AXISJOBS"
@@ -42,7 +54,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         """
         UPDATE platform.jobs
         SET state = 'failed', finished_at = clock_timestamp(), error = @message
-        WHERE state = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        WHERE state = 'running' AND lease_until < clock_timestamp() AND claims - waits >= @max
         RETURNING id, kind, tenant_id, actor
         """;
 
@@ -51,7 +63,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         """
         WITH next AS (
           SELECT j.id FROM platform.jobs j
-          WHERE (j.state = 'queued' OR (j.state = 'running' AND j.lease_until < clock_timestamp() AND j.claims < @max))
+          WHERE (j.state = 'queued' OR (j.state = 'running' AND j.lease_until < clock_timestamp() AND j.claims - j.waits < @max))
             AND NOT EXISTS (SELECT 1 FROM platform.jobs o WHERE o.tenant_id = j.tenant_id AND o.state = 'running' AND o.id <> j.id)
           ORDER BY j.created_at, j.id LIMIT 1
           FOR UPDATE SKIP LOCKED)
@@ -59,7 +71,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         SET state = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.kind, p.tenant_id, p.steps::text, p.actor, p.claims, p.input::text
+        RETURNING p.id, p.kind, p.tenant_id, p.steps::text, p.actor, p.claims, p.input::text, p.waits
         """;
 
     // The claims count is the fencing token: it goes up on every claim, so a publisher that lost its claim changes no row.
@@ -70,11 +82,38 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         WHERE id = @id AND state = 'running' AND claims = @claims
         """;
 
+    // Keeps the job running but not claimable for the wait interval, and counts the wait. A failure to do so leaves the lease to run out.
+    private async Task WaitAsync(ClaimedJob job, TextWriter output)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(platformConnectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(WaitSql, connection);
+            command.Parameters.AddWithValue("wait", waitInterval ?? _defaultWaitInterval);
+            command.Parameters.AddWithValue("id", job.Id);
+            command.Parameters.AddWithValue("claims", job.Claims);
+            await command.ExecuteNonQueryAsync();
+        }
+        catch (Exception exception)
+        {
+            output.WriteLine($"{job.TenantId} claim failed: {TenantDatabaseSteps.Safe(exception)}");
+        }
+    }
+
     // Ends the lease at once, so the next round claims the job again. The claims count still limits it to three.
     private const string ReleaseSql =
         """
         UPDATE platform.jobs
         SET lease_until = clock_timestamp()
+        WHERE id = @id AND state = 'running' AND claims = @claims
+        """;
+
+    // A job that waits for a lease stays running and cannot be claimed again until the wait ends. A wait is not a claim.
+    private const string WaitSql =
+        """
+        UPDATE platform.jobs
+        SET waits = waits + 1, lease_until = clock_timestamp() + @wait
         WHERE id = @id AND state = 'running' AND claims = @claims
         """;
 
@@ -184,7 +223,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
-                claimed = new ClaimedJob(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetString(6));
+                claimed = new ClaimedJob(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetInt32(7));
             }
         }
 
@@ -246,13 +285,24 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             string? refusal;
             try
             {
-                refusal = await defined[index].RunAsync(job.Id, job.TenantId, job.Input, cancellationToken);
+                var lease = defined[index].LeaseAsync is { } take ? await take(job.TenantId, cancellationToken) : NoLease.Instance;
+                if (lease is null)
+                {
+                    output.WriteLine($"{job.TenantId} {defined[index].Name} waiting: the tenant has no lease free. The job runs again in a later round.");
+                    await WaitAsync(job, output);
+                    return;
+                }
+
+                await using (lease)
+                {
+                    refusal = await defined[index].RunAsync(job.Id, job.TenantId, job.Input, cancellationToken);
+                }
             }
             catch (Exception exception)
             {
                 var message = TenantDatabaseSteps.Safe(exception);
                 output.WriteLine($"{job.TenantId} {defined[index].Name} failed: {message}");
-                if (job.Claims < MaxClaims)
+                if (job.Claims - job.Waits < MaxClaims)
                 {
                     await ReleaseAsync(job, output);
                     return;
@@ -349,7 +399,14 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private sealed record ClaimedJob(Guid Id, string Kind, string TenantId, string Steps, string Actor, int Claims, string? Input);
+    private sealed record ClaimedJob(Guid Id, string Kind, string TenantId, string Steps, string Actor, int Claims, string? Input, int Waits);
+
+    private sealed class NoLease : IAsyncDisposable
+    {
+        public static readonly NoLease Instance = new();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private sealed record StoredStep(string Name, string State, string? Error);
 }
