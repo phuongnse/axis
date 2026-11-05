@@ -370,6 +370,7 @@ sessions.MapUserPickerEndpoints();
 sessions.MapUserIdFieldEndpoints();
 sessions.MapStudioEndpoints();
 sessions.MapCellEndpoints();
+sessions.MapTenantExportEndpoints();
 
 // An /api path that matches no route answers a 404 problem, never the SPA's page. GET and HEAD only, as the SPA fallback,
 // so a wrong method on a real route still answers 405.

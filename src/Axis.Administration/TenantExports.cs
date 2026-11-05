@@ -2,12 +2,15 @@ namespace Axis.Administration;
 
 /// <summary>
 /// What the server and the publisher share about a stored tenant export, see <c>docs/reference/tenant-lifecycle.md#exporting-a-tenant</c>:
-/// where its ZIP lives, how long it is kept and the command of the audit record of its download.
+/// where its ZIP lives, how long it is kept and the commands of the audit records of its start by a tenant administrator and of its download.
 /// </summary>
 public static class TenantExports
 {
     /// <summary>How long a ZIP is kept: the route answers that the export is gone after this time and the publisher's sweep deletes it.</summary>
     public static readonly TimeSpan Kept = TimeSpan.FromDays(7);
+
+    /// <summary>The command of the platform audit record that a start by a tenant administrator writes when it queues a job.</summary>
+    public const string StartCommand = "tenant export start";
 
     /// <summary>The command of the platform audit record that each download writes.</summary>
     public const string DownloadCommand = "tenant export download";
