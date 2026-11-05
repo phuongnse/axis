@@ -362,6 +362,14 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
+    /// <summary>Adds the tombstone of a tenant purged <paramref name="daysAgo"/> days ago, with the hosts it had.</summary>
+    public async Task AddTombstoneAsync(string id, int daysAgo, params string[] hosts)
+    {
+        await using var context = NewContext();
+        context.DeletedTenants.Add(new DeletedTenantRow { Id = id, DeletedAt = DateTimeOffset.UtcNow.AddDays(-daysAgo), Actor = "test", Hosts = hosts });
+        await context.SaveChangesAsync(CancellationToken);
+    }
+
     public async Task SetStatusAsync(string id, string status)
     {
         await using var context = NewContext();

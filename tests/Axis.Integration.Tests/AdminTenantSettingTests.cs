@@ -212,6 +212,42 @@ public sealed class AdminTenantSettingTests(PostgreSqlFixture database) : IClass
     }
 
     [Fact]
+    public async Task A_host_of_a_tenant_deleted_10_days_ago_is_refused_and_one_deleted_91_days_ago_is_accepted()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        var other = scenario.NewTenantId();
+        var gone = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, "one.example.test")).Exit);
+        Assert.Equal(0, (await scenario.CreateAsync(other, "two.example.test")).Exit);
+        await scenario.AddTombstoneAsync(gone, 10, "recent.example.test", "two.example.test");
+        await scenario.AddTombstoneAsync(scenario.NewTenantId(), 91, "old.example.test");
+        var before = await scenario.SnapshotAsync();
+        var records = (await RecordsAsync(scenario)).Count;
+
+        var add = await scenario.RunAsync(["tenant", "host", "add", id, "RECENT.example.test"], extra: AdminScenario.Directory);
+        var move = await scenario.RunAsync(["tenant", "host", "move", "two.example.test", "--to", id], extra: AdminScenario.Directory);
+
+        Assert.All([add, move], result =>
+        {
+            Assert.Equal(2, result.Exit);
+            Assert.Empty(result.Output);
+            var line = Assert.Single(result.Error);
+            Assert.Contains("held back", line, StringComparison.Ordinal);
+            Assert.DoesNotContain(gone, line, StringComparison.Ordinal);
+        });
+        Assert.Equal(before, await scenario.SnapshotAsync());
+        Assert.Equal(records, (await RecordsAsync(scenario)).Count);
+
+        var accepted = await scenario.RunAsync(["tenant", "host", "add", id, "old.example.test"], extra: AdminScenario.Directory);
+
+        Assert.Equal(0, accepted.Exit);
+        Assert.Contains("old.example.test", await scenario.HostsAsync(id));
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
     public async Task A_host_added_with_a_site_keeps_one_host_per_site_and_the_last_host_that_is_no_sites_stays()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);

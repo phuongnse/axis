@@ -129,8 +129,8 @@ creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 
 | Option | Meaning |
 | --- | --- |
-| `<id>` | The tenant id. It follows the rule of the `Tenants` section: lowercase letters, digits and hyphens. It is at most 50 characters. It is also the name of the tenant's realm, so `master`, the identity provider's own admin realm, is refused. |
-| `--host <host>` | A host of the tenant. Repeat it for more hosts. At least one is needed. |
+| `<id>` | The tenant id. It follows the rule of the `Tenants` section: lowercase letters, digits and hyphens. It is at most 50 characters. It is also the name of the tenant's realm, so `master`, the identity provider's own admin realm, is refused. The id of a deleted tenant, one with a row in `platform.deleted_tenants`, is refused with exit code 2 at the `entry` step. |
+| `--host <host>` | A host of the tenant. Repeat it for more hosts. At least one is needed. A host that a tenant deleted less than 90 days ago had is refused with exit code 2, see [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant). |
 | `--administrator <email>` | Invites the person with this email as the tenant's first administrator, see [the first administrator](user-administration.md#the-first-administrator). Give it once. The email must be a plain address, such as `name@example.com`. It is a usage error together with `--preview-of`. |
 | `--preview-of <main>` | Makes the tenant the preview tenant of the main tenant `<main>`. |
 | `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |

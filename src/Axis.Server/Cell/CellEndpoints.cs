@@ -64,8 +64,8 @@ namespace Axis.Server.CellApi;
 /// steps <c>tenant</c>, <c>application</c>, <c>activate</c>, <c>invite</c> and <c>resume</c>, all <c>pending</c>, and answers <c>202</c>
 /// as the suspend route does. The checks run in this order: the <c>Idempotency-Key</c> header (<c>400</c>), the replay of the first job
 /// or <c>422</c>, the body (<c>400</c>: the id by the rule of <c>tenant create</c>, an application that is not an installed template, an
-/// administrator that is not an email), then under a cell-wide advisory lock an id that a directory row or an unfinished create job
-/// holds (<c>409</c>) and the cell's <see cref="CellOptions.TenantCap"/> (<c>409</c>, "This cell is full."). The job's <c>input</c> holds the
+/// administrator that is not an email), then under a cell-wide advisory lock an id that a directory row, an unfinished create job
+/// or a tombstone of a deleted tenant holds (<c>409</c>) and the cell's <see cref="CellOptions.TenantCap"/> (<c>409</c>, "This cell is full."). The job's <c>input</c> holds the
 /// application and the administrator and the job read never returns it.
 /// </para>
 /// <para>
@@ -75,7 +75,8 @@ namespace Axis.Server.CellApi;
 /// <c>_axis-verify.&lt;host&gt;</c> that holds the token, <c>cname</c> points the host to <c>&lt;id&gt;.&lt;Cell:TenantDomain&gt;</c>, and the
 /// request expires 7 days later. A repeat request from the same tenant for the same pending host answers <c>200</c> with the same
 /// token. A blank host or one that is not a DNS name of at least two labels answers <c>400</c>, an unknown tenant or a preview tenant
-/// <c>404</c>, and a host that <c>platform.tenant_hosts</c> holds for any tenant <c>409</c>, whose title names no tenant. A transaction
+/// <c>404</c>, and a host that <c>platform.tenant_hosts</c> holds for any tenant <c>409</c>, whose title names no tenant. A host that a tenant deleted less than <see cref="DeletedTenantHolds.HostHoldBackDays"/> days
+/// ago had answers <c>409</c> too, with a title that names no tenant. A transaction
 /// lock on the tenant and host serializes parallel requests. A pending request does not hold the host, so another tenant may request it
 /// and the host still answers <c>404</c> until a later step verifies it. The insert goes over the reader role. The request's <c>actor</c>
 /// is the operator's id. The route queues no job and takes no <c>Idempotency-Key</c>.
@@ -323,6 +324,12 @@ internal static class CellEndpoints
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This host already belongs to a tenant.");
         }
 
+        // The title names neither the host nor the deleted tenant that held it.
+        if (await DeletedTenantHolds.IsHostHeldBackAsync(platform, [host], cancellationToken))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This host is held back after a tenant was deleted.");
+        }
+
         // A request whose expiry has passed is not pending, although its state says so until a later step marks it expired.
         var now = DateTimeOffset.UtcNow;
         var pending = await platform.TenantHostRequests.AsNoTracking()
@@ -417,7 +424,8 @@ internal static class CellEndpoints
             cancellationToken);
         var unfinished = platform.Jobs.AsNoTracking().Where(job => job.Kind == "create" && (job.State == "queued" || job.State == "running"));
         if (await platform.Tenants.AnyAsync(tenant => tenant.Id == id, cancellationToken)
-            || await unfinished.AnyAsync(job => job.TenantId == id, cancellationToken))
+            || await unfinished.AnyAsync(job => job.TenantId == id, cancellationToken)
+            || await DeletedTenantHolds.IsDeletedIdAsync(platform, id, cancellationToken))
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "A tenant of the cell already has this id.");
         }
