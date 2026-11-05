@@ -1,11 +1,13 @@
 # Threat model: the product
 
-Part of the [threat model](threat-model.md). How the rows are filled is in [threat model method](threat-model-method.md).
+This page holds the threats to the product, the **P** scope of the [threat model](threat-model.md).
+How its rows are found, rated and checked is in [threat model method](threat-model-method.md).
 
 ## The product
 
-The server, the worker, the SPA, tenants, Studio and authoring, extension packages, connectors,
-endpoints and webhooks, and the identity provider Axis ships.
+The product is the server, the worker, the SPA, tenants, Studio and authoring, extension packages,
+connectors, endpoints and webhooks, the identity provider Axis ships and the personal data Axis
+holds. The overview shows how the parts connect, and each boundary below has its own table.
 
 ```mermaid
 flowchart LR
@@ -158,7 +160,8 @@ flowchart LR
 
 ### Worker and extension package
 
-Extension package code runs inside the worker process until the package runners of M21 exist.
+Extension package code runs inside the worker process, with the secrets and data of every tenant in
+reach, see [Not a sandbox](extension-packages.md#not-a-sandbox).
 
 ```mermaid
 flowchart LR
@@ -339,7 +342,7 @@ flowchart LR
 | P42 | A site in another origin sends a write as a signed-in author. | Studio API | Tampering | Medium | **Mitigated** | `StudioEndpointTests` refuses a write without the CSRF header. `CsrfHeaderTests` does the same for record writes. |
 | P43 | A write escapes the application folder through `..`, a link or a folder link. | Studio API | Tampering | High | **Mitigated** | `StudioEndpointTests` refuses a name with `..` and does not write through a linked file or folder. `StudioCreateApplicationTests` refuses a name with `..`. |
 | P44 | Two authors overwrite each other's changes. | Studio API | Tampering | Medium | **Mitigated** | `StudioWriteLockTests` gives one of two writes that share a version a 409. See [versions](authoring.md#versions). |
-| P115 | An author reads the names of a tenant's bindings through `GET /api/studio/bindings` _(planned for M31)_. | Studio API | Information disclosure | Low | **Accepted** | A binding's name is not a secret, and an author needs it to choose a binding. The route answers names by kind, never a value, and only to an author. The owner accepted this on 2026-11-04. See [Studio API](studio-resource-form.md#studio-api). |
+| P115 | An author reads the names of a tenant's bindings through `GET /api/studio/bindings` _(planned for M31)_. | Studio API | Information disclosure | Low | **Accepted** | A binding's name is not a secret, and an author needs it to choose a binding. The route answers names by kind, never a value, and only to an author. Accepted on 2026-11-04. See [Studio API](studio-resource-form.md#studio-api). |
 | P116 | An author's layer or module resource save moves a module record past a guard or into a protected state. | Studio API | Tampering | Medium | **Mitigated** | `ContractLayerTests` refuses a layer that adds a transition into a protected state with `AXC0370`. `ModuleLifecycleLayerTests` refuses a transition whose guard is false, or one into the protected state, and writes nothing. `StudioModuleLayerTests` refuses a save that changes a contract transition and writes nothing. |
 | P45 | The live release differs from the folder the author sent to publish. | Publishing | Tampering | Medium | **Mitigated** | `StudioPublishTests` shows that the release keeps the folder as it was at the call. A later edit is not in it. |
 | P46 | A publish from one tenant's host changes another tenant. | Publishing | Elevation of privilege | High | **Mitigated** | `StudioPublishTests` stores the request in that tenant's database only. `AdminPublisherTests` activates the release for that tenant only. |
@@ -360,10 +363,8 @@ flowchart LR
 
 ### Identity provider
 
-Axis's identity provider is Keycloak, with one realm for each tenant. See [identity provider](identity-provider.md)
-and [user administration](user-administration.md), and the decisions [D99](../decisions/d99-axis-ships-its-own-identity-provider.md)
-and [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md). It has six boundaries, each
-with its own diagram below.
+Axis's identity provider is Keycloak, with one realm for each tenant, see [identity provider](identity-provider.md)
+and [user administration](user-administration.md). It has six boundaries, each with its own diagram below.
 
 **Browser and sign-in page**
 
@@ -502,21 +503,19 @@ flowchart LR
 
 An identity provider session's lifetime and CSRF are covered by P1, P2 and P8.
 
-Open, waiting for an issue:
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 
 - (Spoofing, High) no test shows that the realm checks the signature of a SAML provider's response. The sync keeps
   what Keycloak's metadata import sets, which may leave the check off.
 - (Elevation of privilege, Medium) the `/api/apps/{app}` data endpoints do not check the session's provider, see
   [sites and sign-in](identity-provider.md#sites-and-sign-in).
 
-Each becomes a **Gap** row, linked to its issue, once that issue exists.
-
 ### Personal data
 
 Axis holds personal data about the people who use it: user profiles with email addresses, records and
 their history, audit records with client addresses, notifications, logs and traces, uploaded files,
 exports and backups. LINDDUN finds the privacy threats to that data, see
-[D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md).
+[threat model method](threat-model-method.md#how-it-is-filled).
 
 ```mermaid
 flowchart LR
@@ -579,12 +578,10 @@ flowchart LR
 Non-repudiation does not apply as a privacy threat. The audit records exist so that a person cannot deny
 a business action, see P3, P12 and P20. What they keep about a person is in the list below.
 
-Open, waiting for an issue:
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 
-- (Identifying, Medium) audit records written before M27 keep the actor's display name, `actor_name`, forever.
-  New rows store no name, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+- (Identifying, Medium) an audit record whose `actor_name` holds the actor's display name keeps it forever. A new
+  audit record stores no name.
 - (Non-compliance, Medium) `axis.email_outbox` rows keep the address and the body forever.
 - (Non-compliance, Medium) `axis.user_profiles` rows and old audit records cannot be removed for a person's
   removal request.
-
-Each becomes a **Gap** row, linked to its issue, once that issue exists.

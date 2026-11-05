@@ -1,25 +1,26 @@
 # Fuzz tests
 
-Detailed reference for the fuzz tests of the parsers that read outside input. The conventions of
-[architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet,
-and Dn refers to [decisions.md](../decisions.md).
+This page describes the fuzz tests of the parsers that read outside input: what each one fuzzes, how it mutates
+its input, what fails a run and how to replay a failure. The reasons for them are in
+[D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
 
-The design follows [D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
 A fuzz test feeds a parser random and mutated input. It runs with the unit or integration tests,
 with a fixed seed and a time limit, so a run is repeatable and fast. It does not use a
 coverage-guided fuzzer, so it needs no instrumentation and no extra package.
 
 ## The fuzzed parsers
 
-| Parser | Status | Suite |
-| ------ | ------ | ----- |
-| Expression parser, `ExpressionParser` | Built | `ExpressionFuzzTests`, `Parser_returns_a_tree_or_a_diagnostic_for_any_text` |
-| Expression type checker, `ExpressionTypeChecker` | Built | `ExpressionFuzzTests`, `Checker_returns_a_type_or_a_diagnostic_for_any_parsed_expression` |
-| SQL translator, `SqlTranslator` | Built | `ExpressionFuzzTests`, `Translator_keeps_every_input_value_in_a_parameter` |
-| Record API request bodies | Built | `RecordBodyFuzzTests` in `Axis.Server.Tests`, `Create_body_is_accepted_or_refused_with_a_400_problem` and `Update_body_is_parsed_or_refused_with_a_400_problem`, and `RecordBodyFuzzTests` in `Axis.Integration.Tests`, `Create_answers_an_allowed_status_and_an_accepted_body_leaves_a_valid_record` and `Update_answers_an_allowed_status_and_an_accepted_body_leaves_a_valid_record` |
-| CSV reader, `RecordImportCsv` | Built | `RecordImportFuzzTests`, `Csv_reader_returns_rows_or_refusals_for_any_bytes` |
-| Spreadsheet reader, `RecordImportXlsx` | Built | `RecordImportFuzzTests`, `Xlsx_reader_returns_rows_or_refusals_for_any_workbook` |
-| Import dry run, `RecordImportCheckHandler` | Built | `RecordImportEndpointTests`, `The_dry_run_of_any_fuzzed_file_completes_checked_or_failed` |
+These parsers are fuzzed, each by the test class and the tests that the table names.
+
+| Parser | Suite |
+| ------ | ----- |
+| Expression parser, `ExpressionParser` | `ExpressionFuzzTests`, `Parser_returns_a_tree_or_a_diagnostic_for_any_text` |
+| Expression type checker, `ExpressionTypeChecker` | `ExpressionFuzzTests`, `Checker_returns_a_type_or_a_diagnostic_for_any_parsed_expression` |
+| SQL translator, `SqlTranslator` | `ExpressionFuzzTests`, `Translator_keeps_every_input_value_in_a_parameter` |
+| Record API request bodies | `RecordBodyFuzzTests` in `Axis.Server.Tests`, `Create_body_is_accepted_or_refused_with_a_400_problem` and `Update_body_is_parsed_or_refused_with_a_400_problem`, and `RecordBodyFuzzTests` in `Axis.Integration.Tests`, `Create_answers_an_allowed_status_and_an_accepted_body_leaves_a_valid_record` and `Update_answers_an_allowed_status_and_an_accepted_body_leaves_a_valid_record` |
+| CSV reader, `RecordImportCsv` | `RecordImportFuzzTests`, `Csv_reader_returns_rows_or_refusals_for_any_bytes` |
+| Spreadsheet reader, `RecordImportXlsx` | `RecordImportFuzzTests`, `Xlsx_reader_returns_rows_or_refusals_for_any_workbook` |
+| Import dry run, `RecordImportCheckHandler` | `RecordImportEndpointTests`, `The_dry_run_of_any_fuzzed_file_completes_checked_or_failed` |
 
 The expression tests leave out the interpreter, which evaluates a checked expression and takes no
 outside text. The import tests leave out the commit, which reads only rows that the dry run accepted.
@@ -29,6 +30,9 @@ checks of a create that need no database, in `RecordCommand`. The integration su
 kind of bodies over HTTP. Neither fuzzes the query parameters of a list or the file upload.
 
 ## How the expression tests fuzz
+
+The expression tests mutate the expressions of the samples and check the parser, the type checker and the SQL
+translator on each result.
 
 - **Suite.** The `Axis.Expressions.Tests` project, in `scripts/test.sh`. Run one with
   `dotnet test --project tests/Axis.Expressions.Tests -c Release --filter-class '*ExpressionFuzz*'`.
@@ -51,6 +55,9 @@ kind of bodies over HTTP. Neither fuzzes the query parameters of a list or the f
   the checker, so the first translation keeps the translator busy.
 
 ## How the import tests fuzz
+
+The import tests feed the CSV and spreadsheet readers mutated files, zip damage and zip bombs, and run the dry run on a
+share of them.
 
 - **Suites.** `RecordImportFuzzTests` is in `Axis.Data.Tests`, so it runs in `scripts/test.sh`. Run it
   with `dotnet test --project tests/Axis.Data.Tests -c Release --filter-class '*RecordImportFuzz*'`.
@@ -95,6 +102,9 @@ kind of bodies over HTTP. Neither fuzzes the query parameters of a list or the f
   and does not search deeply.
 
 ## How the record API tests fuzz
+
+The record API tests send mutated create and update bodies, first to the parsing and command steps alone and then over
+HTTP, and check that an accepted write leaves a valid record.
 
 - **Suites.** `RecordBodyFuzzTests` in the `Axis.Server.Tests` project runs in `scripts/test.sh`.
   Run it with `dotnet test --project tests/Axis.Server.Tests -c Release --filter-class '*RecordBodyFuzz*'`.
@@ -144,6 +154,8 @@ kind of bodies over HTTP. Neither fuzzes the query parameters of a list or the f
 
 ## Budgets and overrides
 
+Every fuzz test runs with a seed and a time budget that an environment variable can override.
+
 | Setting | Default | Override |
 | ------- | ------- | -------- |
 | Seed | `2025` | `AXIS_FUZZ_SEED` |
@@ -157,6 +169,9 @@ change. For a deeper search by hand, run the suite with a longer budget and othe
 example `AXIS_FUZZ_SEED=7 AXIS_FUZZ_SECONDS=120`.
 
 ## What fails a run
+
+A run of the expression tests fails on any of these. The import and record API tests add their own checks, described
+in their sections.
 
 - **An exception.** The parser, the checker or the translator throws. A rejected input is not an
   exception: each stage answers with a tree, a type or SQL, or with a diagnostic, and exactly one
@@ -176,7 +191,7 @@ example `AXIS_FUZZ_SEED=7 AXIS_FUZZ_SECONDS=120`.
 
 ## Replaying a failure
 
-A failure message gives the seed, the number of the input and the input as a C# string literal:
+A failure is replayed by its input or by its seed. A failure message gives the seed, the number of the input and the input as a C# string literal:
 
 ```text
 Fuzz input 1342 of seed 2025 (rerun with AXIS_FUZZ_SEED=2025): "t == 'x'' and (("
@@ -197,8 +212,7 @@ Fuzz input 1342 of seed 2025 (rerun with AXIS_FUZZ_SEED=2025): "t == 'x'' and ((
 
 ## Adding a fuzz test
 
-A later fuzz test uses the same helper,
-`tests/Axis.Expressions.Tests/Fuzz.cs`. The file depends on nothing else, so the test project links
+A new fuzz test uses the same helper, `tests/Axis.Expressions.Tests/Fuzz.cs`. The file depends on nothing else, so the test project links
 it:
 
 ```xml

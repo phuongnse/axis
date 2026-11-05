@@ -1,20 +1,15 @@
 # Performance
 
-Detailed reference for the service level objectives of the server and the worker, and the load
-test that measures them. The conventions of [architecture.md](../architecture.md) apply: sections
-marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
-
-The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
-built. The per-request budgets of the `*PerformanceTests` classes are built. They
-run in the performance workflow, as [D97](../decisions/d97-reliable-test-runs.md) says. See
-[testing](../architecture.md#testing).
+This page states the service level objectives of the server and the worker, the routes that need limits of their
+own, and the load tests that measure an installation and a cell. The reasons are in
+[D82](../decisions/d82-performance-slos-and-load-tests.md). The per-request budgets of the `*PerformanceTests`
+classes run in the performance workflow, see [testing](../architecture.md#testing).
 
 ## Resource-demanding routes
 
-_(Built.)_ These routes take much time, memory or database work. Each is limited so that
-one caller cannot use up the server, and none builds a response that takes longer than a
-caller's or a proxy's timeout, because long work is asynchronous: the route answers `202` and the
-caller polls.
+These routes take much time, memory or database work. Each is limited so that one caller cannot use up the server,
+and none builds a response that takes longer than a caller's or a proxy's timeout, because long work is asynchronous:
+the route answers `202` and the caller polls.
 
 | Route                                                                                           | Why it is heavy                                                         | What limits it                                                                                                                                                                                                     |
 | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -68,11 +63,13 @@ A test fails when this list and that file differ:
   runaway statement, so it never replaces the objective. See
   [data settings](host-settings.md#data-settings).
 - **Same metrics in production.** Each objective uses a metric that the hosts already export, so an
-  operator can watch the same numbers on a running installation. Axis builds no alerting.
+  operator can watch the same numbers on a running installation. Axis ships no alert rule for an objective.
 - **New routes.** A milestone that adds a route in one of the groups adds it to the load test, and
   the route takes that group's objective.
 
 ## Reference environment
+
+The objectives are measured on this environment:
 
 - Two server replicas behind the TLS proxy, as in
   [several server replicas](several-server-replicas.md).
@@ -85,20 +82,24 @@ to find its own numbers.
 
 ## Load test
 
-- **Script.** _(Built.)_ `scripts/load.sh` builds the production images and starts the Docker Compose
-  stack with two server replicas, one worker and PostgreSQL over TLS, as in
-  [several server replicas](several-server-replicas.md). It starts `server` and
-  then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the k6
-  scenario `tests/load/objectives.js` in a container through the proxy: 50 users, each in a loop over the routes of the
-  [objectives](#objectives), with a pause of about 1 s an iteration. The scenario runs the loop of
-  `tests/load/lib/objectives-loop.js`, which the cell load test shares. Every request goes through one helper in that
-  loop that tags it with its objective (`reads`, `writes` or `signIn`) and its route. The run fails, with a non-zero
-  exit code, when reads miss p95 under 300 ms, writes miss p95 under 500 ms, the rate of `5xx` answers, the
-  `server_errors` metric, is 0.1% or more, or fewer than 99% of its checks pass. The sign-in pages and the token request are tagged `signIn`, so they count toward no objective.
-  The stack also runs the https stub `load-stub`, a Caddy service under the `load` profile whose certificate comes from the
-  run's own authority and which answers every call with a fixed JSON body. The worker trusts that authority. It removes the
-  stack at the end, unless `--keep` is given. It needs Docker. See [development](../development.md#scripts).
-- **Data.** _(Built.)_ It creates a tenant with a generated application of
+The load test measures the [objectives](#objectives) on the [reference environment](#reference-environment) with
+production images, once a week in CI and on demand.
+
+- **Script.** `scripts/load.sh` builds the production images and starts the Docker Compose stack with two server
+  replicas, one worker and PostgreSQL over TLS, as in [several server replicas](several-server-replicas.md). It starts
+  `server` and then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the k6 scenario
+  `tests/load/objectives.js` in a container through the proxy. It removes the stack at the end, unless `--keep` is
+  given. It needs Docker, see [development](../development.md#scripts).
+- **Scenario.** 50 users each run in a loop over the routes of the [objectives](#objectives), with a pause of about 1 s
+  an iteration. The scenario runs the loop of `tests/load/lib/objectives-loop.js`, which the cell load test shares.
+  Every request goes through one helper in that loop that tags it with its objective (`reads`, `writes` or `signIn`)
+  and its route. The sign-in pages and the token request are tagged `signIn`, so they count toward no objective.
+- **Failing a run.** The run fails, with a non-zero exit code, when reads miss p95 under 300 ms, writes miss p95 under
+  500 ms, the rate of `5xx` answers, the `server_errors` metric, is 0.1% or more, or fewer than 99% of its checks pass.
+- **The stub.** The stack also runs the https stub `load-stub`, a Caddy service under the `load` profile whose
+  certificate comes from the run's own authority and which answers every call with a fixed JSON body. The worker trusts
+  that authority.
+- **Data.** It creates a tenant with a generated application of
   [typical size](../domain/knowledge.md#typical-application-size), and records in every entity.
   `tests/Axis.LoadData` writes that application from a seed, so the same seed gives the same files:
   `dotnet run --project tests/Axis.LoadData -- <folder> [--seed <n>]`. It writes 100 seed records
@@ -114,44 +115,44 @@ to find its own numbers.
   `Entity00ChangedDelivered`, which starts the process `Entity00Notify`, and its step calls the connector. So the run
   makes `process.step`, `connector.call` and `event.deliver` work items. `scripts/load.sh` sets the binding
   to `https://load-stub:8443` for the tenant `load` before it activates the application.
-- **Users.** _(Built.)_ `scripts/load.sh` adds the users `load-user-01` to `load-user-50` to the
+- **Users.** `scripts/load.sh` adds the users `load-user-01` to `load-user-50` to the
   realm of the tenant `load`, each with a password, an authenticator whose secret comes from the
   seed and the application's roles, except `load-caller`. It writes their names, passwords and
   secrets to a file that k6 reads. It also adds the machine caller, a confidential client
   `load-caller` whose service account holds the role `load-caller` and whose tokens carry the
   audience `axis-load-endpoints`. It writes the client id and secret to `caller.json`, next to the
   users file, and runs `admin tenant oidc set load --endpoint-audience axis-load-endpoints` so that
-  the tenant accepts those tokens. _(Built.)_ Each virtual user signs in once through the tenant's realm sign-in
+  the tenant accepts those tokens.
+- **Virtual users.** Each virtual user signs in once through the tenant's realm sign-in
   page, with its password and then its authenticator code, and keeps its session cookie for the whole run. It works on the
   entity `Entity{i}`, with `i` from its number modulo 40. An iteration starts the process `Entity{i}Process00` on a record
   and completes the review task of the record it started in the iteration before. The machine caller calls the
   endpoint `CreateEntity00` in every fifth iteration of each user, so the calls stay under the default of
   `RateLimits:Bearer`. The test authentication scheme is not used,
   because only test hosts register it.
-- **Output.** _(Built.)_ k6 writes its summary to `artifacts/load-results/summary.json`, and the
+- **Output.** k6 writes its summary to `artifacts/load-results/summary.json`, and the
   cleanup keeps that folder. `scripts/lib/load-objectives.mjs` prints each objective with its
   measured value and exits non-zero when one is missed or a metric is missing from the summary. The
   evaluator also reads `worker-metrics.json` and checks the claim delay p95 of the tenant `load` against
   5 s. It interpolates the percentile inside the histogram buckets, and it fails when the metric is
   missing. The load test workflow keeps `artifacts/load-results`, the k6 summary and the worker
   metrics, as the `load-results` artifact of each run, even when an objective is missed.
-- **Worker metrics.** _(Built.)_ `scripts/load.sh` adds an OpenTelemetry Collector to the stack. The worker
+- **Worker metrics.** `scripts/load.sh` adds an OpenTelemetry Collector to the stack. The worker
   exports its metrics to it every 5 s over OTLP with https, because the worker refuses plain http
   outside Development. The collector's certificate comes from the run's own authority, which the worker
   trusts. The collector writes the metrics, as OTLP JSON with one document per line, to
   `artifacts/load-results/worker-metrics.json`. After k6 the script stops the worker and then the
   collector, so the last values reach the file, and the cleanup keeps it.
-- **When it runs.** _(Built.)_ The load test workflow, `.github/workflows/load.yml`, runs `scripts/load.sh`
+- **When it runs.** The load test workflow, `.github/workflows/load.yml`, runs `scripts/load.sh`
   every Monday at 03:00 UTC and on demand, and a missed objective marks the run red. It never gates a merge, and it is not a
   NexKit check, because a run on a shared CI machine varies too much to block a pull request.
 
 ### Cell load test
 
-_(planned for M31)_ The cell load test measures how many tenants a [cell](cells.md) holds, as
-[D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md)
-agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
+The cell load test measures how many tenants a [cell](cells.md) holds. The number becomes the cell's cap, see
+[cell size](cells.md#cell-size).
 
-- **Where it runs.** _(Built.)_ On demand, against a staging cell built like a production cell of the region:
+- **Where it runs.** On demand, against a staging cell built like a production cell of the region:
   managed Kubernetes, managed PostgreSQL with PgBouncer, the identity provider and object storage. It
   does not run on a CI runner, because a runner is not a cell, and NexKit does not run it. An operator runs
   `scripts/load-cell.sh <cell address>`, where the address is that of the provisioning API. It runs k6 in Docker, from
@@ -175,14 +176,14 @@ agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
   - 949 idle tenants, each with one user who signs in once an hour and reads one page every
     10 minutes.
 
-  _(Built.)_ `scripts/lib/load-cell-tenants.mjs` creates the busy and idle tenants through the provisioning API with
+  `scripts/lib/load-cell-tenants.mjs` creates the busy and idle tenants through the provisioning API with
   one idempotency key each, polls each create job, adds the users and the machine callers of the busy tenants, and writes
   the file that `AXIS_LOAD_TENANTS` names. `load-backlog` gets the application but no users, because nobody signs in to
   it, and the file names it as `backlog` with its `id` and `url`. `scripts/load-cell.sh` creates the tenants once, when
   `artifacts/load-cell/k6/tenants.json` is missing, because provisioning 1,000 tenants takes hours and the identity
   provider refuses users that exist. A rerun reuses them and first resumes the tenants listed in
   `artifacts/load-cell/suspended.json`.
-- **Scenarios.** _(Built.)_ `tests/load/cell.js` holds the two k6 scenarios: the busy tenants run the loop of the
+- **Scenarios.** `tests/load/cell.js` holds the two k6 scenarios: the busy tenants run the loop of the
   objectives, and each idle tenant signs in once an hour and reads a page every 10 minutes. The scenarios read the
   tenants from the JSON file named by `AXIS_LOAD_TENANTS`. The file has a `busy` list, with each tenant's `url`,
   `tokenUrl`, `caller` and 10 `users`, and an `idle` list, with each tenant's `url`, `tokenUrl` and one user.
@@ -190,16 +191,17 @@ agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
   step below 1,000 tenants runs the same scenario with fewer idle tenants. Each
   sample is tagged `phase:warmup` or `phase:run`, and the thresholds read only `phase:run`. `scripts/load-cell.test.mjs`
   keeps the numbers of this section equal to the scenario.
-- **Pass.** _(Built.)_ The run passes when, over one hour after a warm-up of 10 minutes:
+- **Pass.** The run passes when, over one hour after a warm-up of 10 minutes:
   - the busy tenants meet the [objectives](#objectives) for reads, writes and errors;
   - every tenant but the one with the backlog meets the worker objective, a claim delay p95 within
     5 s;
   - the sign-ins of idle tenants succeed, and their p95 is under 2 s;
   - the cell's CPU, memory and database connections stay under 80% of their limits.
-  - `scripts/lib/load-cell-criteria.mjs` checks the k6 summary, the worker metrics and the usage file
-    against these criteria, and names each criterion it misses. The usage file holds the peak fraction
-    of each limit, for example `{ "cpu": 0.62, "memory": 0.55, "connections": 0.71 }`.
-- **Finding the number.** _(Built.)_ `scripts/load-cell.sh` does the step-down with `findCap` in
+
+  `scripts/lib/load-cell-criteria.mjs` checks the k6 summary, the worker metrics and the usage file against these
+  criteria, and names each criterion it misses. The usage file holds the peak fraction of each limit, for example
+  `{ "cpu": 0.62, "memory": 0.55, "connections": 0.71 }`.
+- **Finding the number.** `scripts/load-cell.sh` does the step-down with `findCap` in
   `scripts/lib/load-cell-criteria.mjs`: it runs at 1,000 tenants, then at each lower count by steps of 100, and
   stops at the first count that passes. It finds no cap when even 100 fails. The highest passing number is the cap,
   set as `Cell:TenantCap`. Each step:
