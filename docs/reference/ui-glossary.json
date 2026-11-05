@@ -37,94 +37,58 @@
       "concept": "Application",
       "en": "application",
       "vi": "ứng dụng",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "app"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Resource",
       "en": "resource",
       "vi": "tài nguyên",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "resource"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Module",
       "en": "module",
       "vi": "mô-đun",
+      "status": "approved"
+    },
+    {
+      "concept": "Module version",
+      "en": "version",
+      "vi": "bản",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "module",
-          "môđun"
-        ]
-      }
+      "note": "A module's version, with its number: \"Organization bản 1.2.0\". \"phiên bản\" is a release of the application."
     },
     {
       "concept": "Built-in module",
       "en": "built-in module",
       "vi": "mô-đun có sẵn",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "mô-đun tích hợp"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Module contract",
       "en": "contract",
       "vi": "cam kết",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "contract",
-          "hợp đồng"
-        ]
-      },
       "note": "What a module promises the application."
     },
     {
       "concept": "Customization layer",
       "en": "layer",
       "vi": "lớp tùy biến",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "layer"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Release",
       "en": "release",
       "vi": "phiên bản",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "release",
-          "bản phát hành"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Publish (action)",
       "en": "Publish",
       "vi": "Phát hành",
       "status": "approved",
-      "note": "The verb that makes a release: \"Phát hành…\" makes \"phiên bản\".",
-      "avoid": {
-        "vi": [
-          "Xuất bản"
-        ]
-      }
+      "note": "The verb that makes a release: \"Phát hành…\" makes \"phiên bản\"."
     },
     {
       "concept": "Activate (a release)",
@@ -143,37 +107,14 @@
       "en": "problem",
       "vi": "vấn đề",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "chẩn đoán",
-          "diagnostic"
-        ]
-      },
       "note": "A diagnostic is an error or a warning: \"lỗi\" and \"cảnh báo\"."
-    },
-    {
-      "concept": "Dependencies",
-      "en": "Dependencies",
-      "vi": "Phụ thuộc",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "Liên quan"
-        ]
-      },
-      "note": "The tab of a resource that lists what uses it and what it uses, opened before a rename or a delete."
     },
     {
       "concept": "Used by",
       "en": "Used by",
-      "vi": "Được dùng bởi",
-      "status": "approved"
-    },
-    {
-      "concept": "Uses",
-      "en": "Uses",
-      "vi": "Sử dụng",
-      "status": "approved"
+      "vi": "Nơi sử dụng",
+      "status": "approved",
+      "note": "The tab of a resource that lists what uses it, the references a delete or a rename breaks. What a resource uses is not listed: its editor shows it."
     },
     {
       "concept": "Studio",
@@ -187,48 +128,26 @@
       "en": "entity",
       "vi": "đối tượng",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "entity",
-          "thực thể"
-        ]
-      },
       "note": "The definition of a kind of record, such as Purchase request. \"bảng\" names the table widget."
     },
     {
       "concept": "Field",
       "en": "field",
       "vi": "trường",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "field"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Data type",
       "en": "type",
       "vi": "kiểu dữ liệu",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "kiểu trường",
-          "kiểu tham số"
-        ]
-      },
       "note": "What a field or a parameter holds: text, number, date, a reference."
     },
     {
       "concept": "Record",
       "en": "record",
       "vi": "bản ghi",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "record"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Display field",
@@ -253,11 +172,6 @@
       "en": "seed data",
       "vi": "dữ liệu ban đầu",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "dữ liệu mẫu"
-        ]
-      },
       "note": "Seed data is the data an application starts with, not sample data."
     },
     {
@@ -270,13 +184,7 @@
       "concept": "Enum (field type)",
       "en": "Enum",
       "vi": "Lựa chọn",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "enum",
-          "danh sách chọn"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Reference (field type)",
@@ -300,13 +208,7 @@
       "concept": "Unique",
       "en": "Unique",
       "vi": "Không trùng",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "unique",
-          "duy nhất"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Sensitive",
@@ -325,23 +227,13 @@
       "en": "label",
       "vi": "tên hiển thị",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "nhãn"
-        ]
-      },
       "note": "What people see as the name of a field, an entity, a value or an action. \"Tên\" alone is the name that references use."
     },
     {
       "concept": "Help text",
       "en": "help text",
       "vi": "hướng dẫn",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "văn bản trợ giúp"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Expression",
@@ -354,11 +246,6 @@
       "en": "rule",
       "vi": "quy tắc",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "rule"
-        ]
-      },
       "note": "A named, reusable expression with parameters, which validations, filters and processes call."
     },
     {
@@ -366,14 +253,7 @@
       "en": "validation",
       "vi": "quy tắc kiểm tra",
       "status": "approved",
-      "note": "A condition a record must meet to be saved, as a validation rule: \"Thêm quy tắc kiểm tra\", \"3 quy tắc kiểm tra\". A kind of rule, so it may call one.",
-      "avoid": {
-        "vi": [
-          "điều kiện lưu",
-          "kiểm tra hợp lệ",
-          "ràng buộc"
-        ]
-      }
+      "note": "A condition a record must meet to be saved, as a validation rule: \"Thêm quy tắc kiểm tra\", \"3 quy tắc kiểm tra\". A kind of rule, so it may call one."
     },
     {
       "concept": "Process",
@@ -391,13 +271,7 @@
       "concept": "Human task",
       "en": "task",
       "vi": "công việc",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "nhiệm vụ",
-          "task"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Trigger",
@@ -422,12 +296,7 @@
       "en": "endpoint",
       "vi": "endpoint",
       "status": "approved",
-      "note": "Kept in English: integrators say it.",
-      "avoid": {
-        "vi": [
-          "điểm cuối"
-        ]
-      }
+      "note": "Kept in English: integrators say it."
     },
     {
       "concept": "Webhook",
@@ -463,29 +332,14 @@
       "concept": "Widget",
       "en": "widget",
       "vi": "thành phần",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "widget"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Text resource",
       "en": "language",
       "vi": "ngôn ngữ",
       "status": "approved",
-      "note": "An application's texts in one language. On screens it is named as a language, \"Languages\", \"Add language…\", \"Ngôn ngữ\", \"Thêm ngôn ngữ…\", and each one by its language's name, \"Tiếng Việt\", \"English\". The source language is one of them. \"text resource\" stays the kind's name in files, docs and the API.",
-      "avoid": {
-        "en": [
-          "text resource"
-        ],
-        "vi": [
-          "tài nguyên văn bản",
-          "bộ văn bản",
-          "bản văn bản"
-        ]
-      }
+      "note": "An application's texts in one language. On screens it is named as a language, \"Languages\", \"Add language…\", \"Ngôn ngữ\", \"Thêm ngôn ngữ…\", and each one by its language's name, \"Tiếng Việt\", \"English\". The source language is one of them. \"text resource\" stays the kind's name in files, docs and the API."
     },
     {
       "concept": "Translation",
@@ -499,11 +353,6 @@
       "en": "people",
       "vi": "người dùng",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "mọi người"
-        ]
-      },
       "note": "Mostly left out where the sentence needs no subject. The person reading is addressed as \"bạn\"."
     },
     {
@@ -529,13 +378,7 @@
       "en": "tenant",
       "vi": "tenant",
       "status": "approved",
-      "note": "Kept in English: operators say it.",
-      "avoid": {
-        "vi": [
-          "người thuê",
-          "đơn vị thuê"
-        ]
-      }
+      "note": "Kept in English: operators say it."
     },
     {
       "concept": "Operator console",
@@ -553,24 +396,13 @@
       "concept": "Action: Cancel",
       "en": "Cancel",
       "vi": "Hủy",
-      "status": "approved",
-      "avoid": {
-        "vi": [
-          "Huỷ"
-        ]
-      }
+      "status": "approved"
     },
     {
       "concept": "Action: Delete",
       "en": "Delete",
       "vi": "Xóa",
       "status": "approved",
-      "avoid": {
-        "vi": [
-          "Xoá",
-          "Xóa bỏ"
-        ]
-      },
       "note": "Destroys a thing."
     },
     {

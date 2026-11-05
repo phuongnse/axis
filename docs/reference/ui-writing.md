@@ -88,9 +88,11 @@ and the verbs of the common actions, with the term of each locale. A term has a 
 - `proposed`: suggested, waiting for the owner;
 - `decide`: the owner chooses among the `options` before any text changes.
 
-`avoid` lists words that must not name the concept in that locale, such as a second translation or the English word.
 `keep` lists what no locale translates, by group: `names` for names and acronyms, and `integration` for the closed list
 of integration and operations terms.
+
+The glossary and this page are conventions. They hold by being followed when a text is written and reviewed: the
+glossary says which word to use for a concept, and lists no words to avoid, as no list of wrong words is ever complete.
 
 ## English
 
@@ -148,10 +150,9 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
 
 ## Checks _(planned)_
 
-A check in `scripts/lint.sh` reads the texts and the glossary and fails when:
+A test checks the rules that a test can decide, and no list of words. It fails when:
 
 - a key is missing in a locale, or a placeholder of the English text is missing or added in another locale;
-- a text uses a word the glossary's `avoid` lists for its locale;
 - a text in another locale is the same as the English one, unless the glossary's `keep` allows it.
 
 ## Changing a text
