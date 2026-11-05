@@ -308,14 +308,22 @@
         "vi": [
           "rule"
         ]
-      }
+      },
+      "note": "A named, reusable expression with parameters, which validations, filters and processes call."
     },
     {
       "concept": "Validation",
       "en": "validation",
-      "vi": "điều kiện lưu",
+      "vi": "quy tắc kiểm tra",
       "status": "approved",
-      "note": "A condition a record must meet to be saved."
+      "note": "A condition a record must meet to be saved, as a validation rule: \"Thêm quy tắc kiểm tra\", \"3 quy tắc kiểm tra\". A kind of rule, so it may call one.",
+      "avoid": {
+        "vi": [
+          "điều kiện lưu",
+          "kiểm tra hợp lệ",
+          "ràng buộc"
+        ]
+      }
     },
     {
       "concept": "Process",
@@ -567,8 +575,9 @@
     {
       "concept": "Action: Validate",
       "en": "Validate",
-      "vi": "Kiểm tra",
-      "status": "approved"
+      "vi": "Kiểm tra lỗi",
+      "status": "approved",
+      "note": "Checks the application's configuration for errors and warnings, not the data of any record."
     },
     {
       "concept": "Action: Preview",
