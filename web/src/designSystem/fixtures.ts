@@ -776,6 +776,8 @@ const currentUser: CurrentUser = {
   studioTest: false,
   console: true,
   users: true,
+  tenantStatus: 'active',
+  billingUrl: null,
 }
 
 const purchaseApplication = {

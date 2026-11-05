@@ -128,6 +128,8 @@ const signedInUser: CurrentUser = {
   studioTest: false,
   console: false,
   users: false,
+  tenantStatus: 'active',
+  billingUrl: null,
 }
 
 const e2eSite: ApplicationSite = {

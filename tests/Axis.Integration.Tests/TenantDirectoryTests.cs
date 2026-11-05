@@ -213,6 +213,52 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
     }
 
     [Fact]
+    public async Task Me_answers_the_status_of_the_tenant_and_no_billing_address_outside_a_cell()
+    {
+        var role = NewRole();
+        var quiz = await PrepareTenantAsync("quiz", role);
+        var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector(), ("Users:AdministratorRole", "author"));
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        var active = await ReadMeAsync(client, "quiz.example.test");
+        Assert.Equal("active", active.GetProperty("tenantStatus").GetString());
+        Assert.Equal(JsonValueKind.Null, active.GetProperty("billingUrl").ValueKind);
+
+        await UpdateTenantAsync(platform, "quiz", row => row.Status = "readOnly");
+        await RefreshAsync(factory);
+
+        var readOnly = await ReadMeAsync(client, "quiz.example.test");
+        Assert.Equal("readOnly", readOnly.GetProperty("tenantStatus").GetString());
+        Assert.Equal(JsonValueKind.Null, readOnly.GetProperty("billingUrl").ValueKind);
+    }
+
+    [Fact]
+    public async Task Me_answers_the_billing_address_of_the_tenant_in_a_cell_to_an_administrator_only()
+    {
+        var role = NewRole();
+        var quiz = await PrepareTenantAsync("quiz", role);
+        var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" });
+        await using var factory = CreateFactory(platform, new LogCollector(), [.. _cellSettings, ("Users:AdministratorRole", "author")]);
+        using var administrator = factory.CreateClient().SignedInAs("author");
+        using var member = factory.CreateClient().SignedInAs("requester");
+
+        var administratorMe = await ReadMeAsync(administrator, "quiz.example.test");
+        Assert.Equal("https://account.vn.example.test/tenants/quiz", administratorMe.GetProperty("billingUrl").GetString());
+
+        var memberMe = await ReadMeAsync(member, "quiz.example.test");
+        Assert.Equal(JsonValueKind.Null, memberMe.GetProperty("billingUrl").ValueKind);
+    }
+
+    private static async Task<JsonElement> ReadMeAsync(HttpClient client, string host)
+    {
+        using var response = await client.SendAsync(Request("/api/me", host), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return body.RootElement.Clone();
+    }
+
+    [Fact]
     public async Task A_host_removed_from_a_tenant_is_404_after_a_refresh_and_its_other_host_still_serves()
     {
         var role = NewRole();

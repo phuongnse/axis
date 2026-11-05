@@ -90,9 +90,9 @@ and `POST /api/cell/tenants/{id}/read-only` set and `resume` clears.
 - **No work**. The worker claims none of the tenant's new work, as for a suspended
   tenant. Work already claimed finishes. Schedules do not fire, and a missed occurrence is not caught
   up after a resume: the worker skips them when it first sees the tenant active again. No email is sent for the tenant.
-- **A banner** _(planned for M33)_. `GET /api/me` answers `tenantStatus: "readOnly"`, and the shell
-  shows a banner on every page: why the workspace is read-only, and, for an administrator, a link to
-  the [billing portal](billing-portal.md).
+- **A banner.** `GET /api/me` answers `tenantStatus: "readOnly"`, and the shell shows a banner on
+  every page: why the workspace is read-only, and, for an administrator in a cell, a link to the
+  [billing portal](billing-portal.md).
 - **Quotas.** Unchanged. Nothing grows, so none is reached.
 
 ## Emails
