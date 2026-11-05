@@ -1,0 +1,198 @@
+{
+  "web/src/identitySignIn/AddAuthenticatorPage.tsx": {
+    "button": 2
+  },
+  "web/src/identitySignIn/PageExpiredPage.tsx": {
+    "button": 1
+  },
+  "web/src/identitySignIn/ResetPasswordPage.tsx": {
+    "button": 1
+  },
+  "web/src/identitySignIn/SamlPostPage.tsx": {
+    "button": 1
+  },
+  "web/src/identitySignIn/SignInPage.tsx": {
+    "button": 2
+  },
+  "web/src/identitySignIn/SignOutPage.tsx": {
+    "button": 1
+  },
+  "web/src/identitySignIn/TermsPage.tsx": {
+    "button": 2
+  },
+  "web/src/identitySignIn/TwoStepPage.tsx": {
+    "button": 2
+  },
+  "web/src/identitySignIn/UpdatePasswordPage.tsx": {
+    "button": 2
+  },
+  "web/src/identitySignIn/UpdateProfilePage.tsx": {
+    "button": 1
+  },
+  "web/src/pages/AccountPage.tsx": {
+    "button": 4,
+    "table": 2
+  },
+  "web/src/pages/ConnectorEditor.tsx": {
+    "button": 6
+  },
+  "web/src/pages/ConnectorInputRows.tsx": {
+    "button": 2
+  },
+  "web/src/pages/ConsoleDeadLetters.tsx": {
+    "table": 1
+  },
+  "web/src/pages/ConsolePage.tsx": {
+    "tag": 1,
+    "table": 2
+  },
+  "web/src/pages/ConsoleSchedules.tsx": {
+    "table": 1
+  },
+  "web/src/pages/EndpointValues.tsx": {
+    "button": 2
+  },
+  "web/src/pages/EntityDesigner.tsx": {
+    "table": 1,
+    "button": 9
+  },
+  "web/src/pages/FormPalette.tsx": {
+    "button": 2
+  },
+  "web/src/pages/FormSteps.tsx": {
+    "button": 4
+  },
+  "web/src/pages/HomePage.tsx": {
+    "button": 1
+  },
+  "web/src/pages/IdentityProviderEditor.tsx": {
+    "button": 2
+  },
+  "web/src/pages/LabelTexts.tsx": {
+    "button": 1
+  },
+  "web/src/pages/LicencesPage.tsx": {
+    "table": 1
+  },
+  "web/src/pages/MappingRows.tsx": {
+    "button": 2
+  },
+  "web/src/pages/NotifyFields.tsx": {
+    "button": 2
+  },
+  "web/src/pages/PageDataPanel.tsx": {
+    "button": 1
+  },
+  "web/src/pages/PageEditor.tsx": {
+    "button": 12
+  },
+  "web/src/pages/ProcessEditor.tsx": {
+    "button": 12
+  },
+  "web/src/pages/ProcessPalette.tsx": {
+    "button": 1
+  },
+  "web/src/pages/ScenarioEditor.tsx": {
+    "button": 4
+  },
+  "web/src/pages/ScenarioStep.tsx": {
+    "button": 5
+  },
+  "web/src/pages/SchemaForm.tsx": {
+    "button": 3
+  },
+  "web/src/pages/SeedGrid.tsx": {
+    "table": 1,
+    "button": 2
+  },
+  "web/src/pages/SiteSignIn.tsx": {
+    "button": 1
+  },
+  "web/src/pages/StudioEditor.tsx": {
+    "button": 1
+  },
+  "web/src/pages/StudioFormDesign.tsx": {
+    "button": 1
+  },
+  "web/src/pages/StudioModuleContract.tsx": {
+    "button": 3,
+    "table": 1
+  },
+  "web/src/pages/StudioModuleEditor.tsx": {
+    "button": 1
+  },
+  "web/src/pages/StudioNewApplication.tsx": {
+    "button": 1
+  },
+  "web/src/pages/StudioPageDesign.tsx": {
+    "button": 1
+  },
+  "web/src/pages/StudioPolicyMatrix.tsx": {
+    "table": 1,
+    "button": 5
+  },
+  "web/src/pages/StudioProcessDesign.tsx": {
+    "button": 2
+  },
+  "web/src/pages/StudioReferences.tsx": {
+    "button": 1
+  },
+  "web/src/pages/TextTable.tsx": {
+    "table": 1,
+    "button": 1
+  },
+  "web/src/pages/UserRolesDrawer.tsx": {
+    "tag": 2
+  },
+  "web/src/pages/UsersPage.tsx": {
+    "table": 1
+  },
+  "web/src/platform/ChildCollectionTable.tsx": {
+    "table": 1
+  },
+  "web/src/platform/ConsolePublishing.tsx": {
+    "table": 2
+  },
+  "web/src/platform/ConsoleWebhookDeliveries.tsx": {
+    "table": 1
+  },
+  "web/src/platform/DeadLetterList.tsx": {
+    "table": 1
+  },
+  "web/src/platform/FilterBar.tsx": {
+    "button": 2
+  },
+  "web/src/platform/ImportDialog.tsx": {
+    "button": 1
+  },
+  "web/src/platform/KpiWidget.tsx": {
+    "button": 1
+  },
+  "web/src/platform/NotificationBell.tsx": {
+    "button": 2
+  },
+  "web/src/platform/ProcessInspectorWidget.tsx": {
+    "table": 1
+  },
+  "web/src/platform/ProcessInstancePage.tsx": {
+    "tag": 2,
+    "table": 4,
+    "button": 2
+  },
+  "web/src/platform/ReferenceLookup.tsx": {
+    "table": 1
+  },
+  "web/src/platform/SignInPrompt.tsx": {
+    "button": 1
+  },
+  "web/src/platform/TaskInboxWidget.tsx": {
+    "tag": 1,
+    "table": 1
+  },
+  "web/src/platform/TaskPage.tsx": {
+    "button": 3
+  },
+  "web/src/platform/UserMenu.tsx": {
+    "button": 1
+  }
+}
