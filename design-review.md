@@ -143,11 +143,17 @@ owner is reviewing it one step at a time.
   - The details are inputs on the page, with no Edit details step.
 - **Step 1, built:** the Form tab is sections: General (name, label, description and display field, each with its help),
   Fields, Validations and Indexes, with Uses, Used by and the Danger zone after them as before. Fields is `AxisTable`, in the
-  file's order, with Name, Label, Type ("Reference → Supplier", "Enum 3 values"), Required, Unique and Properties (tags for
+  file's order, with Name, Label, Type ("Reference to Supplier", "Enum", see "A type in words" below), Required, Unique and Properties (tags for
   Sequence, Creator, Computed, Default, Searchable and Sensitive), a search, Add field in the section's heading, and Move up,
   Move down and Remove in each row's menu. A field's name opens its settings in a 560 px drawer, with the table still in sight.
   The drawer's name, label, type, Required, Unique and help have help texts, and its label and help are typed as texts, a box
   per locale, as the entity's label is. The other settings are still the old list, for step 2.
+- **A type in words:** the Type column read "Reference → organization/Department" and "Enum 3 values", a shorthand of
+  this review's own, with technical names and a count that leads nowhere. It now reads as Salesforce's Data Type column
+  does, in words and by label: the type's name, and for a reference, references or child collection the entity it points
+  to, by its label, as "Reference to Department" or "Child collection of Line item", from
+  `shell.studio.entity.typeOf.<type>`. The label comes from `referenceOptions` and `useTextOfKey`, as the drawer's target
+  picker gives it, and the name shows only where the entity has no label. Enum and every other type is its name alone.
 - **Tried and dropped:** tabs for Fields, Validations and Indexes with a header that summed the entity up and an Edit details
   drawer. The owner wanted the details on the page. Sections suit an entity better than tabs while its parts are small;
   tabs are for parts that are large and apart, as Salesforce's many object parts are. Not every page must be sections.

@@ -359,27 +359,34 @@ function EntityGeneral({
   )
 }
 
-/** Proposed: what a field's type says in the Type column: its name, then the entity it points to or its number of values. */
+/** The types whose Type cell names the entity they point to, as "Reference to Department". */
+const typesWithTarget = new Set(['reference', 'references', 'child-collection'])
+
+/**
+ * Proposed: what a field's type says in the Type column, in words: the type, and for a type that points to an entity,
+ * that entity by its label, as "Reference to Department" or "Child collection of Line item", as the target picker in the
+ * drawer names it. The name shows only where the entity has no label. Enum and the other types are their name alone,
+ * with no count, as a list shows no count that leads nowhere.
+ */
 function TypeCell({ field }: { field: Content }) {
   const t = useText()
-  const { colour } = useDesignTokens()
+  const names = useContext(StudioNamesContext)
+  const textOfKey = useTextOfKey()
   const type = text(field.type)
   if (type === '') {
     return <EmptyDash />
   }
   const target = text(field.target)
-  const values = Array.isArray(field.values) ? field.values.length : 0
-  const detail =
-    target !== ''
-      ? `→ ${target}`
-      : type === 'enum'
-        ? t('shell.studio.entity.valueCount').replace('{count}', String(values))
-        : null
+  if (target === '' || !typesWithTarget.has(type)) {
+    return <span>{t(`shell.studio.entity.type.${type}`)}</span>
+  }
+  const choice = names
+    ? referenceOptions(names, 'entity', undefined, '').find(
+        (option) => option.name.toLowerCase() === target.toLowerCase(),
+      )
+    : undefined
   return (
-    <span>
-      {t(`shell.studio.entity.type.${type}`)}
-      {detail && <span style={{ color: colour.textMuted }}> {detail}</span>}
-    </span>
+    <span>{t(`shell.studio.entity.typeOf.${type}`).replace('{entity}', textOfKey(choice?.labelKey) ?? target)}</span>
   )
 }
 
