@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { dialogWidth } from '../platform/dialogButtons'
 import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
-import { useText } from '../platform/texts'
+import { useText, withWord } from '../platform/texts'
 import type { designTokensFor } from '../platform/designTokens'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import {
@@ -234,11 +234,11 @@ export default function ExpressionEditor(props: ExpressionEditorProps) {
     </Typography.Text>
   ) : result.type !== null && !empty ? (
     <Typography.Text style={{ color: colour.textMuted, fontSize: 12 }} data-testid="studio-expression-type">
-      {t('shell.studio.expression.gives').replace('{type}', typeWords(result.type, t))}
+      {withWord(t('shell.studio.expression.gives'), '{type}', typeWords(result.type, t))}
     </Typography.Text>
   ) : expects ? (
     <Typography.Text style={{ color: colour.textMuted, fontSize: 12 }} data-testid="studio-expression-expects">
-      {t('shell.studio.expression.expects').replace('{type}', typeWords(expects, t))}
+      {withWord(t('shell.studio.expression.expects'), '{type}', typeWords(expects, t))}
     </Typography.Text>
   ) : null
 
@@ -322,11 +322,11 @@ export default function ExpressionEditor(props: ExpressionEditorProps) {
   }
 }
 
-/** A type in the words the entity designer names it by, such as "yes or no" for `boolean`, else as written. */
+/** A type in the words the entity designer names it by, such as "Yes or no" for `boolean`, else as written. */
 function typeWords(type: string, t: (key: string) => string): string {
   const key = `shell.studio.entity.type.${type}`
   const words = t(key)
-  return words === key ? type : words.toLowerCase()
+  return words === key ? type : words
 }
 
 /** A function's signature with the parameter the cursor is at in bold. */
@@ -550,11 +550,11 @@ function completionDetail(
     return { detail: signatureOf(option.fn), info: t(`shell.studio.expression.fn.${option.fn.name}`) }
   }
   const label = textOfKey(option.labelKey)
-  const type = option.type === 'rule' ? (option.detail ?? null) : option.detail ? typeWords(option.detail, t) : null
-  return {
-    detail: [label, type].filter((part): part is string => part !== null && part !== '').join(' · '),
-    info: null,
+  if (option.type === 'rule' || !option.detail) {
+    return { detail: [label, option.detail ?? null].filter((part): part is string => !!part).join(' · '), info: null }
   }
+  // A type after a label follows the line's capitals, as a word Axis defines does in a sentence.
+  return { detail: withWord(label ? `${label} · {type}` : '{type}', '{type}', typeWords(option.detail, t)), info: null }
 }
 
 /** What completion reads from the editor: the scope of the place, how to describe a choice, the texts and the type. */

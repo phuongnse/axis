@@ -1765,7 +1765,7 @@
   "shell.studio.entity.type.file": "Tệp",
   "shell.studio.entity.typeOf.reference": "Tham chiếu tới {entity}",
   "shell.studio.entity.typeOf.references": "Nhiều tham chiếu tới {entity}",
-  "shell.studio.entity.typeOf.child-collection": "Bảng con {entity}",
+  "shell.studio.entity.typeOf.child-collection": "Bảng con gồm {entity}",
   "shell.studio.newResource.button": "Tài nguyên mới…",
   "shell.studio.newResource.title": "Tài nguyên mới",
   "shell.studio.newResource.kindButton.connector": "Bộ kết nối mới…",

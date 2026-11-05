@@ -86,3 +86,17 @@ export function useTextCatalogs(): TextCatalogs {
   }
   return catalogs
 }
+
+/**
+ * Proposed: a text with a word that Axis defines, such as a type's or a kind's name, put in place of `placeholder`. The
+ * word follows the sentence's capitals: it starts with a capital where the placeholder starts the text, and in lower
+ * case elsewhere, so "{type} settings" reads "Text settings" and "Thiết lập {type}" reads "Thiết lập văn bản". A name an
+ * author gave, such as an entity's label, is not put in this way: it keeps its own capitals.
+ */
+export function withWord(template: string, placeholder: string, word: string): string {
+  const atStart = template.trimStart().startsWith(placeholder)
+  const cased = atStart
+    ? word.charAt(0).toLocaleUpperCase() + word.slice(1)
+    : word.charAt(0).toLocaleLowerCase() + word.slice(1)
+  return template.replace(placeholder, cased)
+}

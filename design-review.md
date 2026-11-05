@@ -362,6 +362,12 @@ owner is reviewing it one step at a time.
   two ways is rewritten. Applied to every text they touch, 33 in `vi` and 8 in English: the Fields table's columns, a
   process step's and parameter's settings, a scenario step's type, the page editor's labels, a release's label, and the
   identity provider's button text. No "nhãn", "kiểu trường" or "kiểu tham số" is left.
+- **Capitals of a word put in a sentence:** "Thiết lập Văn bản" capitalized a type's name in the middle of a phrase.
+  `withWord` in `platform/texts.ts` puts a word Axis defines in place of a placeholder with the sentence's capitals, a
+  capital where the placeholder starts the text and lower case elsewhere: "Text settings", "Thiết lập văn bản". The
+  drawer's type group, the expression editor's "Gives" and "Needs to give" lines and its completion's type detail take
+  it, in place of the editor's own lower-casing. A name an author gave keeps its capitals. The rule is in #2974.
+- **A child collection reads "Bảng con gồm Dòng hàng"**, so the entity is what the rows are, not who owns the table.
 - **For the issue:** the rewrite of the other areas, one NexKit issue each, after the owner's review of this one.
 
 ### Second mechanisms found by the audit of 2026-11-05

@@ -40,7 +40,7 @@ import {
   type ReferenceChoice,
   type ReferenceOption,
 } from '../platform/studioNames'
-import { useText } from '../platform/texts'
+import { useText, withWord } from '../platform/texts'
 import { Expression } from './ExpressionField'
 import { SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
@@ -953,7 +953,7 @@ function FieldGroups({
     <>
       {typeSettings.length > 0 && (
         <AxisFieldGroup
-          title={t('shell.studio.entity.group.type').replace('{type}', typeName)}
+          title={withWord(t('shell.studio.entity.group.type'), '{type}', typeName)}
           testId="studio-field-group-type"
         >
           {typeSettings}
