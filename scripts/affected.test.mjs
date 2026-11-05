@@ -355,7 +355,7 @@ describe("check scripts", () => {
   };
 
   const scenarioSuites = () =>
-    ["samples/apps", "samples/templates"].flatMap((group) =>
+    ["samples/apps"].flatMap((group) =>
       readdirSync(path.join(root, group))
         .map((folder) => path.join(root, group, folder, "application.json"))
         .filter((manifest) => existsSync(manifest))

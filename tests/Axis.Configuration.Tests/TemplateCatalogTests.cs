@@ -10,9 +10,9 @@ public sealed class TemplateCatalogTests
     [Fact]
     public void An_installed_template_loads_with_its_manifest_and_files_without_template_json()
     {
-        using var root = Template(new TemporaryFolder(), "request-approval", "1.0.0")
-            .With("request-approval/1.0.0/entities/Request.json", """{ "kind": "entity" }""")
-            .With("request-approval/1.0.0/readme.txt", "ignored");
+        using var root = Template(new TemporaryFolder(), "expense-claims", "1.0.0")
+            .With("expense-claims/1.0.0/entities/Request.json", """{ "kind": "entity" }""")
+            .With("expense-claims/1.0.0/readme.txt", "ignored");
 
         var catalog = TemplateCatalog.Load(root.Path);
 
@@ -20,10 +20,10 @@ public sealed class TemplateCatalogTests
         var template = Assert.Single(catalog.Newest);
         Assert.Equal(
             new TemplateManifest(
-                "request-approval",
+                "expense-claims",
                 "1.0.0",
-                new TemplateText("Title of request-approval", "Tiêu đề của request-approval"),
-                new TemplateText("Description of request-approval", "Mô tả của request-approval")),
+                new TemplateText("Title of expense-claims", "Tiêu đề của expense-claims"),
+                new TemplateText("Description of expense-claims", "Mô tả của expense-claims")),
             template.Manifest);
         Assert.Equal(["entities/Request.json", "sites/site.json"], template.Files.Select(file => file.Path));
     }

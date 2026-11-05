@@ -23,9 +23,9 @@ namespace Axis.Integration.Tests;
 public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, MailpitFixture mailpit, PostgreSqlFixture database)
     : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
-    private const string Template = "request-approval";
+    private const string Template = "approvals";
 
-    private const string ApplicationFolder = "request-approval";
+    private const string ApplicationFolder = "approvals";
 
     private readonly HttpClientHandler _handler = new();
     private readonly List<string> _realms = [];
@@ -121,9 +121,7 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
         _realms.Add(id);
         var applications = NewApplicationsFolder();
         var settings = Settings(applications);
-        settings["Templates:Path"] = BuiltInApplications.Path;
-        settings["Modules:Path"] = Path.Combine(AppContext.BaseDirectory, "BuiltInModules");
-        var job = await QueueAsync(scenario, settings, id, NewEmail(), "approvals");
+        var job = await QueueAsync(scenario, settings, id, NewEmail());
 
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings, identityProvider: _handler);
@@ -246,7 +244,8 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
         ["Cell:Region"] = "vn",
         ["Cell:TenantDomain"] = "vn.example.test",
         ["Cell:BackupKeyFile"] = _cellKeyFile,
-        ["Templates:Path"] = SampleTemplates.Path,
+        ["Templates:Path"] = BuiltInApplications.Path,
+        ["Modules:Path"] = Path.Combine(AppContext.BaseDirectory, "BuiltInModules"),
         ["Studio:ApplicationsPath"] = applications,
         ["IdentityProvider:Url"] = _baseAddress.ToString(),
         ["IdentityProvider:AdminClientId"] = KeycloakFixture.AdminClientId,

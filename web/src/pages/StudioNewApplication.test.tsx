@@ -7,11 +7,11 @@ import { ThemeModeProvider } from '../platform/theme'
 import { StudioNewApplication } from './StudioNewApplication'
 
 const template = {
-  id: 'request-approval',
+  id: 'expense-claims',
   version: '1.0.0',
   builtIn: false,
-  title: { en: 'Request approval', vi: 'Phê duyệt yêu cầu' },
-  description: { en: 'A request form, a list and a two-step approval.', vi: 'Một biểu mẫu yêu cầu.' },
+  title: { en: 'Expense claims', vi: 'Đề nghị hoàn ứng' },
+  description: { en: 'A claim form and a list of claims.', vi: 'Một biểu mẫu đề nghị.' },
   diagnostics: [],
 }
 
@@ -108,12 +108,12 @@ describe.each(['light', 'dark'])('StudioNewApplication in %s mode', (mode) => {
     renderButton()
     const dialog = await openDialog()
 
-    expect(await within(dialog).findByText('Request approval')).toBeInTheDocument()
-    expect(within(dialog).getByText('A request form, a list and a two-step approval.')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Expense claims')).toBeInTheDocument()
+    expect(within(dialog).getByText('A claim form and a list of claims.')).toBeInTheDocument()
     const labels = within(dialog)
       .getAllByRole('radio')
       .map((radio) => radio.closest('label')?.textContent)
-    expect(labels).toEqual(['Blank', 'Request approvalA request form, a list and a two-step approval.'])
+    expect(labels).toEqual(['Blank', 'Expense claimsA claim form and a list of claims.'])
   })
 
   it('lists a built-in template first, with Built in in its name, and no mark on the other', async () => {
@@ -123,9 +123,9 @@ describe.each(['light', 'dark'])('StudioNewApplication in %s mode', (mode) => {
 
     await within(dialog).findByRole('radio', { name: /^Tracker test/ })
     const radios = within(dialog).getAllByRole('radio')
-    expect(radios.map((radio) => radio.getAttribute('value'))).toEqual(['', 'tracker-test', 'request-approval'])
+    expect(radios.map((radio) => radio.getAttribute('value'))).toEqual(['', 'tracker-test', 'expense-claims'])
     expect(radios[1]).toHaveAccessibleName(/^Tracker test.*Built in/)
-    expect(radios[2]).toHaveAccessibleName(/^Request approval/)
+    expect(radios[2]).toHaveAccessibleName(/^Expense claims/)
     expect(radios[2]).not.toHaveAccessibleName(/Built in/)
   })
 
@@ -158,13 +158,13 @@ describe.each(['light', 'dark'])('StudioNewApplication in %s mode', (mode) => {
     const onCreated = renderButton()
     const dialog = await openDialog()
 
-    await userEvent.click(await within(dialog).findByRole('radio', { name: /Request approval/ }))
+    await userEvent.click(await within(dialog).findByRole('radio', { name: /Expense claims/ }))
     await typeName(dialog, 'Onboarding')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith('Onboarding'))
     const post = fetchMock.mock.calls.find(([input, init]) => input === '/api/studio/apps' && init?.method === 'POST')!
-    expect(JSON.parse(post[1]!.body as string)).toEqual({ name: 'Onboarding', template: 'request-approval' })
+    expect(JSON.parse(post[1]!.body as string)).toEqual({ name: 'Onboarding', template: 'expense-claims' })
   })
 
   it('shows that the name is taken on a 409 and keeps the dialog open', async () => {
