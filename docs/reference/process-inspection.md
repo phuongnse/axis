@@ -367,6 +367,10 @@ connector or package call, see [Tables](process-tables.md#tables). The call row 
 attempts and keeps only the last status and error, so the attempt rows hold the
 earlier ones.
 
+- **Trace ids** _(planned for M31)_. Each `path` entry and each attempt carries the `traceId` of the
+  run that wrote it, from its stored `trace_id`, and the process inspector shows it, so an operator can
+  find the run's logs and spans, see [telemetry](telemetry.md).
+
 - **Attempt.** One send of a connector call, or one run of a package
   operation. Its outcome is `succeeded`, `retryable`, `unknown` or `failed`,
   the classes of [Call outcomes](process-execution.md#call-outcomes) and

@@ -744,8 +744,7 @@ A tenant archive is not a backup of the installation. The operator also keeps th
   installed extension packages and modules. A restore needs the package versions that the archive
   marks `required`.
 
-Point-in-time recovery and restoring into another installation are out of scope, see
-[out of scope](#out-of-scope).
+Point-in-time recovery of one tenant is out of scope, see [out of scope](#out-of-scope).
 
 ## Platform rekey
 
@@ -872,7 +871,8 @@ These operations are outside what `Axis.Admin` does. An operator who needs one u
 server's own tools.
 
 - Moving a tenant to another database server. Axis supports a single database server.
-- Point-in-time recovery of one tenant, and restoring a tenant into another installation. A cell
-  keeps point-in-time recovery of its whole cluster, see
-  [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+- Point-in-time recovery of one tenant. A cell keeps point-in-time recovery of its whole cluster, see
+  [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). An archive does restore into
+  another installation, where the tenant gets a new realm, see
+  [the new realm](tenant-backup-and-restore.md#the-new-realm).
 - Overwriting a tenant in place with a restore.

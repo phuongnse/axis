@@ -1,6 +1,6 @@
 # D131. Tenant notices live in axis.notifications
 
-Status: **Proposed**
+Status: **Agreed**
 
 ## Context
 
