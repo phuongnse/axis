@@ -195,6 +195,29 @@ Last updated 2026-11-05 (merged `main` at fd1bf541; Display field names fields b
 - **Built:** `ReferencePicker` takes `labelOf`. The entity's Display field uses it first. The pickers of Validations and
   Indexes and the other pickers of fields and resources are left to follow it.
 
+### Second mechanisms found by the audit of 2026-11-05
+
+Each is one concern with more than one way to do it. The issue merges each into the first one named, as the rule "One
+concern has one mechanism" says. Found by reading, not yet run.
+
+1. Name of a kind: `platform/studioKinds.ts` (`kindName`, `kindSingular`) against `pages/studioViews.ts` (`kindName`, other
+   text keys) and `kindLabel` in `StudioPage.tsx`.
+2. A localized title with its fallback: `localized()` in `platform/site.ts` against the copies in `platform/studio.ts` and
+   `SchemaForm.tsx`, which fall back differently (first locale, or `en`).
+3. Sorting names: `nameCollator` in `pages/studioViews.ts` against inline collators and bare `localeCompare` calls. It moves
+   to `platform/`.
+4. The label of an option: `labelOf` of `ReferencePicker`, `StudioResourceTitle`, and the label built in `SchemaForm`. The
+   target is the names route answering a label key with each name.
+5. A status as a tag: raw colour names in `UsersPage`, `ConsolePublishing`, `StudioReleases`, `StudioTestResults` and
+   `StudioPolicyMatrix`, against the colour tokens.
+6. Empty states drawn with Ant Design's `Empty` in `HomePage`, `ProcessInstancePage` and `RecordHistory`, against
+   `EmptyState`.
+7. Tables that do not use `AxisTable`, such as `UsersPage`, `LicencesPage`, `TextTable`, `AccountPage` and the console
+   lists. `DeadLetterList` and `ConsoleDeadLetters` look like two lists of one thing. Some are editable grids.
+8. Search boxes and filters apart from `TableFilter`, and literal input widths, against the size tokens.
+9. Raw `Button` next to `AxisButton`, mostly in `PageEditor`, `ProcessEditor`, `EntityDesigner` and `ConnectorEditor`.
+10. `Alert` drawn by hand in about 20 places, with the same text (`referencesFailed`) twice.
+
 ### Merge of `main` at fd1bf541, 2026-11-05
 
 `main` built, since the first merge: the size tokens and `AxisTable` (D129), the kind lists, the Releases list, the band, the
