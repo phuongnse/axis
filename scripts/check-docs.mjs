@@ -20,8 +20,8 @@
 //   closes it.
 // - Every threat table under docs/, found by its header line, such as the ones in
 //   docs/reference/threat-model-*.md, has a unique id across all of them, a status and a rating from
-//   the lists, and evidence. A Mitigated row names only test classes that exist, a Gap row links the
-//   GitHub issue that closes it, and an Accepted row gives a date.
+//   the lists, and evidence. A Mitigated row names only test classes declared under tests/, controlplane/tests/
+//   or samples/, a Gap row links the GitHub issue that closes it, and an Accepted row gives a date.
 // - docs/reference/security.md, when it exists with samples/keycloak/axis-realm.json, has a '### Development users'
 //   table that lists the same users with the same axis roles as the realm's users, except service accounts, and
 //   each realm user's id is its username.
@@ -98,13 +98,14 @@ const splitLines = (text) => text.replace(/\n$/, '').split('\n')
 const countLines = (text) => splitLines(text).length
 const lines = (file) => splitLines(readFileSync(file, 'utf8'))
 
-/** Returns a function that gives the names of the classes declared under tests/ and samples/, read once. */
+/** Returns a function that gives the names of the classes declared under tests/, controlplane/tests/ and samples/, read once. */
 function testClassLookup(root) {
   let classes
   return () => {
     if (!classes) {
       classes = new Set()
-      for (const file of [...sourceFiles(path.join(root, 'tests')), ...sourceFiles(path.join(root, 'samples'))]) {
+      const folders = ['tests', path.join('controlplane', 'tests'), 'samples']
+      for (const file of folders.flatMap((folder) => sourceFiles(path.join(root, folder)))) {
         for (const match of readFileSync(file, 'utf8').matchAll(classPattern)) classes.add(match[1])
       }
     }
@@ -143,7 +144,7 @@ function checkAsvs(root, asvs, report, testClasses) {
     if (evidence === '') report(asvs, line, `${id} has no evidence`)
     else if (statusName === 'Met') {
       for (const match of rawEvidence.matchAll(testClassPattern)) {
-        if (!testClasses().has(match[1])) report(asvs, line, `${id} names the test class ${match[1]}, which no .cs file under tests/ or samples/ declares`)
+        if (!testClasses().has(match[1])) report(asvs, line, `${id} names the test class ${match[1]}, which no .cs file under tests/, controlplane/tests/ or samples/ declares`)
       }
     } else if (statusName === 'Gap' && !issueLinkPattern.test(rawEvidence)) {
       report(asvs, line, `${id} is a Gap and links no issue: link the GitHub issue that closes it`)
@@ -181,7 +182,7 @@ function checkThreatTables(file, report, testClasses, seen, relative) {
       if (evidence === '') report(file, line, `${id} has no evidence`)
       else if (statusName === 'Mitigated') {
         for (const match of rawEvidence.matchAll(testClassPattern)) {
-          if (!testClasses().has(match[1])) report(file, line, `${id} names the test class ${match[1]}, which no .cs file under tests/ or samples/ declares`)
+          if (!testClasses().has(match[1])) report(file, line, `${id} names the test class ${match[1]}, which no .cs file under tests/, controlplane/tests/ or samples/ declares`)
         }
       } else if (statusName === 'Gap' && !issueLinkPattern.test(rawEvidence)) {
         report(file, line, `${id} is a Gap and links no issue: link the GitHub issue that closes it`)
