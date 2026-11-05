@@ -538,7 +538,7 @@ An application that declares it maps both slots to roles of its own:
 
 This section follows
 [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-The manifest, the one-site rule, installation, listing, the sample and the copy are built.
+The manifest, the one-site rule, installation, listing and the copy are built.
 An application template is an application folder with a `template.json`
 manifest. Studio creates a new application by copying an installed template, see
 [creating an application](authoring.md#creating-an-application).
@@ -548,12 +548,16 @@ The manifest is `template.json` at the root of the folder:
 ```json
 {
   "kind": "applicationTemplate",
-  "id": "request-approval",
+  "id": "approvals",
   "version": "1.0.0",
-  "title": { "en": "Request approval", "vi": "Phê duyệt yêu cầu" },
+  "builtIn": true,
+  "title": {
+    "en": "Approvals",
+    "vi": "Phê duyệt"
+  },
   "description": {
-    "en": "A request form, a list and a two-step approval.",
-    "vi": "Một biểu mẫu yêu cầu, một danh sách và phê duyệt hai bước."
+    "en": "Departments, employees, out-of-office periods and approval requests, from the built-in organization and approvals modules.",
+    "vi": "Phòng ban, nhân viên, thời gian vắng mặt và yêu cầu phê duyệt, từ các mô-đun tích hợp organization và approvals."
   }
 }
 ```
@@ -574,7 +578,7 @@ The manifest is `template.json` at the root of the folder:
   server. A template version with a bad manifest, with folder names that differ
   from its manifest, or without exactly one site is left out and logged as a
   warning at start, and the other versions still load. The warning names the
-  version's folder, as `request-approval/1.0.0`, and has no `AXC` code.
+  version's folder, as `approvals/1.0.0`, and has no `AXC` code.
 - **Listing.** `GET /api/studio/templates` lists the newest version of each
   template, with the diagnostics of compiling it in memory. A template that does
   not compile is still listed. Built-in templates come first, then the others,
@@ -589,11 +593,9 @@ The manifest is `template.json` at the root of the folder:
   - References are by name, so they still resolve.
   - The copy has the template's diagnostics. `template.json` is not copied,
     because template metadata does not belong in an application.
-- **Sample.** `samples/templates/request-approval` is the sample template. It
-  holds one entity with a sequence number, a form page, a table page, a two-step
-  approval process, two roles and their policies, an `accounts` identity provider, texts in `en` and `vi`, and one
-  test scenario. `scripts/build.sh` installs it into `artifacts/templates`. The
-  production images hold no template, and the Compose image holds the samples in
+- **No sample template.** There is no sample template. `scripts/build.sh`
+  installs the built-in applications into `artifacts/templates`. The production
+  images hold no template, and the Compose image holds the built-in applications in
   `/templates`.
 
 ### Blank application

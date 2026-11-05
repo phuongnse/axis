@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Admin;
+using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -648,14 +649,15 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.All(job.GetProperty("steps").EnumerateArray(), step => Assert.Equal("pending", step.GetProperty("state").GetString()));
         Assert.False(job.TryGetProperty("input", out _));
         Assert.Equal(
-            """{"application":"request-approval","administrator":"admin@example.test"}""",
+            """{"application":"approvals","administrator":"admin@example.test"}""",
             await ScalarAsync("SELECT input::text FROM platform.jobs") is string input ? Compact(input) : null);
     }
 
     [Fact]
     public async Task A_create_from_the_built_in_approvals_application_answers_202_when_it_is_installed_and_400_when_it_is_not()
     {
-        await using (var without = await StartAsync())
+        using var empty = new TemporaryFolder();
+        await using (var without = await StartAsync(templates: empty.Path))
         {
             using var client = CreateClient(without, _console);
             var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
@@ -666,7 +668,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             Assert.Equal(0, await CountAsync("platform.jobs"));
         }
 
-        await using var with = await StartAsync(templates: BuiltInApplications.Path);
+        await using var with = await StartAsync();
         using var installedClient = CreateClient(with, _console);
         var installedToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
 
@@ -846,7 +848,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(overridden, quota.GetProperty("overridden").GetBoolean());
     }
 
-    private static string CreateBody(string id, string application = "request-approval", string administrator = "admin@example.test") =>
+    private static string CreateBody(string id, string application = "approvals", string administrator = "admin@example.test") =>
         JsonSerializer.Serialize(new { id, application, administrator });
 
     private static string Compact(string json) => JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>(json));
@@ -957,7 +959,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             builder.UseSetting("Cell:OperatorRealm", _realm);
             builder.UseSetting("Cell:OperatorRole", OperatorRole);
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());
-            builder.UseSetting("Templates:Path", templates ?? SampleTemplates.Path);
+            builder.UseSetting("Templates:Path", templates ?? BuiltInApplications.Path);
             if (tenantCap is { } cap)
             {
                 builder.UseSetting("Cell:TenantCap", cap.ToString(System.Globalization.CultureInfo.InvariantCulture));
