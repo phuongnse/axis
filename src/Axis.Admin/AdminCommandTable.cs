@@ -32,4 +32,5 @@ internal sealed record AdminRun(
     TimeSpan PublisherLease,
     TimeSpan PublisherTestLimit,
     HttpMessageHandler? IdentityProviderHandler,
-    CancellationToken CancellationToken);
+    CancellationToken CancellationToken,
+    IDnsTxtResolver? DnsResolver = null);

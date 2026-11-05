@@ -56,7 +56,8 @@ namespace Axis.Admin;
 /// see <see cref="IPublisherTenants"/>. After a <c>publish</c> or a <c>rollback</c> that left a work item due now for the tenant, such
 /// as a schedule trigger that is past due, the publisher sends the wake signal for that tenant, and a failure to send it fails nothing.
 /// Under the directory source it also runs the provisioning jobs of <c>platform.jobs</c> in a third loop, see <see cref="ProvisioningJobs"/>.
-/// A stop lets a running job finish.
+/// A stop lets a running job finish. In a fourth loop it also checks the pending host requests of <c>platform.tenant_host_requests</c> every
+/// <c>Cell:HostCheckInterval</c>, see <see cref="TenantHostVerification"/>. A failed round writes one line, and the next round tries again.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -68,7 +69,8 @@ internal sealed class Publisher(
     TextWriter output,
     TextWriter error,
     CancellationToken stopping,
-    ProvisioningJobs? jobs = null)
+    ProvisioningJobs? jobs = null,
+    TenantHostVerification? hosts = null)
 {
     // Both loops write to these.
     private readonly TextWriter _output = TextWriter.Synchronized(output);
@@ -164,9 +166,39 @@ internal sealed class Publisher(
             return 1;
         }
 
-        // Two loops, so a long test holds up no publish. Only the first reads the tenants again. A third runs the provisioning jobs.
-        await Task.WhenAll(LoopAsync(tests: false), LoopAsync(tests: true), jobs is null ? Task.CompletedTask : JobsLoopAsync(jobs));
+        // Two loops, so a long test holds up no publish. Only the first reads the tenants again. A third runs the provisioning jobs,
+        // and a fourth checks the host requests.
+        await Task.WhenAll(
+            LoopAsync(tests: false),
+            LoopAsync(tests: true),
+            jobs is null ? Task.CompletedTask : JobsLoopAsync(jobs),
+            hosts is null ? Task.CompletedTask : HostsLoopAsync(hosts));
         return 0;
+    }
+
+    // Checks the host requests once each interval. A stop is checked between rounds, so a running round finishes.
+    private async Task HostsLoopAsync(TenantHostVerification verification)
+    {
+        while (!stopping.IsCancellationRequested)
+        {
+            try
+            {
+                await verification.RunRoundAsync(_output, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                _output.WriteLine($"platform host check failed: {TenantDatabaseSteps.Safe(exception)}");
+            }
+
+            try
+            {
+                await Task.Delay(verification.Interval, stopping);
+            }
+            catch (OperationCanceledException)
+            {
+                // A stop ends the loop.
+            }
+        }
     }
 
     // Runs the provisioning jobs one at a time. A stop is checked only between jobs, so a running job finishes.

@@ -640,6 +640,7 @@ does not read `Quotas:Defaults` yet.
 | `Cell:Region` | All hosts | The region code, such as `vn`. |
 | `Cell:TenantDomain` | Server, publisher | The domain of the tenant subdomains, such as `vn.example.com`. |
 | `Cell:InternalDomain` | Admin, publisher | A domain no ingress serves, for scratch tenants of the restore check. `cell restore-check` stops with exit code `2` when it is blank. |
+| `Cell:HostCheckInterval` | Publisher | How often the publisher checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS, `00:10:00` by default. Zero, a negative value or one that is not a time span stops the publisher with exit code `2`, and the message names the setting. |
 | `Cell:TenantCap` | Server | The measured number of tenants the cell holds, see [cell size](cells.md#cell-size). |
 | `Cell:ConsoleHost` | Server | The host of the [cell console](cell-console.md). |
 | `Cell:ConsoleAllowedNetworks` | Server | Address ranges that may reach the console host. Empty allows every address. |
