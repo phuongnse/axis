@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="MailKit" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Npgsql.OpenTelemetry" />
@@ -14,6 +15,11 @@
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+  </ItemGroup>
+
+  <!-- The email templates ship in the assembly: <kind>.<language>.txt, found from the files themselves. WithCulture stops MSBuild from reading en and vi as cultures. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Emails/Templates/*.txt" WithCulture="false" LogicalName="Axis.ControlPlane.Emails.Templates.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

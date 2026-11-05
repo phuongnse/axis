@@ -99,6 +99,8 @@ describe('the Axis control plane Helm chart', () => {
   for (const [path, message] of [
     ['controlPlane.region', 'controlPlane.region is required'],
     ['controlPlane.tenantDomain', 'controlPlane.tenantDomain is required'],
+    ['controlPlane.mailFrom', 'controlPlane.mailFrom is required'],
+    ['controlPlane.mail.host', 'controlPlane.mail.host is required'],
     ['secrets.connectionString.name', 'secrets.connectionString.name is required'],
     ['secrets.certificate.name', 'secrets.certificate.name is required'],
   ]) {
@@ -110,7 +112,7 @@ describe('the Axis control plane Helm chart', () => {
   }
 
   test('rejects a secret value in the values, and never prints it', () => {
-    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak']) {
+    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak', 'secrets.mailPassword.value=leak']) {
       const result = render('--set', setting)
       assert.notEqual(result.status, 0, setting)
       assert.doesNotMatch(result.stdout, /leak/, setting)
@@ -121,6 +123,25 @@ describe('the Axis control plane Helm chart', () => {
     const deployment = find(renderOk('--set', 'controlPlane.region=eu', '--set', 'controlPlane.tenantDomain=eu.example.org'), 'Deployment', 'axis-controlplane')
     assert.match(deployment, /- name: ControlPlane__Region\n\s+value: "eu"\n/)
     assert.match(deployment, /- name: ControlPlane__TenantDomain\n\s+value: "eu\.example\.org"\n/)
+  })
+
+  test('sets the mail settings and mounts the relay password as ControlPlane__Mail__Password', () => {
+    const deployment = find(renderOk(), 'Deployment', 'axis-controlplane')
+    assert.match(deployment, /- name: ControlPlane__MailFrom\n\s+value: "no-reply@mail\.vn\.example\.com"\n/)
+    assert.match(deployment, /- name: ControlPlane__Mail__Host\n\s+value: "smtp\.example\.com"\n/)
+    assert.match(deployment, /- name: ControlPlane__Mail__Port\n\s+value: "587"\n/)
+    assert.match(deployment, /- name: ControlPlane__Mail__UseTls\n\s+value: "true"\n/)
+    assert.match(deployment, /- name: ControlPlane__Mail__UserName\n\s+value: "relay-user"\n/)
+    assert.doesNotMatch(deployment, /- name: ControlPlane__Mail__Password\n/)
+    assert.match(
+      deployment,
+      /- secret:\n\s+name: "axis-controlplane-mail"\n\s+items:\n\s+- key: "ControlPlane__Mail__Password"\n\s+path: ControlPlane__Mail__Password\n/,
+    )
+  })
+
+  test('sets no user name and mounts no password when the values leave them out', () => {
+    const deployment = find(renderOk('--set', 'controlPlane.mail.userName=', '--set', 'secrets.mailPassword.name='), 'Deployment', 'axis-controlplane')
+    assert.doesNotMatch(deployment, /ControlPlane__Mail__UserName|ControlPlane__Mail__Password/)
   })
 
   test('applies the image registry, tag and pull Secrets', () => {

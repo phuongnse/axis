@@ -44,7 +44,18 @@
       "type": "object",
       "properties": {
         "region": { "type": "string" },
-        "tenantDomain": { "type": "string" }
+        "tenantDomain": { "type": "string" },
+        "mailFrom": { "type": "string" },
+        "mail": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "useTls": { "type": "boolean" },
+            "userName": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
@@ -52,6 +63,7 @@
       "type": "object",
       "properties": {
         "connectionString": { "$ref": "#/definitions/secretReference" },
+        "mailPassword": { "$ref": "#/definitions/secretReference" },
         "certificate": { "$ref": "#/definitions/tlsSecretReference" }
       },
       "additionalProperties": false

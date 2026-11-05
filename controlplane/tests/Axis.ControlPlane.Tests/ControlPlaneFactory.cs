@@ -28,6 +28,9 @@ internal static class ControlPlaneFactory
                 ["ControlPlane:Region"] = "vn",
                 ["ControlPlane:TenantDomain"] = "vn.example.com",
                 ["ControlPlane:ConnectionString"] = UnreachableConnectionString,
+                ["ControlPlane:MailFrom"] = "no-reply@vn.example.com",
+                ["ControlPlane:Mail:Host"] = "127.0.0.1",
+                ["ControlPlane:Mail:Port"] = "1",
             };
             foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
             {

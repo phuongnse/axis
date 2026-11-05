@@ -1,0 +1,9 @@
+Subject: Your Axis is taking longer than expected
+
+Hello {{name}},
+
+Setting up your Axis is taking longer than we expected. Our team is working on it, and you do not need to do anything.
+
+We will email you again as soon as it is ready.
+
+The Axis team

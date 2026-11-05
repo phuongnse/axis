@@ -9,9 +9,9 @@ M33)_, except the parts that billing adds, _(planned for M34)_, and except the s
 settings, its health, its [durable jobs](#its-own-work), its audit records, its image and its Helm chart, which
 are built: `controlplane/src/Axis.ControlPlane` starts, checks its `ControlPlane:` settings, applies its own
 migrations, runs its job queue and answers `/health/live` and `/health/ready`, the `axis-controlplane` image
-packs it, and `deploy/helm/axis-controlplane` installs it. No job kind exists yet, so the job runner is idle
-until the issues that add provisioning, the subscription clock and emails register their handlers. The
-conventions of [architecture.md](../architecture.md) apply.
+packs it, and `deploy/helm/axis-controlplane` installs it. The only job kind so far is `sendEmail`, see
+[emails](#its-own-work). The job runner takes the other kinds as the issues that add provisioning and the
+subscription clock register their handlers. The conventions of [architecture.md](../architecture.md) apply.
 
 ## What it is
 
@@ -86,7 +86,30 @@ conventions of [architecture.md](../architecture.md) apply.
 - **Emails.** The control plane sends its own emails, from a mail domain of its own,
   `ControlPlane:MailFrom`, with SPF, DKIM and DMARC. It never uses a cell's mail domain, so one
   tenant's sending never touches a sign-up or a payment reminder. Every email is in `en` and `vi`,
-  in the language the person chose at sign-up.
+  in the language the person chose at sign-up. SPF, DKIM and DMARC are DNS and relay setup, outside
+  the repository.
+  - **The `sendEmail` job.** Every email is one durable job of the kind `sendEmail`, so a restart
+    loses none. Code queues it through one helper, `EmailJobs.EnqueueAsync`, which may run in the
+    transaction of the change that needs the email. The payload is `{ template, language, to, values }`.
+    The helper rejects an unknown template, a language other than `en` or `vi`, an address that is
+    not an email address and a missing value, so a bad email fails when it is queued and not on the
+    tenth retry. A payload is stored in the database, so it never holds a password, a token or a payment
+    detail: an email that needs a link with a token needs its own design.
+  - **Templates.** A template is a plain text file embedded in the service, named
+    `<kind>.<language>.txt`, such as `tenantReady.vi.txt`. Its first line is `Subject: …`, a blank
+    line follows, and the rest is the body. A placeholder is written `{{name}}`. The kinds are found
+    from the files themselves. At start every kind must have exactly an `en` text and a `vi` text,
+    with the same placeholders in both, or the start stops and the message names the kind. The first
+    set holds `tenantReady` (the tenant's address) and `provisioningDelayed`. The sign-up, trial and
+    billing issues add their own kinds. The email is plain text, with no HTML part.
+  - **Sending.** The job fills in the template in the payload's language and sends it through the
+    relay of `ControlPlane:Mail`, from `ControlPlane:MailFrom`, never through a cell's mail settings.
+    A failed send is retried on the job queue's normal backoff, see the retries above. `last_error`
+    holds the type of the failure and never its message, since an SMTP rejection can quote the
+    recipient's address.
+  - **At-least-once, made visible.** The email's `Message-ID` is the job id and the domain of
+    `ControlPlane:MailFrom`. A job that runs twice after a crash sends the same message twice, and the
+    receiver can drop the copy.
 - **Audit.** Every change to a subscription, a payment, an invoice or an account writes an
   append-only audit record with its actor: a person of the [billing portal](billing-portal.md), a
   provider's webhook, a job, or an operator.
@@ -110,15 +133,23 @@ conventions of [architecture.md](../architecture.md) apply.
   the mail settings, the [plans](plans.md) and the providers' non-secret values. Secrets are
   Kubernetes Secrets.
 
-The service reads three settings at start, and the rest are _(planned for M33)_. Every one is required.
-A missing or wrong value stops the start, and the message names the setting and never its value. The
-connection string may also come from the key-per-file secret `/run/secrets/ControlPlane__ConnectionString`.
+The service reads these settings at start, and the rest are _(planned for M33)_. Every one is required,
+except `ControlPlane:Mail:UserName`. A missing or wrong value stops the start, and the message names the
+setting and never its value. The connection string and the mail password may also come from the
+key-per-file secrets `/run/secrets/ControlPlane__ConnectionString` and
+`/run/secrets/ControlPlane__Mail__Password`.
 
 | Setting | Meaning | Start check |
 | --- | --- | --- |
 | `ControlPlane:Region` | The region code, such as `vn` | Lowercase letters and digits only |
 | `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
 | `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
+| `ControlPlane:MailFrom` | The address every email of the control plane comes from | A valid email address |
+| `ControlPlane:Mail:Host` | The host of the SMTP relay | Not empty |
+| `ControlPlane:Mail:Port` | The SMTP port. Default 587 | 1 to 65535. Port 465 starts with TLS, any other port upgrades with STARTTLS |
+| `ControlPlane:Mail:UseTls` | Whether the relay connection uses TLS. Default on | Outside Development and Testing it must be on |
+| `ControlPlane:Mail:UserName` | The user name to sign in to the relay. Optional | When set, `ControlPlane:Mail:Password` is required |
+| `ControlPlane:Mail:Password` | The password of the user name, from the secret `ControlPlane__Mail__Password` | Never a value in a setting file or a message |
 
 At start the service applies its migrations to the `control_plane` schema, with the history table
 `control_plane.__control_plane_migrations`. A failed migration stops the start. One database role runs
@@ -136,12 +167,16 @@ the migrations and the queries for now.
 - **HTTPS only.** The control plane listens on port 8443 with the certificate of a Kubernetes TLS Secret
   (`secrets.certificate`), and the Service forwards its port 443 to it. The probes use HTTPS.
 - **Values.** `controlPlane.region` and `controlPlane.tenantDomain` set the settings of the same name.
-  `secrets.connectionString` names the Kubernetes Secret, and optionally its key, that holds the
-  connection string. The chart mounts it as the file `/run/secrets/ControlPlane__ConnectionString`.
+  `controlPlane.mailFrom` and `controlPlane.mail.{host,port,useTls,userName}` set `ControlPlane:MailFrom` and
+  `ControlPlane:Mail`. `secrets.connectionString` names the Kubernetes Secret, and optionally its key, that
+  holds the connection string. The chart mounts it as the file `/run/secrets/ControlPlane__ConnectionString`.
+  `secrets.mailPassword` does the same for the relay password, as `/run/secrets/ControlPlane__Mail__Password`,
+  and is left out when the relay needs no sign-in.
   `image`, `replicas`, `resources` and `service` are the usual. The chart holds no secret value and
   creates no Secret, and its schema rejects a `value` in a secret reference.
 - **Render failures.** Rendering fails and names the value when `controlPlane.region`,
-  `controlPlane.tenantDomain`, `secrets.connectionString.name` or `secrets.certificate.name` is not set.
+  `controlPlane.tenantDomain`, `controlPlane.mailFrom`, `controlPlane.mail.host`,
+  `secrets.connectionString.name` or `secrets.certificate.name` is not set.
 - **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the Kubernetes
   schemas, `scripts/helm-controlplane.test.mjs` tests the render, the image scan covers the image, and
   the `images` smoke suite starts it read-only against PostgreSQL over TLS.
@@ -149,8 +184,10 @@ the migrations and the queries for now.
 ## Health and telemetry
 
 - **Health.** `/health/live` and `/health/ready`, as the platform's hosts answer them. Live runs no
-  check. Ready checks its database, which must answer `SELECT 1`, and answers 503 `Unhealthy` when it
-  does not. The directory and the mail relay _(planned for M33)_ join the ready check when they exist.
+  check. Ready checks its database, which must answer `SELECT 1`, and the mail relay, which must accept a
+  connection (the check signs in with nothing and sends no email). It answers 503 `Unhealthy` when either
+  does not, so a relay outage takes every replica out of readiness. The directory _(planned for M33)_
+  joins the ready check when it exists.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.

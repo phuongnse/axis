@@ -1,4 +1,5 @@
 using Axis.ControlPlane;
+using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.Storage;
@@ -15,16 +16,21 @@ builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 var options = ControlPlaneOptions.Load(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(options);
 
+// Read next to the settings, so a kind without both languages stops the start.
+builder.Services.AddSingleton(EmailTemplates.LoadEmbedded());
+
 // The first hosted service: it migrates in StartingAsync, so a database that cannot be reached stops the start.
 builder.Services.AddHostedService<ControlPlaneMigrationStart>();
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(options.ConnectionString!));
 
-// After the migration start, whose StartingAsync runs before any hosted service starts. With no job handler the runner is idle.
+// After the migration start, whose StartingAsync runs before any hosted service starts. The runner claims only the kinds below.
 builder.Services.AddSingleton(new JobRunnerOptions());
+builder.Services.AddSingleton<IJobHandler, SendEmailJobHandler>();
 builder.Services.AddHostedService<JobRunner>();
 
 builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
+    .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])
+    .AddCheck<MailRelayHealthCheck>("mail-relay", tags: [HealthEndpoints.ReadyTag]);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddControlPlaneTelemetry(builder.Configuration, builder.Environment);
