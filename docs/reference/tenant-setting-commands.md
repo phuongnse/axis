@@ -304,7 +304,8 @@ command prints `<id> legal ok`.
 
 ## Hosts
 
-- `tenant host add <id> <host>` adds a host. A host already used by any tenant exits with code 2.
+- `tenant host add <id> <host>` adds a host. A host already used by any tenant exits with code 2. So does a host that a tenant deleted less than 90 days ago had, see
+  [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
 - `tenant host add <id> <host> --site <path>` gives the host to one site of the tenant. The path is stored in lower
   case in `platform.tenant_hosts.site_path`. A path with bad syntax, or a reserved path such as `api`, exits with
   code 2. The command does not check that a release has the site. A site has at most one host per tenant, so a
@@ -315,7 +316,8 @@ command prints `<id> legal ok`.
   last step of restoring over an existing tenant, see
   [tenant restore](tenant-backup-and-restore.md#tenant-restore). A move may leave the source tenant with no
   hosts. Only `tenant host remove` refuses to remove a last host. A move keeps the host's site, and it exits with
-  code 2 when the target tenant already has a host for that site.
+  code 2 when the target tenant already has a host for that site. It exits with code 2 for a host that a tenant deleted
+  less than 90 days ago had.
 - `tenant backup` and `tenant restore` keep the host's site, and `tenant list` shows it, see
   [tenant backup](tenant-backup-and-restore.md#tenant-backup) and [tenant list](tenant-status-commands.md#tenant-list).
 - Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding

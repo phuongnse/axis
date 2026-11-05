@@ -833,6 +833,36 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task A_create_with_the_id_of_a_deleted_tenant_answers_409_and_queues_no_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone', now() - interval '200 days', 'test', '{}')");
+
+        using var response = await PostJobAsync(client, "/api/cell/tenants", token, "create-gone", CreateBody("gone"));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task A_host_of_a_tenant_deleted_10_days_ago_answers_409_without_naming_the_tenant()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone', now() - interval '10 days', 'test', '{gone.vn.example.test}')");
+
+        using var response = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "GONE.vn.example.test" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.DoesNotContain("gone", body, StringComparison.Ordinal);
+        Assert.Equal(0, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
     public async Task An_operator_queues_a_create_job_with_five_pending_steps_and_the_job_read_hides_its_input()
     {
         await using var factory = await StartAsync();

@@ -127,6 +127,12 @@ internal sealed class TenantCreate : IAsyncDisposable
                 .ToList();
             var keys = hosts.Select(host => host.ToLowerInvariant()).ToArray();
 
+            if (await DeletedTenantHolds.IsDeletedIdAsync(_platform, _id, _cancellationToken))
+            {
+                Refuse("the id belonged to a deleted tenant");
+                return 2;
+            }
+
             _row = await _platform.Tenants.FirstOrDefaultAsync(tenant => tenant.Id == _id, _cancellationToken);
             if (_row is not null && _row.Status != Provisioning)
             {
@@ -140,6 +146,12 @@ internal sealed class TenantCreate : IAsyncDisposable
             if (taken)
             {
                 Refuse("a host belongs to another tenant");
+                return 2;
+            }
+
+            if (await DeletedTenantHolds.IsHostHeldBackAsync(_platform, keys, _cancellationToken))
+            {
+                Refuse("a host is held back after a tenant was deleted");
                 return 2;
             }
 

@@ -89,7 +89,7 @@ an optional `quotas`, which the `tenant` step writes as the tenant's quota rows,
 - `id` follows the rule of [`tenant create`](administration.md#tenant-create): 1 to 50 lowercase letters,
   digits and hyphens, and not `master`. A bad id answers `400`. An id that a directory row holds, in any
   status and a preview tenant's included, or that a `queued` or `running` create job holds, answers `409`.
-  An id that a deleted tenant had answers `409` too _(planned for M31)_.
+  An id that a deleted tenant has a tombstone for answers `409` too.
 - `application` names an installed [application template](modules-and-templates.md#application-templates),
   such as the built-in `approvals`. An id that is not an installed template answers `400`. The job keeps the id, and its `application` step takes the newest version.
 - `administrator` is the email of the person invited as the tenant's first administrator. A value that is
@@ -131,8 +131,8 @@ The route is built as far as the request:
   passed the request is no longer pending, and a new request stores a new row with a new token. A
   transaction lock on the tenant and host keeps two parallel retries from storing two tokens.
 - **A host that is held.** A host that `platform.tenant_hosts` holds, for any tenant, answers `409`,
-  and the message does not say which tenant holds it. The held back check after a deletion is
-  _(planned for M31)_, with tenant deletion.
+  and the message does not say which tenant holds it. A host that a tenant deleted less than 90 days ago had
+  answers `409` too, see [deleting a tenant](#deleting-a-tenant), and its message names no tenant either.
 - **A pending request holds nothing.** The request is a row of `platform.tenant_host_requests`, see
   [storage](storage.md#platform-database), and another tenant may request the same host. The host is
   not in `platform.tenant_hosts`, so it still answers `404` for every path. The server stores the
@@ -255,8 +255,12 @@ A deletion can be undone during its grace window, and not after.
    7. its quota, lease, usage and counter rows;
    8. its directory entry, replaced by a tombstone in `platform.deleted_tenants`: the id, the time,
       the actor and the hosts, with no other data.
-4. **After** _(planned for M31)_. The id is never used again in the cell. Each host is held back for 90 days, so a new
-   tenant does not receive the old tenant's links and emails. The platform audit records stay.
+4. **After.** The id is never used again in the cell. Each host is held back for 90 days, counted from the tombstone's
+   `deleted_at` on the database clock, so a new tenant does not receive the old tenant's links and emails. The check
+   ignores letter case. `tenant create` refuses the id and the hosts with exit code 2, `tenant host add` and `move`
+   refuse the hosts with exit code 2, and `POST /api/cell/tenants` and `POST /api/cell/tenants/{id}/hosts` answer `409`.
+   No message names the deleted tenant. A host request whose DNS check passed stays pending for the same reason. The
+   platform audit records stay.
 
 **What remains, and for how long.**
 
