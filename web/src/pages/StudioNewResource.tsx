@@ -1,6 +1,7 @@
-import { Form, Input, Modal, Select } from 'antd'
-import { useState } from 'react'
+import { Flex, Input, Modal, Select, type InputRef, type RefSelectProps } from 'antd'
+import { useRef, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
 import { dialogWidth } from '../platform/dialogButtons'
 import {
   createStudioResource,
@@ -49,6 +50,10 @@ export function StudioNewResource({
   const [value, setValue] = useState('')
   const [problem, setProblem] = useState<Problem>()
   const [creating, setCreating] = useState(false)
+  // Proposed: whether Create was clicked, so a field left empty says so from then on.
+  const [checked, setChecked] = useState(false)
+  const kindInput = useRef<RefSelectProps>(null)
+  const nameInput = useRef<InputRef>(null)
   const isText = kind === 'text'
   const kindOptions = kindGroupNames.flatMap((group) => {
     const options = studioKinds
@@ -59,15 +64,32 @@ export function StudioNewResource({
   })
   const label = t(isText ? 'shell.studio.newResource.locale' : 'shell.studio.newResource.name')
 
+  const kindError = checked && kind === undefined ? t('shell.studio.newResource.kindMissing') : null
+  const nameError =
+    problem !== undefined
+      ? t(`shell.studio.newResource.${problem}`)
+      : checked && value.trim() === ''
+        ? t(isText ? 'shell.studio.newResource.localeMissing' : 'shell.studio.newResource.nameMissing')
+        : null
+
   function show() {
     setKind(fixedKind)
     setValue('')
     setProblem(undefined)
+    setChecked(false)
     setOpen(true)
   }
 
   async function create() {
-    if (kind === undefined || value.trim() === '') {
+    // Proposed: Create is never disabled. A click checks the fields, says under each what is missing and focuses the
+    // first, as the form widget's Save does.
+    setChecked(true)
+    if (kind === undefined) {
+      kindInput.current?.focus()
+      return
+    }
+    if (value.trim() === '') {
+      nameInput.current?.focus()
       return
     }
     const entered = value.trim()
@@ -121,17 +143,24 @@ export function StudioNewResource({
         )}
         okText={t('shell.studio.newResource.create')}
         cancelText={t('shell.studio.cancel')}
-        okButtonProps={{ disabled: kind === undefined || value.trim() === '' }}
         confirmLoading={creating}
         onOk={create}
         onCancel={() => setOpen(false)}
       >
-        <Form layout="vertical">
+        <Flex vertical gap="middle">
           {fixedKind === undefined && (
-            <Form.Item label={t('shell.studio.newResource.kind')}>
+            <AxisField
+              label={t('shell.studio.newResource.kind')}
+              help={t('shell.studio.newResource.kind.help')}
+              required
+              error={kindError}
+            >
               <Select
+                ref={kindInput}
                 aria-label={t('shell.studio.newResource.kind')}
+                aria-required
                 value={kind}
+                style={{ width: '100%' }}
                 // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
                 showSearch
                 optionFilterProp="label"
@@ -142,15 +171,24 @@ export function StudioNewResource({
                   setProblem(undefined)
                 }}
               />
-            </Form.Item>
+            </AxisField>
           )}
-          <Form.Item
+          <AxisField
             label={label}
-            validateStatus={problem === undefined ? undefined : 'error'}
-            help={problem === undefined ? undefined : t(`shell.studio.newResource.${problem}`)}
+            help={t(
+              isText
+                ? 'shell.studio.newResource.locale.help'
+                : kind === 'role'
+                  ? 'shell.studio.newResource.roleName.help'
+                  : 'shell.studio.newResource.name.help',
+            )}
+            required
+            error={nameError}
           >
             <Input
+              ref={nameInput}
               aria-label={label}
+              aria-required
               value={value}
               onChange={(event) => {
                 setValue(event.target.value)
@@ -158,8 +196,8 @@ export function StudioNewResource({
               }}
               onPressEnter={create}
             />
-          </Form.Item>
-        </Form>
+          </AxisField>
+        </Flex>
       </Modal>
     </>
   )

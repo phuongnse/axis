@@ -1,4 +1,4 @@
-import { Checkbox, Flex } from 'antd'
+import { Checkbox, Flex, Form } from 'antd'
 import { useId, type ReactNode } from 'react'
 import { RequiredAsterisk } from './RequiredAsterisk'
 import { useDesignTokens } from './themeMode'
@@ -42,25 +42,49 @@ export function AxisFieldHeading({
  * field is a group described by its help, so a screen reader reads the help with the input. `testId` is the id a
  * diagnostic opens at, such as `studio-field-/name`. A `required` field has the form widget's mark (D96): a `*` in
  * `dangerText` after its label, hidden from screen readers, and its input carries `aria-required`, which the screen sets.
+ * Proposed: a field the screen checks takes `error`, `null` while it has none. Its message is the form widget's: Ant
+ * Design's form item draws it 4px under the input and marks the input, and the group is described by it too. A screen
+ * checks its fields when the finish button is clicked, never by disabling it, see `design-review.md`.
  */
 export function AxisField({
   label,
   help,
   required = false,
+  error,
   testId,
   children,
 }: {
   label: string
   help: string
   required?: boolean
+  /** Proposed: the field's message, or `null` while it has none. A field the screen does not check leaves it out. */
+  error?: string | null
   testId?: string
   children: ReactNode
 }) {
   const helpId = useId()
+  const errorId = useId()
   return (
-    <div role="group" aria-label={label} aria-describedby={helpId} data-testid={testId}>
+    <div
+      role="group"
+      aria-label={label}
+      aria-describedby={error ? `${helpId} ${errorId}` : helpId}
+      data-testid={testId}
+    >
       <AxisFieldHeading label={label} help={help} helpId={helpId} required={required} />
-      {children}
+      {error === undefined ? (
+        children
+      ) : (
+        // Always a form item, so the input is not drawn anew, and loses no focus, as the message comes and goes. The
+        // message keeps no gap of its own below it: the field's container spaces the fields.
+        <Form.Item
+          validateStatus={error ? 'error' : undefined}
+          help={error ? <span id={errorId}>{error}</span> : undefined}
+          style={{ marginBottom: 0, ['--ant-form-item-margin-bottom' as string]: '0px' }}
+        >
+          {children}
+        </Form.Item>
+      )}
     </div>
   )
 }

@@ -23,7 +23,8 @@ owner is reviewing it one step at a time.
 - **Done:** the kind lists (one table, standard table steps 1 to 3, a table with too little room); the band (too little
   room, its actions); the entity designer's sections, `AxisField` with required help, the required mark, the Publish
   dialog's fields, the relaxed points in the Modules table, step 2, the field drawer in groups with the rules at the field;
-  and "A picker names by the label" for every `ReferencePicker`.
+  "A picker names by the label" for every `ReferencePicker`; and New resource, checked on click with every required field
+  marked.
 - **Waiting:** the owner's verdict on step 2, the field drawer.
 - **Next, in order:**
   1. Step 3: Add field opens a choice of type first, a grid of the types, each with an icon and one line, then the drawer.
@@ -160,8 +161,9 @@ owner is reviewing it one step at a time.
   `dangerText` after its label, hidden from screen readers, and its input carries `aria-required`. `AxisField` takes
   `required`, and the schema form marks what its schema requires, but not inside an optional object such as `fileStorage`,
   whose fields are needed only once it is there. A field never says "(optional)": the Publish dialog's Label and Note are now
-  fields with a heading and help, where they had only a placeholder. A short form whose every field is required, such as
-  sign-in, marks none.
+  fields with a heading and help, where they had only a placeholder. Every required field is marked, in every form and
+  dialog, even where every field is required, such as New resource. Only the sign-in page marks none, as everyone knows
+  both its fields are needed. (Changed on 2026-11-05: a short form whose every field was required used to mark none.)
 - **Nothing between help and input:** a field is its label, its help and its input. Guidance goes into the help, never on
   a line of its own between them.
 - **A dialog holds only what it edits:** Add module and Edit module have Module, Version, Roles and Connectors, and no
@@ -195,6 +197,23 @@ owner is reviewing it one step at a time.
   editors that draw their own labels, such as ConnectorEditor, ProcessEditor, PageEditor and FormSteps, move to `AxisField`.
 - **For the issue:** a diagnostic inside a field opens at its row; it is to open the drawer at the setting. Reordering by drag
   is still to come.
+
+### A field is checked on click
+
+- **Asked:** New resource's fields had no `*` and no help, and Create was disabled until both had a value. The owner asked
+  whether an action should be disabled or should show what is wrong when clicked.
+- **Rule:** a finish button is never disabled because the input is not valid. A click checks the fields, shows under each one
+  that is wrong what to do, such as "Enter a name.", and focuses the first. A message goes once the field is put right. A button
+  is disabled only while its action runs. This is the form widget's Save already (D96), and one rule for every form and dialog.
+- **Why:** a disabled button says nothing of what is missing, has low contrast and cannot be focused, so a screen reader
+  user does not find it. GOV.UK's design system, SAP Fiori and Atlassian advise against it.
+- **Built:** `AxisField` takes `error` (Proposed), `null` while the field has none. Ant Design's form item draws the message,
+  so it is the form widget's message: 4px under the input, in `dangerText`, with the input's border in it, and the group is
+  described by it. New resource is built to the rule: Kind and Name (or Locale) are `AxisField`s, marked required, with help;
+  a role's name has its own help; Create is always enabled, and its click checks and focuses.
+- **For the issue:** the other dialogs that disable their finish button move to the rule: New application
+  (`StudioNewApplication`), the schema form's dialog (`SchemaForm`), Relax, Add state and Add transition
+  (`StudioModuleContract`), and the entity migration's Fill nulls or Add conversion (`EntityMigrationQuestions`).
 
 ### A picker names by the label
 
