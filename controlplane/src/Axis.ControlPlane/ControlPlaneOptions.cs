@@ -1,15 +1,16 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Axis.ControlPlane.Cells;
+using MimeKit;
 using Npgsql;
 
 namespace Axis.ControlPlane;
 
 /// <summary>
 /// The <c>ControlPlane</c> settings of the service, see the settings table in
-/// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain and the connection string are
-/// required. The cell settings are optional, and once a cell is listed, all of them are required. A bad value stops
-/// the start. A message names the setting and never holds its value.
+/// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
+/// and the mail relay are required, except the relay's user name. The cell settings are optional, and once a cell is
+/// listed, all of them are required. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
 {
@@ -41,6 +42,12 @@ public sealed partial class ControlPlaneOptions
     /// Without it the system trust store decides.
     /// </summary>
     public string? CellCertificateAuthorityPath { get; set; }
+
+    /// <summary>The address that every email of the control plane comes from, such as <c>no-reply@mail.example.com</c>.</summary>
+    public string? MailFrom { get; set; }
+
+    /// <summary>The mail relay that sends the emails of the control plane. Never a cell's mail settings.</summary>
+    public ControlPlaneMailOptions Mail { get; set; } = new();
 
     /// <summary>Reads and checks the settings, and returns them.</summary>
     /// <exception cref="InvalidOperationException">
@@ -85,6 +92,36 @@ public sealed partial class ControlPlaneOptions
         if (options.Cells.Count > 0)
         {
             problems.AddRange(CellProblems(options));
+        }
+
+        if (string.IsNullOrWhiteSpace(options.MailFrom))
+        {
+            problems.Add(Required(nameof(MailFrom)));
+        }
+        else if (!MailboxAddress.TryParse(options.MailFrom, out _))
+        {
+            problems.Add($"The setting {SectionName}:{nameof(MailFrom)} must be an email address.");
+        }
+
+        var mail = $"{SectionName}:{nameof(Mail)}";
+        if (string.IsNullOrWhiteSpace(options.Mail.Host))
+        {
+            problems.Add($"The setting {mail}:{nameof(ControlPlaneMailOptions.Host)} is required.");
+        }
+
+        if (options.Mail.Port is < 1 or > 65535)
+        {
+            problems.Add($"The setting {mail}:{nameof(ControlPlaneMailOptions.Port)} must be between 1 and 65535.");
+        }
+
+        if (!options.Mail.UseTls && RequiresVerifiedTls(environment))
+        {
+            problems.Add($"The setting {mail}:{nameof(ControlPlaneMailOptions.UseTls)} must be on outside Development.");
+        }
+
+        if (!string.IsNullOrEmpty(options.Mail.UserName) && string.IsNullOrEmpty(options.Mail.Password))
+        {
+            problems.Add($"The setting {mail}:{nameof(ControlPlaneMailOptions.Password)} is required when {mail}:{nameof(ControlPlaneMailOptions.UserName)} is set.");
         }
 
         if (problems.Count > 0)

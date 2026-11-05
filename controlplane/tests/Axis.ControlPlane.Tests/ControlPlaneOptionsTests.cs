@@ -10,6 +10,8 @@ public sealed class ControlPlaneOptionsTests
     [InlineData("ControlPlane:Region")]
     [InlineData("ControlPlane:TenantDomain")]
     [InlineData("ControlPlane:ConnectionString")]
+    [InlineData("ControlPlane:MailFrom")]
+    [InlineData("ControlPlane:Mail:Host")]
     public void A_missing_setting_stops_the_start_and_the_message_names_it(string setting)
     {
         using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { [setting] = string.Empty });
@@ -80,6 +82,53 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.Contains("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-password", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_mail_sender_that_is_not_an_address_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:MailFrom"] = "not an address" });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:MailFrom", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_mail_port_out_of_range_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:Mail:Port"] = "70000" });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Mail:Port", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Outside_Development_a_mail_relay_without_TLS_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(
+            environment: "Production",
+            settings: new Dictionary<string, string?>
+            {
+                ["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString + ";SSL Mode=VerifyFull",
+                ["ControlPlane:Mail:UseTls"] = "false",
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Mail:UseTls", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_mail_user_name_without_a_password_stops_the_start_and_the_message_holds_no_value()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:Mail:UserName"] = "relay-user" });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Mail:Password", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("relay-user", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -219,6 +268,8 @@ public sealed class ControlPlaneOptionsTests
                 ["ControlPlane:Region"] = "vn",
                 ["ControlPlane:TenantDomain"] = "vn.example.com",
                 ["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString,
+                ["ControlPlane:MailFrom"] = "no-reply@vn.example.com",
+                ["ControlPlane:Mail:Host"] = "127.0.0.1",
                 ["ControlPlane:Cells:0:Id"] = id,
                 ["ControlPlane:Cells:0:InternalUrl"] = internalUrl,
                 ["ControlPlane:Cells:0:TokenUrl"] = tokenUrl,

@@ -36,6 +36,18 @@ spec:
               value: {{ required "controlPlane.region is required: the region code, such as vn" .Values.controlPlane.region | quote }}
             - name: ControlPlane__TenantDomain
               value: {{ required "controlPlane.tenantDomain is required: the domain of the tenant subdomains of the region, such as vn.example.com" .Values.controlPlane.tenantDomain | quote }}
+            - name: ControlPlane__MailFrom
+              value: {{ required "controlPlane.mailFrom is required: the address every email of the control plane comes from, such as no-reply@mail.example.com" .Values.controlPlane.mailFrom | quote }}
+            - name: ControlPlane__Mail__Host
+              value: {{ required "controlPlane.mail.host is required: the SMTP relay of the control plane's emails" .Values.controlPlane.mail.host | quote }}
+            - name: ControlPlane__Mail__Port
+              value: {{ .Values.controlPlane.mail.port | default 587 | quote }}
+            - name: ControlPlane__Mail__UseTls
+              value: {{ .Values.controlPlane.mail.useTls | quote }}
+            {{- with .Values.controlPlane.mail.userName }}
+            - name: ControlPlane__Mail__UserName
+              value: {{ . | quote }}
+            {{- end }}
             # HTTPS only: a Kestrel endpoint list replaces the plain HTTP port of the image.
             - name: Kestrel__Endpoints__Https__Url
               value: https://+:8443
@@ -95,6 +107,13 @@ spec:
                   items:
                     - key: {{ .Values.secrets.connectionString.key | default "ControlPlane__ConnectionString" | quote }}
                       path: ControlPlane__ConnectionString
+              {{- with .Values.secrets.mailPassword.name }}
+              - secret:
+                  name: {{ . | quote }}
+                  items:
+                    - key: {{ $.Values.secrets.mailPassword.key | default "ControlPlane__Mail__Password" | quote }}
+                      path: ControlPlane__Mail__Password
+              {{- end }}
         - name: tmp
           emptyDir: {}
         - name: controlplane-tls

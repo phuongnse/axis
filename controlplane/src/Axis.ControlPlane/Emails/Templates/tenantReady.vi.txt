@@ -1,0 +1,11 @@
+Subject: Axis của bạn đã sẵn sàng
+
+Chào {{name}},
+
+Axis của bạn đã sẵn sàng. Bạn có thể đăng nhập tại địa chỉ:
+
+{{tenantAddress}}
+
+Nếu cần hỗ trợ, hãy liên hệ với đội ngũ hỗ trợ Axis.
+
+Đội ngũ Axis

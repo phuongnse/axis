@@ -26,6 +26,18 @@ controlPlane:
   region: ""
   # ControlPlane:TenantDomain, the domain of the tenant subdomains of the region, such as "vn.example.com". Required.
   tenantDomain: ""
+  # ControlPlane:MailFrom, the address every email of the control plane comes from, such as "no-reply@mail.example.com".
+  # Required. Its domain needs SPF, DKIM and DMARC at the relay.
+  mailFrom: ""
+  # ControlPlane:Mail, the SMTP relay of the control plane's own emails, never a cell's mail settings.
+  mail:
+    # ControlPlane:Mail:Host. Required.
+    host: ""
+    port: 587
+    # TLS is on. Port 465 starts with TLS, any other port upgrades with STARTTLS.
+    useTls: true
+    # ControlPlane:Mail:UserName. Optional. When set, secrets.mailPassword is required.
+    userName: ""
 
 secrets:
   # ControlPlane:ConnectionString, the connection string of the control plane database. It must set
@@ -38,3 +50,8 @@ secrets:
   # are fixed, so the reference holds only the name.
   certificate:
     name: ""
+  # ControlPlane:Mail:Password, the password of controlPlane.mail.userName. The chart mounts it as the file
+  # /run/secrets/ControlPlane__Mail__Password. Leave the name empty when the relay needs no sign-in.
+  mailPassword:
+    name: ""
+    key: ControlPlane__Mail__Password
