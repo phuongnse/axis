@@ -1,22 +1,12 @@
 # Roles and policies
 
-Detailed reference for the `role` and `policy` resources, the record creator and sensitive
-fields. How the server applies them is in [security.md](security.md#authorization).
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+A `role` names a kind of user, and a `policy` gives roles grants on entities, data sources,
+processes and endpoints. Axis denies everything a grant does not allow. This page covers the two
+resources, their compile checks, the record creator and sensitive fields. How the server applies
+grants is in [authorization](security.md#authorization), and the reasons for the design are in
+[D24](../decisions/d24-roles-and-policies.md).
 
-The design follows
-[D24](../decisions/d24-roles-and-policies.md), and
-[Authorization](security.md#authorization) describes how the server
-applies it. The `role` and `policy` resources, the check of task assignees
-and the policy checks are built. So are matching the roles claim and
-enforcing every grant. That covers entity grants with filters and fields on
-the record API, data source grants with root read filters and field checks,
-and process `start` grants. The `endpoint` grant with its `invoke` action and
-its compile checks are built too, and the endpoint call enforces it. So is the
-`inspect` action on a `process` grant, which the process instance list
-and the instance detail enforce, see [Process inspection](process-inspection.md#process-inspection). Each
-compile check below is a compile error.
+## Roles
 
 A `role` resource declares a role that users can hold:
 
@@ -51,10 +41,10 @@ A `role` resource declares a role that users can hold:
 ```
 
 - **Name.** A role name is lower-case letters, digits and hyphens. It starts
-  with a letter and is at most 60 characters long. Roles claim values and
-  task assignees already use names such as `finance-reviewer`, which the
-  usual resource name rule refuses. With one lower-case form, letter case
-  never matters.
+  with a letter and is at most 60 characters long. It differs from the usual
+  resource name rule because roles claim values and task assignees use names
+  such as `finance-reviewer`, and with one lower-case form, letter case never
+  matters.
 - **Claim values.** A role matches a roles claim value exactly. A claim value
   that names no declared role is ignored. This is also the default of an identity
   provider's `roles` mapping, which may map other claim values to roles. Mapped
@@ -66,11 +56,13 @@ A `role` resource declares a role that users can hold:
 - **Schema.** A name in another form, or a missing `label`, is `AXC0004`.
   Two roles with the same name are `AXC0006`.
 
+## Policies
+
 A `policy` resource gives roles grants. The record API and the data source
-endpoint enforce entity and data source grants. Both enforce the filter and
-fields rules below: the data source endpoint adds the root entity's read
-filters to its query and refuses a data source that shows a field the user
-may not read. The purchase request sample uses the four policies below.
+endpoint enforce entity and data source grants, with the filter and fields
+rules below: the data source endpoint adds the root entity's read filters to
+its query and refuses a data source that shows a field the user may not read.
+The purchase request sample uses the four policies below.
 Employees reach their own requests, department managers the requests of
 the departments they head, and finance reviewers the submitted requests and their
 outcomes. Operators inspect the approvals and change nothing:
@@ -163,12 +155,9 @@ outcomes. Operators inspect the approvals and change nothing:
   - a `process` takes `start`, `inspect`, `cancel`, `retry`, `resolve` and
     `reassign`, see [Reassign](task-deadlines.md#reassign);
   - an `endpoint` takes `invoke`.
-  - `export` reaches only what the user's `read` grants reach, and needs a
-    `read` grant on the same target in the same policy, or it is `AXC0265`.
-    `import` writes through the user's `create` grants, and needs a `create`
-    grant on the same entity in the same policy, or it is `AXC0265`. The
-    import checks `update` as well for an import with a key. See [import and export](import-export.md#grants) and
-    [D79](../decisions/d79-import-and-export-under-policies.md).
+  - `export` stays within the user's `read` grants and `import` within their
+    `create` and `update` grants, as [import and export](import-export.md#grants)
+    says.
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
   the entity's fields, paths through `reference` fields of up to 3 hops, the
@@ -176,12 +165,11 @@ outcomes. Operators inspect the approvals and change nothing:
   `count` test a child collection or a `references` field of the entity, so
   `any(assignees, userId == currentUser())` reads only the records that list
   the user. A list under an `any` filter over a child collection finds each
-  record's rows through the child table's owner index
-  ([D77](../decisions/d77-indexes-defaults-and-ranges.md)).
+  record's rows through the child table's owner index, and
   `AnyPolicyPerformanceTests` fails when a list read over 100,000 records
-  with 500,000 child rows takes 2 s or more. Without it,
-  the grant covers every record. On `read`, `update` and
-  `delete` the stored record must match it. On `create` and `update` the new
+  with 500,000 child rows takes 2 s or more. A grant without a filter covers
+  every record. On `read`, `update` and `delete` the stored record must match
+  the filter. On `create` and `update` the new
   record must match it too. The employee's write grant above keeps a request
   at `draft` or `returned`, so a new request is saved with one of those
   statuses, and the process moves it on.
@@ -205,27 +193,31 @@ outcomes. Operators inspect the approvals and change nothing:
   the role's ceiling: an action or field past it is a diagnostic (`AXC0334`).
   At run time the filters of the role's ceiling entries that list the action
   join the grant's filter with `and`, so a grant never reaches a record past
-  the ceiling.
-  See [grant ceiling](module-contracts.md#grant-ceiling).
+  the ceiling. See [grant ceiling](module-contracts.md#grant-ceiling).
+
+## Process and endpoint grants
+
+A `process` grant lets a role start and operate a process, and an `endpoint`
+grant lets a machine caller invoke an inbound endpoint. Neither takes a
+`filter` or `fields`.
 
 The `cancel` action of a `process` grant lets a user cancel that process's
 instances, see [Cancel](process-inspection.md#cancel). The `retry` action lets a user
 retry its failed instances, see [Retry](process-inspection.md#retry). The `resolve`
 action lets a user settle an unknown connector call, see
 [Resolve](process-inspection.md#resolve). That covers a connector call and a package call.
-Each is checked on its own, and none implies another. `start` implies none of
-them. A grant takes no `filter` or `fields`, as for `start`. The finance
-reviewer policy above lets its reviewers inspect, cancel, retry and resolve an approval. An operator role
-that holds all three has:
+Each is checked on its own, and none implies another, and `start` implies none
+of them. The finance reviewer policy above lets its reviewers inspect, cancel,
+retry and resolve an approval. An operator role that may retry, cancel and
+resolve has:
 
 ```json
 { "name": "purchaseRequestApprovalOperate", "process": "PurchaseRequestApproval", "actions": ["retry", "cancel", "resolve"] }
 ```
 
 A policy also grants inbound [endpoints](integration-resources.md#endpoint-resource). The target is
-`endpoint`, and its only action is `invoke`. An `endpoint` grant takes no
-`filter` or `fields`. The grant, its compile checks and its enforcement are
-built. Holding it is enough to call the endpoint: the record create and the
+`endpoint`, and its only action is `invoke`. Holding it is enough to call the
+endpoint: the record create and the
 process start inside the call need no `entity` or `process` grant of the
 caller. The purchase request sample gives the purchasing system this policy, in
 `policies/purchasing-system-access.json`:
@@ -257,7 +249,10 @@ The caller holds the role through the roles claim of its token, as a user
 does. See [Machine callers](security.md#machine-callers). The sample
 holds this policy and role with its `SubmitPurchaseRequest` endpoint.
 
-Compile checks, each a compile error:
+## Compile checks
+
+The compiler refuses a role, a policy or a task assignee that does not fit the
+rules above, and each check below is a compile error:
 
 - A process task's `assignee.role` that names no declared role, compared
   exactly, is `AXC0089`.
@@ -290,8 +285,9 @@ Compile checks, each a compile error:
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
-`export`, `import`, `start`, `invoke`, `inspect`, `cancel`, `retry`, `resolve` and `reassign`, and a grant has no other properties. A problem there is
-`AXC0004`. The schema also lists the actions each target kind takes, as
+`export`, `import`, `start`, `invoke`, `inspect`, `cancel`, `retry`,
+`resolve` and `reassign`, and a grant has no other properties. A problem there
+is `AXC0004`. The schema also lists the actions each target kind takes, as
 `entityAction`, `dataSourceAction`, `processAction` and `endpointAction`. The
 compiler, the policy matrix and Studio read those lists, so each lives in one
 place. The compiler, not the schema, refuses an action the target's kind does
@@ -299,8 +295,10 @@ not take.
 
 ## Record creator
 
-A `text` field can declare `"creator": true`. On create it gets the signed-in
-user's id, and policies use it, for example `requester == currentUser()`:
+The record creator is a `text` field that the server fills with the id of the
+user who creates the record, so that policies can give people their own records.
+A field declares it with `"creator": true`, and policies test it, for example
+`requester == currentUser()`:
 
 ```json
 {
@@ -330,9 +328,10 @@ user's id, and policies use it, for example `requester == currentUser()`:
 
 ## Sensitive fields
 
-A field can declare `"sensitive": true`. Its value never
-appears in [process inspection](process-inspection.md#values-and-masking), for any
-user:
+A sensitive field holds a value that Axis encrypts at rest and never shows in
+[process inspection](process-inspection.md#values-and-masking), for any user.
+A field declares it with `"sensitive": true`. How the values are encrypted,
+looked up and re-encrypted is in [data encryption](data-encryption.md).
 
 ```json
 {
@@ -351,37 +350,32 @@ user:
 
 - **Effect.** A call input that reads or writes the field is hidden in
   inspection, as [Values and masking](process-inspection.md#values-and-masking) says.
-  The record API still shows the field to users whose grants cover it, but it
-  refuses a `sort` on it.
-- **Default.** `sensitive` defaults to `false`. A sensitive field's column is
-  `bytea`, whatever the field's type, so it can hold ciphertext. A new field or a
-  new table gets that column. Adding or removing the flag on an existing field makes
-  activation encrypt or decrypt the stored values, see
-  [changing the flag](data-encryption.md#changing-the-flag). A flag change together
-  with a type change is `AXC0016` at `/fields/{i}/type`, except that text may widen.
-- **Uses it cannot serve.** A filter (except the equality of an exact lookup in
-  a grant's `filter`, a data source's `filter` or a measure's `filter`), sort, aggregate, group field, index,
+  The record API still shows the field to users whose grants cover it.
+- **Encrypted at rest.** `sensitive` defaults to `false`. The value is stored
+  encrypted under its tenant's data key, in a `bytea` column whatever the
+  field's type, and a new field or a new table gets that column. Adding or
+  removing the flag on an existing field makes activation encrypt or decrypt
+  the stored values in a migration, see
+  [changing the flag](data-encryption.md#changing-the-flag). A flag change
+  together with a type change is `AXC0016` at `/fields/{i}/type`, except that
+  text may widen.
+- **Uses it cannot serve.** A filter, sort, aggregate, group field, index,
   `unique`, `searchable`, stored computed field, migration `fill` or `convert`
   target or value, or other expression that runs as SQL on the field is
-  [`AXC0308`](diagnostic-codes.md), and a caller's `sort` on it in the record
-  API or a data source is a `400`. See
+  [`AXC0308`](diagnostic-codes.md), except the exact lookup below, and a
+  caller's `sort` on it in the record API or a data source is a `400`. See
   [what a sensitive field cannot do](data-encryption.md#what-a-sensitive-field-cannot-do).
-- **Encrypted at rest.** The value is stored encrypted under
-  its tenant's data key, and adding or removing the flag encrypts or decrypts the
-  stored values in a migration. A field that declares an exact lookup may be
-  tested with `==` or `!=` against a literal other than `null` in a grant's
-  `filter`, and also against a parameter in a data source's `filter` or a measure's `filter`, see [exact lookup](data-encryption.md#exact-lookup). The record API still shows the field to users whose
-  grants cover it. See
-  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
-  [data encryption](data-encryption.md), which also describes `exactLookup`.
+- **Exact lookup.** A field that declares an exact lookup may be tested with
+  `==` or `!=` against a literal other than `null` in a grant's `filter`, and
+  also against a parameter in a data source's `filter` or a measure's
+  `filter`, see [exact lookup](data-encryption.md#exact-lookup).
 - **Allowed fields.** `sensitive` is allowed on `text`, `integer`, `decimal`,
   `boolean`, `date`, `date-time`, `enum` and `money` fields, and on the fields of
   a child entity. On a `reference`, `references` or `file` field, `"sensitive": true`
   is `AXC0308` at `/fields/{i}/sensitive`, and so it is on the entity's
   `displayField`, at `/displayField`. On a `child-collection` field it is
-  `AXC0013` at `/fields/{i}/sensitive`. A value
-  that is not a boolean is `AXC0004`. Even `"sensitive": false` on a
-  `child-collection` field is `AXC0013`, as `required` and `unique` are. A
+  `AXC0013` at `/fields/{i}/sensitive`, even as `"sensitive": false`, as
+  `required` and `unique` are. A value that is not a boolean is `AXC0004`. A
   `child-collection` field in a call mapping counts as sensitive when any field
   of its child entity is sensitive.
 - **Two releases.** A field counts as sensitive when the release an instance is

@@ -32,7 +32,7 @@ caught:
 - **The docs are written for people,** in whole sentences that open with their purpose.
 - **A design review rewrites reference pages** and adds a decision only for a choice between real
   alternatives.
-- **A check is added only once the whole tree passes it,** with no baselines and no lists of
+- **A docs check is added only once the whole tree passes it,** with no baselines and no lists of
   exceptions, so a check never carries the problems it was meant to remove.
 
 This decision supersedes the "Rules from" decisions of the design reviews: D96, D98, D114, D128, D129

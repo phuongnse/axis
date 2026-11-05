@@ -2,56 +2,32 @@
 
 Status: **Agreed**
 
-Human work arrives in M3. See [processes](../reference/processes.md#steps) and
-[the frontend](../reference/frontend.md). The `form` resource, the `form`
-widget that names one, the task inbox widget, the task page and the start
-process action are built. So are task steps, task completion with its
-one-decision and who-may-act checks, and saving the task form with the
-decision. Only the items under **Later** are not built.
+## Context
 
-- **Task step:** a `task` step has a `label`, an assignee, a `form`, an
-  optional `dueIn` and its outcomes.
-  - `label` is a required text key. The task inbox and the task page show
-    it, because every UI string comes from text resources.
-  - The assignee is either `user`, an expression that gives a user id, such
-    as `department.manager`, or `role`, a role name. Queues come later.
-  - `dueIn` is an ISO 8601 duration. It is stored as the task's due date and
-    shown. Escalation needs timers, so it comes later.
-  - [D71](d71-task-deadlines-escalation-claim-and-reassign.md) replaces the
-    "Queues come later" and "Escalation … comes later" points: M14 adds
-    deadlines, escalation, claim and reassign.
-  - Each outcome has a name, a label text key and a next step.
-- **Exactly one decision:** an open task can be completed once. A later or
-  concurrent completion is a `409`. An outcome the step does not allow is a
-  `400`.
-- **Who may act:** the current user may act when they are the assignee, or
-  hold the assignee role. Anyone else gets a `403`, and a request without a
-  user gets a `401`. This is checked at the moment of action. Policies in M4
-  add to this check and never replace it.
-- **Task form:** the task page shows the step's form over the subject
-  record. The fields the form makes editable are saved with the decision, in
-  the same transaction.
-- **Task inbox:** a `taskInbox` widget lists the current user's open tasks in
-  the application and opens the task page.
-- **Start process action:** a `form` widget can declare a `startProcess`
-  action, shown as a button. It saves the record first, then starts the
-  process. Navigate actions are agreed in
-  [D63](d63-navigate-actions-and-page-parameters.md).
-- **Form resource:** a `form` resource has one entity and sections of fields,
-  and each field can be read-only. A `form` widget names a `form`, or an
-  `entity` as shorthand for all its fields. The same `form` serves a page and
-  a task. This settles the forms point of D15.
-- **Later:** these come later, with no milestone yet:
-  - conditional visibility, required and read-only states;
-  - validation as the user types;
-  - wizard steps;
-  - file upload.
+Processes need people to decide. A platform without a task concept leaves every application to model
+assignment with ordinary records, inconsistently and hard to secure, as
+[human work](../domain/knowledge.md#human-work) describes.
 
-  This replaces the sentence of D17 that put validation as the user types in
-  M3.
+## Decision
 
-_Why:_ see [knowledge](../domain/knowledge.md#human-work) and
-[user interface](../domain/knowledge.md#user-interface). A task is a first-class
-step, so exactly one decision is recorded and the instance resumes from it.
-One form resource serves a page and a task, so a layout is written once.
-Moving the richer form features out keeps M3 on processes.
+- **A task is a step,** with a label, an assignee (a user from an expression, or a role), a form, an
+  optional due time and its outcomes.
+  [D71](d71-task-deadlines-escalation-claim-and-reassign.md) adds deadlines, escalation, claim and
+  reassign.
+- **Exactly one decision.** An open task is completed once, with one of its outcomes, and the task
+  form saves with it in the same transaction.
+- **Who may act is checked at the moment of action:** the assignee or a holder of the assignee role.
+  Policies add to this check and never replace it.
+- **A task inbox widget** lists the user's open tasks, and a form widget can start a process after it
+  saves the record.
+- **One `form` resource serves a page and a task:** sections of one entity's fields, each of which
+  can be read-only.
+
+The detail is in [processes](../reference/processes.md#steps), the [task API](../reference/task-api.md),
+the [task inbox widget](../reference/task-inbox-widget.md) and the
+[form resource](../reference/form-widget.md).
+
+## Consequences
+
+- Every application gets the same inbox, assignment and authorization for human work.
+- A layout is written once for a page and a task.
