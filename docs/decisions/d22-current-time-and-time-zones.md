@@ -2,39 +2,30 @@
 
 Status: **Agreed**
 
-The expression function `now()` gives the current time as a `date-time`. It is
-an instant, so it never depends on a time zone. See
-[expressions](../reference/expressions.md#functions).
+## Context
 
-- **One value per transaction:** every `now()` in one database transaction
-  gives the same value, the transaction's start time.
-  - A process step uses the step's transaction. That covers its decision
-    branches, its `updateRecord` values and a task's `assignee.user`. The
-    value is the same instant as the step history's `started_at`.
-  - A start condition uses the start transaction.
-  - A validation uses the transaction that writes the record.
-  - A data source filter uses the query. It is translated to SQL as
-    PostgreSQL's `now()`.
-  - A rule uses the transaction of whatever calls it.
-- **Both back ends agree:** the interpreter and the SQL translation give the
-  same value for `now()` in one transaction.
-- **Not in computed fields:** a computed field's value is stored, so it would
-  go stale. `now()` in a computed field, including inside an aggregate's item
-  expression, is `AXC0086` at the call.
+Processes need the current time, for example to set `submittedAt` when a request is submitted.
+Every expression in one step must see the same time as the step's own record, and the SQL
+translation of a filter must agree with the interpreter. A current time that is an instant needs no
+time zone, while a date or a local year does.
 
-**Waits for a time zone rule.** Applications have no time zone yet, and the
-rule has no milestone. These wait for it:
+## Decision
 
-- `today()`, and taking a date from a `date-time`.
-- Calendar durations in a task's `dueIn`, such as `P1M` and `P1Y`. They are
-  `AXC0084` for now.
-- The local year in a sequence's `{yyyy}`, which is UTC today.
+- **`now()` is an instant.** The expression function `now()` gives the current time as a
+  `date-time`, so it never depends on a time zone.
+- **One value per transaction.** Every `now()` in one database transaction gives the same value,
+  the transaction's start time. The interpreter and the SQL translation give the same value.
+- **Not in computed fields.** A computed field's value is stored and would go stale, so `now()` in
+  a computed field is a compile error.
+- **Time zones come from the application.** Everything that needs a time zone, such as today's date
+  or the local year of a sequence, follows the application's time zone of
+  [D75](d75-the-application-time-zone.md).
 
-[D75](d75-the-application-time-zone.md) settles this rule for M14: each
-application has a time zone. `today()`, taking a date from a `date-time` and
-the local year follow it. Calendar durations stay `AXC0084`.
+Which transaction each kind of expression uses is in
+[functions](../reference/expressions.md#functions).
 
-_Why:_ processes need the time of a step, for example to set `submittedAt`.
-One value per transaction keeps every expression in a step consistent with
-the step's own record. An instant needs no time zone, so `now()` can come
-first, and everything that does need one waits for a single rule.
+## Consequences
+
+- A process step's decisions, record writes and history share one time.
+- A value that depends on the current time is set by a process step or compared in a filter or a
+  condition, and never stored in a computed field.
