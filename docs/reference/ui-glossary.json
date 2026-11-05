@@ -152,6 +152,30 @@
       "note": "A diagnostic is an error or a warning: \"lỗi\" and \"cảnh báo\"."
     },
     {
+      "concept": "Dependencies",
+      "en": "Dependencies",
+      "vi": "Phụ thuộc",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "Liên quan"
+        ]
+      },
+      "note": "The tab of a resource that lists what uses it and what it uses, opened before a rename or a delete."
+    },
+    {
+      "concept": "Used by",
+      "en": "Used by",
+      "vi": "Được dùng bởi",
+      "status": "approved"
+    },
+    {
+      "concept": "Uses",
+      "en": "Uses",
+      "vi": "Sử dụng",
+      "status": "approved"
+    },
+    {
       "concept": "Studio",
       "en": "Studio",
       "vi": "Studio",
@@ -181,6 +205,19 @@
           "field"
         ]
       }
+    },
+    {
+      "concept": "Data type",
+      "en": "type",
+      "vi": "kiểu dữ liệu",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "kiểu trường",
+          "kiểu tham số"
+        ]
+      },
+      "note": "What a field or a parameter holds: text, number, date, a reference."
     },
     {
       "concept": "Record",
@@ -286,8 +323,14 @@
     {
       "concept": "Label",
       "en": "label",
-      "vi": "nhãn",
-      "status": "approved"
+      "vi": "tên hiển thị",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "nhãn"
+        ]
+      },
+      "note": "What people see as the name of a field, an entity, a value or an action. \"Tên\" alone is the name that references use."
     },
     {
       "concept": "Help text",
@@ -450,6 +493,18 @@
       "vi": "bản dịch",
       "status": "approved",
       "note": "One text in another language, as a label's Translations… dialog shows it. Not a whole language."
+    },
+    {
+      "concept": "People who use the application",
+      "en": "people",
+      "vi": "người dùng",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "mọi người"
+        ]
+      },
+      "note": "Mostly left out where the sentence needs no subject. The person reading is addressed as \"bạn\"."
     },
     {
       "concept": "Role",

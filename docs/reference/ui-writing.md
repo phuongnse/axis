@@ -16,6 +16,8 @@ These hold in every language.
   is the source of the keys, not of the sentences.
 - **The person's words.** Name what the person sees and does, in the terms of the people who use the screen. Write
   "The record could not be saved", not the name of the API call that failed.
+- **A setting by what it means.** Name a setting by what it is to the person, not by the English word for it: what
+  people see as a field's name is its display name, and what a field holds is its data type.
 - **One term for one concept.** Use the glossary's term. Never bring in a synonym, and never change an approved term in
   passing: a change of term is a change of the glossary, which the owner approves, and then of every text that uses it.
 - **Direct verbs for actions.** A button or a menu item says what it does, with a verb first where the language allows:
@@ -63,9 +65,17 @@ These hold in every language.
 
 A label, a title and a button take sentence case in English: "Display field", not "Display Field".
 
+A label or a column title does not repeat what its section, table, row or dialog is about: the Fields table's columns
+are Name, Label and Type, not Field name, Field label and Field type, and a step's settings say Name, not Step name. An
+accessible name that no visible heading explains, such as an input's `aria-label` in a row with no title, keeps the
+noun.
+
 ## Placeholders and numbers
 
 - Keep every placeholder, such as `{count}` or `{entity}`, in every locale, and move it to where the language puts it.
+- A word Axis defines that a placeholder puts in a sentence, such as a type's or a kind's name, follows the sentence's
+  capitals: "Text settings" where it starts the text, "Thiết lập văn bản" in the middle. A name an author gave, such as
+  an entity's label, keeps its own capitals: "Tham chiếu tới Phòng ban".
 - A count reads naturally: English needs "1 field" and "3 fields"; a language without plural forms writes one text.
 - Dates, times and numbers come from the locale's formats, never from words in a text.
 
@@ -96,6 +106,10 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   bản ghi.". A question or advice addressed to the person says "bạn": "Bạn có muốn xóa vai trò này không?", "Bạn nên
   sao lưu trước khi khôi phục.". Axis speaking of itself says "chúng tôi", rarely. Never "người dùng" for the person
   reading, and never "quý khách", "mình" or a familiar tone.
+- **The people who use an application are "người dùng", and are mostly left out.** Studio's help speaks of them often,
+  as English says "people". Leave them out where the sentence needs no subject: "Thông báo hiện ở trường này khi điều
+  kiện không thỏa.", "Tên hiện trong menu và biểu mẫu.". Where it needs one, "người dùng": "Người dùng chọn một người.".
+  Never "mọi người" for them, which reads as a crowd.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
 - **"Hãy" and "Vui lòng" only where they belong.** A validation message, a button or a tooltip takes the bare verb:
   "Nhập tên.", "Chọn loại.". A sentence of guidance may start with "Hãy": "Hãy đăng nhập lại để đổi vai trò.". "Vui lòng"
@@ -117,12 +131,14 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   "ẩn", not "giấu"; "ID", not "mã định danh"; a fragment where it reads better: "Nếu còn sự cố", not "Nếu bạn vẫn còn
   sự cố".
 - **Not the English sentence's shape.**
-  - No "của nó" for "its": name the thing, or leave it out. "Hiện dữ liệu" or "Hiện dữ liệu của nguồn", not "Hiện dữ
-    liệu của nó".
+  - No "nó" for "it" or "its": name the thing again, or leave it out. "Hiện dữ liệu", not "Hiện dữ liệu của nó";
+    "Không tài nguyên nào khác dùng tài nguyên này.", not "Không tài nguyên nào khác dùng nó."
   - No passive built on "được" or "bị" where English is passive: "Đã xóa vai trò", not "Vai trò đã được xóa".
   - No "việc", "thực hiện việc", "tiến hành" or "thao tác" wrapped around a verb: "Xóa", not "Thực hiện việc xóa".
   - No literal noun piles from English: "Độ rộng (trên 12 cột)", not "Độ rộng theo phần mười hai của hàng". A compound
     reads in Vietnamese order: "Tài khoản Internet", not "Internet tài khoản".
+- **A short label that reads two ways on its own is rewritten.** "Nhãn trường" can read as a school's label; "Tên
+  hiển thị" cannot.
 - **Capital on the first word only**, on buttons and titles too: "Chọn tất cả", not "Chọn Tất Cả". A proper name keeps its
   capitals: "Việt Nam".
 - **One spelling and spacing.** The modern placement of tone marks: "xóa", "hủy", "hòa". No space before `. , : ; ? ! )`
