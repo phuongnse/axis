@@ -972,7 +972,7 @@
   "shell.studio.field.entity.fields.minLength": "Minimum length",
   "shell.studio.field.entity.fields.minLength.help": "The fewest characters a value may have.",
   "shell.studio.field.entity.fields.maxLength": "Maximum length",
-  "shell.studio.field.entity.fields.maxLength.help": "The most characters a value may have.",
+  "shell.studio.field.entity.fields.maxLength.help": "The longest text the field holds, in characters. It is the size of the stored value, so it applies however the value is set.",
   "shell.studio.field.entity.fields.min": "Minimum",
   "shell.studio.field.entity.fields.min.help": "The smallest value allowed.",
   "shell.studio.field.entity.fields.max": "Maximum",

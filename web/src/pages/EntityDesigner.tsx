@@ -772,12 +772,13 @@ function FieldDrawer({
 /**
  * Proposed: a field's settings after General, in groups, each setting with its help, one to a row, and only those its
  * type takes, so a group with none is left out:
- * - the type's settings: the target entity, the values and their labels, the currency, and precision with scale;
+ * - the type's settings: the target entity, the values and their labels, the currency, the maximum length, and
+ *   precision with scale, the shape of what the field stores;
  * - Value: where the value comes from, one choice of the ways the type takes, then only that way's settings: a default
  *   and whether it holds a user for an entered value, the expression, the sequence, or the match. Proposed: it comes
  *   before Validation, as the way changes which checks apply, so what has an effect comes before what it affects;
- * - Validation: Required, Unique, the length and the range, each pair on one row, a file's size and media types, then the
- *   rules whose message shows at this field;
+ * - Validation: Required, Unique, the minimum length and the range, the range on one row, a file's size and media
+ *   types, then the rules whose message shows at this field;
  * - Search and privacy: Searchable, Sensitive and Exact lookup.
  */
 function FieldGroups({
@@ -906,6 +907,9 @@ function FieldGroups({
         onChange={onChange}
       />
     ),
+    // Proposed: Maximum length is the size of the stored text, as precision and scale are of a number, so it is a
+    // setting of the type, not a check, and it stays for a value the server sets, where no check applies.
+    has('maxLength') && <Fragment key="maxLength">{number('maxLength')}</Fragment>,
     (has('precision') || has('scale')) && (
       <Fragment key="precision">
         {pair(has('precision') ? number('precision') : null, has('scale') ? number('scale') : null)}
@@ -1010,7 +1014,7 @@ function FieldGroups({
           <FlagRow field={field} setting="required" pointer={`${pointer}/required`} onChange={onChange} />
         )}
         <FlagRow field={field} setting="unique" pointer={`${pointer}/unique`} onChange={onChange} />
-        {pair(has('minLength') ? number('minLength') : null, has('maxLength') ? number('maxLength') : null)}
+        {has('minLength') && number('minLength')}
         {pair(has('min') ? limit('min') : null, has('max') ? limit('max') : null)}
         {has('maxSize') && number('maxSize')}
         {has('accept') && tags('accept')}

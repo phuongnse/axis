@@ -972,7 +972,7 @@
   "shell.studio.field.entity.fields.minLength": "Độ dài tối thiểu",
   "shell.studio.field.entity.fields.minLength.help": "Số ký tự ít nhất một giá trị được có.",
   "shell.studio.field.entity.fields.maxLength": "Độ dài tối đa",
-  "shell.studio.field.entity.fields.maxLength.help": "Số ký tự nhiều nhất một giá trị được có.",
+  "shell.studio.field.entity.fields.maxLength.help": "Văn bản dài nhất field chứa được, tính bằng ký tự. Đây là kích thước của giá trị được lưu, nên áp dụng dù giá trị được đặt theo cách nào.",
   "shell.studio.field.entity.fields.min": "Giá trị nhỏ nhất",
   "shell.studio.field.entity.fields.min.help": "Giá trị nhỏ nhất được phép.",
   "shell.studio.field.entity.fields.max": "Giá trị lớn nhất",

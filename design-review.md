@@ -240,6 +240,11 @@ owner is reviewing it one step at a time.
 - **Value before Validation:** the drawer's groups are General, the type's settings, Value, Validation, then Search and
   privacy. What has an effect comes before what it affects: the type decides which settings there are, and where the value
   comes from decides whether Required applies.
+- **Maximum length is the type's:** a sequence field showed Maximum length alone under Validation, as the compiler refuses
+  `minLength`, `min` and `max` on a value the server sets, yet keeps `maxLength`, the size of the stored text. So Maximum
+  length is a setting of the type, under Text settings, as precision and scale are of a number, and as Salesforce's
+  `Text(80)` and Dataverse's "Maximum character count" put it. Validation keeps only checks on an entered value: Required,
+  Unique, Minimum length, the range and the rules.
 - **Matched:** Find by offers only the target entity's unique fields, so `GET .../names` answers `unique` with each field
   (Proposed), and From only this entity's fields of the same type that the compiler allows (AXC0362).
 - **One choice control:** `AxisChoiceField` in `platform/AxisField.tsx` is a choice among a few ways, each with its help, and
