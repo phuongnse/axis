@@ -180,7 +180,8 @@ tenant administrator can run it in M33.
   a cell, export without a lease. One export of a tenant runs at a time, because the publisher runs one job of a tenant at a
   time.
 - **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does: one `RepeatableRead`
-  transaction for the active releases and every record.
+  transaction for the active releases, every record and every stored file. The Studio folder is read from disk while the job runs, outside the snapshot,
+  so an author's edit during the export may or may not be in the ZIP, as in a backup.
 - **Kept.** The ZIP is stored in the cell's object storage, encrypted at rest, for 7 days, then
   deleted. The download answers it to a caller of the provisioning API, and to nobody else. Each
   download writes a platform audit record. The job stores the ZIP at `exports/<tenant>/<job id>.zip` in the bucket of
@@ -218,17 +219,18 @@ same job and the same ZIP as the provisioning API, as
 
 | Entry | What it holds |
 | --- | --- |
-| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application, ordered by name, with its `name`, its `folder`, its active `release` number and its `entities`, each `{ name, file }` with the original entity name and the file name without its extension. |
-| `applications/<application>/` | _(planned for M31)_ The application folder from the tenant's Studio folder, as Studio writes it, its `customizations/` included. |
+| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application, ordered by name, with its `name`, its `folder`, its active `release` number and its `entities`, each `{ name, file }` with the original entity name and the file name without its extension, and its `files`, each `{ entity, record, field, name, file }` with the original entity name, the record id, the stored field path such as `attachments/file`, the original file name and the path of the file in the ZIP. |
+| `applications/<path>` | Every file of `<Studio:ApplicationsPath>/<tenant id>/` by its path below that folder, `customizations/` included, as Studio wrote it and found by the same walk as `tenant backup`. Symbolic links are skipped. With no setting or no folder there are no entries. |
 | `data/<application>/<entity>.jsonl` | One JSON object per line for each record, in the shape of the [record API](record-api.md#record-shape), with child rows inside the record. A child entity has no file of its own. |
 | `data/<application>/<entity>.csv` | The same records in the CSV form of [export](import-export.md#export), one file per entity. Its first column is `id`, the record id, which entity export does not write. Child rows go in a file of their own named `<entity>.<field>.csv`, whose first column is `recordId`, the id of the record that owns the row, so a row can be joined to its record. |
-| `files/<application>/<entity>/<record id>/<field>/<file name>` | _(planned for M31)_ Each stored file, under its record and field. |
+| `files/<application>/<entity>/<record id>/<field>/<file name>` | Each attached file, read in the snapshot, under its record and field. `<entity>` is the entity's file name in `data/`. A file of a child row goes under its parent record, and its `<field>` is the stored field path made safe, such as `attachments_file`. |
 | `users.csv` | _(planned for M31)_ The realm's accounts: user name, email, display name, roles, enabled, created. No credential. |
 
-An entity name or a file name that is not a safe file name is written with its unsafe characters
+An entity name, a field path or a file name that is not a safe file name is written with its unsafe characters
 replaced by `_`, and `export.json` lists the original name. The safe characters are letters, digits, `.`, `_` and `-`, so the
 module entity `organization/Department` is written as `organization_Department`. When two names become the same file name
-in one application, the later one gets `_2`, `_3` and so on.
+in one application, the later one gets `_2`, `_3` and so on. Two file names that clash in one folder get `_2`, `_3` and so on before the
+extension, such as `scan_2.pdf`. The paths under `applications/` are copied as they are.
 
 ## Deleting a tenant
 

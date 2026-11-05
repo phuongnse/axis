@@ -7,12 +7,20 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Axis.Admin;
 using Axis.Administration;
+using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Releases;
+using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
+using Axis.Data;
+using Axis.Data.Files;
 using Axis.Data.Records;
+using Axis.Data.Schema;
+using Axis.Processes.Instances;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
@@ -58,6 +66,7 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         var files = await ReadZipAsync(s3, bucket, key);
         using var manifest = JsonDocument.Parse(files["export.json"]);
         var root = manifest.RootElement;
+        Assert.DoesNotContain(files.Keys, name => name.StartsWith("applications/", StringComparison.Ordinal));
         Assert.Equal(1, root.GetProperty("format").GetInt32());
         Assert.Equal(fixture.TenantId, root.GetProperty("tenantId").GetString());
         Assert.Matches(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", root.GetProperty("createdAt").GetString());
@@ -141,12 +150,74 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         Assert.Contains("The setting Cell:ExportStorage:Bucket is required.", output.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task The_zip_of_a_tenant_with_two_applications_holds_both_studio_folders_and_each_attached_file_under_its_record_and_field()
+    {
+        var (tenant, record) = await NewFilesTenantAsync();
+        using var studio = StudioFolder(tenant);
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+
+        var (job, output) = await RunExportAsync(tenant, bucket, studio.Path);
+
+        Assert.Contains($"{tenant} export ok", output);
+        var files = await ReadZipAsync(s3, bucket, $"exports/{tenant}/{job:D}.zip");
+        Assert.Equal(
+            ["applications/files-app/application.json", "applications/files-app/customizations/x.json", "applications/second-app/application.json"],
+            files.Keys.Where(name => name.StartsWith("applications/", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
+        Assert.Equal("""{ "name": "customization" }""", files["applications/files-app/customizations/x.json"]);
+        Assert.DoesNotContain(files.Keys, name => name.Contains("secret", StringComparison.Ordinal));
+
+        var folder = $"files/FilesApp/Claim/{record:D}";
+        Assert.Equal(
+            [$"{folder}/attachments_file/scan.pdf", $"{folder}/attachments_file/scan_2.pdf", $"{folder}/receipt/My_receipt__1_.pdf"],
+            files.Keys.Where(name => name.StartsWith("files/", StringComparison.Ordinal)).Order(StringComparer.Ordinal));
+        Assert.Equal("first scan", files[$"{folder}/attachments_file/scan.pdf"]);
+        Assert.Equal("second scan", files[$"{folder}/attachments_file/scan_2.pdf"]);
+        Assert.Equal("the receipt", files[$"{folder}/receipt/My_receipt__1_.pdf"]);
+    }
+
+    [Fact]
+    public async Task A_file_with_an_unsafe_name_is_written_with_underscores_and_the_manifest_lists_its_original_name_with_its_zip_path()
+    {
+        var (tenant, record) = await NewFilesTenantAsync();
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+
+        var (job, output) = await RunExportAsync(tenant, bucket);
+
+        Assert.Contains($"{tenant} export ok", output);
+        var files = await ReadZipAsync(s3, bucket, $"exports/{tenant}/{job:D}.zip");
+        Assert.DoesNotContain(files.Keys, name => name.StartsWith("applications/", StringComparison.Ordinal));
+        using var manifest = JsonDocument.Parse(files["export.json"]);
+        var applications = manifest.RootElement.GetProperty("applications").EnumerateArray().ToList();
+        Assert.Empty(applications.Single(application => application.GetProperty("name").GetString() == "SecondApp").GetProperty("files").EnumerateArray());
+        var listed = applications.Single(application => application.GetProperty("name").GetString() == "FilesApp").GetProperty("files").EnumerateArray()
+            .Select(item => (
+                Entity: item.GetProperty("entity").GetString(),
+                Record: item.GetProperty("record").GetGuid(),
+                Field: item.GetProperty("field").GetString(),
+                Name: item.GetProperty("name").GetString(),
+                File: item.GetProperty("file").GetString()))
+            .Order()
+            .ToList();
+        var folder = $"files/FilesApp/Claim/{record:D}";
+        Assert.Equal(
+            [
+                ("Claim", record, "attachments/file", "scan.pdf", $"{folder}/attachments_file/scan.pdf"),
+                ("Claim", record, "attachments/file", "scan.pdf", $"{folder}/attachments_file/scan_2.pdf"),
+                ("Claim", record, "receipt", "My receipt (1).pdf", $"{folder}/receipt/My_receipt__1_.pdf"),
+            ],
+            listed);
+        Assert.All(listed, item => Assert.Contains(item.File!, files.Keys));
+    }
+
     private const string TenantStatusMessage = "the tenant is still provisioning. Finish tenant create first.";
 
-    private async Task<(Guid Job, string Output)> RunExportAsync(string tenantId, string bucket)
+    private async Task<(Guid Job, string Output)> RunExportAsync(string tenantId, string bucket, string? studio = null)
     {
         var storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
-        var kinds = Kinds(JobSetting<CellBackupStorage>.Of(storage));
+        var kinds = Kinds(JobSetting<CellBackupStorage>.Of(storage), studio: studio);
         var job = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", tenantId, "operator-1", null, null, CancellationToken);
         using var output = new StringWriter();
 
@@ -233,17 +304,79 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         Assert.Contains($"{fixture.TenantId} export ok", output.ToString(), StringComparison.Ordinal);
     }
 
+    // A Studio folder with two applications of the tenant, a customization and an application of another tenant.
+    private static TemporaryFolder StudioFolder(string tenant) =>
+        new TemporaryFolder()
+            .With($"{tenant}/files-app/application.json", """{ "name": "FilesApp" }""")
+            .With($"{tenant}/files-app/customizations/x.json", """{ "name": "customization" }""")
+            .With($"{tenant}/second-app/application.json", """{ "name": "SecondApp" }""")
+            .With($"other-{tenant}/secret/application.json", """{ "name": "secret" }""");
+
+    // A new tenant with the FilesApp and SecondApp fixtures active. A claim record has a receipt and two attachment files with the same name.
+    private async Task<(string Tenant, Guid Record)> NewFilesTenantAsync()
+    {
+        var scenario = fixture.Scenario;
+        var tenant = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(tenant, $"{tenant}.example.test")).Exit);
+        var row = await scenario.RowAsync(tenant);
+        var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.SchemaPassword, row.SchemaPassword).Reveal();
+        await using var connection = new NpgsqlConnection(scenario.TenantConnectionString(tenant, row.SchemaUser, password));
+        await connection.OpenAsync(CancellationToken);
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
+        await configuration.Database.MigrateAsync(CancellationToken);
+        await data.Database.MigrateAsync(CancellationToken);
+
+        var second = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "SecondApp"), configuration);
+        Assert.Empty(second.Diagnostics);
+        Assert.Empty((await ReleaseActivator.ActivateAsync(second, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance)).Diagnostics);
+
+        var compiled = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilesApp"), configuration);
+        Assert.Empty(compiled.Diagnostics);
+        var bindings = new ActivationBindings(
+            "default",
+            new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase) { ["Files"] = new(ActivationBinding.StorageKind, null) },
+            AllowHttp: false);
+        Assert.Empty((await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance)).Diagnostics);
+
+        var record = Guid.CreateVersion7();
+        var model = Assert.IsAssignableFrom<ApplicationModel>(compiled.Model);
+        var applicationId = model.Manifest.Id;
+        Assert.True(model.TryGetEntity("Claim", out var claim));
+        Assert.True(model.TryGetEntity("ClaimAttachment", out var attachment));
+        var now = DateTimeOffset.UtcNow;
+        await AttachAsync(connection, applicationId, claim.Id, "receipt", "My receipt (1).pdf", "the receipt", now, record);
+        await AttachAsync(connection, applicationId, attachment.Id, "attachments/file", "scan.pdf", "first scan", now.AddSeconds(1), record);
+        await AttachAsync(connection, applicationId, attachment.Id, "attachments/file", "scan.pdf", "second scan", now.AddSeconds(2), record);
+        return (tenant, record);
+    }
+
+    private static async Task AttachAsync(NpgsqlConnection connection, Guid applicationId, Guid entityId, string path, string name, string content, DateTimeOffset uploadedAt, Guid record)
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        var id = Guid.CreateVersion7();
+        await FileStore.InsertPendingAsync(
+            connection,
+            new PendingFile(id, applicationId, entityId, path, name, "application/pdf", bytes.Length, SHA256.HashData(bytes), "requester", uploadedAt),
+            new MemoryStream(bytes),
+            CancellationToken);
+        await using var command = new NpgsqlCommand("UPDATE axis.files SET state = 'attached', owner_record_id = @record WHERE id = @id", connection);
+        command.Parameters.AddWithValue("record", record);
+        command.Parameters.AddWithValue("id", id);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+    }
+
     private static QuotaDefaults CellDefaults(params (string Setting, string Value)[] settings) =>
         QuotaDefaults.Load(
             new ConfigurationBuilder().AddInMemoryCollection(settings.ToDictionary(setting => setting.Setting, setting => (string?)setting.Value)).Build(),
             new CellOptions { Id = "vn-1" });
 
-    private Dictionary<string, IReadOnlyList<JobStep>> Kinds(JobSetting<CellBackupStorage> storage, QuotaDefaults? quotas = null, Func<JobStep, JobStep>? wrap = null)
+    private Dictionary<string, IReadOnlyList<JobStep>> Kinds(JobSetting<CellBackupStorage> storage, QuotaDefaults? quotas = null, Func<JobStep, JobStep>? wrap = null, string? studio = null)
     {
         var platform = fixture.Scenario.Platform;
         var sensitive = new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(platform, AdminScenario.Cipher)));
         var leases = new TenantLeases(_leaseSource, NullLogger<TenantLeases>.Instance);
-        var steps = TenantExport.Steps(new TenantExportSettings(platform, AdminScenario.Cipher, PackageCatalog.Load(SamplePackages.Path).Versions, sensitive, storage, leases, quotas));
+        var steps = TenantExport.Steps(new TenantExportSettings(platform, AdminScenario.Cipher, PackageCatalog.Load(SamplePackages.Path).Versions, sensitive, storage, leases, quotas, studio));
         return new Dictionary<string, IReadOnlyList<JobStep>>
         {
             ["export"] = wrap is null ? steps : [.. steps.Select(wrap)],

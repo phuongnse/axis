@@ -13,6 +13,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data.Exports;
+using Axis.Data.Files;
 using Axis.Data.Naming;
 using Axis.Data.Records;
 using Axis.Tenancy;
@@ -28,6 +29,8 @@ namespace Axis.Admin;
 /// every other job, and only the export refuses with the problem that names the setting. <paramref name="Leases"/> takes the tenant's
 /// <c>concurrentImports</c> lease, with the limit from <paramref name="Quotas"/> when the tenant has no row of its own.
 /// <paramref name="Quotas"/> is <see langword="null"/> outside a cell, where no quota applies and the export takes no lease.
+/// <paramref name="StudioApplicationsPath"/> is the <c>Studio:ApplicationsPath</c> folder, or <see langword="null"/> when the setting is unset,
+/// and then the ZIP has no <c>applications/</c> entries.
 /// </summary>
 internal sealed record TenantExportSettings(
     string PlatformConnectionString,
@@ -36,7 +39,8 @@ internal sealed record TenantExportSettings(
     SensitiveValues Sensitive,
     JobSetting<CellBackupStorage> Storage,
     TenantLeases Leases,
-    QuotaDefaults? Quotas);
+    QuotaDefaults? Quotas,
+    string? StudioApplicationsPath = null);
 
 /// <summary>
 /// The <c>export</c> job of the publisher, with one <c>export</c> step. It reads every application's active release and its records in one
@@ -46,6 +50,9 @@ internal sealed record TenantExportSettings(
 /// The rows of a child collection go to <c>&lt;entity&gt;.&lt;field&gt;.csv</c>, whose columns start with <c>recordId</c>. A character of a name that is not a
 /// letter, a digit, <c>.</c>, <c>_</c> or <c>-</c> is written as <c>_</c>, and <c>export.json</c> lists the original name. The ZIP goes to
 /// <c>exports/&lt;tenant&gt;/&lt;job id&gt;.zip</c> in the export storage with server-side encryption, so its owner can open it after the download.
+/// <c>files/&lt;application&gt;/&lt;entity&gt;/&lt;record id&gt;/&lt;field&gt;/&lt;file name&gt;</c> holds each attached file, read in the same snapshot, with a child-row
+/// field folder that is its field path made safe, and a clash of names gets <c>_2</c>, <c>_3</c> and so on before the extension. <c>applications/</c> holds
+/// every file of the tenant's Studio folder by its path, in the walk of <c>tenant backup</c>, and has no entries without the setting or the folder.
 /// The ZIP and the CSV parts are written to a folder that only its owner can use, which is deleted at the end. In a cell the job holds one
 /// <c>concurrentImports</c> lease of the tenant until the ZIP is stored, and when none is free the job waits, see <see cref="JobStep"/>.
 /// </summary>
@@ -185,6 +192,35 @@ internal static class TenantExport
             }
         }
 
+        foreach (var application in applications)
+        {
+            foreach (var stored in application.Files)
+            {
+                // The file row and its bytes are read in one snapshot, so a file that was listed has its bytes.
+                var found = await FileStore.CopyContentAsync(
+                    connection,
+                    transaction,
+                    stored.Id,
+                    async (_, content) =>
+                    {
+                        await using var target = zip.CreateEntry(stored.File, CompressionLevel.Optimal).Open();
+                        await content.CopyToAsync(target, cancellationToken);
+                    },
+                    cancellationToken);
+                if (!found)
+                {
+                    throw new InvalidOperationException($"The bytes of the file {stored.Id} were not found in the snapshot.");
+                }
+            }
+        }
+
+        foreach (var (relative, path) in TenantBackup.StudioFiles(settings.StudioApplicationsPath, tenantId))
+        {
+            await using var studio = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            await using var target = zip.CreateEntry($"applications/{relative}", CompressionLevel.Optimal).Open();
+            await studio.CopyToAsync(target, cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -236,10 +272,89 @@ internal static class TenantExport
                 entities.Add(new ExportEntity(entity, ReserveStem(SafeName(entity.Name), collections, files), collections));
             }
 
-            applications.Add(new ExportApplication(active.Name, folder, number, model, entities));
+            var stored = await ReadFilesAsync(connection, transaction, active.ApplicationId, folder, entities, cancellationToken);
+            applications.Add(new ExportApplication(active.Name, folder, number, model, entities, stored));
         }
 
         return applications;
+    }
+
+    // The attached files of an application, each with its place in the ZIP. A file of an entity that the active release no longer has is left out,
+    // because it has no folder. A file of a field that was removed is kept, under its stored path made safe.
+    private static async Task<List<ExportFile>> ReadFilesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid applicationId,
+        string applicationFolder,
+        List<ExportEntity> entities,
+        CancellationToken cancellationToken)
+    {
+        var owners = new Dictionary<Guid, ExportEntity>();
+        foreach (var entity in entities)
+        {
+            owners[entity.Entity.Id] = entity;
+            foreach (var collection in entity.Collections)
+            {
+                owners[collection.Child.Id] = entity;
+            }
+        }
+
+        // Npgsql allows one open reader per connection, so the rows are read before any bytes.
+        var rows = new List<(Guid Id, Guid EntityId, string Path, Guid Record, string Name)>();
+        await using (var command = new NpgsqlCommand(
+            "SELECT id, entity_id, field_path, owner_record_id, name FROM axis.files WHERE application_id = @application AND state = 'attached' ORDER BY owner_record_id, field_path, uploaded_at, id",
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("application", applicationId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                rows.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetGuid(3), reader.GetString(4)));
+            }
+        }
+
+        var fieldFolders = new Dictionary<Guid, (Dictionary<string, string> Folders, HashSet<string> Used)>();
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var files = new List<ExportFile>();
+        foreach (var (id, entityId, fieldPath, record, name) in rows)
+        {
+            if (!owners.TryGetValue(entityId, out var owner))
+            {
+                continue;
+            }
+
+            if (!fieldFolders.TryGetValue(owner.Entity.Id, out var fields))
+            {
+                fields = (new Dictionary<string, string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+                fieldFolders[owner.Entity.Id] = fields;
+            }
+
+            if (!fields.Folders.TryGetValue(fieldPath, out var fieldFolder))
+            {
+                fieldFolder = Unique(SafeName(fieldPath), fields.Used);
+                fields.Folders[fieldPath] = fieldFolder;
+            }
+
+            var folder = $"files/{applicationFolder}/{owner.Stem}/{record:D}/{fieldFolder}";
+            files.Add(new ExportFile(id, owner.Entity.Name, record, fieldPath, name, UniqueFile(folder, SafeName(name), paths)));
+        }
+
+        return files;
+    }
+
+    // The ZIP path of a file in a folder, with _2, _3 and so on before the extension when an earlier file has the path.
+    private static string UniqueFile(string folder, string safe, HashSet<string> used)
+    {
+        var path = $"{folder}/{safe}";
+        var extension = Path.GetExtension(safe);
+        var stem = safe[..^extension.Length];
+        for (var number = 2; !used.Add(path); number++)
+        {
+            path = $"{folder}/{stem}_{number.ToString(CultureInfo.InvariantCulture)}{extension}";
+        }
+
+        return path;
     }
 
     private static string Unique(string safe, HashSet<string> used)
@@ -283,6 +398,14 @@ internal static class TenantExport
                 folder = application.Folder,
                 release = application.Release,
                 entities = application.Entities.Select(entity => new { name = entity.Entity.Name, file = entity.Stem }),
+                files = application.Files.Select(stored => new
+                {
+                    entity = stored.Entity,
+                    record = stored.Record,
+                    field = stored.Field,
+                    name = stored.Name,
+                    file = stored.File,
+                }),
             }),
         };
 
@@ -402,7 +525,9 @@ internal static class TenantExport
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private sealed record ExportApplication(string Name, string Folder, int? Release, ApplicationModel Model, List<ExportEntity> Entities);
+    private sealed record ExportApplication(string Name, string Folder, int? Release, ApplicationModel Model, List<ExportEntity> Entities, List<ExportFile> Files);
+
+    private sealed record ExportFile(Guid Id, string Entity, Guid Record, string Field, string Name, string File);
 
     private sealed record ExportEntity(EntityModel Entity, string Stem, List<ExportCollection> Collections);
 
