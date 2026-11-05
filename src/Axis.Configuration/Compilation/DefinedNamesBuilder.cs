@@ -37,7 +37,7 @@ internal static class DefinedNamesBuilder
                 entity.Id,
                 entity.Name,
                 ModuleOf(entity),
-                [.. entity.Fields.Select(field => new DefinedField(field.Name, field.Type, field.Target, field.Values, field.Label?.TextKey))],
+                [.. entity.Fields.Select(field => new DefinedField(field.Name, field.Type, field.Target, field.Values, field.Label?.TextKey, field.Unique == true))],
                 entity.Label?.TextKey))],
             [.. loaded.DataSources.Select(dataSource => DataSource(dataSource, findEntity))],
             [.. loaded.Processes.Select(process => new DefinedProcess(

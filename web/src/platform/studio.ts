@@ -330,6 +330,8 @@ export interface StudioNameField {
   values: string[] | null
   /** Proposed: the text key of its label or title, which `texts` resolves, or `null` when it has none. */
   labelKey?: string | null
+  /** Proposed: whether the field is unique, so a matched reference is offered only unique fields to find by. */
+  unique?: boolean
 }
 
 /** The names of one kind in `GET .../names`. `module` is the module id, or `null` for the application's own. */

@@ -224,6 +224,18 @@ owner is reviewing it one step at a time.
   maximum, and precision with scale. A rule at the field is a box with its name, Remove rule, its condition and its message,
   typed as texts; Add rule adds one at this field. Value labels are rows of a value and its label typed as texts. The
   migration warning moves to the top of the drawer.
+- **Where the value comes from:** the drawer's Value group showed every way at once, a default, an expression, a sequence
+  and Creator, though the compiler refuses two together (AXC0013), and Required beside a value the server sets. It is now
+  one choice, "The value comes from", of the ways the type takes: Entered by people, Computed, Sequence, Creator, and
+  Matched for a reference, each with one line of help, then only the chosen way's settings: a default and Holds a user
+  (`userId`) for an entered value, the expression, the sequence, or Find by and From for a match. Required shows only for an
+  entered value. Choosing a way rewrites the field once, through `withValueSource` in `platform/entityFields.ts`, which drops
+  the other ways' keys and those only an entered value may have. Dataverse's column Behavior (Simple, Calculated, Rollup) is
+  the same idea. `match` and `userId` were edited only in the JSON tab before.
+- **Matched:** Find by offers only the target entity's unique fields, so `GET .../names` answers `unique` with each field
+  (Proposed), and From only this entity's fields of the same type that the compiler allows (AXC0362).
+- **One choice control:** `AxisChoiceField` in `platform/AxisField.tsx` is a choice among a few ways, each with its help, and
+  the money field's currency source takes it too, in place of its own radio group.
 - **Found, for the issue:** an empty condition, as a new validation or rule has, is sent to `expressions/check`, which
   answers `400`; `main` does it too. The editor is to wait until there is text to check.
 - **Help text, for the issue:** every field of the platform's own screens has help text, enforced three ways. `AxisField`

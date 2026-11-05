@@ -104,8 +104,8 @@ export const fieldKeysEditedElsewhere: Record<string, string> = {
   type: 'the type column',
   label: 'the label column',
   help: 'the settings column',
-  match: 'the JSON tab',
-  userId: 'the JSON tab',
+  match: 'the value group',
+  userId: 'the value group',
 }
 
 /** The settings a field type takes. An unknown type takes none. */
@@ -114,6 +114,75 @@ export function fieldSettings(type: string): FieldSetting[] {
 }
 
 const valueSettings: FieldSetting[] = ['default', 'min', 'max', 'minLength']
+
+/**
+ * Proposed: where a record gets a field's value. People enter it, or the server sets it: computed from an expression,
+ * numbered from a sequence, the user who creates the record, or a matched reference found by a unique field. The ways
+ * exclude one another, as the compiler refuses two of them on a field (AXC0013).
+ */
+export type ValueSource = 'entered' | 'computed' | 'sequence' | 'creator' | 'matched'
+
+/** Proposed: the way a field gets its value, as its file says. */
+export function valueSourceOf(field: Record<string, unknown>): ValueSource {
+  if (typeof field.expression === 'string') {
+    return 'computed'
+  }
+  if (typeof field.sequence === 'string') {
+    return 'sequence'
+  }
+  if (field.creator === true) {
+    return 'creator'
+  }
+  if (typeof field.match === 'object' && field.match !== null) {
+    return 'matched'
+  }
+  return 'entered'
+}
+
+/** Proposed: the ways a field of `type` may get its value, entered first. A type with one way offers no choice. */
+export function valueSources(type: string): ValueSource[] {
+  const settings = fieldSettings(type)
+  return [
+    'entered',
+    ...(settings.includes('expression') ? (['computed'] as const) : []),
+    ...(settings.includes('sequence') ? (['sequence'] as const) : []),
+    ...(settings.includes('creator') ? (['creator'] as const) : []),
+    ...(type === 'reference' ? (['matched'] as const) : []),
+  ]
+}
+
+/** The keys that say where a value comes from, and those only a value people enter may have. */
+const sourceKeys = ['expression', 'sequence', 'creator', 'match']
+const enteredKeys = ['default', 'userId', 'required', 'min', 'max', 'minLength']
+
+/**
+ * Proposed: the field with its value from `source`. It drops the keys of the other ways, and for a value the server
+ * sets, the ones only an entered value may have, `required`, `default`, `userId` and the limits, as the compiler refuses
+ * them together. The new way starts empty, for the author to fill: an empty expression, sequence or match.
+ */
+export function withValueSource(field: Record<string, unknown>, source: ValueSource): Record<string, unknown> {
+  const next: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(field)) {
+    if (!sourceKeys.includes(key) && (source === 'entered' || !enteredKeys.includes(key))) {
+      setOwn(next, key, value)
+    }
+  }
+  switch (source) {
+    case 'computed':
+      next.expression = typeof field.expression === 'string' ? field.expression : ''
+      break
+    case 'sequence':
+      next.sequence = typeof field.sequence === 'string' ? field.sequence : ''
+      break
+    case 'creator':
+      next.creator = true
+      break
+    case 'matched':
+      next.match = typeof field.match === 'object' && field.match !== null ? field.match : { field: '', from: '' }
+      break
+  }
+  return next
+}
 
 /**
  * The settings the designer offers for a field. A field that computes its value with an `expression`, a `sequence` or

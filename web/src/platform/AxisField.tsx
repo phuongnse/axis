@@ -1,4 +1,4 @@
-import { Checkbox, Flex, Form } from 'antd'
+import { Checkbox, Flex, Form, Radio } from 'antd'
 import { useId, type ReactNode } from 'react'
 import { RequiredAsterisk } from './RequiredAsterisk'
 import { useDesignTokens } from './themeMode'
@@ -86,6 +86,55 @@ export function AxisField({
         </Form.Item>
       )}
     </div>
+  )
+}
+
+/**
+ * Proposed: a field that is one choice among a few ways, such as where a value comes from or where a currency comes
+ * from: its label and help as `AxisField` draws them, then one radio button to a row, each with its own help under its
+ * label, as `AxisCheckboxField` reads. The settings of the chosen way follow it, and only those.
+ */
+export function AxisChoiceField<T extends string>({
+  label,
+  help,
+  value,
+  options,
+  disabled = false,
+  testId,
+  onChange,
+}: {
+  label: string
+  help: string
+  value: T
+  options: readonly { value: T; label: string; help?: string }[]
+  disabled?: boolean
+  testId?: string
+  onChange: (next: T) => void
+}) {
+  const { colour, spacing } = useDesignTokens()
+  return (
+    <AxisField label={label} help={help} testId={testId}>
+      <Radio.Group
+        aria-label={label}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as T)}
+        style={{ width: '100%' }}
+      >
+        <Flex vertical gap={spacing.xs}>
+          {options.map((option) => (
+            <Radio key={option.value} value={option.value}>
+              <span style={{ color: colour.text }}>{option.label}</span>
+              {option.help && (
+                <span style={{ display: 'block', fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
+                  {option.help}
+                </span>
+              )}
+            </Radio>
+          ))}
+        </Flex>
+      </Radio.Group>
+    </AxisField>
   )
 }
 

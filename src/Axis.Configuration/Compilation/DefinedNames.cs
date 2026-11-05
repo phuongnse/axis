@@ -33,9 +33,13 @@ public sealed record DefinedNames(
 public sealed record DefinedEntity(
     Guid Id, string Name, string? Module, IReadOnlyList<DefinedField> Fields, string? LabelKey = null);
 
-/// <summary>A field as written. <paramref name="Target"/> and <paramref name="Values"/> are null when the field has none.</summary>
+/// <summary>
+/// A field as written. <paramref name="Target"/> and <paramref name="Values"/> are null when the field has none.
+/// Proposed: <paramref name="Unique"/> says the field is unique, so Studio offers only unique fields where a matched
+/// reference finds its record.
+/// </summary>
 public sealed record DefinedField(
-    string Name, string Type, string? Target, IReadOnlyList<string>? Values, string? LabelKey = null);
+    string Name, string Type, string? Target, IReadOnlyList<string>? Values, string? LabelKey = null, bool Unique = false);
 
 /// <summary>
 /// A data source with its parameters and the columns a row of it carries. <paramref name="GroupBy"/> is the group

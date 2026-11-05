@@ -8,7 +8,6 @@ import {
   Flex,
   Input,
   InputNumber,
-  Radio,
   Select,
   Tag,
   Tooltip,
@@ -18,7 +17,7 @@ import {
 import dayjs from 'dayjs'
 import { Fragment, lazy, Suspense, useContext, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
-import { AxisCheckboxField, AxisField, AxisFieldGroup, AxisFieldRow } from '../platform/AxisField'
+import { AxisCheckboxField, AxisChoiceField, AxisField, AxisFieldGroup, AxisFieldRow } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import { searchRows } from '../platform/tableControls'
@@ -29,6 +28,9 @@ import {
   fieldSettings,
   fieldTypes,
   type FieldSetting,
+  valueSourceOf,
+  valueSources,
+  withValueSource,
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
@@ -773,7 +775,8 @@ function FieldDrawer({
  * - the type's settings: the target entity, the values and their labels, the currency, and precision with scale;
  * - Validation: Required, Unique, the length and the range, each pair on one row, a file's size and media types, then the
  *   rules whose message shows at this field;
- * - Value: the default, the expression that computes it, the sequence that numbers it and Creator;
+ * - Value: where the value comes from, one choice of the ways the type takes, then only that way's settings: a default
+ *   and whether it holds a user for an entered value, the expression, the sequence, or the match;
  * - Search and privacy: Searchable, Sensitive and Exact lookup.
  */
 function FieldGroups({
@@ -908,8 +911,26 @@ function FieldGroups({
       </Fragment>
     ),
   ].filter(Boolean)
+  // Proposed: where the value comes from is one choice, and only the chosen way's settings follow it, so the drawer
+  // never offers two ways the compiler refuses together. A type with one way shows no choice.
+  const type = text(field.type)
+  const sources = valueSources(type)
+  const source = valueSourceOf(field)
+  const sourceKey = (way: string) => `shell.studio.entity.valueSource.${way}`
   const valueSettings = [
-    has('default') && (
+    sources.length > 1 && (
+      <AxisChoiceField
+        key="source"
+        label={label('valueSource')}
+        help={helpOf(t, key('valueSource'))}
+        value={source}
+        disabled={readOnly}
+        testId={`studio-field-${pointer}/valueSource`}
+        options={sources.map((way) => ({ value: way, label: t(sourceKey(way)), help: t(`${sourceKey(way)}.help`) }))}
+        onChange={(next) => onChange(pointer, withValueSource(field, next))}
+      />
+    ),
+    source === 'entered' && has('default') && (
       <AxisField key="default" {...about('default')}>
         <Expression
           pointer={`${pointer}/default`}
@@ -921,32 +942,44 @@ function FieldGroups({
         />
       </AxisField>
     ),
-    has('expression') && (
-      <AxisField key="expression" {...about('expression')}>
+    source === 'entered' && type === 'text' && (
+      <AxisCheckboxField
+        key="userId"
+        label={label('userId')}
+        help={helpOf(t, key('userId'))}
+        checked={field.userId === true}
+        testId={`studio-field-${pointer}/userId`}
+        onChange={(checked) => onChange(`${pointer}/userId`, checked ? true : undefined)}
+      />
+    ),
+    source === 'computed' && (
+      <AxisField key="expression" {...about('expression', true)}>
         <Expression
           pointer={`${pointer}/expression`}
           name={label('expression')}
           value={text(field.expression)}
-          required={false}
+          required
           readOnly={readOnly}
           onChange={onChange}
         />
       </AxisField>
     ),
-    has('sequence') && (
-      <AxisField key="sequence" {...about('sequence')}>
+    source === 'sequence' && (
+      <AxisField key="sequence" {...about('sequence', true)}>
         <PickerControl
           pointer={`${pointer}/sequence`}
           label={label('sequence')}
           kind="sequence"
           value={field.sequence}
-          required={false}
+          required
           block
-          onPick={(next) => onChange(`${pointer}/sequence`, next)}
+          onPick={(next) => onChange(`${pointer}/sequence`, next ?? '')}
         />
       </AxisField>
     ),
-    has('creator') && <Fragment key="creator">{flag('creator')}</Fragment>,
+    source === 'matched' && (
+      <MatchSettings key="match" pointer={pointer} field={field} fields={fields} onChange={onChange} />
+    ),
   ].filter(Boolean)
   // Proposed: Exact lookup shows once the field is sensitive, as it needs that, or while the file still has it.
   const searchSettings = (['searchable', 'sensitive', 'exactLookup'] as const)
@@ -965,7 +998,11 @@ function FieldGroups({
         </AxisFieldGroup>
       )}
       <AxisFieldGroup title={t('shell.studio.entity.group.validation')} testId="studio-field-group-validation">
-        <FlagRow field={field} setting="required" pointer={`${pointer}/required`} onChange={onChange} />
+        {/* Proposed: a value the server sets is never required of people, so Required shows only for an entered value,
+            or while the file still has it, for the author to clear. */}
+        {(source === 'entered' || field.required === true) && (
+          <FlagRow field={field} setting="required" pointer={`${pointer}/required`} onChange={onChange} />
+        )}
         <FlagRow field={field} setting="unique" pointer={`${pointer}/unique`} onChange={onChange} />
         {pair(has('minLength') ? number('minLength') : null, has('maxLength') ? number('maxLength') : null)}
         {pair(has('min') ? limit('min') : null, has('max') ? limit('max') : null)}
@@ -983,6 +1020,86 @@ function FieldGroups({
           {searchSettings}
         </AxisFieldGroup>
       )}
+    </>
+  )
+}
+
+/**
+ * Proposed: the settings of a matched reference: Find by, a unique field of the target entity, and From, a field of this
+ * entity whose value is looked up there. Find by offers only the target's unique fields, and From only this entity's
+ * fields of the same type, and for a reference the same target, that are not the field itself, sensitive, computed or
+ * matched, as the compiler allows no other (AXC0362). Both are named by their labels, as every picker names a choice.
+ */
+function MatchSettings({
+  pointer,
+  field,
+  fields,
+  onChange,
+}: {
+  pointer: string
+  field: Content
+  fields: unknown[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const key = (setting: string) => `shell.studio.field.entity.fields.${setting}`
+  const match = isContent(field.match) ? field.match : {}
+  const target = text(field.target).toLowerCase()
+  const targetFields = names?.entities.find((entity) => entity.name.toLowerCase() === target)?.fields ?? []
+  const findBy = targetFields.find((candidate) => candidate.name === text(match.field))
+  const findByChoices: ReferenceChoice[] = targetFields
+    .filter((candidate) => candidate.unique === true)
+    .map((candidate) => ({ name: candidate.name, labelKey: candidate.labelKey ?? null }))
+  const fromChoices: ReferenceChoice[] = fields.flatMap((other) =>
+    isContent(other) &&
+    typeof other.name === 'string' &&
+    other.name !== '' &&
+    other.name !== field.name &&
+    other.sensitive !== true &&
+    typeof other.expression !== 'string' &&
+    !isContent(other.match) &&
+    (findBy === undefined ||
+      (other.type === findBy.type && (findBy.type !== 'reference' || text(other.target) === (findBy.target ?? ''))))
+      ? [{ name: other.name, labelKey: isContent(other.label) ? text(other.label.textKey) || null : null }]
+      : [],
+  )
+  const write = (part: 'field' | 'from', next: string | undefined) =>
+    onChange(`${pointer}/match`, { ...match, [part]: next ?? '' })
+  return (
+    <>
+      <AxisField
+        label={t(key('matchField'))}
+        help={helpOf(t, key('matchField'))}
+        required
+        testId={`studio-field-${pointer}/match/field`}
+      >
+        <PickerControl
+          pointer={`${pointer}/match/field`}
+          label={t(key('matchField'))}
+          options={findByChoices}
+          value={match.field}
+          required
+          block
+          onPick={(next) => write('field', next)}
+        />
+      </AxisField>
+      <AxisField
+        label={t(key('matchFrom'))}
+        help={helpOf(t, key('matchFrom'))}
+        required
+        testId={`studio-field-${pointer}/match/from`}
+      >
+        <PickerControl
+          pointer={`${pointer}/match/from`}
+          label={t(key('matchFrom'))}
+          options={fromChoices}
+          value={match.from}
+          required
+          block
+          onPick={(next) => write('from', next)}
+        />
+      </AxisField>
     </>
   )
 }
@@ -1262,17 +1379,16 @@ function CurrencySource({
   }
   return (
     <>
-      <AxisField label={t(key('currencySource'))} help={helpOf(t, key('currencySource'))}>
-        <Radio.Group
-          role="radiogroup"
-          aria-label={t(key('currencySource'))}
-          value={fromField ? 'field' : 'code'}
-          onChange={(event) => switchTo(event.target.value)}
-        >
-          <Radio value="code">{t('shell.studio.entity.currencyFixed')}</Radio>
-          <Radio value="field">{t('shell.studio.entity.currencyFromField')}</Radio>
-        </Radio.Group>
-      </AxisField>
+      <AxisChoiceField
+        label={t(key('currencySource'))}
+        help={helpOf(t, key('currencySource'))}
+        value={fromField ? 'field' : 'code'}
+        options={[
+          { value: 'code', label: t('shell.studio.entity.currencyFixed') },
+          { value: 'field', label: t('shell.studio.entity.currencyFromField') },
+        ]}
+        onChange={switchTo}
+      />
       {fromField ? (
         <AxisField
           label={t(key('currencyField'))}
