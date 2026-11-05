@@ -68,6 +68,13 @@
       }
     },
     {
+      "concept": "Module version",
+      "en": "version",
+      "vi": "bản",
+      "status": "approved",
+      "note": "A module's version, with its number: \"Organization bản 1.2.0\". \"phiên bản\" is a release of the application."
+    },
+    {
       "concept": "Built-in module",
       "en": "built-in module",
       "vi": "mô-đun có sẵn",
@@ -152,28 +159,17 @@
       "note": "A diagnostic is an error or a warning: \"lỗi\" and \"cảnh báo\"."
     },
     {
-      "concept": "Dependencies",
-      "en": "Dependencies",
-      "vi": "Phụ thuộc",
+      "concept": "Used by",
+      "en": "Used by",
+      "vi": "Nơi sử dụng",
       "status": "approved",
       "avoid": {
         "vi": [
-          "Liên quan"
+          "Được dùng bởi",
+          "Phụ thuộc"
         ]
       },
-      "note": "The tab of a resource that lists what uses it and what it uses, opened before a rename or a delete."
-    },
-    {
-      "concept": "Used by",
-      "en": "Used by",
-      "vi": "Được dùng bởi",
-      "status": "approved"
-    },
-    {
-      "concept": "Uses",
-      "en": "Uses",
-      "vi": "Sử dụng",
-      "status": "approved"
+      "note": "The tab of a resource that lists what uses it, the references a delete or a rename breaks. What a resource uses is not listed: its editor shows it."
     },
     {
       "concept": "Studio",
