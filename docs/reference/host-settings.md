@@ -656,6 +656,11 @@ does not read `Quotas:Defaults` yet.
 | `Cell:BackupStorage:Bucket` | Admin | The bucket that receives `<tenant id>/<yyyy-mm-dd>.axisbak`. |
 | `Cell:BackupStorage:AccessKeyId` | Admin | The access key id of the service. |
 | `Cell:BackupStorage:SecretAccessKey` | Admin | The secret access key of the service. It is never printed. |
+| `Cell:ExportStorage:ServiceUrl` | Publisher | The address of the S3-compatible service that the `export` job of the publisher uploads the ZIP of a [tenant export](tenant-lifecycle.md#exporting-a-tenant) to. Only the `export` job reads the five `Cell:ExportStorage` settings. When one is blank, the publisher still starts and runs its other jobs, and the `export` job fails with a message that names the setting. |
+| `Cell:ExportStorage:Region` | Publisher | The signing region of that service. |
+| `Cell:ExportStorage:Bucket` | Publisher | The bucket that receives `exports/<tenant id>/<job id>.zip`, stored with server-side encryption (`AES256`). |
+| `Cell:ExportStorage:AccessKeyId` | Publisher | The access key id of the service. |
+| `Cell:ExportStorage:SecretAccessKey` | Publisher | The secret access key of the service. It is never printed. |
 | `Cell:RuntimeDatabaseHost` | Server, worker | The address of every tenant's runtime database connection, such as PgBouncer, see [connections](cells.md#connections). Those connections also take `Maximum Pool Size=5`, `Minimum Pool Size=0`, `Connection Idle Lifetime=60` and `Max Auto Prepare=0`. Without it each connection uses the host of the tenant's directory row. The schema role, the publisher, the worker's `LISTEN` connection and the platform connections never use it. |
 | `Cell:RuntimeDatabasePort` | Server, worker | The port of that address. It defaults to the port of the tenant's directory row. Setting it without `Cell:RuntimeDatabaseHost` stops the start. |
 | `Quotas:Defaults:<quota>` | All hosts | The default of each [quota](tenant-quotas.md#quotas). |

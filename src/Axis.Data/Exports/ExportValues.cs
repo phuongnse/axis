@@ -1,14 +1,14 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 
-namespace Axis.Server.Exports;
+namespace Axis.Data.Exports;
 
 /// <summary>
 /// The machine form of a value in an export file: ISO dates and instants, numbers as text with a dot
 /// and every stored digit, enum values and not their labels, <c>true</c> and <c>false</c>, a file as
 /// its name, and a reference as the display value of its target.
 /// </summary>
-internal static class ExportValues
+public static class ExportValues
 {
     private const string ReferencesSeparator = "; ";
 

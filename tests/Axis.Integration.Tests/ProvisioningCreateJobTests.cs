@@ -164,9 +164,9 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
                 ? step
                 : step with
                 {
-                    RunAsync = (tenantId, input, ct) => ++activations == 1
+                    RunAsync = (jobId, tenantId, input, ct) => ++activations == 1
                         ? throw new InvalidOperationException("The activation broke.")
-                        : step.RunAsync(tenantId, input, ct),
+                        : step.RunAsync(jobId, tenantId, input, ct),
                 })
             .ToList();
         var kinds = new Dictionary<string, IReadOnlyList<JobStep>> { ["create"] = steps };
