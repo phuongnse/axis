@@ -33,7 +33,8 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
   `Tenancy:RefreshInterval`, and answer a tenant's effective quota from them.
 - **Who sets them.** The operator sets a tenant's quotas through the
   [provisioning API](tenant-lifecycle.md#provisioning-api), and each change writes a platform audit
-  record that names the keys of the request.
+  record that names the keys of the request. The [create route](tenant-lifecycle.md#creating-a-tenant)
+  can also set the first rows.
 - **The operator as actor** _(planned for M31)_. The audit record of a quota change names the operator
   or the machine caller in its `actor` column.
 - **From a plan** _(planned for M34)_. The [control plane](control-plane.md) writes a SaaS tenant's

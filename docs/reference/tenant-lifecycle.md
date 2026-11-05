@@ -110,9 +110,10 @@ over the schema role.
 
 ## Creating a tenant
 
-`POST /api/cell/tenants` takes `{ "id", "application", "administrator" }` and queues a `create` job
-with five steps, all `pending`. The job keeps the request's `application` and `administrator` in its
-`input`, which the job read never returns.
+`POST /api/cell/tenants` takes `{ "id", "application", "administrator", "quotas" }` and queues a
+`create` job with five steps, all `pending`. `quotas` is optional. The job keeps the request's
+`application`, `administrator` and `quotas`, when the request has them, in its `input`, which the job
+read never returns.
 
 - **`id`** follows the rule of [`tenant create`](administration.md#tenant-create): 1 to 50 lowercase
   letters, digits and hyphens, and not `master`. A bad id answers `400`. An id that a directory row
@@ -124,13 +125,20 @@ with five steps, all `pending`. The job keeps the request's `application` and `a
   `application` step takes the newest version.
 - **`administrator`** is the email of the person invited as the tenant's first administrator. A value
   that is not an email answers `400`.
-- **`quotas`** _(planned for M33)_. An optional `quotas`, which the `tenant` step writes as the
-  tenant's quota rows, so a tenant of the [sign-up](sign-up.md#provisioning) never runs with the
-  cell's defaults.
+- **`quotas`** is optional and has the shape of the `set` object of
+  [`PUT /api/cell/tenants/{id}/quotas`](#routes): a flat object that maps a quota key to a number, or
+  to `null` for no limit, such as `{ "users": 10, "storage": null }`. The `tenant` step writes one
+  [quota](tenant-quotas.md#quotas) row for each key, in the transaction that writes the directory
+  entry, so a tenant of the [sign-up](sign-up.md#provisioning) never runs with the cell's defaults.
+  A tenant created without `quotas`, or with `{}`, has no rows and uses the cell's defaults. An
+  unknown key or a negative value answers `422` and queues no job. A `quotas` that is not an object
+  of numbers is a body that cannot be read and answers `400`. A rerun of the `tenant` step replaces
+  the tenant's rows with the given ones when the job has `quotas`, and leaves them alone when it has
+  none.
 - **The cap.** A cell at its cap answers `409`, see [cell size](cells.md#cell-size).
 - **Order of the checks.** The route needs an `Idempotency-Key` header, see
   [idempotency](#provisioning-api). The checks run in this order: the header (`400`), the replay of
-  the first job or `422`, the body (`400`), then the id and the cap (`409`). A retry with the same key
+  the first job or `422`, the body (`400`), the quotas (`422`), then the id and the cap (`409`). A retry with the same key
   and body answers the first job again, even after the tenant exists.
 - **One at a time.** A cell-wide advisory lock covers the id check and the cap check, so two parallel
   creates cannot both pass. `Axis.Admin tenant create` does not take that lock.
@@ -139,7 +147,8 @@ The publisher runs the job's steps in order, see the [create job](administration
 
 1. `tenant`: create the tenant as `tenant create` does, with the host `<id>.<Cell:TenantDomain>`, its
    realm, its keys and its backup key, see
-   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell), and write the quota rows of
+   the job's `quotas`.
 2. `application`: copy the application into the tenant's Studio folder,
    `<Studio:ApplicationsPath>/<tenant id>/`, as Studio creates one from a template.
 3. `activate`: activate the application's first release in the tenant.

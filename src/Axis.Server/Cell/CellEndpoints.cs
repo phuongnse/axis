@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Amazon.S3;
 using Axis.Administration;
 using Axis.Configuration.Templates;
@@ -147,6 +148,9 @@ internal static partial class CellEndpoints
     private const int MaxHostLabelLength = 63;
 
     private static readonly TimeSpan _hostRequestWindow = TimeSpan.FromDays(7);
+
+    private static readonly JsonSerializerOptions _createJobInputOptions =
+        new(JsonSerializerOptions.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
     public static void MapCellEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -535,7 +539,12 @@ internal static partial class CellEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: problem);
         }
 
-        var id = request!.Id!;
+        if (QuotaValueProblem(request!.Quotas ?? []) is { } quotaProblem)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: quotaProblem);
+        }
+
+        var id = request.Id!;
 
         // One lock for the whole cell covers the id check and the cap check, so two creates cannot both pass. It comes after the
         // key lock in every request, which is one fixed order.
@@ -560,7 +569,8 @@ internal static partial class CellEndpoints
             }
         }
 
-        var input = JsonSerializer.Serialize(new { request.Application, request.Administrator }, JsonSerializerOptions.Web);
+        var input = JsonSerializer.Serialize(
+            new CellCreateJobInput(request.Application, request.Administrator, request.Quotas), _createJobInputOptions);
         var job = NewJob("create", id, httpContext, key, hash, input);
         platform.Jobs.Add(job);
         await platform.SaveChangesAsync(cancellationToken);
@@ -816,20 +826,26 @@ internal static partial class CellEndpoints
             return "The request must set or remove at least one quota.";
         }
 
-        var unknown = set.Keys.Concat(remove).Where(key => key is null || !QuotaKeys.All.Contains(key)).ToList();
+        if (QuotaValueProblem(set, remove) is { } problem)
+        {
+            return problem;
+        }
+
+        var both = remove.FirstOrDefault(set.ContainsKey);
+        return both is null ? null : $"'{both}' is both set and removed.";
+    }
+
+    // The checks of one quota value map, shared by the quotas route and the create route. Removed keys are checked as well.
+    private static string? QuotaValueProblem(Dictionary<string, long?> values, IEnumerable<string>? removed = null)
+    {
+        var unknown = values.Keys.Concat(removed ?? []).Where(key => key is null || !QuotaKeys.All.Contains(key)).ToList();
         if (unknown.Count > 0)
         {
             return $"'{unknown[0]}' is not a quota. The quotas are {string.Join(", ", QuotaKeys.All)}.";
         }
 
-        var negative = set.FirstOrDefault(entry => entry.Value < 0).Key;
-        if (negative is not null)
-        {
-            return $"The value of '{negative}' must be zero or more, or null for no limit.";
-        }
-
-        var both = remove.FirstOrDefault(set.ContainsKey);
-        return both is null ? null : $"'{both}' is both set and removed.";
+        var negative = values.FirstOrDefault(entry => entry.Value < 0).Key;
+        return negative is null ? null : $"The value of '{negative}' must be zero or more, or null for no limit.";
     }
 
     private static async Task<Dictionary<string, CellQuotaResponse>> ReadQuotasAsync(
@@ -933,8 +949,14 @@ internal sealed record CellQuotaResponse(long? Value, bool Overridden);
 /// <summary>The effective quotas of a tenant, keyed by quota key.</summary>
 internal sealed record CellQuotasResponse(IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
 
-/// <summary>The body of the create route. A missing or wrongly typed member is null and answers <c>400</c>.</summary>
-internal sealed record CellCreateTenantRequest(string? Id, string? Application, string? Administrator);
+/// <summary>
+/// The body of the create route. A missing or wrongly typed member is null and answers <c>400</c>. <c>Quotas</c> maps a quota key to
+/// its value, where <c>null</c> is no limit, and is null when the tenant uses the cell's defaults.
+/// </summary>
+internal sealed record CellCreateTenantRequest(string? Id, string? Application, string? Administrator, Dictionary<string, long?>? Quotas);
+
+/// <summary>The input the create route stores on the create job. <c>Quotas</c> is left out when the request had none.</summary>
+internal sealed record CellCreateJobInput(string? Application, string? Administrator, Dictionary<string, long?>? Quotas);
 
 /// <summary>The body of the host request route. A missing or wrongly typed host is null and answers <c>400</c>.</summary>
 internal sealed record CellHostRequest(string? Host);
