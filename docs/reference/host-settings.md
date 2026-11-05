@@ -154,7 +154,7 @@ and a JSON view, and shows the diagnostics.
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **In a cell.** The publisher also reads this setting for the create job, which copies a template into the tenant's folder. When `Cell:Id` is set, each tenant's applications are under
+- **In a cell.** The publisher also reads this setting for the create job, which copies a template into the tenant's folder, and for the purge job, which deletes it. When `Cell:Id` is set, each tenant's applications are under
   `<Studio:ApplicationsPath>/<tenant id>/`, and Studio on a tenant's host reads, writes and creates
   only there. Studio creates the folder the first time it uses it. Another tenant's application, by
   name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
@@ -524,11 +524,11 @@ for `tenant create` and `tenant restore`. `migrate`, `tenant suspend`, `tenant r
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`, and the publisher reads it in a cell for the create job. Outside Development and Testing, every command refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`, and the publisher reads it in a cell for the create and purge jobs. Outside Development and Testing, every command refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 
 As an environment variable it is `Admin__ConnectionString`.
 
-`tenant create` of a main tenant also reads three settings for the identity provider, and so does the publisher in a cell, for the create job. See
+`tenant create` of a main tenant also reads three settings for the identity provider, and so does the publisher in a cell, for the create and purge jobs. See
 [administration](administration.md#settings) and [Axis's identity provider](identity-provider.md#keeping-the-realm-in-step).
 A preview tenant reads none of them.
 

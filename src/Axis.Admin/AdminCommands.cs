@@ -1388,12 +1388,15 @@ internal static partial class AdminCommands
                 quotas)),
         };
 
-        // The create job runs in a cell only: outside one, the provisioning API answers 404, so no create job is queued.
+        // The create and purge jobs run in a cell only: outside one, the provisioning API answers 404, so no create job is queued and no delete job
+        // sets delete_after.
         if (cell.IsCell)
         {
+            var createSettings = ReadCreateJobSettings(configuration, cell, settings);
             jobs = new Dictionary<string, IReadOnlyList<JobStep>>(jobs)
             {
-                ["create"] = CreateJob.Steps(ReadCreateJobSettings(configuration, cell, settings), http, output, error),
+                ["create"] = CreateJob.Steps(createSettings, http, output, error),
+                [PurgeJob.Kind] = PurgeJob.Steps(createSettings.Create, createSettings.ApplicationsPath, settings.Platform.PlatformConnectionString, settings.Platform.Cipher, http),
             };
         }
 
