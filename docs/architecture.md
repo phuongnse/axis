@@ -462,9 +462,10 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
   screenshot and a text to the test: the page URL, the console output, the page errors and the failed
   requests since the step began, the load of the machine and its busiest processes. In
   `purchase-request-release.spec.ts` it wraps `editInStudio`, the edit of `texts/en.json` through
-  Studio's JSON view in the edit-to-rollback journey, and `openStudio`, which opens Studio before a
-  publish, each with a limit of 60 seconds. The other journeys of that spec write their changed files
-  through the Studio resource API, without the browser.
+  Studio's JSON view in the journey from an edit to activating an earlier release, and
+  `openStudio`, which opens Studio before a publish, each with a limit of 60 seconds. The other
+  journeys of that spec write their changed files through the Studio resource API, without the
+  browser.
 
 ### Shared test services
 

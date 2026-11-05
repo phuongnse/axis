@@ -25,7 +25,7 @@ Studio shows its test controls. Their defaults, environment variables and behavi
 | `Studio:Folders`          | The application folders that Studio edits                                                                                | Studio edits only the applications of `Studio:ApplicationsPath` |
 | `Studio:ApplicationsPath` | The folder where Studio [creates applications](#creating-an-application), whose application subfolders Studio also lists | Studio cannot create an application                             |
 | `Studio:AuthorRole`       | The roles claim value that may use the API. Application policies play no part, because an author edits them              | Nobody may author                                               |
-| `Studio:PublisherRole`    | The roles claim value that may `publish` and `rollback`, on top of the author role                                       | Nobody may publish or roll back                                 |
+| `Studio:PublisherRole`    | The roles claim value that may `publish` and `rollback`, on top of the author role                                       | Nobody may publish or activate a release                        |
 | `Studio:Tests`            | Whether Studio shows its test controls                                                                                   | Off                                                             |
 
 Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set. When it is off,
@@ -266,7 +266,7 @@ templates answers no `404` and no `409`. The other routes differ:
 | Validate                                    | Unknown application                                                                         | The manifest has no UUID `id`                                                                            |
 | Publish                                     | Unknown application                                                                         | The manifest has no UUID `id`                                                                            |
 | Preview                                     | Unknown application                                                                         | This tenant has no served preview tenant, or the manifest has no UUID `id`                               |
-| Rollback                                    | Unknown application, or a release not in the tenant's history                               | Not used                                                                                                 |
+| Activate                                    | Unknown application, or a release not in the tenant's history                               | Not used                                                                                                 |
 | Request status                              | Unknown application or request                                                              | Not used                                                                                                 |
 | Release history                             | Unknown application                                                                         | Not used                                                                                                 |
 
@@ -652,24 +652,25 @@ references is saved, and the diagnostics list the broken references.
 
 ## Publishing
 
-An author validates, publishes, previews, tests and rolls back an application from Studio. The server
-holds no tenant schema connection and never activates in its own process: it stores a **publish
-request** in the tenant database, and a separate [publisher](administration.md#publisher) runs it
-with the tenant's schema role. The tables are in
+An author validates, publishes, previews and tests an application from Studio, and activates any
+release of its history. The server holds no tenant schema connection and never activates in its own
+process: it stores a **publish request** in the tenant database, and a separate
+[publisher](administration.md#publisher) runs it with the tenant's schema role. The tables are in
 [publish requests and release history](storage.md#publish-requests-and-release-history).
 
 A request runs for the tenant of the author's session, so Studio on a tenant's host publishes to that
 tenant only.
 
-| Method and path                                              | Response                                                                                                                                                                                                                      |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/studio/apps/{application}/validate`               | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role                                                                                                                              |
-| `POST /api/studio/apps/{application}/publish`                | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role                                               |
-| `POST /api/studio/apps/{application}/preview`                | `202` with the request and a `Location` header. It needs the author role only, and answers `409` when the tenant has no preview tenant, see [Preview](#preview)                                                               |
-| `POST /api/studio/apps/{application}/test`                   | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`, and none or an empty list means every scenario. It needs the author role only, see [Test](#test) |
-| `GET /api/studio/apps/{application}/requests/{id}`           | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes                                                                                                                                    |
-| `GET /api/studio/apps/{application}/releases`                | `200` with the activation history, newest first, and which release is active, see [Release history](#release-history)                                                                                                         |
-| `POST /api/studio/apps/{application}/releases/{id}/rollback` | `202` with the request and a `Location` header. It needs the author role and the publisher role, see [Rollback](#rollback)                                                                                                    |
+| Method and path                                                                  | Response                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/studio/apps/{application}/validate`                                   | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role                                                                                                                              |
+| `POST /api/studio/apps/{application}/publish`                                    | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role                                               |
+| `POST /api/studio/apps/{application}/preview`                                    | `202` with the request and a `Location` header. It needs the author role only, and answers `409` when the tenant has no preview tenant, see [Preview](#preview)                                                               |
+| `POST /api/studio/apps/{application}/test`                                       | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`, and none or an empty list means every scenario. It needs the author role only, see [Test](#test) |
+| `GET /api/studio/apps/{application}/requests/{id}`                               | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes                                                                                                                                    |
+| `GET /api/studio/apps/{application}/releases`                                    | `200` with the activation history, newest first, and which release is active, see [Release history](#release-history)                                                                                                         |
+| `POST /api/studio/apps/{application}/releases/{id}/rollback`                     | `202` with the request and a `Location` header. It needs the author role and the publisher role, see [Activating a release](#activating-a-release)                                                                            |
+| `POST /api/studio/apps/{application}/releases/{id}/activate` _(planned for M31)_ | Replaces `.../rollback`, with the same request, rules and answer, and the publish request kind `rollback` becomes `activate`                                                                                                  |
 
 `validate`, `preview` and `rollback` take no body, and a body that is sent is ignored. A `publish`
 without a body stores no label and no note, and a `test` without a body runs every scenario. A body
@@ -835,7 +836,7 @@ stateDiagram-v2
 
 `GET .../releases` answers the application's activations in this tenant, newest first, as
 `{ active: { releaseId, number, contentHash }, folderContentHash, changes, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`.
-The publisher writes the rows of a publish and a rollback.
+The publisher writes the rows of a `publish` and a `rollback` request.
 
 - **`active`** is the application's active release in this tenant, or null when there is none.
 - **`folderContentHash`** is the content hash that the folder would compile to now, so Studio can show
@@ -845,7 +846,7 @@ The publisher writes the rows of a publish and a rollback.
   `removed`. A removed file has the other fields from the active release and its texts, and `titles`
   is null without a label text key. Files are read one by one, without scenarios and modules' copies.
   `changes` is null with no active release.
-- **Items.** Each item is one activation: a startup, an `axis-admin activate`, a publish or a rollback.
+- **Items.** Each item is one activation: a startup, an `axis-admin activate`, a publish or a `rollback`.
   `actor` is a user id, `startup` or `operator`, and a row that a migration added for a release that
   was live before the history existed has the actor `unknown`. `actorName` is the actor's name from
   their [user profile](notifications.md#user-profiles), else the name stored with the activation, else
@@ -862,35 +863,27 @@ The publisher writes the rows of a publish and a rollback.
 - **No copies.** Activating the release that is already active adds no row and keeps the number, so
   that every restart under `scripts/dev.sh` does not fill the history with copies.
 
-### Rollback
+### Activating a release
 
-A `rollback` request names a release from the history and makes it the active release again. The
-publisher activates the stored release as it is, without compiling it again: it rebuilds the release's
-model from its stored files, never from the folder, and stores no new release.
+A `rollback` request makes a release from the history live again, back to an older release or
+forward to a newer one. The publisher activates it as it is, without compiling it again: it rebuilds
+the release's model from its stored files, never from the folder, and stores no new release.
 
-- **The activation.** It records an activation with the rollback's actor, which is the requesting
+- **The activation.** It records an activation with the request's actor, which is the requesting
   user, and the request id, with no label and no note.
-- **Running instances.** Instances that are already pinned to a newer release keep running on it, and
-  new starts use the rolled-back release.
-- **Seeds.** A rollback runs the `seed` step of the release as well, so its schedule triggers and seed
-  records are the ones of the release that is live. Records that the newer release created stay in
-  place, and seeds with `sync` go back to the values of the older release.
-- **The folder.** A rollback does not change the folder. Studio shows when the active release does not
-  match the folder, with `folderContentHash`.
-- **The active release.** Rolling back to the release that is already active succeeds and adds no row.
+- **Running instances.** Instances that are already pinned to another release keep running on it,
+  and new starts use the activated release.
+- **Seeds.** Activating a stored release runs the `seed` step of the release as well, so its schedule
+  triggers and seed records are the ones of the release that is live. Records that the release that
+  was live created stay in place, and seeds with `sync` take the values of the activated release.
+- **The folder.** Activating a stored release does not change the folder. Studio shows when the
+  active release does not match the folder, with `folderContentHash`.
+- **The active release.** Activating the release that is already active succeeds and adds no row.
 
-A rollback is refused, and the request ends `failed`, in these cases:
-
-| Case                                                                                                                           | Code      |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------- |
-| A migration that was applied after that release is missing from it, see [applied migrations](migrations.md#applied-migrations) | `AXC0174` |
-| An extension package version that the release pins is no longer installed                                                      | `AXC0146` |
-
-These are the codes that activation gives for the same causes. A rollback also gets every other
-refusal of activation, because those checks protect stored data. For example, rolling back past a
-release that added a field is refused with `AXC0015`, because the column has no field in the older
-release. So a rollback is possible only across releases that did not change the storage. A refused
-rollback changes nothing: the active release and the history stay as they were.
+Activating a stored release is refused, and the request ends `failed`, in the cases of
+[refusals to activate a stored release](storage.md#refusals-to-activate-a-stored-release), and with
+every other refusal of activation. A refused activation changes nothing: the active release and the
+history stay as they were.
 
 ### Audit
 

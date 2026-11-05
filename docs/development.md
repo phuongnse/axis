@@ -624,7 +624,7 @@ Each sample uses development users of the `axis` realm, in a site of its own, an
   under `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at
   http://localhost:5173/studio. Studio saves into those committed folders, so
   `git checkout -- samples/apps` reverts an edit. The `publisher` role lets the authoring API publish,
-  shows **Publish** on the Studio page and allows rollback from the release history.
+  shows **Publish** on the Studio page and allows activating a release from the release history.
 - **Signing in.** Under `scripts/dev.sh` and in the E2E run, the server signs people in through Keycloak at
   `/api/auth/sign-in`, and the session then answers `GET /api/me`. Opening the home page without a
   session starts sign-in at once, and the header offers sign-in on other pages and sign-out once
