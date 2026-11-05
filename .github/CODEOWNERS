@@ -9,4 +9,6 @@
 /scripts/lib/accepted-findings.mjs @phuongnse
 /scripts/check-docs.mjs @phuongnse
 /scripts/check-raw-html.mjs @phuongnse
+/scripts/check-shared-widgets.mjs @phuongnse
+/scripts/shared-widgets-baseline.json @phuongnse
 /scripts/check-prototype-pollution.mjs @phuongnse

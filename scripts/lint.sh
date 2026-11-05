@@ -19,6 +19,10 @@ node scripts/check-locators.mjs
 # The SPA shows every value as text and never writes one into the page as HTML (ASVS V1.2.1, V3.2.2).
 node scripts/check-raw-html.mjs
 
+# The SPA draws a button, a table and a tag with the platform's shared widgets and tokens, not with the library's own
+# (AGENTS.md: one concern has one mechanism). The code that predates this check is counted in a baseline that only goes down.
+node scripts/check-shared-widgets.mjs
+
 # The SPA has no code that a key such as __proto__ can turn into prototype pollution (ASVS V15.3.6).
 node scripts/check-prototype-pollution.mjs
 

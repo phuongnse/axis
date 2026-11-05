@@ -45,11 +45,14 @@ A host runs as a cell when `Cell:Id` is set, see [cell settings](host-settings.m
   1. The cell answers with a verification token. The customer adds the DNS record
      `_axis-verify.<host>` of type `TXT` with that token, and a `CNAME` of the host to the
      tenant's subdomain.
-  2. A cell job looks the record up every 10 minutes for 7 days. When it matches, the host is
-     `verified`. After 7 days without a match the request expires.
+  2. The [publisher](administration.md#publisher) looks the record up every `Cell:HostCheckInterval`,
+     10 minutes by default, for 7 days. When it matches, the host is `verified`. After 7 days without
+     a match the request expires. Step 2 is built.
   3. Only then does the cell create a cert-manager `Certificate` for the host, with the HTTP-01
      challenge, and add the host to the tenant, which keeps the realm's redirect addresses in step
-     as `tenant host add` does.
+     as `tenant host add` does. The adding and the redirect addresses are built, and the
+     certificate is _(planned for M31)_. A verified host is in the directory, but the ingress has no
+     route or certificate for it yet.
   4. A host that is not verified is never served: the ingress has no route for it, and the server
      answers `404` for it, as for any unknown host.
   - A host that a deleted tenant used is held back for 90 days, see
