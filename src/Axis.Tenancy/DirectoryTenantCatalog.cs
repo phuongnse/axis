@@ -8,8 +8,8 @@ using Npgsql;
 namespace Axis.Tenancy;
 
 /// <summary>
-/// The tenant catalog read from the tenant directory, the <c>directory</c> source. It holds the active tenants
-/// read at one moment, and the hosts of the other tenants, which resolve no tenant but are known. Each password and secret stays encrypted in memory and is decrypted only when a
+/// The tenant catalog read from the tenant directory, the <c>directory</c> source. It holds the served tenants, the active and
+/// the read-only ones, read at one moment, and the hosts of the other tenants, which resolve no tenant but are known. Each password and secret stays encrypted in memory and is decrypted only when a
 /// connection opens, the sign-in client is set up, a binding is resolved, an email is sent or the realm is synced.
 /// </summary>
 public sealed class DirectoryTenantCatalog : ITenantCatalog
@@ -58,7 +58,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
 
     public TenantEntry? FindByHost(string host) => _tenantsByHost.GetValueOrDefault(host);
 
-    /// <summary>Whether the host belongs to a tenant of the directory that is not active, or was withheld.</summary>
+    /// <summary>Whether the host belongs to a tenant of the directory that is not served, or was withheld.</summary>
     public bool IsUnavailableHost(string host) => _unavailableHosts.Contains(host);
 
     /// <summary>
@@ -201,7 +201,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             hosts = await context.TenantHosts.AsNoTracking()
                 .OrderBy(host => host.Host)
                 .ToListAsync(cancellationToken);
-            var ids = tenants.Where(IsActive).Select(tenant => tenant.Id).ToArray();
+            var ids = tenants.Where(IsServed).Select(tenant => tenant.Id).ToArray();
             bindings = await context.TenantBindings.AsNoTracking()
                 .Where(binding => ids.Contains(binding.TenantId))
                 .ToListAsync(cancellationToken);
@@ -217,7 +217,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             throw new InvalidOperationException("The tenant directory could not be read over ConnectionStrings:Platform.", exception);
         }
 
-        var active = tenants.Where(IsActive).ToList();
+        var active = tenants.Where(IsServed).ToList();
         var problems = new List<string>();
         foreach (var tenant in active.OrderBy(tenant => tenant.Id, StringComparer.Ordinal))
         {
@@ -260,7 +260,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 platformProviders.Where(provider => provider.TenantId == (row.PreviewOf ?? row.Id))), StringComparer.Ordinal));
     }
 
-    private static bool IsActive(TenantRow row) => row.Status == "active";
+    // An active tenant and a read-only tenant are served. A read-only tenant answers requests, and its entry says so.
+    private static bool IsServed(TenantRow row) => row.Status is "active" or "readOnly";
 
     // Compares the stored encrypted password, so nothing is decrypted to tell whether the database settings changed.
     private static string DatabaseKey(TenantRow row) =>
@@ -400,7 +401,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             realmProviders,
             hostSites,
             Quotas(quotaRows),
-            legal);
+            legal,
+            row.Status == "readOnly");
     }
 
     // The privacy and terms links of a tenant row with the rows of its sites, or null when the tenant sets none. Legal

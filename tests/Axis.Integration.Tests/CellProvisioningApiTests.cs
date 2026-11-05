@@ -615,6 +615,51 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task Read_only_queues_a_job_that_the_runner_finishes_with_one_audit_record_naming_the_operator_and_a_caller_without_the_role_gets_403_and_no_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        using var none = await PostJobAsync(client, "/api/cell/tenants/b/read-only", token: null, "read-only-none");
+        using var noRole = await PostJobAsync(client, "/api/cell/tenants/b/read-only", noRoleToken, "read-only-b");
+        using var preview = await PostJobAsync(client, "/api/cell/tenants/a-preview/read-only", token, "read-only-preview");
+        using var unknown = await PostJobAsync(client, "/api/cell/tenants/nobody/read-only", token, "read-only-nobody");
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+
+        using var readOnly = await PostJobAsync(client, "/api/cell/tenants/b/read-only", token, "read-only-b");
+        Assert.Equal(HttpStatusCode.Accepted, readOnly.StatusCode);
+        var queued = await readOnly.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("read-only", queued.GetProperty("kind").GetString());
+        Assert.Equal("b", queued.GetProperty("tenantId").GetString());
+        Assert.Equal("queued", queued.GetProperty("state").GetString());
+        var jobId = queued.GetProperty("id").GetGuid();
+        Assert.True(await RunJobAsync());
+
+        using var tenant = await GetAsync(client, "/api/cell/tenants/b", token);
+        Assert.Equal("readOnly", (await tenant.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+        using var read = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", token);
+        var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("succeeded", job.GetProperty("state").GetString());
+        Assert.Equal("status", Assert.Single(job.GetProperty("steps").EnumerateArray()).GetProperty("name").GetString());
+
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT command, tenant_id, actor FROM platform.audit_records WHERE changed = ARRAY[@changed]", connection);
+        command.Parameters.AddWithValue("changed", $"job:{jobId:D}");
+        await using var records = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await records.ReadAsync(CancellationToken));
+        Assert.Equal(("tenant read-only", "b", new JsonWebToken(token).Subject), (records.GetString(0), records.GetString(1), records.GetString(2)));
+        Assert.False(await records.ReadAsync(CancellationToken));
+    }
+
+    [Fact]
     public async Task Delete_queues_a_job_that_suspends_the_tenant_and_its_preview_and_sets_the_deletion_date_7_days_ahead_and_the_reads_answer_deleting()
     {
         await using var factory = await StartAsync();

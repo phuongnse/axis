@@ -27,6 +27,7 @@ public sealed class AdminPlatformAuditTests(PostgreSqlFixture database) : IClass
 
         Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
         await AddBindingsAsync(scenario, id);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "read-only", id])).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "suspend", id])).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", id])).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["migrate", "--tenant", id])).Exit);
@@ -43,6 +44,7 @@ public sealed class AdminPlatformAuditTests(PostgreSqlFixture database) : IClass
                 ("migrate", id),
                 ("tenant backup", id),
                 ("tenant create", id),
+                ("tenant read-only", id),
                 ("tenant restore", restored),
                 ("tenant resume", id),
                 ("tenant suspend", id),

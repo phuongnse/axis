@@ -39,7 +39,7 @@ implementation.
   code as the `Axis.Admin` command, over the schema role. `GET /api/cell/jobs/{id}` answers the job,
   with `state` `queued`, `running`, `succeeded` or `failed`, its steps, and the error of a failed
   step. A failed job can be run again, and it skips the steps already done, as `tenant create` does.
-  The `platform.jobs` table and the runner in the publisher are built for the `suspend`, `resume`, `delete`, `cancel-deletion` and `purge` kinds. The first two have one
+  The `platform.jobs` table and the runner in the publisher are built for the `suspend`, `resume`, `read-only`, `delete`, `cancel-deletion` and `purge` kinds. The first three have one
   `status` step each, `delete` has one `schedule` step, `cancel-deletion` has one `cancel` step and `purge` has the eight steps of [deleting a tenant](#deleting-a-tenant). No route queues a `purge` job: the publisher does. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
   A step may take a lease of the tenant first, as the `export` step does. A wait for a lease uses no claim: it adds to the
@@ -56,7 +56,7 @@ implementation.
   the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.
   A key is shared across the cell, not kept for each caller. A lock on the key keeps two parallel retries from queuing two jobs.
 - **Audit.** Each job writes one platform audit record when it ends, with the operator or the
-  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend`, `resume`, `delete`, `cancel-deletion` and `purge` is built: it writes the
+  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend`, `resume`, `read-only`, `delete`, `cancel-deletion` and `purge` is built: it writes the
   record in the same transaction as the job's final state, whether the job succeeded or failed, with the command name of the
   matching `Axis.Admin` command and `job:<id>` in `changed`. A refused call writes a log
   event, not a record _(planned for M31)_.
@@ -71,7 +71,7 @@ implementation.
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
 | `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does, through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`. |
 | `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does, through a job. It answers as `suspend` does. |
-| `POST /api/cell/tenants/{id}/read-only` | _(planned for M33)_ Makes a tenant read-only, as [`tenant read-only`](tenant-status-commands.md#tenant-read-only) does. `resume` ends it. |
+| `POST /api/cell/tenants/{id}/read-only` | Makes a tenant read-only, as [`tenant read-only`](tenant-status-commands.md#tenant-read-only) does, through a job. It answers as `suspend` does. `resume` ends it. |
 | `GET /api/cell/tenants/{id}/administrators` | _(planned for M33)_ Lists the accounts that hold the [administrator role](user-administration.md#the-administrator-role) in the tenant's realm: email, display name and language. The [control plane](control-plane.md) mails them. |
 | `PUT /api/cell/tenants/{id}/quotas` | Sets or clears the tenant's quota rows, see [quotas](tenant-quotas.md#quotas). The body is `{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }`. A set value of `null` is no limit, a removed key goes back to the cell's default, and a key the body does not name stays as it is. It applies at once, with no job, and answers `200` with the tenant's `quotas` as the tenant read does. An unknown key, a negative value, a key both set and removed, or a body that names no key answers `400` and writes nothing. An unknown tenant id or a preview tenant's id answers `404`. It writes the rows and one [platform audit record](tenant-setting-commands.md#platform-audit-records), `tenant quotas set`, in one transaction, over the schema role: the server opens a connection for the write alone and keeps none in a pool. The hosts apply the new values at their next `Tenancy:RefreshInterval`. |
 | `POST /api/cell/tenants/{id}/hosts` | Asks for a host of the tenant's own, see [hosts](#hosts). |

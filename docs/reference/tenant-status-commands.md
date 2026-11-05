@@ -5,8 +5,7 @@ commands are in [administration](administration.md). The conventions of [archite
 
 ## Tenant suspend
 
-`tenant suspend <id>` sets the status of an `active` tenant, or _(planned for M33)_ a `readOnly`
-one, to `suspended` and raises its `version`.
+`tenant suspend <id>` sets the status of an `active` or a `readOnly` tenant to `suspended` and raises its `version`.
 
 | Option | Meaning |
 | --- | --- |
@@ -24,8 +23,7 @@ write failed. `2` for an unknown tenant.
 
 ## Tenant resume
 
-`tenant resume <id>` sets the status of a `suspended` tenant, or _(planned for M33)_ a `readOnly`
-one, to `active` and raises its `version`.
+`tenant resume <id>` sets the status of a `suspended` or a `readOnly` tenant to `active` and raises its `version`.
 
 | Option | Meaning |
 | --- | --- |
@@ -40,7 +38,7 @@ write failed. `2` for an unknown tenant.
 
 ## Tenant read-only
 
-_(planned for M33)_ `tenant read-only <id>` sets the status of an `active` tenant to `readOnly` and
+`tenant read-only <id>` sets the status of an `active` tenant to `readOnly` and
 raises its `version`, as [D126](../decisions/d126-sign-up-trials-and-the-control-plane.md) agrees.
 The control plane sets it when a trial ends or a payment's grace ends, through the
 [provisioning API](tenant-lifecycle.md#provisioning-api).
@@ -49,11 +47,13 @@ The control plane sets it when a trial ends or a payment's grace ends, through t
 | --- | --- |
 | `<id>` | The tenant id. |
 
-Hosts pick the change up at their next refresh. After that people still sign in and read, and every
-write answers `403` with the reason `tenant-read-only`. The worker claims none of the tenant's new
-work, and work already claimed finishes. What it allows and refuses is in
+Hosts pick the change up at their next refresh. After that the tenant's hosts are still served, and
+each request learns that the tenant is read-only. _(planned for M33)_ People still sign in and read,
+and every write answers `403` with the reason `tenant-read-only`. The worker claims none of the
+tenant's new work, and work already claimed finishes. What it allows and refuses is in
 [the read-only tenant](subscriptions.md#the-read-only-tenant). `tenant resume` sets it `active` again,
-and `tenant suspend` suspends it. Making a `readOnly` tenant read-only is a no-op that exits `0`.
+and `tenant suspend` suspends it. Making a `readOnly` tenant read-only is a no-op that exits `0` and
+does not raise the `version`.
 
 **Exit codes.** `0` on success. `1` when the tenant is `provisioning` or `suspended`, or the write
 failed. `2` for an unknown tenant.
@@ -66,7 +66,7 @@ the id:
 | Column | Meaning |
 | --- | --- |
 | `id` | The tenant id. |
-| `status` | `provisioning`, `active` or `suspended`, and _(planned for M33)_ `readOnly`. |
+| `status` | `provisioning`, `active`, `suspended` or `readOnly`. |
 | `hosts` | The tenant's hosts, separated by commas. A site host shows its path, such as `shop.example.test (shop)`. |
 | `schema version` | The recorded schema version, or `-` when it is empty. |
 | `preview of` | The id of the main tenant, for a preview tenant, or `-` for a main tenant. |

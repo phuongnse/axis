@@ -32,8 +32,8 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     `applications`. Each application has its `id`, `name`, `releaseId` (the active release),
     `releaseNumber` and `releaseLabel` (the number and label of that release in the application's
     release history, as Studio shows them) and `activatedAt`. The applications are the ones with an
-    active release, in name order. The `status` is `active`, because a host serves only active
-    tenants: the hosts of a suspended tenant answer `503`.
+    active release, in name order. The `status` is `active` or `readOnly`, because a host serves
+    only those tenants: the hosts of a suspended tenant answer `503`.
   - **`GET /api/console/failed-work`.** Lists the failed work of the tenant, newest first, in the
     paging shape of the record API (`items`, `page`, `pageSize`, `totalCount`). The parameters are
     `application` (an application id), `page` and `pageSize`, all optional. An invalid one is a

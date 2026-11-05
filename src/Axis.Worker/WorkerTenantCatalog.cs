@@ -78,6 +78,10 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         return new WorkerTenantCatalog(null, platformConnectionString, cipher, refreshInterval, tenantsSectionIgnored, runtimeAddress);
     }
 
+    // The directory serves read-only tenants to the hosts that answer requests, but the worker claims no work for them, as for a suspended tenant.
+    private static DirectoryTenantCatalog WithholdReadOnly(DirectoryTenantCatalog loaded) =>
+        loaded.Withhold([.. loaded.Tenants.Where(tenant => tenant.ReadOnly).Select(tenant => tenant.Id)]);
+
     /// <summary>Reads the active tenants from the tenant directory and keeps them.</summary>
     /// <exception cref="InvalidOperationException">The directory cannot be read. The message holds no connection value.</exception>
     public async Task LoadAsync(CancellationToken cancellationToken)
@@ -87,7 +91,7 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
             return;
         }
 
-        var loaded = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress);
+        var loaded = WithholdReadOnly(await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress));
         _directory = loaded;
         _current = loaded;
     }
@@ -112,7 +116,7 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
         DirectoryTenantCatalog loaded;
         try
         {
-            loaded = await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress);
+            loaded = WithholdReadOnly(await DirectoryTenantCatalog.LoadAsync(_platformConnectionString, _cipher, cancellationToken, _runtimeAddress));
         }
         catch (InvalidOperationException)
         {

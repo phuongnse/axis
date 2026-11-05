@@ -167,7 +167,7 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("jobs", "platform", t =>
                         {
-                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion', 'purge')");
+                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'read-only', 'create', 'export', 'delete', 'cancel-deletion', 'purge')");
 
                             t.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
                         });
@@ -777,7 +777,7 @@ namespace Axis.Tenancy.Platform.Migrations
 
                             t.HasCheckConstraint("ck_tenants_smtp_host", "smtp_host IS NOT NULL OR (smtp_port IS NULL AND smtp_use_tls IS NULL AND smtp_user_name IS NULL AND smtp_password IS NULL)");
 
-                            t.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
+                            t.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended', 'readOnly')");
 
                             t.HasCheckConstraint("ck_tenants_terms_version", "(terms_url IS NULL) = (terms_version IS NULL)");
                         });

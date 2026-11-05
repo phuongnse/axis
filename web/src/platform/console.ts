@@ -20,7 +20,7 @@ export interface ConsoleApplication {
 /** The tenant of the host, as served by `GET /api/console/tenant`. */
 export interface ConsoleTenant {
   id: string
-  status: 'active'
+  status: 'active' | 'readOnly'
   applications: ConsoleApplication[]
 }
 

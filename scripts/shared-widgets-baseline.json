@@ -43,7 +43,6 @@
     "table": 1
   },
   "web/src/pages/ConsolePage.tsx": {
-    "tag": 1,
     "table": 2
   },
   "web/src/pages/ConsoleSchedules.tsx": {
