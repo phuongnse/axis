@@ -106,6 +106,10 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   bản ghi.". A question or advice addressed to the person says "bạn": "Bạn có muốn xóa vai trò này không?", "Bạn nên
   sao lưu trước khi khôi phục.". Axis speaking of itself says "chúng tôi", rarely. Never "người dùng" for the person
   reading, and never "quý khách", "mình" or a familiar tone.
+- **The people who use an application are "người dùng", and are mostly left out.** Studio's help speaks of them often,
+  as English says "people". Leave them out where the sentence needs no subject: "Thông báo hiện ở trường này khi điều
+  kiện không thỏa.", "Tên hiện trong menu và biểu mẫu.". Where it needs one, "người dùng": "Người dùng chọn một người.".
+  Never "mọi người" for them, which reads as a crowd.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
 - **"Hãy" and "Vui lòng" only where they belong.** A validation message, a button or a tooltip takes the bare verb:
   "Nhập tên.", "Chọn loại.". A sentence of guidance may start with "Hãy": "Hãy đăng nhập lại để đổi vai trò.". "Vui lòng"

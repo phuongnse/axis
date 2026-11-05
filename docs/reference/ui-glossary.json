@@ -471,6 +471,18 @@
       "note": "One text in another language, as a label's Translations… dialog shows it. Not a whole language."
     },
     {
+      "concept": "People who use the application",
+      "en": "people",
+      "vi": "người dùng",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "mọi người"
+        ]
+      },
+      "note": "Mostly left out where the sentence needs no subject. The person reading is addressed as \"bạn\"."
+    },
+    {
       "concept": "Role",
       "en": "role",
       "vi": "vai trò",
