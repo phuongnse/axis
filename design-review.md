@@ -200,6 +200,11 @@ owner is reviewing it one step at a time.
   fields with a heading and help, where they had only a placeholder. Every required field is marked, in every form and
   dialog, even where every field is required, such as New resource. Only the sign-in page marks none, as everyone knows
   both its fields are needed. (Changed on 2026-11-05: a short form whose every field was required used to mark none.)
+- **Not translated:** under a text typed in the author's language, a muted line says which languages lack it, as before,
+  but only once the text has words in the author's language, so an empty optional text such as a help says nothing. It
+  names up to two languages, "Not translated into Vietnamese", and counts more, "Not translated into 3 languages", so it
+  stays one short line however many languages the application has; Translations lists them all. `LabelTexts` draws it, so
+  every label of Studio follows it.
 - **Nothing between help and input:** a field is its label, its help and its input. Guidance goes into the help, never on
   a line of its own between them.
 - **A dialog holds only what it edits:** Add module and Edit module have Module, Version, Roles and Connectors, and no
@@ -232,6 +237,9 @@ owner is reviewing it one step at a time.
   entered value. Choosing a way rewrites the field once, through `withValueSource` in `platform/entityFields.ts`, which drops
   the other ways' keys and those only an entered value may have. Dataverse's column Behavior (Simple, Calculated, Rollup) is
   the same idea. `match` and `userId` were edited only in the JSON tab before.
+- **Value before Validation:** the drawer's groups are General, the type's settings, Value, Validation, then Search and
+  privacy. What has an effect comes before what it affects: the type decides which settings there are, and where the value
+  comes from decides whether Required applies.
 - **Matched:** Find by offers only the target entity's unique fields, so `GET .../names` answers `unique` with each field
   (Proposed), and From only this entity's fields of the same type that the compiler allows (AXC0362).
 - **One choice control:** `AxisChoiceField` in `platform/AxisField.tsx` is a choice among a few ways, each with its help, and

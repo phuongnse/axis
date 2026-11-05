@@ -773,10 +773,11 @@ function FieldDrawer({
  * Proposed: a field's settings after General, in groups, each setting with its help, one to a row, and only those its
  * type takes, so a group with none is left out:
  * - the type's settings: the target entity, the values and their labels, the currency, and precision with scale;
+ * - Value: where the value comes from, one choice of the ways the type takes, then only that way's settings: a default
+ *   and whether it holds a user for an entered value, the expression, the sequence, or the match. Proposed: it comes
+ *   before Validation, as the way changes which checks apply, so what has an effect comes before what it affects;
  * - Validation: Required, Unique, the length and the range, each pair on one row, a file's size and media types, then the
  *   rules whose message shows at this field;
- * - Value: where the value comes from, one choice of the ways the type takes, then only that way's settings: a default
- *   and whether it holds a user for an entered value, the expression, the sequence, or the match;
  * - Search and privacy: Searchable, Sensitive and Exact lookup.
  */
 function FieldGroups({
@@ -997,6 +998,11 @@ function FieldGroups({
           {typeSettings}
         </AxisFieldGroup>
       )}
+      {valueSettings.length > 0 && (
+        <AxisFieldGroup title={t('shell.studio.entity.group.value')} testId="studio-field-group-value">
+          {valueSettings}
+        </AxisFieldGroup>
+      )}
       <AxisFieldGroup title={t('shell.studio.entity.group.validation')} testId="studio-field-group-validation">
         {/* Proposed: a value the server sets is never required of people, so Required shows only for an entered value,
             or while the file still has it, for the author to clear. */}
@@ -1010,11 +1016,6 @@ function FieldGroups({
         {has('accept') && tags('accept')}
         <FieldRules fieldName={text(field.name)} validations={validations} readOnly={readOnly} onChange={onChange} />
       </AxisFieldGroup>
-      {valueSettings.length > 0 && (
-        <AxisFieldGroup title={t('shell.studio.entity.group.value')} testId="studio-field-group-value">
-          {valueSettings}
-        </AxisFieldGroup>
-      )}
       {searchSettings.length > 0 && (
         <AxisFieldGroup title={t('shell.studio.entity.group.search')} testId="studio-field-group-search">
           {searchSettings}

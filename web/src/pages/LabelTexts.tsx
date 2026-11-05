@@ -68,7 +68,13 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
     const language = new Intl.DisplayNames([uiLocale], { type: 'language' })
     const nameOf = (locale: string) => language.of(locale) ?? locale
     const primary = names.locales.includes(uiLocale) ? uiLocale : names.locales[0]
-    const missing = names.locales.filter((locale) => locale !== primary && (shown[locale] ?? '').trim() === '')
+    // Proposed: a text is untranslated only once it has words in the author's language, so an empty optional text, such
+    // as a help not written yet, says nothing. Up to two languages are named, and more are counted, so the line stays
+    // short however many languages the application has; Translations lists them all.
+    const missing =
+      (shown[primary] ?? '').trim() === ''
+        ? []
+        : names.locales.filter((locale) => locale !== primary && (shown[locale] ?? '').trim() === '')
     const write = (locale: string, text: string) => {
       setPending(key, { ...shown, [locale]: text })
       if (getAt(value, '/textKey') !== key) {
@@ -99,10 +105,12 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
         />
         {missing.length > 0 && (
           <Typography.Text style={{ color: colour.textMuted, fontSize: 12 }} data-testid="studio-label-missing">
-            {t('shell.studio.translations.missing').replace(
-              '{languages}',
-              new Intl.ListFormat(uiLocale, { type: 'conjunction' }).format(missing.map(nameOf)),
-            )}
+            {missing.length > 2
+              ? t('shell.studio.translations.missingCount').replace('{count}', String(missing.length))
+              : t('shell.studio.translations.missing').replace(
+                  '{languages}',
+                  new Intl.ListFormat(uiLocale, { type: 'conjunction' }).format(missing.map(nameOf)),
+                )}
           </Typography.Text>
         )}
         {others > 0 && (
