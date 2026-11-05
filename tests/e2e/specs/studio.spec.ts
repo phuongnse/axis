@@ -660,4 +660,19 @@ test.describe('Studio on a copy of its own', () => {
       await noPublisher.stop()
     }
   })
+
+  test('an author opens the overview and finds the live sites of the application, each in a new tab', async ({ page }) => {
+    await useSession(page, 'author')
+
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+
+    await expect(page.getByRole('region', { name: 'Get started', exact: true })).toHaveCount(0)
+    const tiles = page
+      .getByRole('region', { name: 'Live', exact: true })
+      .getByRole('link', { name: /opens in a new tab$/ })
+    await expect(tiles.first()).toBeVisible()
+    for (const tile of await tiles.all()) {
+      await expect(tile).toHaveAttribute('target', '_blank')
+    }
+  })
 })

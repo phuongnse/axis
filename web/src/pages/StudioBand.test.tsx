@@ -15,6 +15,7 @@ function diagnostic(severity: 'error' | 'warning', code: string): StudioDiagnost
 const live: StudioReleases = {
   active: { releaseId: 'r7', number: 7, contentHash: 'hash-7' },
   folderContentHash: 'hash-7',
+  changes: null,
   items: [],
 }
 
@@ -85,7 +86,7 @@ describe('StudioBand', () => {
   })
 
   it('says Not published yet when there is no live release', () => {
-    renderBand({ active: null, folderContentHash: null, items: [] })
+    renderBand({ active: null, folderContentHash: null, changes: null, items: [] })
 
     expect(screen.getByText('Not published yet')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-folder-differs')).not.toBeInTheDocument()
@@ -116,7 +117,7 @@ describe('StudioBand', () => {
   it.each([
     ['Release is live', live, []],
     ['Changes not live', { ...live, folderContentHash: 'other' }, []],
-    ['Not published yet', { active: null, folderContentHash: null, items: [] }, []],
+    ['Not published yet', { active: null, folderContentHash: null, changes: null, items: [] }, []],
     ['Releases did not load', 'failed' as const, []],
     ['problems', live, [diagnostic('error', 'AXC1'), diagnostic('warning', 'AXC2')]],
   ])('has no icon and no link in the %s state', (_, history, diagnostics) => {

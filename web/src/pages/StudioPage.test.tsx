@@ -241,7 +241,7 @@ function stubServer(
       return json({ items: resources })
     }
     if (input === `${folder}/releases`) {
-      return json({ active: null, folderContentHash: null, items: [] })
+      return json({ active: null, folderContentHash: null, changes: null, items: [] })
     }
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
@@ -1314,6 +1314,7 @@ describe('StudioPage publishing', () => {
         return json({
           active: { releaseId, number: 3, contentHash: 'hash-3' },
           folderContentHash: 'hash-3',
+          changes: [],
           items: [row(releaseId, 3, '2026-05-02T10:00:00Z'), row('older', 2, '2026-05-01T10:00:00Z')],
         })
       }
