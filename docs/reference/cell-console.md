@@ -114,4 +114,5 @@ The console shows what the operator needs to run the cell, and no business data 
   only. To see the detail, the operator uses the tenant's [operator console](operator-console.md),
   which needs an account in that tenant's realm that the tenant's administrator gives.
 - A tenant secret, key, password or binding value.
-- A tenant user's name or email, except the first administrator's email on the create job.
+- A tenant user's name or email, the first administrator's included, because the console needs none
+  of them.

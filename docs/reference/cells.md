@@ -52,7 +52,7 @@ that it controls the host.
   validation. The DNS provider's token is a Kubernetes Secret of the cell, never a setting. The chart
   renders the Issuer and the Certificate from its `cell.certificate` values, see
   [installation](installation.md#settings-and-secrets).
-- **A host of the tenant's own.** A tenant administrator, or the operator through the
+- **A host of the tenant's own.** The operator, through the
   [provisioning API](tenant-lifecycle.md#hosts), adds a host such as `approvals.acme.vn`, in these
   steps.
   1. The cell answers with a verification token. The customer adds the DNS record
@@ -74,6 +74,8 @@ that it controls the host.
 
   A host that a deleted tenant used is held back for 90 days, see
   [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
+- **A host added by a tenant administrator** _(planned for M33)_. A tenant administrator adds a host
+  of the tenant's own in the same steps.
 - **Routing.** Inside the cell, a request is resolved as on any installation, see
   [request resolution](../architecture.md#request-resolution).
 - **The region directory** _(planned for M33)_. The [region directory](region-directory.md) sends a

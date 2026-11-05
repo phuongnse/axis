@@ -78,6 +78,9 @@ The actions are New resource…, Validate, Preview and Run tests as text buttons
 Publish… as the band's one solid button, see [buttons](actions-and-controls.md#buttons). New resource…
 comes first, so it is never next to Publish….
 
+- **Ask AI** _(planned for M35)_. Ask AI is a text button just before Publish…, and it opens the
+  request panel of [AI authoring in Studio](ai-authoring-in-studio.md).
+
 ## Problems panel
 
 The band's errors and warnings open a Problems panel on the right, under the header and the band. It is
