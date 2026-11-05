@@ -298,6 +298,14 @@ function EntityGeneral({
   const names = useContext(StudioNamesContext)
   const label = useContext(LabelTextsContext)
   const texts = names !== undefined && label !== null && !readOnly
+  const labelText = useLabelText()
+  // Proposed: a field is named by its label, as a person knows it, and by its name only beside it.
+  const labelOf = (option: string) => {
+    const found = (Array.isArray(value.fields) ? value.fields : []).find(
+      (item) => isContent(item) && item.name === option,
+    )
+    return isContent(found) ? labelText(found.label) : null
+  }
   const field = (name: string) => ({
     testId: `studio-field-/${name}`,
     label: t(`shell.studio.field.entity.${name}`),
@@ -344,6 +352,7 @@ function EntityGeneral({
           value={typeof value.displayField === 'string' ? value.displayField : undefined}
           required={false}
           options={fieldNames}
+          labelOf={labelOf}
           block
           onChange={(next) => onChange('/displayField', next)}
         />

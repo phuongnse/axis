@@ -1,5 +1,6 @@
 import { Select, Tag } from 'antd'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 
 /**
  * A searchable choice of the names an application defines. A value that is not one of them stays visible and is
@@ -11,6 +12,7 @@ export function ReferencePicker({
   required,
   options,
   block = false,
+  labelOf,
   onChange,
 }: {
   name: string
@@ -19,9 +21,15 @@ export function ReferencePicker({
   options: string[]
   /** Proposed: fills its column, as an input beside it does, rather than its 240 px. */
   block?: boolean
+  /**
+   * Proposed: the text people know an option by, such as a field's label. The picker shows it first, with the name after
+   * it in textMuted, and the search finds either. The value stays the name. An option with no text shows its name.
+   */
+  labelOf?: (option: string) => string | null
   onChange: (next: string | undefined) => void
 }) {
   const t = useText()
+  const { colour, spacing } = useDesignTokens()
   const current = value === undefined || value === '' ? undefined : value
   const match =
     current === undefined ? undefined : options.find((option) => option.toLowerCase() === current.toLowerCase())
@@ -38,7 +46,21 @@ export function ReferencePicker({
           },
         ]
       : []),
-    ...options.map((option) => ({ value: option, label: option })),
+    ...options.map((option) => {
+      const text = labelOf?.(option)
+      return {
+        value: option,
+        search: text ? `${text} ${option}` : option,
+        label:
+          text && text !== option ? (
+            <span>
+              {text} <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>{option}</span>
+            </span>
+          ) : (
+            option
+          ),
+      }
+    }),
   ]
 
   return (
@@ -46,6 +68,7 @@ export function ReferencePicker({
       aria-label={name}
       showSearch
       virtual={false}
+      optionFilterProp="search"
       allowClear={!required}
       style={block ? { width: '100%' } : { minWidth: 240 }}
       value={match ?? current}

@@ -185,6 +185,14 @@ Last updated 2026-11-05 (merged `main` at fd1bf541). The review is open; the own
 - **For the issue:** a diagnostic inside a field opens at its row; it is to open the drawer at the setting. Reordering by drag
   is still to come.
 
+### A picker names by the label
+
+- **Asked:** wherever a person picks a field or a resource, the choices show its label as text, as the tables do, not its
+  name. The name follows in textMuted so two with the same label differ, the search finds either, and the file keeps the
+  name.
+- **Built:** `ReferencePicker` takes `labelOf`. The entity's Display field uses it first. The pickers of Validations and
+  Indexes and the other pickers of fields and resources are left to follow it.
+
 ### Merge of `main` at fd1bf541, 2026-11-05
 
 `main` built, since the first merge: the size tokens and `AxisTable` (D129), the kind lists, the Releases list, the band, the
