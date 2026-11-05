@@ -1,7 +1,9 @@
-import { Alert, Flex, Typography } from 'antd'
+import { Alert, Flex, Input, Segmented } from 'antd'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
-import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
+import { TableFilterButton, TableFilterChips } from '../platform/TableFilter'
+import { emptyFilter, matchesFilter, searchRows, type FilterField, type FilterGroup } from '../platform/tableControls'
+import { useContext, useEffect, useState } from 'react'
 import {
   fetchResourceReferences,
   ServerUnreachableError,
@@ -24,8 +26,8 @@ type Direction = 'uses' | 'usedBy'
 export type OpenResource = (id: string, path: string | null) => void
 
 /**
- * The Uses and Used by lists of a selected resource, each entry a name that opens it. A load failure shows an alert in
- * their place.
+ * The Dependencies of a selected resource: what uses it and what it uses, each entry a name that opens it. A load
+ * failure shows an alert in their place.
  */
 export function StudioReferences({
   application,
@@ -63,58 +65,139 @@ export function StudioReferences({
   if (!references) {
     return null
   }
-  // Proposed: Uses and Used by are two panels, as the form's sections are, each with its entries in groups by kind: the other resource by its label as the link that opens it, and how the one uses the other, in words. Uses leaves out
-  // what the kind's form already shows, its labels' texts on every kind, and Used by is left out for a kind nothing can
-  // refer to, as it never applies; a panel with nothing left to show is left out. The same resource used the same way
+  // Proposed: the Dependencies tab of a resource, as low-code tools show a component's dependencies: one table at a time,
+  // Used by or Uses, chosen above it. Uses leaves out what the kind's form already shows, its labels' texts on every kind,
+  // and Used by is left out for a kind nothing can refer to, as it never applies. The same resource used the same way
   // shows once.
-  const shown = usesShownByForm[kind] ?? new Set(['text'])
+  const shownByForm = usesShownByForm[kind] ?? new Set(['text'])
   const uses = references.uses.filter(
-    (entry) => !shown.has(entry.node.type === 'resource' ? entry.node.kind : entry.node.type),
+    (entry) => !shownByForm.has(entry.node.type === 'resource' ? entry.node.kind : entry.node.type),
   )
-  const showUses = !(usesShownByForm[kind] && uses.length === 0)
-  const showUsedBy = !neverUsed.has(kind)
-  if (!showUses && !showUsedBy) {
-    return null
+  const directions: Direction[] = [
+    ...(neverUsed.has(kind) ? [] : (['usedBy'] as const)),
+    ...(usesShownByForm[kind] && uses.length === 0 ? [] : (['uses'] as const)),
+  ]
+  if (directions.length === 0) {
+    return <EmptyState text={t('shell.studio.usedBy.none')} />
   }
   return (
-    <Flex vertical gap="middle">
-      {showUses && (
-        <ReferencePanel
-          testId="studio-uses"
-          title={t('shell.studio.uses')}
-          entries={uses}
-          application={application}
-          direction="uses"
+    <ReferenceTable application={application} directions={directions} entries={{ uses, usedBy: references.usedBy }} />
+  )
+}
+
+/**
+ * Proposed: the entries of one direction as the standard table, `AxisTable`: the other resource by its label, the link
+ * that opens it, its kind, and how the one uses the other, sorted by kind in the sidebar's order, then by name. Search
+ * looks in all three, and the filter picks kinds, as every list's do. A choice above the table switches between Used by
+ * and Uses, when both apply.
+ */
+function ReferenceTable({
+  application,
+  directions,
+  entries,
+}: {
+  application: string
+  directions: Direction[]
+  entries: Record<Direction, StudioReference[]>
+}) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const [direction, setDirection] = useState<Direction>(directions[0])
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<FilterGroup>(emptyFilter)
+  const rows = useReferenceRows(entries[direction], application, direction)
+  const collator = nameCollator()
+  const sorted = [...rows].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || collator.compare(a.name, b.name))
+  const kinds = [...new Set(sorted.map((row) => row.kind))]
+  const filterFields: FilterField[] = [
+    {
+      key: 'kind',
+      label: t('shell.studio.references.kind'),
+      type: 'enum',
+      options: kinds.map((kind) => ({ value: kind, label: kind })),
+    },
+  ]
+  const columns: AxisColumn<StudioChangeRow>[] = [
+    {
+      key: 'name',
+      kind: 'freeText',
+      title: t('shell.studio.references.name'),
+      searchText: (row) => row.name,
+      render: (_, row) =>
+        row.to ? (
+          <Link to={row.to} style={{ color: colour.primaryText }}>
+            {row.name}
+          </Link>
+        ) : (
+          row.name
+        ),
+    },
+    {
+      key: 'kind',
+      kind: 'fixed',
+      title: t('shell.studio.references.kind'),
+      searchText: (row) => row.kind,
+      render: (_, row) => row.kind,
+    },
+    {
+      key: 'how',
+      kind: 'freeText',
+      title: t('shell.studio.references.how'),
+      searchText: (row) => row.change,
+      render: (_, row) => row.change,
+    },
+  ]
+  const shown = searchRows(sorted, columns, search).filter((row) =>
+    matchesFilter(filter, (field) => (field === 'kind' ? row.kind : null)),
+  )
+  const testId = direction === 'usedBy' ? 'studio-used-by' : 'studio-uses'
+  return (
+    <Flex vertical gap="middle" data-testid="studio-dependencies">
+      {directions.length > 1 && (
+        <Segmented
+          value={direction}
+          onChange={(next) => {
+            setDirection(next as Direction)
+            setFilter(emptyFilter)
+          }}
+          options={directions.map((value) => ({
+            value,
+            label: t(value === 'usedBy' ? 'shell.studio.usedBy' : 'shell.studio.uses'),
+          }))}
+          style={{ alignSelf: 'flex-start' }}
         />
       )}
-      {showUsedBy && (
-        <ReferencePanel
-          testId="studio-used-by"
-          title={t('shell.studio.usedBy')}
-          entries={references.usedBy}
-          application={application}
-          direction="usedBy"
-        />
-      )}
+      <AxisTable<StudioChangeRow>
+        testId={testId}
+        dataSource={shown}
+        rowKey={(row) => row.key}
+        columns={columns}
+        emptyText={t(direction === 'usedBy' ? 'shell.studio.usedBy.none' : 'shell.studio.uses.none')}
+        pagination={false}
+        toolbar={{
+          view: (
+            <Flex gap="small" align="center">
+              <Input.Search
+                allowClear
+                aria-label={t('shell.studio.search')}
+                placeholder={t('shell.studio.search')}
+                style={{ maxWidth: 320 }}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+              <TableFilterButton fields={filterFields} filter={filter} onApply={setFilter} />
+            </Flex>
+          ),
+        }}
+        below={<TableFilterChips fields={filterFields} filter={filter} onChange={setFilter} />}
+      />
     </Flex>
   )
 }
 
-function ReferencePanel({
-  testId,
-  title,
-  entries,
-  application,
-  direction,
-}: {
-  testId: string
-  title: string
-  entries: StudioReference[]
-  application: string
-  direction: Direction
-}) {
+/** The rows of one direction: each other resource once per way it is used, by its label, kind and relation in words. */
+function useReferenceRows(entries: StudioReference[], application: string, direction: Direction): StudioChangeRow[] {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
   const titleOf = useContext(StudioResourceTitle)
   const catalog = useContext(StudioCatalogContext)
   const seen = new Set<string>()
@@ -153,88 +236,8 @@ function ReferencePanel({
         change: relation,
       })
     } else {
-      rows.push({ key, name: node.key, kind: '', change: relation })
+      rows.push({ key, name: node.key, kind: t('shell.studio.references.textKeys'), change: relation })
     }
   }
-  return (
-    <section
-      data-testid={testId}
-      style={{
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-        padding: spacing.lg,
-      }}
-    >
-      <Flex vertical gap={spacing.md}>
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          {title}
-        </Typography.Title>
-        {rows.length === 0 ? <EmptyState /> : <ReferenceGroups testId={`${testId}-list`} rows={rows} />}
-      </Flex>
-    </section>
-  )
-}
-
-/** A row of a Uses or Used by table: a kind's group row, or an entry under it. */
-type ReferenceRow = { key: string; group: string } | { key: string; group?: undefined; entry: StudioChangeRow }
-
-/**
- * Proposed: the entries of a Uses or Used by panel as the standard table, `AxisTable`, grouped by kind in the sidebar's
- * order: a group row with the kind's name, whose other cells stay blank, then its entries, each the other resource by
- * its label, the link that opens it, and how the one uses the other. The kind is the group's, so no row repeats it.
- */
-function ReferenceGroups({ rows, testId }: { rows: readonly StudioChangeRow[]; testId: string }) {
-  const t = useText()
-  const { colour } = useDesignTokens()
-  const collator = nameCollator()
-  const table: ReferenceRow[] = []
-  let current: string | null = null
-  for (const row of [...rows].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || collator.compare(a.name, b.name))) {
-    const kind = row.kind || t('shell.studio.references.textKeys')
-    if (kind !== current) {
-      table.push({ key: `group/${kind}`, group: kind })
-      current = kind
-    }
-    table.push({ key: row.key, entry: row })
-  }
-  const columns: AxisColumn<ReferenceRow>[] = [
-    {
-      key: 'name',
-      kind: 'freeText',
-      title: t('shell.studio.references.name'),
-      render: (_, row) =>
-        row.group !== undefined ? (
-          <Typography.Text strong>{row.group}</Typography.Text>
-        ) : row.entry.to ? (
-          <Link to={row.entry.to} style={{ color: colour.primaryText }}>
-            {row.entry.name}
-          </Link>
-        ) : (
-          row.entry.name
-        ),
-    },
-    {
-      key: 'how',
-      kind: 'freeText',
-      title: t('shell.studio.references.how'),
-      render: (_, row) => (row.group !== undefined ? null : row.entry.change),
-    },
-  ]
-  return (
-    <AxisTable<ReferenceRow>
-      testId={testId}
-      dataSource={table}
-      rowKey={(row) => row.key}
-      columns={columns}
-      emptyText=""
-      pagination={false}
-      blankRow={(row) => row.group !== undefined}
-      rowAttributes={(row) =>
-        (row.group !== undefined
-          ? { 'data-testid': `${testId}-group`, style: { background: colour.canvas } }
-          : { 'data-testid': `${testId}-row` }) as unknown as HTMLAttributes<HTMLElement>
-      }
-    />
-  )
+  return rows
 }

@@ -1153,6 +1153,8 @@
   "shell.studio.references.textKeys": "Text keys",
   "shell.studio.references.name": "Name",
   "shell.studio.references.how": "How it is used",
+  "shell.studio.tab.dependencies": "Dependencies",
+  "shell.studio.references.kind": "Kind",
   "shell.studio.noReferences": "None.",
   "shell.studio.expand": "Expand",
   "shell.studio.collapse": "Collapse",

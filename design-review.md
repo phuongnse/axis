@@ -378,12 +378,15 @@ owner is reviewing it one step at a time.
 
 - **Asked:** the owner found the relation words poor, "Sửa bản ghi của nó", "Cấp quyền trên nó", and the flat list hard to
   read. The headings "Sử dụng" and "Được dùng bởi" stay: they read clearly.
-- **Built:** each panel is the standard table, `AxisTable`, grouped by kind in the sidebar's order: a group row with the
-  kind's name, its other cells blank through the table's `blankRow`, on the canvas colour, then its entries, with the
-  columns Name, the other resource by its label as the link that opens it, and How it is used. No count. The kind is the
-  group's, so no row repeats it. A first try drew grouped lists of its own; the owner asked why not the table, which
-  groups as well, so the one table does it. `StudioChangeList` stays for the change lists of a release and of the
-  Overview.
+- **Built:** what uses a resource and what it uses leave the foot of its page for a tab of their own, **Dependencies**
+  ("Phụ thuộc"), beside Design, Form and JSON, opened when it is needed, before a rename or a delete, as low-code tools
+  show a component's dependencies. A choice above it switches between Used by and Uses, when both apply. Each is the
+  standard table, `AxisTable`, flat: Name, the other resource by its label as the link that opens it, Kind and How it
+  is used, sorted by kind in the sidebar's order, then by name, with the search and the kind filter every list has
+  (`searchRows`, `TableFilterButton`, `TableFilterChips`). No count, no group rows. Two tries came first: grouped lists
+  of their own, then the table with group rows, which the owner found poor. `StudioChangeList` stays for the change lists
+  of a release and of the Overview.
+- **For the issue:** Delete in the Danger zone lists what uses the resource before it asks, as a "blocked by" list does.
 - **Words:** each relation is a verb and its object, with no "nó": "Sửa bản ghi", "Đọc bản ghi", "Cấp quyền", "Gọi",
   "Khởi chạy", "Hiện dữ liệu". The English relations stay. The rule, no "nó" for "it", is in #2974, and the other 39
   texts that said "nó" are rewritten, with "phát hành", "trang web", "thành phần", "cam kết" and "bộ kết nối" where they

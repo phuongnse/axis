@@ -227,7 +227,7 @@ export function StudioEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
-  const [tab, setTab] = useState<'design' | 'form' | 'json'>(
+  const [tab, setTab] = useState<'design' | 'form' | 'json' | 'dependencies'>(
     item.kind === 'page' || item.kind === 'form' || item.kind === 'process' ? 'design' : 'form',
   )
   const [formDrawn, setFormDrawn] = useState(false)
@@ -854,7 +854,7 @@ export function StudioEditor({
             <RemovedNoticeContext.Provider value={notifyRemoved}>
               <Tabs
                 activeKey={tab}
-                onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
+                onChange={(key) => setTab(key as 'design' | 'form' | 'json' | 'dependencies')}
                 // Proposed: the JSON view's actions end the tab bar, so they take no height from it.
                 tabBarExtraContent={tab === 'json' ? <div ref={setJsonActions} /> : undefined}
                 items={[
@@ -1055,6 +1055,11 @@ export function StudioEditor({
                       </Flex>
                     ),
                   },
+                  // Proposed: what uses the resource and what it uses are a tab of their own, Dependencies, opened when
+                  // they are needed, such as before a rename or a delete, rather than a list at the foot of every page.
+                  ...(references
+                    ? [{ key: 'dependencies', label: t('shell.studio.tab.dependencies'), children: references }]
+                    : []),
                 ]}
               />
             </RemovedNoticeContext.Provider>
@@ -1074,7 +1079,6 @@ export function StudioEditor({
       <Flex gap="small" align="center">
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </Flex>
-      <StudioCatalogContext.Provider value={catalog}>{references}</StudioCatalogContext.Provider>
       {item.kind !== 'application' && (
         // Proposed: deleting a resource is the last section of its page, a Danger zone as GitHub's settings have, so the
         // one destructive action is apart from every edit and says what it does before its dialog asks again.

@@ -1153,6 +1153,8 @@
   "shell.studio.references.textKeys": "Khóa văn bản",
   "shell.studio.references.name": "Tên",
   "shell.studio.references.how": "Cách dùng",
+  "shell.studio.tab.dependencies": "Phụ thuộc",
+  "shell.studio.references.kind": "Loại",
   "shell.studio.noReferences": "Không có.",
   "shell.studio.expand": "Mở rộng",
   "shell.studio.collapse": "Thu gọn",
