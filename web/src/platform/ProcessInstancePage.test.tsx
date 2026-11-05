@@ -351,6 +351,27 @@ describe('ProcessInstancePage', () => {
     expect(within(attemptRow).getByText('attempt')).toBeInTheDocument()
   })
 
+  it('shows the em dash in the HTTP status cell of an attempt with no status', async () => {
+    const detail = JSON.parse(detailText) as { calls: { attempts: { httpStatus: number | null }[] }[] }
+    detail.calls[0]!.attempts[0]!.httpStatus = null
+    stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    const attemptRow = screen.getByRole('row', { name: /retryable/ })
+    expect(within(attemptRow).getAllByRole('cell')[5]).toHaveTextContent('—')
+  })
+
+  it('shows the no-attempts text for a call with no attempts', async () => {
+    stubApi()
+
+    renderPage()
+
+    const visible = await screen.findByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d')
+    expect(within(visible).getByText('No attempts yet.')).toBeInTheDocument()
+  })
+
   it('shows the hidden text and no input value for a call whose input is hidden', async () => {
     stubApi()
 
@@ -359,7 +380,8 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     const hidden = screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c')
     expect(within(hidden).getByText('Input: Hidden')).toBeInTheDocument()
-    expect(within(hidden).getByText('PurchasingSystem · createOrder')).toBeInTheDocument()
+    expect(within(hidden).getByText('PurchasingSystem')).toBeInTheDocument()
+    expect(within(hidden).getByText('createOrder')).toBeInTheDocument()
     expect(within(hidden).queryByText('title')).not.toBeInTheDocument()
   })
 
@@ -370,7 +392,8 @@ describe('ProcessInstancePage', () => {
 
     await screen.findByTestId('inspector-instance')
     const visible = screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d')
-    expect(within(visible).getByText('PaymentReferences@1.0.0 · reference')).toBeInTheDocument()
+    expect(within(visible).getByText('PaymentReferences@1.0.0')).toBeInTheDocument()
+    expect(within(visible).getByText('reference')).toBeInTheDocument()
     expect(within(visible).queryByText('Hidden')).not.toBeInTheDocument()
     expect(within(visible).getByText('Laptops')).toBeInTheDocument()
     expect(within(visible).getByText('1250.50')).toBeInTheDocument()

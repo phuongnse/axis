@@ -164,8 +164,8 @@ describe('TaskInboxWidget', () => {
       `/e2e/tasks/${approveId}`,
     )
     expect(within(approve).getByText('Order chairs')).toBeInTheDocument()
-    // No due date is an empty cell.
-    expect(within(approve).getAllByRole('cell')[2]).toHaveTextContent(/^$/)
+    // No due date is an empty cell, shown as the em dash.
+    expect(within(approve).getAllByRole('cell')[2]).toHaveTextContent('—')
   })
 
   it("renders a step label from the texts of the task's release when the site texts lack the key", async () => {

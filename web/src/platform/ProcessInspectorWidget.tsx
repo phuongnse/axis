@@ -1,6 +1,7 @@
-import { Alert, Flex, Select, Table, Typography, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Flex, Select, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { DeadLetterList } from './DeadLetterList'
 import { formatValue } from './formatValue'
 import {
@@ -11,7 +12,6 @@ import {
   type InstanceListItem,
   type InstancePage,
 } from './inspection'
-import { markCurrentPage } from './pagination'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 import { useText } from './texts'
@@ -40,11 +40,6 @@ const pageSizes = tablePageSizes()
 const parameterNames = ['state']
 const createdAtField = { name: 'createdAt', type: 'date-time' } as const
 const endedAtField = { name: 'endedAt', type: 'date-time' } as const
-const emptyDash = (
-  <Typography.Text type="secondary" italic>
-    —
-  </Typography.Text>
-)
 
 /**
  * Lists the instances of the widget's process, newest first, as the inspection API orders them. A
@@ -121,10 +116,11 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     return () => controller.abort()
   }, [instancesPath, requestQuery, requestUrl])
 
-  const columns = useMemo<TableColumnsType<InstanceListItem>>(
+  const columns = useMemo<AxisColumn<InstanceListItem>[]>(
     () => [
       {
         key: 'record',
+        kind: 'freeText',
         title: t('shell.inspector.subject'),
         render: (_value: unknown, instance: InstanceListItem) => (
           <Link to={`${instancePath}/${instance.id}`}>
@@ -135,25 +131,34 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
       },
       {
         key: 'state',
+        kind: 'fixed',
         title: t('shell.inspector.state'),
         render: (_value: unknown, instance: InstanceListItem) => stateText(t, instance.state),
       },
-      { key: 'step', title: t('shell.inspector.step'), render: (_value: unknown, instance) => instance.step },
+      {
+        key: 'step',
+        kind: 'freeText',
+        title: t('shell.inspector.step'),
+        render: (_value: unknown, instance) => instance.step,
+      },
       {
         key: 'release',
+        kind: 'fixed',
         title: t('shell.inspector.release'),
-        render: (_value: unknown, instance) => instance.releaseNumber ?? emptyDash,
+        render: (_value: unknown, instance) => instance.releaseNumber ?? null,
       },
       {
         key: 'createdAt',
+        kind: 'fixed',
         title: t('shell.inspector.createdAt'),
         render: (_value: unknown, instance) => formatValue(createdAtField, instance.createdAt, {}, { locale, text: t }),
       },
       {
         key: 'endedAt',
+        kind: 'fixed',
         title: t('shell.inspector.endedAt'),
         render: (_value: unknown, instance) =>
-          instance.endedAt === null ? emptyDash : formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }),
+          instance.endedAt === null ? null : formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }),
       },
     ],
     [locale, t, instancePath],
@@ -186,32 +191,33 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   }
   return (
     <Flex vertical gap="middle">
-      <Select
-        allowClear
-        aria-label={t('shell.inspector.state')}
-        style={{ width: 240 }}
-        placeholder={t('shell.inspector.allStates')}
-        value={state}
-        options={stateOptions}
-        virtual={false}
-        onChange={onStateChange}
-      />
-      <Table<InstanceListItem>
-        rowKey="id"
+      <AxisTable<InstanceListItem>
+        rowKey={(instance) => instance.id}
         columns={columns}
-        scroll={{ x: 'max-content' }}
         dataSource={load.page?.items}
         loading={loading}
-        locale={{ emptyText: t('shell.inspector.empty') }}
+        emptyText={t('shell.inspector.empty')}
         pagination={{
           current: query.page,
           pageSize: query.pageSize,
           total: load.page?.totalCount ?? 0,
           pageSizeOptions: pageSizes,
-          showSizeChanger: true,
-          itemRender: markCurrentPage(query.page),
         }}
         onChange={onChange}
+        toolbar={{
+          view: (
+            <Select
+              allowClear
+              aria-label={t('shell.inspector.state')}
+              style={{ width: 240 }}
+              placeholder={t('shell.inspector.allStates')}
+              value={state}
+              options={stateOptions}
+              virtual={false}
+              onChange={onStateChange}
+            />
+          ),
+        }}
       />
       <DeadLetterList deadLettersPath={widget.deadLettersPath!} locale={locale} />
     </Flex>

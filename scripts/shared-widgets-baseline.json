@@ -143,9 +143,6 @@
   "web/src/platform/ChildCollectionTable.tsx": {
     "table": 1
   },
-  "web/src/platform/DeadLetterList.tsx": {
-    "table": 1
-  },
   "web/src/platform/FilterBar.tsx": {
     "button": 2
   },
@@ -158,12 +155,8 @@
   "web/src/platform/NotificationBell.tsx": {
     "button": 2
   },
-  "web/src/platform/ProcessInspectorWidget.tsx": {
-    "table": 1
-  },
   "web/src/platform/ProcessInstancePage.tsx": {
     "tag": 2,
-    "table": 4,
     "button": 2
   },
   "web/src/platform/ReferenceLookup.tsx": {
@@ -173,8 +166,7 @@
     "button": 1
   },
   "web/src/platform/TaskInboxWidget.tsx": {
-    "tag": 1,
-    "table": 1
+    "tag": 1
   },
   "web/src/platform/TaskPage.tsx": {
     "button": 3

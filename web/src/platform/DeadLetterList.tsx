@@ -1,7 +1,7 @@
 import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, Flex, Table, Typography, type TableColumnsType } from 'antd'
+import { Alert, Flex, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
-import { AxisButton } from './AxisButton'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { formatValue } from './formatValue'
 import {
   deadLetterCommands,
@@ -12,7 +12,6 @@ import {
   type DeadLetterItem,
   type DeadLetterPage,
 } from './inspection'
-import { markCurrentPage } from './pagination'
 import { ReasonDialog } from './ReasonDialog'
 import { useText } from './texts'
 
@@ -79,43 +78,31 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
     return () => controller.abort()
   }, [deadLettersPath, page, query, loadKey])
 
-  const columns = useMemo<TableColumnsType<DeadLetterItem>>(
+  const columns = useMemo<AxisColumn<DeadLetterItem>[]>(
     () => [
-      { key: 'kind', title: t('shell.inspector.deadLetters.kind'), render: (_value: unknown, item) => item.kind },
+      {
+        key: 'kind',
+        kind: 'fixed',
+        title: t('shell.inspector.deadLetters.kind'),
+        render: (_value: unknown, item) => item.kind,
+      },
       {
         key: 'attempts',
+        kind: 'fixed',
         title: t('shell.inspector.deadLetters.attempts'),
         render: (_value: unknown, item) => item.attempts,
       },
       {
         key: 'lastError',
+        kind: 'freeText',
         title: t('shell.inspector.deadLetters.lastError'),
         render: (_value: unknown, item) => item.lastError,
       },
       {
         key: 'createdAt',
+        kind: 'fixed',
         title: t('shell.inspector.deadLetters.createdAt'),
         render: (_value: unknown, item) => formatValue(createdAtField, item.createdAt, {}, { locale, text: t }),
-      },
-      {
-        key: 'commands',
-        render: (_value: unknown, item) => (
-          <Flex gap="small">
-            {deadLetterCommands
-              .filter((command) => item.commands.includes(command))
-              .map((command) => (
-                <AxisButton
-                  key={command}
-                  role="icon"
-                  nameKey={`shell.inspector.commands.${command}`}
-                  destructive={command === 'discard'}
-                  icon={command === 'redeliver' ? <SendOutlined /> : <DeleteOutlined />}
-                  data-testid={`inspector-dead-letter-${command}-${item.id}`}
-                  onClick={() => setOpen({ command, item })}
-                />
-              ))}
-          </Flex>
-        ),
       },
     ],
     [locale, t],
@@ -132,22 +119,32 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
             title={t('shell.inspector.deadLetters.loadFailed')}
           />
         ) : (
-          <Table<DeadLetterItem>
-            rowKey="id"
+          <AxisTable<DeadLetterItem>
+            rowKey={(item) => item.id}
             columns={columns}
-            scroll={{ x: 'max-content' }}
             dataSource={load.page?.items}
             loading={loading}
-            locale={{ emptyText: t('shell.inspector.deadLetters.empty') }}
+            emptyText={t('shell.inspector.deadLetters.empty')}
             pagination={{
               current: page,
-              pageSize: load.page?.pageSize,
+              pageSize: load.page?.pageSize ?? 20,
               total: load.page?.totalCount ?? 0,
-              showSizeChanger: false,
-              hideOnSinglePage: true,
-              itemRender: markCurrentPage(page),
             }}
             onChange={(pagination) => setPage(pagination.current ?? 1)}
+            rowActions={{
+              configured: deadLetterCommands.length,
+              actions: (item) =>
+                deadLetterCommands
+                  .filter((command) => item.commands.includes(command))
+                  .map((command) => ({
+                    key: command,
+                    labelKey: `shell.inspector.commands.${command}`,
+                    icon: command === 'redeliver' ? <SendOutlined /> : <DeleteOutlined />,
+                    destructive: command === 'discard',
+                    onClick: () => setOpen({ command, item }),
+                    attributes: { 'data-testid': `inspector-dead-letter-${command}-${item.id}` },
+                  })),
+            }}
           />
         )}
       </Flex>
