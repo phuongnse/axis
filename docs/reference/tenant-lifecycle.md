@@ -5,7 +5,7 @@ cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the route that requests a host of a tenant's own, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete and cancel-deletion described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete and cancel-deletion described under it, the purge steps of [deleting a tenant](#deleting-a-tenant), which nothing queues yet, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -89,7 +89,7 @@ an optional `quotas`, which the `tenant` step writes as the tenant's quota rows,
 - `id` follows the rule of [`tenant create`](administration.md#tenant-create): 1 to 50 lowercase letters,
   digits and hyphens, and not `master`. A bad id answers `400`. An id that a directory row holds, in any
   status and a preview tenant's included, or that a `queued` or `running` create job holds, answers `409`.
-  An id that a deleted tenant had answers `409` too _(planned for M31, once deletion adds `platform.deleted_tenants`)_.
+  An id that a deleted tenant had answers `409` too _(planned for M31)_.
 - `application` names an installed [application template](modules-and-templates.md#application-templates),
   such as the built-in `approvals`. An id that is not an installed template answers `400`. The job keeps the id, and its `application` step takes the newest version.
 - `administrator` is the email of the person invited as the tenant's first administrator. A value that is
@@ -236,12 +236,14 @@ A deletion can be undone during its grace window, and not after.
 2. **Grace window.** `POST /api/cell/tenants/{id}/deletion/cancel` clears `delete_after`, and the
    tenant stays `suspended` until it is resumed. A cancel after `delete_after` has passed fails its job and keeps the date. A cancel
    of a tenant with no scheduled deletion succeeds and changes nothing. An export can still run in the window.
-3. **Purge** _(planned for M31)_. After `delete_after`, a job removes, in this order, and each step can run again:
-   1. the tenant's hosts from the directory, its realm redirect addresses and its cert-manager
-      certificates;
+3. **Purge**. The eight steps below are built, as the named steps `hosts`, `database`, `realm`, `files`, `studio`, `keys`, `rows` and `directory`, and nothing
+   queues them yet. The job that runs them after `delete_after` is _(planned for M31)_. They run in this order, and each step can run again, so a purge that
+   stopped finishes when it runs again. When the tenant has a preview tenant, each step removes the preview's part first, and the preview gets a tombstone of its own:
+   1. the tenant's hosts from the directory and its realm redirect addresses, and its cert-manager
+      certificates _(planned for M31)_. This step first writes the tombstone, and it takes the actor from the job input `{ "actor" }`, and refuses a job that has none;
    2. the tenant database, then its schema and runtime roles;
    3. its realm in the identity provider;
-   4. its files in object storage, when a storage binding holds them outside the database;
+   4. its files in object storage, when a storage binding holds them outside the database _(planned for M31)_. The step does nothing yet;
    5. its Studio folder;
    6. its data keys, lookup keys and backup key, see [crypto-shredding](tenant-backup-and-restore.md#backups-in-a-cell);
    7. its quota, lease, usage and counter rows;
