@@ -550,7 +550,7 @@ internal sealed class TenantBackup : IAsyncDisposable
             _counts);
     }
 
-    private static string AxisVersion()
+    internal static string AxisVersion()
     {
         var assembly = typeof(TenantBackup).Assembly;
         var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion

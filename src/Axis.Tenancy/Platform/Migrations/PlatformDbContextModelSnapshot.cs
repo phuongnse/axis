@@ -135,7 +135,7 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("jobs", "platform", t =>
                         {
-                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'delete', 'cancel-deletion')");
+                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion')");
 
                             t.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
                         });

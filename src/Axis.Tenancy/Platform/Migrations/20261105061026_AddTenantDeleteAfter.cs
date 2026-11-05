@@ -27,7 +27,7 @@ namespace Axis.Tenancy.Platform.Migrations
                 name: "ck_jobs_kind",
                 schema: "platform",
                 table: "jobs",
-                sql: "kind IN ('suspend', 'resume', 'create', 'delete', 'cancel-deletion')");
+                sql: "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion')");
         }
 
         /// <inheritdoc />
@@ -47,7 +47,7 @@ namespace Axis.Tenancy.Platform.Migrations
                 name: "ck_jobs_kind",
                 schema: "platform",
                 table: "jobs",
-                sql: "kind IN ('suspend', 'resume', 'create')");
+                sql: "kind IN ('suspend', 'resume', 'create', 'export')");
         }
     }
 }

@@ -324,3 +324,5 @@ Two businesses start from the `approvals` application, and each changes it diffe
   so the publish is refused.
 - **For both:** a requester who is also a department head never decides their own request, and a
   task decision never moves a request two steps.
+
+The E2E specs run the journey with two applications on the journey tenant, one for each business, until a tenant can start from a built-in application (M31).

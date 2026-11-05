@@ -1357,7 +1357,17 @@ internal static partial class AdminCommands
         }
 
         using var http = IdentityProviderClient(identityProviderHandler);
-        var jobs = ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString);
+        var sensitive = new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(settings.Platform.PlatformConnectionString, settings.Platform.Cipher)));
+        var storage = CellBackupStorage.Read(configuration, CellBackupStorage.ExportSection, out var storageProblem);
+        var jobs = new Dictionary<string, IReadOnlyList<JobStep>>(ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString))
+        {
+            ["export"] = TenantExport.Steps(new TenantExportSettings(
+                settings.Platform.PlatformConnectionString,
+                settings.Platform.Cipher,
+                settings.Packages.Versions,
+                sensitive,
+                storage is null ? JobSetting<CellBackupStorage>.Missing(storageProblem!) : JobSetting<CellBackupStorage>.Of(storage))),
+        };
 
         // The create job runs in a cell only: outside one, the provisioning API answers 404, so no create job is queued.
         if (cell.IsCell)
@@ -1372,7 +1382,7 @@ internal static partial class AdminCommands
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit, settings.ActivationTimeout),
             scenarioServer,
             new DirectoryPublisherTenants(settings.Platform, settings.Mail, refreshInterval, http),
-            new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(settings.Platform.PlatformConnectionString, settings.Platform.Cipher))),
+            sensitive,
             lease,
             testLimit,
             output,

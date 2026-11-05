@@ -57,6 +57,7 @@ namespace Axis.Server.CellApi;
 /// kind, tenant and body, hashed with SHA-256, answers the first job again, and the same key with any other request answers
 /// <c>422</c>. The key is shared across the cell. A transaction lock on the key serializes parallel retries, so they queue one job.
 /// <c>GET /api/cell/jobs/{id}</c> answers the job with its <c>steps</c> and the <c>error</c> of a failed job, or <c>404</c>.
+/// <c>POST /api/cell/tenants/{id}/exports</c> queues an <c>export</c> job with the one step <c>export</c> in the same way.
 /// </para>
 /// <para>
 /// <c>POST /api/cell/tenants</c> takes <c>{ "id", "application", "administrator" }</c> and queues a <c>create</c> job with the five
@@ -96,6 +97,7 @@ internal static class CellEndpoints
         ["delete"] = ["schedule"],
         ["cancel-deletion"] = ["cancel"],
         ["create"] = ["tenant", "application", "activate", "invite", "resume"],
+        ["export"] = ["export"],
     };
 
     private const int MaxTenantIdLength = 50;
@@ -123,6 +125,8 @@ internal static class CellEndpoints
             QueueJobAsync("delete", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/deletion/cancel", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("cancel-deletion", id, http, dataSource, cancellationToken));
+        cell.MapPost("/tenants/{id}/exports", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
+            QueueJobAsync("export", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/hosts", RequestHostAsync);
         cell.MapGet("/jobs/{id:guid}", GetJobAsync);
 

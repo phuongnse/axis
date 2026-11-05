@@ -739,6 +739,14 @@ answers `404` there. The job has five steps, and each can run again:
 A step that throws ends the claim, and the next claim runs the job again from the first step that has not succeeded. A job gets three
 claims, see [provisioning API](tenant-lifecycle.md#provisioning-api). The run again of a failed job is _(planned for M31)_.
 
+### Export job
+
+The publisher runs the `export` job that `POST /api/cell/tenants/{id}/exports` queues, in a cell or not, because only the provisioning API
+queues it. The job has one step, `export`. It reads the tenant's active releases and records in one snapshot, writes the ZIP of
+[exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) to a folder that only its owner can use, uploads it to the
+`Cell:ExportStorage` bucket and deletes the folder. A tenant that is `provisioning`, unknown or a preview tenant fails the job at once. A
+missing `Cell:ExportStorage` setting does the same and names the setting. An upload that fails ends the claim, and the job runs again.
+
 ## What else to back up
 
 A tenant archive is not a backup of the

@@ -8,7 +8,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// One real MinIO container, an S3-compatible object store, for the tests of a class. It supports object-locked buckets, as the
-/// backup storage of a cell is. The fixture starts the container before the class's first test and removes it after the last.
+/// backup storage of a cell is, and server-side encryption. The fixture starts the container before the class's first test and removes it after the last.
 /// Each test makes a bucket of its own, so no test sees another's objects.
 /// </summary>
 public sealed class MinioFixture : IAsyncLifetime
@@ -27,6 +27,9 @@ public sealed class MinioFixture : IAsyncLifetime
         _container = new ContainerBuilder(Image)
             .WithEnvironment("MINIO_ROOT_USER", AccessKey)
             .WithEnvironment("MINIO_ROOT_PASSWORD", SecretKey)
+
+            // MinIO accepts server-side encryption only when it has a key, and the tenant export stores its ZIP encrypted.
+            .WithEnvironment("MINIO_KMS_SECRET_KEY", "axis-test:" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
             .WithPortBinding(ApiContainerPort, assignRandomHostPort: true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(ApiContainerPort).ForPath("/minio/health/ready")))
             .Build();

@@ -49,11 +49,11 @@ internal static class CreateJob
 
     public static IReadOnlyList<JobStep> Steps(CreateJobSettings settings, HttpClient http, TextWriter output, TextWriter error) =>
     [
-        new JobStep("tenant", (id, _, ct) => TenantAsync(settings, http, output, id, ct)),
-        new JobStep("application", (id, input, ct) => ApplicationAsync(settings, id, input, ct)),
-        new JobStep("activate", (id, input, ct) => ActivateAsync(settings, http, output, error, id, input, ct)),
-        new JobStep("invite", (id, input, ct) => InviteAsync(settings, http, id, input, ct)),
-        new JobStep("resume", (id, _, ct) => ResumeAsync(settings, id, ct)),
+        new JobStep("tenant", (_, id, _, ct) => TenantAsync(settings, http, output, id, ct)),
+        new JobStep("application", (_, id, input, ct) => ApplicationAsync(settings, id, input, ct)),
+        new JobStep("activate", (_, id, input, ct) => ActivateAsync(settings, http, output, error, id, input, ct)),
+        new JobStep("invite", (_, id, input, ct) => InviteAsync(settings, http, id, input, ct)),
+        new JobStep("resume", (_, id, _, ct) => ResumeAsync(settings, id, ct)),
     ];
 
     private static async Task<string?> TenantAsync(CreateJobSettings settings, HttpClient http, TextWriter output, string id, CancellationToken cancellationToken)

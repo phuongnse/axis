@@ -7,10 +7,10 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// One step of a provisioning job. <paramref name="RunAsync"/> gets the tenant id and the job's input JSON, which may be null, and
+/// One step of a provisioning job. <paramref name="RunAsync"/> gets the job id, the tenant id and the job's input JSON, which may be null, and
 /// returns <see langword="null"/> on success or a refusal message. A refusal fails the job at once, and an exception that it throws ends only the claim.
 /// </summary>
-internal sealed record JobStep(string Name, Func<string, string?, CancellationToken, Task<string?>> RunAsync);
+internal sealed record JobStep(string Name, Func<Guid, string, string?, CancellationToken, Task<string?>> RunAsync);
 
 /// <summary>
 /// The provisioning jobs of <c>platform.jobs</c>, which the publisher runs under <c>Tenancy:Source=directory</c>. A job is queued
@@ -85,10 +85,10 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
     public static IReadOnlyDictionary<string, IReadOnlyList<JobStep>> Builtin(string platformConnectionString) =>
         new Dictionary<string, IReadOnlyList<JobStep>>
         {
-            ["suspend"] = [new JobStep("status", (tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.SuspendChangeAsync, tenantId, cancellationToken))],
-            ["resume"] = [new JobStep("status", (tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.ResumeChangeAsync, tenantId, cancellationToken))],
-            ["delete"] = [new JobStep("schedule", (tenantId, _, cancellationToken) => TenantDeletion.ScheduleAsync(platformConnectionString, tenantId, cancellationToken))],
-            ["cancel-deletion"] = [new JobStep("cancel", (tenantId, _, cancellationToken) => TenantDeletion.CancelAsync(platformConnectionString, tenantId, cancellationToken))],
+            ["suspend"] = [new JobStep("status", (_, tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.SuspendChangeAsync, tenantId, cancellationToken))],
+            ["resume"] = [new JobStep("status", (_, tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.ResumeChangeAsync, tenantId, cancellationToken))],
+            ["delete"] = [new JobStep("schedule", (_, tenantId, _, cancellationToken) => TenantDeletion.ScheduleAsync(platformConnectionString, tenantId, cancellationToken))],
+            ["cancel-deletion"] = [new JobStep("cancel", (_, tenantId, _, cancellationToken) => TenantDeletion.CancelAsync(platformConnectionString, tenantId, cancellationToken))],
         };
 
     /// <summary>Adds a <c>queued</c> job with every step of <paramref name="kind"/> <c>pending</c>, and returns its id.</summary>
@@ -251,7 +251,7 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
             string? refusal;
             try
             {
-                refusal = await defined[index].RunAsync(job.TenantId, job.Input, cancellationToken);
+                refusal = await defined[index].RunAsync(job.Id, job.TenantId, job.Input, cancellationToken);
             }
             catch (Exception exception)
             {

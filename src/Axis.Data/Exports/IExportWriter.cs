@@ -1,7 +1,7 @@
-namespace Axis.Server.Exports;
+namespace Axis.Data.Exports;
 
 /// <summary>Writes the rows of an export to a stream in one file format. Call <see cref="WriteHeader"/>, then <see cref="WriteRow"/> for each row, then <see cref="Complete"/>.</summary>
-internal interface IExportWriter : IDisposable
+public interface IExportWriter : IDisposable
 {
     /// <summary>Writes the first row, which holds the column names.</summary>
     void WriteHeader(IReadOnlyList<ExportColumn> columns);
