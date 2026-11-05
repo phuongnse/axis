@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, before, describe, test } from 'node:test'
@@ -191,5 +191,30 @@ describe('scripts/scan.sh', () => {
     const result = scan({ accepted: 'missing.json' })
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Scan failed, accepted list/)
+  })
+})
+
+// The advisories that failed the scan of web on main (run 42099816054) name these ranges. The scan
+// itself needs the advisory database, so this test checks the lockfile against the recorded ranges
+// without the network.
+describe('web/package-lock.json', () => {
+  const lockfile = JSON.parse(readFileSync(fileURLToPath(new URL('../web/package-lock.json', import.meta.url)), 'utf8'))
+
+  function version(name) {
+    return lockfile.packages[`node_modules/${name}`].version.split('.').map(Number)
+  }
+
+  function compare(a, b) {
+    return a.reduce((difference, part, index) => difference || part - b[index], 0)
+  }
+
+  test('resolves undici outside the ranges of GHSA-xjj6-f33q-929c and the advisories listed with it', () => {
+    // Every undici advisory of the run lists >=8.0.0 <8.12.2.
+    assert.ok(compare(version('undici'), [8, 12, 2]) >= 0, `undici ${version('undici').join('.')}`)
+  })
+
+  test('resolves vite outside the ranges of GHSA-587h-7wmj-h5pm and the advisories listed with it', () => {
+    // Every vite advisory of the run lists >=8.3.0 <=8.3.2.
+    assert.ok(compare(version('vite'), [8, 3, 2]) > 0, `vite ${version('vite').join('.')}`)
   })
 })
