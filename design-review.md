@@ -374,6 +374,20 @@ owner is reviewing it one step at a time.
   in every area, and the last four old tone marks, "xoá" to "xóa".
 - **For the issue:** the rewrite of the other areas, one NexKit issue each, after the owner's review of this one.
 
+### Uses and Used by
+
+- **Asked:** the owner found the relation words poor, "Sửa bản ghi của nó", "Cấp quyền trên nó", and the flat list hard to
+  read. The headings "Sử dụng" and "Được dùng bởi" stay: they read clearly.
+- **Built:** each panel groups its entries by kind, in the sidebar's order, under the kind's name, with no count. A row is
+  the other resource by its label, the link that opens it, then how the one uses the other in muted words. The kind is
+  the group's, so no row repeats it. `StudioChangeList` stays for the change lists of a release and of the Overview.
+- **Words:** each relation is a verb and its object, with no "nó": "Sửa bản ghi", "Đọc bản ghi", "Cấp quyền", "Gọi",
+  "Khởi chạy", "Hiện dữ liệu". The English relations stay. The rule, no "nó" for "it", is in #2974, and the other 39
+  texts that said "nó" are rewritten, with "phát hành", "trang web", "thành phần", "cam kết" and "bộ kết nối" where they
+  still had older words.
+- **To decide:** "phiên bản" names a release, and a module's version is also called "phiên bản"; the module blocker now
+  says "một bản" for the module's version. The glossary is to name a module version apart.
+
 ### Second mechanisms found by the audit of 2026-11-05
 
 Each is one concern with more than one way to do it. The issue merges each into the first one named, as the rule "One

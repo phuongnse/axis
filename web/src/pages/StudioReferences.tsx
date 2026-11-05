@@ -1,4 +1,5 @@
 import { Alert, Flex, Typography } from 'antd'
+import { Link } from 'react-router'
 import { useContext, useEffect, useState } from 'react'
 import {
   fetchResourceReferences,
@@ -12,9 +13,9 @@ import { useText } from '../platform/texts'
 import { EmptyState } from '../platform/EmptyState'
 import { useDesignTokens } from '../platform/themeMode'
 import { neverUsed, StudioCatalogContext, usesShownByForm } from './schemaFormSections'
-import { StudioChangeList, type StudioChangeRow } from './StudioChangeList'
+import { type StudioChangeRow } from './StudioChangeList'
 import { StudioResourceTitle } from './studioResourceTitle'
-import { kindName, kindOrder } from './studioViews'
+import { kindName, kindOrder, nameCollator } from './studioViews'
 
 type Direction = 'uses' | 'usedBy'
 
@@ -61,8 +62,7 @@ export function StudioReferences({
   if (!references) {
     return null
   }
-  // Proposed: Uses and Used by are two panels, as the form's sections are, each Studio's one change list: the other
-  // resource by its label as the link that opens it, its kind, and how the one uses the other, in words. Uses leaves out
+  // Proposed: Uses and Used by are two panels, as the form's sections are, each with its entries in groups by kind: the other resource by its label as the link that opens it, and how the one uses the other, in words. Uses leaves out
   // what the kind's form already shows, its labels' texts on every kind, and Used by is left out for a kind nothing can
   // refer to, as it never applies; a panel with nothing left to show is left out. The same resource used the same way
   // shows once.
@@ -169,8 +169,61 @@ function ReferencePanel({
         <Typography.Title level={5} style={{ margin: 0 }}>
           {title}
         </Typography.Title>
-        {rows.length === 0 ? <EmptyState /> : <StudioChangeList testId={`${testId}-list`} rows={rows} />}
+        {rows.length === 0 ? <EmptyState /> : <ReferenceGroups testId={`${testId}-list`} rows={rows} />}
       </Flex>
     </section>
+  )
+}
+
+/**
+ * Proposed: the entries of a Uses or Used by panel in groups by kind, in the sidebar's order, each under the kind's name,
+ * so a resource used in many places reads by kind rather than as one long list. A row is the
+ * other resource by its label, the link that opens it, then how the one uses the other in a few muted words. The kind
+ * is the group's, so no row repeats it.
+ */
+function ReferenceGroups({ rows, testId }: { rows: readonly StudioChangeRow[]; testId: string }) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const collator = nameCollator()
+  const groups = new Map<string, StudioChangeRow[]>()
+  for (const row of [...rows].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || collator.compare(a.name, b.name))) {
+    const kind = row.kind || t('shell.studio.references.textKeys')
+    groups.set(kind, [...(groups.get(kind) ?? []), row])
+  }
+  return (
+    <Flex vertical gap={spacing.md} data-testid={testId}>
+      {[...groups].map(([kind, members]) => (
+        <section key={kind} data-testid={`${testId}-group`}>
+          <Typography.Text style={{ display: 'block', color: colour.textMuted, marginBottom: spacing.xs }}>
+            {kind}
+          </Typography.Text>
+          <ul
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              display: 'grid',
+              gridTemplateColumns: 'fit-content(320px) max-content',
+              columnGap: spacing.lg,
+              rowGap: spacing.xs,
+              alignItems: 'baseline',
+            }}
+          >
+            {members.map((row) => (
+              <li key={row.key} style={{ display: 'contents' }} data-testid={`${testId}-row`}>
+                {row.to ? (
+                  <Link to={row.to} style={{ color: colour.primaryText }}>
+                    {row.name}
+                  </Link>
+                ) : (
+                  <Typography.Text>{row.name}</Typography.Text>
+                )}
+                <Typography.Text style={{ color: colour.textMuted }}>{row.change}</Typography.Text>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </Flex>
   )
 }

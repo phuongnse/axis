@@ -1150,6 +1150,7 @@
   "shell.studio.loadResourceFailed": "The resource could not be loaded.",
   "shell.studio.uses": "Uses",
   "shell.studio.usedBy": "Used by",
+  "shell.studio.references.textKeys": "Text keys",
   "shell.studio.noReferences": "None.",
   "shell.studio.expand": "Expand",
   "shell.studio.collapse": "Collapse",
