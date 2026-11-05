@@ -249,6 +249,15 @@ describe('ConsolePage', () => {
     expect(screen.queryByTestId('console-forbidden')).toBeNull()
   })
 
+  it('labels a read-only tenant', async () => {
+    stubServer((url) => json(url.startsWith('/api/console/tenant') ? { ...tenant, status: 'readOnly' } : failedWork))
+    renderPage()
+
+    const view = await screen.findByTestId('console-tenant')
+    expect(within(view).getByText('Read-only')).toBeVisible()
+    expect(within(view).queryByText('Active')).toBeNull()
+  })
+
   it('shows the forbidden page on a 403', async () => {
     stubServer(() => new Response(null, { status: 403 }))
     renderPage()

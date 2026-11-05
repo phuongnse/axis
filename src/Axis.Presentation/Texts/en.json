@@ -121,6 +121,7 @@
   "shell.console.tenant.title": "Tenant",
   "shell.console.tenant.status": "Status",
   "shell.console.tenant.status.active": "Active",
+  "shell.console.tenant.status.readOnly": "Read-only",
   "shell.console.tenant.application": "Application",
   "shell.console.tenant.release": "Active release",
   "shell.console.tenant.activatedAt": "Activated",

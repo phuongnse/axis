@@ -39,9 +39,6 @@
   "web/src/pages/ConnectorInputRows.tsx": {
     "button": 2
   },
-  "web/src/pages/ConsolePage.tsx": {
-    "tag": 1
-  },
   "web/src/pages/EndpointValues.tsx": {
     "button": 2
   },

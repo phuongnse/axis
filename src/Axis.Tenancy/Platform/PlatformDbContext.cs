@@ -63,7 +63,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         {
             tenant.ToTable("tenants", table =>
             {
-                table.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
+                table.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended', 'readOnly')");
                 table.HasCheckConstraint("ck_tenants_oidc_profile", "oidc_profile IN ('standard', 'fapi2')");
                 table.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
@@ -415,7 +415,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         {
             job.ToTable("jobs", table =>
             {
-                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion', 'purge')");
+                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'read-only', 'create', 'export', 'delete', 'cancel-deletion', 'purge')");
                 table.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
             });
             job.HasKey(j => j.Id).HasName("pk_jobs");

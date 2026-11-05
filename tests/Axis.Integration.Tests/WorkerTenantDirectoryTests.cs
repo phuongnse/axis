@@ -164,6 +164,32 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
     }
 
     [Fact]
+    public async Task A_tenant_set_read_only_at_a_refresh_gets_no_new_work_claimed_while_another_tenant_runs()
+    {
+        var a = await PrepareTenantAsync("a");
+        var b = await PrepareTenantAsync("b");
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a, b);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs, ("Tenancy:RefreshInterval", "00:00:00.2"));
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Loaded 2 active tenant(s) from the tenant directory.")), "The first read did not work.");
+
+        await SetStatusAsync(platform, "a", "readOnly");
+        await WaitForRefreshesAsync(logs, RefreshCount(logs) + 2);
+        await EnqueueAsync(a);
+        var itemB = await EnqueueAsync(b);
+        await WaitUntilAsync(async () => await RunsAsync(b) is { Count: 1 }, "The work of the active tenant did not run.");
+        await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+
+        Assert.Equal(itemB, (await RunsAsync(b)).Single().ItemId);
+        Assert.Empty(await RunsAsync(a));
+        Assert.Equal(1L, await AdminCountAsync(a.SchemaConnectionString, "axis.process_work_items WHERE claim_token IS NULL"));
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_tenant_added_while_the_worker_runs_has_its_due_work_run_after_a_refresh()
     {
         var a = await PrepareTenantAsync("a");
