@@ -356,6 +356,12 @@ owner is reviewing it one step at a time.
   "thực thể" left; "Biểu thức tính" in place of "Tính từ"; one spelling, "thỏa"; "Thêm đối tượng…" verb first.
 - **English too:** the field drawer's validations read "Validations", "Add validation" and "Delete validation", where they
   said "Rules", which names another concept.
+- **Labels, by rule, in every area:** the owner's review gave three rules for every screen, in `ui-writing.md` by #2974: a
+  label or a column title does not repeat what holds it ("Tên", not "Tên trường", in the Fields table), a setting is
+  named by what it means ("Tên hiển thị" for a label, "Kiểu dữ liệu" for a type), and a short Vietnamese label that reads
+  two ways is rewritten. Applied to every text they touch, 33 in `vi` and 8 in English: the Fields table's columns, a
+  process step's and parameter's settings, a scenario step's type, the page editor's labels, a release's label, and the
+  identity provider's button text. No "nhãn", "kiểu trường" or "kiểu tham số" is left.
 - **For the issue:** the rewrite of the other areas, one NexKit issue each, after the owner's review of this one.
 
 ### Second mechanisms found by the audit of 2026-11-05
