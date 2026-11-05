@@ -1,6 +1,29 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { waitForDialog } from './dialogs'
 import { pickOption } from './select'
+
+/**
+ * Opens the Problems panel from the band's problems button, unless it is open, and returns the panel. The button
+ * shows only while the application has a problem, so this waits for one.
+ */
+export async function openProblems(page: Page): Promise<Locator> {
+  const button = page.getByTestId('studio-problems')
+  await expect(button).toBeVisible()
+  if ((await button.getAttribute('aria-expanded')) !== 'true') {
+    await button.click()
+  }
+  const panel = page.getByTestId('studio-diagnostics')
+  await expect(panel).toBeVisible()
+  return panel
+}
+
+/** Like `openProblems`, but without waiting for a problem: with none, the band has no button and the panel is absent, so test it with `filter` and `toHaveCount`. */
+export async function openProblemsIfAny(page: Page): Promise<Locator> {
+  if ((await page.getByTestId('studio-problems').count()) > 0) {
+    return openProblems(page)
+  }
+  return page.getByTestId('studio-diagnostics')
+}
 
 /** The sidebar entry of a kind. Its address ends in `&kind=<kind>`, so it is found by that and not by its label. */
 function kindEntry(page: Page, kind: string) {

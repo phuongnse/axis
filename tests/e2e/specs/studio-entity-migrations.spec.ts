@@ -7,7 +7,7 @@ import { startServer } from "../activate";
 import { confirmDialog, waitForDialog } from "../dialogs";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
-import { openKind } from "../studio-resources";
+import { openKind, openProblemsIfAny } from "../studio-resources";
 
 // Each journey starts a second server and publishes once, which takes a while.
 test.setTimeout(240_000);
@@ -133,9 +133,7 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
           timeout: 60_000,
         },
       );
-      await expect(page.getByTestId("studio-diagnostics")).not.toContainText(
-        "AXC0015",
-      );
+      await expect((await openProblemsIfAny(page)).filter({ hasText: "AXC0015" })).toHaveCount(0);
     } finally {
       await server.stop();
     }
@@ -205,9 +203,7 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
           timeout: 60_000,
         },
       );
-      await expect(page.getByTestId("studio-diagnostics")).not.toContainText(
-        "AXC0016",
-      );
+      await expect((await openProblemsIfAny(page)).filter({ hasText: "AXC0016" })).toHaveCount(0);
     } finally {
       await server.stop();
     }

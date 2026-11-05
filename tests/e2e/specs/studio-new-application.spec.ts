@@ -111,7 +111,7 @@ test.describe('Studio creates an application', () => {
     await expect(page.getByTestId('studio-group-site')).toBeVisible()
     await openKind(page, 'text')
     await expect(page.getByTestId('studio-group-text')).toBeVisible()
-    await expect(page.getByTestId('studio-diagnostics')).toContainText('No diagnostics')
+    await expect(page.getByTestId('studio-problems')).toHaveCount(0)
   })
 
   test('an author creates an application from the request-approval template', async ({ page }) => {
@@ -172,7 +172,7 @@ test.describe('Studio creates an application', () => {
     await page.goto('/studio?app=PurchaseRequests')
     await me
 
-    await expect(page.getByTestId('studio-diagnostics')).toBeVisible()
+    await expect(page.getByTestId('studio-band')).toBeVisible()
     await expect(page.getByRole('button', { name: /new application/i })).toHaveCount(0)
   })
 })

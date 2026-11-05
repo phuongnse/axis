@@ -7,7 +7,7 @@ import { startServer } from '../activate'
 import { openSelect, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openFormTab, openKind } from '../studio-resources'
+import { openFormTab, openKind, openProblems } from '../studio-resources'
 
 // A server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -82,7 +82,7 @@ test.describe('Studio on a copy of its own', () => {
     await expect(page).toHaveURL(new RegExp(`/studio\\?app=PurchaseRequests&resource=${entity.id}$`))
     await expect(entitiesLink).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
-    await expect(page.getByTestId('studio-diagnostics')).toBeVisible()
+    await expect(page.getByTestId('studio-band')).toBeVisible()
   })
 
   test('an author changes the maxLength of an entity field and the file holds only that change', async ({ page }) => {
@@ -398,8 +398,7 @@ test.describe('Studio on a copy of its own', () => {
       ).toBeVisible()
 
       await page.goto(`${server.url}/studio?app=PurchaseRequests`)
-      const diagnostic = page
-        .getByTestId('studio-diagnostics')
+      const diagnostic = (await openProblems(page))
         .getByRole('button')
         .filter({ hasText: 'Path: /input/2/target' })
       await expect(diagnostic).toContainText('AXC0012')

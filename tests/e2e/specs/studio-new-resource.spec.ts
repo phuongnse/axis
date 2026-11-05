@@ -8,7 +8,7 @@ import { waitForDialog } from '../dialogs'
 import { pickOption, pickOptions } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab, openKind } from '../studio-resources'
+import { createResource, openFormTab, openKind, openProblemsIfAny } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -312,12 +312,12 @@ test.describe('Studio creates a resource from a starter', () => {
     expect(own).toEqual([])
     // The starter of the page that an earlier journey created has an empty label, so the panel is checked for the two
     // files of this journey and for the codes that only a provider or a sign-in list raises.
-    const panel = page.getByTestId('studio-diagnostics')
+    const panel = await openProblemsIfAny(page)
     for (const file of ['identity-providers/partner.json', 'sites/purchasing.json']) {
       await expect(panel.getByRole('button').filter({ hasText: file })).toHaveCount(0)
     }
     for (const code of ['AXC0285', 'AXC0288', 'AXC0289']) {
-      await expect(panel).not.toContainText(code)
+      await expect(panel.filter({ hasText: code })).toHaveCount(0)
     }
     const saved = JSON.parse(await readFile(path.join(copy, 'identity-providers', 'partner.json'), 'utf8')) as Record<
       string,

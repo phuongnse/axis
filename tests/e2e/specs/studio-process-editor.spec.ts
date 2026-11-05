@@ -8,7 +8,7 @@ import { dragTo, scrollBelowHeader } from "../design-drag";
 import { pickAction, pickOption } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { openFormTab } from "../studio-resources";
+import { openFormTab, openProblems } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -228,8 +228,7 @@ test.describe("Studio edits a process in the process editor", () => {
     await save.click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();
 
-    const diagnostic = page
-      .getByTestId("studio-diagnostics")
+    const diagnostic = (await openProblems(page))
       .getByRole("button")
       .filter({ hasText: "Path: /steps/2/otherwise" });
     await expect(diagnostic).toContainText("AXC0070");
@@ -330,7 +329,7 @@ test.describe("Studio edits a process in the process editor", () => {
 
       await page.getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByTestId("studio-saved")).toBeVisible();
-      await expect(page.getByTestId("studio-diagnostics")).toContainText(
+      await expect(await openProblems(page)).toContainText(
         "AXC0070",
       );
 
