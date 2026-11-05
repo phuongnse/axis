@@ -88,7 +88,7 @@ An idle tenant is polled less and less often, and a wake signal brings it back a
 ## Metrics
 
 - `axis.work_items.claim_delay` keeps its `axis.tenant` attribute, as in the
-  [worker metrics](process-execution.md#worker-metrics). The [cell load test](performance.md#cell-load-test) _(planned for M31)_ checks it for every
-  tenant, not only the busy ones.
+  [worker metrics](process-execution.md#worker-metrics). The [cell load test](performance.md#cell-load-test) checks it for every
+  tenant but the one with the backlog, not only the busy ones.
 - `axis.worker.active_tenants`, a gauge, is the length of the active list. It has no attributes.
 - `axis.worker.polls`, a counter, counts the polls of a tenant with the attribute `axis.poll.found` `true` or `false`, so the cost of idle tenants shows. It has no tenant attribute.

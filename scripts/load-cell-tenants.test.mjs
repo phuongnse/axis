@@ -93,7 +93,7 @@ function runScript({ env = {}, args } = {}) {
   }
 }
 
-const ids = ['load-busy-01', 'load-busy-02', 'load-idle-001', 'load-idle-002', 'load-idle-003']
+const ids = ['load-busy-01', 'load-busy-02', 'load-idle-001', 'load-idle-002', 'load-idle-003', 'load-backlog']
 
 describe('scripts/lib/load-cell-tenants.mjs creates the load tenants through the provisioning API', () => {
   test('it queues one create and polls one job for each tenant, each create with its own idempotency key', () => {
@@ -119,6 +119,7 @@ describe('scripts/lib/load-cell-tenants.mjs creates the load tenants through the
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.equal(run.tenants.busy.length, 2)
     assert.equal(run.tenants.idle.length, 3)
+    assert.deepEqual(run.tenants.backlog, { id: 'load-backlog', url: 'https://load-backlog.cell.test' })
     run.tenants.busy.forEach((tenant, index) => {
       const id = ids[index]
       assert.equal(tenant.url, `https://${id}.cell.test`)
@@ -149,11 +150,12 @@ describe('scripts/lib/load-cell-tenants.mjs creates the load tenants through the
     const run = runScript()
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
-    for (const id of ids) {
+    for (const id of ids.slice(0, -1)) {
       assert.ok(run.calls.some((call) => / -X POST .*\/admin\/realms\/\S+\/users$/.test(call) && call.includes(`/admin/realms/${id}/users`)), id)
     }
     assert.equal(run.calls.filter((call) => / -X POST .*\/admin\/realms\/\S+\/users$/.test(call)).length, 2 * 10 + 3)
     assert.equal(run.calls.filter((call) => / -X POST .*\/admin\/realms\/\S+\/clients$/.test(call)).length, 2)
+    assert.equal(run.calls.some((call) => call.includes('/admin/realms/load-backlog/')), false, 'the backlog tenant gets no users')
     for (const call of run.calls.filter((call) => call.includes('/admin/realms/') || call.includes('/api/cell/'))) {
       assert.match(call, / -H @\S+\/realm\/(operator-)?authorization /, call)
     }
