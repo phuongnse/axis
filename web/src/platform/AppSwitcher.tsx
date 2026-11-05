@@ -17,8 +17,8 @@ function isCurrent(address: string, pathname: string): boolean {
 
 /**
  * The "Switch to" button in the shell header. Its menu lists the person's sites, then Studio for a
- * user who may use it, the operator console for a user who may use that and Users for an
- * administrator. The site or tool of the current page is drawn selected and marked as the current page.
+ * user who may use it, the operator console for a user who may use that, Users for an
+ * administrator and Billing, a link to the billing portal, for an administrator in a cell. The site or tool of the current page is drawn selected and marked as the current page.
  * It renders nothing
  * while the user loads, when nobody is signed in, or when loading the user fails. When loading the
  * sites fails, the menu lists only the tools.
@@ -78,6 +78,10 @@ export function AppSwitcher({ locale }: { locale: string }) {
   }
   if (user.users) {
     tools.push({ key: 'users', ...entry('/users', t('shell.appSwitcher.users')) })
+  }
+  if (user.billingUrl) {
+    // An outside link, so it is never the current page.
+    tools.push({ key: 'billing', label: <a href={user.billingUrl}>{t('shell.appSwitcher.billing')}</a> })
   }
   const items: NonNullable<MenuProps['items']> = []
   if (sites.length > 0) {

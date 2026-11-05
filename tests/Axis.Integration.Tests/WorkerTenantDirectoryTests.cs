@@ -4,6 +4,7 @@ using System.Text.Json;
 using Axis.Admin;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
+using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
@@ -20,9 +21,10 @@ using static Axis.Integration.Tests.Polling;
 namespace Axis.Integration.Tests;
 
 /// <summary>Under <c>Tenancy:Source=directory</c> the worker reads its tenants from the tenant directory.</summary>
-public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
+public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database, MailpitFixture mailpit) : IClassFixture<PostgreSqlFixture>
 {
     private const string RecordKind = "test.record";
+    private const string SlowKind = "test.slow";
     private const string TestSecretKey = TestPlatform.SecretKey;
     private const string LoadFailedLog = "Loading the tenant directory failed";
     private const string RefreshedLog = "Read the tenant directory again";
@@ -335,9 +337,204 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
         Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
     }
 
-    private static WebApplication BuildWorker(string platform, LogCollector logs, params (string Key, string Value)[] extraSettings)
+    [Fact]
+    public async Task A_work_item_queued_while_the_tenant_is_read_only_is_not_claimed_and_runs_after_the_resume()
     {
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+        var a = await PrepareTenantAsync("a");
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs, ("Tenancy:RefreshInterval", "00:00:00.2"));
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Loaded 1 active tenant(s) from the tenant directory.")), "The first read did not work.");
+
+        await SetStatusAsync(platform, "a", "readOnly");
+        await WaitForRefreshesAsync(logs, RefreshCount(logs) + 2);
+        var item = await EnqueueAsync(a);
+        await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+
+        Assert.Empty(await RunsAsync(a));
+        Assert.Equal(1L, await AdminCountAsync(a.SchemaConnectionString, "axis.process_work_items WHERE claim_token IS NULL"));
+
+        await SetStatusAsync(platform, "a", "active");
+
+        await WaitUntilAsync(async () => await RunsAsync(a) is { Count: 1 }, "The work did not run after the resume.");
+        Assert.Equal(item, (await RunsAsync(a)).Single().ItemId);
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_work_item_running_when_the_tenant_becomes_read_only_runs_to_its_end()
+    {
+        var a = await PrepareTenantAsync("a");
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs, ("Tenancy:RefreshInterval", "00:00:00.2"));
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Loaded 1 active tenant(s) from the tenant directory.")), "The first read did not work.");
+        var slow = app.Services.GetRequiredService<SlowHandler>();
+        await using var connection = new NpgsqlConnection(a.SchemaConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        var item = await WorkItemQueue.EnqueueAsync(connection, null, a.Id, SlowKind, DateTimeOffset.UtcNow.AddMinutes(-1), CancellationToken);
+        await slow.Started.Task.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
+
+        await SetStatusAsync(platform, "a", "readOnly");
+        var refreshes = RefreshCount(logs);
+        slow.Gate.Release();
+        await WaitForRefreshesAsync(logs, refreshes + 2);
+        await WaitUntilAsync(async () => await AdminCountAsync(a.SchemaConnectionString, $"axis.process_work_items WHERE kind = '{SlowKind}'") == 0, "The running item did not end.");
+
+        Assert.Equal(item, (await RunsAsync(a)).Single().ItemId);
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_schedule_due_while_the_tenant_is_read_only_is_skipped_and_does_not_fire_after_the_resume()
+    {
+        var a = await PrepareTenantAsync("a");
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+        await using var app = BuildWorker(platform, logs, ("Tenancy:RefreshInterval", "00:00:00.2"));
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Loaded 1 active tenant(s) from the tenant directory.")), "The first read did not work.");
+        await SetStatusAsync(platform, "a", "readOnly");
+        await WaitForRefreshesAsync(logs, RefreshCount(logs) + 2);
+        var trigger = Guid.NewGuid();
+        await using var connection = new NpgsqlConnection(a.SchemaConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using (var insert = new NpgsqlCommand(
+            """
+            INSERT INTO axis.trigger_schedules (trigger_id, application_id, release_id, schedule, time_zone, next_occurrence_at)
+            VALUES (@trigger, @application, @release, '0 * * * *', 'UTC', now() - interval '5 minutes')
+            """,
+            connection))
+        {
+            insert.Parameters.AddWithValue("trigger", trigger);
+            insert.Parameters.AddWithValue("application", Guid.NewGuid());
+            insert.Parameters.AddWithValue("release", Guid.NewGuid());
+            await insert.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        await WorkItemQueue.EnqueueAsync(
+            connection,
+            null,
+            a.Id,
+            ProcessStarts.TriggerScheduleWorkItemKind,
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            CancellationToken,
+            triggerId: trigger);
+        await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+        Assert.Equal(0L, await AdminCountAsync(a.SchemaConnectionString, "axis.process_work_items WHERE claim_token IS NOT NULL"));
+
+        var resumedAt = DateTimeOffset.UtcNow;
+        await SetStatusAsync(platform, "a", "active");
+        await WaitUntilAsync(
+            () => Task.FromResult(logs.Entries.Any(entry => entry.Contains($"Trigger {trigger} of tenant a skipped", StringComparison.Ordinal))),
+            "The worker did not skip the occurrence.");
+        await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+
+        await using var select = new NpgsqlCommand(
+            """
+            SELECT s.last_occurrence_at, s.next_occurrence_at, i.due_at
+            FROM axis.trigger_schedules s JOIN axis.process_work_items i ON i.trigger_id = s.trigger_id AND i.kind = 'trigger.schedule'
+            WHERE s.trigger_id = @trigger
+            """,
+            connection);
+        select.Parameters.AddWithValue("trigger", trigger);
+        await using (var reader = await select.ExecuteReaderAsync(CancellationToken))
+        {
+            Assert.True(await reader.ReadAsync(CancellationToken));
+            Assert.True(await reader.IsDBNullAsync(0, CancellationToken));
+            var next = reader.GetFieldValue<DateTimeOffset>(1);
+            Assert.True(next > resumedAt, $"The next occurrence {next:o} is not after the resume {resumedAt:o}.");
+            Assert.Equal(next, reader.GetFieldValue<DateTimeOffset>(2));
+        }
+
+        Assert.Equal(0L, await AdminCountAsync(a.SchemaConnectionString, $"axis.process_work_items WHERE kind = '{ProcessStarts.TriggerFanOutWorkItemKind}'"));
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_email_queued_while_the_tenant_is_read_only_is_not_sent_and_is_sent_after_the_resume()
+    {
+        var a = await PrepareTenantAsync("a");
+        var platform = await database.CreateDatabaseAsync("worker_platform", CancellationToken);
+        await SeedPlatformAsync(platform, a);
+        await GrantPlatformAsync(platform);
+        var logs = new LogCollector();
+
+        // Development looks for the extension and module folders next to the build, which are empty here.
+        using var empty = new TempFolder();
+        await using var app = BuildWorker(
+            platform,
+            logs,
+            "Development",
+            [
+                ("Tenancy:RefreshInterval", "00:00:00.2"),
+                ("Extensions:Path", empty.Path),
+                ("Modules:Path", empty.Path),
+                ("Email:Smtp:Host", await mailpit.SmtpHostAsync()),
+                ("Email:Smtp:Port", (await mailpit.SmtpPortAsync()).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                ("Email:Smtp:UseTls", "false"),
+                ("Email:From", "axis@example.test"),
+            ]);
+        await app.StartAsync(CancellationToken);
+        await WaitUntilAsync(() => Task.FromResult(logs.Entries.Contains("Information: Loaded 1 active tenant(s) from the tenant directory.")), "The first read did not work.");
+        await SetStatusAsync(platform, "a", "readOnly");
+        await WaitForRefreshesAsync(logs, RefreshCount(logs) + 2);
+        var address = $"read-only-{Guid.NewGuid():N}@example.test";
+        var emailId = Guid.NewGuid();
+        await using (var connection = new NpgsqlConnection(a.SchemaConnectionString))
+        {
+            await connection.OpenAsync(CancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
+            await ProcessEmails.InsertAsync(
+                transaction,
+                [new NewEmail(emailId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "notify", address, null, "Read-only", "Held back.", $"<{emailId:N}@example.test>", "{}")],
+                CancellationToken);
+            await WorkItemQueue.EnqueueAsync(
+                connection,
+                transaction,
+                a.Id,
+                ProcessStarts.NotificationEmailWorkItemKind,
+                DateTimeOffset.UtcNow.AddMinutes(-1),
+                CancellationToken,
+                emailId: emailId);
+            await transaction.CommitAsync(CancellationToken);
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken);
+
+        Assert.Empty(await mailpit.MessagesToAsync(address, CancellationToken));
+        Assert.Equal("pending", await OutboxStateAsync(a, emailId));
+
+        await SetStatusAsync(platform, "a", "active");
+
+        await WaitUntilAsync(async () => (await mailpit.MessagesToAsync(address, CancellationToken)).Count == 1, "The email was not sent after the resume.");
+        await WaitUntilAsync(async () => await OutboxStateAsync(a, emailId) == "sent", "The email was not marked sent.");
+        Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
+    }
+
+    private static async Task<string> OutboxStateAsync(DirectoryTenant tenant, Guid emailId)
+    {
+        await using var connection = new NpgsqlConnection(tenant.SchemaConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT state FROM axis.email_outbox WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", emailId);
+        return (string)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
+    private static WebApplication BuildWorker(string platform, LogCollector logs, params (string Key, string Value)[] extraSettings) =>
+        BuildWorker(platform, logs, "Testing", extraSettings);
+
+    private static WebApplication BuildWorker(string platform, LogCollector logs, string environment, (string Key, string Value)[] extraSettings)
+    {
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = environment });
         var settings = new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = "directory",
@@ -357,6 +554,8 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
         builder.Logging.AddProvider(logs);
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         builder.Services.AddSingleton<IWorkItemHandler, RecordingHandler>();
+        builder.Services.AddSingleton<SlowHandler>();
+        builder.Services.AddSingleton<IWorkItemHandler>(services => services.GetRequiredService<SlowHandler>());
         var app = builder.Build();
         app.MapWorkerHealth();
         return app;
@@ -505,6 +704,13 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
         return (response.StatusCode, body.RootElement.GetProperty("status").GetString());
     }
 
+    private sealed class TempFolder : IDisposable
+    {
+        public string Path { get; } = Directory.CreateTempSubdirectory("axis-worker-").FullName;
+
+        public void Dispose() => Directory.Delete(Path, recursive: true);
+    }
+
     private sealed record Role(string Name, string Password);
 
     private sealed record DirectoryTenant(string Id, string DatabaseHost, int DatabasePort, string DatabaseName, Role Role, string SchemaConnectionString)
@@ -531,6 +737,35 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
             command.Parameters.AddWithValue("item", context.Item.Id);
             command.Parameters.AddWithValue("tenant", accessor.Current!.TenantId);
             await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    /// <summary>Records its run like <see cref="RecordingHandler"/>, says it started, and then waits until the test releases <see cref="Gate"/>.</summary>
+    private sealed class SlowHandler(ITenantContextAccessor accessor) : IWorkItemHandler
+    {
+        public string Kind => SlowKind;
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public SemaphoreSlim Gate { get; } = new(0);
+
+        public async Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
+        {
+            await using (var command = new NpgsqlCommand(
+                "INSERT INTO test_runs (item_id, tenant_id, db, role) VALUES (@item, @tenant, current_database(), current_user)",
+                context.Connection,
+                context.Transaction))
+            {
+                command.Parameters.AddWithValue("item", context.Item.Id);
+                command.Parameters.AddWithValue("tenant", accessor.Current!.TenantId);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            Started.TrySetResult();
+            await Gate.WaitAsync(cancellationToken);
         }
 
         public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>

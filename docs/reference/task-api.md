@@ -228,7 +228,8 @@ record API's [rules](record-api.md#create-update-and-delete), so a wrong one is 
 A request is checked in this order, and the first failure is the response: `401`, then `404`, then
 `403`, then `409`, then `415`, then `400`. So a user who may not act on a task never learns its state.
 A completion or a form state call without the [CSRF header](record-api.md#create-update-and-delete)
-is a `403` before any of these checks.
+is a `403` before any of these checks, and so is one in a
+[read-only tenant](subscriptions.md#the-read-only-tenant).
 
 - **`401`.** Nobody is signed in. Every task route needs a signed-in user.
 

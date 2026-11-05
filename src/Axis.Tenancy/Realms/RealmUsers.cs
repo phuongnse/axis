@@ -11,7 +11,7 @@ namespace Axis.Tenancy.Realms;
 /// Lists and changes the users of a tenant's realm. It signs in to the realm as <c>axis-users</c> with the client
 /// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
 /// It reads one page of users with the number of all users that match the search, and for each user on the page the
-/// alias of the first federated identity. It counts the enabled users. It also finds one user, disables or enables a user, ends a user's realm
+/// alias of the first federated identity. It counts the enabled users. It reads the contact details of one user: the enabled flag, email, display name and locale. It also finds one user, disables or enables a user, ends a user's realm
 /// sessions or one realm session by its id, lists a user's authenticators and removes them. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
 /// adds a required action to every user. It also normalises an email address. An error names the step and the status code, never a response body or a secret.
@@ -112,6 +112,42 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
             userId,
             user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
             await ProviderAliasAsync(token, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users", userId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Reads the contact details of one user, or <c>null</c> when the realm has no user with this id. The locale is the first value of the
+    /// user's <c>locale</c> attribute, or <c>null</c> when the user never chose one.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<RealmUserContact?> ReadContactAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await GetAsync(token, UserPath(userId), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        EnsureSuccess(response, "read the user");
+        var user = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        string? locale = null;
+        if (user.TryGetProperty("attributes", out var attributes)
+            && attributes.ValueKind == JsonValueKind.Object
+            && attributes.TryGetProperty("locale", out var values)
+            && values.ValueKind == JsonValueKind.Array
+            && values.GetArrayLength() > 0
+            && values[0].ValueKind == JsonValueKind.String
+            && values[0].GetString() is { Length: > 0 } chosen)
+        {
+            locale = chosen;
+        }
+
+        var name = string.Join(' ', new[] { Text(user, "firstName"), Text(user, "lastName") }.Where(part => part is not null));
+        return new RealmUserContact(
+            user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
+            Text(user, "email"),
+            name.Length > 0 ? name : Text(user, "username") ?? "",
+            locale);
     }
 
     /// <summary>Disables or enables the user. It reads the full representation and writes it back, because a partial update can clear fields.</summary>
@@ -408,6 +444,9 @@ public sealed record RealmUser(
     public string DisplayName =>
         string.Join(' ', new[] { FirstName, LastName }.Where(name => name is not null)) is { Length: > 0 } name ? name : Username;
 }
+
+/// <summary>The contact details of one realm user. <c>Locale</c> is the language the user chose, or <c>null</c> when none.</summary>
+public sealed record RealmUserContact(bool Enabled, string? Email, string DisplayName, string? Locale);
 
 /// <summary>The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
 public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias);

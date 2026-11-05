@@ -280,6 +280,72 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_administrators_route_lists_a_suspended_tenants_enabled_administrators_with_email_name_and_language()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var tenant = $"adm-{Guid.NewGuid():N}"[..16];
+        const string usersSecret = "users-secret-1";
+        var admin = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+            .EnsureAsync(tenant, "Acme", new TenantRealmSecrets("platform-secret-1", "activation-secret-1", usersSecret), new Dictionary<string, string>(), CancellationToken);
+        try
+        {
+            var tenantDatabase = await CellTestPlatform.AddRealmTenantAsync(database, _platform, tenant, "suspended", _baseAddress, usersSecret, CancellationToken);
+            var enabledAdministrator = await CreateRealmUserAsync(admin, tenant, "ada@example.test", "Ada", "Lovelace", true, "vi");
+            var disabledAdministrator = await CreateRealmUserAsync(admin, tenant, "old@example.test", "Old", "Admin", false, "en");
+            await CreateRealmUserAsync(admin, tenant, "member@example.test", "Mem", "Ber", true, "en");
+            await using (var connection = new NpgsqlConnection(tenantDatabase))
+            {
+                await connection.OpenAsync(CancellationToken);
+                foreach (var holder in new[] { enabledAdministrator, disabledAdministrator })
+                {
+                    await using var command = new NpgsqlCommand(
+                        "INSERT INTO axis.given_roles (id, user_id, application_id, role) VALUES (gen_random_uuid(), @user, NULL, 'administrator')", connection);
+                    command.Parameters.AddWithValue("user", holder);
+                    await command.ExecuteNonQueryAsync(CancellationToken);
+                }
+            }
+
+            using var response = await GetAsync(client, $"/api/cell/tenants/{tenant}/administrators", token);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var items = (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items").EnumerateArray().ToList();
+            var item = Assert.Single(items);
+            Assert.Equal("ada@example.test", item.GetProperty("email").GetString());
+            Assert.Equal("Ada Lovelace", item.GetProperty("displayName").GetString());
+            Assert.Equal("vi", item.GetProperty("language").GetString());
+            Assert.Equal(["email", "displayName", "language"], item.EnumerateObject().Select(property => property.Name).ToArray());
+        }
+        finally
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(_baseAddress, $"admin/realms/{tenant}"));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", admin);
+            using var deleted = await _http.SendAsync(request, CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task The_administrators_route_answers_401_without_a_token_403_without_the_role_and_404_for_an_unknown_or_a_preview_tenant()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        using var none = await GetAsync(client, "/api/cell/tenants/c/administrators", token: null);
+        using var noRole = await GetAsync(client, "/api/cell/tenants/c/administrators", noRoleToken);
+        using var unknown = await GetAsync(client, "/api/cell/tenants/zz-unknown/administrators", operatorToken);
+        using var preview = await GetAsync(client, "/api/cell/tenants/a-preview/administrators", operatorToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+    }
+
+    [Fact]
     public async Task The_console_host_serves_the_probes_and_answers_404_for_tenant_routes_and_unknown_cell_routes()
     {
         await using var factory = await StartAsync();
@@ -1668,6 +1734,26 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         return counts.ValueKind == JsonValueKind.Null
             ? null
             : (counts.GetProperty("instances").GetInt64(), counts.GetProperty("unknownCalls").GetInt64(), counts.GetProperty("deadLetters").GetInt64());
+    }
+
+    private async Task<string> CreateRealmUserAsync(
+        string adminToken, string realm, string email, string firstName, string lastName, bool enabled, string locale)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(_baseAddress, $"admin/realms/{realm}/users"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        request.Content = JsonContent.Create(new
+        {
+            username = email,
+            email,
+            firstName,
+            lastName,
+            enabled,
+            attributes = new Dictionary<string, string[]> { ["locale"] = [locale] },
+        });
+        using var response = await _http.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var location = response.Headers.Location!.ToString();
+        return location[(location.LastIndexOf('/') + 1)..];
     }
 
     private static string[] Hosts(JsonElement tenant) =>

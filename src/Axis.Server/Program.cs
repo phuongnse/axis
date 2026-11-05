@@ -93,6 +93,9 @@ if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaCo
 // The provisioning API's writes that need no job open this role's connection for the write alone, see CellPlatformWriter.
 builder.Services.AddSingleton(new CellPlatformWriter(platformSchemaConnectionString));
 
+// The route that lists a tenant's administrators opens the tenant database of a suspended tenant too, see CellTenantDatabases.
+builder.Services.AddSingleton(new CellTenantDatabases(TenantDatabaseTls.From(platformConnectionString), runtimeAddress));
+
 // A download of a tenant export streams the ZIP from this storage. Without the settings the server starts and only a download answers 503.
 builder.Services.AddSingleton(new CellExportStorage(Axis.Administration.CellBackupStorage.Read(builder.Configuration, Axis.Administration.CellBackupStorage.ExportSection, out _)));
 
@@ -301,6 +304,10 @@ app.UseCsrfHeader();
 // callback is counted here, and only here.
 app.UseWhen(RateLimits.IsCallback, branch => branch.UseRateLimiter());
 app.UseAuthentication();
+
+// After the session, so a service account or session is known, and before the limiter and every route, so a refused write
+// reads no body and uses no limit.
+app.UseReadOnlyTenant();
 
 // After authentication, so the caller is known and a refused request still gets its 401 or 403 first.
 app.UseWhen(context => !RateLimits.IsCallback(context), branch => branch.UseRateLimiter());

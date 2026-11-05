@@ -10,10 +10,12 @@ using System.Text.Json;
 using Amazon.S3;
 using Axis.Administration;
 using Axis.Configuration.Templates;
+using Axis.Data.Storage;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -52,6 +54,14 @@ namespace Axis.Server.CellApi;
 /// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is <see langword="null"/> until the
 /// create job records it. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
 /// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults.
+/// </para>
+/// <para>
+/// <c>GET /api/cell/tenants/{id}/administrators</c> answers <c>{ "items": [{ email, displayName, language }] }</c>, ordered by email: the
+/// enabled realm accounts that hold the administrator role and have an email, and nothing else of them. The holders are the administrator
+/// rows of the tenant's <c>axis.given_roles</c>, which the invite step and the users page write, read over the tenant's runtime role. The
+/// route opens the tenant database from the tenant row and not from the tenant catalog, so it answers for a suspended or deleting tenant
+/// too. The <c>language</c> is the locale the person chose in the realm, or <see langword="null"/>. An unknown tenant or a preview tenant
+/// answers <c>404</c>, a tenant without a realm users client <c>409</c> and an identity provider failure <c>502</c>.
 /// </para>
 /// <para>
 /// <c>PUT /api/cell/tenants/{id}/quotas</c> takes <c>{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }</c>.
@@ -106,7 +116,7 @@ namespace Axis.Server.CellApi;
 /// is the operator's id. The route queues no job and takes no <c>Idempotency-Key</c>.
 /// </para>
 /// </summary>
-internal static class CellEndpoints
+internal static partial class CellEndpoints
 {
     private const string IdempotencyKeyHeader = "Idempotency-Key";
 
@@ -147,6 +157,7 @@ internal static class CellEndpoints
         cell.MapGet("/session", GetSession);
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
+        cell.MapGet("/tenants/{id}/administrators", ListAdministratorsAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
         cell.MapPost("/tenants", CreateTenantAsync);
         cell.MapPost("/tenants/{id}/suspend", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
@@ -256,6 +267,65 @@ internal static class CellEndpoints
         return Results.Ok(new CellTenantDetailResponse(
             tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id), failedWork.GetValueOrDefault(tenant.Id), quotas));
     }
+
+    // The tenant row, not the tenant catalog, which holds active tenants only. A suspended tenant has no pool, so the read opens one connection.
+    private static async Task<IResult> ListAdministratorsAsync(
+        string id,
+        NpgsqlDataSource dataSource,
+        TenantSecretCipher cipher,
+        CellTenantDatabases databases,
+        IHttpClientFactory httpClients,
+        ILogger<CellAdministratorsLog> logger,
+        CancellationToken cancellationToken)
+    {
+        TenantRow? row;
+        await using (var platform = Open(dataSource))
+        {
+            row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id && tenant.PreviewOf == null, cancellationToken);
+        }
+
+        if (row is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+        }
+
+        if (DirectoryTenantCatalog.RealmUsers(row, cipher) is not { } access)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This tenant has no realm to read its administrators from.");
+        }
+
+        try
+        {
+            IReadOnlyList<string> holders;
+            await using (var connection = new NpgsqlConnection(
+                DirectoryTenantCatalog.RuntimeConnectionString(row, cipher, databases.Tls, databases.Address)))
+            {
+                await connection.OpenAsync(cancellationToken);
+                holders = await GivenRoles.ListPlatformRoleHoldersAsync(connection, UserInvitations.AdministratorKind, cancellationToken);
+            }
+
+            using var client = httpClients.CreateClient(nameof(CellEndpoints));
+            var users = new RealmUsers(client, access);
+            var administrators = new List<CellAdministratorResponse>();
+            foreach (var holder in holders)
+            {
+                if (await users.ReadContactAsync(holder, cancellationToken) is { Enabled: true, Email: { } email } contact)
+                {
+                    administrators.Add(new CellAdministratorResponse(email, contact.DisplayName, contact.Locale));
+                }
+            }
+
+            return Results.Ok(new CellAdministratorListResponse([.. administrators.OrderBy(administrator => administrator.Email, StringComparer.Ordinal)]));
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            LogAdministratorsFailed(logger, id, exception.Message);
+            return Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The identity provider could not read the administrators.");
+        }
+    }
+
+    [LoggerMessage(LogLevel.Warning, "The administrators of tenant {TenantId} could not be read. {Reason}")]
+    private static partial void LogAdministratorsFailed(ILogger logger, string tenantId, string reason);
 
     private static async Task<IResult> SetQuotasAsync(
         string id,
@@ -844,6 +914,15 @@ internal sealed record CellTenantDetailResponse(
     IReadOnlyList<string> Hosts,
     CellFailedWorkResponse? FailedWork,
     IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
+
+/// <summary>The category of the logs of the administrators route.</summary>
+internal sealed class CellAdministratorsLog;
+
+/// <summary>One enabled administrator of a tenant. <c>Language</c> is the locale the person chose in the realm, or null when none.</summary>
+internal sealed record CellAdministratorResponse(string Email, string DisplayName, string? Language);
+
+/// <summary>The enabled administrators of a tenant, ordered by email.</summary>
+internal sealed record CellAdministratorListResponse(IReadOnlyList<CellAdministratorResponse> Items);
 
 /// <summary>The body of the quotas write: the quotas to set, where <c>null</c> is no limit, and the quotas to take back to the default.</summary>
 internal sealed record CellQuotasRequest(Dictionary<string, long?>? Set, List<string>? Remove);

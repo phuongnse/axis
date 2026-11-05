@@ -167,6 +167,7 @@ failure is the response. The session comes before the role, and the roles before
 a caller without the roles cannot find out which applications, resources, requests or releases exist.
 
 1. The CSRF header `X-Axis-Csrf: 1` on a `POST`, `PUT`, `PATCH` or `DELETE`, `403`.
+   A write in a [read-only tenant](subscriptions.md#the-read-only-tenant) is refused next, before the session.
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs Studio to be on and `Studio:AuthorRole` to be set and held in
    the session's roles, see [Settings](#settings).
@@ -548,6 +549,7 @@ is blank.
 The route has its own order of checks, and the first failure is the response:
 
 1. The CSRF header `X-Axis-Csrf: 1`, `403`.
+   A write in a [read-only tenant](subscriptions.md#the-read-only-tenant) is refused next, before the session.
 2. The session, `401`.
 3. In a cell, the tenant over its storage quota, `403` with `reason` `quota-exceeded`, see
    [refusals](tenant-quotas.md#refusals).

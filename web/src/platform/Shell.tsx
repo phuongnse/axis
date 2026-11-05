@@ -7,6 +7,7 @@ import { AppSwitcher } from './AppSwitcher'
 import { AxisButton } from './AxisButton'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { NotificationBell } from './NotificationBell'
+import { ReadOnlyBanner } from './ReadOnlyBanner'
 import { PreferencesMenu } from './PreferencesMenu'
 import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
@@ -70,7 +71,8 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header. A shell given `account` shows it in place of the app switcher
- * and the account button.
+ * and the account button. While the tenant is read-only, a banner tops the content
+ * column on every page, see `ReadOnlyBanner`. A shell given `account` has no tenant and shows no banner.
  */
 export function Shell({
   titleKey,
@@ -243,6 +245,7 @@ export function Shell({
               </Layout.Sider>
             )}
             <Layout>
+              {!hasAccount && <ReadOnlyBanner />}
               <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
                 <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
               </Layout.Content>

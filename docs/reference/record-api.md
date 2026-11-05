@@ -322,7 +322,8 @@ fixed and never contain text from the request.
 A request is checked in this order, and the first failure is the response:
 
 1. The [CSRF header](#create-update-and-delete) of a write, `403`. A service account request has no
-   such check.
+   such check. A write in a [read-only tenant](subscriptions.md#the-read-only-tenant) is refused
+   right after it, `403` with `reason: tenant-read-only`, before the session check.
 2. The session or the bearer token, `401`, before the path, so a caller without a session cannot
    find out which applications or records exist. See
    [Sign-in and the session](security.md#sign-in-and-the-session). On create and update in a cell,

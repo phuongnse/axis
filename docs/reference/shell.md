@@ -19,6 +19,11 @@ their own controls where they expect them.
   padding at its sides, and the items on its right are `spacing-sm` apart.
   On the cell console's host the operator's name takes the place of the app switcher and the account
   button, see [the console's views](cell-console.md#views).
+- **Read-only banner.** While the tenant is [read-only](subscriptions.md#the-read-only-tenant), a
+  warning banner with the alert role sits at the top of the content, under the header and beside the
+  sidebar, on every page of every site. It says that the workspace is read-only and why. An
+  administrator in a cell also gets a link to the billing portal, the `billingUrl` of
+  `GET /api/me`. The cell console's host has no tenant, so it shows no banner.
 - **Mark and title.** The mark is the first letter of the site's title on a `primary` tile with
   `radius-base` corners, and the mark and the title are one link to the site's first navigation page.
   The platform site's title and mark name Axis, because the tenant has no name yet, as the
@@ -115,6 +120,8 @@ theme.
   under the heading "Sites", then the tools of their roles under the heading "Tools": Studio for an
   author, the operator console for an operator and Users for an administrator, which links to the
   users page at `/users`, see [the administrator role](user-administration.md#the-administrator-role).
+  An administrator in a cell also sees Billing after Users, a link to `billingUrl` that opens the
+  [billing portal](billing-portal.md#where) in the same tab. Outside a cell there is no such entry.
   The entry of the current page, a site or a tool, is drawn selected, as the language and theme menu
   draws its current choices, and marked `aria-current="page"`. With nobody signed in the app switcher
   is not shown. On a site's own host it lists only that site and no tools.
