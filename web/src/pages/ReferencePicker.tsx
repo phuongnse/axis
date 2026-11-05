@@ -22,8 +22,9 @@ export function ReferencePicker({
   /** Proposed: fills its column, as an input beside it does, rather than its 240 px. */
   block?: boolean
   /**
-   * Proposed: the text people know an option by, such as a field's label. The picker shows it first, with the name after
-   * it in textMuted, and the search finds either. The value stays the name. An option with no text shows its name.
+   * Proposed: the text people know an option by, such as a field's label. The picker shows it alone, and the search finds
+   * the label or the name. The name shows after the label, in textMuted, only for options that share one label. The value
+   * stays the name. An option with no text shows its name.
    */
   labelOf?: (option: string) => string | null
   onChange: (next: string | undefined) => void
@@ -47,14 +48,17 @@ export function ReferencePicker({
         ]
       : []),
     ...options.map((option) => {
-      const text = labelOf?.(option)
+      const text = labelOf?.(option) || null
+      // The name shows beside the label only where the label alone would leave two options alike.
+      const alike = text !== null && options.some((other) => other !== option && labelOf?.(other) === text)
       return {
         value: option,
         search: text ? `${text} ${option}` : option,
         label:
-          text && text !== option ? (
+          text !== null && text !== option ? (
             <span>
-              {text} <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>{option}</span>
+              {text}
+              {alike && <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>{option}</span>}
             </span>
           ) : (
             option

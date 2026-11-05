@@ -188,8 +188,8 @@ Last updated 2026-11-05 (merged `main` at fd1bf541). The review is open; the own
 ### A picker names by the label
 
 - **Asked:** wherever a person picks a field or a resource, the choices show its label as text, as the tables do, not its
-  name. The name follows in textMuted so two with the same label differ, the search finds either, and the file keeps the
-  name.
+  name. The name shows only where it is needed: instead of a missing label, and in textMuted after the label of options
+  that share one. The search finds either, and the file keeps the name.
 - **Built:** `ReferencePicker` takes `labelOf`. The entity's Display field uses it first. The pickers of Validations and
   Indexes and the other pickers of fields and resources are left to follow it.
 
