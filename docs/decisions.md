@@ -144,4 +144,4 @@ the files agree, title and status included.
 | [D130](decisions/d130-activate-a-release-replaces-roll-back.md) | "Activate a release" replaces "roll back" | **Proposed** |
 | [D131](decisions/d131-tenant-notices-live-in-axisnotifications.md) | Tenant notices live in axis.notifications | **Proposed** |
 | D132 | Rules from the Studio settings review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d132-rules-from-the-studio-settings-review.md) |
-| [D133](decisions/d133-docs-state-each-current-rule-once.md) | Docs state each current rule once | **Proposed** |
+| [D133](decisions/d133-docs-state-each-current-rule-once.md) | Docs state each current rule once | **Agreed** |

@@ -114,9 +114,9 @@ way cannot be kept right, so a lint rule refuses `Table` from `antd` anywhere bu
 - **An empty table keeps its header** _(planned for M31)_, with the [empty state](#showing-what-is-empty) in its body.
 - **Paging and scrolling.** A long table pages, and one narrower than its columns' content scrolls sideways rather
   than squeezing them.
-- **Bulk actions** _(Proposed)_. Selecting rows is for bulk actions alone: a table shows checkboxes only when it has a
-  bulk action, and a selection shows an "N selected" bar that holds them.
-  [D59](../decisions/d59-table-row-and-toolbar-actions.md) left bulk actions for later.
+- **Bulk actions** _(planned for M31)_. Selecting rows is for bulk actions alone: a table shows checkboxes only when
+  it has a bulk action, and a selection shows an "N selected" bar that holds them. An action on one row stays on the
+  row.
 
 ## Opening things
 

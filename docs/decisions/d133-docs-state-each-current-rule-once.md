@@ -1,6 +1,6 @@
 # D133. Docs state each current rule once
 
-Status: **Proposed**
+Status: **Agreed**
 
 ## Context
 
