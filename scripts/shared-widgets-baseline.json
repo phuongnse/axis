@@ -156,9 +156,6 @@
   "web/src/pages/UsersPage.tsx": {
     "table": 1
   },
-  "web/src/platform/ChildCollectionTable.tsx": {
-    "table": 1
-  },
   "web/src/platform/ConsolePublishing.tsx": {
     "tag": 1
   },
@@ -184,9 +181,6 @@
     "tag": 2,
     "table": 4,
     "button": 2
-  },
-  "web/src/platform/ReferenceLookup.tsx": {
-    "table": 1
   },
   "web/src/platform/ReleaseOffStandard.tsx": {
     "tag": 1

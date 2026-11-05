@@ -132,12 +132,13 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
     sorted ascending by the target's display field, in one column for that
-    field. The record API lists only the target records that match the
+    field. The shared table draws it, with the search in its toolbar, and the
+    pager hides when one page holds every record. The record API lists only the target records that match the
     user's read filters. It pages 20 records at a time and keeps nothing in the URL.
     Loading, empty and error states use the table's texts. Clicking a row
     or pressing Enter on it picks the record and closes the dialog. The same
     dialog picks the record of a `reference` filter input.
-  - **Lookup search.** A search box above the list filters the records to
+  - **Lookup search.** A search box in the table's toolbar filters the records to
     those whose display field contains the typed text, ignoring letter case.
     The search applies 300 ms after typing stops, so typing does not request
     records for every key. The SPA trims the text and sends it as the record
@@ -191,10 +192,12 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       Integer, decimal and money columns sit on the right, in the header and
       in every cell, in tabular figures, see **Shown values** in
       [frontend.md](frontend.md).
-    - A reference column is 240px wide.
-    - Each row has a remove row button: a trash icon button in `dangerText`,
-      with its name as a tooltip on hover and on focus. Add row sits above the
-      table on the right, outlined at the *main* level of
+    - The table is the shared table, see [tables](actions-and-controls.md#tables).
+      A reference cell's input keeps at least 240px and the other inputs at least 160px.
+    - Remove row is the row's icon action: a trash icon button in `dangerText`,
+      with its name as a tooltip on hover and on focus. Below 992px it folds
+      into the row's "…" menu. Add row is the table toolbar's main action, above
+      the table on the right, outlined at the *main* level of
       [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`,
       and focus moves to the row's first input. Rows cannot be reordered.
     - When rows were added, removed or edited, the form sends the whole row
