@@ -69,7 +69,8 @@ it change. It never holds progress, dates, names or issue numbers.
   fixed, but a change to the choice is a new decision.
 - **A new decision that changes an agreed one replaces it whole.** It restates the parts that still
   hold, so the old file is never half valid. In the same change the old file is deleted, its row in
-  the index says `Superseded by Dn` with a link to its last text in git, and every reference page and
+  the index names the decision, or decisions, that superseded it, as `Superseded by Dn`, with a link to
+  its last text in git, and every reference page and
   link follows the new decision. A number is never used again.
 
 ## Reference pages

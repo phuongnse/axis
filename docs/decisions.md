@@ -115,8 +115,8 @@ the files agree, title and status included.
 | [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md) | The extensibility milestone is split into six | **Agreed** |
 | [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) | Built-in modules open to change and bound by a contract | **Agreed** |
 | [D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) | Modules hold triggers, scenarios and connector slots | **Agreed** |
-| [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md) | CodeQL and the performance tests run every night | **Agreed** |
-| [D105](decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md) | CI on main runs every two hours, and four issues run at once | **Agreed** |
+| D104 | CodeQL and the performance tests run every night | Superseded by [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md), [last text](https://github.com/phuongnse/axis/blob/7a4b98e91afc50fb844b235afd67f702f1ed0f91/docs/decisions/d104-codeql-and-the-performance-tests-run-every-night.md) |
+| D105 | CI on main runs every two hours, and four issues run at once | Superseded by [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) and [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md), [last text](https://github.com/phuongnse/axis/blob/7a4b98e91afc50fb844b235afd67f702f1ed0f91/docs/decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md) |
 | [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md) | A threat model kept current like the ASVS tracking | **Agreed** |
 | [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) | The dependency scan runs now, and images are scanned and signed | **Agreed** |
 | [D108](decisions/d108-reporting-a-vulnerability-and-security-fixes.md) | Reporting a vulnerability and security fixes | **Agreed** |
