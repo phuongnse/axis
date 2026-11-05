@@ -73,7 +73,7 @@ over the schema role.
 | --- | --- | --- |
 | `suspend`, `resume`, `read-only` | Its route | One `status` step |
 | `create` | `POST /api/cell/tenants` | The five steps of [creating a tenant](#creating-a-tenant), see the [create job](administration.md#create-job) |
-| `export` | `POST /api/cell/tenants/{id}/exports` | One `export` step, see [exporting a tenant](#exporting-a-tenant) |
+| `export` | `POST /api/cell/tenants/{id}/exports` or `POST /api/tenant/exports` | One `export` step, see [exporting a tenant](#exporting-a-tenant) |
 | `delete` | `DELETE /api/cell/tenants/{id}` | One `schedule` step |
 | `cancel-deletion` | `POST /api/cell/tenants/{id}/deletion/cancel` | One `cancel` step |
 | `purge` | The publisher, never a route | The eight steps of [deleting a tenant](#deleting-a-tenant), see the [purge job](administration.md#purge-job) |
@@ -207,8 +207,9 @@ An export gives a tenant's data to its owner in a form that any tool reads. It i
 restore takes an [archive](tenant-backup-and-restore.md), never an export.
 
 - **When.** For a tenant in any status but `provisioning`. A job for a `provisioning` tenant fails
-  with the refusal that `suspend` gives. An operator starts the `export` job with the exports route.
-  One export of a tenant runs at a time, because the publisher runs one job of a tenant at a time.
+  with the refusal that `suspend` gives. An operator starts the `export` job with the exports route, or
+  a tenant administrator with the [tenant route](#exports-by-a-tenant-administrator). One export of a
+  tenant runs at a time, because the publisher runs one job of a tenant at a time.
 - **A lease.** In a cell the job holds one lease of the tenant's `concurrentImports` quota while it
   reads the tenant and uploads the ZIP, so an import that runs at the same time competes for the same
   leases. When none is free, the job stays `running` with its step `pending`, and the publisher tries
@@ -229,9 +230,10 @@ restore takes an [archive](tenant-backup-and-restore.md), never an export.
 - **Kept 7 days.** The [publisher](administration.md#publisher) sweeps the export bucket every hour
   and deletes each ZIP under `exports/` that was stored more than 7 days ago. So a ZIP can outlive its
   `expiresAt` by up to an hour, and the route answers `410` from `expiresAt` in that time.
-- **Downloaded.** The download is the [exports route](#routes) with `Accept: application/zip`, and it
-  answers the ZIP to a caller of the provisioning API and to nobody else. Each download writes a
-  platform audit record that names the operator as actor and `export:<id>` in `changed`.
+- **Downloaded.** The download is the [exports route](#routes) with `Accept: application/zip`, or
+  `GET /api/tenant/exports/{exportId}` with it, and it answers the ZIP to a caller of the provisioning
+  API and to an administrator of the tenant, and to nobody else. Each download writes a platform audit
+  record that names that caller as actor and `export:<id>` in `changed`.
 - **Sensitive fields.** The export holds their values in clear, because the data is the owner's. The
   ZIP is [restricted](keys-and-data-protection.md#restricted) data.
 - **The console's warning** _(planned for M31)_. The cell console says that the ZIP is restricted data
@@ -259,23 +261,30 @@ extension, such as `scan_2.pdf`. The paths under `applications/` are copied as t
 
 ## Exports by a tenant administrator
 
-_(planned for M33)_
-
 A tenant administrator exports their own tenant from the application, with the same job and the same
 ZIP as the provisioning API, so that a business can take its data without asking the operator.
 
-- **Who.** A person who holds the [administrator role](user-administration.md#the-administrator-role),
-  on the users page's "Export data" section.
+- **Who.** A person who holds the [administrator role](user-administration.md#the-administrator-role).
+  _(The users page's "Export data" section is planned for M33.)_
 - **Routes.** `POST /api/tenant/exports` on the tenant's host starts it, and
   `GET /api/tenant/exports/{exportId}` answers it and its download, for 7 days. They are platform
   routes, in the session partition, with the CSRF header on the `POST`.
+- **Checks.** In this order: no session answers `401`, no administrator role `403`, and a tenant that
+  is not a cell tenant, or is a preview tenant, `404`.
+- **Start.** A new start queues the `export` job with the administrator as actor and answers `202`. While
+  an export of the tenant is queued or running, whoever started it, a start answers `200` with that
+  export and queues nothing. Both answers hold the export as the exports route does and a `Location`
+  header of `/api/tenant/exports/{exportId}`. The start needs no `Idempotency-Key`.
+- **Read.** The `GET` answers as the [exports route](#routes) does: the export's state and expiry, or
+  the ZIP with `Accept: application/zip`, and `404`, `409`, `410` and `503` as there.
 - **When.** While the tenant is `active` or `readOnly`, so a business whose trial ended or that
   stopped paying can still take its data, see [subscriptions](subscriptions.md#the-timeline). One
   export of a tenant runs at a time, whoever started it.
-- **Warning.** Before it starts, the page says that the file holds every value in clear, sensitive
-  ones included, and must be kept safe.
-- **Audit.** The start and each download write a platform audit record with the administrator as
-  actor.
+- **Warning** _(planned for M33)_. Before it starts, the page says that the file holds every value in
+  clear, sensitive ones included, and must be kept safe.
+- **Audit.** A start that queues a job writes the platform audit record `tenant export start`, and each
+  download writes `tenant export download`. Both name the administrator as actor and `export:<id>` in
+  `changed`.
 
 ## Deleting a tenant
 

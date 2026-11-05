@@ -60,10 +60,11 @@ public sealed class ReadOnlyTenantTests(RecordApiFixture fixture) : IClassFixtur
         await using var factory = ReadOnlyFactory();
         var open = ApiRoutes.From(factory.Services).Where(route => ReadOnlyTenant.OpenWrites.Contains(route.Name)).ToList();
 
-        // Sign-out and the two session routes exist. The tenant export route is on the list before it exists.
+        // Sign-out, the two session routes and the tenant export start exist.
         Assert.Contains(open, route => route.Name == "POST /api/auth/sign-out");
         Assert.Contains(open, route => route.Name == "DELETE /api/me/sessions");
         Assert.Contains(open, route => route.Name == "DELETE /api/me/sessions/{id}");
+        Assert.Contains(open, route => route.Name == "POST /api/tenant/exports");
         foreach (var route in open)
         {
             using var client = factory.CreateClient().SignedInAs("requester");

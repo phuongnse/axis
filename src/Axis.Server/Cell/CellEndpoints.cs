@@ -676,6 +676,9 @@ internal static partial class CellEndpoints
     }
 
     private static JobRow NewJob(string kind, string tenantId, HttpContext httpContext, string key, string hash, string? input) =>
+        NewJob(kind, tenantId, httpContext.User.FindFirst(CellOperator.IdClaim)!.Value, key, hash, input);
+
+    internal static JobRow NewJob(string kind, string tenantId, string actor, string? key, string? hash, string? input) =>
         new()
         {
             Id = Guid.CreateVersion7(),
@@ -684,7 +687,7 @@ internal static partial class CellEndpoints
             State = "queued",
             Steps = JsonSerializer.Serialize(_jobSteps[kind].Select(name => new CellJobStepResponse(name, "pending", null)), JsonSerializerOptions.Web),
             Input = input,
-            Actor = httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
+            Actor = actor,
             IdempotencyKey = key,
             RequestHash = hash,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -702,76 +705,16 @@ internal static partial class CellEndpoints
         CellExportStorage storage,
         CancellationToken cancellationToken)
     {
-        JobRow? job;
         await using (var platform = Open(dataSource))
         {
             if (!await platform.Tenants.AsNoTracking().AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
             {
                 return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
             }
-
-            job = await platform.Jobs.AsNoTracking()
-                .SingleOrDefaultAsync(row => row.Id == exportId && row.Kind == "export" && row.TenantId == id, cancellationToken);
         }
 
-        if (job is null)
-        {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No export of this tenant has this id.");
-        }
-
-        var succeeded = job.State == "succeeded";
-        DateTimeOffset? expiresAt = succeeded && job.FinishedAt is { } finished ? finished + TenantExports.Kept : null;
-        if (expiresAt <= DateTimeOffset.UtcNow)
-        {
-            return Gone();
-        }
-
-        if (!httpContext.Request.GetTypedHeaders().Accept.Any(accept => accept.MediaType.Equals("application/zip", StringComparison.OrdinalIgnoreCase)))
-        {
-            return Results.Ok(new CellExportResponse(job.Id, job.TenantId, job.State, job.CreatedAt, expiresAt));
-        }
-
-        if (!succeeded)
-        {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The export is not ready.");
-        }
-
-        if (storage.Storage is null)
-        {
-            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "The export storage is not configured.");
-        }
-
-        var client = storage.Storage.NewClient();
-        httpContext.Response.RegisterForDispose(client);
-        Amazon.S3.Model.GetObjectResponse stored;
-        try
-        {
-            stored = await client.GetObjectAsync(storage.Storage.Bucket, TenantExports.Key(id, exportId), cancellationToken);
-        }
-        catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound || exception.ErrorCode == "NoSuchKey")
-        {
-            return Gone();
-        }
-
-        httpContext.Response.RegisterForDispose(stored);
-
-        // The record comes after the storage returned the object and before the first byte, so a download that breaks half-way is
-        // still recorded, and a download that finds no ZIP is not.
-        await using (var platform = writer.Open())
-        {
-            await PlatformAuditRecords.WriteAsync(
-                platform,
-                TenantExports.DownloadCommand,
-                id,
-                [$"export:{exportId:D}"],
-                httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
-                cancellationToken);
-        }
-
-        return Results.Stream(stored.ResponseStream, "application/zip", $"{id}-{exportId:D}.zip");
-
-        static IResult Gone() =>
-            Results.Problem(statusCode: StatusCodes.Status410Gone, title: "The export was deleted after 7 days.");
+        return await CellExportReads.AnswerAsync(
+            id, exportId, httpContext.User.FindFirst(CellOperator.IdClaim)!.Value, httpContext, dataSource, writer, storage, cancellationToken);
     }
 
     private static async Task<IResult> GetJobAsync(Guid id, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
@@ -863,7 +806,7 @@ internal static partial class CellEndpoints
             StringComparer.Ordinal);
     }
 
-    private static PlatformDbContext Open(NpgsqlDataSource dataSource) =>
+    internal static PlatformDbContext Open(NpgsqlDataSource dataSource) =>
         new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(dataSource).Options);
 
     private static async Task<ILookup<string, string>> ReadHostsAsync(
