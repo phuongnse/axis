@@ -1,0 +1,11 @@
+Subject: Your Axis is ready
+
+Hello {{name}},
+
+Your Axis is ready. You can sign in at:
+
+{{tenantAddress}}
+
+If you need help, reply to the team that invited you or contact Axis support.
+
+The Axis team

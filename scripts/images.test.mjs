@@ -233,6 +233,10 @@ test('the control plane starts read-only with its connection string in /run/secr
       'ControlPlane__Region=vn',
       '-e',
       'ControlPlane__TenantDomain=vn.example.com',
+      '-e',
+      'ControlPlane__MailFrom=no-reply@vn.example.com',
+      '-e',
+      'ControlPlane__Mail__Host=mail.invalid',
     ]),
   )
 })
