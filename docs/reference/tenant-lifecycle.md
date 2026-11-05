@@ -5,7 +5,7 @@ cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the export read and download route, the route that requests a host of a tenant's own, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete and cancel-deletion described under it, the purge steps of [deleting a tenant](#deleting-a-tenant), which nothing queues yet, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete, cancel-deletion and purge described under it, the purge of [deleting a tenant](#deleting-a-tenant), and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -39,8 +39,8 @@ implementation.
   code as the `Axis.Admin` command, over the schema role. `GET /api/cell/jobs/{id}` answers the job,
   with `state` `queued`, `running`, `succeeded` or `failed`, its steps, and the error of a failed
   step. A failed job can be run again, and it skips the steps already done, as `tenant create` does.
-  The `platform.jobs` table and the runner in the publisher are built for the `suspend`, `resume`, `delete` and `cancel-deletion` kinds. The first two have one
-  `status` step each, `delete` has one `schedule` step and `cancel-deletion` has one `cancel` step. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
+  The `platform.jobs` table and the runner in the publisher are built for the `suspend`, `resume`, `delete`, `cancel-deletion` and `purge` kinds. The first two have one
+  `status` step each, `delete` has one `schedule` step, `cancel-deletion` has one `cancel` step and `purge` has the eight steps of [deleting a tenant](#deleting-a-tenant). No route queues a `purge` job: the publisher does. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
   A step may take a lease of the tenant first, as the `export` step does. A wait for a lease uses no claim: it adds to the
   job's `waits` count, and the limit of three is `claims` minus `waits`.
@@ -56,7 +56,7 @@ implementation.
   the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.
   A key is shared across the cell, not kept for each caller. A lock on the key keeps two parallel retries from queuing two jobs.
 - **Audit.** Each job writes one platform audit record when it ends, with the operator or the
-  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend`, `resume`, `delete` and `cancel-deletion` is built: it writes the
+  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend`, `resume`, `delete`, `cancel-deletion` and `purge` is built: it writes the
   record in the same transaction as the job's final state, whether the job succeeded or failed, with the command name of the
   matching `Axis.Admin` command and `job:<id>` in `changed`. A refused call writes a log
   event, not a record _(planned for M31)_.
@@ -239,8 +239,11 @@ A deletion can be undone during its grace window, and not after.
 2. **Grace window.** `POST /api/cell/tenants/{id}/deletion/cancel` clears `delete_after`, and the
    tenant stays `suspended` until it is resumed. A cancel after `delete_after` has passed fails its job and keeps the date. A cancel
    of a tenant with no scheduled deletion succeeds and changes nothing. An export can still run in the window.
-3. **Purge**. The eight steps below are built, as the named steps `hosts`, `database`, `realm`, `files`, `studio`, `keys`, `rows` and `directory`, and nothing
-   queues them yet. The job that runs them after `delete_after` is _(planned for M31)_. They run in this order, and each step can run again, so a purge that
+3. **Purge**. After `delete_after`, the [publisher](administration.md#publisher) in a cell queues a `purge` job for each main tenant, never for a preview tenant, and
+   runs it, see the [purge job](administration.md#purge-job). The job's actor is the actor of the tenant's latest succeeded `delete` job, and the tombstone names
+   them. A tenant whose deletion was cancelled has no `delete_after` and is never purged. A purge that failed is queued again no sooner than an hour after it ended,
+   and a tenant has one `purge` job at a time. The job has the eight steps below, the named steps `hosts`, `database`, `realm`, `files`, `studio`, `keys`, `rows` and
+   `directory`. They run in this order, and each step can run again, so a purge that
    stopped finishes when it runs again. When the tenant has a preview tenant, each step removes the preview's part first, and the preview gets a tombstone of its own:
    1. the tenant's hosts from the directory and its realm redirect addresses, and its cert-manager
       certificates _(planned for M31)_. This step first writes the tombstone, and it takes the actor from the job input `{ "actor" }`, and refuses a job that has none;

@@ -409,7 +409,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         {
             job.ToTable("jobs", table =>
             {
-                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion')");
+                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'export', 'delete', 'cancel-deletion', 'purge')");
                 table.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
             });
             job.HasKey(j => j.Id).HasName("pk_jobs");

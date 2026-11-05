@@ -8,7 +8,7 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// The purge of a deleted tenant, step 3 of deleting a tenant, as eight named <see cref="JobStep"/>s in this order: <c>hosts</c>, <c>database</c>,
+/// The purge of a deleted tenant, step 3 of deleting a tenant, which the <c>purge</c> job runs (see <see cref="PurgeJob"/>), as eight named <see cref="JobStep"/>s in this order: <c>hosts</c>, <c>database</c>,
 /// <c>realm</c>, <c>files</c>, <c>studio</c>, <c>keys</c>, <c>rows</c> and <c>directory</c>. <c>hosts</c> first writes the tombstone, one row of
 /// <c>platform.deleted_tenants</c> with the id, the time, the actor from the job input <c>{ "actor" }</c> and the hosts, and refuses the job when the
 /// input names no actor. It then deletes the tenant's hosts and its realm's redirect addresses. <c>database</c> drops the database and the schema and

@@ -35,13 +35,13 @@ which host holds which connection. There is no HTTP API for provisioning.
 
 | Setting | Environment variable | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create`, `tenant restore` and `tenant rotate-passwords` read it, and `publisher` reads it in a cell for the [create job](#create-job). `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
+| `Admin:ConnectionString` | `Admin__ConnectionString` | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. It creates the tenant databases and roles. Only `tenant create`, `tenant restore` and `tenant rotate-passwords` read it, and `publisher` reads it in a cell for the [create](#create-job) and [purge](#purge-job) jobs. `migrate` needs no admin role. See [admin settings](host-settings.md#admin-settings). |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant and `cell operator invite` read it, and `tenant restore` reads it when it is set. In a cell, `publisher` reads it for the [create job](#create-job). `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
-| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when it is set. In a cell, `publisher` reads it for the [create job](#create-job). |
-| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. In a cell, `publisher` reads it for the [create job](#create-job). It is never stored and never printed. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant and `cell operator invite` read it, and `tenant restore` reads it when it is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
+| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when it is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. It is never stored and never printed. |
 | `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | Optional. A connection string to the identity provider's database, for a role that is read-only and has `SELECT` on Keycloak's `credential` table and no other right. Only `tenant backup` and `cell backup` read it, to put the password hashes and authenticator secrets of a realm's users into `realm.json`, see [Tenant backup](tenant-backup-and-restore.md#tenant-backup). A `tenant restore` into a new realm imports that file and needs no such setting. It is never printed. Without it, no archive holds a `realm.json`. A value that is not a connection string exits with code 2, naming the setting. |
 | `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher`, `cell operator invite` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
@@ -443,7 +443,7 @@ tenant and lets a running job finish when it is stopped. A job that it ends writ
 [platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor.
 In a fourth loop it checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS every `Cell:HostCheckInterval`,
 `00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set. The record of that add is named `tenant host verify` and names
-the operator who asked for the host. The publisher writes no other record, because it acts on no tenant on its own: the audit
+the operator who asked for the host. The publisher writes no other record of its own, except the `tenant purge` record of the purge job it queues itself: the audit
 of a publish is the release's own record in the tenant database. A value of `Cell:HostCheckInterval` that is not a positive
 time span exits with code `2`. In a fifth loop it sweeps the `Cell:ExportStorage` bucket every hour and deletes each ZIP under `exports/` that was stored
 more than 7 days ago, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant). It writes one line for each deletion and runs only when the
@@ -482,10 +482,10 @@ agrees. See [test](authoring.md#test) for the route.
   settings error.
 - `Activation:InlineRecomputeLimit`, as for `activate`.
 - `Data:ActivationTimeout`, as for `activate`.
-- In a cell (`Cell:Id` set), the settings of the [create job](#create-job): `Admin:ConnectionString`, the
+- In a cell (`Cell:Id` set), the settings of the [create](#create-job) and [purge](#purge-job) jobs: `Admin:ConnectionString`, the
   `IdentityProvider` settings, `Cell:BackupKeyFile`, `Cell:TenantDomain`, `Studio:ApplicationsPath` and `Templates:Path`. The
   publisher reads them without stopping. When one is missing or wrong, it still starts and runs its other requests, and only the
-  create job fails, at the first step that needs the setting, with a message that names it. The `Email` block it reads anyway.
+  create or purge job fails, at the first step that needs the setting, with a message that names it. The `Email` block it reads anyway.
 - `Scenarios:ServerConnectionString`, the role that creates
   the scenario databases of `test` requests and of the contract scenarios of
   `publish` and `validate` requests. It is optional. The publisher
@@ -752,6 +752,25 @@ before it reads anything and holds it until the ZIP is stored. When none is free
 three claims, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant). An upload that fails ends the claim, and the job runs again.
 The publisher deletes the ZIP 7 days after it was stored, see [publisher](#publisher).
 
+### Purge job
+
+In a cell, the publisher queues and runs the `purge` job, which carries out step 3 of [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
+Outside a cell it knows no `purge` kind, because the provisioning API answers `404` there, so no `delete` job and no `delete_after` exist.
+No route queues the job. In each round of its jobs loop, in the same transaction and under the same lock as a claim, the publisher queues one `purge` job
+for each main tenant, never a preview tenant, whose `delete_after` has passed and that has no queued or running `purge` job. The job's actor is the actor of the
+tenant's latest succeeded `delete` job, and it is also the `actor` in the job's input, which the tombstone names. A tenant with no succeeded `delete` job gets none.
+A tenant whose deletion was cancelled has no `delete_after`, so it is never purged and keeps all its data.
+
+The job has the eight steps of `TenantPurge`, in order: `hosts`, `database`, `realm`, `files`, `studio`, `keys`, `rows` and `directory`. It reads the
+admin database role and the identity provider admin client of the [create job](#create-job), and `Studio:ApplicationsPath`. When one of them is missing, the
+job fails at its first step with a message that names the setting, removes nothing, and the publisher keeps running. A missing `Studio:ApplicationsPath` is
+never read as no folder. A missing `Cell:BackupKeyFile` fails the job too, because the purge reads the create job's settings, though it needs no backup key.
+When the job ends it writes one platform audit record, `tenant purge`, with the actor of the job.
+
+A failed `purge` job is queued again no sooner than an hour after it ended, so a lasting fault adds one failed job and one audit record for the tenant each hour
+until an operator fixes it. A step that throws ends the claim, as for the other jobs. The cert-manager certificates and the 90-day hold on hosts of
+[deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) are _(planned for M31)_.
+
 ## What else to back up
 
 A tenant archive is not a backup of the
@@ -863,8 +882,8 @@ admin host carries the same version in its OCI label, see
 
 ## Not built yet
 
-- The purge of a deleted tenant, and the other routes of the HTTP API for provisioning, _(planned for M31)_ in a cell, see
-  [tenant lifecycle in a cell](tenant-lifecycle.md). Scheduling a deletion and cancelling it in the grace window are built.
+- The other routes of the HTTP API for provisioning, _(planned for M31)_ in a cell, see
+  [tenant lifecycle in a cell](tenant-lifecycle.md). Scheduling a deletion, cancelling it in the grace window and the purge after it are built.
 - Moving a tenant to another database server.
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation. A cell keeps point-in-time recovery of its whole cluster, see
