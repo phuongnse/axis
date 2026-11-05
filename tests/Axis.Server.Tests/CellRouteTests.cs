@@ -36,6 +36,7 @@ public sealed class CellRouteTests
         var routes = CellRoutes(factory).Where(route => !Names(route).Intersect(_sessionRoutes).Any()).ToList();
 
         Assert.NotEmpty(routes);
+        Assert.Contains(routes, route => Names(route).Contains("GET /api/cell/session"));
         Assert.All(routes, route =>
         {
             var name = route.RoutePattern.RawText;
@@ -65,7 +66,7 @@ public sealed class CellRouteTests
     }
 
     [Fact]
-    public async Task The_provisioning_API_reads_the_cell_the_tenants_jobs_and_exports_sets_quotas_queues_create_suspend_resume_delete_and_cancel_deletion_takes_host_requests_and_has_the_session_routes_sign_in_and_out()
+    public async Task The_provisioning_API_reads_the_cell_the_tenants_jobs_and_exports_sets_quotas_queues_create_suspend_resume_delete_and_cancel_deletion_takes_host_requests_and_has_the_session_routes_sign_in_and_out_and_the_session_read()
     {
         await using var factory = CreateFactory();
 
@@ -78,6 +79,7 @@ public sealed class CellRouteTests
                 "GET /api/cell/auth/sign-in",
                 "GET /api/cell/jobs",
                 "GET /api/cell/jobs/{id:guid}",
+                "GET /api/cell/session",
                 "GET /api/cell/tenants",
                 "GET /api/cell/tenants/{id}",
                 "GET /api/cell/tenants/{id}/exports/{exportId:guid}",

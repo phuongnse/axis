@@ -4,7 +4,7 @@ namespace Axis.Server.CellApi;
 
 /// <summary>
 /// The platform hosts of a cell: <c>Cell:ConsoleHost</c> and the host of <c>Cell:InternalUrl</c>. They belong to no tenant,
-/// so request resolution gives them no tenant and serves only the cell's own routes there. A host that is not in a cell has none.
+/// so request resolution gives them no tenant and serves only the cell's own routes there. The console host also serves the SPA's page and its two shell reads. A host that is not in a cell has none.
 /// </summary>
 internal sealed class CellHosts
 {

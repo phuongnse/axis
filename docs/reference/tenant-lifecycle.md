@@ -5,7 +5,7 @@ cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the export read and download route, the route that requests a host of a tenant's own, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete, cancel-deletion and purge described under it, the purge of [deleting a tenant](#deleting-a-tenant), and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete, cancel-deletion and purge described under it, the purge of [deleting a tenant](#deleting-a-tenant), and the console's sign-in, sign-out and session read, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -18,7 +18,9 @@ implementation.
 - **Where it answers.** Under `/api/cell/` on the cell console's host, `Cell:ConsoleHost`, and on
   the host of the server's internal listener, `Cell:InternalUrl`, which only the cell's network
   reaches. Both are platform hosts: they resolve no tenant, the health probes still answer there, and
-  every path outside `/api/cell/` answers `404`, the page at `/` included. A tenant host answers `404`
+  every path outside `/api/cell/` answers `404`, except on the console host, which also serves the SPA's
+  page, its files, `GET /api/site` and `GET /api/texts/{locale}`. The internal listener's host answers `404` for every
+  path outside `/api/cell/`, the page at `/` included. A tenant host answers `404`
   for every path under `/api/cell/`, before any sign-in work. A self-hosted installation has no
   platform host, so every `/api/cell/` path answers `404`. The server opens no separate internal
   listener yet _(planned for M31)_.
@@ -66,6 +68,7 @@ implementation.
 | `GET /api/cell` | Answers the cell as `{ "id", "region", "tenants", "cap" }`. `tenants` counts the cell's tenants whatever their status and leaves out preview tenants. `cap` is `Cell:TenantCap`, see [cell size](cells.md#cell-size), or `null` when it is not set. |
 | `GET /api/cell/auth/sign-in` | Sends the operator to the operator realm's login page, see [sign-in](cell-console.md#sign-in). It needs no session and answers `404` on any host but the console host, and when the console offers no sign-in. |
 | `POST /api/cell/auth/sign-out` | Deletes the operator's session and answers `204`. It needs the CSRF header. |
+| `GET /api/cell/session` | Answers the signed-in operator as `{ "displayName" }`, see [sign-in](cell-console.md#sign-in). Needs the operator role. |
 | `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application`, `hosts` and `failedWork`, read from the platform tables. `status` is `deleting` while a deletion is scheduled, though the stored status stays `suspended`. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. `failedWork` is `{ "instances", "unknownCalls", "deadLetters" }`, counts only: the failed instances, the connector and package calls whose outcome is unknown, and the open dead letters. It comes from the worker's hourly [usage sample](tenant-quotas.md#usage) and is `null` until the worker has counted the tenant. Usage and quotas, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
 | `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, `deleting` and `failedWork` included, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
