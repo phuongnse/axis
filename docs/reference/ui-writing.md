@@ -16,6 +16,8 @@ These hold in every language.
   is the source of the keys, not of the sentences.
 - **The person's words.** Name what the person sees and does, in the terms of the people who use the screen. Write
   "The record could not be saved", not the name of the API call that failed.
+- **A setting by what it means.** Name a setting by what it is to the person, not by the English word for it: what
+  people see as a field's name is its display name, and what a field holds is its data type.
 - **One term for one concept.** Use the glossary's term. Never bring in a synonym, and never change an approved term in
   passing: a change of term is a change of the glossary, which the owner approves, and then of every text that uses it.
 - **Direct verbs for actions.** A button or a menu item says what it does, with a verb first where the language allows:
@@ -62,6 +64,11 @@ These hold in every language.
 | Status             | A short state, as a noun or an adjective.                                     | Live, Not published                                                           |
 
 A label, a title and a button take sentence case in English: "Display field", not "Display Field".
+
+A label or a column title does not repeat what its section, table, row or dialog is about: the Fields table's columns
+are Name, Label and Type, not Field name, Field label and Field type, and a step's settings say Name, not Step name. An
+accessible name that no visible heading explains, such as an input's `aria-label` in a row with no title, keeps the
+noun.
 
 ## Placeholders and numbers
 
@@ -123,6 +130,8 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   - No "việc", "thực hiện việc", "tiến hành" or "thao tác" wrapped around a verb: "Xóa", not "Thực hiện việc xóa".
   - No literal noun piles from English: "Độ rộng (trên 12 cột)", not "Độ rộng theo phần mười hai của hàng". A compound
     reads in Vietnamese order: "Tài khoản Internet", not "Internet tài khoản".
+- **A short label that reads two ways on its own is rewritten.** "Nhãn trường" can read as a school's label; "Tên
+  hiển thị" cannot.
 - **Capital on the first word only**, on buttons and titles too: "Chọn tất cả", not "Chọn Tất Cả". A proper name keeps its
   capitals: "Việt Nam".
 - **One spelling and spacing.** The modern placement of tone marks: "xóa", "hủy", "hòa". No space before `. , : ; ? ! )`

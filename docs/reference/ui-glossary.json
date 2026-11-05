@@ -183,6 +183,19 @@
       }
     },
     {
+      "concept": "Data type",
+      "en": "type",
+      "vi": "kiểu dữ liệu",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "kiểu trường",
+          "kiểu tham số"
+        ]
+      },
+      "note": "What a field or a parameter holds: text, number, date, a reference."
+    },
+    {
       "concept": "Record",
       "en": "record",
       "vi": "bản ghi",
@@ -286,8 +299,14 @@
     {
       "concept": "Label",
       "en": "label",
-      "vi": "nhãn",
-      "status": "approved"
+      "vi": "tên hiển thị",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "nhãn"
+        ]
+      },
+      "note": "What people see as the name of a field, an entity, a value or an action. \"Tên\" alone is the name that references use."
     },
     {
       "concept": "Help text",
