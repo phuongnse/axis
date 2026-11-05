@@ -429,6 +429,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             job.Property(j => j.ClaimedBy).HasColumnName("claimed_by");
             job.Property(j => j.LeaseUntil).HasColumnName("lease_until").HasColumnType("timestamp with time zone");
             job.Property(j => j.Claims).HasColumnName("claims").HasDefaultValue(0);
+            job.Property(j => j.Waits).HasColumnName("waits").HasDefaultValue(0);
             job.HasIndex(j => new { j.State, j.CreatedAt }).HasDatabaseName("ix_jobs_state_created_at");
             job.HasIndex(j => j.IdempotencyKey).HasDatabaseName("ix_jobs_idempotency_key");
         });

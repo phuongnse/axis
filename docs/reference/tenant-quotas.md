@@ -113,6 +113,10 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
     runs. When none is free it does not run. Its work item is due again in 1 second and the import
     keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. The
     lease is held until the work has committed.
+  - In a cell, the `export` job of the publisher takes a `concurrentImports` lease before its step runs, and holds it until the
+    ZIP is stored. When none is free the job stays `running` and the publisher tries again about a second later. The wait does not
+    use one of the job's three claims, so a busy tenant never fails an export. The limit is the tenant's own row in
+    `platform.tenant_quotas`, read when the lease is taken, or the publisher's `Quotas:Defaults` when it has no row.
   - A connector or package call is not claimed by the worker while the tenant has no lease free.
     The work item stays due, and the worker runs other tenants' work. The worker retries the claim
     at the tenant's next turn, after one of its items ends or at the next poll. The lease is held
@@ -125,7 +129,9 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
     releases its lease when its file is complete, before the file is sent.
 - **When the platform database is down.** A read, an export, an import or a connector or package call that cannot reach the
   platform database runs without a lease, and the server or the worker logs a warning. Under `directory` the server keeps serving from the last good
-  directory then, and the limit would otherwise turn a platform outage into a cell-wide read outage.
+  directory then, and the limit would otherwise turn a platform outage into a cell-wide read outage. The `export` job of the publisher is
+  the exception: it needs the platform database to renew and finish the job anyway, so a lease that cannot be taken ends its claim, and the
+  export does not run without one.
 - **Cost.** A lease costs two short statements on the platform database. The
   [cell load test](performance.md#cell-load-test) shows whether the objectives still hold with them.
 
