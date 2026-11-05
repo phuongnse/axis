@@ -1,6 +1,7 @@
 import { Alert, Button, Flex, Input, Result } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { ActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
 import {
@@ -532,12 +533,14 @@ function StudioWorkspace() {
         actions={
           // Proposed: New resource… heads the band's actions, the same gap apart as the others, as every one acts on the
           // application; Publish… stands out as the one solid button and is never beside it.
-          <Flex align="center" gap={spacing.xs}>
-            {loaded && 'resources' in loaded && (
-              <StudioNewResource application={application} resources={resources} inBand onCreated={onCreated} />
-            )}
-            <div ref={setActionsSlot} style={{ display: 'flex' }} />
-          </Flex>
+          <ActionRow finish={canPublish}>
+            <Flex align="center" gap={spacing.xs}>
+              {loaded && 'resources' in loaded && (
+                <StudioNewResource application={application} resources={resources} inBand onCreated={onCreated} />
+              )}
+              <div ref={setActionsSlot} style={{ display: 'flex' }} />
+            </Flex>
+          </ActionRow>
         }
       >
         {loaded && 'resources' in loaded && (
