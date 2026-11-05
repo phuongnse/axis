@@ -21,7 +21,7 @@ implementation.
   every path outside `/api/cell/` answers `404`, the page at `/` included. A tenant host answers `404`
   for every path under `/api/cell/`, before any sign-in work. A self-hosted installation has no
   platform host, so every `/api/cell/` path answers `404`. The server opens no separate internal
-  listener yet, and `Cell:ConsoleAllowedNetworks` is not enforced yet _(planned for M31)_.
+  listener yet _(planned for M31)_.
 - **Who may call.** A caller signs in through the cell's [operator realm](cell-console.md#sign-in):
   the cell console with the operator's session, and a machine caller, such as the
   control plane or a script, with a bearer token of a client of that realm. The server finds the realm at

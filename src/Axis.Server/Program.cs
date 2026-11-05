@@ -276,6 +276,10 @@ if (!forwardedHeaders.IsEmpty)
     app.UseWhen(context => context.Connection.RemoteIpAddress is not null, branch => branch.UseForwardedHeaders());
 }
 
+// After the forwarded headers, so the client address is the real one, and before tenant resolution and sign-in, so a
+// refused request does no work.
+app.UseConsoleNetworks(cell);
+
 // Then tenant resolution, so API and SPA paths alike need a known tenant host, and a session is
 // checked against the resolved tenant.
 app.UseTenantResolution();
