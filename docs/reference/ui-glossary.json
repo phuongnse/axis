@@ -152,6 +152,30 @@
       "note": "A diagnostic is an error or a warning: \"lỗi\" and \"cảnh báo\"."
     },
     {
+      "concept": "Dependencies",
+      "en": "Dependencies",
+      "vi": "Phụ thuộc",
+      "status": "approved",
+      "avoid": {
+        "vi": [
+          "Liên quan"
+        ]
+      },
+      "note": "The tab of a resource that lists what uses it and what it uses, opened before a rename or a delete."
+    },
+    {
+      "concept": "Used by",
+      "en": "Used by",
+      "vi": "Được dùng bởi",
+      "status": "approved"
+    },
+    {
+      "concept": "Uses",
+      "en": "Uses",
+      "vi": "Sử dụng",
+      "status": "approved"
+    },
+    {
       "concept": "Studio",
       "en": "Studio",
       "vi": "Studio",
