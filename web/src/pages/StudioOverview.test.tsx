@@ -93,6 +93,12 @@ describe('Get started', () => {
 
     expect(screen.queryByRole('region', { name: 'Get started' })).not.toBeInTheDocument()
   })
+
+  it('is gone when a module supplies the entity', () => {
+    renderOverview({ resources: [], moduleKinds: new Set(['entity']) })
+
+    expect(screen.queryByRole('region', { name: 'Get started' })).not.toBeInTheDocument()
+  })
 })
 
 describe('Live', () => {
@@ -211,6 +217,20 @@ describe('Changes since the live release', () => {
       'href',
       '/studio?app=PurchaseRequests&resource=e1',
     )
+  })
+
+  it('links an added resource and says Added', () => {
+    const changes: StudioReleaseChange[] = [
+      { path: 'seeds/start.json', change: 'added', kind: null, name: null, titles: null, locale: null },
+    ]
+    renderOverview({
+      resources: [...withEntity, resource('s1', 'seed', 'Start', 'seeds/start.json')],
+      history: { ...live, changes },
+    })
+
+    const row = within(section('Changes since the live release').getByTestId('studio-change-row'))
+    expect(row.getByRole('link', { name: 'Start' })).toHaveAttribute('href', '/studio?app=PurchaseRequests&resource=s1')
+    expect(row.getByText(english['shell.studio.overview.change.added'])).toBeInTheDocument()
   })
 
   it('links to the releases list', () => {

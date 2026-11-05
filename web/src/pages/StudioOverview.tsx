@@ -39,8 +39,8 @@ export function StudioOverview({
   const { colour, spacing } = useDesignTokens()
   const loaded = history === undefined || history === 'failed' ? undefined : history
   const releaseId = loaded?.active?.releaseId ?? null
-  const getStarted = !resources.some((item) => item.kind === 'entity')
   const present = new Set([...resources.map((item) => item.kind), ...moduleKinds])
+  const getStarted = !present.has('entity')
   const missing = studioKinds.filter(
     (entry) =>
       entry.group !== 'other' && !present.has(entry.kind) && !(getStarted && getStartedKinds.includes(entry.kind)),
