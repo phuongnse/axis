@@ -6,8 +6,8 @@ name: CI
 # review's prototype branches are left out too: a prototype changes the widgets without their tests
 # and is never merged, so CI could only fail on it.
 # A merge by NexKit starts no push workflow, so NexKit starts CI on main once every 5 of its merges
-# (D112). It also runs on a person's push and on demand. Once a week the schedule runs the image scan
-# alone, so a new advisory in a base image fails CI on main even when nothing merged (D107).
+# (D112). It also runs on a person's push and on demand. Once a week the schedule runs the dependency
+# and image scans alone, so a new advisory fails CI on main even when nothing merged (D107).
 on:
   push:
     branches-ignore: ['nexkit/**', 'design/**']
@@ -173,10 +173,34 @@ jobs:
       - name: Image scan
         run: scripts/scan-images.sh
 
+  # Scans the .NET solution and the npm packages with scripts/scan.sh. It fails on a high or critical
+  # finding that scripts/scan-accepted.json does not cover (D107).
+  dependency-scan:
+    name: Dependency scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Find a .NET SDK that matches global.json
+        id: sdk
+        run: |
+          if dotnet --version; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.sdk.outputs.found != 'true'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Dependency scan
+        run: scripts/scan.sh
+
   # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
   # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
   nexkit-sweep:
-    needs: [checks, image-scan]
+    needs: [checks, dependency-scan, image-scan]
     if: always() && github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-24.04
     timeout-minutes: 15

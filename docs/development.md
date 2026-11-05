@@ -223,11 +223,13 @@ with a missing setting.
 
 `scripts/scan.sh` scans the NuGet and npm packages, and `scripts/scan-images.sh` scans the production
 images. Both fail on a high or critical finding that their accepted list does not cover, see
-[dependency updates](#dependency-updates). Neither is a NexKit check.
+[dependency updates](#dependency-updates). CI runs both on its triggers, and its weekly schedule
+runs them alone, so a new advisory fails CI on `main` even when nothing merged. Neither is a NexKit
+check.
 
 `scripts/scan-images.sh` builds the Dockerfile's `axis-*` stages, pulls the identity provider image
 that `KeycloakFixture.Image` pins, and scans them with Trivy, which it downloads at its pinned
-version. CI runs it on its triggers, and its weekly schedule runs it alone.
+version.
 
 `scripts/dependabot-issues.mjs` prints the NexKit issues, as JSON with a title, a body and labels, for
 the high and critical Dependabot alerts whose advisory id no open issue names, and opens nothing. The
