@@ -20,7 +20,13 @@ spec:
         {{- include "axis.labels" . | nindent 8 }}
         app.kubernetes.io/component: publisher
     spec:
+      {{- if and .Values.cell.id .Values.cell.certificate.enabled }}
+      {{- /* The token lets the publisher create the Certificate of a verified tenant host, see publisher-rbac.yaml. */}}
+      serviceAccountName: {{ .Release.Name }}-publisher
+      automountServiceAccountToken: true
+      {{- else }}
       automountServiceAccountToken: false
+      {{- end }}
       # Longer than the five-minute lease, so a stop lets the running request finish.
       terminationGracePeriodSeconds: {{ .Values.publisher.terminationGracePeriodSeconds }}
       {{- with .Values.image.pullSecrets }}
@@ -51,6 +57,10 @@ spec:
               value: /studio
             - name: Templates__Path
               value: /templates
+            {{- if .Values.cell.certificate.enabled }}
+            - name: Cell__HostCertificateIssuer
+              value: {{ printf "%s-tenant-hosts" .Release.Name | quote }}
+            {{- end }}
             {{- else }}
             {{- include "axis.hostEnv" . | nindent 12 }}
             {{- end }}

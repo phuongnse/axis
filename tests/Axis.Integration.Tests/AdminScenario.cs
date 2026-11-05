@@ -168,7 +168,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         TimeSpan? publisherTestLimit = null,
         string? input = null,
         HttpMessageHandler? identityProvider = null,
-        IDnsTxtResolver? dnsResolver = null)
+        IDnsTxtResolver? dnsResolver = null,
+        ICertificateWriter? certificateWriter = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -204,7 +205,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             publisherTestLimit ?? Publisher.DefaultTestLimit,
             identityProvider ?? IdentityProvider,
             stop?.Token ?? CancellationToken,
-            dnsResolver);
+            dnsResolver,
+            certificateWriter);
         var text = output.ToString()!;
         _texts.Add(text);
         _texts.Add(error.ToString());

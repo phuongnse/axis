@@ -112,6 +112,13 @@
                 }
               },
               "additionalProperties": false
+            },
+            "http01": {
+              "type": "object",
+              "properties": {
+                "ingressClassName": { "type": "string" }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

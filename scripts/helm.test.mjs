@@ -434,6 +434,48 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(issuer, /email:/)
   })
 
+  test('the host Issuer has one HTTP-01 solver, with the ingress class when set and an empty ingress otherwise', () => {
+    const issuer = find(renderOk(), 'Issuer', 'axis-tenant-hosts')
+    assert.match(issuer, /apiVersion: cert-manager\.io\/v1\n/)
+    assert.match(issuer, /server: "https:\/\/acme-v02\.api\.letsencrypt\.org\/directory"\n/)
+    assert.match(issuer, /email: "ops@example\.com"\n/)
+    assert.match(issuer, /privateKeySecretRef:\n\s+name: axis-tenant-hosts-acme-account\n/)
+    assert.match(issuer, /- http01:\n\s+ingress:\n\s+ingressClassName: "nginx"\n/)
+    assert.equal(issuer.match(/- http01:/g).length, 1)
+    assert.doesNotMatch(issuer, /dns01/)
+
+    const unclassed = find(renderOk('--set', 'cell.certificate.http01.ingressClassName='), 'Issuer', 'axis-tenant-hosts')
+    assert.match(unclassed, /- http01:\n\s+ingress: \{\}\n/)
+    assert.doesNotMatch(unclassed, /ingressClassName/)
+    assert.doesNotMatch(find(renderOk('--set', 'cell.certificate.issuer.email='), 'Issuer', 'axis-tenant-hosts'), /email:/)
+  })
+
+  test('the publisher may only create certificates.cert-manager.io in the release namespace', () => {
+    const output = renderOk('--namespace', 'axis')
+    const role = find(output, 'Role', 'axis-publisher-certificates')
+    assert.match(role, /namespace: axis\n/)
+    assert.match(role, /rules:\n\s+- apiGroups:\n\s+- cert-manager\.io\n\s+resources:\n\s+- certificates\n\s+verbs:\n\s+- create\n/)
+    assert.equal(role.match(/- apiGroups:/g).length, 1)
+    assert.equal(role.match(/verbs:/g).length, 1)
+    const binding = find(output, 'RoleBinding', 'axis-publisher-certificates')
+    assert.match(binding, /namespace: axis\n/)
+    assert.match(binding, /roleRef:\n\s+apiGroup: rbac\.authorization\.k8s\.io\n\s+kind: Role\n\s+name: axis-publisher-certificates\n/)
+    assert.match(binding, /subjects:\n\s+- kind: ServiceAccount\n\s+name: axis-publisher\n\s+namespace: axis\n/)
+    assert.doesNotMatch(output, /^kind: (ClusterRole|ClusterRoleBinding)$/m)
+  })
+
+  test('with the certificate on, the publisher runs as its own service account with the token and the issuer name, and no other pod does', () => {
+    const output = renderOk()
+    const publisher = find(output, 'Deployment', 'axis-publisher')
+    assert.match(publisher, /serviceAccountName: axis-publisher\n\s+automountServiceAccountToken: true\n/)
+    assert.match(publisher, /- name: Cell__HostCertificateIssuer\n\s+value: "axis-tenant-hosts"\n/)
+    assert.match(find(output, 'ServiceAccount', 'axis-publisher'), /automountServiceAccountToken: false\n/)
+    for (const name of ['axis-server', 'axis-worker', 'axis-identity']) {
+      const document = find(output, 'Deployment', name)
+      assert.doesNotMatch(document, /serviceAccountName|automountServiceAccountToken: true|Cell__HostCertificateIssuer/, name)
+    }
+  })
+
   test('an inline token under cell.certificate.issuer fails rendering and never appears in the output', () => {
     for (const path of ['cell.certificate.issuer.token', 'cell.certificate.issuer.dns01.token']) {
       const result = render('--set', `${path}=leak`)
@@ -449,9 +491,15 @@ describe('the Axis Helm chart', () => {
     assert.match(result.stderr, /provider/)
   })
 
-  test('with the certificate off, no Issuer or Certificate renders', () => {
+  test('with the certificate off, no Issuer, Certificate, ServiceAccount, Role or RoleBinding renders and the publisher has no token or issuer name', () => {
     const output = renderOk('--set', 'cell.certificate.enabled=false')
-    assert.doesNotMatch(output, /^kind: (Issuer|Certificate)$/m)
+    assert.doesNotMatch(output, /^kind: (Issuer|Certificate|ServiceAccount|Role|RoleBinding)$/m)
+    const publisher = find(output, 'Deployment', 'axis-publisher')
+    assert.match(publisher, /automountServiceAccountToken: false\n/)
+    assert.doesNotMatch(publisher, /serviceAccountName|automountServiceAccountToken: true|Cell__HostCertificateIssuer/)
+    for (const name of ['axis-server', 'axis-worker']) {
+      assert.doesNotMatch(find(output, 'Deployment', name), /Cell__HostCertificateIssuer/, name)
+    }
   })
 
   test('with the certificate on, an empty cell.tenantDomain fails and names it', () => {

@@ -442,7 +442,7 @@ It takes no option. Under `Tenancy:Source=directory` it also runs the provisioni
 tenant and lets a running job finish when it is stopped. A job that it ends writes one
 [platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor.
 In a fourth loop it checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS every `Cell:HostCheckInterval`,
-`00:10:00` by default, and adds a verified host to its tenant. The record of that add is named `tenant host verify` and names
+`00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set. The record of that add is named `tenant host verify` and names
 the operator who asked for the host. The publisher writes no other record, because it acts on no tenant on its own: the audit
 of a publish is the release's own record in the tenant database. A value of `Cell:HostCheckInterval` that is not a positive
 time span exits with code `2`. It has no HTTP endpoint and listens on no port, so nothing

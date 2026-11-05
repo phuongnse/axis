@@ -13,7 +13,8 @@ namespace Axis.Integration.Tests;
 /// The publisher checks the pending requests of <c>platform.tenant_host_requests</c> against DNS, here a fake resolver. A record that
 /// holds the token adds the host to the tenant, writes the realm's redirect addresses in a real Keycloak and makes the request
 /// <c>verified</c>. A request past its seven days becomes <c>expired</c>. A wrong token leaves the request <c>pending</c>. A host
-/// that the tenant already holds is not added twice, and a host that another tenant holds stays pending.
+/// that the tenant already holds is not added twice, and a host that another tenant holds stays pending. The certificate of a verified
+/// host is written, here by a fake writer, before the request is marked. A failed write leaves the request pending.
 /// </summary>
 public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
@@ -50,11 +51,13 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
         var host = $"shop-{id}.example.test";
         await RequestAsync(scenario, id, host, expired: false);
         var resolver = new FakeDnsResolver { [$"_axis-verify.{host}"] = [Token] };
+        var certificates = new FakeCertificateWriter();
 
-        var result = await RunPublisherUntilAsync(scenario, resolver, async () => await StateAsync(scenario, id, host) == "verified");
+        var result = await RunPublisherUntilAsync(scenario, resolver, certificates, async () => await StateAsync(scenario, id, host) == "verified");
 
         Assert.Equal(0, result.Exit);
         Assert.Contains($"{id} host verified: {host}", result.Output);
+        Assert.Equal([(id, host)], certificates.Writes);
         Assert.Contains(host, await scenario.HostsAsync(id));
         AssertAddresses(await PlatformClientAsync(id), $"{id}.example.test", host);
         var record = Assert.Single(await scenario.AuditRecordsAsync(), record => record.Command == "tenant host verify");
@@ -73,12 +76,14 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
         var host = $"late-{id}.example.test";
         await RequestAsync(scenario, id, host, expired: true);
         var resolver = new FakeDnsResolver { [$"_axis-verify.{host}"] = [Token] };
+        var certificates = new FakeCertificateWriter();
 
-        var result = await RunPublisherUntilAsync(scenario, resolver, async () => await StateAsync(scenario, id, host) == "expired");
+        var result = await RunPublisherUntilAsync(scenario, resolver, certificates, async () => await StateAsync(scenario, id, host) == "expired");
 
         Assert.Equal(0, result.Exit);
         Assert.Contains($"{id} host expired: {host}", result.Output);
         Assert.Empty(resolver.Names);
+        Assert.Empty(certificates.Writes);
         Assert.DoesNotContain(host, await scenario.HostsAsync(id));
         await using var server = AdminScenario.CreateServer(scenario.Platform);
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(server, host));
@@ -98,10 +103,12 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
         }
 
         var resolver = new FakeDnsResolver { [$"_axis-verify.{wrong}"] = ["another-token"], FailFor = $"_axis-verify.{broken}" };
+        var certificates = new FakeCertificateWriter();
 
         var result = await RunPublisherUntilAsync(
             scenario,
             resolver,
+            certificates,
             async () => await CheckedAsync(scenario, id, wrong) && await CheckedAsync(scenario, id, none) && await CheckedAsync(scenario, id, broken));
 
         Assert.Equal(0, result.Exit);
@@ -111,6 +118,7 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
         }
 
         Assert.Contains($"{id} host check failed: The lookup failed.", result.Output);
+        Assert.Empty(certificates.Writes);
         Assert.Equal([$"{id}.example.test"], await scenario.HostsAsync(id));
         Assert.DoesNotContain(await scenario.AuditRecordsAsync(), record => record.Command == "tenant host verify");
         await using var server = AdminScenario.CreateServer(scenario.Platform);
@@ -130,19 +138,82 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
         await RequestAsync(scenario, id, held, expired: false);
         await RequestAsync(scenario, id, taken, expired: false);
         var resolver = new FakeDnsResolver { [$"_axis-verify.{held}"] = [Token], [$"_axis-verify.{taken}"] = [Token] };
+        var certificates = new FakeCertificateWriter();
         var before = (await scenario.AuditRecordsAsync()).Count(record => record.Command == "tenant host verify");
 
         var result = await RunPublisherUntilAsync(
             scenario,
             resolver,
+            certificates,
             async () => await StateAsync(scenario, id, held) == "verified" && await CheckedAsync(scenario, id, taken));
 
         Assert.Equal(0, result.Exit);
+        Assert.Equal([(id, held)], certificates.Writes);
         Assert.Equal(0, before);
         Assert.Equal(0, (await scenario.AuditRecordsAsync()).Count(record => record.Command == "tenant host verify"));
         Assert.Equal("pending", await StateAsync(scenario, id, taken));
         Assert.Equal([held], await scenario.HostsAsync(id));
         Assert.Equal([taken], await scenario.HostsAsync(other));
+    }
+
+    [Fact]
+    public async Task A_blank_certificate_issuer_still_verifies_the_host_and_writes_no_certificate()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantAsync(scenario);
+        var host = $"plain-{id}.example.test";
+        await RequestAsync(scenario, id, host, expired: false);
+        var resolver = new FakeDnsResolver { [$"_axis-verify.{host}"] = [Token] };
+        var certificates = new FakeCertificateWriter();
+
+        var result = await RunPublisherUntilAsync(
+            scenario,
+            resolver,
+            certificates,
+            async () => await StateAsync(scenario, id, host) == "verified",
+            issuer: " ");
+
+        Assert.Equal(0, result.Exit);
+        Assert.Contains($"{id} host verified: {host}", result.Output);
+        Assert.Empty(certificates.Writes);
+    }
+
+    [Fact]
+    public async Task A_failed_certificate_write_leaves_the_request_pending_and_writes_a_certificate_failed_line()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantAsync(scenario);
+        var host = $"cert-{id}.example.test";
+        await RequestAsync(scenario, id, host, expired: false);
+        var resolver = new FakeDnsResolver { [$"_axis-verify.{host}"] = [Token] };
+        var certificates = new FakeCertificateWriter { Fail = true };
+
+        var result = await RunPublisherUntilAsync(
+            scenario,
+            resolver,
+            certificates,
+            async () => certificates.Writes.Count > 0 && await CheckedAsync(scenario, id, host));
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("pending", await StateAsync(scenario, id, host));
+        Assert.Contains($"{id} certificate failed: HttpRequestException", result.Output);
+        Assert.DoesNotContain($"{id} host verified: {host}", result.Output);
+    }
+
+    [Fact]
+    public async Task A_certificate_issuer_without_a_service_account_stops_the_publisher_with_exit_2_and_names_the_setting()
+    {
+        Assert.SkipWhen(Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST") is not null, "The test host runs in a cluster.");
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var settings = Settings();
+        settings["Cell:HostCertificateIssuer"] = "axis-tenant-hosts";
+
+        var result = await scenario.RunAsync(["publisher"], extra: settings, identityProvider: _handler);
+
+        Assert.Equal(2, result.Exit);
+        Assert.Empty(result.Output);
+        var message = Assert.Single(result.Error);
+        Assert.Contains("Cell:HostCertificateIssuer", message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -183,12 +254,18 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
     }
 
     // Runs the publisher with a one second check interval until the condition holds, then stops it and returns its result.
-    private async Task<AdminResult> RunPublisherUntilAsync(AdminScenario scenario, FakeDnsResolver resolver, Func<Task<bool>> done)
+    private async Task<AdminResult> RunPublisherUntilAsync(
+        AdminScenario scenario,
+        FakeDnsResolver resolver,
+        FakeCertificateWriter certificates,
+        Func<Task<bool>> done,
+        string issuer = "axis-tenant-hosts")
     {
         var settings = Settings();
         settings["Cell:HostCheckInterval"] = "00:00:01";
+        settings["Cell:HostCertificateIssuer"] = issuer;
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings, identityProvider: _handler, dnsResolver: resolver);
+        var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings, identityProvider: _handler, dnsResolver: resolver, certificateWriter: certificates);
         try
         {
             var deadline = DateTimeOffset.UtcNow.AddSeconds(120);
@@ -315,6 +392,35 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
             }
 
             return Task.FromResult<IReadOnlyList<string>>(_records.GetValueOrDefault(name) ?? []);
+        }
+    }
+
+    // Records each write, and throws when Fail is set. The record comes first, so a failed write is counted too.
+    private sealed class FakeCertificateWriter : ICertificateWriter
+    {
+        private readonly List<(string Tenant, string Host)> _writes = [];
+
+        public bool Fail { get; init; }
+
+        public IReadOnlyList<(string Tenant, string Host)> Writes
+        {
+            get
+            {
+                lock (_writes)
+                {
+                    return [.. _writes];
+                }
+            }
+        }
+
+        public Task WriteAsync(string tenantId, string host, CancellationToken cancellationToken)
+        {
+            lock (_writes)
+            {
+                _writes.Add((tenantId, host));
+            }
+
+            return Fail ? throw new HttpRequestException("The write failed.") : Task.CompletedTask;
         }
     }
 }
