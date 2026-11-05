@@ -399,8 +399,10 @@ owner is reviewing it one step at a time.
   "Khởi chạy", "Hiện dữ liệu". The English relations stay. The rule, no "nó" for "it", is in #2974, and the other 39
   texts that said "nó" are rewritten, with "phát hành", "trang web", "thành phần", "cam kết" and "bộ kết nối" where they
   still had older words.
-- **To decide:** "phiên bản" names a release, and a module's version is also called "phiên bản"; the module blocker now
-  says "một bản" for the module's version. The glossary is to name a module version apart.
+- **A module's version is "bản":** "phiên bản" named both a release and a module's or a package's version. A version is
+  now "bản" with its number, "Organization bản 1.2.0", in Settings' Version fields, the version choice and the release
+  blockers, and "phiên bản" names only a release. The glossary term is in #2979. "Mô-đun" stays: it is the word
+  "module" in Vietnamese spelling, so no English is mixed in.
 
 ### Second mechanisms found by the audit of 2026-11-05
 
