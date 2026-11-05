@@ -38,6 +38,6 @@ How the threat model is filled, as [D106](../decisions/d106-a-threat-model-kept-
   - It does not judge that a test covers its threat, that a time frame was kept, or that a
     **Delegated** row names the right party. A reviewer does.
 - **Kept current.** A change that adds a trust boundary updates this page in the same change, see
-  [the threat model rule](../delivery.md#keeping-the-docs-current). Each docs sweep reviews the page.
+  [the threat model rule](../writing-docs.md#how-the-docs-stay-correct). Each docs sweep reviews the page.
   Once a year the owner rates Axis against OWASP SAMM _(planned for M32)_, see
   [ASVS other evidence](asvs.md#other-evidence).

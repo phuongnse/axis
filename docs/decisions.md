@@ -3,11 +3,12 @@
 Each decision has a status. **Agreed** means the owner has accepted it and work may rely on it.
 **Proposed** means it is a working default that can still change.
 
-Each decision is one file in [decisions/](decisions/). Find the decisions a change touches in this
-table, then read only those files. A new decision is a new file, `decisions/d<n>-<slug>.md`, with
-the next free number, and a new row at the end of this table. Change an existing decision only by
-recording a newer one that replaces it. `scripts/check-docs.mjs` checks that this table and the
-files agree, title and status included.
+Each decision in force is one file in [decisions/](decisions/). Find the decisions a change touches
+in this table, then read only those files. A new decision takes the next free number and a new row at
+the end of this table. A decision that a newer one replaced has no file: its row names the decision
+that superseded it and links its last text in git. How a decision is written and replaced is in
+[writing the docs](writing-docs.md#decisions). `scripts/check-docs.mjs` checks that this table and
+the files agree, title and status included.
 
 | Decision | Title | Status |
 | --- | --- | --- |
@@ -143,3 +144,4 @@ files agree, title and status included.
 | [D130](decisions/d130-activate-a-release-replaces-roll-back.md) | "Activate a release" replaces "roll back" | **Proposed** |
 | [D131](decisions/d131-tenant-notices-live-in-axisnotifications.md) | Tenant notices live in axis.notifications | **Proposed** |
 | [D132](decisions/d132-rules-from-the-studio-settings-review.md) | Rules from the Studio settings review | **Agreed** |
+| [D133](decisions/d133-docs-state-each-current-rule-once.md) | Docs state each current rule once | **Proposed** |

@@ -7,8 +7,11 @@
 // - Each decision file is docs/decisions/d<n>-<slug>.md, starts with '# D<n>. <title>', where the
 //   slug is the title's anchor, and has a 'Status: **<status>**' line whose status starts with
 //   Agreed or Proposed.
-// - docs/decisions.md has one row per decision file, numbered from 1 with no gaps, in order, with
-//   the file's title and status.
+// - docs/decisions.md has one row per decision, numbered from 1 with no gaps, in order. The row of a
+//   decision file has the file's title and status. The row of a superseded decision has no file: it
+//   names the live decision that superseded it and links the last text of its file at a commit on
+//   GitHub.
+// - No '(planned for Mx)' marker under docs/ names a milestone that docs/roadmap.md calls Done.
 // - docs/reference/asvs.md, when it exists, has one row for each requirement of the committed ASVS list
 //   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
 //   evidence. A Met row names only test classes that exist. A Gap row links the GitHub issue that
@@ -48,6 +51,10 @@ const decisionFilePattern = /^d(\d+)-([a-z0-9-]+)\.md$/
 const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
 const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
+const supersededRowPattern =
+  /^\| D(\d+) \| (.+?) \| Superseded by \[D(\d+)\]\(decisions\/([^)]+)\), \[last text\]\((https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/blob\/[0-9a-f]{40}\/docs\/decisions\/d(\d+)-[a-z0-9-]+\.md)\) \|$/
+const roadmapRowPattern = /^\| \*\*(M\d+)\*\* \| [^|]+\| ([^|]+?) \|/
+const plannedPattern = /planned for (M\d+(?:(?:, | and )M\d+)*)/g
 const asvsFile = 'docs/reference/asvs.md'
 const threatHeader = '| Id | Threat | Boundary | Category | Rating | Status | Evidence |'
 const threatSeparator = '| --- | --- | --- | --- | --- | --- | --- |'
@@ -320,6 +327,8 @@ export function checkDocs(root, { baseLineCount } = {}) {
     checkDevelopmentUsers(root, report)
   }
 
+  checkPlannedMarkers(root, files, report)
+
   // The decisions.
   const index = path.join(docs, 'decisions.md')
   if (!existsSync(decisionsFolder) && !existsSync(index)) return problems
@@ -355,10 +364,33 @@ export function checkDocs(root, { baseLineCount } = {}) {
   lines(index).forEach((line, i) => {
     const row = decisionRowPattern.exec(line)
     if (row) rows.push({ line: i + 1, number: Number(row[1]), name: row[2], title: row[3], status: row[4] })
+    const superseded = supersededRowPattern.exec(line)
+    if (superseded) {
+      rows.push({
+        line: i + 1,
+        number: Number(superseded[1]),
+        title: superseded[2],
+        by: Number(superseded[3]),
+        byName: superseded[4],
+        lastTextNumber: Number(superseded[6]),
+      })
+    }
   })
+  const rowByNumber = new Map(rows.map((row) => [row.number, row]))
   rows.forEach((row, i) => {
     if (row.number !== i + 1) report(index, row.line, `row D${row.number} should be D${i + 1}: decisions are numbered in order with no gaps`)
     const decision = decisions.get(row.number)
+    if (row.by !== undefined) {
+      if (decision) report(index, row.line, `D${row.number} is superseded, so delete ${relative(decision.file)}`)
+      if (row.lastTextNumber !== row.number) report(index, row.line, `D${row.number}'s last text links the file of D${row.lastTextNumber}`)
+      const successor = decisions.get(row.by)
+      if (!successor || rowByNumber.get(row.by)?.by !== undefined) {
+        report(index, row.line, `D${row.number} is superseded by D${row.by}, which is not a decision in force`)
+      } else if (row.byName !== successor.name) {
+        report(index, row.line, `D${row.number} links ${row.byName} for D${row.by}, the file is ${successor.name}`)
+      }
+      return
+    }
     if (!decision) {
       report(index, row.line, `D${row.number} has no file in docs/decisions/`)
       return
@@ -375,6 +407,28 @@ export function checkDocs(root, { baseLineCount } = {}) {
   }
 
   return problems
+}
+
+/** Reports every '(planned for Mx)' marker under docs/ whose milestone docs/roadmap.md calls Done. */
+function checkPlannedMarkers(root, files, report) {
+  const roadmap = path.join(root, 'docs', 'roadmap.md')
+  if (!existsSync(roadmap)) return
+  const done = new Set()
+  for (const line of lines(roadmap)) {
+    const row = roadmapRowPattern.exec(line)
+    if (row && row[2].trim() === 'Done') done.add(row[1])
+  }
+  for (const file of files) {
+    lines(file).forEach((line, i) => {
+      for (const match of line.matchAll(plannedPattern)) {
+        for (const milestone of match[1].match(/M\d+/g)) {
+          if (done.has(milestone)) {
+            report(file, i + 1, `planned for ${milestone}, which the roadmap calls Done: remove the marker, or move it to the milestone that builds the rest`)
+          }
+        }
+      }
+    })
+  }
 }
 
 /** Runs git in root and returns its output, or undefined when git fails. */
@@ -408,7 +462,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the ASVS table, the threat model tables, the development users and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the planned markers, the ASVS table, the threat model tables, the development users and the doc and skill sizes are in order.')
   return 0
 }
 

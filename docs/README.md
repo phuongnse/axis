@@ -1,9 +1,8 @@
 # Documentation
 
 This is the map of the Axis docs. Each topic has one home, and other docs link to it rather than
-repeat it. Find the file for your topic here, then read only the sections you need. How the docs are
-kept current and how they are split is in
-[keeping the docs current](delivery.md#keeping-the-docs-current).
+repeat it. Find the file for your topic here, then read only the sections you need. What goes in
+which doc, how to write it and how the docs stay correct is in [writing the docs](writing-docs.md).
 
 ## Product and design
 
@@ -131,4 +130,5 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | ----------------------------- | ---------------------------------------------------------------------------- |
 | [AGENTS.md](../AGENTS.md)     | The working rules and the commands, for people and agents                    |
 | [Development](development.md) | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users |
-| [Delivery](delivery.md)       | How work flows through NexKit, and how the docs are kept current             |
+| [Delivery](delivery.md)       | How work flows through NexKit                                                |
+| [Writing the docs](writing-docs.md) | What goes in which doc, how to write it, and how the docs stay correct |
