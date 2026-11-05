@@ -1649,6 +1649,8 @@
   "shell.studio.entity.migration.uniqueWarning": "Adding unique has no migration. Validate reports AXC0016.",
   "shell.studio.entity.properties": "Properties",
   "shell.studio.entity.computed": "Computed",
+  "shell.studio.entity.userId": "User",
+  "shell.studio.entity.matched": "Matched",
   "shell.studio.entity.unnamedField": "Unnamed field",
   "shell.studio.entity.noFields": "No fields yet",
   "shell.studio.entity.migration.rowWarning": "No migration follows this change. Open the field to see why.",

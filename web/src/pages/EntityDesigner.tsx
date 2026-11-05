@@ -407,12 +407,17 @@ function TypeCell({ field }: { field: Content }) {
   )
 }
 
-/** Proposed: the settings that set a field apart, as neutral tags in the Properties column. */
+/**
+ * Proposed: the settings that set a field apart, as neutral tags in the Properties column: where its value comes from
+ * (Computed, Sequence, Creator, Matched, a User id, Default), then Searchable and Sensitive.
+ */
 function fieldTraits(field: Content): string[] {
   return [
     typeof field.expression === 'string' && field.expression !== '' ? 'shell.studio.entity.computed' : null,
     typeof field.sequence === 'string' && field.sequence !== '' ? 'shell.studio.entity.sequence' : null,
     field.creator === true ? 'shell.studio.entity.creator' : null,
+    isContent(field.match) ? 'shell.studio.entity.matched' : null,
+    field.userId === true ? 'shell.studio.entity.userId' : null,
     field.default !== undefined ? 'shell.studio.entity.default' : null,
     field.searchable === true ? 'shell.studio.entity.searchable' : null,
     field.sensitive === true ? 'shell.studio.entity.sensitive' : null,

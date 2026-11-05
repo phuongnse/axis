@@ -1649,6 +1649,8 @@
   "shell.studio.entity.migration.uniqueWarning": "Thêm unique không có migration. Validate báo AXC0016.",
   "shell.studio.entity.properties": "Thuộc tính",
   "shell.studio.entity.computed": "Tính toán",
+  "shell.studio.entity.userId": "Người dùng",
+  "shell.studio.entity.matched": "Tự khớp",
   "shell.studio.entity.unnamedField": "Trường chưa đặt tên",
   "shell.studio.entity.noFields": "Chưa có trường nào",
   "shell.studio.entity.migration.rowWarning": "Thay đổi này không có migration. Mở trường để xem lý do.",

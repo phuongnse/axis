@@ -160,6 +160,9 @@ owner is reviewing it one step at a time.
   No is a value. Both answers now show as words, through `booleanText` in `platform/formatValue.ts`, the words a record's
   boolean reads in every table and read-only form, which the schema form's read-only value takes too. Words are read the
   same by a screen reader and are not mistaken for an empty cell.
+- **Properties:** the tags say where a field's value comes from, at most one of Computed, Sequence, Creator, Matched
+  (`match`), User (`userId`) and Default, then Searchable and Sensitive. User and Matched were missing, so a user field and
+  a matched reference looked like any other.
 - **The target is a link:** in the Type cell, the entity a reference, references or child collection points to is a
   link that opens it, a module's entity at its module view. Only the label is the link; the field's name stays the row's
   button that opens the drawer. The address comes from `studioResourceAddress` in `platform/studio.ts`, which Uses, Used by
