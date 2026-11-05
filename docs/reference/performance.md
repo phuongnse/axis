@@ -167,12 +167,17 @@ agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
   `tokenUrl`, `caller` and 10 `users`, and an `idle` list, with each tenant's `url`, `tokenUrl` and one user. Each
   sample is tagged `phase:warmup` or `phase:run`, and the thresholds read only `phase:run`. `scripts/load-cell.test.mjs`
   keeps the numbers of this section equal to the scenario.
-- **Pass.** The run passes when, over one hour after a warm-up of 10 minutes:
+- **Pass.** _(Built.)_ The run passes when, over one hour after a warm-up of 10 minutes:
   - the busy tenants meet the [objectives](#objectives) for reads, writes and errors;
   - every tenant but the one with the backlog meets the worker objective, a claim delay p95 within
     5 s;
   - the sign-ins of idle tenants succeed, and their p95 is under 2 s;
   - the cell's CPU, memory and database connections stay under 80% of their limits.
-- **Finding the number.** A run that fails is run again with fewer tenants, by steps of 100, until
-  one passes. The highest passing number is the cap, set as `Cell:TenantCap`. The run keeps its k6
+  - `scripts/lib/load-cell-criteria.mjs` checks the k6 summary, the worker metrics and the usage file
+    against these criteria, and names each criterion it misses. The usage file holds the peak fraction
+    of each limit, for example `{ "cpu": 0.62, "memory": 0.55, "connections": 0.71 }`.
+- **Finding the number.** _(Built.)_ `findCap` in `scripts/lib/load-cell-criteria.mjs` does the
+  step-down: it runs at 1,000 tenants, then at each lower count by steps of 100, and returns the first
+  count that passes. It finds no cap when even 100 fails. The highest passing number is the cap, set as
+  `Cell:TenantCap`. The run keeps its k6
   summary and worker metrics in `artifacts/load-results`, as the load test does.
