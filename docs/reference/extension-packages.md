@@ -1,28 +1,17 @@
 # Extension packages
 
-Detailed reference for extension packages: what a package is, its manifest,
-the contracts it builds on, installation, versions and pinning, loading,
-capabilities and what the capability limits do not protect against. The
-manifest, the contracts, installation and loading are built. Version ranges
-and pinning in releases are built too, and so is checking a process step
-against the pinned manifest. Running a package operation from a process is
-built too, and so are its retries under the step's retry policy. So are the
-capability limits of the operation context. How a process calls a package
-operation is in
-[Package operations](process-execution.md#package-operations), and how an application
-declares its packages is in
-[Extension packages](#declaring-packages-in-an-application). Package runners
-are _(planned for M21)_, see [Package runners](#package-runners). Widgets in
-packages and the published SDK are _(planned for M22)_, see
-[custom widgets](custom-widgets.md).
-
-Dn refers to [decisions.md](../decisions.md). The design follows
-[D7](../decisions/d7-custom-code-lives-in-extension-packages.md) and
-[D28](../decisions/d28-extension-packages.md). The reason for keeping
-custom code out of configuration is in
-[knowledge](../domain/knowledge.md#logic-in-configuration).
+An extension package holds custom C# code that an application calls where configuration is not
+enough. This page covers what a package is, its manifest, the contracts it builds on, how it is
+installed, versioned, pinned and loaded, what its operations may reach, and what those limits do not
+protect against. How a process calls a package operation is in
+[package operations](process-execution.md#package-operations), and how an application declares its
+packages is in [declaring packages](#declaring-packages-in-an-application). The reason for keeping
+custom code out of configuration is in [knowledge](../domain/knowledge.md#logic-in-configuration).
 
 ## What a package is
+
+A package is a versioned .NET class library that adds typed operations, and it is built and installed
+apart from any application.
 
 - **Custom C# code.** A package holds logic that does not fit expressions,
   such as file parsing or a complex calculation. It adds typed operations
@@ -33,19 +22,15 @@ custom code out of configuration is in
   assembly described in [Contracts](#contracts).
 - **Build artifact.** Its build gives a folder with the package's assemblies
   and a manifest, `axis-package.json`.
-- **No data access.** A package cannot read or write entities. Data access
-  comes later.
+- **No data access.** A package cannot read or write entities.
 - **Widgets** _(planned for M22)_. A package may also hold custom widgets,
-  React components that a page names. A custom widget builds on Axis widgets
-  and Axis tokens, never on Ant Design directly
-  ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
-  See [custom widgets](custom-widgets.md) and
-  [D88](../decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md).
+  React components that a page names, which build on Axis widgets and Axis tokens, never on Ant
+  Design directly. See [custom widgets](custom-widgets.md).
 
 ## Manifest
 
-The manifest, `axis-package.json`, sits at the root of the
-package folder. This example uses an illustrative package,
+The manifest, `axis-package.json`, sits at the root of the package folder and declares the package's
+identity, its main assembly and its operations. This example uses an illustrative package,
 `purchasing-tools`. The [sample package](#sample-and-test-packages),
 `payment-references`, has a manifest of the same shape.
 
@@ -72,13 +57,14 @@ package folder. This example uses an illustrative package,
   hyphens, and starts with a letter. A process step names an operation as
   `<id>/<operation>`.
 - **`version`.** A SemVer version in plain `major.minor.patch` form, such as
-  `1.2.0`. Pre-release versions come later.
+  `1.2.0`.
 - **`label`** _(planned for M31)_. The package's name for people, 1 to 100
   characters and required, as a module's is, so Studio never names a package by
   its id.
 - **`assembly`.** The file name of the package's main assembly, in the
-  package folder. _(planned for M22)_ It is optional for a package that holds
-  only widgets.
+  package folder.
+- **`assembly` left out** _(planned for M22)_. A package that holds only widgets has no
+  `assembly`.
 - **`widgets`** _(planned for M22)_. The custom widgets the package offers,
   each with a `name`, an `entry`, a `label`, `properties` and an `sdk` range.
   See [widgets in a package manifest](custom-widgets.md#widgets-in-a-package-manifest).
@@ -105,10 +91,7 @@ package folder. This example uses an illustrative package,
 
 ## Contracts
 
-`Axis.Extensions` is the only assembly a package
-references. _(planned for M22)_ It is published as a NuGet package, at a 0.x
-version with no compatibility promise, see [the SDK](custom-widgets.md#the-sdk).
-It holds only these types:
+`Axis.Extensions` is the only assembly a package references, and it holds only these types:
 
 ```csharp
 public interface IOperation
@@ -150,7 +133,12 @@ public class RetryableException : Exception { }
 
   A missing value is `null`.
 
+- **Published** _(planned for M22)_. `Axis.Extensions` is published as a NuGet package, at a 0.x
+  version with no compatibility promise, see [the SDK](custom-widgets.md#the-sdk).
+
 ## Installation
+
+The operator installs packages once for the whole installation, in a folder that every host reads.
 
 - **Per installation.** Packages are installed once for the installation,
   not per tenant. Every tenant sees the same installed packages. An
@@ -164,8 +152,8 @@ public class RetryableException : Exception { }
   not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
-  _(planned for M21)_ The `package-host` container holds them too, and its
-  runners run them, see [Package runners](#package-runners).
+- **The package host** _(planned for M21)_. The `package-host` container holds the same packages,
+  and its runners run them, see [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
 - **Keep pinned versions.** Keep every version that an active release, or a
@@ -174,11 +162,11 @@ public class RetryableException : Exception { }
 
 ## Versions and pinning
 
-- **Ranges.** An application's `packages` entry gives a version range, see
-  [Extension packages](#declaring-packages-in-an-application). A range is an
-  exact version `1.2.0`, `^1.2.0` for any version of the same major version
-  from `1.2.0`, or `~1.2.0` for any version of the same minor version from
-  `1.2.0`. Any other form is `AXC0140`.
+A release pins one exact version of each package it uses, so a running instance keeps the version
+that its release was compiled against.
+
+- **Ranges.** An application's `packages` entry gives a version range: an exact version, a `^`
+  range or a `~` range, as [declaring packages](#declaring-packages-in-an-application) says.
 - **Pinning.** Compilation picks the highest installed version in each range
   and pins that exact version in the release. The pin is part of the
   release's content hash. So once a newer version in range is installed,
@@ -205,8 +193,7 @@ public class RetryableException : Exception { }
   worker process then exits with a non-zero code. An older release with no
   running or waiting instance is not checked. The worker checks a tenant once
   its database is migrated, and the server skips a tenant database that is not
-  migrated or cannot be reached. See
-  [D29](../decisions/d29-release-pinning-and-text-resources.md).
+  migrated or cannot be reached.
 - **Pinned version missing on the worker.** A call to a version that the
   worker does not hold is a retryable attempt. Nothing ran, as with a missing
   binding on a connector call. The call is retried under the step's retry
@@ -216,11 +203,11 @@ public class RetryableException : Exception { }
 
 ## Loading
 
-_(planned for M21)_ Outside Development, the worker no longer loads package
-code and the server only reads its metadata, see
-[Package runners](#package-runners). This section describes in-process
-loading, which stays for Development.
+Each host loads the installed packages into its own process at startup and checks every manifest.
 
+- **Development only** _(planned for M21)_. In-process loading is used only in Development.
+  Elsewhere the worker loads no package code and the server only reads its metadata, see
+  [Package runners](#package-runners).
 - **Own load context.** Each package version loads in its own
   `AssemblyLoadContext`. Two versions of the same package can be loaded at
   once.
@@ -257,9 +244,8 @@ loading, which stays for Development.
 
 ## Capabilities
 
-An operation gets resources only through its context, and
-the context hands out only what the operation's manifest declares, for the
-tenant of the call.
+An operation gets resources only through its context, and the context hands out only what the
+operation's manifest declares, for the tenant of the call.
 
 - **Resolved before the run.** The worker resolves every declared binding for
   the current tenant before it runs the operation. A declared binding that the
@@ -268,8 +254,7 @@ tenant of the call.
 - **HTTP.** `GetHttpClient(name)` returns a client whose base address is the
   value of the declared `url` binding `name`, with a trailing `/` added when
   it has none, so a relative path extends the base path. The client follows no
-  redirects, as a connector call does
-  ([D25](../decisions/d25-connectors-deployment-bindings-and-secrets.md)).
+  redirects, as a [connector call](integration-resources.md#connector-resource) does.
   It refuses a request whose scheme, host and port are not those of a `url`
   binding the operation declares. The path on a declared host is not limited.
   The clients share one connection pool for all tenants, which keeps no cookies.
@@ -299,11 +284,13 @@ tenant of the call.
 
 ## Package runners
 
-_(planned for M21)_ Packages run outside the worker, in package runners, as
-[D90](../decisions/d90-extension-packages-run-out-of-process.md) agrees.
+_(planned for M21)_
 
-- **The runner host.** `Axis.PackageHost` runs package operations. The worker
-  no longer loads package code. The runners run in their own container,
+Outside Development, package operations run outside the worker, in package runners, so that a
+package reaches nothing of the host and no binding of another call.
+
+- **The runner host.** `Axis.PackageHost` runs package operations, and the worker loads no package
+  code. The runners run in their own container,
   `package-host`, beside the worker, in Compose and in the Helm chart.
 - **One runner per version.** Each installed package version gets its own
   runner processes, shared by every tenant. Each runner process runs one call
@@ -337,17 +324,13 @@ _(planned for M21)_ Packages run outside the worker, in package runners, as
 
 ## Not a sandbox
 
-A package loads in the host's process, so loading it is not
-isolation. The capability limits stop mistakes. They do not stop a package
-that sets out to get around them. Packages are trusted code that the operator
-installs and reviews. _(planned for M21)_ Outside Development, packages run in
-[package runners](#package-runners). There, the runner's network route, empty
-environment, read-only file system, resource limits and kill at the timeout
-stop the items in the list below, and the runner holds nothing of the host to
-reach by reflection. Static state shared across tenants is the one item still
-possible, because one runner serves every tenant.
+A package loads in the host's process, so loading it is not isolation. The capability limits stop
+mistakes, but they do not stop a package that sets out to get around them. Packages are trusted code
+that the operator installs and reviews.
 
-**Limits that hold:**
+### Limits that hold
+
+These limits hold for every package:
 
 - The operation context hands out only the bindings that the operation
   declares.
@@ -356,8 +339,9 @@ possible, because one runner serves every tenant.
 - An attempt that asks the context for anything else fails.
 - The platform stops waiting for an operation when its `timeout` passes.
 
-**Limits that do not hold.** A package that uses .NET APIs directly can do
-all of these:
+### Limits that do not hold
+
+A package that loads in the host's process and uses .NET APIs directly can do all of these:
 
 - create its own `HttpClient`, or open sockets, and reach any host;
 - read environment variables, including every tenant's secrets;
@@ -368,7 +352,19 @@ all of these:
 - ignore the cancellation token. On a timeout the worker stops waiting, but a
   runaway thread keeps running.
 
+### In package runners
+
+_(planned for M21)_
+
+Outside Development, packages run in [package runners](#package-runners). There, the runner's network
+route, empty environment, read-only file system, resource limits and kill at the timeout stop the
+items in the list above, and the runner holds nothing of the host to reach by reflection. Static state
+shared across tenants is the one item still possible, because one runner serves every tenant.
+
 ## Sample and test packages
+
+One sample package shows a package in use, and one test package covers installation, loading and the
+capability limits.
 
 - **Sample package.** `samples/packages/` holds one package, `payment-references`
   1.0.0, with its own unit tests. Its one operation, `creditorReference`, is pure and
@@ -388,11 +384,8 @@ all of these:
 
 ## Declaring packages in an application
 
-This section follows
-[D28](../decisions/d28-extension-packages.md). An application
-declares the [extension packages](extension-packages.md) it uses in its
-manifest, `application.json`. Each entry names a package id and a version
-range:
+An application declares the extension packages it uses in its manifest, `application.json`. Each
+entry names a package id and a version range:
 
 ```json
 {
@@ -414,19 +407,16 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
   shape, so breaking it is `AXC0004`. Each package id appears at most once:
   `AXC0142`.
 - `version` is a version range in one of three forms. Versions are plain
-  `major.minor.patch` without leading zeros, and pre-release versions come
-  later. Any other form is `AXC0140`.
+  `major.minor.patch` without leading zeros. Any other form is `AXC0140`.
   - `1.0.0` is that exact version.
   - `^1.0.0` is any version from `1.0.0` with the same major version, so
     `1.4.2` but not `2.0.0`. `^0.2.0` also means the same major version, so
     `0.9.0` but not `1.0.0`.
   - `~1.0.0` is any version from `1.0.0` with the same minor version, so
     `1.0.3` but not `1.1.0`.
-- **Pinning.** Compilation picks the highest installed version in each range
-  and pins that exact version in the release, as step 4, **Release**, of the
-  pipeline describes. The server compiles against the packages installed
-  under `Extensions:Path`. A process step is
-  checked against the pinned version's manifest. A module's `packages` share
+- **Pinning.** Compilation picks the highest installed version in each range and pins it in the
+  release, in the Release step of the [pipeline](configuration.md#configuration-pipeline), as
+  [versions and pinning](#versions-and-pinning) says. A module's `packages` share
   the release's pins, which hold one version of each package id. A module
   uses the application's pin when the application lists the package too, and
   its entry is `AXC0141` in `module.json` when that pin is outside its range.
@@ -434,18 +424,11 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
   range of every module that lists the package, and a package with no such
   version is `AXC0141` in each of those modules' `module.json`. An application
   process sees only the application's own packages.
-- **Diagnostics.** A package id with no installed version is `AXC0139`. A
-  range that no installed version meets is `AXC0141`, and its message lists
-  the installed versions. Both are compile errors in `application.json`.
-  Compilation sees only the versions that loaded at host startup. A manifest
-  that does not match its package is reported at startup, as `AXC0132` to
-  `AXC0138`, see [Loading](#loading).
-  At the start of the server and the worker, every active release and every
-  release with a running or waiting instance is rebuilt. A pinned version
-  that is not installed is `AXC0146` and stops the start. The diagnostic names
-  the tenant, application, release and package version. See
-  [Versions and pinning](#versions-and-pinning) and
-  [D29](../decisions/d29-release-pinning-and-text-resources.md).
+- **Diagnostics.** `AXC0139`, a package id with no installed version, and `AXC0141`, a range that
+  no installed version meets, are compile errors in `application.json`. Compilation sees only the
+  versions that loaded at host startup. A manifest that does not match its package is reported at
+  startup, as `AXC0132` to `AXC0138`, see [Loading](#loading), and a pinned version missing at
+  startup is `AXC0146`, see [versions and pinning](#versions-and-pinning).
 - An application uses only the packages it declares, even though every
   tenant sees the same installed packages. Installation is in
   [Installation](#installation).

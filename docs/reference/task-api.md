@@ -1,52 +1,48 @@
 # Task API
 
-Detailed reference for the task API: the routes that list a user's tasks, read one task and
-complete it, and their errors. The task states are in [processes.md](process-states.md#task-states).
-Claim, release and reassign are in [task-deadlines.md](task-deadlines.md#claim-and-release), as are
-overdue tasks, escalations and deadlines.
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+The task API lets the signed-in user list the tasks they may act on, read one task, ask what its form
+shows for a draft and complete it with an outcome. The user is the user of the
+[session](security.md#sign-in-and-the-session). The task states are in
+[process states](process-states.md#task-states), and claim, release, reassign, overdue tasks,
+escalations and deadlines are in [task deadlines and claims](task-deadlines.md).
 
-The task API lets the signed-in user list their open tasks, read one task and
-complete it with an outcome. The user is the user of the
-[session](security.md#sign-in-and-the-session)
-([D23](../decisions/d23-sign-in-through-oidc-and-the-bff-session.md)).
+## Who may act
 
-**Who may act.** The user may act on a task when they are its assignee, or
-when the task's assignee is a role and the user holds it. The user's roles
-are the roles kept in their session. A role counts only when the active
-release declares it, so a task assigned to a role the active release no
-longer declares can be listed, read or completed by nobody. This is checked on every request, at
-the moment of action. Policies add to this check and never replace it. A
+Who may act on a task is decided by its assignee, at the moment of each action. The user may act on
+a task when they are its assignee, or when the task's assignee is a role and the user holds it. The
+user's roles are the roles kept in their session. A role counts only when the active release declares
+it, so a task assigned to a role the active release does not declare can be listed, read or completed
+by nobody. This is checked on every request. Policies add to this check and never replace it. A
 claimed role task is listed and may be completed only by its claimer, see
 [Claim and release](task-deadlines.md#claim-and-release).
 
-**Policies on tasks.** These follow
-[D24](../decisions/d24-roles-and-policies.md).
+## Policies on tasks
 
-- The assignee check is enough to list, read and complete a task. The user
-  needs no grant on the subject entity, and its read filters do not apply.
-- The task's `form` and its `entity` leave out the fields the user may not
-  read on the subject entity. A user with no `read` grant on it reads no
-  field. A form section left with no field is left out too.
-- Which fields the user may read comes from the policies of the active
-  release, so a grant change applies to open tasks at once. The form's
-  layout still comes from the task's release. Fields are matched by name.
-- A value for a field the user may not read is refused as a field the form
-  does not make editable, with "Cannot be set.".
-- Field write grants do not apply to the values of a task completion. The
-  form decides which fields are editable.
-- `subject.label` uses the subject entity's display field from the task's
-  release. Readability still comes from the active
-  release's policies. The label is `null` when the user may not read that
+Policies decide which fields of the subject record a task shows, never whether the user may act on
+the task.
+
+- The assignee check is enough to list, read and complete a task. The user needs no grant on the
+  subject entity, and its read filters do not apply.
+- The task's `form` and its `entity` leave out the fields the user may not read on the subject
+  entity. A user with no `read` grant on it reads no field. A form section left with no field is left
+  out too.
+- Which fields the user may read comes from the policies of the active release, so a grant change
+  applies to open tasks at once. The form's layout still comes from the task's release. Fields are
+  matched by name.
+- A value for a field the user may not read is refused as a field the form does not make editable,
+  with "Cannot be set.".
+- Field write grants do not apply to the values of a task completion: the form decides which fields
+  are editable.
+- `subject.label` uses the subject entity's display field from the task's release, and readability
+  still comes from the active release's policies. The label is `null` when the user may not read that
   field, as in the record API's [label rule](record-api.md#record-shape).
 
-**List my tasks.** `GET /api/apps/{app}/tasks?page=&pageSize=` lists the
-`open` tasks the user may act on, whatever release their instance is pinned
-to. `page` and `pageSize` follow the record API's
-[paging rules](record-api.md#paging-and-sorting). There is no `sort` or
-`search`. Tasks are ordered by `dueAt` ascending with no due date last, then
-by `createdAt`, then by `id`.
+## List my tasks
+
+`GET /api/apps/{app}/tasks?page=&pageSize=` lists the `open` tasks the user may act on, whatever
+release their instance is pinned to. `page` and `pageSize` follow the record API's
+[paging rules](record-api.md#paging-and-sorting), and there is no `sort` or `search`. Tasks are
+ordered by `dueAt` ascending with no due date last, then by `createdAt`, then by `id`.
 
 ```json
 {
@@ -74,25 +70,24 @@ by `createdAt`, then by `id`.
 }
 ```
 
-- `releaseId` names the task's release. The inbox loads
-  the texts of each release its rows name, so each step label uses its own
-  release's texts.
-- `subject.label` is the value of the display field from the task's release.
-  It is `null` when the active release's policies do not
-  let the user read that field.
-- `claimedBy` is the user id of the holder who claimed the role task, or
-  `null`. A claimed task is listed for its claimer only.
+- `releaseId` names the task's release. The inbox loads the texts of each release its rows name, so
+  each step label uses its own release's texts.
+- `subject.label` is the value of the display field from the task's release. It is `null` when the
+  active release's policies do not let the user read that field.
+- `claimedBy` is the user id of the holder who claimed the role task, or `null`. A claimed task is
+  listed for its claimer only.
 - `dueAt` is `null` when the step has no `dueIn`.
-- `overdue` is `true` when `dueAt` has passed. It is worked out when read with
-  database time. See [task-deadlines.md](task-deadlines.md#task-states).
-- **Speed.** The list answers within 300 ms for a holder of a role with 1,000
-  open role tasks, 300 of them claimed by others, and its count reads through
-  the task index. This is the Reads objective of
-  [performance](performance.md#objectives). `TaskInboxPerformanceTests` fails
-  when the best of three calls takes 300 ms or more.
+- `overdue` is `true` when `dueAt` has passed, worked out when read, see
+  [Task states](task-deadlines.md#task-states).
 
-**Read one task.** `GET /api/apps/{app}/tasks/{id}` returns one task in any
-state:
+The list answers within 300 ms for a holder of a role with 1,000 open role tasks, 300 of them claimed
+by others, and its count reads through the task index. This is the Reads objective of
+[performance](performance.md#objectives), and `TaskInboxPerformanceTests` fails when the best of
+three calls takes 300 ms or more.
+
+## Read one task
+
+`GET /api/apps/{app}/tasks/{id}` returns one task in any state:
 
 ```json
 {
@@ -139,39 +134,53 @@ state:
 }
 ```
 
-- `releaseId` names the task's release. The task page
-  loads its texts with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`.
-- `subject.label` uses the display field from the task's release. The active
-  release's policies decide whether the user
-  may read it. Otherwise the label is `null`.
+- `releaseId` names the task's release. The task page loads its texts with
+  `GET /api/sites/{path}/texts/{locale}?release={releaseId}`.
+- `subject.label` uses the display field from the task's release. The active release's policies
+  decide whether the user may read it, and otherwise the label is `null`.
 - `assignee` has the user id or the role name, and the other is `null`.
-- `claimedBy` is the user id of the holder who claimed the role task, or
-  `null`. Other holders can still read a claimed task.
-- `form` is the step's form in the task's release, so a task pinned to an
-  earlier release keeps its own layout. It has the shape of a form widget's
-  `form` metadata, plus `entity` in the shape of a widget's `entity`
-  metadata, so the task page knows each field's type. See
+- `claimedBy` is the user id of the holder who claimed the role task, or `null`. Other holders can
+  still read a claimed task.
+- `form` is the step's form in the task's release, so a task pinned to an earlier release keeps its
+  own layout. It has the shape of a form widget's `form` metadata, plus `entity` in the shape of a
+  widget's `entity` metadata, so the task page knows each field's type. See
   [form widget](form-widget.md) and [frontend](frontend.md). The example shortens both.
-  The `form` carries the same additions as the form metadata in
-  [form widget](form-widget.md): `visibleWhen` as a yes or no flag on each field
-  and section, each section's `name` (`null` when it has none), and `steps`
-  (`[]` when the form has none). Sections the user cannot read, and the steps
-  left empty by that, are left out. The condition expressions stay on the
-  server. See
+- Like the form metadata of the [form widget](form-widget.md), `form` holds `visibleWhen` as a yes or
+  no flag on each field and section, each section's `name` (`null` when it has none), and `steps`
+  (`[]` when the form has none). Sections the user cannot read, and the steps left empty by that, are
+  left out, and the condition expressions stay on the server. See
   [Form conditions and steps](form-conditions.md#form-conditions-and-steps).
-- `completedAt`, `completedBy` and `outcome` are `null` while the task is
-  `open`.
-- `overdue` is `true` only for an open task whose `dueAt` has passed. A
-  completed, cancelled or expired task reads `false`.
-- `commands` lists what the user may do with the task now, from `claim`,
-  `release` and `reassign`, in that order. It is empty unless the task is
-  `open`. The claim, release, reassign and complete responses carry it too.
-- `reassignRoles` holds the `name` and `labelKey` of each role of the active
-  release, and is empty unless `commands` has `reassign`. See
-  [task-deadlines.md](task-deadlines.md#inbox-and-task-page).
+- `completedAt`, `completedBy` and `outcome` are `null` while the task is `open`.
+- `overdue` is `true` only for an open task whose `dueAt` has passed. A completed, cancelled or
+  expired task reads `false`.
+- `commands` lists what the user may do with the task now, and `reassignRoles` the roles they may
+  reassign it to. The claim, release, reassign and complete responses carry both too, see
+  [Inbox and task page](task-deadlines.md#inbox-and-task-page).
 
-**Complete a task.** `POST /api/apps/{app}/tasks/{id}/complete` records the
-decision:
+## Form state of a task
+
+`POST /api/apps/{app}/tasks/{id}/form-state` answers what the task's form shows for a draft, as the
+record API's [form state](record-api.md#form-state) does for a record form. It needs
+`Content-Type: application/json` and the [CSRF header](record-api.md#create-update-and-delete).
+
+```json
+{ "values": { "decisionComments": "Fine for Q4." }, "touched": ["decisionComments"] }
+```
+
+- The body has `values` and `touched`, with the shapes of the record API. There is no `recordId`,
+  because the subject record is the task's.
+- The response has `sections`, `fields`, `errors` and `defaults`, as in the record API. `defaults` is
+  always `{}`, because the subject record exists.
+- It uses the form from the task's release and the subject record. Fields the user may not read are
+  left out of `fields`.
+- It writes nothing, and runs no unique or reference-existence check.
+- A subject record that no longer exists is a `404` with the title "No record has this id.".
+- The checks follow the order of [Task API errors](#task-api-errors): `401`, `404`, `403`, then `409`
+  when the task is not `open`.
+
+## Completing a task
+
+`POST /api/apps/{app}/tasks/{id}/complete` records the decision on a task and resumes its instance:
 
 ```http
 POST /api/apps/{app}/tasks/{id}/complete
@@ -180,56 +189,48 @@ Content-Type: application/json
 { "outcome": "approve", "values": { "decisionComments": "Fine for Q4." }, "version": 3 }
 ```
 
-- `outcome` is required. It names one of the step's outcomes, ignoring
-  letter case.
-- `values` is optional. It holds only fields the task's form makes editable
-  and the user may read, in the record API's
-  [value format](record-api.md#request-bodies-and-values).
-- `version` is the subject record's version, as the record API reads it. It
-  is required when `values` is not empty.
-- The response is `200` with the completed task, in the shape of a single
-  read.
+- `outcome` is required. It names one of the step's outcomes, ignoring letter case.
+- `values` is optional. It holds only fields the task's form makes editable and the user may read, in
+  the record API's [value format](record-api.md#request-bodies-and-values).
+- `version` is the subject record's version, as the record API reads it. It is required when `values`
+  is not empty.
+- The response is `200` with the completed task, in the shape of a single read.
 
-## Form state of a task
+One transaction records the decision:
 
-`POST /api/apps/{app}/tasks/{id}/form-state` answers
-what the task's form shows for a draft, as the record API's
-[form state](record-api.md#form-state) does for a record form
-([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
-It needs `Content-Type: application/json` and the
-[CSRF header](record-api.md#create-update-and-delete).
+1. It locks the task row and checks that the task is still `open`.
+2. It writes `values`, when there are any, through the record update command, so computed fields are
+   recomputed and validations run.
+3. It sets the task's `outcome`, `completedBy` and `completedAt`, and its state to `completed`.
+4. It sets the instance to `running` on the outcome's `next` step, with a new revision. The instance
+   must be `waiting` on the task's step.
+5. It writes the history row of the task step at the revision the instance waited at. Its `decision`
+   is the outcome's declared name. Its input is `{ "subjectId", "subjectVersion" }`, with the version
+   the values were written over, or `null` when there are no values. Its output is
+   `{ "taskId", "outcome", "next" }`, plus `subjectVersion`, the version the values wrote, when there
+   are any.
+6. It writes the audit record `task.completed`, with the user as its actor and details
+   `{ "outcome", "fields" }`. `fields` names the changed fields in declaration order and holds no
+   values. A completion writes no `record.updated`.
+7. It deletes the task's pending `task.escalate` and `task.deadline` work items, see
+   [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
+8. It inserts the work item for the outcome's `next` step.
 
-```json
-{ "values": { "decisionComments": "Fine for Q4." }, "touched": ["decisionComments"] }
-```
-
-- The body has `values` and `touched`, with the shapes of the record API.
-  There is no `recordId`, because the subject record is the task's.
-- The response has `sections`, `fields`, `errors` and `defaults`, as in the
-  record API. `defaults` is always `{}`, because the subject record exists.
-- It uses the form from the task's release and the subject record. Fields the
-  user may not read are left out of `fields`.
-- It writes nothing, and runs no unique or reference-existence check.
-- A subject record that no longer exists is a `404` with the title "No record
-  has this id.".
-- The checks follow the task check order below: `401`, `404`, `403`, then
-  `409` when the task is not `open`.
+The form, the outcomes and the record write all use the release the instance is pinned to. When any
+part fails, nothing is written. The worker then runs the next step as usual.
 
 ## Task API errors
 
-Errors are problem details, as in the [record API](record-api.md#errors).
-The titles are fixed and never contain text from the request. The content
-type follows the record API's
-[rules](record-api.md#create-update-and-delete), so a wrong one is a `415`.
+Every task route answers a failure with a problem detail, as the [record API](record-api.md#errors)
+does. The titles are fixed and never contain text from the request. The content type follows the
+record API's [rules](record-api.md#create-update-and-delete), so a wrong one is a `415`.
 
-A request is checked in this order, and the first failure is the response:
-`401`, then `404`, then `403`, then `409`, then `415`, then `400`. So a user
-who may not act on a task never learns its state. A completion or a form
-state call without the [CSRF header](record-api.md#create-update-and-delete)
+A request is checked in this order, and the first failure is the response: `401`, then `404`, then
+`403`, then `409`, then `415`, then `400`. So a user who may not act on a task never learns its state.
+A completion or a form state call without the [CSRF header](record-api.md#create-update-and-delete)
 is a `403` before any of these checks.
 
-- **`401`.** Nobody is signed in.
-  Every task route needs a signed-in user.
+- **`401`.** Nobody is signed in. Every task route needs a signed-in user.
 
   ```json
   {
@@ -252,8 +253,11 @@ is a `403` before any of these checks.
     "status": 404
   }
   ```
-- **`403`.** The user is not the assignee and does not hold the assignee
-  role, or the active release no longer declares that role. It is also the answer when a role holder completes a role task that another holder claimed. This applies to reading one task, asking for its form state and completing it.
+
+- **`403`.** The user is not the assignee and does not hold the assignee role, or the active release
+  does not declare that role. It is also the answer when a role holder completes a role task that
+  another holder claimed. This applies to reading one task, asking for its form state and completing
+  it.
 
   ```json
   {
@@ -263,11 +267,9 @@ is a `403` before any of these checks.
   }
   ```
 
-- **`409` for a decided task.** The task is not `open`, because another
-  completion came first. This covers a later completion and the loser of two
-  concurrent ones. It covers a `cancelled` task and an `expired` task too, see
-  [Task states](task-deadlines.md#task-states). A task that is not `open` is
-  not listed.
+- **`409` for a decided task.** The task is not `open`. Another completion came first, which covers a
+  later completion and the loser of two concurrent ones, or the task is `cancelled` or `expired`, see
+  [Task states](task-deadlines.md#task-states). A task that is not `open` is not listed.
 
   ```json
   {
@@ -349,32 +351,3 @@ is a `403` before any of these checks.
   `Data:WriteTimeout` and PostgreSQL cancelled it. Nothing was written, and the
   client may send the request again. The title is fixed: "The write took too
   long. Try again." See [data settings](host-settings.md#data-settings).
-
-## Completing a task
-
-One transaction records the decision:
-
-1. It locks the task row and checks that the task is still `open`.
-2. It writes `values`, when there are any, through the record update command,
-   so computed fields are recomputed and validations run.
-3. It sets the task's `outcome`, `completedBy` and `completedAt`, and its
-   state to `completed`.
-4. It sets the instance to `running` on the outcome's `next` step, with a
-   new revision. The instance must be `waiting` on the task's step.
-5. It writes the history row of the task step at the revision the instance
-   waited at. Its `decision` is the outcome's declared name. Its input is
-   `{ "subjectId", "subjectVersion" }`, with the version the values were
-   written over, or `null` when there are no values. Its output is
-   `{ "taskId", "outcome", "next" }`, plus `subjectVersion`, the version the
-   values wrote, when there are any.
-6. It writes the audit record `task.completed`, with the user as its
-   actor, and details `{ "outcome", "fields" }`.
-   `fields` names the changed fields in declaration order and holds no
-   values. A completion writes no `record.updated`.
-7. It deletes the task's pending `task.escalate` and `task.deadline` work items, see
-   [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
-8. It inserts the work item for the outcome's `next` step.
-
-The form, the outcomes and the record write all use the release the instance
-is pinned to. When any part fails, nothing is written. The worker then runs
-the next step as usual.

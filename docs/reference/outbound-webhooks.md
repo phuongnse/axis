@@ -1,23 +1,17 @@
 # Outbound webhooks
 
-Detailed reference for the `webhook` resource and the delivery of an event to it, moved out of
-[integration-resources.md](integration-resources.md), which holds the connectors, events, triggers and
-inbound endpoints. How a process raises an event is in [process-events.md](process-events.md#raise-event-step).
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+This page describes the `webhook` resource and how Axis delivers an event to it. The connectors,
+events, triggers and inbound endpoints are in [integration resources](integration-resources.md), and
+how a process raises an event is in [raise event step](process-events.md#raise-event-step).
 
 ## Outbound webhooks
 
-A webhook tells another system that an event happened, as
-[D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
-in the application, so it is part of the release. There is no API through
-which another system subscribes itself. The webhook resource, its compile
-checks, the activation check of its bindings, the delivery, the rotation by two
-secrets and the dead letter of a delivery that keeps failing are built. The
-console lists recent deliveries and dead letters (built).
+A webhook tells another system that an event happened. The author configures it in the application,
+so it is part of the release, and there is no API through which another system subscribes itself.
 
 ### Webhook resource
 
+A `webhook` resource names the event it sends, the URL and the secret it sends with, and its timeout.
 A webhook that tells a chat system when a note is closed, in
 `webhooks/note-closed-chat.json`:
 
@@ -63,7 +57,8 @@ A webhook that tells a chat system when a note is closed, in
 
 ### Webhook delivery
 
-The delivery is built.
+Each raised event is delivered to every webhook of the event as a signed `POST`, at least once,
+retried until it succeeds or becomes a dead letter.
 
 - **Staged with the event.** Raising the event stages one delivery for each
   webhook of the event, in the same transaction, as a row in
@@ -126,4 +121,4 @@ The delivery is built.
   Its deliveries stay queued.
 - **Seen in the console.** The [operator console](operator-console.md#views)
   lists recent deliveries with their state, attempts and status code, and its
-  Dead letters view lists the dead letters (built).
+  Dead letters view lists the dead letters.
