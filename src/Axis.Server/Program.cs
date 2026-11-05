@@ -93,6 +93,9 @@ if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaCo
 // The provisioning API's writes that need no job open this role's connection for the write alone, see CellPlatformWriter.
 builder.Services.AddSingleton(new CellPlatformWriter(platformSchemaConnectionString));
 
+// The route that lists a tenant's administrators opens the tenant database of a suspended tenant too, see CellTenantDatabases.
+builder.Services.AddSingleton(new CellTenantDatabases(TenantDatabaseTls.From(platformConnectionString), runtimeAddress));
+
 // A download of a tenant export streams the ZIP from this storage. Without the settings the server starts and only a download answers 503.
 builder.Services.AddSingleton(new CellExportStorage(Axis.Administration.CellBackupStorage.Read(builder.Configuration, Axis.Administration.CellBackupStorage.ExportSection, out _)));
 
