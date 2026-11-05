@@ -624,6 +624,63 @@ describe('Shell footer', () => {
   })
 })
 
+describe('Shell account slot', () => {
+  const signedInUser = { id: 'u', displayName: 'Ada', roles: [], studio: true, console: false, users: false }
+  const accountCatalogs = [
+    {
+      texts: {
+        'shell.appSwitcher.label': 'Switch to',
+        'shell.appSwitcher.studio': 'Studio',
+        'site.title': 'Workspace',
+      },
+      fallbackTexts: {},
+    },
+  ]
+
+  function renderWith(account?: ReactNode) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input === '/api/me'
+          ? new Response(JSON.stringify(signedInUser))
+          : new Response(JSON.stringify([]), { status: 404 }),
+      ),
+    )
+    return render(
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={accountCatalogs} development={false}>
+            <Shell
+              titleKey="site.title"
+              navigation={[]}
+              locales={['en']}
+              locale="en"
+              onLocaleChange={() => {}}
+              account={account}
+            >
+              <p>page</p>
+            </Shell>
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('shows the app switcher without an account', async () => {
+    renderWith()
+
+    expect(await screen.findByRole('button', { name: 'Switch to' })).toBeInTheDocument()
+  })
+
+  it('shows the account in place of the app switcher and the account button', async () => {
+    renderWith(<span data-testid="account">Ada Operator</span>)
+
+    expect(await screen.findByTestId('account')).toHaveTextContent('Ada Operator')
+    await waitFor(() => expect(fetch).not.toHaveBeenCalledWith('/api/me', expect.anything()))
+    expect(screen.queryByRole('button', { name: 'Switch to' })).not.toBeInTheDocument()
+  })
+})
+
 describe('antLocaleFor', () => {
   it('maps en and vi in any letter case, and anything else to en_US', () => {
     expect(antLocaleFor('en').locale).toBe('en')

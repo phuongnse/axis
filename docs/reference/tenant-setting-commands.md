@@ -501,6 +501,10 @@ The publisher and the server also write records for the operator's work in a cel
   `changed`.
 - **The actor of a quota change** _(planned for M31)_. The record of the quotas route names the operator
   or the machine caller as its actor.
-- **Export downloads.** The exports route, `GET /api/cell/tenants/{id}/exports/{exportId}`, writes
-  `tenant export download` for each download of the ZIP, with the operator as actor and `export:<id>` in
+- **Export downloads.** The exports route, `GET /api/cell/tenants/{id}/exports/{exportId}`, and the
+  tenant administrator's route, `GET /api/tenant/exports/{exportId}`, write `tenant export download`
+  for each download of the ZIP, with the operator or the administrator as actor and `export:<id>` in
   `changed`. A refused call and a read of the JSON write none.
+- **Export starts by an administrator.** `POST /api/tenant/exports` writes `tenant export start` in one
+  transaction with the job it queues, with the administrator as actor and `export:<id>` in `changed`. A
+  start that answers the export already running writes none.
