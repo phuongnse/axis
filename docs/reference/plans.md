@@ -1,17 +1,16 @@
 # Plans
 
-Detailed reference for the plans of Axis SaaS: what a tenant pays for, how a plan sets its quotas,
-add-ons, and changing a plan. It follows
-[D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
-[D127](../decisions/d127-plans-payments-and-invoices.md). Everything in this file is _(planned for
-M34)_, except the trial's plan, _(planned for M33)_. The prices themselves are set when M34 is broken
-down, from what the cell load test and the first cell measure, as D118 agrees. The conventions of
-[architecture.md](../architecture.md) apply.
+_(planned for M34)_
+
+A plan is what a tenant of Axis SaaS pays for: a price for the whole tenant and the quotas it sets.
+This page covers the catalogue of plans, how a plan becomes the tenant's quotas, add-ons, and
+changing a plan. The prices are set from what the [cell load test](performance.md#cell-load-test)
+and the first cell measure.
 
 ## The catalogue
 
 Plans are settings of the regional [control plane](control-plane.md), `ControlPlane:Plans`, so a
-price change needs no decision and no release, as D118 agrees.
+price change needs no decision and no release.
 
 ```json
 {
@@ -41,20 +40,25 @@ The numbers above show the shape only. They are not prices.
 - **Shape.** A plan has a `code`, a `version`, a `name` in `en` and `vi`, `includedUsers`, the
   `quotas` of [tenant quotas](tenant-quotas.md#quotas) except `users`, `prices` and `addOns`.
 - **One price for the tenant.** A price is for the whole tenant, with `includedUsers` in it, not a
-  price for each user, as D118 agrees.
+  price for each user.
+- **What a price covers.** A plan's lowest price covers its share of a cell's fixed cost, counted with
+  the cell 60% full of paying tenants, the cost of its quotas, the payment and invoice fees, time for
+  support, and a margin.
 - **Money in minor units.** Every amount is an integer in the currency's smallest unit: dong for
   `VND`, cents for `USD`. No amount is a decimal or a float.
 - **A year costs ten months.** A plan gives only monthly prices. A yearly period costs 10 times the
-  monthly price, as D118 agrees.
+  monthly price.
 - **A price for each currency.** `VND` in `vn`, and `USD` for a customer that pays abroad. Axis
   never converts a price at an exchange rate.
 - **Versions.** Changing a plan's quotas or prices adds a new version. A subscription pins the
   version it bought and keeps it until its plan changes, so a price rise never reaches a customer
   in the middle of what they agreed. A plan version that a subscription pins is never removed.
-- **The trial's plan.** A plan marked `"trial": true` sets a trial's quotas: those of a mid plan, with
-  at most 10 users, as D118 agrees. It has no price.
+- **The trial's plan** _(planned for M33)_. A plan marked `"trial": true` sets a trial's quotas:
+  those of a mid plan, with at most 10 users. It has no price.
 
 ## From a plan to the quotas
+
+The control plane turns a subscription's plan and add-ons into the tenant's quotas on the cell.
 
 - **The control plane writes them.** When a subscription starts, changes its plan, adds or drops an
   add-on, or becomes `active` again, the control plane writes the tenant's quota rows through
@@ -68,6 +72,8 @@ The numbers above show the shape only. They are not prices.
 
 ## Add-ons
 
+An add-on lets a business buy more users without moving to the next plan.
+
 - **User packs.** An add-on adds a fixed number of users, such as 10, at the add-on's price. A
   business with a few more people than its plan buys a pack instead of the next plan.
 - **Buying.** The owner or a billing contact adds a pack in the [billing portal](billing-portal.md).
@@ -76,6 +82,9 @@ The numbers above show the shape only. They are not prices.
   users than the new number is refused, naming how many users to disable first.
 
 ## Changing a plan
+
+A larger plan applies at once, with the rest of the period prorated, and a smaller one applies at the
+period's end.
 
 - **Upgrade at once.** A larger plan applies at once. The unused part of the current period is
   credited, and the new plan's price for the rest of the period is charged, both by the days left.

@@ -1,13 +1,15 @@
 # Region directory
 
-Detailed reference for the directory of regions, cells, tenants and hosts that the
-[control plane](control-plane.md) keeps. It follows
-[D126](../decisions/d126-sign-up-trials-and-the-control-plane.md). Everything in this file is
-_(planned for M33)_. Inside a cell, request resolution stays as
-[architecture](../architecture.md#request-resolution) describes. The conventions of
-[architecture.md](../architecture.md) apply.
+_(planned for M33)_
+
+The region directory is the [control plane](control-plane.md)'s record of the regions, their cells,
+and which cell holds each tenant and host. This page covers what it holds, how it picks a cell for a
+new tenant, and how a host reaches its cell. Inside a cell, a request is resolved as
+[architecture](../architecture.md#request-resolution) describes.
 
 ## What it holds
+
+The directory holds ids, hosts and cells, and no personal data.
 
 | Table | Rows |
 | --- | --- |
@@ -20,15 +22,17 @@ _(planned for M33)_. Inside a cell, request resolution stays as
 - **No personal data.** No name, email, plan or payment. A tenant id is the name a person chose for
   their subdomain, so it is checked against reserved words, not against people.
 - **One owner.** Only the control plane writes it. A cell never reads or writes it.
-- **Unique everywhere.** A tenant id is unique across every region, so a tenant never changes id if
-  moving between regions is ever built.
+- **Unique everywhere.** A tenant id is unique across every region.
 
 ## Picking a cell
 
-- A new tenant goes to a cell of its region that takes new tenants and is under 80% of its cap, as
-  D118 agrees. Of those, it goes to the least full.
-- A cell that answers `409` "This cell is full." is marked full, and the next one is tried.
-- With no cell left, the sign-up waits as `queued`, the operator is alerted to open a cell, and the
+The directory sends a new tenant to the least full cell of its region that has room.
+
+- **Room.** A new tenant goes to a cell of its region that takes new tenants and is under 80% of its
+  [cap](cells.md#cell-size). Of those, it goes to the least full.
+- **A full cell.** A cell that answers `409` "This cell is full." is marked full, and the next one is
+  tried.
+- **No cell left.** The sign-up waits as `queued`, the operator is alerted to open a cell, and the
   person is told by email when their tenant is ready.
 - **Counts stay true.** Every 5 minutes the directory reads each cell's tenant list through the
   provisioning API and corrects its counts and its rows, so a tenant created or deleted from a cell
@@ -36,15 +40,17 @@ _(planned for M33)_. Inside a cell, request resolution stays as
 
 ## Routing a host
 
+A tenant's traffic goes from DNS straight to its cell, so nothing global sits in its path.
+
 - **DNS, not a router.** Each tenant's subdomain gets a `CNAME` record of its own to its cell's
   ingress, `ingress.<cell id>.<tenant domain>`, with a time to live of 300 seconds. The control plane
   writes the record through the DNS provider's API when it creates the tenant, and removes it when the
   tenant is deleted.
-- **No shared hop.** A request goes from DNS straight to the cell. Nothing global sits in its path, so
-  a failure of the directory or the control plane never stops a tenant's traffic.
-- **The wildcard goes.** Once the directory runs, the region's wildcard record of
-  [hosts and certificates](cells.md#hosts-and-certificates) is removed, because every tenant has a
-  record of its own. The wildcard certificate stays.
+- **No shared hop.** A request goes from DNS straight to the cell, so a failure of the directory or
+  the control plane never stops a tenant's traffic.
+- **No wildcard record.** Every tenant has a record of its own, so the region's DNS zone has no
+  wildcard record. The wildcard certificate of
+  [hosts and certificates](cells.md#hosts-and-certificates) stays.
 - **A host of the tenant's own.** The customer's `CNAME` points at the tenant's subdomain, as the
   cell's [host checks](cells.md#hosts-and-certificates) ask, so it follows the tenant's record.
 - **Reserved names.** A tenant id cannot be `account`, `admin`, `api`, `app`, `auth`, `billing`,
