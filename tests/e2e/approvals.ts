@@ -232,6 +232,7 @@ export async function expectHeadRequestGoesToAdmin(page: Page, sitePath: string,
 
   await useJourneySession(page, 'employee')
   await page.goto(`${journeyURL}/${sitePath}/approvals/todecide`)
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
   await expect(page.getByRole('table')).toBeVisible()
   await expect(page.getByRole('row', { name: new RegExp(title) })).toHaveCount(0)
 
