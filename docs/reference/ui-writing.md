@@ -131,8 +131,8 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   "ẩn", not "giấu"; "ID", not "mã định danh"; a fragment where it reads better: "Nếu còn sự cố", not "Nếu bạn vẫn còn
   sự cố".
 - **Not the English sentence's shape.**
-  - No "của nó" for "its": name the thing, or leave it out. "Hiện dữ liệu" or "Hiện dữ liệu của nguồn", not "Hiện dữ
-    liệu của nó".
+  - No "nó" for "it" or "its": name the thing again, or leave it out. "Hiện dữ liệu", not "Hiện dữ liệu của nó";
+    "Không tài nguyên nào khác dùng tài nguyên này.", not "Không tài nguyên nào khác dùng nó."
   - No passive built on "được" or "bị" where English is passive: "Đã xóa vai trò", not "Vai trò đã được xóa".
   - No "việc", "thực hiện việc", "tiến hành" or "thao tác" wrapped around a verb: "Xóa", not "Thực hiện việc xóa".
   - No literal noun piles from English: "Độ rộng (trên 12 cột)", not "Độ rộng theo phần mười hai của hàng". A compound
