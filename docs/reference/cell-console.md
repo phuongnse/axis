@@ -76,25 +76,29 @@ session.
 
 ## Views
 
-_(planned for M31)_
+The console has four views, which read the provisioning API. Its shell has the title Cell console and one
+navigation entry for each built view. A person with no session goes to the operator realm's sign-in, and a
+person without the operator role sees a forbidden page in place of the views. The header shows the
+operator's display name from the session read in place of the app switcher and the account button, and has no
+notification bell. The built views are read only.
 
-The console has four views, which read the provisioning API.
-
-| View | What it shows |
-| --- | --- |
-| Cell | The cell id, its region, the number of tenants against [the cap](cells.md#cell-size), and the cell's newest restore check with its result, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell) |
-| Tenants | One row per tenant, with a search by id and host and a filter by status, see below |
-| Tenant | One tenant's details: its quotas and the rows that override the defaults, the usage of the last 13 months by day, its hosts with their verification state, its jobs, and a deletion's dates. Each [action](#actions) is a button with a confirmation that names the tenant. |
-| Jobs | The jobs of the cell, newest first, with their steps and errors |
-
-A row of the Tenants view shows:
-
-- the id, the status (`active`, `suspended`, `provisioning` or `deleting`), the application and the
-  hosts;
-- the newest storage sample against its quota, the users and applications against theirs, and the
-  emails sent today;
-- the counts of failed instances, calls with an unknown outcome and open dead letters;
-- the time of the newest daily archive, marked when it is more than 26 hours old.
+- **Cell.** The cell id, its region, and the number of tenants against [the cap](cells.md#cell-size). With no
+  cap it shows the count alone.
+- **Jobs.** The jobs of the cell, newest first. A row shows the time, the kind, the tenant and the state, each
+  step with its state, and the error of a failed job or step.
+- **Cell restore check** _(planned for M31)_. The Cell view also shows the cell's newest restore check with its
+  result, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+- **Tenants** _(planned for M31)_. One row per tenant, with a search by id and host and a filter by status. A row
+  shows:
+  - the id, the status (`active`, `suspended`, `provisioning` or `deleting`), the application and the
+    hosts;
+  - the newest storage sample against its quota, the users and applications against theirs, and the
+    emails sent today;
+  - the counts of failed instances, calls with an unknown outcome and open dead letters;
+  - the time of the newest daily archive, marked when it is more than 26 hours old.
+- **Tenant** _(planned for M31)_. One tenant's details: its quotas and the rows that override the defaults, the
+  usage of the last 13 months by day, its hosts with their verification state, its jobs, and a deletion's
+  dates. Each [action](#actions) is a button with a confirmation that names the tenant.
 
 ## Actions
 

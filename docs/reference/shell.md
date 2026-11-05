@@ -17,6 +17,8 @@ their own controls where they expect them.
   administrator, then the app switcher, the language and theme menu and the account button. The
   header's items are centred by its flex row, never by its line height. The header has `spacing-md`
   padding at its sides, and the items on its right are `spacing-sm` apart.
+  On the cell console's host the operator's name takes the place of the app switcher and the account
+  button, see [the console's views](cell-console.md#views).
 - **Mark and title.** The mark is the first letter of the site's title on a `primary` tile with
   `radius-base` corners, and the mark and the title are one link to the site's first navigation page.
   The platform site's title and mark name Axis, because the tenant has no name yet, as the
