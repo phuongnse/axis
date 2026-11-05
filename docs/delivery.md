@@ -382,8 +382,8 @@ index. The same split keeps two pull requests from editing the same lines.
   [diagnostic codes](reference/diagnostic-codes.md), lives in a file of its
   own.
 - **Short agent instructions.** [AGENTS.md](../AGENTS.md) holds only where to
-  look, the working rules and the commands, in at most 100 lines.
-  `CLAUDE.md` only imports it. Anything longer goes to the doc it belongs to,
+  look, the working rules and the commands, in at most 100 lines, and no rule
+  takes more than five. `CLAUDE.md` only imports it. Anything longer goes to the doc it belongs to,
   such as [development.md](development.md), and AGENTS.md links to it. A
   skill's `SKILL.md` stays at or under 250 lines and holds only how to apply
   the rules it links.
