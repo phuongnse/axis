@@ -17,7 +17,7 @@ After a merge, run the type check, lint, and the tests of the shared widgets, an
 
 ## State and how to continue
 
-Last updated 2026-11-05 (merged `main` at fd1bf541). The review is open; the owner is reviewing it one step at a time.
+Last updated 2026-11-05 (merged `main` at fd1bf541; Display field names fields by label). The review is open; the owner is reviewing it one step at a time.
 
 - **Done:** the kind lists (one table, standard table steps 1 to 3, a table with too little room); the entity designer's
   sections, `AxisField` with required help, the required mark, the Publish dialog's fields, the relaxed points in the Modules
@@ -27,7 +27,9 @@ Last updated 2026-11-05 (merged `main` at fd1bf541). The review is open; the own
   1. Step 3: Add field opens a choice of type first, a grid of the types, each with an icon and one line, then the drawer.
   2. Step 4: the entity's Validations section as `AxisField` boxes like the drawer's rules, with a Field column or label,
      and Indexes the same way.
-  3. Then the review's End, as the `axis-design` skill says: one docs change, the tag, one NexKit issue.
+  3. The rule "A picker names by the label" for the rest: the Field picker of Validations, the multi-choice of fields in
+     Indexes, then the pickers of resources (process, page, scenario and the others that use `ReferencePicker`).
+  4. Then the review's End, as the `axis-design` skill says: one docs change, the tag, one NexKit issue.
 - **To pick it up on another machine:**
   - `git fetch && git switch design/2026-11-04-entities`, then `scripts/setup.sh` once and `scripts/dev.sh`.
   - A Keycloak container made before #2794 refuses the realm sync (`axis-fapi`, "DPoP token is disabled") and the server
