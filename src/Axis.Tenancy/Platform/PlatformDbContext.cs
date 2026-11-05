@@ -106,6 +106,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.RealmActivationClientSecret).HasColumnName("realm_activation_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.RealmUsersClientSecret).HasColumnName("realm_users_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.EmailFrom).HasColumnName("email_from");
+            tenant.Property(t => t.DeleteAfter).HasColumnName("delete_after");
             tenant.Property(t => t.PrivacyUrl).HasColumnName("privacy_url");
             tenant.Property(t => t.TermsUrl).HasColumnName("terms_url");
             tenant.Property(t => t.TermsVersion).HasColumnName("terms_version");
@@ -396,7 +397,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         {
             job.ToTable("jobs", table =>
             {
-                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create')");
+                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create', 'delete', 'cancel-deletion')");
                 table.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
             });
             job.HasKey(j => j.Id).HasName("pk_jobs");

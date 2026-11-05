@@ -104,6 +104,9 @@ public sealed class TenantRow
     /// <summary>The version of the tenant's terms. A new version asks users to accept the terms again. It is set exactly when <see cref="TermsUrl"/> is.</summary>
     public string? TermsVersion { get; set; }
 
+    /// <summary>The time after which the purge removes the tenant. <c>null</c> when no deletion is scheduled.</summary>
+    public DateTimeOffset? DeleteAfter { get; set; }
+
     /// <summary>The newest migration applied to the tenant database. Empty until the first migration.</summary>
     public string SchemaVersion { get; set; } = "";
 }
