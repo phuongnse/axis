@@ -502,6 +502,172 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task Delete_queues_a_job_that_suspends_the_tenant_and_its_preview_and_sets_the_deletion_date_7_days_ahead_and_the_reads_answer_deleting()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var delete = await PostJobAsync(client, "/api/cell/tenants/a", token, "delete-a", method: HttpMethod.Delete);
+        Assert.Equal(HttpStatusCode.Accepted, delete.StatusCode);
+        var queued = await delete.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("delete", queued.GetProperty("kind").GetString());
+        Assert.Equal("a", queued.GetProperty("tenantId").GetString());
+        var jobId = queued.GetProperty("id").GetGuid();
+        Assert.True(await RunJobAsync());
+
+        using var read = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", token);
+        var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("succeeded", job.GetProperty("state").GetString());
+        var step = Assert.Single(job.GetProperty("steps").EnumerateArray());
+        Assert.Equal(("schedule", "succeeded"), (step.GetProperty("name").GetString(), step.GetProperty("state").GetString()));
+
+        foreach (var id in new[] { "a", "a-preview" })
+        {
+            Assert.Equal("suspended", await ScalarAsync($"SELECT status FROM platform.tenants WHERE id = '{id}'"));
+            var deleteAfter = (DateTime)(await ScalarAsync($"SELECT delete_after FROM platform.tenants WHERE id = '{id}'"))!;
+            Assert.InRange(deleteAfter, DateTime.UtcNow.AddDays(7).AddMinutes(-5), DateTime.UtcNow.AddDays(7).AddMinutes(5));
+        }
+
+        using var one = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var list = await GetAsync(client, "/api/cell/tenants", token);
+        Assert.Equal("deleting", (await one.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+        var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.Equal(["deleting", "active", "suspended"], items.EnumerateArray().Select(item => item.GetProperty("status").GetString()).ToArray());
+    }
+
+    [Fact]
+    public async Task A_second_delete_job_keeps_the_first_deletion_date()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await PostJobAsync(client, "/api/cell/tenants/a", token, "delete-1", method: HttpMethod.Delete);
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.True(await RunJobAsync());
+        var date = await ScalarAsync("SELECT delete_after FROM platform.tenants WHERE id = 'a'");
+        await ExecuteAsync("UPDATE platform.tenants SET delete_after = delete_after - interval '3 days' WHERE id IN ('a', 'a-preview')");
+        var earlier = await ScalarAsync("SELECT delete_after FROM platform.tenants WHERE id = 'a'");
+
+        using var second = await PostJobAsync(client, "/api/cell/tenants/a", token, "delete-2", method: HttpMethod.Delete);
+        Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
+        Assert.True(await RunJobAsync());
+
+        Assert.NotEqual(date, earlier);
+        Assert.Equal(earlier, await ScalarAsync("SELECT delete_after FROM platform.tenants WHERE id = 'a'"));
+        Assert.Equal(earlier, await ScalarAsync("SELECT delete_after FROM platform.tenants WHERE id = 'a-preview'"));
+    }
+
+    [Fact]
+    public async Task A_cancel_within_the_window_clears_the_deletion_date_and_leaves_the_tenant_suspended_with_its_database_and_hosts()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        const string Snapshot =
+            """
+            SELECT (SELECT database_name FROM platform.tenants WHERE id = 'a') || '|'
+              || (SELECT count(*) FROM pg_database WHERE datname = (SELECT database_name FROM platform.tenants WHERE id = 'a')) || '|'
+              || (SELECT string_agg(host, ',' ORDER BY host) FROM platform.tenant_hosts WHERE tenant_id = 'a') || '|'
+              || (SELECT count(*) FROM platform.tenants WHERE id IN ('a', 'a-preview'))
+            """;
+        var before = await ScalarAsync(Snapshot);
+
+        using var delete = await PostJobAsync(client, "/api/cell/tenants/a", token, "delete-a", method: HttpMethod.Delete);
+        Assert.Equal(HttpStatusCode.Accepted, delete.StatusCode);
+        Assert.True(await RunJobAsync());
+        using var cancel = await PostJobAsync(client, "/api/cell/tenants/a/deletion/cancel", token, "cancel-a");
+        Assert.Equal(HttpStatusCode.Accepted, cancel.StatusCode);
+        var queued = await cancel.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("cancel-deletion", queued.GetProperty("kind").GetString());
+        Assert.True(await RunJobAsync());
+
+        using var read = await GetAsync(client, $"/api/cell/jobs/{queued.GetProperty("id").GetGuid():D}", token);
+        var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("succeeded", job.GetProperty("state").GetString());
+        Assert.Equal("cancel", Assert.Single(job.GetProperty("steps").EnumerateArray()).GetProperty("name").GetString());
+        foreach (var id in new[] { "a", "a-preview" })
+        {
+            Assert.Equal(DBNull.Value, await ScalarAsync($"SELECT delete_after FROM platform.tenants WHERE id = '{id}'"));
+            Assert.Equal("suspended", await ScalarAsync($"SELECT status FROM platform.tenants WHERE id = '{id}'"));
+        }
+
+        using var one = await GetAsync(client, "/api/cell/tenants/a", token);
+        Assert.Equal("suspended", (await one.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+        Assert.Equal(before, await ScalarAsync(Snapshot));
+    }
+
+    [Fact]
+    public async Task A_cancel_after_the_deletion_date_fails_its_job_and_the_date_stays()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        using var delete = await PostJobAsync(client, "/api/cell/tenants/a", token, "delete-a", method: HttpMethod.Delete);
+        Assert.True(await RunJobAsync());
+        await ExecuteAsync("UPDATE platform.tenants SET delete_after = now() - interval '1 minute' WHERE id IN ('a', 'a-preview')");
+
+        using var cancel = await PostJobAsync(client, "/api/cell/tenants/a/deletion/cancel", token, "cancel-a");
+        Assert.Equal(HttpStatusCode.Accepted, cancel.StatusCode);
+        var jobId = (await cancel.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid();
+        Assert.True(await RunJobAsync());
+
+        using var read = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", token);
+        var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("failed", job.GetProperty("state").GetString());
+        Assert.Equal("The grace window of the deletion has ended.", job.GetProperty("error").GetString());
+        foreach (var id in new[] { "a", "a-preview" })
+        {
+            Assert.NotEqual(DBNull.Value, await ScalarAsync($"SELECT delete_after FROM platform.tenants WHERE id = '{id}'"));
+        }
+    }
+
+    [Fact]
+    public async Task A_cancel_for_a_tenant_with_no_scheduled_deletion_succeeds_and_changes_nothing()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var cancel = await PostJobAsync(client, "/api/cell/tenants/b/deletion/cancel", token, "cancel-b");
+        Assert.Equal(HttpStatusCode.Accepted, cancel.StatusCode);
+        var jobId = (await cancel.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid();
+        Assert.True(await RunJobAsync());
+
+        using var read = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", token);
+        Assert.Equal("succeeded", (await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("state").GetString());
+        Assert.Equal("active", await ScalarAsync("SELECT status FROM platform.tenants WHERE id = 'b'"));
+        Assert.Equal(DBNull.Value, await ScalarAsync("SELECT delete_after FROM platform.tenants WHERE id = 'b'"));
+    }
+
+    [Fact]
+    public async Task The_delete_and_cancel_routes_answer_401_without_a_token_403_without_the_role_and_404_for_a_preview_or_unknown_id_and_queue_nothing()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        foreach (var (method, suffix) in new[] { (HttpMethod.Delete, ""), (HttpMethod.Post, "/deletion/cancel") })
+        {
+            using var none = await PostJobAsync(client, $"/api/cell/tenants/b{suffix}", token: null, "k", method: method);
+            using var noRole = await PostJobAsync(client, $"/api/cell/tenants/b{suffix}", noRoleToken, "k", method: method);
+            using var preview = await PostJobAsync(client, $"/api/cell/tenants/a-preview{suffix}", operatorToken, "k", method: method);
+            using var unknown = await PostJobAsync(client, $"/api/cell/tenants/nobody{suffix}", operatorToken, "k", method: method);
+            using var noKey = await PostJobAsync(client, $"/api/cell/tenants/b{suffix}", operatorToken, key: null, method: method);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, noKey.StatusCode);
+        }
+
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
     public async Task An_operator_queues_an_export_job_with_one_pending_step_and_an_unknown_tenant_a_preview_tenant_and_a_missing_key_are_refused()
     {
         await using var factory = await StartAsync();
@@ -854,9 +1020,9 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             .RunNextAsync(TextWriter.Null, CancellationToken);
 
     // A bearer call needs no CSRF header, so a request with a token never sets it.
-    private static async Task<HttpResponseMessage> PostJobAsync(HttpClient client, string path, string? token, string? key, string? body = null)
+    private static async Task<HttpResponseMessage> PostJobAsync(HttpClient client, string path, string? token, string? key, string? body = null, HttpMethod? method = null)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+        using var request = new HttpRequestMessage(method ?? HttpMethod.Post, new Uri(path, UriKind.Relative));
         if (body is not null)
         {
             request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");

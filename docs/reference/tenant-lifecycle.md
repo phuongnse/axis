@@ -4,8 +4,8 @@ Detailed reference for creating, exporting and deleting the tenants of a [cell](
 cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the create route that queues its job, the exports route that queues its job, the route that requests a host of a tenant's own, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend, resume, create and export described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the route that requests a host of a tenant's own, and the job read of the
+[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete and cancel-deletion described under it, and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -39,10 +39,10 @@ implementation.
   code as the `Axis.Admin` command, over the schema role. `GET /api/cell/jobs/{id}` answers the job,
   with `state` `queued`, `running`, `succeeded` or `failed`, its steps, and the error of a failed
   step. A failed job can be run again, and it skips the steps already done, as `tenant create` does.
-  The `platform.jobs` table and the runner in the publisher are built for the `suspend` and `resume` kinds, each with one
-  `status` step. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
+  The `platform.jobs` table and the runner in the publisher are built for the `suspend`, `resume`, `delete` and `cancel-deletion` kinds. The first two have one
+  `status` step each, `delete` has one `schedule` step and `cancel-deletion` has one `cancel` step. A step that throws ends the claim, and the job runs again in the next round, up to three claims. A step that
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
-  The `suspend` and `resume` routes and the job read are built: the server only queues the job, over the platform reader role,
+  The `suspend`, `resume`, `DELETE` and `deletion/cancel` routes and the job read are built: the server only queues the job, over the platform reader role,
   which may insert into `platform.jobs` and nothing else there, and answers `202` with a `Location` header of `/api/cell/jobs/{id}`.
   The job's actor is the operator's id, the subject of the token or the session. The create route is built too: it queues a `create` job with the five steps of
   [creating a tenant](#creating-a-tenant), all `pending`, and keeps the request's `application` and `administrator` in the job's
@@ -54,7 +54,7 @@ implementation.
   the tenant and the body, hashed with SHA-256, so the body must match byte for byte. The same key with another request answers `422`.
   A key is shared across the cell, not kept for each caller. A lock on the key keeps two parallel retries from queuing two jobs.
 - **Audit.** Each job writes one platform audit record when it ends, with the operator or the
-  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend` and `resume` is built: it writes the
+  machine caller as actor, the tenant and the job kind, and no secret. The runner for `suspend`, `resume`, `delete` and `cancel-deletion` is built: it writes the
   record in the same transaction as the job's final state, whether the job succeeded or failed, with the command name of the
   matching `Axis.Admin` command and `job:<id>` in `changed`. A refused call writes a log
   event, not a record _(planned for M31)_.
@@ -63,8 +63,8 @@ implementation.
 | --- | --- |
 | `GET /api/cell/auth/sign-in` | Sends the operator to the operator realm's login page, see [sign-in](cell-console.md#sign-in). It needs no session and answers `404` on any host but the console host, and when the console offers no sign-in. |
 | `POST /api/cell/auth/sign-out` | Deletes the operator's session and answers `204`. It needs the CSRF header. |
-| `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application` and `hosts`, read from the platform tables. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. Usage, quotas and failed work counts, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
-| `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
+| `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application` and `hosts`, read from the platform tables. `status` is `deleting` while a deletion is scheduled, though the stored status stays `suspended`. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. Usage, quotas and failed work counts, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
+| `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, `deleting` included, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
 | `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does, through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`. |
 | `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does, through a job. It answers as `suspend` does. |
@@ -74,8 +74,8 @@ implementation.
 | `POST /api/cell/tenants/{id}/hosts` | Asks for a host of the tenant's own, see [hosts](#hosts). |
 | `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant), through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`, and `202` with a `Location` header. A tenant that is still `provisioning` makes the job fail. |
 | `GET /api/cell/tenants/{id}/exports/{exportId}` | _(planned for M31)_ Answers the export, and its download while it is kept. |
-| `DELETE /api/cell/tenants/{id}` | Schedules the deletion, see [deleting a tenant](#deleting-a-tenant). |
-| `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window. |
+| `DELETE /api/cell/tenants/{id}` | Schedules the deletion through a `delete` job, see [deleting a tenant](#deleting-a-tenant). It answers `202` as `suspend` does. |
+| `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window through a `cancel-deletion` job. It answers as `suspend` does. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
 ## Creating a tenant
@@ -225,10 +225,12 @@ A deletion can be undone during its grace window, and not after.
 
 1. **Schedule.** `DELETE /api/cell/tenants/{id}` suspends the tenant, as `tenant suspend` does, and
    records `delete_after`, 7 days later. Its hosts answer `503`. The tenant shows as
-   `deleting` in the console. A deletion of a tenant that has a preview tenant deletes the preview too.
+   `deleting` in the console and in the tenant reads, though its stored status stays `suspended`. A rerun of the job keeps the first
+   date. A deletion of a tenant that has a preview tenant deletes the preview too.
 2. **Grace window.** `POST /api/cell/tenants/{id}/deletion/cancel` clears `delete_after`, and the
-   tenant stays `suspended` until it is resumed. An export can still run in the window.
-3. **Purge.** After `delete_after`, a job removes, in this order, and each step can run again:
+   tenant stays `suspended` until it is resumed. A cancel after `delete_after` has passed fails its job and keeps the date. A cancel
+   of a tenant with no scheduled deletion succeeds and changes nothing. An export can still run in the window.
+3. **Purge** _(planned for M31)_. After `delete_after`, a job removes, in this order, and each step can run again:
    1. the tenant's hosts from the directory, its realm redirect addresses and its cert-manager
       certificates;
    2. the tenant database, then its schema and runtime roles;
@@ -239,7 +241,7 @@ A deletion can be undone during its grace window, and not after.
    7. its quota, lease, usage and counter rows;
    8. its directory entry, replaced by a tombstone in `platform.deleted_tenants`: the id, the time,
       the actor and the hosts, with no other data.
-4. **After.** The id is never used again in the cell. Each host is held back for 90 days, so a new
+4. **After** _(planned for M31)_. The id is never used again in the cell. Each host is held back for 90 days, so a new
    tenant does not receive the old tenant's links and emails. The platform audit records stay.
 
 **What remains, and for how long.**

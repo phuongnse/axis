@@ -32,7 +32,8 @@ namespace Axis.Server.CellApi;
 /// <para>
 /// <c>GET /api/cell/tenants</c> answers <c>{ "items": [...] }</c>, ordered by id, with each tenant's <c>id</c>,
 /// <c>status</c>, <c>application</c> and <c>hosts</c>. <c>GET /api/cell/tenants/{id}</c> answers one such tenant. Both read the
-/// platform tables over the reader role. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
+/// platform tables over the reader role. The <c>status</c> is <c>deleting</c> while the tenant has a scheduled deletion, whatever
+/// its stored status, which stays <c>suspended</c>. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
 /// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is <see langword="null"/> until the
 /// create job records it. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
 /// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults.
@@ -47,7 +48,8 @@ namespace Axis.Server.CellApi;
 /// <c>actor</c> column stays empty.
 /// </para>
 /// <para>
-/// <c>POST /api/cell/tenants/{id}/suspend</c> and <c>/resume</c> queue a job in <c>platform.jobs</c> and answer <c>202</c> with
+/// <c>POST /api/cell/tenants/{id}/suspend</c> and <c>/resume</c>, <c>DELETE /api/cell/tenants/{id}</c> and
+/// <c>POST /api/cell/tenants/{id}/deletion/cancel</c> queue a job in <c>platform.jobs</c> and answer <c>202</c> with
 /// <c>{ id, kind, tenantId, state, createdAt }</c> and a <c>Location</c> header of the job. The publisher's job runner changes the
 /// tenant's status later. The jobs insert over the reader role. The job's <c>actor</c> is the operator's id, the subject of the
 /// token or the session. An unknown tenant or a preview tenant answers <c>404</c>. Then the <c>Idempotency-Key</c> header, one
@@ -92,6 +94,8 @@ internal static class CellEndpoints
     {
         ["suspend"] = ["status"],
         ["resume"] = ["status"],
+        ["delete"] = ["schedule"],
+        ["cancel-deletion"] = ["cancel"],
         ["create"] = ["tenant", "application", "activate", "invite", "resume"],
         ["export"] = ["export"],
     };
@@ -117,6 +121,10 @@ internal static class CellEndpoints
             QueueJobAsync("suspend", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/resume", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("resume", id, http, dataSource, cancellationToken));
+        cell.MapDelete("/tenants/{id}", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
+            QueueJobAsync("delete", id, http, dataSource, cancellationToken));
+        cell.MapPost("/tenants/{id}/deletion/cancel", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
+            QueueJobAsync("cancel-deletion", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/exports", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("export", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/hosts", RequestHostAsync);
@@ -167,7 +175,7 @@ internal static class CellEndpoints
         await using var platform = Open(dataSource);
         var tenants = await platform.Tenants.AsNoTracking()
             .Where(tenant => tenant.PreviewOf == null)
-            .Select(tenant => new { tenant.Id, tenant.Status })
+            .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status })
             .ToListAsync(cancellationToken);
         var hosts = await ReadHostsAsync(platform, tenants.Select(tenant => tenant.Id).ToList(), cancellationToken);
 
@@ -186,7 +194,7 @@ internal static class CellEndpoints
         await using var platform = Open(dataSource);
         var tenant = await platform.Tenants.AsNoTracking()
             .Where(row => row.Id == id && row.PreviewOf == null)
-            .Select(row => new { row.Id, row.Status })
+            .Select(row => new { row.Id, Status = row.DeleteAfter != null ? "deleting" : row.Status })
             .SingleOrDefaultAsync(cancellationToken);
         if (tenant is null)
         {

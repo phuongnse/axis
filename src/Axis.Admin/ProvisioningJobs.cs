@@ -78,12 +78,17 @@ internal sealed class ProvisioningJobs(string platformConnectionString, IReadOnl
         WHERE id = @id AND state = 'running' AND claims = @claims
         """;
 
-    /// <summary>The kinds that the CLI commands also have: <c>suspend</c> and <c>resume</c>, each with one <c>status</c> step.</summary>
+    /// <summary>
+    /// The kinds that need only the platform connection: <c>suspend</c> and <c>resume</c>, which the CLI commands also have, each with one
+    /// <c>status</c> step, and <c>delete</c> and <c>cancel-deletion</c>, with one <c>schedule</c> and one <c>cancel</c> step.
+    /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<JobStep>> Builtin(string platformConnectionString) =>
         new Dictionary<string, IReadOnlyList<JobStep>>
         {
             ["suspend"] = [new JobStep("status", (_, tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.SuspendChangeAsync, tenantId, cancellationToken))],
             ["resume"] = [new JobStep("status", (_, tenantId, _, cancellationToken) => StatusAsync(platformConnectionString, TenantStatus.ResumeChangeAsync, tenantId, cancellationToken))],
+            ["delete"] = [new JobStep("schedule", (_, tenantId, _, cancellationToken) => TenantDeletion.ScheduleAsync(platformConnectionString, tenantId, cancellationToken))],
+            ["cancel-deletion"] = [new JobStep("cancel", (_, tenantId, _, cancellationToken) => TenantDeletion.CancelAsync(platformConnectionString, tenantId, cancellationToken))],
         };
 
     /// <summary>Adds a <c>queued</c> job with every step of <paramref name="kind"/> <c>pending</c>, and returns its id.</summary>
