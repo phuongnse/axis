@@ -342,6 +342,55 @@ namespace Axis.Tenancy.Platform.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRequestRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Host")
+                        .HasColumnType("text")
+                        .HasColumnName("host");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset?>("CheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.HasKey("TenantId", "Host", "RequestedAt")
+                        .HasName("pk_tenant_host_requests");
+
+                    b.HasIndex("Host")
+                        .HasDatabaseName("ix_tenant_host_requests_host");
+
+                    b.ToTable("tenant_host_requests", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_host_requests_state", "state IN ('pending', 'verified', 'expired')");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -871,6 +920,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_data_keys_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRequestRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_host_requests_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRow", b =>

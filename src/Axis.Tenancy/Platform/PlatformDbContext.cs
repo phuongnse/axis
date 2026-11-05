@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
-/// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
+/// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts, the requests for hosts of their own,
 /// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
@@ -17,6 +17,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantRow> Tenants => Set<TenantRow>();
 
     public DbSet<TenantHostRow> TenantHosts => Set<TenantHostRow>();
+
+    public DbSet<TenantHostRequestRow> TenantHostRequests => Set<TenantHostRequestRow>();
 
     public DbSet<TenantBindingRow> TenantBindings => Set<TenantBindingRow>();
 
@@ -121,6 +123,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .HasForeignKey(host => host.TenantId)
                 .HasConstraintName("fk_tenant_hosts_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantHostRequestRow>()
+                .WithOne()
+                .HasForeignKey(request => request.TenantId)
+                .HasConstraintName("fk_tenant_host_requests_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
             tenant.HasMany<TenantBindingRow>()
                 .WithOne()
                 .HasForeignKey(binding => binding.TenantId)
@@ -186,6 +193,23 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             host.Property(h => h.Host).HasColumnName("host");
             host.Property(h => h.SitePath).HasColumnName("site_path");
             host.HasIndex(h => new { h.TenantId, h.SitePath }).IsUnique().HasDatabaseName("ix_tenant_hosts_tenant_id_site_path");
+        });
+
+        modelBuilder.Entity<TenantHostRequestRow>(request =>
+        {
+            request.ToTable("tenant_host_requests", table => table.HasCheckConstraint(
+                "ck_tenant_host_requests_state",
+                "state IN ('pending', 'verified', 'expired')"));
+            request.HasKey(r => new { r.TenantId, r.Host, r.RequestedAt }).HasName("pk_tenant_host_requests");
+            request.Property(r => r.TenantId).HasColumnName("tenant_id");
+            request.Property(r => r.Host).HasColumnName("host");
+            request.Property(r => r.Token).HasColumnName("token");
+            request.Property(r => r.State).HasColumnName("state");
+            request.Property(r => r.RequestedAt).HasColumnName("requested_at").HasColumnType("timestamp with time zone");
+            request.Property(r => r.ExpiresAt).HasColumnName("expires_at").HasColumnType("timestamp with time zone");
+            request.Property(r => r.CheckedAt).HasColumnName("checked_at").HasColumnType("timestamp with time zone");
+            request.Property(r => r.Actor).HasColumnName("actor");
+            request.HasIndex(r => r.Host).HasDatabaseName("ix_tenant_host_requests_host");
         });
 
         modelBuilder.Entity<TenantBindingRow>(binding =>
