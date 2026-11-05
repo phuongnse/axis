@@ -60,9 +60,10 @@ over a private network with mutual TLS.
   plane's client certificate, follows no redirect and goes over `https` only: a cell address that is
   not `https` stops the start. With `ControlPlane:CellCertificateAuthorityPath` the client trusts only
   a server certificate that chains to that authority, and checks no revocation list.
-- **The cell's side** _(planned for M33)_. The cell accepts on its
+- **The cell's side.** The cell accepts on its
   [internal listener](tenant-lifecycle.md#provisioning-api) only a client certificate that the
-  region's internal certificate authority issued to the control plane.
+  region's internal certificate authority issued to the control plane. A cell sets
+  `Cell:InternalClientCa` for this, see [host settings](host-settings.md#cell-settings).
 - **The chart's wiring** _(planned for M33)_. The Helm chart mounts the client certificate, the
   authority file and the cells' secrets, so that a region's control plane reaches its cells.
 - **Idempotent.** Every `POST` to a cell carries an `Idempotency-Key` that the control plane derives
@@ -167,12 +168,14 @@ The platform operator, who runs the cells, runs the control plane too, from the 
 settings, and secrets are Kubernetes Secrets. The service reads them at start.
 
 - **Required.** The region, the tenant domain, the connection string, the mail sender and the mail
-  relay are required, except `ControlPlane:Mail:UserName`. The cell settings are optional, and once a
-  cell is listed, all of its settings, its secret and the client certificate are required.
+  relay are required, except `ControlPlane:Mail:UserName`. The directory connection string is
+  optional. The cell settings are optional, and once a cell is listed, all of its settings, its secret
+  and the client certificate are required.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell, and never its value.
-- **Secrets as files.** The connection string, the mail password and the cells' secrets may also come
+- **Secrets as files.** The connection strings, the mail password and the cells' secrets may also come
   from the key-per-file secrets `/run/secrets/ControlPlane__ConnectionString`,
+  `/run/secrets/ControlPlane__DirectoryConnectionString`,
   `/run/secrets/ControlPlane__Mail__Password` and `/run/secrets/ControlPlane__CellSecrets__<cell id>`.
 - **Plans and providers** _(planned for M34)_. `ControlPlane:` settings also hold the
   [plans](plans.md) and the payment and e-invoice providers' non-secret values.
@@ -182,6 +185,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Region` | The region code, such as `vn` | Lowercase letters and digits only |
 | `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
 | `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
+| `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString` |
 | `ControlPlane:MailFrom` | The address every email of the control plane comes from | A valid email address |
 | `ControlPlane:Mail:Host` | The host of the SMTP relay | Not empty |
 | `ControlPlane:Mail:Port` | The SMTP port. Default 587 | 1 to 65535. Port 465 starts with TLS, any other port upgrades with STARTTLS |
@@ -198,7 +202,9 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 
 At start the service applies its migrations to the `control_plane` schema, with the history table
 `control_plane.__control_plane_migrations`. A failed migration stops the start. One database role
-runs the migrations and the queries.
+runs the migrations and the queries. When `ControlPlane:DirectoryConnectionString` is set, the start
+then applies the region directory's migrations to the `directory` schema of that database, with the
+history table `directory.__directory_migrations`, and a failure there also stops the start.
 
 ## Image and chart
 

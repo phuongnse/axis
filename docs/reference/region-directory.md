@@ -1,7 +1,5 @@
 # Region directory
 
-_(planned for M33)_
-
 The region directory is the [control plane](control-plane.md)'s record of the regions, their cells,
 and which cell holds each tenant and host. This page covers what it holds, how it picks a cell for a
 new tenant, and how a host reaches its cell. Inside a cell, a request is resolved as
@@ -26,6 +24,8 @@ The directory holds ids, hosts and cells, and no personal data.
 
 ## Picking a cell
 
+_(planned for M33)_
+
 The directory sends a new tenant to the least full cell of its region that has room.
 
 - **Room.** A new tenant goes to a cell of its region that takes new tenants and is under 80% of its
@@ -39,6 +39,8 @@ The directory sends a new tenant to the least full cell of its region that has r
   console is found.
 
 ## Routing a host
+
+_(planned for M33)_
 
 A tenant's traffic goes from DNS straight to its cell, so nothing global sits in its path.
 

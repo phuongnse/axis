@@ -72,6 +72,10 @@ public sealed class StorageQuotaRouteTests
         "POST /api/cell/tenants/{id}/resume",
         "POST /api/cell/tenants/{id}/suspend",
         "PUT /api/cell/tenants/{id}/quotas",
+
+        // A tenant administrator's export writes only platform rows (a job and an audit record), and a tenant over its
+        // quota must still be able to take its data.
+        "POST /api/tenant/exports",
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 

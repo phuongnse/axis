@@ -48,8 +48,8 @@ signed key rather than a secret, and checks who answered.
 
 Under `fapi2`, inbound endpoints and service accounts accept only access tokens bound to a DPoP key
 (RFC 9449). A DPoP proof is a short signed JWT that the caller makes for each request, so a stolen
-token is useless without the caller's private key. Mutual TLS is not offered, because the TLS proxy
-ends the client's TLS connection. The rule sits in the token check itself, so it holds on every route
+token is useless without the caller's private key. Mutual TLS is not offered to these callers, because
+the TLS proxy ends the client's TLS connection. The rule sits in the token check itself, so it holds on every route
 that takes a bearer token.
 
 - **The header.** The token arrives as `Authorization: DPoP <token>`, with one `DPoP` header that holds
