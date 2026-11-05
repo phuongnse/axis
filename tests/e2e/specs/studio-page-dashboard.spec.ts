@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { expect, test } from '../test'
@@ -11,8 +11,9 @@ import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
 import { createResource, openFormTab, openNewApplication } from '../studio-resources'
 
-// A second server starts in beforeAll, and the journey creates an application and publishes it.
-test.setTimeout(240_000)
+// A second server starts in beforeAll, and the journey creates an application and publishes it. The publisher runs
+// the contract scenarios of both modules, so the publish takes longer than in the other Studio journeys.
+test.setTimeout(420_000)
 
 // The journey publishes a new application, which would change the live release of the shared purchase request copy
 // that other specs use. So it runs on a second server whose applications folder is a temporary one.
@@ -71,8 +72,9 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
 
-  /** Writes a data source with one measure, `requests`, that counts the requests, and a read grant for the requester. */
+  /** Writes a data source over approvals/Request with one measure, `requests`, that counts the requests. */
   async function addAggregate(folder: string, file: string, name: string, groupBy: string[]) {
+    await mkdir(path.join(folder, 'data-sources'), { recursive: true })
     await writeFile(
       path.join(folder, 'data-sources', `${file}.json`),
       JSON.stringify({
@@ -80,15 +82,30 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
         kind: 'dataSource',
         name,
         formatVersion: 1,
-        entity: 'Request',
+        entity: 'approvals/Request',
         fields: [{ name: 'status', path: 'status' }],
         aggregate: { groupBy, measures: [{ name: 'requests', function: 'count' }] },
       }),
     )
-    const policyFile = path.join(folder, 'policies', 'requester-access.json')
-    const policy = JSON.parse(await readFile(policyFile, 'utf8')) as { grants: unknown[] }
-    policy.grants.push({ name: `${name[0].toLowerCase()}${name.slice(1)}1`, dataSource: name, actions: ['read'] })
-    await writeFile(policyFile, JSON.stringify(policy, null, 2))
+  }
+
+  /** Writes a policy that lets the employee role read both aggregate data sources. */
+  async function addDashboardAccess(folder: string) {
+    await mkdir(path.join(folder, 'policies'), { recursive: true })
+    await writeFile(
+      path.join(folder, 'policies', 'dashboard-access.json'),
+      JSON.stringify({
+        id: randomUUID(),
+        kind: 'policy',
+        name: 'DashboardAccess',
+        formatVersion: 1,
+        roles: ['employee'],
+        grants: [
+          { name: 'requestTotalsRead', dataSource: 'RequestTotals', actions: ['read'] },
+          { name: 'requestsByStatusRead', dataSource: 'RequestsByStatus', actions: ['read'] },
+        ],
+      }),
+    )
   }
 
   test('an author builds a dashboard with a KPI and a chart, publishes it and opens it on the site', async ({ page }) => {
@@ -100,15 +117,16 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
     await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
-    await dialog.getByRole('radio', { name: /^Request approval/ }).click()
+    await dialog.getByRole('radio', { name: /^Approvals/ }).click()
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`app=${name}$`))
     await expect(dialog).toBeHidden()
 
-    // The template has no aggregate data source, so the journey adds a total one and a grouped one.
+    // The built-in Approvals application has no aggregate data source or policy, so the journey adds them.
     const folder = await applicationFolder(name)
     await addAggregate(folder, 'request-totals', 'RequestTotals', [])
     await addAggregate(folder, 'requests-by-status', 'RequestsByStatus', ['status'])
+    await addDashboardAccess(folder)
 
     await createResource(page, 'page', 'Dashboard')
     await openFormTab(page)
@@ -154,12 +172,12 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
-      timeout: 60_000,
+      timeout: 300_000,
     })
 
     const sites = await readdir(path.join(folder, 'sites'))
     const site = JSON.parse(await readFile(path.join(folder, 'sites', sites[0]), 'utf8')) as { path: string }
-    // The requester holds the requester role, whose policy reads both data sources.
+    // The requester holds the employee role, which DashboardAccess lets read both data sources.
     await useSession(page, 'requester')
     await page.goto(`${server.url}/${site.path}/dashboard`)
     await expect(page.getByTestId('kpi-tile')).toContainText(`Requests ${stamp}`)
