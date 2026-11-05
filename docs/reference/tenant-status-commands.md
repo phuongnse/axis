@@ -44,7 +44,7 @@ refuses is in [the read-only tenant](subscriptions.md#the-read-only-tenant).
 - **Hosts keep serving.** Once the hosts have picked the change up, the tenant's hosts still answer,
   and each request learns that the tenant is read-only. The worker claims none of the tenant's new
   work, and work already claimed finishes.
-- **Writes are refused** _(planned for M33)_. People still sign in and read, and every write answers
+- **Writes are refused.** People still sign in and read, and every write answers
   `403` with the reason `tenant-read-only`.
 - **Ending it.** `tenant resume` makes the tenant `active` again, and `tenant suspend` suspends it.
   After a resume the worker skips the schedule occurrences that fell while the tenant was read-only.
