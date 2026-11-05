@@ -9,8 +9,8 @@ namespace Axis.ControlPlane;
 /// <summary>
 /// The <c>ControlPlane</c> settings of the service, see the settings table in
 /// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
-/// and the mail relay are required, except the relay's user name. The cell settings are optional, and once a cell is
-/// listed, all of them are required. A bad value stops the start. A message names the setting and never holds its value.
+/// and the mail relay are required, except the relay's user name. The directory connection string is optional. The cell
+/// settings are optional, and once a cell is listed, all of them are required. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
 {
@@ -24,6 +24,12 @@ public sealed partial class ControlPlaneOptions
 
     /// <summary>The connection string of the control plane database.</summary>
     public string? ConnectionString { get; set; }
+
+    /// <summary>
+    /// The connection string of the region directory's own database. Optional. It also comes from the key-per-file secret
+    /// <c>ControlPlane__DirectoryConnectionString</c>.
+    /// </summary>
+    public string? DirectoryConnectionString { get; set; }
 
     /// <summary>The cells of the region. Each is reached over mutual TLS, see <see cref="CellOptions"/>.</summary>
     public List<CellOptions> Cells { get; } = [];
@@ -84,9 +90,15 @@ public sealed partial class ControlPlaneOptions
         {
             problems.Add(Required(nameof(ConnectionString)));
         }
-        else if (ConnectionStringProblem(options.ConnectionString, RequiresVerifiedTls(environment)) is { } problem)
+        else if (ConnectionStringProblem(nameof(ConnectionString), options.ConnectionString, RequiresVerifiedTls(environment)) is { } problem)
         {
             problems.Add(problem);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString)
+            && ConnectionStringProblem(nameof(DirectoryConnectionString), options.DirectoryConnectionString, RequiresVerifiedTls(environment)) is { } directoryProblem)
+        {
+            problems.Add(directoryProblem);
         }
 
         if (options.Cells.Count > 0)
@@ -212,9 +224,9 @@ public sealed partial class ControlPlaneOptions
     private static bool RequiresVerifiedTls(IHostEnvironment environment) =>
         !environment.IsDevelopment() && !environment.IsEnvironment("Testing");
 
-    private static string? ConnectionStringProblem(string connectionString, bool requireVerifyFull)
+    private static string? ConnectionStringProblem(string settingName, string connectionString, bool requireVerifyFull)
     {
-        var setting = $"{SectionName}:{nameof(ConnectionString)}";
+        var setting = $"{SectionName}:{settingName}";
         try
         {
             if (requireVerifyFull && new NpgsqlConnectionStringBuilder(connectionString).SslMode != SslMode.VerifyFull)
