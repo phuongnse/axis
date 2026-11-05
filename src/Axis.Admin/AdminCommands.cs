@@ -2253,6 +2253,7 @@ internal static partial class AdminCommands
 /// <c>tenant create</c>. A main tenant has no <paramref name="PreviewOf"/> and gets a realm. A preview tenant has
 /// <paramref name="PreviewOf"/>, no realm and any <paramref name="Bindings"/>. A main tenant may have an
 /// <paramref name="Administrator"/>, the normalised email of the person to invite as its first administrator.
+/// <paramref name="Quotas"/>, when not null, are the tenant's quota rows, where a null value is no limit.
 /// </summary>
 internal sealed record TenantCreateRequest(
     string Id,
@@ -2260,7 +2261,8 @@ internal sealed record TenantCreateRequest(
     string? PreviewOf,
     IReadOnlyList<KeyValuePair<string, string>> Bindings,
     string? Administrator = null,
-    bool StayProvisioning = false);
+    bool StayProvisioning = false,
+    IReadOnlyDictionary<string, long?>? Quotas = null);
 
 /// <summary><c>tenant oidc set</c>. <paramref name="WithClientKey"/> says that the client key is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
 internal sealed record OidcSetRequest(string Id, bool WithClientKey, TenantSignInChange Change);

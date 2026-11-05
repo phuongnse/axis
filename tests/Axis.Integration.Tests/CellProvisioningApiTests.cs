@@ -1272,6 +1272,29 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task A_create_with_quotas_stores_them_in_the_job_input_and_an_unknown_key_a_negative_value_or_other_quotas_for_the_same_key_answer_422()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var valid = await PostJobAsync(client, "/api/cell/tenants", token, "quotas-1", CreateBody("d", quotas: new { users = 5 }));
+        using var unknown = await PostJobAsync(client, "/api/cell/tenants", token, "quotas-2", CreateBody("e", quotas: new { seats = 5 }));
+        using var negative = await PostJobAsync(client, "/api/cell/tenants", token, "quotas-3", CreateBody("e", quotas: new { users = -1 }));
+        using var wrongType = await PostJobAsync(client, "/api/cell/tenants", token, "quotas-4", CreateBody("e", quotas: new { users = "many" }));
+        using var other = await PostJobAsync(client, "/api/cell/tenants", token, "quotas-1", CreateBody("d", quotas: new { users = 6 }));
+
+        Assert.Equal(HttpStatusCode.Accepted, valid.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, negative.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, wrongType.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, other.StatusCode);
+        var input = JsonSerializer.Deserialize<JsonElement>((string)(await ScalarAsync("SELECT input::text FROM platform.jobs"))!);
+        Assert.Equal("""{"users":5}""", Compact(input.GetProperty("quotas").GetRawText()));
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
     public async Task The_same_key_and_body_sent_after_the_tenant_exists_answer_the_first_job_and_another_body_answers_422()
     {
         await using var factory = await StartAsync();
@@ -1558,8 +1581,8 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(overridden, quota.GetProperty("overridden").GetBoolean());
     }
 
-    private static string CreateBody(string id, string application = "approvals", string administrator = "admin@example.test") =>
-        JsonSerializer.Serialize(new { id, application, administrator });
+    private static string CreateBody(string id, string application = "approvals", string administrator = "admin@example.test", object? quotas = null) =>
+        JsonSerializer.Serialize(quotas is null ? new { id, application, administrator } : (object)new { id, application, administrator, quotas });
 
     private static string Compact(string json) => JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>(json));
 

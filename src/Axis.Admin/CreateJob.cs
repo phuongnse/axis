@@ -36,7 +36,7 @@ internal sealed record CreateJobSettings(
 /// <summary>
 /// The <c>create</c> job of the publisher: <c>tenant</c>, <c>application</c>, <c>activate</c>, <c>invite</c> and <c>resume</c>, which carry
 /// out creating a tenant with the code of <c>tenant create</c>, <c>activate</c> and Studio's create from a template. The tenant stays
-/// <c>provisioning</c>, so it is never served, until <c>resume</c> sets it <c>active</c>. Each step can run again and reuses what an earlier run
+/// <c>provisioning</c>, so it is never served, until <c>resume</c> sets it <c>active</c>. The <c>tenant</c> step writes the quota rows of the input, if it has any. Each step can run again and reuses what an earlier run
 /// did. Before its own work a step returns the problem of any setting it needs that is missing, and a missing or unreadable input as a refusal.
 /// </summary>
 internal static class CreateJob
@@ -49,22 +49,27 @@ internal static class CreateJob
 
     public static IReadOnlyList<JobStep> Steps(CreateJobSettings settings, HttpClient http, TextWriter output, TextWriter error) =>
     [
-        new JobStep("tenant", (_, id, _, ct) => TenantAsync(settings, http, output, id, ct)),
+        new JobStep("tenant", (_, id, input, ct) => TenantAsync(settings, http, output, id, input, ct)),
         new JobStep("application", (_, id, input, ct) => ApplicationAsync(settings, id, input, ct)),
         new JobStep("activate", (_, id, input, ct) => ActivateAsync(settings, http, output, error, id, input, ct)),
         new JobStep("invite", (_, id, input, ct) => InviteAsync(settings, http, id, input, ct)),
         new JobStep("resume", (_, id, _, ct) => ResumeAsync(settings, id, ct)),
     ];
 
-    private static async Task<string?> TenantAsync(CreateJobSettings settings, HttpClient http, TextWriter output, string id, CancellationToken cancellationToken)
+    private static async Task<string?> TenantAsync(CreateJobSettings settings, HttpClient http, TextWriter output, string id, string? input, CancellationToken cancellationToken)
     {
         if ((settings.Create.Problem ?? settings.TenantDomain.Problem) is { } problem)
         {
             return problem;
         }
 
+        if (ReadInput(input) is not { } read)
+        {
+            return NoInput;
+        }
+
         var create = settings.Create.Value!;
-        var request = new TenantCreateRequest(id, [$"{id}.{settings.TenantDomain.Value}"], null, [], null, StayProvisioning: true);
+        var request = new TenantCreateRequest(id, [$"{id}.{settings.TenantDomain.Value}"], null, [], null, StayProvisioning: true, Quotas: read.Quotas);
         if (await AdminCommands.ValidateAsync(create, request, cancellationToken) is { } refusal)
         {
             return refusal;
@@ -243,7 +248,7 @@ internal static class CreateJob
         return await TenantStatus.ActivateChangeAsync(connection, id, cancellationToken) == StatusChange.Unknown ? TenantStatus.UnknownMessage : null;
     }
 
-    private sealed record CreateInput(string Application, string Administrator);
+    private sealed record CreateInput(string Application, string Administrator, Dictionary<string, long?>? Quotas = null);
 
     private static CreateInput? ReadInput(string? json)
     {

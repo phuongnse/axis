@@ -661,6 +661,8 @@ because the provisioning API answers `404` there. The job has five steps, and ea
 
 1. `tenant`: runs the code of `tenant create` for the host `<id>.<Cell:TenantDomain>`, with no
    administrator and the cell's backup key. The tenant stays `provisioning`, so no host serves it.
+   When the job's input has `quotas`, the step writes them as the tenant's quota rows in the entry's
+   transaction, and a rerun replaces the rows with them.
    The step writes no audit record of its own, because the job writes one when it ends. A rerun on a
    `provisioning` entry reuses the realm, the secrets and the keys. A refusal that `tenant create`
    gives before it does any work, such as a taken host or an id that is already an active tenant,

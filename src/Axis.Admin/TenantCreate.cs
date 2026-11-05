@@ -10,14 +10,14 @@ namespace Axis.Admin;
 
 /// <summary>
 /// <c>tenant create</c>: writes the directory entry as <c>provisioning</c> with the tenant's data key 1 and lookup key 1 (and, in a cell, its
-/// backup key, wrapped by the cell's key), creates
+/// backup key, wrapped by the cell's key) and, when the request has quotas, the tenant's quota rows in the same transaction, creates
 /// the tenant's realm in the identity provider (a main tenant only), creates the database roles and the database, grants and migrates it as the schema role, checks the
 /// runtime role and sets the entry <c>active</c>. With an administrator email, the <c>version</c> step records the schema version
 /// only. An <c>administrator</c> step follows: it creates the invited account in the realm, gives it the administrator platform
 /// role with the audit records, has the realm email the invitation, and then sets the entry <c>active</c>. A rerun finds the
 /// account by its email. The realm step saves the three generated client secrets, encrypted, and the
 /// tenant's <c>Oidc</c> block before it calls the identity provider. A rerun on a <c>provisioning</c> entry skips what is done
-/// and reuses the secrets and the keys. Each step writes one line that names the tenant and never a password,
+/// and reuses the secrets and the keys, and replaces the quota rows when the request has quotas. Each step writes one line that names the tenant and never a password,
 /// a host or a connection string.
 /// </summary>
 internal sealed class TenantCreate : IAsyncDisposable
@@ -173,6 +173,11 @@ internal sealed class TenantCreate : IAsyncDisposable
                 _row.Version++;
                 _platform.TenantHosts.RemoveRange(_platform.TenantHosts.Where(host => host.TenantId == _id));
                 _platform.TenantBindings.RemoveRange(_platform.TenantBindings.Where(binding => binding.TenantId == _id));
+                if (_request.Quotas is not null)
+                {
+                    _platform.TenantQuotas.RemoveRange(_platform.TenantQuotas.Where(quota => quota.TenantId == _id));
+                }
+
                 await _platform.SaveChangesAsync(_cancellationToken);
             }
 
@@ -190,6 +195,17 @@ internal sealed class TenantCreate : IAsyncDisposable
                 Kind = DeploymentBindingKinds.Url,
                 Url = binding.Value,
             }));
+            if (_request.Quotas is not null)
+            {
+                _platform.TenantQuotas.AddRange(_request.Quotas.Select(quota => new TenantQuotaRow
+                {
+                    TenantId = _id,
+                    Quota = quota.Key,
+                    Value = quota.Value,
+                    UpdatedAt = DateTimeOffset.UtcNow,
+                }));
+            }
+
             await TenantKeyRows.AddMissingAsync(_platform, _id, _settings.Cipher, _cancellationToken);
             if (_settings.CellBackupCipher is { } cell)
             {
