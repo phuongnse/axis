@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { APIRequestContext, Page } from '@playwright/test'
+import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import { expect } from './test'
 import { csrfHeaders } from './csrf'
 import { confirmDialog, waitForDialog } from './dialogs'
@@ -42,8 +42,8 @@ async function expectNoErrors(page: Page, app: string) {
 }
 
 /** Opens the lookup of the reference field `field`, searches for `name` and picks the row. */
-async function choose(page: Page, field: string, label: string, name: string) {
-  await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose…', exact: true }).click()
+export async function choose(page: Page, field: string, label: string, name: string) {
+  await page.getByTestId(`reference-${field}`).getByRole('button', { name: /^Choose…/ }).click()
   const dialog = await waitForDialog(page)
   await dialog.getByTestId('reference-lookup-search').fill(name)
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
@@ -189,7 +189,7 @@ async function waitInInbox(page: Page, sitePath: string, title: string) {
 }
 
 /** Waits for the task of the request `title` in To decide, opens it and approves it. */
-async function decideFromInbox(page: Page, sitePath: string, title: string) {
+export async function decideFromInbox(page: Page, sitePath: string, title: string) {
   await waitInInbox(page, sitePath, title)
   await page
     .getByRole('row', { name: new RegExp(title) })
@@ -201,20 +201,14 @@ async function decideFromInbox(page: Page, sitePath: string, title: string) {
   await expect(page).toHaveURL(new RegExp(`/${sitePath}/approvals/todecide$`))
 }
 
-/**
- * Has `employee` submit a request of the type `typeName`, which heads the requester's department. The request must not
- * show in the employee's To decide, and `manager` must approve it there. The employee then sees it approved.
- */
-export async function expectHeadRequestGoesToAdmin(page: Page, sitePath: string, typeName: string) {
-  const title = `Head request ${Date.now().toString(36)}`
-
-  await useJourneySession(page, 'employee')
+/** Saves a draft `title` of the type `typeName` with `amount` from My requests, and submits it. The current user is the requester. */
+export async function submitRequest(page: Page, sitePath: string, typeName: string, title: string, amount: string) {
   await page.goto(`${journeyURL}/${sitePath}/approvals/myrequests`)
   await page.getByRole('button', { name: 'New request', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/${sitePath}/approvals/requestform/new$`))
   await choose(page, 'type', 'Type', typeName)
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
-  await page.getByLabel(fieldLabel('Amount')).fill('800')
+  await page.getByLabel(fieldLabel('Amount')).fill(amount)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/${sitePath}/approvals/myrequests$`))
 
@@ -226,6 +220,35 @@ export async function expectHeadRequestGoesToAdmin(page: Page, sitePath: string,
   await expect(page).toHaveURL(new RegExp(`/${sitePath}/approvals/requestform/[0-9a-f-]{36}$`))
   await page.getByRole('button', { name: 'Submit', exact: true }).click()
   await expect(page.getByTestId('form-started')).toHaveText('The process has started.')
+}
+
+/** Opens the detail page of the request `title` from My requests, as the current user. */
+export async function openRequestDetail(page: Page, sitePath: string, title: string) {
+  await page.goto(`${journeyURL}/${sitePath}/approvals/myrequests`)
+  await page
+    .getByRole('row', { name: new RegExp(title) })
+    .getByRole('button', { name: 'View', exact: true })
+    .click()
+  await expect(page).toHaveURL(new RegExp(`/${sitePath}/approvals/requestdetail\\?request=[0-9a-f-]{36}$`))
+}
+
+/** The value shown in the detail widget for the field labelled `label`, read from its own `dd` element. */
+export function detailValue(page: Page, label: string): Locator {
+  return page
+    .getByTestId('detail')
+    .locator('div', { has: page.locator('dt', { hasText: fieldLabel(label) }) })
+    .locator('dd')
+}
+
+/**
+ * Has `employee` submit a request of the type `typeName`, which heads the requester's department. The request must not
+ * show in the employee's To decide, and `manager` must approve it there. The employee then sees it approved.
+ */
+export async function expectHeadRequestGoesToAdmin(page: Page, sitePath: string, typeName: string) {
+  const title = `Head request ${Date.now().toString(36)}`
+
+  await useJourneySession(page, 'employee')
+  await submitRequest(page, sitePath, typeName, title, '800')
 
   await useJourneySession(page, 'manager')
   await waitInInbox(page, sitePath, title)
@@ -250,11 +273,7 @@ export async function expectHeadRequestGoesToAdmin(page: Page, sitePath: string,
     await expect(page.getByRole('row', { name: new RegExp(title) })).toContainText('Approved', { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
 
-  await page
-    .getByRole('row', { name: new RegExp(title) })
-    .getByRole('button', { name: 'View', exact: true })
-    .click()
-  await expect(page).toHaveURL(new RegExp(`/${sitePath}/approvals/requestdetail\\?request=[0-9a-f-]{36}$`))
+  await openRequestDetail(page, sitePath, title)
   const detail = page.getByTestId('detail')
   await expect(detail).toContainText(title)
   await expect(detail).toContainText('Approved')
