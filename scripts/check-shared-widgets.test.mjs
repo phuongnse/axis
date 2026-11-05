@@ -44,8 +44,29 @@ describe('findUses', () => {
     assert.deepEqual(uses('<AxisTable columns={c} />'), [])
     assert.deepEqual(uses('<ButtonGroup />'), [])
     assert.deepEqual(uses('<TableFilter />'), [])
-    assert.deepEqual(uses('<Tag color="success">x</Tag>'), [])
     assert.deepEqual(uses('<Tag style={{ color: colour.text }}>x</Tag>'), [])
+  })
+
+  test('reports each status preset and each -inverse colour name as one tag', () => {
+    for (const name of ['success', 'error', 'warning', 'processing', 'default', 'blue-inverse']) {
+      assert.deepEqual(uses(`<Tag color="${name}">x</Tag>`), ['1 tag'], name)
+    }
+  })
+
+  test('reports a preset inside a colour expression once, and passes a colour token', () => {
+    assert.deepEqual(uses(`<Tag color={failed ? 'error' : 'success'}>x</Tag>`), ['1 tag'])
+    assert.deepEqual(uses(`<Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>x</Tag>`), ['1 tag'])
+    assert.deepEqual(uses('<Tag color={colour.dangerText}>x</Tag>'), [])
+    assert.deepEqual(uses('<Tag color={statusColors[value]}>x</Tag>'), [])
+  })
+
+  test('reports a tag whose colour is on a later line at the line of the tag', () => {
+    assert.deepEqual(uses(['<Tag', '  key={a}', '  color="warning"', '>x</Tag>'].join('\n')), ['1 tag'])
+  })
+
+  test('reports the line where a button and a table start', () => {
+    assert.deepEqual(uses(['<div>', '  <Button type="text"', '    onClick={f}', '  />', '</div>'].join('\n')), ['2 button'])
+    assert.deepEqual(uses(['<div>', '  <Table<Row> rowKey="id"', '  />', '</div>'].join('\n')), ['2 table'])
   })
 
   test('lets the shared widget itself use the Ant Design one', () => {

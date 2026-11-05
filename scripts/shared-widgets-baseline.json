@@ -85,6 +85,9 @@
   "web/src/pages/ProcessPalette.tsx": {
     "button": 1
   },
+  "web/src/pages/ReferencePicker.tsx": {
+    "tag": 1
+  },
   "web/src/pages/ScenarioEditor.tsx": {
     "button": 4
   },
@@ -114,21 +117,37 @@
   "web/src/pages/StudioModuleEditor.tsx": {
     "button": 1
   },
+  "web/src/pages/StudioModulePolicy.tsx": {
+    "tag": 1
+  },
   "web/src/pages/StudioNewApplication.tsx": {
     "button": 1
+  },
+  "web/src/pages/StudioPage.tsx": {
+    "tag": 1
   },
   "web/src/pages/StudioPageDesign.tsx": {
     "button": 1
   },
   "web/src/pages/StudioPolicyMatrix.tsx": {
     "table": 1,
+    "tag": 3,
     "button": 5
+  },
+  "web/src/pages/StudioProblems.tsx": {
+    "tag": 1
   },
   "web/src/pages/StudioProcessDesign.tsx": {
     "button": 2
   },
   "web/src/pages/StudioReferences.tsx": {
     "button": 1
+  },
+  "web/src/pages/StudioReleases.tsx": {
+    "tag": 1
+  },
+  "web/src/pages/StudioTestResults.tsx": {
+    "tag": 1
   },
   "web/src/pages/TextTable.tsx": {
     "table": 1,
@@ -142,6 +161,9 @@
   },
   "web/src/platform/ChildCollectionTable.tsx": {
     "table": 1
+  },
+  "web/src/platform/ConsolePublishing.tsx": {
+    "tag": 1
   },
   "web/src/platform/DeadLetterList.tsx": {
     "table": 1
@@ -169,14 +191,18 @@
   "web/src/platform/ReferenceLookup.tsx": {
     "table": 1
   },
+  "web/src/platform/ReleaseOffStandard.tsx": {
+    "tag": 1
+  },
   "web/src/platform/SignInPrompt.tsx": {
     "button": 1
   },
   "web/src/platform/TaskInboxWidget.tsx": {
-    "tag": 1,
+    "tag": 2,
     "table": 1
   },
   "web/src/platform/TaskPage.tsx": {
+    "tag": 1,
     "button": 3
   },
   "web/src/platform/UserMenu.tsx": {
