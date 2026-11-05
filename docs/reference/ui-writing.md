@@ -79,8 +79,7 @@ and the verbs of the common actions, with the term of each locale. A term has a 
 
 ## Vietnamese
 
-Where this section is silent, follow Microsoft's [Vietnamese Localization Style Guide][ms-vi], whose voice it shares:
-the meaning rewritten as a Vietnamese writer would say it, in short, everyday, modern words.
+The voice is the meaning rewritten as a Vietnamese writer would say it, in short, everyday, modern words.
 
 - **"Bạn" when speaking to the person, no subject otherwise.** Most texts need no subject: "Nhập tên.", "Không lưu được
   bản ghi.". A question or advice addressed to the person says "bạn": "Bạn có muốn xóa vai trò này không?", "Bạn nên
@@ -135,5 +134,3 @@ A check in `scripts/lint.sh` reads the texts and the glossary and fails when:
    owner to approve.
 3. A change that rewrites many texts of one locale goes area by area, with the owner reviewing the first area before
    the rest follow.
-
-[ms-vi]: https://download.microsoft.com/download/b/f/e/bfecb1b4-21ab-48fd-a48c-c2471b026f8f/vie-vnm-StyleGuide.pdf

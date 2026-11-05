@@ -9,6 +9,7 @@
     "AXC codes such as AXC0035",
     "Axis",
     "CSV",
+    "endpoint",
     "HTML",
     "ID",
     "JSON",
@@ -17,6 +18,7 @@
     "PIN",
     "placeholders such as {count}",
     "Studio",
+    "tenant",
     "TOTP",
     "URL",
     "webhook",
@@ -28,7 +30,7 @@
       "concept": "Application",
       "en": "application",
       "vi": "ứng dụng",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "app"
@@ -39,7 +41,7 @@
       "concept": "Resource",
       "en": "resource",
       "vi": "tài nguyên",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "resource"
@@ -50,7 +52,7 @@
       "concept": "Module",
       "en": "module",
       "vi": "mô-đun",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "module",
@@ -62,7 +64,7 @@
       "concept": "Built-in module",
       "en": "built-in module",
       "vi": "mô-đun có sẵn",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "mô-đun tích hợp"
@@ -73,26 +75,20 @@
       "concept": "Module contract",
       "en": "contract",
       "vi": "cam kết",
-      "status": "decide",
+      "status": "approved",
       "avoid": {
         "vi": [
-          "contract"
+          "contract",
+          "hợp đồng"
         ]
       },
-      "options": {
-        "vi": [
-          "cam kết",
-          "hợp đồng",
-          "giao kèo"
-        ]
-      },
-      "note": "\"Hợp đồng\", used today, reads as a legal contract; a module's contract is what it promises the application."
+      "note": "What a module promises the application."
     },
     {
       "concept": "Customization layer",
       "en": "layer",
       "vi": "lớp tùy biến",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "layer"
@@ -103,50 +99,43 @@
       "concept": "Release",
       "en": "release",
       "vi": "phiên bản",
-      "status": "decide",
+      "status": "approved",
       "avoid": {
         "vi": [
-          "release"
-        ]
-      },
-      "options": {
-        "vi": [
-          "phiên bản",
+          "release",
           "bản phát hành"
         ]
-      },
-      "note": "Today three words name it: \"phiên bản\", \"bản phát hành\" and \"phát hành\"."
+      }
     },
     {
       "concept": "Publish (action)",
       "en": "Publish",
-      "vi": "Xuất bản",
-      "status": "decide",
-      "options": {
+      "vi": "Phát hành",
+      "status": "approved",
+      "note": "The verb that makes a release: \"Phát hành…\" makes \"phiên bản\".",
+      "avoid": {
         "vi": [
-          "Xuất bản",
-          "Phát hành"
+          "Xuất bản"
         ]
-      },
-      "note": "The verb that makes a release. It pairs with the release's term: \"Phát hành\" with \"bản phát hành\", \"Xuất bản\" with \"phiên bản\"."
+      }
     },
     {
       "concept": "Activate (a release)",
       "en": "Activate",
       "vi": "Kích hoạt",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Live (release)",
       "en": "Live",
       "vi": "Đang chạy",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Diagnostic",
       "en": "problem",
       "vi": "vấn đề",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "chẩn đoán",
@@ -159,76 +148,67 @@
       "concept": "Studio",
       "en": "Studio",
       "vi": "Studio",
-      "status": "proposed",
+      "status": "approved",
       "note": "A product name, kept."
     },
     {
       "concept": "Entity",
       "en": "entity",
-      "vi": "thực thể",
-      "status": "decide",
+      "vi": "đối tượng",
+      "status": "approved",
       "avoid": {
         "vi": [
-          "entity"
+          "entity",
+          "thực thể"
         ]
       },
-      "options": {
-        "vi": [
-          "đối tượng",
-          "bảng",
-          "thực thể",
-          "entity"
-        ]
-      },
-      "note": "Today \"thực thể\" and \"entity\" are mixed, 25 to 20. Microsoft Dataverse says \"Bảng\", which would clash with the table widget's \"bảng\"; Odoo says \"Mô hình\" and \"Đối tượng\". No product shows \"thực thể\"."
+      "note": "The definition of a kind of record, such as Purchase request. \"bảng\" names the table widget."
     },
     {
       "concept": "Field",
       "en": "field",
       "vi": "trường",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "field"
         ]
-      },
-      "note": "Odoo says \"Trường\"; Microsoft Dataverse says \"Cột\"."
+      }
     },
     {
       "concept": "Record",
       "en": "record",
       "vi": "bản ghi",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "record"
         ]
-      },
-      "note": "Odoo says \"Bản ghi\"; Microsoft Dataverse mixes \"Hàng\" and \"Bản ghi\"."
+      }
     },
     {
       "concept": "Display field",
       "en": "display field",
       "vi": "trường hiển thị",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Data source",
       "en": "data source",
       "vi": "nguồn dữ liệu",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Sequence",
       "en": "sequence",
       "vi": "dãy số",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Seed data",
       "en": "seed data",
       "vi": "dữ liệu ban đầu",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "dữ liệu mẫu"
@@ -240,44 +220,43 @@
       "concept": "Migration",
       "en": "migration",
       "vi": "di chuyển dữ liệu",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Enum (field type)",
       "en": "Enum",
       "vi": "Lựa chọn",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "enum",
           "danh sách chọn"
         ]
-      },
-      "note": "Microsoft Dataverse and Odoo both name it \"Lựa chọn\"."
+      }
     },
     {
       "concept": "Reference (field type)",
       "en": "Reference",
       "vi": "Tham chiếu",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Child collection (field type)",
       "en": "Child collection",
       "vi": "Bảng con",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Required",
       "en": "Required",
       "vi": "Bắt buộc",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Unique",
       "en": "Unique",
       "vi": "Không trùng",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "unique",
@@ -289,25 +268,25 @@
       "concept": "Sensitive",
       "en": "Sensitive",
       "vi": "Nhạy cảm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Computed",
       "en": "Computed",
       "vi": "Tính toán",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Label",
       "en": "label",
       "vi": "nhãn",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Help text",
       "en": "help text",
       "vi": "hướng dẫn",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "văn bản trợ giúp"
@@ -318,13 +297,13 @@
       "concept": "Expression",
       "en": "expression",
       "vi": "biểu thức",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Rule",
       "en": "rule",
       "vi": "quy tắc",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "rule"
@@ -335,33 +314,26 @@
       "concept": "Validation",
       "en": "validation",
       "vi": "điều kiện lưu",
-      "status": "decide",
-      "options": {
-        "vi": [
-          "điều kiện lưu",
-          "kiểm tra hợp lệ",
-          "ràng buộc"
-        ]
-      },
-      "note": "A validation is a condition a record must meet to be saved."
+      "status": "approved",
+      "note": "A condition a record must meet to be saved."
     },
     {
       "concept": "Process",
       "en": "process",
       "vi": "quy trình",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Step",
       "en": "step",
       "vi": "bước",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Human task",
       "en": "task",
       "vi": "công việc",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "nhiệm vụ",
@@ -373,72 +345,69 @@
       "concept": "Trigger",
       "en": "trigger",
       "vi": "bộ kích hoạt",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Event",
       "en": "event",
       "vi": "sự kiện",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Connector",
       "en": "connector",
       "vi": "bộ kết nối",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Endpoint",
       "en": "endpoint",
       "vi": "endpoint",
-      "status": "decide",
-      "options": {
+      "status": "approved",
+      "note": "Kept in English: integrators say it.",
+      "avoid": {
         "vi": [
-          "endpoint",
-          "điểm cuối",
-          "điểm nhận"
+          "điểm cuối"
         ]
-      },
-      "note": "\"Điểm cuối\", used today, is a word-for-word rendering few readers know."
+      }
     },
     {
       "concept": "Webhook",
       "en": "webhook",
       "vi": "webhook",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Test scenario",
       "en": "test scenario",
       "vi": "kịch bản kiểm thử",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Site",
       "en": "site",
       "vi": "trang web",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Page",
       "en": "page",
       "vi": "trang",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Form",
       "en": "form",
       "vi": "biểu mẫu",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Widget",
       "en": "widget",
       "vi": "thành phần",
-      "status": "decide",
-      "options": {
+      "status": "approved",
+      "avoid": {
         "vi": [
-          "thành phần",
           "widget"
         ]
       }
@@ -446,66 +415,63 @@
     {
       "concept": "Text resource",
       "en": "text resource",
-      "vi": "bản văn bản",
-      "status": "decide",
-      "options": {
+      "vi": "bộ văn bản",
+      "status": "approved",
+      "note": "An application's texts in one language: \"Bộ văn bản tiếng Việt\".",
+      "avoid": {
         "vi": [
-          "bản văn bản",
-          "tài nguyên văn bản",
-          "bản dịch"
+          "tài nguyên văn bản"
         ]
-      },
-      "note": "A text resource holds an application's texts in one language."
+      }
     },
     {
       "concept": "Role",
       "en": "role",
       "vi": "vai trò",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Policy",
       "en": "policy",
       "vi": "chính sách",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Identity provider",
       "en": "identity provider",
       "vi": "nhà cung cấp danh tính",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Tenant",
       "en": "tenant",
       "vi": "tenant",
-      "status": "decide",
-      "options": {
+      "status": "approved",
+      "note": "Kept in English: operators say it.",
+      "avoid": {
         "vi": [
-          "tenant",
-          "đơn vị thuê",
-          "không gian"
+          "người thuê",
+          "đơn vị thuê"
         ]
-      },
-      "note": "Today \"tenant\" is kept, in 13 texts."
+      }
     },
     {
       "concept": "Operator console",
       "en": "operator console",
       "vi": "bảng điều khiển vận hành",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Save",
       "en": "Save",
       "vi": "Lưu",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Cancel",
       "en": "Cancel",
       "vi": "Hủy",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "Huỷ"
@@ -516,131 +482,130 @@
       "concept": "Action: Delete",
       "en": "Delete",
       "vi": "Xóa",
-      "status": "proposed",
+      "status": "approved",
       "avoid": {
         "vi": [
           "Xoá",
           "Xóa bỏ"
         ]
       },
-      "note": "Destroys a thing. Microsoft's products say \"Xóa\"; \"Remove\" is \"Loại bỏ\"."
+      "note": "Destroys a thing."
     },
     {
       "concept": "Action: Remove",
       "en": "Remove",
       "vi": "Loại bỏ",
-      "status": "proposed",
-      "note": "Takes a thing out of a list or a setting; the thing itself stays. Microsoft's Vietnamese guide: Remove is \"Loại bỏ\"."
+      "status": "approved",
+      "note": "Takes a thing out of a list or a setting; the thing itself stays."
     },
     {
       "concept": "Action: Add",
       "en": "Add",
       "vi": "Thêm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Create",
       "en": "Create",
       "vi": "Tạo",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Edit",
       "en": "Edit",
       "vi": "Sửa",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Discard",
       "en": "Discard",
       "vi": "Bỏ thay đổi",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Undo",
       "en": "Undo",
       "vi": "Hoàn tác",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Redo",
       "en": "Redo",
       "vi": "Làm lại",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Refresh",
       "en": "Refresh",
       "vi": "Làm mới",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Search",
       "en": "Search",
       "vi": "Tìm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Filter",
       "en": "Filter",
       "vi": "Lọc",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Validate",
       "en": "Validate",
       "vi": "Kiểm tra",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Preview",
       "en": "Preview",
       "vi": "Xem trước",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Run tests",
       "en": "Run tests",
       "vi": "Chạy kiểm thử",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Export",
       "en": "Export",
       "vi": "Xuất",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Import",
       "en": "Import",
       "vi": "Nhập",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Restore",
       "en": "Restore",
       "vi": "Khôi phục",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Done",
       "en": "Done",
       "vi": "Xong",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "concept": "Action: Clear",
       "en": "Clear",
       "vi": "Xóa",
-      "status": "proposed",
+      "status": "approved",
       "note": "Empties a value or a search; destroys nothing that was saved."
     },
     {
       "concept": "Error",
       "en": "Error",
       "vi": "lỗi",
-      "status": "proposed",
-      "note": "Every error message says \"lỗi\", as Microsoft's guide asks."
+      "status": "approved"
     }
   ]
 }
