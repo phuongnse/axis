@@ -423,23 +423,21 @@ hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets).
 - **An alert on a stale backup** _(planned for M31)_. An alert fires on a gauge that is too old.
 - **Settings.** `Cell:BackupStorage:ServiceUrl`, `:Region`, `:Bucket`, `:AccessKeyId` and
   `:SecretAccessKey` name an S3-compatible service, reached with the AWS SDK and path-style addressing,
-  see [host settings](host-settings.md#cell-settings). All five are required. The command also needs
-  `Cell:Id`, `Cell:BackupKeyFile`, the platform database, the installation key and `pg_dump` on `PATH`.
+  see [host settings](host-settings.md#cell-settings). All five are required. The command's other
+  settings and its exit codes are in [cell backup](administration.md#cell-backup).
 - **Output.** Each line starts with the tenant id. A try writes the lines of the `tenant backup` steps,
   `dump`, `realm` (only with `IdentityProvider:DatabaseConnectionString` set, for a tenant with its own
   realm) and `archive`, and then `upload ok`. A step that fails writes `<step> failed: <message>`, where
   the step is `key` (the tenant has no backup key or it does not unwrap), `check` (the tenant cannot be
   backed up, for example because it is no longer in the directory), `dump`, `realm`, `archive` or
   `upload`. The message of `upload` is the error code of the service or the name of the error type,
-  never the address or a key. No line holds the secret access key.
+  never the address or a key. No line holds the secret access key. A tenant that is tried again writes
+  its lines again, so its failed line comes twice.
 - **The last lines.** When the time runs out, the last line is
   `cell backup stopped: the run reached its 6-hour limit`. A tenant whose upload time cannot be stored
   writes `<tenant id> record failed: <message>` after its upload, counts as failed and is not uploaded
   again. When the gauge cannot be recorded, the last line is `cell backup metric failed: <message>`, and
   the command exits `1`.
-- **Exit codes.** `0` when every tenant succeeded. `1` when any tenant failed or the time ran out. `2`
-  outside a cell or when a setting or `pg_dump` is missing, or when an OTLP endpoint setting is not an
-  absolute `https` URL outside Development, before anything is uploaded or audited.
 
 ### Weekly restore check
 
@@ -453,8 +451,9 @@ no argument and runs only in a cell. It does these steps:
    up a scratch tenant that an earlier run left behind. When no tenant qualifies, the command writes
    `cell restore-check failed: no tenant has an archive of today or yesterday`, records no point, writes
    no audit record and exits `1`.
-2. **Audit.** It writes one platform audit record for the source tenant, which names the scratch tenant
-   and does not hold the result.
+2. **Audit.** It writes one platform audit record for the source tenant, before the first change. The
+   record lists `tenant: <scratch tenant id>` and does not hold the result, which goes to the metric
+   and the output.
 3. **Clean up.** It removes every `restore-check-*` tenant that an earlier run left behind. It finds them
    by their directory rows and their `axis_restore-check-*` databases, and always removes today's id.
 4. **Download.** It downloads the archive to a folder that only its owner can use, and deletes the
@@ -504,9 +503,5 @@ no argument and runs only in a cell. It does these steps:
   a row or a username.
 - **Shown on the console** _(planned for M31)_. The [cell console](cell-console.md#views) shows the
   newest result.
-- **Exit code 2.** Outside a cell, with arguments, or when `Cell:InternalDomain`, `IdentityProvider:Url`,
-  a `Cell:BackupStorage` setting, `Cell:BackupKeyFile`, the platform database or `pg_restore` on `PATH`
-  is missing, or when `Scenarios:ServerConnectionString` is not a connection string or the folder of
-  `Extensions:Path` or `Modules:Path` does not exist, or when an OTLP endpoint is not an `https` URL
-  outside Development. Nothing changes and no audit record is written. The full list of settings is in
-  [administration](administration.md#cell-restore-check).
+- **Settings and exit codes.** They are in
+  [cell restore check](administration.md#cell-restore-check).

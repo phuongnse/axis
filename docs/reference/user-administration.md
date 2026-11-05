@@ -1,8 +1,8 @@
 # User administration
 
 This page describes the accounts of [Axis's identity provider](identity-provider.md), the roles that an
-administrator gives people, and the users page where an administrator manages both. It covers the page, its routes,
-the account rules of every tenant realm, and the audit records that each change writes.
+administrator gives people, and the users page where an administrator manages both. It covers the page's commands and
+routes, the account rules of every tenant realm, and the audit records that each change writes.
 
 ## The administrator role
 
@@ -24,77 +24,36 @@ like the author and the operator roles.
 
 The users page lists every user of the tenant and holds the commands an administrator runs on them: invite, resend an
 invitation, disable, enable, reset an account's authenticator, give a role and remove a role. Each command asks for
-confirmation first and writes an [audit record](#audit). The page shows names, never translated labels, and never shows
-a field marked `sensitive` or record data.
+confirmation first and writes an [audit record](#audit). What the page shows, and what it says for each answer, is in
+[users page](platform-pages.md#users-page).
 
 ### The list
 
-The list holds the people who have signed in and the accounts that are invited. It searches by name or email, and
-pages.
-
-- **Columns.** Each row has the display name, the email, how the person signs in (the provider's alias as the
-  [list route](#read-routes) sends it, or "Account"), the status (`invited`, `active` or `disabled`) and the last
-  sign-in.
-- **Paging and search.** The page asks the route for 20 users at a time. A search starts on Enter or on the search
-  button and goes back to page 1.
+The list holds the people who have signed in and the accounts that are invited, searched by name or email and paged,
+from [the list route](#read-routes).
 
 ### Inviting and resending
 
-An administrator invites a person from the list and can send an account's invitation again.
-
-- **Invite.** The "Invite" button next to the search box opens a form with the email, the display name and optional
-  roles. The roles are in one section for each active application and one for the platform, as on
-  [a user's roles](#a-users-roles). The form gets them from the [roles route](#read-routes), called with the signed-in
-  administrator's own id, and uses only `applications` and `platformRoles`. When they cannot be loaded, the form says
-  so and still invites without roles.
-- **Confirming an invitation.** Submitting the form asks "Invite this person?" and names the email, the name and the
-  roles. After the confirmation, the page calls the invite route and loads the list again, so the new row shows as
-  `invited`. It shows a `403` as "Sign in again to give a platform role." and a `409` as "An account already uses this
-  email." Any other failure shows "The invitation could not be sent." and loads the list again, because an invitation
-  whose email failed leaves the account as `invited`.
-- **Resend invitation.** A row that is `invited` and is an account, not a brokered user, has a "Resend invitation"
-  button. It asks for confirmation, names the person and the email, calls the resend route, shows "The invitation was
-  sent again." and loads the list again, because the resend gives the person a new id. It shows a `403` as "This page is
-  for administrators." and a `409` as "This person has a password or signs in through a provider, so they cannot get a
-  new invitation."
+An administrator invites a person and can send an account's invitation again, by the rules of [accounts](#accounts),
+from the form and the button of [inviting and resending](platform-pages.md#inviting-and-resending).
 
 ### Disabling, enabling and resetting an authenticator
 
-Each row has the buttons that change whether and how the person signs in.
-
-- **Which buttons.** A row that is `active` or `invited` has a "Disable" button, and a row that is `disabled` has an
-  "Enable" button instead. A row for an account, not a brokered user, has a "Reset authenticator" button. The Disable
-  button also shows on the administrator's own row, where the server answers `409`.
-- **Confirmation.** Each button asks for confirmation, names the person and the email, calls its route and loads the
-  list again. The Disable and Reset confirmations add a line on the effect: the person's sessions end, and they cannot
-  sign in until they are enabled, or their next sign-in asks them to add an authenticator again.
-- **Answers.** A success shows "The person was disabled.", "The person was enabled." or "The authenticator was reset."
-  The page shows a `403` on disable as "Sign in again to disable a person." and a `409` as "An administrator cannot
-  disable themselves." Any other failure of the three commands, including a `403` or a `409` on enable and reset, shows
-  "The change was not made." and loads the list again.
+An administrator disables and enables a person, see [disabled users](#disabled-users), and resets an account's
+authenticator, see [accounts](#accounts), from the buttons of
+[disabling, enabling and resetting](platform-pages.md#disabling-enabling-and-resetting-an-authenticator).
 
 ### A user's roles
 
-A person's roles show in one section for each active application and one for the platform, where the administrator
-gives and removes them.
-
-- **A page of its own** _(planned for M31)_. Clicking a row opens the user as a page of its own, as
-  [opening things](actions-and-controls.md#opening-things) says, which holds these sections.
-- **Tags.** Each role shows the "Given" tag when the person has it. A given role that is not declared any more has a
-  "Not declared" tag, and its section lists it even when its application is not active.
-- **Give and Remove.** A Give or Remove button asks for confirmation, names the role, the place and the person, then
-  calls the give-role or remove-role route and loads the roles again. A `403` shows as "Sign in again to change a
-  platform role." and a `409` as "An administrator cannot remove their own administrator role."
-- **What shows.** The roles that an administrator gave, not the platform roles that the provider's sign-in mapping
-  gives.
+An administrator gives and removes a person's roles, see [roles](#roles), in the sections of
+[a user's roles](platform-pages.md#a-users-roles).
 
 ### Export data and usage
 
 _(planned for M33)_
 
-In a tenant of a cell, the users page has two more sections for an administrator: "Export data", see
-[exports by a tenant administrator](tenant-lifecycle.md#exports-by-a-tenant-administrator), and "Usage", the tenant's
-quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
+In a tenant of a cell, the users page also shows the tenant's exports and usage, see
+[export data and usage](platform-pages.md#export-data-and-usage).
 
 ### Read routes
 

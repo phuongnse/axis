@@ -512,6 +512,10 @@ user of the `axis` realm and the roles they hold.
 
 The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
 
+- **Users.** The realm holds the [development users](reference/security.md#development-users), with
+  fixed ids that seed data and E2E journeys name.
+- **Roles.** The roles are client roles of the confidential client `axis`. A client-role mapper writes
+  them to the `roles` claim, so the claim holds only the sample roles.
 - **Password and code.** The development password is `axis` for every user. After the password, the
   sign-in asks for a 6-digit code, as
   [D99](decisions/d99-axis-ships-its-own-identity-provider.md) requires of every account. Each user has
@@ -551,9 +555,14 @@ The realm's clients:
 
 | Client           | Secret                               | What uses it                                                                                                                                                                                                                                                                                                                                     |
 | ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `axis`           | `axis-development-secret`            | The server's sign-in of people, as the `default` tenant's OIDC client in the Development and E2E settings. The sample roles are its client roles                                                                                                                                                                                                 |
 | `axis-activation` | `axis-activation-development-secret` | The server's startup activation. Its service account holds the `realm-management` roles that a tenant's realm grants the same client. The `default` tenant's realm details under `scripts/dev.sh` and E2E name the realm `axis` and this secret, so activation signs in as the client, adds the `site-` client of each sample site, creates the brokered provider `oidc-companyissuer` from the purchase request sample's `company` provider and lists it in the `site-purchasing` client's `axis.providers` |
 | `axis-users`     | `axis-users-development-secret`      | The users page. Its service account holds `manage-users`, `view-users` and `query-users`, as the client of a realm that `tenant create` makes does. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names this secret, so `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them |
 | `axis-fapi`      | Development keys in `samples/keycloak` | An integration test host only, for the `fapi2` sign-in profile, see [FAPI 2.0 profile](reference/fapi2-profile.md)                                                                                                                                                                                                                                |
+
+The confidential clients `purchasing-system`, a [machine caller](reference/security.md#machine-callers),
+and `reporting-system`, a [service account](reference/security.md#service-accounts), get tokens through
+the client credentials grant.
 
 ### The company realm
 
@@ -616,7 +625,7 @@ Each sample uses development users of the `axis` realm, in a site of its own, an
   http://localhost:5173/studio. Studio saves into those committed folders, so
   `git checkout -- samples/apps` reverts an edit. The `publisher` role lets the authoring API publish,
   shows **Publish** on the Studio page and allows rollback from the release history.
-- **Signing in.** Under `scripts/dev.sh`, the server signs people in through Keycloak at
+- **Signing in.** Under `scripts/dev.sh` and in the E2E run, the server signs people in through Keycloak at
   `/api/auth/sign-in`, and the session then answers `GET /api/me`. Opening the home page without a
   session starts sign-in at once, and the header offers sign-in on other pages and sign-out once
   signed in. See [sign-in and the session](reference/security.md#sign-in-and-the-session).

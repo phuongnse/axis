@@ -2,9 +2,9 @@
 
 The frontend is one single-page application (SPA) that draws every site, page and widget of every application from
 metadata the server serves. This page covers the rules every widget follows, the design tokens, the endpoints that
-describe sites and pages, the routes, the table widget, the account button and narrow width. The frame around a page is
-in [shell and home page](shell.md), and buttons, menus, fields, tables and dialogs are in
-[actions and controls](actions-and-controls.md).
+describe sites and pages, the routes, the table widget and narrow width. The frame around a page, the account button and
+the sign-in prompt included, is in [shell and home page](shell.md), and buttons, menus, fields, tables and dialogs are
+in [actions and controls](actions-and-controls.md).
 
 ## One SPA
 
@@ -148,9 +148,10 @@ so the shell's own texts keep working inside every application site.
 The person picks a locale and a theme in the shell's [language and theme](shell.md#app-switcher-and-preferences) menu,
 and the SPA keeps both in the browser.
 
-- **Browser storage.** The chosen locale is kept in `localStorage` under `axis.locale`, as the theme mode is under
-  `axis.themeMode`. These are the only keys the SPA keeps in browser storage. Sign-out clears both through
-  `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default locale.
+- **Browser storage.** The chosen locale is kept in `localStorage` under `axis.locale`, beside the theme mode that
+  [themes](shell.md#app-switcher-and-preferences) keeps. These are the only keys the SPA keeps in browser storage.
+  Sign-out clears both through `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default
+  locale.
 - **One key for every site.** A site starts in the stored locale when it offers it, and in its default locale
   otherwise.
 - **Changing the locale.** The shell keeps the current texts until the chosen locale's texts have loaded. If they fail
@@ -202,7 +203,7 @@ tenant host.
   tenant does not exist for the request.
 - **A session first.** The endpoints need a session. Without one they answer a `401` problem, before any `404`, so a
   signed-out caller cannot learn which sites or pages exist. So every application page shows the
-  [sign-in prompt](#account-button-and-sign-in-prompt) when nobody is signed in, and the browser stays on the page.
+  [sign-in prompt](shell.md#session-ended) when nobody is signed in, and the browser stays on the page.
   The record API and the data source endpoint also need a grant, so a page's data fails to load for a user without
   one.
 - **Load time.** At typical size, a page with a three-level widget tree loads in under 2 s: its metadata, then the rows
@@ -454,7 +455,7 @@ below answers `200`.
 
 | Address                                | Shows                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                                    | the [platform home page](shell.md#platform-home-page): signed in, the launcher of the person's applications and tools, and with nobody signed in, sign-in at once with no screen drawn first, except at the card addresses below                                                                                                                                                                                                                                    |
+| `/`                                    | the [platform home page](shell.md#platform-home-page): signed in, the launcher of the person's applications and tools, and with nobody signed in, sign-in at once with no screen drawn first, except at the addresses of [the sign-in card](shell.md#the-sign-in-card)                                                                                                                                                                                              |
 | `/licences`                            | the [open source licences](legal.md#open-source-licences) page, open without signing in                                                                                                                                                                                                                                                                                                                                                                             |
 | `/{site}`                              | the site's first navigation entry, by redirect                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `/{site}/{page}`                       | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
@@ -464,14 +465,8 @@ below answers `200`.
 | `/{site}/{inboxpage}/{taskId}`         | the task page of the task with that id, under the page of a task inbox                                                                                                                                                                                                                                                                                                                                                                                              |
 | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector                                                                                                                                                                                                                                                                                                                                                                       |
 
-- **The home page's cards.** Three addresses show a card, and none starts sign-in until the person clicks its button.
-  `/?signIn=failed`, where the server sends the browser after a refused sign-in, shows "Sign in" and, above its
-  button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason.
-  `/?signIn=declined`, where the server sends the browser after a person declines the terms step, shows the same card
-  with the platform text `shell.home.signInDeclined`, which says that signing in needs the terms accepted.
-  `/?signedOut`, where the identity provider returns the browser after sign-out, shows "You have signed out", a
-  message and a "Sign in again" button. A signed-in person who opens any of them sees the launcher. On the launcher,
-  each site is titled in the current locale, or in the site's first locale when it lacks the current one.
+- **The home page's cards.** `/?signIn=failed`, `/?signIn=declined` and `/?signedOut` show a card in place of
+  sign-in, see [the sign-in card](shell.md#the-sign-in-card).
 - **Reserved paths.** The sessions screen at `/account` and the users page at `/users` are platform routes beside
   `/studio`, before the site route, so `account`, `users` and `licences` are reserved site paths. See
   [platform pages](platform-pages.md).
@@ -835,34 +830,8 @@ current rows stay under the loading overlay.
 
 ## Account button and sign-in prompt
 
-The shell header of every site shows an account button first among its actions, and a `401` from any call shows the
-sign-in prompt. Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-session).
-
-- **Loading.** The account button loads `GET /api/me` each time a shell mounts, and shows nothing while it loads or
-  when the load fails. The [app switcher](shell.md#app-switcher-and-preferences) reads `studio` and `console` from it.
-- **Signed out.** With nobody signed in, it is a Sign in button, except on the home page `/`, which starts sign-in or
-  shows a card. It sends the browser to `/api/auth/sign-in` with the current path and query string as `returnUrl`, so
-  the person comes back there, but to `/` from the card addresses `/?signIn=failed`, `/?signIn=declined` and
-  `/?signedOut`.
-- **Signed in.** With someone signed in, it shows their display name, with their avatar before it and a caret after
-  it. Its menu holds Sessions, which opens the [sessions screen](platform-pages.md), and Sign out, which ends the
-  session. The server ends the identity provider's session itself and the browser goes to `/?signedOut`. Only when
-  that fails does the browser go to the identity provider's sign-out page.
-- **The sign-in prompt.** A `401` from any API call shows a dialog titled "Your session has ended", with a short
-  message and a Sign in button. It shows when a signed-out person opens an application page, and over the current
-  page when a session ends during use. The button starts the same sign-in, with the current path and query string as
-  `returnUrl`. Only the click starts it, so a live session at the identity provider never signs the person in without
-  their action.
-- **It stays.** The prompt cannot be dismissed, and once shown it stays until the browser leaves the page. It sits at
-  the root of the platform, above every route, so it shows even when the site itself fails to load with a `401`, and
-  then nothing shows behind it, in place of the error that the site could not be loaded.
-- **Exempt calls.** Four calls never show the prompt. `GET /api/me` answers `401` when nobody is signed in, so the
-  header shows the Sign in button and no app switcher. The home page's `GET /api/sites` answers `401` too, and the home
-  page starts sign-in at once when either call does, except at the card addresses, where it shows the card. The
-  notification bell's calls and Studio's readiness checks stay quiet as well.
-- **Texts.** The platform texts are `shell.account.signIn`, `shell.account.signOut` and `shell.account.label`, the
-  menu's label, and `shell.signInPrompt.title` and `shell.signInPrompt.message`, the prompt's title and message. The
-  prompt's button reuses `shell.account.signIn`.
+The account button and the sign-in prompt are parts of the shell, see [account button](shell.md#account-button) and
+[session ended](shell.md#session-ended).
 
 ## Narrow width
 
@@ -877,9 +846,8 @@ narrow one.
   see [Studio](studio.md).
 - **Tables.** Every platform table, form line items and the reference lookup included, scrolls sideways inside its
   widget, so the page never does.
-- **The shell header** keeps the site title, the account button and a Menu button (`shell.navigation.menu`) with
-  `aria-expanded`. It opens a panel with the navigation and the language and theme menu, while the app switcher stays
-  in the header. Escape or following a link closes it, and Escape returns focus to the button.
+- **The shell header** folds the navigation and the language and theme menu into a Menu panel, see
+  [layout](shell.md#layout).
 
 ## Studio
 

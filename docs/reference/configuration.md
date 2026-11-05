@@ -284,12 +284,8 @@ checked here.
   already lists, in any section and ignoring letter case, is `AXC0076` at the later entry's `field`,
   naming the first one.
 - **Labels.** Each section title joins the `AXC0028` check, at `/sections/{i}/title/textKey`.
-- **Conditions and steps.** Each condition is a boolean expression over the entity, and it reads
-  only listed fields (`AXC0225`). `visibleWhen` is not allowed on a required field (`AXC0226`). A
-  section name is used once (`AXC0227`) and a step name once (`AXC0360`). A step names a known
-  section (`AXC0228`) that is in no other step (`AXC0229`), and when there are steps, every section
-  is in one step (`AXC0230`). The detail is in
-  [form conditions and steps](form-conditions.md#form-conditions-and-steps).
+- **Conditions and steps.** The conditions and wizard steps are checked as
+  [form conditions](form-conditions.md#compile-checks) says.
 
 ### Seeds
 
@@ -311,169 +307,19 @@ field that is not `text` gets no `AXC0066`.
 
 ### Data sources
 
-A [data source](data-sources.md#compile-checks) projects fields of one entity, and its entity,
-paths, sort, aggregate, parameters and filters are checked here.
-
-- **Entity.** A data source's `entity` must name a loaded entity, ignoring letter case, otherwise it
-  is `AXC0042` at `/entity`, and its fields and sort are not checked further. An `entity` that is a
-  child entity is `AXC0064` at `/entity`, naming the owner.
-- **Paths.** Each `path` must name a field of that entity, or go through `reference` fields with at
-  most 3 hops, each name ignoring letter case, otherwise it is `AXC0043` at `/fields/{i}/path`, with
-  a message that says whether the path goes through a field that is not a `reference`, reaches an
-  unknown field or has more than 3 hops. A path ending at a `child-collection` field is `AXC0043`
-  too, because that field has no column.
-- **Projected names** compare exactly: a name that an earlier entry of `fields` already uses is
-  `AXC0044` at `/fields/{i}/name`.
-- **Sort.** The `sort`, without its leading `-`, must exactly match a projected name whose path does
-  not end at a `reference`, otherwise it is `AXC0045` at `/sort`. When the data source is grouped,
-  the `sort` must exactly match a group field that is not a `reference`, or a measure, otherwise it
-  is `AXC0045`. A sort naming an entry whose path is already `AXC0043` is not reported again.
-- **Group fields.** An `aggregate` groups by projected names, compared exactly: a `groupBy` entry
-  that names no projected field is `AXC0061` at `/aggregate/groupBy/{i}`, or at
-  `/aggregate/groupBy/{i}/field` for the object form. A field grouped twice is `AXC0061` at the
-  later entry, and a `bucket` on a field that is not a date or a date-time is `AXC0061` at
-  `/aggregate/groupBy/{i}/bucket`.
-- **Measures.** A measure name that is a group field or repeats an earlier measure, compared
-  exactly, is `AXC0062` at `/aggregate/measures/{i}/name`. A `count` with a `field`, or a `sum`,
-  `min` or `max` without one, is `AXC0063` at `/aggregate/measures/{i}`. A measure `field` that
-  names no projected field, or whose type the function does not take, is `AXC0063` at
-  `/aggregate/measures/{i}/field`. `sum` takes an integer, a decimal or a money field, and `min` and
-  `max` also take a date or a date-time. A measure field whose path is already `AXC0043` is not
-  reported again. A `sum`, `min` or `max` over a money field with a `currencyField`, without a group
-  field that reaches that currency field on the same record, is `AXC0248` at
-  `/aggregate/measures/{i}/field`.
-- **Parameters.** A parameter name that is also a field of the entity, is `page`, `pageSize`, `sort`
-  or `search`, or repeats an earlier parameter, all ignoring letter case, is `AXC0054` at
-  `/parameters/{i}/name`. A parameter's type properties are checked as an entity field's, with the
-  same codes (`AXC0012`, `AXC0013`, `AXC0014`, `AXC0030`, `AXC0040`) at `/parameters/{i}/...`, and
-  its label joins the `AXC0028` check.
-- **Search.** A data source with `"search": true` and no searched projected field, which is a path
-  that ends at a `searchable` text field or the root's display field projected directly, is
-  `AXC0279` at `/search`, unless a projected path is already `AXC0043`.
-- **Filters.** The `filter` is parsed, type-checked as a boolean over the entity's fields, the
-  parameters, paths through `reference` fields and the named rules, and translated to SQL. Its first
-  problem is reported at `/filter` with its [expression diagnostic](expressions.md#diagnostics)
-  code, and anything outside the SQL subset is `AXC0053`, including an aggregate other than `any`
-  and `count` over a child collection or a `references` field. An enum parameter with a value that
-  the compared enum field lacks is `AXC0047`, and so is a `.` after a field that is not a
-  `reference` or after a parameter. A path with more than 3 hops is `AXC0058`. A measure `filter` is
-  checked the same way and reported at `/aggregate/measures/{i}/filter`. The filters of a data source
-  whose entity is unknown, or that has a parameter with a diagnostic, are not checked.
+A data source's entity, projected paths, sort, aggregate, parameters and filters are checked here,
+as its [compile checks](data-sources.md#compile-checks) say.
 
 ### Roles
 
-A [role](roles-and-policies.md)'s `label` joins the `AXC0028` check, at `/label/textKey`. A process
-task's `assignee.role` must name a declared role, compared exactly, otherwise it is `AXC0089`, see
-[processes](#processes).
+A [role](roles-and-policies.md)'s `label` joins the `AXC0028` check, at `/label/textKey`. The roles
+that a process task names are checked with the [process](processes.md#compile-checks).
 
 ### Processes
 
-A [process](processes.md#resource-shape) is checked for its subject, its steps and transitions, its
-conditions and each step type's properties. More of its checks are in
-[compile checks](processes.md#compile-checks) and [sub-process step](process-flow.md#sub-process-step).
-
-- **Subject.** A process's `entity` must name a loaded entity, ignoring letter case, otherwise it is
-  `AXC0067` at `/entity`, and its conditions are not checked. An `entity` that is a child entity is
-  `AXC0068` at `/entity`, naming the owner. A process has `entity` or `parameters`, not both and not
-  neither (`AXC0244`). Without an `entity` it is checked over its `parameters`.
-- **Step names.** Step names are unique ignoring letter case: a later step with a name already used
-  is `AXC0069` at `/steps/{i}/name`, naming the first step. A branch or escalation name used twice in
-  its list, ignoring letter case, is `AXC0359` at its `name`.
-- **Transitions.** `start`, each branch `next`, each `otherwise`, each operation and sub-process
-  `next`, each task outcome `next` and each task `deadline` `next` must name a step, ignoring letter
-  case, otherwise it is `AXC0070` at that property. A transition goes to the first step with its
-  name.
-- **Reach and cycles.** A step that cannot be reached from `start` is `AXC0071` at `/steps/{i}`,
-  which is not checked when `start` is unknown. A step with no path to an `end` step is `AXC0072` at
-  `/steps/{i}`, and a step with a transition to an unknown step is not also `AXC0072`. A transition
-  that closes a cycle with no waiting step is `AXC0073` at that transition, naming the steps in the
-  cycle. The transitions out of a `task` step are not followed, so a loop through a task is allowed.
-  The steps are walked in file order, with the branches, then `otherwise`, then `next`, then the
-  outcomes, then the deadline's `next`. A step whose name is already `AXC0069` is left out of
-  `AXC0071`, `AXC0072` and `AXC0073`.
-- **Conditions.** The `startCondition` expression and each decision `when` are parsed and
-  type-checked as a boolean over the entity's fields, computed ones included, its child collections,
-  which only aggregates accept, the named rules, and paths through `reference` fields of at most 3
-  hops. A problem is reported at `/startCondition/expression` or `/steps/{i}/branches/{j}/when` with
-  its [expression diagnostic](expressions.md#diagnostics) code. The `startCondition` message joins
-  the `AXC0028` check. The `set`, `input` and `fields` expressions, an assignee's `user`, and a
-  sub-process step's `subject` and parameters are type-checked with the same scope as a `when`.
-- **Operations.** An operation step whose `operation` is not `updateRecord`, `callConnector`,
-  `raiseEvent`, `notify` or a package operation written `<package>/<operation>`, matched exactly, is
-  `AXC0078` at `/steps/{i}/operation`, and its other properties are not checked.
-- **Update record.** Each key of an `updateRecord` `set` must name a field of the entity, ignoring
-  letter case, that no earlier key of the step names, otherwise it is `AXC0079`. A computed field, a
-  sequence field or a child collection is `AXC0080`. Each `set` expression is type-checked against
-  its field's type. Each of these is reported at `/steps/{i}/set/{field}`.
-- **Call connector.** A `callConnector` step's `connector` `name` that names no loaded
-  [connector](integration-resources.md#connectors-and-deployment-bindings), ignoring letter case, is
-  `AXC0102` at `/steps/{i}/connector/name`. An `operation` that names no operation of that
-  connector, ignoring letter case, is `AXC0103` at `/steps/{i}/connector/operation`. With either,
-  the step's `input` and `output` are not checked.
-- **Input.** An `input` key that names no input of the operation, ignoring letter case, or an input
-  that an earlier key already names, is `AXC0104`. Each `input` expression is type-checked against
-  its input's type. Each of these is reported at `/steps/{i}/input/{key}`. A required input that no
-  key names is `AXC0105` at `/steps/{i}/input`.
-- **Output.** An `output` key that names no output of the operation, or an output that an earlier
-  key already names, is `AXC0106`. An `output` value that names no field of the entity, ignoring
-  letter case, or a field that an earlier output already writes, is `AXC0107`. A computed field, a
-  sequence field, a child collection, or a field whose type does not fit the output's is `AXC0108`.
-  An output fits a field of the same type, and an `integer` output also fits a `decimal` field. Each
-  of these is reported at `/steps/{i}/output/{key}`.
-- **Retry.** A retry `backoff` that is not a positive whole-number duration is `AXC0109` at
-  `/steps/{i}/retry/backoff`.
-- **Package operation.** A package operation step whose package the application does not list in
-  `packages` is `AXC0150` at `/steps/{i}/operation`, unless it was listed and failed pinning
-  (`AXC0139` to `AXC0142`) or `application.json` was not loaded. An operation that the pinned
-  version's manifest does not offer, ignoring letter case, is `AXC0151` at the same path. With
-  either, the step's `input` and `output` are not checked. Otherwise they and the `retry` are checked
-  as for a `callConnector` step (`AXC0104` to `AXC0109`), against the manifest's fields.
-- **Raise event.** A `raiseEvent` step's `event` that names no loaded
-  [event](integration-resources.md#event-resource), ignoring letter case, is `AXC0125` at
-  `/steps/{i}/event`. An event about another entity than the process's is `AXC0126` at
-  `/steps/{i}/event`, which is not checked when either entity is unknown. With an unknown event, the
-  step's `fields` are not checked. A `fields` key that names no payload field of the event, ignoring
-  letter case, or a field that an earlier key already names, is `AXC0127`. Each `fields` expression
-  is type-checked against its payload field's type. Each of these is reported at
-  `/steps/{i}/fields/{key}`. A payload field that no key names is `AXC0128` at `/steps/{i}/fields`.
-- **Task assignee.** A task step's `assignee` without exactly one of `user` and `role` is `AXC0081`
-  at `/steps/{i}/assignee`. A `role` that names no declared [role](roles-and-policies.md), compared
-  exactly, is `AXC0089` at `/steps/{i}/assignee/role`. A `user` expression is type-checked as
-  `text`, and a problem is reported at `/steps/{i}/assignee/user`.
-- **Task form.** A task's `form` that names no loaded form, ignoring letter case, is `AXC0082` at
-  `/steps/{i}/form`. A form over another entity than the process's is `AXC0083` at
-  `/steps/{i}/form`, which is not checked when either entity is unknown.
-- **Task times and outcomes.** A `dueIn` that is not a positive whole-number duration is `AXC0084`
-  at `/steps/{i}/dueIn`, and so is a `deadline` `after`, at `/steps/{i}/deadline/after`. A later
-  outcome with a name already used in the step, ignoring letter case, is `AXC0085` at
-  `/steps/{i}/outcomes/{j}/name`. The task `label` and each outcome `label` join the `AXC0028`
-  check.
-- **Sub-process.** A sub-process step's `process` that names no process of the application,
-  ignoring letter case, is `AXC0250` at `/steps/{i}/process`, and when that process file was not
-  loaded because of its own errors, its `subject` and `parameters` are not checked. A process that
-  reaches itself through sub-process steps is `AXC0251` at the `process` of each step that closes
-  the loop, naming the chain. A `subject` that is missing when the child's entity is not the
-  parent's, or that is given to a child without a subject, is `AXC0252`. `parameters` given to a
-  child with a subject, or a child parameter that is missing, unknown or repeated, is `AXC0253`. The
-  `subject` and parameter expressions are type-checked.
-- **Shape.** These are `AXC0004`:
-  - a decision with no branches, and a branch or escalation without `name`,
-  - an operation without `operation` or `next`,
-  - an `updateRecord` step without `set`, or with `connector`, `input`, `output` or `retry`,
-  - a `callConnector` step without `connector` or `input`, or with `set`,
-  - a `raiseEvent` step without `event` or `fields`, or with `set`, `connector`, `input`, `output`
-    or `retry`,
-  - a package operation step without `input`, or with `set`, `connector`, `event` or `fields`,
-  - a `notify` step without `to`, `channels` or `message`, or with `set`, `connector`, `input`,
-    `output`, `retry`, `event` or `fields`, a channel other than `inApp` or `email` or one named
-    twice, and a `values` key that is not letters and digits,
-  - an `event` or `fields` on any other step, and `to`, `channels`, `message` or `open` on any other
-    step,
-  - a retry `attempts` outside 1 to 10,
-  - a task without `label`, `assignee`, `form` or an outcome,
-  - an `end` step with `branches`, `otherwise` or any other property,
-  - a sub-process step without `process` or `next`, or with a property of another step type, and
-    `process`, `subject` or `parameters` on any other step.
+A process's subject, step names, transitions, reach and cycles, conditions, step shapes and task
+properties are checked here, as its [compile checks](processes.md#compile-checks) say. The checks of
+each other step type and operation are on its own page, which that section links.
 
 ### Policies
 

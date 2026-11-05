@@ -48,18 +48,82 @@ sign-in first. A signed-out visit shows the sign-in prompt, because the list cal
 
 ## Users page
 
-The platform route `/users` lists the tenant's users from `GET /api/users`, 20 to a page, for an
-administrator. What an administrator may do there is in
-[the users page](user-administration.md#the-users-page). Its texts are `shell.users.*`.
+The platform route `/users` is the users page, where an administrator manages the tenant's users and
+their roles. Who may open it, the rules of each command, its routes and its audit records are in
+[user administration](user-administration.md#the-users-page). The page shows names, never translated
+labels, and never shows a field marked `sensitive` or record data. Its texts are `shell.users.*`.
 
-- **Table.** The table shows the display name, the email, how the person signs in (the provider's
-  alias, or Account), the status as a tag and the last sign-in. Each page is fetched from the server.
+### The list
+
+The page lists the tenant's users from `GET /api/users`, 20 to a page, and fetches each page from the
+server.
+
+- **Columns.** Each row has the display name, the email, how the person signs in (the provider's alias
+  as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a tag
+  (`invited`, `active` or `disabled`) and the last sign-in.
 - **Search.** A search box filters by name or email. A search starts on Enter or on the search button
   and goes back to page 1.
-- **Roles.** Clicking a row opens a side panel with the person's roles from
-  `GET /api/users/{id}/roles`, with a Give or Remove button for each role. The button asks for
-  confirmation and calls the give-role or remove-role route. Its texts are `shell.users.roles.*`.
-- **Commands.** Each row has buttons for its commands: Resend invitation, Disable or Enable, and Reset
-  authenticator. Each asks for confirmation and calls its route.
-- **Refusals.** A `403` shows that the page is for administrators. A `404`, which a preview tenant
-  answers, shows the not-found page. Any other failure shows an error message.
+- **Refusals.** A `403` shows that the page is for administrators. A `404`, which a preview tenant and
+  a tenant without a users client answer, shows the not-found page. Any other failure shows an error
+  message.
+
+### Inviting and resending
+
+- **Invite.** The "Invite" button next to the search box opens a form with the email, the display name
+  and optional roles. The roles are in one section for each active application and one for the
+  platform, as on [a user's roles](#a-users-roles). The form gets them from the
+  [roles route](user-administration.md#read-routes), called with the signed-in administrator's own id,
+  and uses only `applications` and `platformRoles`. When they cannot be loaded, the form says so and
+  still invites without roles.
+- **Confirming an invitation.** Submitting the form asks "Invite this person?" and names the email, the
+  name and the roles. After the confirmation, the page calls the invite route and loads the list again,
+  so the new row shows as `invited`. It shows a `403` as "Sign in again to give a platform role." and a
+  `409` as "An account already uses this email." Any other failure shows "The invitation could not be
+  sent." and loads the list again, because an invitation whose email failed leaves the account as
+  `invited`.
+- **Resend invitation.** A row that is `invited` and is an account, not a brokered user, has a "Resend
+  invitation" button. It asks for confirmation, names the person and the email, calls the resend route,
+  shows "The invitation was sent again." and loads the list again, because the resend gives the person
+  a new id. It shows a `403` as "This page is for administrators." and a `409` as "This person has a
+  password or signs in through a provider, so they cannot get a new invitation."
+
+### Disabling, enabling and resetting an authenticator
+
+- **Which buttons.** A row that is `active` or `invited` has a "Disable" button, and a row that is
+  `disabled` has an "Enable" button instead. A row for an account, not a brokered user, has a "Reset
+  authenticator" button. The Disable button also shows on the administrator's own row, where the server
+  answers `409`.
+- **Confirmation.** Each button asks for confirmation, names the person and the email, calls its route
+  and loads the list again. The Disable and Reset confirmations add a line on the effect: the person's
+  sessions end, and they cannot sign in until they are enabled, or their next sign-in asks them to add
+  an authenticator again.
+- **Answers.** A success shows "The person was disabled.", "The person was enabled." or "The
+  authenticator was reset." The page shows a `403` on disable as "Sign in again to disable a person."
+  and a `409` as "An administrator cannot disable themselves." Any other failure of the three commands,
+  including a `403` or a `409` on enable and reset, shows "The change was not made." and loads the list
+  again.
+
+### A user's roles
+
+A person's roles, from `GET /api/users/{id}/roles`, show in one section for each active application and
+one for the platform, where the administrator gives and removes them. Their texts are
+`shell.users.roles.*`.
+
+- **A page of its own** _(planned for M31)_. Clicking a row opens the user as a page of its own, as
+  [opening things](actions-and-controls.md#opening-things) says, which holds these sections.
+- **Tags.** Each role shows the "Given" tag when the person has it. A given role that is not declared
+  any more has a "Not declared" tag, and its section lists it even when its application is not active.
+- **Give and Remove.** A Give or Remove button asks for confirmation, names the role, the place and the
+  person, then calls the give-role or remove-role route and loads the roles again. A `403` shows as
+  "Sign in again to change a platform role." and a `409` as "An administrator cannot remove their own
+  administrator role."
+- **What shows.** The roles that an administrator gave, not the platform roles that the provider's
+  sign-in mapping gives.
+
+### Export data and usage
+
+_(planned for M33)_
+
+In a tenant of a cell, the users page has two more sections for an administrator: "Export data", see
+[exports by a tenant administrator](tenant-lifecycle.md#exports-by-a-tenant-administrator), and
+"Usage", the tenant's quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
