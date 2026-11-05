@@ -6,7 +6,7 @@ band, its page headings, its Overview, its Releases list and a release's page. T
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
 [D129](../decisions/d129-rules-from-the-studio-editors-review.md) and
-[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace, Band, Problems panel, Page heading, New resource, Releases and Names sections are built, except where marked. The rest of this page is _(planned for M31)_.
+[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace, Band, Problems panel, Page heading, New resource, Overview, Change list, Releases and Names sections are built, except where marked. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
@@ -110,7 +110,7 @@ What Studio shows is a text, never an internal code, see [text](actions-and-cont
 - **On a kind's list.** A kind's list has its own button on the right of its heading, among the page's own actions, named for the kind, such as New entity….
   Its dialog, New entity, asks for the name alone, or the locale for a text resource.
 - **One list of kinds.** A kind an author may create is offered everywhere kinds are offered: the band's dialog, the
-  sidebar and More you can add _(planned for M31)_. Migrations are offered too, as [D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md)
+  sidebar and More you can add. Migrations are offered too, as [D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md)
   lets an author write one by hand, though the entity designer usually writes it.
 
 ## Overview
@@ -121,7 +121,7 @@ shows, in one column and in order:
 
 - **Get started**, for an application with no entity: four steps, each a link to where it is done. Describe your data
   with an entity, show it on a page, put the page on the site, then try it and publish.
-- **Live**, once the application has a live release: each live site as the home page shows it, its mark, its title as
+- **Live**, once the application has a live release: each live site of the application as the home page shows it, its mark, its title as
   the link and its description, in the home page's grid and order, see
   [platform home page](shell.md#platform-home-page). The sites are those of the live release, from `GET /api/sites`,
   so a site added since is not there. A tile opens the running site in a new tab, so Studio stays open, and its
@@ -133,8 +133,8 @@ shows, in one column and in order:
   [AI authoring in Studio](ai-authoring-in-studio.md#the-diff) is not planned here.
 - **More you can add**: each kind the application has no resource of, in the sidebar's groups, migrations included,
   each on lines of its own: the kind as a link to its list, what it is for, and in `textMuted` when one is needed, in
-  natural words, such as "Handy for lists that must be ready on the first day". The kinds Get started leads to are
-  not repeated while it shows. Once the application has every kind there is no block, and nothing takes its place.
+  natural words, such as "Handy for lists that must be ready on the first day". Contracts and layers are not offered
+  here. The kinds Get started leads to are not repeated while it shows. Once the application has every kind there is no block, and nothing takes its place.
 
 The Overview lists no problems: the band says how many, and the [problems panel](#problems-panel) lists them on every
 page.
@@ -147,7 +147,7 @@ Studio has one change list, used by the Overview's changes since the live releas
   and Added, Changed or Removed. A removed file is named from the live release and is not a link, as nothing is left to
   open. On a [release page](#release-page) a changed resource is text, as the folder may have moved on.
 - **Modules and packages too.** Its rows are the changed resources and the modules and packages that differ, as
-  "Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0" or "Removed, was 1.0.0". With none, one line says so.
+  "Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0" or "Removed, was 1.0.0". With none, one line says so. _(planned for M31)_
 - **Order.** It groups the kinds in the sidebar's order, then sorts by name, see
   [list order](actions-and-controls.md#list-order).
 

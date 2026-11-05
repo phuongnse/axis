@@ -3,6 +3,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { moduleKinds } from './moduleKinds'
 import { assignLocation } from './navigation'
 import {
+  changeRows,
   checkStudioExpression,
   fetchStudioPolicyMatrix,
   fetchStudioResource,
@@ -18,6 +19,7 @@ import {
   ServerUnreachableError,
   studioAppDescription,
   studioAppTitle,
+  type StudioReleaseChange,
   type StudioReleaseItem,
   type StudioReleases,
   type StudioNames,
@@ -358,14 +360,14 @@ describe('releaseList', () => {
   ]
 
   it('has one row for each release, the highest number first', () => {
-    const rows = releaseList({ active: null, folderContentHash: null, items })
+    const rows = releaseList({ active: null, folderContentHash: null, changes: null, items })
 
     expect(rows.map((row) => row.number)).toEqual([3, 2, 1])
     expect(rows.map((row) => row.live)).toEqual([false, false, false])
   })
 
   it('takes the details of a release from its first activation', () => {
-    const rows = releaseList({ active: null, folderContentHash: null, items })
+    const rows = releaseList({ active: null, folderContentHash: null, changes: null, items })
 
     expect(rows[2]).toMatchObject({
       releaseId: 'r1',
@@ -381,6 +383,7 @@ describe('releaseList', () => {
     const rows = releaseList({
       active: { releaseId: 'r1', number: 1, contentHash: 'hash-1' },
       folderContentHash: null,
+      changes: null,
       items,
     })
 
@@ -391,7 +394,12 @@ describe('releaseList', () => {
 describe('releasePublisher', () => {
   const t = (key: string) => key
   const row = (actor: string, actorName: string | null) => ({
-    ...releaseList({ active: null, folderContentHash: null, items: [release('r1', 1, '2026-05-01T10:00:00Z')] })[0],
+    ...releaseList({
+      active: null,
+      folderContentHash: null,
+      changes: null,
+      items: [release('r1', 1, '2026-05-01T10:00:00Z')],
+    })[0],
     actor,
     actorName,
   })
@@ -411,11 +419,94 @@ describe('releasePublisher', () => {
   })
 })
 
+describe('changeRows', () => {
+  const change = (overrides: Partial<StudioReleaseChange> & Pick<StudioReleaseChange, 'path' | 'change'>) => ({
+    kind: null,
+    name: null,
+    titles: null,
+    locale: null,
+    ...overrides,
+  })
+
+  it('puts the manifest first, named Settings and with no kind', () => {
+    const rows = changeRows(
+      [
+        change({ path: 'application.json', change: 'changed', kind: 'application' }),
+        change({ path: 'x.json', change: 'added' }),
+      ],
+      [resource('z', 'entity', 'Zeta', 'entities/zeta.json')],
+      'en',
+      t,
+    )
+
+    expect(rows[0]).toMatchObject({ name: 'Settings', kind: null, change: 'changed' })
+  })
+
+  it('orders the rows by the sidebar kind and then by name', () => {
+    const rows = changeRows(
+      [
+        change({ path: 'pages/alpha.json', change: 'changed' }),
+        change({ path: 'entities/beta.json', change: 'added' }),
+        change({ path: 'entities/alpha.json', change: 'added' }),
+      ],
+      [
+        resource('p', 'page', 'Alpha', 'pages/alpha.json'),
+        resource('b', 'entity', 'Beta', 'entities/beta.json'),
+        resource('a', 'entity', 'Alpha', 'entities/alpha.json'),
+      ],
+      'en',
+      t,
+    )
+
+    expect(rows.map((row) => row.name)).toEqual(['Alpha', 'Beta', 'Alpha'])
+    expect(rows.map((row) => row.kind)).toEqual(['entity', 'entity', 'page'])
+  })
+
+  it('links an added or changed row to its resource and takes its kind from the resource', () => {
+    const rows = changeRows(
+      [change({ path: 'entities/zeta.json', change: 'changed' })],
+      [resource('z', 'entity', 'Zeta', 'entities/zeta.json')],
+      'en',
+      t,
+    )
+
+    expect(rows).toEqual([
+      { key: 'changed:entities/zeta.json', name: 'Zeta', kind: 'entity', change: 'changed', resourceId: 'z' },
+    ])
+  })
+
+  it('names a removed row from the release, with no link, since the resource is gone', () => {
+    const rows = changeRows(
+      [change({ path: 'entities/gone.json', change: 'removed', kind: 'entity', name: 'Gone' })],
+      [resource('g', 'entity', 'Gone', 'entities/gone.json')],
+      'en',
+      t,
+    )
+
+    expect(rows).toEqual([
+      { key: 'removed:entities/gone.json', name: 'Gone', kind: 'entity', change: 'removed', resourceId: null },
+    ])
+  })
+
+  it('names a row by its path when its kind is unknown, and puts it last', () => {
+    const rows = changeRows(
+      [change({ path: 'notes/readme.md', change: 'added' }), change({ path: 'entities/zeta.json', change: 'added' })],
+      [resource('z', 'entity', 'Zeta', 'entities/zeta.json')],
+      'en',
+      t,
+    )
+
+    expect(rows.map((row) => row.name)).toEqual(['Zeta', 'notes/readme.md'])
+    expect(rows[1]).toMatchObject({ kind: null, resourceId: null })
+  })
+})
+
 describe('folderDiffers', () => {
   const active = { releaseId: 'r1', number: 1, contentHash: 'hash-1' }
   const history = (overrides: Partial<StudioReleases>): StudioReleases => ({
     active,
     folderContentHash: 'hash-1',
+    changes: null,
     items: [],
     ...overrides,
   })
