@@ -34,7 +34,10 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
     private static readonly Uri _tenantHost = new("http://localhost:5206");
     private static readonly Uri _console = new("http://console.test");
 
+    private static readonly Uri _internal = new("http://axis-internal:8080");
+
     private readonly HttpClient _http = new();
+    private readonly string _webRoot = Path.Combine(Path.GetTempPath(), $"axis-cell-console-{Guid.NewGuid():N}");
     private readonly TestClock _clock = new();
     private readonly string _realm = $"ops-{Guid.NewGuid():N}"[..16];
     private Uri _baseAddress = null!;
@@ -43,6 +46,9 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
 
     public async ValueTask InitializeAsync()
     {
+        Directory.CreateDirectory(Path.Combine(_webRoot, "assets"));
+        File.WriteAllText(Path.Combine(_webRoot, "index.html"), "<!doctype html><title>Axis</title>");
+        File.WriteAllText(Path.Combine(_webRoot, "assets", "index-abc123.js"), "export {};");
         _baseAddress = await keycloak.BaseAddressAsync();
         var admin = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(_baseAddress, "admin/realms"));
@@ -80,6 +86,10 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
         using var response = await _http.SendAsync(request, CancellationToken);
         Assert.True(response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound);
         _http.Dispose();
+        if (Directory.Exists(_webRoot))
+        {
+            Directory.Delete(_webRoot, recursive: true);
+        }
     }
 
     [Fact]
@@ -96,6 +106,67 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
         var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
         Assert.Equal(["a", "b", "c"], items.EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
         Assert.Equal(1L, await CountSessionsAsync(platform));
+    }
+
+    [Fact]
+    public async Task The_console_host_serves_the_page_and_the_shell_reads_and_the_internal_and_tenant_hosts_do_not()
+    {
+        var (factory, _) = await StartAsync(withInternalUrl: true);
+        await using var _ = factory;
+        using var console = CreateClient(factory, _console);
+        using var internalHost = CreateClient(factory, _internal);
+        using var tenantHost = CreateClient(factory, _tenantHost);
+
+        foreach (var path in new[] { "/", "/tenants/a" })
+        {
+            using var page = await console.GetAsync(new Uri(path, UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+            Assert.Contains("<title>Axis</title>", await page.Content.ReadAsStringAsync(CancellationToken), StringComparison.Ordinal);
+        }
+
+        using var asset = await console.GetAsync(new Uri("/assets/index-abc123.js", UriKind.Relative), CancellationToken);
+        using var missingAsset = await console.GetAsync(new Uri("/assets/missing.js", UriKind.Relative), CancellationToken);
+        using var site = await console.GetAsync(new Uri("/api/site", UriKind.Relative), CancellationToken);
+        using var texts = await console.GetAsync(new Uri("/api/texts/en", UriKind.Relative), CancellationToken);
+        using var me = await console.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, asset.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missingAsset.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, site.StatusCode);
+        Assert.True((await site.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("cellConsole").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, texts.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, me.StatusCode);
+
+        using var internalPage = await internalHost.GetAsync(new Uri("/", UriKind.Relative), CancellationToken);
+        using var internalSite = await internalHost.GetAsync(new Uri("/api/site", UriKind.Relative), CancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, internalPage.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, internalSite.StatusCode);
+
+        using var tenantSite = await tenantHost.GetAsync(new Uri("/api/site", UriKind.Relative), CancellationToken);
+        using var tenantSession = await tenantHost.GetAsync(new Uri("/api/cell/session", UriKind.Relative), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, tenantSite.StatusCode);
+        Assert.False((await tenantSite.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("cellConsole").GetBoolean());
+        Assert.Equal(HttpStatusCode.NotFound, tenantSession.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_session_read_answers_the_operator_display_name_403_without_the_role_and_401_without_a_session()
+    {
+        var (factory, _) = await StartAsync();
+        await using var _ = factory;
+        using var client = CreateClient(factory, _console);
+        using var other = CreateClient(factory, _console);
+
+        using var beforeSignIn = await client.GetAsync(new Uri("/api/cell/session", UriKind.Relative), CancellationToken);
+        await SignInAsync(client, "operator");
+        using var session = await client.GetAsync(new Uri("/api/cell/session", UriKind.Relative), CancellationToken);
+        await SignInAsync(other, "stranger");
+        using var withoutRole = await other.GetAsync(new Uri("/api/cell/session", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, beforeSignIn.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, session.StatusCode);
+        Assert.Equal("operator Operator", (await session.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("displayName").GetString());
+        Assert.Equal(HttpStatusCode.Forbidden, withoutRole.StatusCode);
     }
 
     [Fact]
@@ -341,7 +412,7 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<(WebApplicationFactory<Program> Factory, string Platform)> StartAsync(bool withSecret = true, string? allowedNetwork = null)
+    private async Task<(WebApplicationFactory<Program> Factory, string Platform)> StartAsync(bool withSecret = true, string? allowedNetwork = null, bool withInternalUrl = false)
     {
         var authority = await keycloak.StartAsync();
         var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
@@ -353,7 +424,13 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
             builder.UseSetting("Cell:Id", "vn-1");
             builder.UseSetting("Cell:Region", "vn");
             builder.UseSetting("Cell:TenantDomain", "vn.example.test");
+            builder.UseWebRoot(_webRoot);
             builder.UseSetting("Cell:ConsoleHost", _console.Host);
+            if (withInternalUrl)
+            {
+                builder.UseSetting("Cell:InternalUrl", _internal.AbsoluteUri);
+            }
+
             builder.UseSetting("Cell:OperatorRealm", _realm);
             builder.UseSetting("Cell:OperatorRole", OperatorRole);
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());

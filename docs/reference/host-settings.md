@@ -154,14 +154,14 @@ and a JSON view, and shows the diagnostics.
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **In a cell.** The publisher also reads this setting for the create job, which copies a template into the tenant's folder, and for the purge job, which deletes it. When `Cell:Id` is set, each tenant's applications are under
+- **In a cell.** The publisher also reads this setting for the create job, which copies a template into the tenant's folder, for the export job, which writes the folder into the tenant's export ZIP, and for the purge job, which deletes it. When `Cell:Id` is set, each tenant's applications are under
   `<Studio:ApplicationsPath>/<tenant id>/`, and Studio on a tenant's host reads, writes and creates
   only there. Studio creates the folder the first time it uses it. Another tenant's application, by
   name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
   message names `Studio:Folders` and `Cell:Id`, because the folders would be reached by every tenant.
   The tenant's folder joins its [backup](tenant-backup-and-restore.md#backups-in-a-cell) _(built)_, and
-  a restore writes it under the new tenant. _(planned for M31)_ The tenant's folder joins its
-  [export and deletion](tenant-lifecycle.md), see [cells](cells.md).
+  a restore writes it under the new tenant. The folder also joins the tenant's [export](tenant-lifecycle.md#exporting-a-tenant), where an unset
+  setting means no entries, and its [deletion](tenant-lifecycle.md#deleting-a-tenant), by the purge job's `studio` step, see [cells](cells.md).
 - **`Studio:AuthorRole`.** A roles claim value, such as `author`. The
   environment variable is `Studio__AuthorRole`. Only a signed-in user whose
   roles claim holds the value may use Studio. It has no default, and with no

@@ -1,5 +1,5 @@
-# Values for the lint, the schema check and the render tests. They set the region and the tenant domain, name the
-# connection string and certificate Secrets, run two replicas and set resources and one image pull Secret, so the
+# Values for the lint, the schema check and the render tests. They set the region and the tenant domain, set the mail sender, relay and user name, name the
+# connection string, mail password and certificate Secrets, run two replicas and set resources and one image pull Secret, so the
 # checks cover every branch of the templates.
 image:
   pullSecrets:
@@ -14,8 +14,14 @@ resources:
 controlPlane:
   region: vn
   tenantDomain: vn.example.com
+  mailFrom: no-reply@mail.vn.example.com
+  mail:
+    host: smtp.example.com
+    userName: relay-user
 secrets:
   connectionString:
     name: axis-controlplane-db
+  mailPassword:
+    name: axis-controlplane-mail
   certificate:
     name: axis-controlplane-tls

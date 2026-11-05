@@ -1,5 +1,6 @@
-import { Alert, Card, Flex, Select, Table, Tag, type TableColumnsType } from 'antd'
+import { Alert, Card, Flex, Select, Tag, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import {
   fetchConsolePublishing,
   type ConsoleApplication,
@@ -7,9 +8,8 @@ import {
   type ConsolePublishing,
   type ConsoleReleaseItem,
 } from './console'
-import { EmptyDash } from './EmptyValue'
-import { markCurrentPage } from './pagination'
 import { ReleaseOffStandard } from './ReleaseOffStandard'
+import { releasePublisher } from './studio'
 import { useText } from './texts'
 
 interface ConsolePublishingProps {
@@ -36,7 +36,7 @@ const statusColors: Record<ConsolePublishRequest['status'], string> = {
 }
 
 function formatTime(value: string | null, locale: string) {
-  return value === null ? <EmptyDash /> : new Date(value).toLocaleString(locale)
+  return value === null ? null : new Date(value).toLocaleString(locale)
 }
 
 /**
@@ -88,12 +88,13 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
       ? undefined
       : load.publishing?.releases.find((row) => row.releaseId === activeReleaseId)
 
-  const releaseColumns = useMemo<TableColumnsType<ConsoleReleaseItem>>(
+  const releaseColumns = useMemo<AxisColumn<ConsoleReleaseItem>[]>(
     () => [
       {
         key: 'number',
+        kind: 'fixed',
         title: t('shell.console.publishing.number'),
-        render: (_value: unknown, row) => (
+        render: (_value, row) => (
           <Flex gap="small" align="center">
             <span>{`#${row.number}`}</span>
             {row === activeRow && <Tag color="success">{t('shell.console.publishing.active')}</Tag>}
@@ -102,64 +103,73 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
       },
       {
         key: 'label',
+        kind: 'freeText',
         title: t('shell.console.publishing.label'),
-        render: (_value: unknown, row) => row.label ?? <EmptyDash />,
+        render: (_value, row) => row.label,
       },
       {
         key: 'note',
+        kind: 'freeText',
         title: t('shell.console.publishing.note'),
-        render: (_value: unknown, row) => row.note ?? <EmptyDash />,
+        render: (_value, row) => row.note,
       },
       {
         key: 'activatedBy',
+        kind: 'freeText',
         title: t('shell.console.publishing.activatedBy'),
-        render: (_value: unknown, row) => row.actorName ?? row.actor,
+        render: (_value, row) => releasePublisher(row, t),
       },
       {
         key: 'activatedAt',
+        kind: 'fixed',
         title: t('shell.console.publishing.activatedAt'),
-        render: (_value: unknown, row) => formatTime(row.activatedAt, locale),
+        render: (_value, row) => formatTime(row.activatedAt, locale),
       },
       {
         key: 'relaxed',
+        kind: 'freeText',
         title: t('shell.console.publishing.relaxed'),
-        render: (_value: unknown, row) =>
-          row.offStandard ? <ReleaseOffStandard relaxed={row.relaxed} /> : <EmptyDash />,
+        render: (_value, row) => (row.offStandard ? <ReleaseOffStandard relaxed={row.relaxed} /> : null),
       },
     ],
     [activeRow, locale, t],
   )
 
-  const requestColumns = useMemo<TableColumnsType<ConsolePublishRequest>>(
+  const requestColumns = useMemo<AxisColumn<ConsolePublishRequest>[]>(
     () => [
-      { key: 'kind', title: t('shell.console.publishing.kind'), dataIndex: 'kind' },
-      { key: 'target', title: t('shell.console.publishing.target'), dataIndex: 'target' },
+      { key: 'kind', kind: 'fixed', title: t('shell.console.publishing.kind'), dataIndex: 'kind' },
+      { key: 'target', kind: 'fixed', title: t('shell.console.publishing.target'), dataIndex: 'target' },
       {
         key: 'status',
+        kind: 'fixed',
         title: t('shell.console.publishing.status'),
-        render: (_value: unknown, row) => (
+        render: (_value, row) => (
           <Tag color={statusColors[row.status]}>{t(`shell.console.publishing.status.${row.status}`)}</Tag>
         ),
       },
       {
         key: 'label',
+        kind: 'freeText',
         title: t('shell.console.publishing.label'),
-        render: (_value: unknown, row) => row.label ?? <EmptyDash />,
+        render: (_value, row) => row.label,
       },
       {
         key: 'requestedBy',
+        kind: 'freeText',
         title: t('shell.console.publishing.requestedBy'),
-        render: (_value: unknown, row) => row.requestedByName ?? row.requestedBy,
+        render: (_value, row) => row.requestedByName ?? row.requestedBy,
       },
       {
         key: 'requestedAt',
+        kind: 'fixed',
         title: t('shell.console.publishing.requestedAt'),
-        render: (_value: unknown, row) => formatTime(row.requestedAt, locale),
+        render: (_value, row) => formatTime(row.requestedAt, locale),
       },
       {
         key: 'finishedAt',
+        kind: 'fixed',
         title: t('shell.console.publishing.finishedAt'),
-        render: (_value: unknown, row) => formatTime(row.finishedAt, locale),
+        render: (_value, row) => formatTime(row.finishedAt, locale),
       },
     ],
     [locale, t],
@@ -182,36 +192,34 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
           <Alert data-testid="console-publishing-error" type="error" title={t('shell.console.publishing.loadFailed')} />
         ) : (
           <>
-            <Table<ConsoleReleaseItem>
-              data-testid="console-publishing-releases"
-              rowKey={(row) => `${row.releaseId}/${row.activatedAt}`}
-              title={() => t('shell.console.publishing.releases')}
-              columns={releaseColumns}
-              scroll={{ x: 'max-content' }}
-              dataSource={load.publishing?.releases}
-              loading={loading}
-              pagination={false}
-              locale={{ emptyText: t('shell.console.publishing.empty') }}
-            />
-            <Table<ConsolePublishRequest>
-              data-testid="console-publishing-requests"
-              rowKey="id"
-              title={() => t('shell.console.publishing.requests')}
-              columns={requestColumns}
-              scroll={{ x: 'max-content' }}
-              dataSource={load.publishing?.requests}
-              loading={loading}
-              locale={{ emptyText: t('shell.console.publishing.empty') }}
-              pagination={{
-                current: page,
-                pageSize: load.publishing?.pageSize,
-                total: load.publishing?.totalCount ?? 0,
-                showSizeChanger: false,
-                hideOnSinglePage: true,
-                itemRender: markCurrentPage(page),
-              }}
-              onChange={(pagination) => setPage(pagination.current ?? 1)}
-            />
+            <Flex vertical gap="small">
+              <Typography.Text strong>{t('shell.console.publishing.releases')}</Typography.Text>
+              <AxisTable<ConsoleReleaseItem>
+                testId="console-publishing-releases"
+                rowKey={(row) => `${row.releaseId}/${row.activatedAt}`}
+                columns={releaseColumns}
+                dataSource={load.publishing?.releases}
+                loading={loading}
+                emptyText={t('shell.console.publishing.empty')}
+              />
+            </Flex>
+            <Flex vertical gap="small">
+              <Typography.Text strong>{t('shell.console.publishing.requests')}</Typography.Text>
+              <AxisTable<ConsolePublishRequest>
+                testId="console-publishing-requests"
+                rowKey={(row) => row.id}
+                columns={requestColumns}
+                dataSource={load.publishing?.requests}
+                loading={loading}
+                emptyText={t('shell.console.publishing.empty')}
+                pagination={{
+                  current: page,
+                  pageSize: load.publishing?.pageSize ?? 20,
+                  total: load.publishing?.totalCount ?? 0,
+                }}
+                onChange={(pagination) => setPage(pagination.current ?? 1)}
+              />
+            </Flex>
           </>
         )}
       </Flex>

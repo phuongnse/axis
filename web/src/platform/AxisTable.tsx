@@ -62,12 +62,15 @@ export interface AxisTableProps<T> {
   columns: AxisColumn<T>[]
   rowKey: (row: T) => string
   dataSource?: readonly T[]
-  loading: boolean
+  loading?: boolean
   emptyText: string
-  /** The paging, or `false` for a table that lists every row on one page. */
-  pagination: { current: number; pageSize: number; total: number; pageSizeOptions: number[] } | false
+  /**
+   * The paging. Without it, or with `false`, every row shows and there is no pager. The page-size picker shows only
+   * when `pageSizeOptions` offers sizes, and a pager with no picker hides on a single page.
+   */
+  pagination?: { current: number; pageSize: number; total: number; pageSizeOptions?: number[] } | false
   onChange?: TableProps<T>['onChange']
-  toolbar: AxisTableToolbar
+  toolbar?: AxisTableToolbar
   /** What sits between the toolbar and the rows, such as a filter bar, messages and dialogs. */
   below?: ReactNode
   /** What shows in place of the rows, such as a message that they did not load. The toolbar stays. */
@@ -80,7 +83,9 @@ export interface AxisTableProps<T> {
   /** Whether a row is a group row: its empty cells stay blank instead of showing the em dash. */
   blankRow?: (row: T) => boolean
   /** Attributes for the row's element, such as test ids and data attributes. */
-  rowAttributes?: (row: T) => HTMLAttributes<HTMLElement>
+  rowAttributes?: (row: T, index?: number) => HTMLAttributes<HTMLElement>
+  /** The test id of the table's outer element. */
+  testId?: string
 }
 
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
@@ -104,16 +109,17 @@ export function AxisTable<T extends object>({
   columns,
   rowKey,
   dataSource,
-  loading,
+  loading = false,
   emptyText,
   pagination,
   onChange,
-  toolbar,
+  toolbar = {},
   below,
   failure,
   rowActions,
   blankRow,
   rowAttributes,
+  testId,
 }: AxisTableProps<T>) {
   const t = useText()
   const tokens = useDesignTokens()
@@ -172,8 +178,10 @@ export function AxisTable<T extends object>({
     toolbar.secondary !== undefined ||
     toolbar.main !== undefined
   const row: CSSProperties = { height: tokens.size.tableRow }
+  const sizes = pagination ? (pagination.pageSizeOptions ?? []) : []
+  const picker = sizes.length > 0
   return (
-    <Flex vertical gap="middle" aria-busy={loading}>
+    <Flex vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
           {toolbar.view}
@@ -203,11 +211,17 @@ export function AxisTable<T extends object>({
             loading={loading}
             locale={{ emptyText }}
             pagination={
-              pagination && {
-                ...pagination,
-                showSizeChanger: true,
-                itemRender: markCurrentPage(pagination.current),
-              }
+              pagination
+                ? {
+                    current: pagination.current,
+                    pageSize: pagination.pageSize,
+                    total: pagination.total,
+                    showSizeChanger: picker,
+                    hideOnSinglePage: !picker,
+                    itemRender: markCurrentPage(pagination.current),
+                    ...(picker ? { pageSizeOptions: sizes } : {}),
+                  }
+                : false
             }
             onRow={rowAttributes}
             onChange={onChange}

@@ -183,3 +183,16 @@ internal sealed class CellOperatorRoute
     {
     }
 }
+
+/// <summary>
+/// The endpoint metadata that marks an open route which the console host serves besides the provisioning API: the SPA's page
+/// and the two shell reads. Tenant resolution reads it and never matches paths.
+/// </summary>
+internal sealed class CellConsoleRoute
+{
+    public static readonly CellConsoleRoute Instance = new();
+
+    private CellConsoleRoute()
+    {
+    }
+}

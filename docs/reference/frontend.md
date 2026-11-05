@@ -158,7 +158,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     Vietnamese (`vi`). The platform site stays: application sites never
     replace or merge into it. The SPA reaches them through the site endpoints
     below. A test checks that every locale has exactly the same keys as
-    English.
+    English, and the placeholders and untranslated-text rules of [UI writing](ui-writing.md#checks).
 - **Application sites.** The sites of the tenant's active applications are
   found by path, not by application name, because the path is what users see
   and one application can have several sites. Four endpoints describe them.

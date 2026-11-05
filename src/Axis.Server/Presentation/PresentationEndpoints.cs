@@ -1,6 +1,7 @@
 using Axis.Core.Tenancy;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
+using Axis.Server.CellApi;
 using Axis.Tenancy;
 
 namespace Axis.Server.Presentation;
@@ -10,19 +11,21 @@ internal static class PresentationEndpoints
 {
     public static void MapPresentationEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/site", (ISiteMetadataProvider sites, ITenantContextAccessor tenants, ITenantCatalog catalog) =>
+        endpoints.MapGet("/api/site", (ISiteMetadataProvider sites, ITenantContextAccessor tenants, ITenantCatalog catalog, HttpContext http, CellOptions cell) =>
         {
             var legal = tenants.Current is { } tenant ? catalog.Find(tenant.TenantId)?.Legal : null;
             return Results.Ok(sites.GetSite() with
             {
                 HostSite = tenants.Current?.SitePath,
                 Legal = legal is { PrivacyUrl: not null } or { TermsUrl: not null } ? new SiteListLegal(legal.PrivacyUrl, legal.TermsUrl) : null,
+                CellConsole = cell.IsCell && CellOperatorSession.IsConsoleHost(http, cell.ConsoleHost),
             });
-        });
+        }).WithMetadata(CellConsoleRoute.Instance);
 
         endpoints.MapGet("/api/texts/{locale}", (string locale, ITextResourceProvider texts) =>
             texts.GetTexts(locale) is { } found
                 ? Results.Ok(found)
-                : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No text resources exist for this locale."));
+                : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No text resources exist for this locale."))
+            .WithMetadata(CellConsoleRoute.Instance);
     }
 }

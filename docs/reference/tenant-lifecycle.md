@@ -5,7 +5,7 @@ cell's provisioning API. It follows
 [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 Everything in this file is _(planned for M31)_, except the two read routes, the quotas route, the suspend and resume routes, the routes that schedule and cancel a deletion, the create route that queues its job, the exports route that queues its job, the export read and download route, the route that requests a host of a tenant's own, and the job read of the
-[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete, cancel-deletion and purge described under it, the purge of [deleting a tenant](#deleting-a-tenant), and the console's sign-in and sign-out, which answer in a cell that has a console or internal host. A
+[provisioning API](#provisioning-api), the job runner for suspend, resume, create, export, delete, cancel-deletion and purge described under it, the purge of [deleting a tenant](#deleting-a-tenant), and the console's sign-in, sign-out and session read, which answer in a cell that has a console or internal host. A
 self-hosted installation keeps the `Axis.Admin` commands of [administration](administration.md). The conventions of
 [architecture.md](../architecture.md) apply.
 
@@ -18,7 +18,9 @@ implementation.
 - **Where it answers.** Under `/api/cell/` on the cell console's host, `Cell:ConsoleHost`, and on
   the host of the server's internal listener, `Cell:InternalUrl`, which only the cell's network
   reaches. Both are platform hosts: they resolve no tenant, the health probes still answer there, and
-  every path outside `/api/cell/` answers `404`, the page at `/` included. A tenant host answers `404`
+  every path outside `/api/cell/` answers `404`, except on the console host, which also serves the SPA's
+  page, its files, `GET /api/site` and `GET /api/texts/{locale}`. The internal listener's host answers `404` for every
+  path outside `/api/cell/`, the page at `/` included. A tenant host answers `404`
   for every path under `/api/cell/`, before any sign-in work. A self-hosted installation has no
   platform host, so every `/api/cell/` path answers `404`. The server opens no separate internal
   listener yet _(planned for M31)_.
@@ -66,6 +68,7 @@ implementation.
 | `GET /api/cell` | Answers the cell as `{ "id", "region", "tenants", "cap" }`. `tenants` counts the cell's tenants whatever their status and leaves out preview tenants. `cap` is `Cell:TenantCap`, see [cell size](cells.md#cell-size), or `null` when it is not set. |
 | `GET /api/cell/auth/sign-in` | Sends the operator to the operator realm's login page, see [sign-in](cell-console.md#sign-in). It needs no session and answers `404` on any host but the console host, and when the console offers no sign-in. |
 | `POST /api/cell/auth/sign-out` | Deletes the operator's session and answers `204`. It needs the CSRF header. |
+| `GET /api/cell/session` | Answers the signed-in operator as `{ "displayName" }`, see [sign-in](cell-console.md#sign-in). Needs the operator role. |
 | `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application`, `hosts` and `failedWork`, read from the platform tables. `status` is `deleting` while a deletion is scheduled, though the stored status stays `suspended`. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. `failedWork` is `{ "instances", "unknownCalls", "deadLetters" }`, counts only: the failed instances, the connector and package calls whose outcome is unknown, and the open dead letters. It comes from the worker's hourly [usage sample](tenant-quotas.md#usage) and is `null` until the worker has counted the tenant. Usage and quotas, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
 | `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, `deleting` and `failedWork` included, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. Its usage history is _(planned for M31)_. |
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
@@ -180,7 +183,9 @@ tenant administrator can run it in M33.
   a cell, export without a lease. One export of a tenant runs at a time, because the publisher runs one job of a tenant at a
   time.
 - **Consistent.** The job reads the tenant database in one snapshot, as `tenant backup` does: one `RepeatableRead`
-  transaction for the active releases and every record.
+  transaction for the active releases, every record, every stored file and the given roles. The Studio folder is read from disk while the job runs, outside the snapshot,
+  so an author's edit during the export may or may not be in the ZIP, as in a backup. The accounts of `users.csv` come from the realm, which is
+  also outside that snapshot, so an account made or removed during the export can disagree with the given roles.
 - **Kept.** The ZIP is stored in the cell's object storage, encrypted at rest, for 7 days, then
   deleted. The download answers it to a caller of the provisioning API, and to nobody else. Each
   download writes a platform audit record. The job stores the ZIP at `exports/<tenant>/<job id>.zip` in the bucket of
@@ -218,17 +223,18 @@ same job and the same ZIP as the provisioning API, as
 
 | Entry | What it holds |
 | --- | --- |
-| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application, ordered by name, with its `name`, its `folder`, its active `release` number and its `entities`, each `{ name, file }` with the original entity name and the file name without its extension. |
-| `applications/<application>/` | _(planned for M31)_ The application folder from the tenant's Studio folder, as Studio writes it, its `customizations/` included. |
+| `export.json` | `format` (`1`), `tenantId`, `createdAt`, `axisVersion`, and each application, ordered by name, with its `name`, its `folder`, its active `release` number and its `entities`, each `{ name, file }` with the original entity name and the file name without its extension, and its `files`, each `{ entity, record, field, name, file }` with the original entity name, the record id, the stored field path such as `attachments/file`, the original file name and the path of the file in the ZIP. |
+| `applications/<path>` | Every file of `<Studio:ApplicationsPath>/<tenant id>/` by its path below that folder, `customizations/` included, as Studio wrote it and found by the same walk as `tenant backup`. Symbolic links are skipped. With no setting or no folder there are no entries. |
 | `data/<application>/<entity>.jsonl` | One JSON object per line for each record, in the shape of the [record API](record-api.md#record-shape), with child rows inside the record. A child entity has no file of its own. |
 | `data/<application>/<entity>.csv` | The same records in the CSV form of [export](import-export.md#export), one file per entity. Its first column is `id`, the record id, which entity export does not write. Child rows go in a file of their own named `<entity>.<field>.csv`, whose first column is `recordId`, the id of the record that owns the row, so a row can be joined to its record. |
-| `files/<application>/<entity>/<record id>/<field>/<file name>` | _(planned for M31)_ Each stored file, under its record and field. |
-| `users.csv` | _(planned for M31)_ The realm's accounts: user name, email, display name, roles, enabled, created. No credential. |
+| `files/<application>/<entity>/<record id>/<field>/<file name>` | Each attached file, read in the snapshot, under its record and field. `<entity>` is the entity's file name in `data/`. A file of a child row goes under its parent record, and its `<field>` is the stored field path made safe, such as `attachments_file`. |
+| `users.csv` | One row for each user of the tenant's realm, read as `axis-users`, with the columns `userName,email,displayName,roles,enabled,created`. Service accounts are left out, and brokered users are listed. `displayName` is the first and last name, or the user name when both are empty. `roles` holds the person's [given roles](user-administration.md#roles) in the export's snapshot, joined with `; `: first the platform roles, each by its kind such as `administrator`, then the application roles, each as `<application name>:<role>`, with the application id in place of the name when no active release names the application. `enabled` is `true` or `false`, and `created` is the realm's creation time in UTC, as `yyyy-MM-ddTHH:mm:ssZ`. Rows are ordered by user name. No column or entry holds a password hash or any other credential. A tenant without its own realm, such as one that signs in with an outside identity provider, gets no `users.csv`. A realm that cannot be read fails the `export` step, so a ZIP without the users is never stored. |
 
-An entity name or a file name that is not a safe file name is written with its unsafe characters
+An entity name, a field path or a file name that is not a safe file name is written with its unsafe characters
 replaced by `_`, and `export.json` lists the original name. The safe characters are letters, digits, `.`, `_` and `-`, so the
 module entity `organization/Department` is written as `organization_Department`. When two names become the same file name
-in one application, the later one gets `_2`, `_3` and so on.
+in one application, the later one gets `_2`, `_3` and so on. Two file names that clash in one folder get `_2`, `_3` and so on before the
+extension, such as `scan_2.pdf`. The paths under `applications/` are copied as they are.
 
 ## Deleting a tenant
 

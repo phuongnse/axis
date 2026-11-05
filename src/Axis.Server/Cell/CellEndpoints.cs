@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Net.Mail;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -31,6 +32,8 @@ namespace Axis.Server.CellApi;
 /// <see cref="CellConsoleSignIn"/>, and answers <c>404</c> when the console offers no sign-in or the host is not
 /// <see cref="CellOptions.ConsoleHost"/>. <c>POST /api/cell/auth/sign-out</c> deletes the session and answers <c>204</c>.
 /// The two skip the operator policy, as they must work for a caller who has no session. Writes need the CSRF header.
+/// <c>GET /api/cell/session</c> answers <c>{ displayName }</c> of the operator, <c>401</c> without a session or token and
+/// <c>403</c> without the role.
 /// </para>
 /// <para>
 /// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap }</c>: <c>tenants</c> counts the rows of the cell's tenant directory
@@ -140,6 +143,7 @@ internal static class CellEndpoints
             .WithMetadata(CellOperatorRoute.Instance)
             .RequireAuthorization(CellOperator.Policy);
         cell.MapGet("", GetCellAsync);
+        cell.MapGet("/session", GetSession);
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
@@ -168,6 +172,9 @@ internal static class CellEndpoints
         // The cast makes the handler a route handler, whose result is written, and not a RequestDelegate.
         auth.MapPost("/sign-out", (Delegate)SignOutAsync);
     }
+
+    private static IResult GetSession(ClaimsPrincipal user) =>
+        Results.Ok(new CellSessionResponse(user.FindFirst(CellOperator.DisplayNameClaim)!.Value));
 
     // Only a local path is a return address, so sign-in can never send the browser to another site.
     private static async Task<IResult> SignInAsync(
@@ -802,6 +809,9 @@ internal static class CellEndpoints
     private static string[] HostsOf(ILookup<string, string> hosts, string tenantId) =>
         [.. hosts[tenantId].Order(StringComparer.Ordinal)];
 }
+
+/// <summary>The signed-in operator: the name the console shows.</summary>
+internal sealed record CellSessionResponse(string DisplayName);
 
 /// <summary>The cell: its id and region, the number of its tenants without preview tenants, and its tenant cap or null.</summary>
 internal sealed record CellResponse(string Id, string Region, int Tenants, int? Cap);

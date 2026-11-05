@@ -477,7 +477,7 @@ internal sealed class TenantBackup : IAsyncDisposable
                 await writer.WriteEntryAsync(NewEntry(RealmEntry, new MemoryStream(_realm)), _cancellationToken);
             }
 
-            foreach (var (relative, path) in StudioFiles())
+            foreach (var (relative, path) in StudioFiles(_settings.StudioApplicationsPath, _id))
             {
                 await using var studio = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
                 await writer.WriteEntryAsync(NewEntry(StudioPrefix + relative, studio), _cancellationToken);
@@ -492,15 +492,16 @@ internal sealed class TenantBackup : IAsyncDisposable
     }
 
     // The files of the tenant's Studio folder, by their path below it with "/" as separator, in ordinal order. A symbolic link is skipped, so a
-    // link cannot pull in a file from outside the folder. A cell without the setting or a tenant without a folder has none.
-    private IEnumerable<(string Relative, string Path)> StudioFiles()
+    // link cannot pull in a file from outside the folder. A cell without the setting or a tenant without a folder has none. The tenant export
+    // walks the folder the same way.
+    internal static IEnumerable<(string Relative, string Path)> StudioFiles(string? applicationsPath, string tenantId)
     {
-        if (_settings.StudioApplicationsPath is not { } root)
+        if (applicationsPath is not { } root)
         {
             return [];
         }
 
-        var folder = Path.Combine(root, _id);
+        var folder = Path.Combine(root, tenantId);
         if (!Directory.Exists(folder))
         {
             return [];
