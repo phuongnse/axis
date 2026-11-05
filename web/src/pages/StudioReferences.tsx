@@ -1,6 +1,7 @@
 import { Alert, Flex, Typography } from 'antd'
 import { Link } from 'react-router'
-import { useContext, useEffect, useState } from 'react'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import {
   fetchResourceReferences,
   ServerUnreachableError,
@@ -175,55 +176,65 @@ function ReferencePanel({
   )
 }
 
+/** A row of a Uses or Used by table: a kind's group row, or an entry under it. */
+type ReferenceRow = { key: string; group: string } | { key: string; group?: undefined; entry: StudioChangeRow }
+
 /**
- * Proposed: the entries of a Uses or Used by panel in groups by kind, in the sidebar's order, each under the kind's name,
- * so a resource used in many places reads by kind rather than as one long list. A row is the
- * other resource by its label, the link that opens it, then how the one uses the other in a few muted words. The kind
- * is the group's, so no row repeats it.
+ * Proposed: the entries of a Uses or Used by panel as the standard table, `AxisTable`, grouped by kind in the sidebar's
+ * order: a group row with the kind's name, whose other cells stay blank, then its entries, each the other resource by
+ * its label, the link that opens it, and how the one uses the other. The kind is the group's, so no row repeats it.
  */
 function ReferenceGroups({ rows, testId }: { rows: readonly StudioChangeRow[]; testId: string }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const collator = nameCollator()
-  const groups = new Map<string, StudioChangeRow[]>()
+  const table: ReferenceRow[] = []
+  let current: string | null = null
   for (const row of [...rows].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || collator.compare(a.name, b.name))) {
     const kind = row.kind || t('shell.studio.references.textKeys')
-    groups.set(kind, [...(groups.get(kind) ?? []), row])
+    if (kind !== current) {
+      table.push({ key: `group/${kind}`, group: kind })
+      current = kind
+    }
+    table.push({ key: row.key, entry: row })
   }
+  const columns: AxisColumn<ReferenceRow>[] = [
+    {
+      key: 'name',
+      kind: 'freeText',
+      title: t('shell.studio.references.name'),
+      render: (_, row) =>
+        row.group !== undefined ? (
+          <Typography.Text strong>{row.group}</Typography.Text>
+        ) : row.entry.to ? (
+          <Link to={row.entry.to} style={{ color: colour.primaryText }}>
+            {row.entry.name}
+          </Link>
+        ) : (
+          row.entry.name
+        ),
+    },
+    {
+      key: 'how',
+      kind: 'freeText',
+      title: t('shell.studio.references.how'),
+      render: (_, row) => (row.group !== undefined ? null : row.entry.change),
+    },
+  ]
   return (
-    <Flex vertical gap={spacing.md} data-testid={testId}>
-      {[...groups].map(([kind, members]) => (
-        <section key={kind} data-testid={`${testId}-group`}>
-          <Typography.Text style={{ display: 'block', color: colour.textMuted, marginBottom: spacing.xs }}>
-            {kind}
-          </Typography.Text>
-          <ul
-            style={{
-              margin: 0,
-              padding: 0,
-              listStyle: 'none',
-              display: 'grid',
-              gridTemplateColumns: 'fit-content(320px) max-content',
-              columnGap: spacing.lg,
-              rowGap: spacing.xs,
-              alignItems: 'baseline',
-            }}
-          >
-            {members.map((row) => (
-              <li key={row.key} style={{ display: 'contents' }} data-testid={`${testId}-row`}>
-                {row.to ? (
-                  <Link to={row.to} style={{ color: colour.primaryText }}>
-                    {row.name}
-                  </Link>
-                ) : (
-                  <Typography.Text>{row.name}</Typography.Text>
-                )}
-                <Typography.Text style={{ color: colour.textMuted }}>{row.change}</Typography.Text>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </Flex>
+    <AxisTable<ReferenceRow>
+      testId={testId}
+      dataSource={table}
+      rowKey={(row) => row.key}
+      columns={columns}
+      emptyText=""
+      pagination={false}
+      blankRow={(row) => row.group !== undefined}
+      rowAttributes={(row) =>
+        (row.group !== undefined
+          ? { 'data-testid': `${testId}-group`, style: { background: colour.canvas } }
+          : { 'data-testid': `${testId}-row` }) as unknown as HTMLAttributes<HTMLElement>
+      }
+    />
   )
 }

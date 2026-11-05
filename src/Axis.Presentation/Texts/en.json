@@ -1151,6 +1151,8 @@
   "shell.studio.uses": "Uses",
   "shell.studio.usedBy": "Used by",
   "shell.studio.references.textKeys": "Text keys",
+  "shell.studio.references.name": "Name",
+  "shell.studio.references.how": "How it is used",
   "shell.studio.noReferences": "None.",
   "shell.studio.expand": "Expand",
   "shell.studio.collapse": "Collapse",
