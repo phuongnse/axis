@@ -453,6 +453,16 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         return RealmLegalOf(row, hosts, siteRows);
     }
 
+    /// <summary>The runtime connection string of a tenant row, with its password decrypted, for a caller that has no tenant context.</summary>
+    public static string RuntimeConnectionString(TenantRow row, TenantSecretCipher cipher, TenantDatabaseTls tls, TenantRuntimeAddress? address)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(cipher);
+        ArgumentNullException.ThrowIfNull(tls);
+
+        return RuntimeConnectionString(row, cipher.Decrypt(row.Id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(), tls, address);
+    }
+
     // The runtime connection of a tenant: the row's database, user and password, the TLS settings of the platform
     // connection, and the row's host and port unless a runtime address replaces them.
     internal static string RuntimeConnectionString(TenantRow row, string password, TenantDatabaseTls tls, TenantRuntimeAddress? address)

@@ -88,6 +88,7 @@ from a secret store of the platform, never from a committed file.
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | server | no | The image default is 8080, plain HTTP. The Compose example and the Helm chart replace it with the Kestrel endpoint below, so nothing listens on 8080. |
 | `Kestrel:Endpoints:Https:Url` | `Kestrel__Endpoints__Https__Url` | server | no | The Compose example and the Helm chart set `https://+:8443`. A Kestrel endpoint replaces `ASPNETCORE_HTTP_PORTS`, so the server serves HTTPS only. |
 | `Kestrel:Endpoints:Https:Certificate:Path`, `Kestrel:Endpoints:Https:Certificate:KeyPath` | `Kestrel__Endpoints__Https__Certificate__Path`, `Kestrel__Endpoints__Https__Certificate__KeyPath` | server | no | The Compose example and the Helm chart set `/server-tls/tls.crt` and `/server-tls/tls.key`. The key is a private key, so the folder is a mounted volume and never a setting. See [TLS](#tls). |
+| `Kestrel:Endpoints:Internal:Url` | `Kestrel__Endpoints__Internal__Url` | server | no | A cell's internal listener, with its own certificate under `Kestrel:Endpoints:Internal:Certificate:Path` and `:KeyPath`. See [the internal listener](tenant-lifecycle.md#provisioning-api). |
 | `OTEL_*` | `OTEL_*` | server, worker | maybe | Optional. See [telemetry export](host-settings.md#telemetry-export). A collector token in the headers is secret. |
 
 The rules of each setting are in [tenancy settings](host-settings.md#tenancy-settings) and
@@ -707,7 +708,8 @@ their addresses.
 - **The certificate.** Use a publicly trusted certificate that covers every tenant host.
 - **No plain HTTP.** The hosts publish only on `127.0.0.1`, and only the TLS endpoint faces clients.
   The server sends HSTS on https, see [security headers](headers-and-rate-limits.md#security-headers).
-- **No client certificate.** Mutual TLS is not offered.
+- **No client certificate.** Mutual TLS is not offered on the public listeners. The one exception is
+  the cell's [internal listener](tenant-lifecycle.md#provisioning-api), which the control plane calls.
 
 ### Connections Axis makes
 

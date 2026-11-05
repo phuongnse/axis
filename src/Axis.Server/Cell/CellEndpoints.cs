@@ -7,13 +7,16 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Amazon.S3;
 using Axis.Administration;
 using Axis.Configuration.Templates;
+using Axis.Data.Storage;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -52,6 +55,14 @@ namespace Axis.Server.CellApi;
 /// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is <see langword="null"/> until the
 /// create job records it. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
 /// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults.
+/// </para>
+/// <para>
+/// <c>GET /api/cell/tenants/{id}/administrators</c> answers <c>{ "items": [{ email, displayName, language }] }</c>, ordered by email: the
+/// enabled realm accounts that hold the administrator role and have an email, and nothing else of them. The holders are the administrator
+/// rows of the tenant's <c>axis.given_roles</c>, which the invite step and the users page write, read over the tenant's runtime role. The
+/// route opens the tenant database from the tenant row and not from the tenant catalog, so it answers for a suspended or deleting tenant
+/// too. The <c>language</c> is the locale the person chose in the realm, or <see langword="null"/>. An unknown tenant or a preview tenant
+/// answers <c>404</c>, a tenant without a realm users client <c>409</c> and an identity provider failure <c>502</c>.
 /// </para>
 /// <para>
 /// <c>PUT /api/cell/tenants/{id}/quotas</c> takes <c>{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }</c>.
@@ -106,7 +117,7 @@ namespace Axis.Server.CellApi;
 /// is the operator's id. The route queues no job and takes no <c>Idempotency-Key</c>.
 /// </para>
 /// </summary>
-internal static class CellEndpoints
+internal static partial class CellEndpoints
 {
     private const string IdempotencyKeyHeader = "Idempotency-Key";
 
@@ -138,6 +149,9 @@ internal static class CellEndpoints
 
     private static readonly TimeSpan _hostRequestWindow = TimeSpan.FromDays(7);
 
+    private static readonly JsonSerializerOptions _createJobInputOptions =
+        new(JsonSerializerOptions.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+
     public static void MapCellEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var cell = endpoints.MapGroup("/api/cell")
@@ -147,6 +161,7 @@ internal static class CellEndpoints
         cell.MapGet("/session", GetSession);
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
+        cell.MapGet("/tenants/{id}/administrators", ListAdministratorsAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
         cell.MapPost("/tenants", CreateTenantAsync);
         cell.MapPost("/tenants/{id}/suspend", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
@@ -256,6 +271,65 @@ internal static class CellEndpoints
         return Results.Ok(new CellTenantDetailResponse(
             tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id), failedWork.GetValueOrDefault(tenant.Id), quotas));
     }
+
+    // The tenant row, not the tenant catalog, which holds active tenants only. A suspended tenant has no pool, so the read opens one connection.
+    private static async Task<IResult> ListAdministratorsAsync(
+        string id,
+        NpgsqlDataSource dataSource,
+        TenantSecretCipher cipher,
+        CellTenantDatabases databases,
+        IHttpClientFactory httpClients,
+        ILogger<CellAdministratorsLog> logger,
+        CancellationToken cancellationToken)
+    {
+        TenantRow? row;
+        await using (var platform = Open(dataSource))
+        {
+            row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id && tenant.PreviewOf == null, cancellationToken);
+        }
+
+        if (row is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+        }
+
+        if (DirectoryTenantCatalog.RealmUsers(row, cipher) is not { } access)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This tenant has no realm to read its administrators from.");
+        }
+
+        try
+        {
+            IReadOnlyList<string> holders;
+            await using (var connection = new NpgsqlConnection(
+                DirectoryTenantCatalog.RuntimeConnectionString(row, cipher, databases.Tls, databases.Address)))
+            {
+                await connection.OpenAsync(cancellationToken);
+                holders = await GivenRoles.ListPlatformRoleHoldersAsync(connection, UserInvitations.AdministratorKind, cancellationToken);
+            }
+
+            using var client = httpClients.CreateClient(nameof(CellEndpoints));
+            var users = new RealmUsers(client, access);
+            var administrators = new List<CellAdministratorResponse>();
+            foreach (var holder in holders)
+            {
+                if (await users.ReadContactAsync(holder, cancellationToken) is { Enabled: true, Email: { } email } contact)
+                {
+                    administrators.Add(new CellAdministratorResponse(email, contact.DisplayName, contact.Locale));
+                }
+            }
+
+            return Results.Ok(new CellAdministratorListResponse([.. administrators.OrderBy(administrator => administrator.Email, StringComparer.Ordinal)]));
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            LogAdministratorsFailed(logger, id, exception.Message);
+            return Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The identity provider could not read the administrators.");
+        }
+    }
+
+    [LoggerMessage(LogLevel.Warning, "The administrators of tenant {TenantId} could not be read. {Reason}")]
+    private static partial void LogAdministratorsFailed(ILogger logger, string tenantId, string reason);
 
     private static async Task<IResult> SetQuotasAsync(
         string id,
@@ -465,7 +539,12 @@ internal static class CellEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: problem);
         }
 
-        var id = request!.Id!;
+        if (QuotaValueProblem(request!.Quotas ?? []) is { } quotaProblem)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: quotaProblem);
+        }
+
+        var id = request.Id!;
 
         // One lock for the whole cell covers the id check and the cap check, so two creates cannot both pass. It comes after the
         // key lock in every request, which is one fixed order.
@@ -490,7 +569,8 @@ internal static class CellEndpoints
             }
         }
 
-        var input = JsonSerializer.Serialize(new { request.Application, request.Administrator }, JsonSerializerOptions.Web);
+        var input = JsonSerializer.Serialize(
+            new CellCreateJobInput(request.Application, request.Administrator, request.Quotas), _createJobInputOptions);
         var job = NewJob("create", id, httpContext, key, hash, input);
         platform.Jobs.Add(job);
         await platform.SaveChangesAsync(cancellationToken);
@@ -746,20 +826,26 @@ internal static class CellEndpoints
             return "The request must set or remove at least one quota.";
         }
 
-        var unknown = set.Keys.Concat(remove).Where(key => key is null || !QuotaKeys.All.Contains(key)).ToList();
+        if (QuotaValueProblem(set, remove) is { } problem)
+        {
+            return problem;
+        }
+
+        var both = remove.FirstOrDefault(set.ContainsKey);
+        return both is null ? null : $"'{both}' is both set and removed.";
+    }
+
+    // The checks of one quota value map, shared by the quotas route and the create route. Removed keys are checked as well.
+    private static string? QuotaValueProblem(Dictionary<string, long?> values, IEnumerable<string>? removed = null)
+    {
+        var unknown = values.Keys.Concat(removed ?? []).Where(key => key is null || !QuotaKeys.All.Contains(key)).ToList();
         if (unknown.Count > 0)
         {
             return $"'{unknown[0]}' is not a quota. The quotas are {string.Join(", ", QuotaKeys.All)}.";
         }
 
-        var negative = set.FirstOrDefault(entry => entry.Value < 0).Key;
-        if (negative is not null)
-        {
-            return $"The value of '{negative}' must be zero or more, or null for no limit.";
-        }
-
-        var both = remove.FirstOrDefault(set.ContainsKey);
-        return both is null ? null : $"'{both}' is both set and removed.";
+        var negative = values.FirstOrDefault(entry => entry.Value < 0).Key;
+        return negative is null ? null : $"The value of '{negative}' must be zero or more, or null for no limit.";
     }
 
     private static async Task<Dictionary<string, CellQuotaResponse>> ReadQuotasAsync(
@@ -845,6 +931,15 @@ internal sealed record CellTenantDetailResponse(
     CellFailedWorkResponse? FailedWork,
     IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
 
+/// <summary>The category of the logs of the administrators route.</summary>
+internal sealed class CellAdministratorsLog;
+
+/// <summary>One enabled administrator of a tenant. <c>Language</c> is the locale the person chose in the realm, or null when none.</summary>
+internal sealed record CellAdministratorResponse(string Email, string DisplayName, string? Language);
+
+/// <summary>The enabled administrators of a tenant, ordered by email.</summary>
+internal sealed record CellAdministratorListResponse(IReadOnlyList<CellAdministratorResponse> Items);
+
 /// <summary>The body of the quotas write: the quotas to set, where <c>null</c> is no limit, and the quotas to take back to the default.</summary>
 internal sealed record CellQuotasRequest(Dictionary<string, long?>? Set, List<string>? Remove);
 
@@ -854,8 +949,14 @@ internal sealed record CellQuotaResponse(long? Value, bool Overridden);
 /// <summary>The effective quotas of a tenant, keyed by quota key.</summary>
 internal sealed record CellQuotasResponse(IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
 
-/// <summary>The body of the create route. A missing or wrongly typed member is null and answers <c>400</c>.</summary>
-internal sealed record CellCreateTenantRequest(string? Id, string? Application, string? Administrator);
+/// <summary>
+/// The body of the create route. A missing or wrongly typed member is null and answers <c>400</c>. <c>Quotas</c> maps a quota key to
+/// its value, where <c>null</c> is no limit, and is null when the tenant uses the cell's defaults.
+/// </summary>
+internal sealed record CellCreateTenantRequest(string? Id, string? Application, string? Administrator, Dictionary<string, long?>? Quotas);
+
+/// <summary>The input the create route stores on the create job. <c>Quotas</c> is left out when the request had none.</summary>
+internal sealed record CellCreateJobInput(string? Application, string? Administrator, Dictionary<string, long?>? Quotas);
 
 /// <summary>The body of the host request route. A missing or wrongly typed host is null and answers <c>400</c>.</summary>
 internal sealed record CellHostRequest(string? Host);

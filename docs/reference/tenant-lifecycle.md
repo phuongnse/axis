@@ -19,9 +19,14 @@ has one implementation.
   path outside `/api/cell/`, the page at `/` included. A tenant host answers `404` for every path
   under `/api/cell/`, before any sign-in work. A self-hosted installation has no platform host, so
   every `/api/cell/` path answers `404` there.
-- **The internal listener** _(planned for M33)_. The server opens a listener of its own for
-  `Cell:InternalUrl`, which only the cell's network reaches and which accepts only a client
-  certificate of the region's internal certificate authority, see
+- **The internal listener.** The server opens a listener of its own for `Cell:InternalUrl`, which only
+  the cell's network reaches. It is the Kestrel endpoint `Internal`, with its own URL and server
+  certificate. With `Cell:InternalClientCa` set, it requires a client certificate that chains to the
+  region's internal certificate authority in that PEM file, and the TLS handshake fails without one.
+  The server checks the chain against that authority only and no revocation list, and it refuses a
+  certificate whose extended key usage leaves out client authentication. The public listeners never ask
+  for a client certificate. The route still needs a bearer token, see the next item. Without
+  `Cell:InternalClientCa` the endpoint serves without client certificates, which development uses. See
   [reaching the cells](control-plane.md#reaching-the-cells).
 - **Who may call.** A caller signs in through the cell's [operator realm](cell-console.md#sign-in):
   the cell console with the operator's session, and a machine caller, such as the control plane or a
@@ -92,6 +97,7 @@ over the schema role.
 | `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does, through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`. |
 | `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does, through a job. It answers as `suspend` does. |
 | `POST /api/cell/tenants/{id}/read-only` | Makes a tenant read-only, as [`tenant read-only`](tenant-status-commands.md#tenant-read-only) does, through a job. It answers as `suspend` does. `resume` ends it. |
+| `GET /api/cell/tenants/{id}/administrators` | Lists the people who hold the [administrator role](user-administration.md#the-administrator-role) as `{ "items": [{ "email", "displayName", "language" }] }`, ordered by email, so the [control plane](control-plane.md) can mail them. The answer holds nothing else of a person, not even an id. The holders are the administrator rows of the tenant's `axis.given_roles`, which the `invite` step and the users page write. A role that a sign-in provider's mapping gives at sign-in is stored nowhere, so it is not listed. Only enabled accounts with an email are listed. `language` is the locale the person chose in the tenant's realm, or `null`. The route answers for an active, a suspended and a `deleting` tenant alike: it opens the tenant database from the tenant's directory row and not from the server's tenant catalog, which holds active tenants only. It answers `404` for an unknown id or a preview tenant's id, `409` for a tenant that has no realm users client, and `502` with the title "The identity provider could not read the administrators." when the identity provider fails. |
 | `PUT /api/cell/tenants/{id}/quotas` | Sets or clears the tenant's quota rows, see [quotas](tenant-quotas.md#quotas). The body is `{ "set": { "users": 100, "storage": null }, "remove": ["applications"] }`. A set value of `null` is no limit, a removed key goes back to the cell's default, and a key the body does not name stays as it is. It applies at once, with no job, and answers `200` with the tenant's `quotas` as the tenant read does. An unknown key, a negative value, a key both set and removed, or a body that names no key answers `400` and writes nothing. An unknown tenant id or a preview tenant's id answers `404`. It writes the rows and one [platform audit record](tenant-setting-commands.md#platform-audit-records), `tenant quotas set`, in one transaction, over the schema role: the server opens a connection for the write alone and keeps none in a pool. The hosts apply the new values at their next `Tenancy:RefreshInterval`. |
 | `POST /api/cell/tenants/{id}/hosts` | Asks for a host of the tenant's own, see [hosts](#hosts). |
 | `POST /api/cell/tenants/{id}/exports` | Exports the tenant, see [exporting a tenant](#exporting-a-tenant), through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`, and `202` with a `Location` header. A tenant that is still `provisioning` makes the job fail. |
@@ -106,15 +112,13 @@ over the schema role.
 - **Usage in the tenant reads** _(planned for M31)_. The tenant list and the tenant read answer the
   tenant's usage against its quotas, as the [views](cell-console.md#views) show it, and the tenant
   read answers its usage history.
-- **`GET /api/cell/tenants/{id}/administrators`** _(planned for M33)_. Lists the accounts that hold
-  the [administrator role](user-administration.md#the-administrator-role) in the tenant's realm:
-  email, display name and language. The [control plane](control-plane.md) mails them.
 
 ## Creating a tenant
 
-`POST /api/cell/tenants` takes `{ "id", "application", "administrator" }` and queues a `create` job
-with five steps, all `pending`. The job keeps the request's `application` and `administrator` in its
-`input`, which the job read never returns.
+`POST /api/cell/tenants` takes `{ "id", "application", "administrator", "quotas" }` and queues a
+`create` job with five steps, all `pending`. `quotas` is optional. The job keeps the request's
+`application`, `administrator` and `quotas`, when the request has them, in its `input`, which the job
+read never returns.
 
 - **`id`** follows the rule of [`tenant create`](administration.md#tenant-create): 1 to 50 lowercase
   letters, digits and hyphens, and not `master`. A bad id answers `400`. An id that a directory row
@@ -126,13 +130,20 @@ with five steps, all `pending`. The job keeps the request's `application` and `a
   `application` step takes the newest version.
 - **`administrator`** is the email of the person invited as the tenant's first administrator. A value
   that is not an email answers `400`.
-- **`quotas`** _(planned for M33)_. An optional `quotas`, which the `tenant` step writes as the
-  tenant's quota rows, so a tenant of the [sign-up](sign-up.md#provisioning) never runs with the
-  cell's defaults.
+- **`quotas`** is optional and has the shape of the `set` object of
+  [`PUT /api/cell/tenants/{id}/quotas`](#routes): a flat object that maps a quota key to a number, or
+  to `null` for no limit, such as `{ "users": 10, "storage": null }`. The `tenant` step writes one
+  [quota](tenant-quotas.md#quotas) row for each key, in the transaction that writes the directory
+  entry, so a tenant of the [sign-up](sign-up.md#provisioning) never runs with the cell's defaults.
+  A tenant created without `quotas`, or with `{}`, has no rows and uses the cell's defaults. An
+  unknown key or a negative value answers `422` and queues no job. A `quotas` that is not an object
+  of numbers is a body that cannot be read and answers `400`. A rerun of the `tenant` step replaces
+  the tenant's rows with the given ones when the job has `quotas`, and leaves them alone when it has
+  none.
 - **The cap.** A cell at its cap answers `409`, see [cell size](cells.md#cell-size).
 - **Order of the checks.** The route needs an `Idempotency-Key` header, see
   [idempotency](#provisioning-api). The checks run in this order: the header (`400`), the replay of
-  the first job or `422`, the body (`400`), then the id and the cap (`409`). A retry with the same key
+  the first job or `422`, the body (`400`), the quotas (`422`), then the id and the cap (`409`). A retry with the same key
   and body answers the first job again, even after the tenant exists.
 - **One at a time.** A cell-wide advisory lock covers the id check and the cap check, so two parallel
   creates cannot both pass. `Axis.Admin tenant create` does not take that lock.
@@ -141,7 +152,8 @@ The publisher runs the job's steps in order, see the [create job](administration
 
 1. `tenant`: create the tenant as `tenant create` does, with the host `<id>.<Cell:TenantDomain>`, its
    realm, its keys and its backup key, see
-   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell), and write the quota rows of
+   the job's `quotas`.
 2. `application`: copy the application into the tenant's Studio folder,
    `<Studio:ApplicationsPath>/<tenant id>/`, as Studio creates one from a template.
 3. `activate`: activate the application's first release in the tenant.

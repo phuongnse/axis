@@ -10,7 +10,7 @@ tenant, its pages and the rules every route follows.
 
 The portal runs on the regional control plane, not in a cell, and the application links to it.
 
-- **On the control plane.** `https://account.<region domain>`, served by the regional
+- **On the control plane.** `https://account.<region domain>`, where the region domain is the cell's `Cell:TenantDomain`, served by the regional
   [control plane](control-plane.md). It is not a page of the cell, so it works while the tenant is
   read-only or suspended, and no payment data enters a cell.
 - **From the application.** The shell shows "Billing" to a person who holds the

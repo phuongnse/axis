@@ -19,6 +19,10 @@ export interface CurrentUser {
   console: boolean
   /** Whether the user may administer users: the user holds the role that the server's `Users:AdministratorRole` names, and the tenant is not a preview tenant. */
   users: boolean
+  /** The tenant's status: `readOnly` while it is read-only, otherwise `active`. A suspended tenant is never served. */
+  tenantStatus: 'active' | 'readOnly'
+  /** The tenant's page in the billing portal, or `null` outside a cell, for a user without the administrator role and in a preview tenant. */
+  billingUrl: string | null
 }
 
 /**

@@ -11,6 +11,7 @@ import type {
   ConsoleWebhookDelivery,
   ConsoleWebhookDeliveryPage,
 } from '../platform/console'
+import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { PlatformContext, type Platform } from './context'
 import { ConsolePage } from './ConsolePage'
@@ -239,6 +240,9 @@ describe('ConsolePage', () => {
     const view = await screen.findByTestId('console-tenant')
     expect(fetchMock.mock.calls[0]).toEqual(['/api/console/tenant', expect.anything()])
     expect(within(view).getByText('Active')).toBeVisible()
+    expect(within(view).getByText('Active').closest('.ant-tag')).toHaveStyle({
+      color: designTokensFor('light').colour.successText,
+    })
     for (const title of ['Application', 'Active release', 'Activated']) {
       expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
     }
@@ -255,6 +259,9 @@ describe('ConsolePage', () => {
 
     const view = await screen.findByTestId('console-tenant')
     expect(within(view).getByText('Read-only')).toBeVisible()
+    expect(within(view).getByText('Read-only').closest('.ant-tag')).toHaveStyle({
+      color: designTokensFor('light').colour.warningText,
+    })
     expect(within(view).queryByText('Active')).toBeNull()
   })
 

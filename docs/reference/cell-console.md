@@ -72,7 +72,8 @@ session.
   tenant session gets `401`.
 - **Machine callers.** A client of the operator realm with the role in its service account, such as
   the control plane, calls the API with a bearer token, see
-  [provisioning API](tenant-lifecycle.md#provisioning-api).
+  [provisioning API](tenant-lifecycle.md#provisioning-api). `Axis.Admin cell operator client add <name>`
+  makes such a client, see [cell operator client add](administration.md#cell-operator-client-add).
 
 ## Views
 

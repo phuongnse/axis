@@ -67,7 +67,7 @@ internal static class CellOperatorInvite
 
         var realm = run.Cell.OperatorRealm;
         var role = run.Cell.OperatorRole;
-        if (!await WriteAuditAsync(run, platformConnection, realm, role))
+        if (!await WriteAuditAsync(run, platformConnection, realm, [$"realm: {realm}", $"role: {role}"]))
         {
             return 1;
         }
@@ -105,13 +105,13 @@ internal static class CellOperatorInvite
         return invited ? 0 : 1;
     }
 
-    private static async Task<bool> WriteAuditAsync(AdminRun run, string platformConnection, string realm, string role)
+    internal static async Task<bool> WriteAuditAsync(AdminRun run, string platformConnection, string realm, string[] changed)
     {
         try
         {
             run.CancellationToken.ThrowIfCancellationRequested();
             await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnection).Options);
-            await PlatformAuditRecords.WriteAsync(platform, run.Command.Name, null, [$"realm: {realm}", $"role: {role}"], run.CancellationToken);
+            await PlatformAuditRecords.WriteAsync(platform, run.Command.Name, null, changed, run.CancellationToken);
             return true;
         }
         catch (Exception exception)
@@ -124,7 +124,7 @@ internal static class CellOperatorInvite
     }
 
     // Runs one step. Any failure, also a stop by Ctrl+C, writes a failed line.
-    private static async Task<bool> StepAsync(AdminRun run, string realm, string step, Func<Task> work, Func<string>? result = null)
+    internal static async Task<bool> StepAsync(AdminRun run, string realm, string step, Func<Task> work, Func<string>? result = null)
     {
         try
         {

@@ -63,6 +63,31 @@ internal static class CellTestPlatform
         return platform;
     }
 
+    /// <summary>
+    /// Adds a tenant of the given status whose id is the name of a realm that <c>TenantRealm</c> made at <paramref name="identityProvider"/>,
+    /// with its own migrated database and the users client secret of that realm. Returns the tenant database's connection string.
+    /// </summary>
+    public static async Task<string> AddRealmTenantAsync(
+        PostgreSqlFixture database,
+        string platform,
+        string id,
+        string status,
+        Uri identityProvider,
+        string usersSecret,
+        CancellationToken cancellationToken)
+    {
+        var tenantDatabase = await database.CreateDatabaseAsync("cell_api_realm", cancellationToken);
+        await DataDatabaseFixture.MigrateTenantAsync(tenantDatabase, cancellationToken);
+        await PostgreSqlServer.GrantRuntimeRoleAsync(tenantDatabase, cancellationToken);
+
+        var row = Tenant(id, status, TenantSchemaVersion.Current, new NpgsqlConnectionStringBuilder(tenantDatabase), new Uri(identityProvider, $"realms/{id}"));
+        row.RealmUsersClientSecret = _cipher.Encrypt(id, TenantSecretFields.RealmUsersClientSecret, usersSecret);
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
+        context.Tenants.Add(row);
+        await context.SaveChangesAsync(cancellationToken);
+        return tenantDatabase;
+    }
+
     private static TenantRow Tenant(
         string id,
         string status,

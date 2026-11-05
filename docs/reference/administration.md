@@ -18,7 +18,7 @@ commands that look after a cell. On this page, "database role" always means the 
 | `tenant rotate-passwords`                                                             | [Database passwords](tenant-setting-commands.md#database-passwords)               |
 | `tenant data-key rotate` and `retire`                                                 | [Rotating the keys](data-encryption.md#rotating-the-keys)                         |
 | `platform rekey`                                                                      | [Installation key](tenant-setting-commands.md#installation-key)                   |
-| `migrate`, `activate`, `publisher`, `cell operator invite`, `cell backup`, `cell restore-check`, `version` | The sections of this page                                                         |
+| `migrate`, `activate`, `publisher`, `cell operator invite`, `cell operator client add`, `cell backup`, `cell restore-check`, `version` | The sections of this page                                                         |
 
 `Axis.Admin` is the only host that writes the [tenant directory](../architecture.md#tenant-directory),
 the only one that holds an admin connection to the database server, and the only one that holds the
@@ -40,9 +40,9 @@ the settings it needs, so a routine command needs no admin role and no secret it
 | `ConnectionStrings:PlatformSchema`          | `ConnectionStrings__PlatformSchema`          | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey`                        | `Platform__SecretKey`                        | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Platform:PreviousSecretKey`                | `Platform__PreviousSecretKey`                | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
-| `IdentityProvider:Url`                      | `IdentityProvider__Url`                      | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant and `cell operator invite` read it, and `tenant restore` reads it when it is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
-| `IdentityProvider:AdminClientId`            | `IdentityProvider__AdminClientId`            | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when it is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. |
-| `IdentityProvider:AdminClientSecret`        | `IdentityProvider__AdminClientSecret`        | The secret of that client. `tenant create` of a main tenant and `cell operator invite` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. It is never stored and never printed. |
+| `IdentityProvider:Url`                      | `IdentityProvider__Url`                      | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and `tenant restore` reads it when it is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
+| `IdentityProvider:AdminClientId`            | `IdentityProvider__AdminClientId`            | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and so does `tenant restore` when it is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. |
+| `IdentityProvider:AdminClientSecret`        | `IdentityProvider__AdminClientSecret`        | The secret of that client. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and so does `tenant restore` when `IdentityProvider:Url` is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. It is never stored and never printed. |
 | `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | Optional. A connection string to the identity provider's database, for a role that is read-only and has `SELECT` on Keycloak's `credential` table and no other right. Only `tenant backup` and `cell backup` read it, to put the password hashes and authenticator secrets of a realm's users into `realm.json`, see [tenant backup](tenant-backup-and-restore.md#tenant-backup). A `tenant restore` into a new realm imports that file and needs no such setting. It is never printed. Without it, no archive holds a `realm.json`. A value that is not a connection string exits with code 2, naming the setting. |
 | `Email:*`                                   | `Email__...`                                 | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher`, `cell operator invite` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
 | `Tenants`                                   | `Tenants__<id>__...`                         | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source, see [publisher](#publisher). |
@@ -661,6 +661,8 @@ because the provisioning API answers `404` there. The job has five steps, and ea
 
 1. `tenant`: runs the code of `tenant create` for the host `<id>.<Cell:TenantDomain>`, with no
    administrator and the cell's backup key. The tenant stays `provisioning`, so no host serves it.
+   When the job's input has `quotas`, the step writes them as the tenant's quota rows in the entry's
+   transaction, and a rerun replaces the rows with them.
    The step writes no audit record of its own, because the job writes one when it ends. A rerun on a
    `provisioning` entry reuses the realm, the secrets and the keys. A refusal that `tenant create`
    gives before it does any work, such as a taken host or an id that is already an active tenant,
@@ -762,7 +764,7 @@ changes nothing outside one.
 - **Realm.** It makes the realm `Cell:OperatorRealm`, or brings an existing one up to date. The realm
   has the account rules of a tenant's realm: the password policy, the lockout, the Axis login theme
   and an authenticator code at every sign-in. It has no brokered identity provider, so the command
-  removes any that it finds, and it has no client. It has the realm role `Cell:OperatorRole`.
+  removes any that it finds. It makes no client. It has the realm role `Cell:OperatorRole`.
 - **Account.** It finds the account with the email or creates it with the required actions to set a
   password and an authenticator, and gives it the role.
 - **Invitation.** The realm emails the link through the host's `Email` settings. An account that has
@@ -779,6 +781,34 @@ changes nothing outside one.
   missing `Cell:Id` or a missing setting, with nothing changed.
 - **Audit.** Each run writes one platform audit record with no tenant, before any change. It lists
   `realm: <name>` and `role: <name>` and never the email.
+
+## Cell operator client add
+
+`cell operator client add <name>` makes the client that a machine caller, such as the control plane,
+uses to call the cell, see [machine callers](cell-console.md#sign-in). It runs only in a cell, where
+`Cell:Id` is set, and changes nothing outside one. Run `cell operator invite` first, because this
+command makes neither the realm nor the role.
+
+- **Client.** A confidential client of `Cell:OperatorRealm` with the name as its client id. It signs
+  in with the client credentials grant only, and its service account holds `Cell:OperatorRole`. A
+  second run keeps the client, resets its settings and gives the role again if it was removed. A
+  client that already has the name is taken over this way.
+- **Secret.** The command makes the secret when it makes the client, prints it once and never
+  stores it. A second run prints no secret and keeps the one the client has. An operator who lost
+  the secret makes a new one in the realm's admin console.
+- **Name.** Lowercase letters and digits joined by single hyphens, at most 64 characters. The
+  command refuses `Cell:ConsoleClientId` and the built-in clients of a realm: `account`,
+  `account-console`, `admin-cli`, `broker`, `realm-management` and `security-admin-console`.
+- **Settings.** `ConnectionStrings:PlatformSchema` and the `IdentityProvider` settings. It needs no
+  `Email` settings.
+- **Output.** `<realm> client ok` or `<realm> client failed: <message>`. A missing realm or role
+  fails the step and tells the operator to run `cell operator invite` first. When the run makes the
+  client, the next line is `<realm> client-secret <secret>`. A failed `audit` line also starts
+  with the realm name.
+- **Exit codes.** `0` when the step succeeded, `1` when it failed, and `2` for a missing or invalid
+  name, a refused name, a missing `Cell:Id` or a missing setting, with nothing changed.
+- **Audit.** Each run writes one platform audit record with no tenant, before any change. It lists
+  `realm: <name>`, `role: <name>` and `client: <name>` and never the secret.
 
 ## Cell backup
 
