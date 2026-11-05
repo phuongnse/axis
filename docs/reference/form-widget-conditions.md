@@ -71,8 +71,7 @@ widget, is in [form-widget.md](form-widget.md) and [frontend.md](frontend.md).
     the others show their number, or a check mark when finished. A number shows
     its step's title on hover and on focus, and to assistive technology. The bar
     is never wider than the form, and when the steps do not fit it wraps
-    between steps
-    ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+    between steps.
   - **Failed check.** When the call for Next fails, by a network error or
     any answer but `200`, the form logs a warning and moves on to the next
     step, because the server checks the save again.

@@ -2,8 +2,7 @@
 
 Detailed reference for the form that edits a Studio resource, its save bar, its references and its JSON view. How
 Studio is laid out is in [Studio workspace](studio-workspace.md), and what each editor and designer does is in
-[Studio](studio.md). The rules come from [D132](../decisions/d132-rules-from-the-studio-settings-review.md). Nothing on
-this page is built yet _(planned for M31)_.
+[Studio](studio.md). Nothing on this page is built yet _(planned for M31)_.
 
 This form is the standard for every resource without a designer of its own: the application, role, policy, rule,
 event, trigger, sequence, data source, migration and webhook. The schema part of the editors that have a designer

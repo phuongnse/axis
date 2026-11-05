@@ -138,7 +138,7 @@ and the application's description it shows, in one column:
    [`GET .../releases`](authoring.md#release-history), in the [change list](#change-list). With no
    change, one line says that everything is live; with no live release, one line says that Publish
    makes the application live. A link to every release follows. A row opens the resource as it is now,
-   not a comparison.
+   not the [diff](ai-authoring-in-studio.md#the-diff) of AI authoring.
 4. **More you can add**: each kind the application has no resource of, migrations included, in the
    sidebar's groups. Each kind is a link to its list, with a line on what it is for and, in
    `textMuted`, when one is needed, such as "Handy for lists that must be ready on the first day".
@@ -163,7 +163,8 @@ The Overview's changes and a release's changes share one list.
 
 The Releases entry lists the application's releases from
 [`GET .../releases`](authoring.md#release-history) on the
-[shared table](actions-and-controls.md#tables), one row per release, the highest number first.
+[shared table](actions-and-controls.md#tables), one row per release, the highest number first: a publish
+gives a release its label and note, and activating goes to whichever release is wanted.
 
 | Column       | Shows                                                                                                                                                       |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -177,7 +178,8 @@ There is no Status column, because a release that is not live has no state of it
 
 Every row but the live one has Activate…, an icon button named as in "Activate release 6", shown to a
 publisher only. It activates that release, back to an older one or forward to a newer one, and its
-dialog says which release replaces the live one.
+dialog says which release replaces the live one. [D130](../decisions/d130-activate-a-release-replaces-roll-back.md)
+proposes the same word for the concept and the route.
 
 - **The number opens the release page** _(planned for M31)_. The number in the Release column is the
   link to the [release page](#release-page).
@@ -202,8 +204,8 @@ The page shows, in order:
    muted line that says what kind of point it is and on which entity, and the reason. With none, one
    line says that the release follows every contract of its modules. Point labels are described in
    [named points](module-contracts.md#named-points).
-4. **Changes**, in the [change list](#change-list). A release that is not live lists what activating it
-   would change, under "If you activate it, compared with live release 4": Added is what activating
+4. **Changes**, in the [change list](#change-list). A release is opened to decide whether to switch to
+   it, so a release that is not live lists what activating it would change, under "If you activate it, compared with live release 4": Added is what activating
    adds and Removed what it takes away. The live release lists what it brought, under "Changes from
    release 3", and the first live release says there is nothing to compare with. The title always names
    the release it compares with.

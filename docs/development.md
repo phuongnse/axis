@@ -526,8 +526,7 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   has row and toolbar actions and a long-text row, and the inbox's has an overdue and a claimed task.
   `processInspector` draws one state with a failed instance and an open dead letter. A
   `field-<type>` preview draws the input the form widget uses for that field type,
-  with its label and the fixture value, laid out as on a form, in three states, as
-  [D96](decisions/d96-rules-from-the-design-system-review.md) agrees: Editable, Read-only, and Required, help text
+  with its label and the fixture value, laid out as on a form, in three states: Editable, Read-only, and Required, help text
   and error, which shows the required mark, a help text and a fixed message at once. `field-child-collection` draws line items with a
   reference cell and a computed cell, in four states: Reference and computed cells, Cell error, Read-only, and Empty.
   The `form` preview draws Validation errors, which submits the form once when it mounts to a fixture that answers

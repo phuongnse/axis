@@ -107,9 +107,9 @@ the files agree, title and status included.
 | [D93](decisions/d93-an-operator-web-console.md) | An operator web console | **Agreed** |
 | [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) | Purchase requests prove the extensibility milestone | **Agreed** |
 | [D95](decisions/d95-widget-previews-show-the-states-a-design-change-touches.md) | Widget previews show the states a design change touches | **Agreed** |
-| [D96](decisions/d96-rules-from-the-design-system-review.md) | Rules from the design system review | **Agreed** |
+| D96 | Rules from the design system review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d96-rules-from-the-design-system-review.md) |
 | [D97](decisions/d97-reliable-test-runs.md) | Reliable test runs | **Agreed** |
-| [D98](decisions/d98-rules-from-the-shell-review.md) | Rules from the shell review | **Agreed** |
+| D98 | Rules from the shell review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d98-rules-from-the-shell-review.md) |
 | [D99](decisions/d99-axis-ships-its-own-identity-provider.md) | Axis ships its own identity provider | **Agreed** |
 | [D100](decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) | Identity providers per application and sign-in per site | **Agreed** |
 | [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md) | The extensibility milestone is split into six | **Agreed** |
@@ -125,7 +125,7 @@ the files agree, title and status included.
 | [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) | Authentication by default, and the owner guards the security checks | **Agreed** |
 | [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) | CI, CodeQL and the performance tests run on main every few merges | **Agreed** |
 | [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) | Branches need not be up to date, and three issues run at once | **Agreed** |
-| [D114](decisions/d114-rules-from-the-sign-in-and-home-page-review.md) | Rules from the sign-in and home page review | **Agreed** |
+| D114 | Rules from the sign-in and home page review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d114-rules-from-the-sign-in-and-home-page-review.md) |
 | [D115](decisions/d115-an-inbound-endpoint-call-raises-an-event.md) | An inbound endpoint call raises an event | **Agreed** |
 | [D116](decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md) | How sensitive fields and backups are encrypted | **Agreed** |
 | [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) | Small businesses first, and the milestones in three phases | **Agreed** |
@@ -139,9 +139,9 @@ the files agree, title and status included.
 | [D125](decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) | How AI authoring connects, runs and keeps its changes | **Agreed** |
 | [D126](decisions/d126-sign-up-trials-and-the-control-plane.md) | Sign-up, trials and the control plane | **Agreed** |
 | [D127](decisions/d127-plans-payments-and-invoices.md) | Plans, payments and invoices | **Agreed** |
-| [D128](decisions/d128-rules-from-the-studio-review.md) | Rules from the Studio review | **Agreed** |
-| [D129](decisions/d129-rules-from-the-studio-editors-review.md) | Rules from the Studio editors review | **Agreed** |
+| D128 | Rules from the Studio review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d128-rules-from-the-studio-review.md) |
+| D129 | Rules from the Studio editors review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d129-rules-from-the-studio-editors-review.md) |
 | [D130](decisions/d130-activate-a-release-replaces-roll-back.md) | "Activate a release" replaces "roll back" | **Proposed** |
 | [D131](decisions/d131-tenant-notices-live-in-axisnotifications.md) | Tenant notices live in axis.notifications | **Proposed** |
-| [D132](decisions/d132-rules-from-the-studio-settings-review.md) | Rules from the Studio settings review | **Agreed** |
+| D132 | Rules from the Studio settings review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d132-rules-from-the-studio-settings-review.md) |
 | [D133](decisions/d133-docs-state-each-current-rule-once.md) | Docs state each current rule once | **Proposed** |

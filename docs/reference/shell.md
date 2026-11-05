@@ -6,15 +6,6 @@ person sees. A person with no session goes to sign-in from it. This page holds t
 endpoints and the widgets are in [frontend](frontend.md), and sign-in and the session in
 [security](security.md#sign-in-and-the-session).
 
-[D98](../decisions/d98-rules-from-the-shell-review.md) agrees this page, and
-[D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md) changes some of its rules: the organization
-heading on the sign-in card, sign-in that starts at once, the shell that fills the window, the menus, the theme that
-follows the system and the home page. D98's and D114's rules are built, and so are the design system's shell previews and
-their Shell group of cards. [D128](../decisions/d128-rules-from-the-studio-review.md) changes the sidebar, the account
-button, how the page scrolls, the footer, the tiles and sign-out, and adds the Studio group of cards. Its sidebar,
-account button, scrolling, footer and tile rules are built. Sign-out and the Studio group of cards are
-_(planned for M31)_.
-
 ## Layout
 
 - **Header.** One row, 48 px high, on `surface` with a `borderSubtle` rule below it. From the left: the button that
@@ -54,8 +45,7 @@ _(planned for M31)_.
   page never scrolls sideways.
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it. Without a sidebar it runs the full
   width under the page. Beside a sidebar it sits under the content column only, so the sidebar runs to the bottom of
-  the window and is never pushed up by it, see
-  [D129](../decisions/d129-rules-from-the-studio-editors-review.md). On the left it reads "© <year> Axis", then " · v<version>" for a
+  the window and is never pushed up by it. On the left it reads "© <year> Axis", then " · v<version>" for a
   signed-in person only, as in "© 2026 Axis · v0.1.0". It shows no server status, and a page that cannot reach the
   server says so where it fails. The legal links take the right,
   as the [legal line](legal.md#legal-line) says. They come from the `legal` of the site the shell shows: the tenant's on
@@ -180,8 +170,7 @@ _(planned for M31)_.
 ## Application and site descriptions
 
 The `application` manifest and each `site` may have a `description`, one line of text that the
-[platform home page](#platform-home-page) shows under the title, as
-[D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md) agrees:
+[platform home page](#platform-home-page) shows under the title:
 
 ```json
 {

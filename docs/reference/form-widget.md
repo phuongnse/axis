@@ -49,8 +49,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     Below 992 px every field takes the whole row, in file order. A detail
     lays out the same sections with the same widths. A `width` that is not a
     whole number from 1 to 12 breaks the schema (`AXC0004`). Studio's
-    [form designer](form-designer.md) edits it
-    ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+    [form designer](form-designer.md) edits it.
     `{ "field": "quantity", "width": 4 }` takes a third of the row.
   - A field appears at most once in the form. A field the form does not list
     is not shown and never sent.
@@ -83,8 +82,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     shows only the fields its form lists, in its order, under the section
     titles (see **Form binding**). A required field's label is
     marked, but the mark blocks nothing: the server still decides.
-  - **Field look**. These rules are agreed in
-    [D96](../decisions/d96-rules-from-the-design-system-review.md).
+  - **Field look**. These rules hold for every field on a form.
     - **Label.** On a form, a field label is weight 500 in `textMuted`.
       The same on a detail and as a KPI's label.
     - **Required mark.** A required field has a `*` after its label, in
@@ -107,7 +105,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       rule, see [fields](actions-and-controls.md#fields).
     - **Read-only values.** A field the form makes read-only, by `readOnly` or
       `readOnlyWhen`, and a `computed`, `sequence` or `creator` field show
-      plain text, not an input. A boolean shows Yes or No. The value starts
+      plain text, not an input, so nothing looks editable that is not. A boolean shows Yes or No. The value starts
       about 6px under its label, and the field keeps the height of an editable
       field. An empty value shows "Not set" in muted italics, see
       [shown values](frontend.md).
