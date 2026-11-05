@@ -27,6 +27,7 @@ import {
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { kindName, kindSingular } from '../platform/studioKinds'
+import { starterKinds } from '../platform/studioStarters'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -160,7 +161,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * and opens it at the diagnostic's path, as a Used by entry does, and the panel stays open. A selected resource opens in an editor below its details, with its Uses and Used by
  * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
  * save, the Problems panel shows the diagnostics that the save answered. After a delete, the resource leaves the
- * folder, and Studio shows the Overview. A New resource… button in the band creates a resource of any kind from its starter. The new resource
+ * folder, and Studio shows the Overview. A New resource… button in the band creates a resource of any kind from its starter, and a kind's list has its own button named for the kind, such as New entity…, on the right of its heading, whose dialog asks for the name alone. The new resource
  * joins its kind's list, the Problems panel shows the diagnostics of the create, and the editor opens the resource.
  * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
@@ -673,7 +674,19 @@ function StudioWorkspace() {
               </div>
             ) : kind !== null ? (
               <Flex vertical gap="small">
-                <StudioPageHeading title={kindName(kind, t)} />
+                <StudioPageHeading
+                  title={kindName(kind, t)}
+                  actions={
+                    starterKinds.includes(kind) ? (
+                      <StudioNewResource
+                        kind={kind}
+                        application={application!}
+                        resources={resources}
+                        onCreated={onCreated}
+                      />
+                    ) : undefined
+                  }
+                />
                 {groups.map((group) => (
                   <section key={group.kind} data-testid={`studio-group-${group.kind}`}>
                     <Flex vertical align="flex-start">

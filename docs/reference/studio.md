@@ -33,9 +33,9 @@ Run and the Test results list, the editable module resources of every kind a mod
   diagnostics. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **New resource.** A **New resource…** button in the band (starting with the list's kind, _planned for M31_) opens a
-  dialog that asks for the kind and the name, or the locale for a `text`
-  resource. The kind picker lists the 20 kinds the create route accepts: every
+- **New resource.** A **New resource…** button in the band opens a dialog that asks for the kind and the name, or the
+  locale for a `text` resource. A kind's list has its own button, such as **New entity…**, that asks for the name or
+  locale alone, see [new resource](studio-workspace.md#new-resource). The kind picker lists the 20 kinds the create route accepts: every
   kind except the manifest. It names each kind by its singular name, such as Entity, under the sidebar's group headings in sidebar order. The author can type to narrow it. A new
   `identityProvider` starts with type `accounts`, in `identity-providers/<name>.json`.
   - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import en from '../../../src/Axis.Presentation/Texts/en.json'
+import vi from '../../../src/Axis.Presentation/Texts/vi.json'
 import { kindGroup, kindName, kindSingular, studioKinds } from './studioKinds'
 import { starterKinds } from './studioStarters'
 
@@ -16,6 +17,13 @@ describe('studioKinds', () => {
     expect(kindName(kind, text)).not.toContain('shell.studio')
     expect(kindSingular(kind, text)).not.toBe(kindName(kind, text))
     expect(namedGroups).toContain(kindGroup(kind))
+  })
+
+  it.each(starterKinds)('gives %s a create button and a dialog title in en and vi', (kind) => {
+    for (const catalogue of [en, vi] as Record<string, string>[]) {
+      expect(catalogue[`shell.studio.newResource.kindButton.${kind}`]).toMatch(/…$/)
+      expect(catalogue[`shell.studio.newResource.kindTitle.${kind}`]).toBeTruthy()
+    }
   })
 
   it('names a kind that is not in the catalogue by the kind and puts it under other', () => {

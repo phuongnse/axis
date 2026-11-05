@@ -21,17 +21,21 @@ type Problem = 'exists' | 'invalid' | 'failed'
 
 /**
  * The New resource button of the open application's band, a text button, and its dialog. The dialog asks for a kind, listed by its singular
- * name under the sidebar's groups, and a name, or for a locale when the kind is `text`. It creates the resource from
+ * name under the sidebar's groups, and a name, or for a locale when the kind is `text`. With `kind` set, it is instead the
+ * button of that kind's list, named for the kind, such as New entity…, an outlined main button, and its dialog asks for the name
+ * or the locale alone. It creates the resource from
  * the kind's starter with an id from `crypto.randomUUID()`. A new text resource is named after its locale, such as `TextsVi`, and copies every key and
  * text of the default locale of the first site in file order, or of `en` when there is no site, so every label still
  * resolves. A `409` or a `400` shows under the field, and the dialog stays open. `onCreated` gets the new resource and
  * the folder's diagnostics after the write.
  */
 export function StudioNewResource({
+  kind: fixedKind,
   application,
   resources,
   onCreated,
 }: {
+  kind?: string
   application: string
   resources: StudioResourceItem[]
   onCreated: (item: StudioResourceItem, diagnostics: StudioDiagnostic[]) => void
@@ -39,7 +43,8 @@ export function StudioNewResource({
   const t = useText()
   const { lost } = useStudioConnection()
   const [open, setOpen] = useState(false)
-  const [kind, setKind] = useState<string>()
+  const [chosenKind, setKind] = useState<string | undefined>(fixedKind)
+  const kind = fixedKind ?? chosenKind
   const [value, setValue] = useState('')
   const [problem, setProblem] = useState<Problem>()
   const [creating, setCreating] = useState(false)
@@ -54,7 +59,7 @@ export function StudioNewResource({
   const label = t(isText ? 'shell.studio.newResource.locale' : 'shell.studio.newResource.name')
 
   function show() {
-    setKind(undefined)
+    setKind(fixedKind)
     setValue('')
     setProblem(undefined)
     setOpen(true)
@@ -98,12 +103,20 @@ export function StudioNewResource({
 
   return (
     <>
-      <AxisButton role="secondary" onClick={show}>
-        {t('shell.studio.newResource.button')}
+      <AxisButton role={fixedKind === undefined ? 'secondary' : 'main'} onClick={show}>
+        {t(
+          fixedKind === undefined
+            ? 'shell.studio.newResource.button'
+            : `shell.studio.newResource.kindButton.${fixedKind}`,
+        )}
       </AxisButton>
       <Modal
         open={open}
-        title={t('shell.studio.newResource.title')}
+        title={t(
+          fixedKind === undefined
+            ? 'shell.studio.newResource.title'
+            : `shell.studio.newResource.kindTitle.${fixedKind}`,
+        )}
         okText={t('shell.studio.newResource.create')}
         cancelText={t('shell.studio.cancel')}
         okButtonProps={{ disabled: kind === undefined || value.trim() === '' }}
@@ -112,21 +125,23 @@ export function StudioNewResource({
         onCancel={() => setOpen(false)}
       >
         <Form layout="vertical">
-          <Form.Item label={t('shell.studio.newResource.kind')}>
-            <Select
-              aria-label={t('shell.studio.newResource.kind')}
-              value={kind}
-              // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
-              showSearch
-              optionFilterProp="label"
-              virtual={false}
-              options={kindOptions}
-              onChange={(next) => {
-                setKind(next)
-                setProblem(undefined)
-              }}
-            />
-          </Form.Item>
+          {fixedKind === undefined && (
+            <Form.Item label={t('shell.studio.newResource.kind')}>
+              <Select
+                aria-label={t('shell.studio.newResource.kind')}
+                value={kind}
+                // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
+                showSearch
+                optionFilterProp="label"
+                virtual={false}
+                options={kindOptions}
+                onChange={(next) => {
+                  setKind(next)
+                  setProblem(undefined)
+                }}
+              />
+            </Form.Item>
+          )}
           <Form.Item
             label={label}
             validateStatus={problem === undefined ? undefined : 'error'}
