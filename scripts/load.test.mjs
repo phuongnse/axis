@@ -124,6 +124,7 @@ function runLoad(args = [], extraEnv = {}, setup = () => {}) {
       'scripts/lib/retry.sh',
       'deploy/compose/compose.yaml',
       'tests/load/objectives.js',
+      'tests/load/lib/objectives-loop.js',
       'tests/load/lib/totp.js',
     ]) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })

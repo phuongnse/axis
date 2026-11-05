@@ -45,7 +45,8 @@ the [reference environment](#reference-environment).
 | Worker | Due work items: process steps, connector calls, event delivery                                          | p95 claimed within 5 s of its due time | `axis.work_items.claim_delay`, see the [worker metrics](process-execution.md#worker-metrics) |
 | Errors | Every request of the run                                                                                | Under 0.1% answer `5xx`                | `http.server.request.duration`, by status code                                               |
 
-The load test sends these routes, and a test fails when this list and `tests/load/objectives.js` differ:
+The load test and the cell load test send these routes from one loop, `tests/load/lib/objectives-loop.js`.
+A test fails when this list and that file differ:
 
 | Group  | Route                                                   |
 | ------ | ------------------------------------------------------- |
@@ -89,10 +90,11 @@ to find its own numbers.
   [several server replicas](several-server-replicas.md). It starts `server` and
   then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the k6
   scenario `tests/load/objectives.js` in a container through the proxy: 50 users, each in a loop over the routes of the
-  [objectives](#objectives), with a pause of about 1 s an iteration. Every request goes through one helper that tags it with
-  its objective (`reads`, `writes` or `signIn`) and its route. The run fails, with a non-zero exit code, when reads miss p95
-  under 300 ms, writes miss p95 under 500 ms, the rate of `5xx` answers, the `server_errors` metric, is 0.1% or more, or
-  fewer than 99% of its checks pass. The sign-in pages and the token request are tagged `signIn`, so they count toward no objective.
+  [objectives](#objectives), with a pause of about 1 s an iteration. The scenario runs the loop of
+  `tests/load/lib/objectives-loop.js`, which the cell load test shares. Every request goes through one helper in that
+  loop that tags it with its objective (`reads`, `writes` or `signIn`) and its route. The run fails, with a non-zero
+  exit code, when reads miss p95 under 300 ms, writes miss p95 under 500 ms, the rate of `5xx` answers, the
+  `server_errors` metric, is 0.1% or more, or fewer than 99% of its checks pass. The sign-in pages and the token request are tagged `signIn`, so they count toward no objective.
   The stack also runs the https stub `load-stub`, a Caddy service under the `load` profile whose certificate comes from the
   run's own authority and which answers every call with a fixed JSON body. The worker trusts that authority. It removes the
   stack at the end, unless `--keep` is given. It needs Docker. See [development](../development.md#scripts).
@@ -159,6 +161,12 @@ agrees. The number becomes the cell's cap, see [cell size](cells.md#cell-size).
   - 1 tenant with a backlog of 100,000 due work items, made before the run starts;
   - 949 idle tenants, each with one user who signs in once an hour and reads one page every
     10 minutes.
+- **Scenarios.** _(Built.)_ `tests/load/cell.js` holds the two k6 scenarios: the busy tenants run the loop of the
+  objectives, and each idle tenant signs in once an hour and reads a page every 10 minutes. The scenarios read the
+  tenants from the JSON file named by `AXIS_LOAD_TENANTS`. The file has a `busy` list, with each tenant's `url`,
+  `tokenUrl`, `caller` and 10 `users`, and an `idle` list, with each tenant's `url`, `tokenUrl` and one user. Each
+  sample is tagged `phase:warmup` or `phase:run`, and the thresholds read only `phase:run`. `scripts/load-cell.test.mjs`
+  keeps the numbers of this section equal to the scenario.
 - **Pass.** The run passes when, over one hour after a warm-up of 10 minutes:
   - the busy tenants meet the [objectives](#objectives) for reads, writes and errors;
   - every tenant but the one with the backlog meets the worker objective, a claim delay p95 within
