@@ -22,7 +22,7 @@ contain.
 - **Malicious files.** An upload that starts like an executable, declares `image/svg+xml`, or does
   not start as its declared PDF, PNG, JPEG, GIF, WebP or ZIP type is refused with a `415`, and
   nothing is stored. Every other file is only ever downloaded as an attachment with `nosniff`, as
-  the [download headers](#download-built) say. Axis does not scan uploads for malware, so an
+  the [download headers](#download) say. Axis does not scan uploads for malware, so an
   operator that needs scanning puts a scanning proxy in front of the upload route.
 - **Several files.** A record holds several files through a child collection whose child entity has
   a `file` field, such as `attachments` with rows of `{ file, note }`.
@@ -87,7 +87,7 @@ module has no upload route. A service account may upload, as it may write record
     [storage and clean-up](#storage-and-clean-up) says. Its id is refused like any other unknown id,
     so it cannot be attached again.
 
-## Download _(built)_
+## Download
 
 A download answers a file's bytes to a user who may read the field on its owner record, and answers
 every other request with the same `404`.
