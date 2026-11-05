@@ -48,8 +48,9 @@ The control plane calls each cell of its region as a machine caller of the cell'
 over a private network with mutual TLS.
 
 - **One client for each cell.** The cell's [operator realm](cell-console.md#sign-in) has a client for
-  the control plane, with the client credentials grant and the role `Cell:OperatorRole`. Its secret is
-  a Kubernetes Secret of the control plane, never a setting. The control plane gets a token from the
+  the control plane, with the client credentials grant and the role `Cell:OperatorRole`. The cell's
+  operator makes it with [`cell operator client add`](administration.md#cell-operator-client-add), and
+  the secret that the command prints once is a Kubernetes Secret of the control plane, never a setting. The control plane gets a token from the
   realm's `TokenUrl` with that grant, keeps it until one minute before it expires, and sends it as a
   bearer token. When the cell answers `401`, it drops the token, gets a new one and sends the call
   once more. A second `401` is an error.
