@@ -1,22 +1,18 @@
 # Built-in modules
 
-The first built-in modules are `organization` and `approvals`, and the first built-in application,
-`approvals`, uses them. A small business starts from the application and changes it to fit: its
-administrator sets request types and approval steps in the running application, and an author
+Built-in modules are modules that Axis maintains and ships, and a built-in application is a thin
+application that declares them, from which a small business starts. The business changes it to fit:
+its administrator sets request types and approval steps in the running application, and an author
 changes anything else in Studio through [customization layers](customization-layers.md). The
-[module contracts](module-contracts.md) hold whatever either of them changes.
-[D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees the
-idea, and [D124](../decisions/d124-the-organization-and-approvals-modules.md) agrees what the modules
-hold. `organization` 1.0.0 exists under `modules/organization`, with its entities, data sources, rule,
-role slots, contracts, policies, contract scenarios, pages, one form and texts. `approvals` 1.0.0 exists under
-`modules/approvals`, with its entities, data sources, `RequestNumber` sequence, role slots, contracts,
-process, policies, contract scenarios, pages and texts. The built-in application `approvals` exists under
-`applications/approvals`, with its roles, one site, Axis accounts and texts. The `service-desk` and `assets` modules are _(planned for M30)_.
-
-The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
-issues that build each check.
+[module contracts](module-contracts.md) hold whatever either of them changes. This page describes the
+built-in modules `organization` and `approvals` and the built-in application `approvals`. Why the
+modules are open to change and bound by a contract is in
+[D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
 
 ## Where they live
+
+Built-in modules and applications are configuration in the repository, which Axis installs like any
+module or template.
 
 - **Modules** are under `modules/<id>/` at the repository root, each a module folder with its
   `module.json`, as [modules](modules-and-templates.md#modules) describes. Each has its own SemVer
@@ -28,25 +24,23 @@ issues that build each check.
   process, page or policy of its own.
 - **Installed with Axis.** `scripts/build.sh`, `scripts/dev.sh` and the E2E run install the modules
   under `artifacts/modules/`, next to the sample modules, and the built-in applications under
-  `artifacts/templates/`. The development images hold the modules in
-  `/modules` and the built-in applications in `/templates`. The production images `axis-server`,
-  `axis-worker` and `axis-admin` do not yet, and a cell's operator fills its templates volume.
-  Shipping them in every installation _(planned for M26)_ needs its own design, because the Helm
-  chart mounts a volume over `/modules`.
+  `artifacts/templates/`. The development images hold the modules in `/modules` and the built-in
+  applications in `/templates`.
+- **In every installation** _(planned for M26)_. Every installation of Axis holds the built-in modules
+  and applications.
 - **Creating an application from one.** Studio's new application dialog lists the built-in
-  applications first, marked as built in, then the templates. Creating one copies the thin folder,
-  as any template does, so the application declares the modules instead of copying them, and every
+  applications first, marked as built in, then the templates. Creating one copies the thin folder, as
+  any template does, so the application declares the modules instead of copying them, and every
   change after that is a layer. The platform operator creates a tenant from one too, see
-  [tenant lifecycle](tenant-lifecycle.md) _(planned for M31)_.
-- **No platform code.** Neither module is named by any engine. They are configuration, compiled by
+  [tenant lifecycle](tenant-lifecycle.md#creating-a-tenant).
+- **No platform code.** No engine names a built-in module. The modules are configuration, compiled by
   the same compiler as any application.
 
 ## The organization module
 
 `organization` holds the departments and the employees of the business, which other modules route
-work by. It keeps no personal data beyond what that needs. Version 1.0.0 holds the entities, the
-data sources, the rule, the contracts, the role slots, the policies, the contract scenarios, the pages,
-the form and the texts below.
+work by. It keeps no personal data beyond what that needs. Version 1.0.0 holds the entities, data
+sources, rule, contracts, role slots, policies, contract scenarios, pages, form and texts below.
 
 - **`Department`:** `code`, unique, in capital letters, `name`, `parent`, a reference to another
   department, `head`, a reference to an employee, and `active`.
@@ -58,9 +52,7 @@ the form and the texts below.
   - `delegate`, a reference to another employee, with `delegateFrom` and `delegateUntil`, the
     dates of an absence.
 - **No more personal data.** No date of birth, no identity number, no address. A business that
-  needs one adds it through a layer, and marks it `sensitive`, as
-  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)
-  asks.
+  needs one adds it through a layer, and marks it [`sensitive`](data-encryption.md#sensitive-field-values).
 - **Linking an account.** An administrator invites the person on the
   [users page](user-administration.md), then picks the account in the employee's `user` field. The
   field is marked `userId`, so the form shows a [user picker](form-widget.md) in place of a text
@@ -88,8 +80,8 @@ the form and the texts below.
     their own. The `Department` ceiling has an `others` entry that reads, so a role mapped to neither
     slot may read departments, as an application's employees and reviewers do when they pick or see
     a department. The `Employee` ceiling has no `others` entry, so a role mapped to neither slot gets
-    no grant on employees, and that includes the roles of other modules until an application maps
-    them to a slot. The points are `Department/ceiling/admin`, `Department/ceiling/member`,
+    no grant on employees, the roles of other modules included, unless an application maps them to a
+    slot. The points are `Department/ceiling/admin`, `Department/ceiling/member`,
     `Department/ceiling/others`, `Employee/ceiling/admin` and `Employee/ceiling/member`.
 - **Policies.**
   - `AdminAccess` grants the `admin` slot every action on both entities, and read and export on the
@@ -125,15 +117,18 @@ the form and the texts below.
 type. It depends on `organization` `^1.0.0` and maps its slots `admin` and `member` to its own
 slots of the same names.
 
-Version 1.0.0 holds the entities below, the data sources `RequestTypes`, `Requests`, `Decisions`, `MyRequests` and
-`RequestDecisions`,
-the sequence `RequestNumber` with the format `RQ-{yyyy}-{n:5}`, `amount` and `minAmount` as `decimal`
-with precision 18 and scale 2, the contracts of `Request`, `RequestType` and `Decision`, the process
-`RequestApproval`, the form `RequestReview`, the policies `MemberAccess` and `AdminAccess`, four module
-scenarios, `RequestGoesToManagerThenNamedEmployee`, `DepartmentHeadReturnsAndRejects`,
-`DelegateDecidesWhileApproverIsAway` and `DepartmentHeadRequestGoesToAdmin`, the contract scenarios
-listed under [the request contract](#the-request-contract), the pages, the forms `RequestForm` and
-`RequestDetail`, and the texts.
+Version 1.0.0 holds:
+
+- the entities below, and the data sources `RequestTypes`, `Requests`, `Decisions`, `MyRequests` and
+  `RequestDecisions`;
+- the sequence `RequestNumber`, with the format `RQ-{yyyy}-{n:5}`;
+- `amount` and `minAmount` as `decimal`, with precision 18 and scale 2;
+- the contracts of `Request`, `RequestType` and `Decision`, the process `RequestApproval`, and the
+  policies `MemberAccess` and `AdminAccess`;
+- the forms `RequestReview`, `RequestForm` and `RequestDetail`, the pages, and the texts;
+- ten module scenarios: the seven contract scenarios listed under
+  [the request contract](#the-request-contract), and `DepartmentHeadReturnsAndRejects`,
+  `DelegateDecidesWhileApproverIsAway` and `DepartmentHeadRequestGoesToAdmin`.
 
 ### Request types
 
@@ -154,6 +149,9 @@ running application, without Studio or a publish.
   `steps`.
 
 ### Requests
+
+A request is what a person submits for a decision, and the module keeps one record for each decision
+made on it.
 
 - **`Request`:** `number`, from a sequence, `type`, `title`, `description`, `amount`, `requester`, the
   creator, `requesterEmployee`, and `status`.
@@ -299,16 +297,20 @@ The built-in application `approvals` is what a business starts from.
 
 ## Samples
 
-The samples become the built-in modules, as D102 agrees:
+The leave request and purchase request samples use the built-in `organization` module, and each stays
+a sample for the reason below.
 
-- **`departments`** becomes `organization`. The leave request sample declares `organization`, maps
-  both of its slots (`admin` to `department-manager`, `member` to `employee`) and seeds its employees
-  and departments, and a leave request goes to the head of its department. The purchase request
-  sample declares `organization` too (`admin` to `operator`, `member` to `department-manager`) and
-  seeds the same employees and departments, and a purchase request goes to the head of its department.
-  `department-budgets` 1.2.0 depends on `organization`. The `departments` sample module is removed.
-- **The request approval sample template** became the `approvals` application and is removed. The
-  Studio journeys create an application from the built-in application.
+- **Leave requests** declare `organization`, map both of its slots (`admin` to `department-manager`,
+  `member` to `employee`) and seed its employees and departments, and a leave request goes to the head
+  of its department. It stays a sample until the HR modules `employees` and `leave` replace it, which
+  come once a practitioner can review their legal rules.
+- **Purchase requests** declare `organization` too (`admin` to `operator`, `member` to
+  `department-manager`) and seed the same employees and departments, and a purchase request goes to
+  the head of its department. The sample stays, because the journeys of
+  [D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) run on it.
+  `department-budgets` 1.2.0 depends on `organization`.
+- **Studio journeys** create an application from the built-in application, because no sample template
+  exists.
 
 ## The journey
 
@@ -325,4 +327,4 @@ Two businesses start from the `approvals` application, and each changes it diffe
 - **For both:** a requester who is also a department head never decides their own request, and a
   task decision never moves a request two steps.
 
-The E2E specs run the journey with two applications on the journey tenant, one for each business, until a tenant can start from a built-in application (M31).
+The E2E specs run the journey with two applications on one tenant, one for each business.

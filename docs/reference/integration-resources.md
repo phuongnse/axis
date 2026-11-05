@@ -1,34 +1,27 @@
 # Connectors, events and endpoints
 
-Detailed reference for the resources that connect an application to other systems: connectors
-and deployment bindings, events and triggers and inbound endpoints. The outbound webhooks are in
-[outbound-webhooks.md](outbound-webhooks.md). How a process calls a
-connector is in [process-execution.md](process-execution.md#connector-calls), how it raises an
-event is in [process-events.md](process-events.md), and how a caller calls an endpoint is in
-[inbound-endpoints.md](inbound-endpoints.md).
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+This page describes the resources that connect an application to other systems: connectors and the
+deployment bindings they use, events and triggers, and inbound endpoints. It covers each resource's
+shape and its compile checks. The [outbound webhooks](outbound-webhooks.md) have a page of their own.
+How a process calls a connector is in [connector calls](process-execution.md#connector-calls), how it
+raises an event and how triggers start processes is in [events and triggers](process-events.md), and
+how a caller calls an endpoint is in [inbound endpoints](inbound-endpoints.md).
 
 ## Connectors and deployment bindings
 
-This section follows
-[D25](../decisions/d25-connectors-deployment-bindings-and-secrets.md).
-The `Bindings` block, its startup checks, resolving a binding at run time,
-the secret value that hides itself from text, JSON and logs, the `connector`
-resource with its [compile checks](configuration.md#configuration-pipeline) and the activation
-check are built. So are the bindings that a package operation declares, which
-activation checks and the operation context hands out, see
-[Capabilities](extension-packages.md#capabilities). Calling a connector and using secrets in its calls are built
-too, and so are retries and reconciliation. A `connector` resource
-describes an external system that a process can call. Its URL and its secret
-are deployment bindings, so a release holds only their names. How a process calls a connector, retries and
-reconciles is in [Connector calls](process-execution.md#connector-calls).
+A `connector` resource describes an external system that a process can call. Its URL and its secret
+are deployment bindings, so a release holds only their names and each tenant holds the values. A
+[package operation](extension-packages.md#capabilities) declares the bindings it needs in the same
+way. How a process calls a connector, retries and reconciles is in
+[connector calls](process-execution.md#connector-calls).
 
 ### Deployment bindings
 
+A deployment binding keeps a value that differs between tenants, or that must stay secret, out of the
+release. These rules say where the values live, how they are checked and how they are resolved.
+
 - **Binding.** A named setting that a release refers to by name and never
-  holds as a value. M5 has two kinds: `url` and `secret`. M15 adds a third,
-  `storage`, see **Storage binding** below.
+  holds as a value. It has one of three kinds: `url`, `secret` and `storage`.
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
@@ -94,18 +87,15 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   start and the worker stays not ready.
 - **Resolved at run time.** The worker reads a binding each time it makes a
   call, so changing a secret needs no new release.
-- **Storage binding**. The application manifest names
-  where the files of its file fields go, as
-  `"fileStorage": { "binding": "<name>" }`. That binding has the kind
-  `storage`. In M15 its only value is `database`, which stores the bytes in
-  the tenant database. Any other value fails the startup check. An
-  application without `fileStorage` uses the tenant database too, and its
-  activation needs no binding. Activating a release whose `fileStorage`
-  binding is missing, or has another kind, fails with `AXC0100`. Other storage
-  comes later. Under `Tenancy:Source=directory`, the `fileStorage` binding is a
-  `storage` binding of the tenant directory, and its value is `database`. See [the application manifest](file-fields.md#the-filestorage-manifest-property),
-  [file fields](file-fields.md#storage-and-clean-up) and
-  [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
+- **Storage binding.** The application manifest names where the files of its file fields go, as
+  `"fileStorage": { "binding": "<name>" }`. That binding has the kind `storage`, and its only value
+  is `database`, which stores the bytes in the tenant database. Any other value fails the startup
+  check. An application without `fileStorage` uses the tenant database too, and its activation needs
+  no binding. Activating a release whose `fileStorage` binding is missing, or has another kind, fails
+  with `AXC0100`. Under `Tenancy:Source=directory`, the `fileStorage` binding is a `storage` binding
+  of the tenant directory, and its value is `database`. See
+  [the application manifest](file-fields.md#the-filestorage-manifest-property) and
+  [file fields](file-fields.md#storage-and-clean-up).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
   must be `https`. Activation checks each connector's base URL binding, each
   webhook's `url` binding and
@@ -134,7 +124,8 @@ The purchasing system's bindings for tenant `default` look like this:
 
 ### Connector resource
 
-The purchase request sample holds the purchasing system connector in
+A `connector` resource names an external system's base URL, its authentication, its timeout and its
+operations. The purchase request sample holds the purchasing system connector in
 `connectors/purchasing-system.json`:
 
 ```json
@@ -225,26 +216,21 @@ The purchase request sample holds the purchasing system connector in
 - The worker never follows a redirect. A `3xx` response fails the call, so
   the secret never goes to another host.
 
-The sample's `PurchaseRequest` entity has a `purchaseOrderNumber` `text`
-field, which the call writes. No policy lets a user update it, so the request
-form shows it read-only. The sample activates only for a tenant that holds the
-`PurchasingSystemUrl`, `PurchasingSystemTokenUrl`, `PurchasingSystemClientId`
-and `PurchasingSystemClientSecret` bindings. Its `PurchaseRequestApprovedWebhook`
-also needs the `PurchaseRequestApprovedWebhookUrl` and
+The sample's `PurchaseRequest` entity has a `purchaseOrderNumber` `text` field, which the call
+writes, and a `paymentReference` `text` field, which the sample extension package writes after the
+purchase order is created. No policy lets a user update either, so the request form shows them
+read-only. The sample activates only for a tenant that holds the `PurchasingSystemUrl`,
+`PurchasingSystemTokenUrl`, `PurchasingSystemClientId` and `PurchasingSystemClientSecret` bindings.
+Its `PurchaseRequestApprovedWebhook` also needs the `PurchaseRequestApprovedWebhookUrl` and
 `PurchaseRequestApprovedWebhookSecret` bindings, see
-[Webhook resource](outbound-webhooks.md#webhook-resource). The entity also
-has a `paymentReference` `text` field, which the sample extension package
-writes after the purchase order is created, so the form shows it read-only too.
-Development,
-Docker Compose, `scripts/dev.sh` and the E2E run point them at the
+[Webhook resource](outbound-webhooks.md#webhook-resource). Development, Docker Compose,
+`scripts/dev.sh` and the E2E run point them at the
 [purchasing system stub](../architecture.md#purchasing-system-stub).
 
 ### OAuth2 auth
 
-A connector can get its access token from an OAuth2 authorization server
-through the client credentials grant, as
-[D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-This auth is built.
+A connector can get its access token from an OAuth2 authorization server through the client
+credentials grant. Grants that act for a user, such as the authorization code grant, are not offered.
 
 ```json
 "auth": {
@@ -300,19 +286,12 @@ This auth is built.
   never its body or an exception message.
 - The token URL follows the connector rules: `https` outside Development, and
   no redirects.
-- `clientAuth: "privateKeyJwt"`, with the private key in a `secret` binding,
-  comes after M16 and reuses the signing code of M16's FAPI 2.0 profile.
-  Changing the binding rotates the key without a new release.
-- Grants that act for a user, such as the authorization code grant, are not
-  offered.
 
 ### Structured payloads
 
-Inputs go outside the body, as
-[D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-Inputs can also nest: declaring an `object` or `list` input is built, and the
-`lines` input in the example compiles. A step maps one and sends it as nested
-JSON. Bodies stay JSON. An output's `source` is built.
+An operation's inputs can go in the path, the query or a header as well as the body, and an input
+can nest objects and lists, which a step maps and sends as nested JSON. An output can be read from
+anywhere in the response through its `source`. Bodies are always JSON.
 
 ```json
 {
@@ -342,7 +321,7 @@ JSON. Bodies stay JSON. An output's `source` is built.
 ```
 
 - **`in`.** `body`, the default, `path`, `query` or `header`. A `header`
-  input's name is the header name, so it cannot hold a hyphen yet. Only scalar
+  input's name is the header name, so it cannot hold a hyphen. Only scalar
   inputs may go outside the body. An optional input with no value is left out.
 - **Path placeholders.** Each `{name}` in `path` names a `path` input, and each
   `path` input appears in `path`. Names match ignoring letter case. A `path`
@@ -353,7 +332,7 @@ JSON. Bodies stay JSON. An output's `source` is built.
 - **`GET`.** A `GET` may have `path`, `query` and `header` inputs, but no
   `body` input. The JSON body of any other method holds only the `body`
   inputs.
-- **`object` and `list`.** _(built)_ An `object` input has nested `fields`. A `list`
+- **`object` and `list`.** An `object` input has nested `fields`. A `list`
   input's items are objects with `fields`. Both need at least one nested field,
   and a scalar input has none. A nested field takes no `in`. Only inputs may be
   `object` or `list`: outputs, module connector slots and package fields stay
@@ -381,7 +360,7 @@ JSON. Bodies stay JSON. An output's `source` is built.
     nested path joins the input names with `/` and uses the item's zero-based
     index for a list, as record error pointers do. No text shows a value, and
     a failed step stages no call.
-- **`source`.** _(built)_ An output field may name a JSON Pointer
+- **`source`.** An output field may name a JSON Pointer
   ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the response body,
   such as `/shipment/tracking/number`. Without it, the output is read from the
   top-level property of its name. Outputs stay scalar, because they write
@@ -396,40 +375,27 @@ JSON. Bodies stay JSON. An output's `source` is built.
     the call `unknown`, as a missing top-level output does. An optional output
     writes nothing.
   - A lookup's outputs need the same `source` as the operation it serves.
-- **Later.** Writing a list from the response into a child collection, and
-  bodies that are not JSON.
 
 ## Events and triggers
 
-This section follows
-[D26](../decisions/d26-events-and-triggers.md). The `event` resource
-and its [compile checks](configuration.md#configuration-pipeline) are built: an event file
-loads, is checked and is part of the release. A
-[raise event step](process-events.md#raise-event-step) raises it. The event
-`trigger` resource and its compile checks are built too: an event trigger file
-loads, is checked and is part of the release. The worker delivers each raised event to the
-`async` event triggers of the active release, see
-[Event delivery](process-events.md#event-delivery). A `raiseEvent` step starts the processes of the
-`sync` event triggers in its own transaction, see
-[Raise event step](process-events.md#raise-event-step). Data change triggers start their
-processes in the transaction of a record API create or update, of an inbound endpoint's
-create, of a task form save, of an `updateRecord` step, of a `createRecord` step, of a connector output and of a package
-operation output, see [Starts from triggers](process-events.md#starts-from-triggers). A delete
-trigger starts its process in the transaction of a record API delete, see
-[Delete triggers](process-events.md#delete-triggers). The schedule
-`trigger` resource and its compile checks are built: a schedule trigger file loads, is checked
-and is part of the release. The worker runs schedule triggers, see
-[Schedules](process-events.md#schedules).
-An `event` resource names something that happened to one record. A
-`trigger` resource starts a process for one record when something happens:
-an event is raised, a record is created or updated, or a schedule is due. How
-a trigger starts a process, and when it skips the start, is in
-[Events and triggers](process-events.md).
+An `event` resource names something that happened to one record. A `trigger` resource starts a
+process when something happens: an event is raised, a record is created, updated or deleted, or a
+schedule is due. Both are part of the release and pass the
+[compile checks](configuration.md#configuration-pipeline) below. How a trigger starts a process, and
+when it skips the start, is in [events and triggers](process-events.md):
 
-The examples use the E2E fixture application in `tests/e2e/fixtures/e2e-app`,
-with its `Note` entity, its `NoteRows` data source and its `NoteReview` and
-`NoteClose` processes. The fixture files do not change until the build issues
-add events and triggers.
+- the worker delivers each raised event to the `async` event triggers of the active release, see
+  [event delivery](process-events.md#event-delivery), and a `raiseEvent` step starts the processes of
+  the `sync` event triggers in its own transaction, see
+  [raise event step](process-events.md#raise-event-step);
+- a data change trigger starts its process in the transaction of the write, see
+  [starts from triggers](process-events.md#starts-from-triggers), and a delete trigger in the
+  transaction of a record API delete, see [delete triggers](process-events.md#delete-triggers);
+- the worker runs schedule triggers, see [schedules](process-events.md#schedules).
+
+The examples use the `Note` entity, the `NoteRows` data source and the `NoteReview` and `NoteClose`
+processes of the E2E fixture application in `tests/e2e/fixtures/e2e-app`. The fixture holds no
+events or triggers of its own.
 
 ### Event resource
 
@@ -462,7 +428,8 @@ An event about a note that was closed, in `events/note-closed.json`:
   name `AXC0112` and an `enum`, `reference` or `child-collection` field
   `AXC0113`. A type name that is not a field type is `AXC0004`.
 - A [raise event step](process-events.md#raise-event-step) raises the event for its
-  subject record. Events raised by the platform itself come later.
+  subject record, and an [inbound endpoint](#endpoint-resource) with an `event` raises it for the
+  record it creates.
 
 ### Trigger resource
 
@@ -471,10 +438,12 @@ Every trigger file has `"kind": "trigger"`. Its trigger kind goes in `type`:
 steps, fields and widgets, see [processes](processes.md#resource-shape).
 Every trigger names the `process` it starts, and each start is for one record
 of the process's subject entity. A schedule trigger without a data source and
-a delete trigger start a process without a subject, see
-[D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
+a delete trigger start a
+[process without a subject](process-flow.md#processes-without-a-subject).
 
-**Event trigger.** It starts `NoteReview` for each closed note of priority 3
+#### Event trigger
+
+An event trigger starts a process when an event is raised. This one starts `NoteReview` for each closed note of priority 3
 or more, in `triggers/review-closed-notes.json`:
 
 ```json
@@ -500,7 +469,10 @@ or more, in `triggers/review-closed-notes.json`:
   - `sync`: the start commits in the transaction of the step that raised the
     event, so both commit or neither does.
 
-**Data change trigger.** It starts `NoteReview` when a note is created, or
+#### Data change trigger
+
+A data change trigger starts a process when a record of its entity is written. This one starts
+`NoteReview` when a note is created, or
 when its `amount` changes, and the amount is 1000 or more, in
 `triggers/review-large-notes.json`:
 
@@ -536,7 +508,9 @@ when its `amount` changes, and the amount is 1000 or more, in
   API, an inbound endpoint's create, a task form save, an `updateRecord` step,
   a `createRecord` step, a connector output and a package operation output.
 
-**Schedule trigger.** It starts `NoteClose` every night at 02:00 in Ho Chi
+#### Schedule trigger
+
+A schedule trigger starts a process at the times of a cron schedule. This one starts `NoteClose` every night at 02:00 in Ho Chi
 Minh City, for each note the `NoteRows` data source returns, in
 `triggers/close-notes-nightly.json`:
 
@@ -569,8 +543,7 @@ Minh City, for each note the `NoteRows` data source returns, in
 - `timeZone` is required, except in a [module](modules-and-templates.md#processes-pages-policies-and-dependencies),
   where it is not allowed because the schedule runs in the application's time
   zone. It is an IANA time zone id, such as
-  `Asia/Ho_Chi_Minh`. It does not settle the application time zone rule of
-  [D22](../decisions/d22-current-time-and-time-zones.md).
+  `Asia/Ho_Chi_Minh`.
 - `dataSource` names a [data source](data-sources.md) that is not grouped.
   Its root entity is the process's subject entity. Each occurrence starts the
   process for every row it returns, in record id order. The data source's
@@ -588,30 +561,40 @@ Minh City, for each note the `NoteRows` data source returns, in
   parameter needs a key. Keys match the declared names ignoring letter case,
   and the release holds the declared names.
 
-The compiler reports these as compile errors. The event trigger checks are
-built, with the codes in the [pipeline](configuration.md#configuration-pipeline): an unknown
-`process` is `AXC0129`, an unknown `event` is `AXC0130`, an event about
-another entity than the process's subject is `AXC0131`, and a `when` problem
-has its expression code at `/when`. The data change trigger checks are built
-too: an unknown `entity` is `AXC0143`, an `entity` that is not the process's
-subject is `AXC0144`, an unknown or computed name in `fields` is `AXC0145`,
-and a `when` problem has its expression code at `/when`. Data change
-triggers compile and are part of the release. They fire on every
-committed write through the record command. The schedule trigger checks are built too: an invalid `schedule` is
-`AXC0160`, an unknown `timeZone` is `AXC0161`, an unknown `dataSource` is
-`AXC0162`, a grouped one is `AXC0163`, one over another entity is `AXC0164`,
-one whose `filter` calls `currentUser()` is `AXC0363`,
-an unknown or repeated `parameters` key is `AXC0165`, a wrongly typed value
-is `AXC0166` and a missing parameter is `AXC0167`. Without a `dataSource`, the
-same three codes check the keys and values against the process's parameters,
-and a process with a subject is `AXC0249`. Schedule triggers compile
-and are part of the release, and the platform computes the next occurrence of
-a schedule in its time zone. On a daylight saving change a local time that
-does not exist runs at the next valid time, and a repeated local time runs
-once, at the first. The worker runs schedule triggers, see
-[Schedules](process-events.md#schedules). The schema accepts only `"type": "event"`, `"type": "dataChange"`
-and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
-`mode` on a schedule trigger and the properties of other types are `AXC0004`.
+The platform computes the next occurrence of a schedule in its time zone. On a daylight saving
+change, a local time that does not exist runs at the next valid time, and a repeated local time runs
+once, at the first.
+
+#### Trigger checks
+
+The compiler reports these as compile errors, with the codes of the
+[pipeline](configuration.md#configuration-pipeline).
+
+| Trigger     | Problem                                                                                          | Code                            |
+| ----------- | ------------------------------------------------------------------------------------------------ | ------------------------------- |
+| Event       | An unknown `process`                                                                             | `AXC0129`                       |
+| Event       | An unknown `event`                                                                               | `AXC0130`                       |
+| Event       | An event about another entity than the process's subject                                         | `AXC0131`                       |
+| Event       | A `when` problem                                                                                 | Its expression code, at `/when` |
+| Data change | An unknown `entity`                                                                              | `AXC0143`                       |
+| Data change | An `entity` that is not the process's subject                                                    | `AXC0144`                       |
+| Data change | An unknown or computed name in `fields`                                                          | `AXC0145`                       |
+| Data change | A `when` problem                                                                                 | Its expression code, at `/when` |
+| Schedule    | An invalid `schedule`                                                                            | `AXC0160`                       |
+| Schedule    | An unknown `timeZone`                                                                            | `AXC0161`                       |
+| Schedule    | An unknown `dataSource`                                                                          | `AXC0162`                       |
+| Schedule    | A grouped `dataSource`                                                                           | `AXC0163`                       |
+| Schedule    | A `dataSource` over another entity                                                               | `AXC0164`                       |
+| Schedule    | A `dataSource` whose `filter` calls `currentUser()`                                              | `AXC0363`                       |
+| Schedule    | An unknown or repeated `parameters` key                                                          | `AXC0165`                       |
+| Schedule    | A `parameters` value of the wrong type                                                           | `AXC0166`                       |
+| Schedule    | A missing parameter                                                                              | `AXC0167`                       |
+| Schedule    | A trigger without a `dataSource` whose process has a subject                                     | `AXC0249`                       |
+| Any         | Any other `type` or `mode`, a `when` or `mode` on a schedule trigger, or another type's property | `AXC0004`                       |
+
+Without a `dataSource`, `AXC0165`, `AXC0166` and `AXC0167` check the keys and values against the
+process's parameters. The schema accepts only `"type": "event"`, `"type": "dataChange"` and
+`"type": "schedule"`. In full, the compiler checks that:
 
 - The `process` exists and has a subject. A trigger that names a process
   without a subject is `AXC0247`, whatever the trigger type. The exceptions are
@@ -641,20 +624,15 @@ and `"type": "schedule"`, so any other `type`, any other `mode`, a `when` or
 
 ## Inbound endpoints
 
-This section follows
-[D27](../decisions/d27-inbound-endpoints.md). The `endpoint` resource,
-its compile checks, the call with its `output` and `wait`, its idempotency, and the
-status location are built. An `endpoint` resource lets another system create
-a record and start a process on it in one call. The call, its responses and its errors are in
-[Inbound endpoints](inbound-endpoints.md). How a machine caller
-signs in is in [Machine callers](security.md#machine-callers).
+An `endpoint` resource lets another system create a record and start a process on it, or raise an
+event about it, in one call. This section covers the resource and its compile checks. The call, its
+responses and its errors are in [inbound endpoints](inbound-endpoints.md), and how a machine caller
+signs in is in [machine callers](security.md#machine-callers).
 
 ### Endpoint resource
 
-The resource and its compile checks are built. The purchase request sample
-holds an endpoint that
-lets the purchasing system submit a purchase request, in
-`endpoints/submit-purchase-request.json`:
+The purchase request sample holds an endpoint that lets the purchasing system submit a purchase
+request, in `endpoints/submit-purchase-request.json`:
 
 ```json
 {
@@ -700,9 +678,8 @@ the caller's id.
   start the work. An endpoint has a `process`, an `event` or both.
   They may name a module entity and process of a module the application
   declares, as `<module id>/<name>`. The call then writes the record into the
-  application's copy of the module's table and starts the module process on it,
-  see [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md).
-  A module still holds no `endpoint` file.
+  application's copy of the module's table and starts the module process on it.
+  A module holds no `endpoint` file.
 - **Input.** `input` lists the typed input fields of the call's body.
   - Their types are the
     [entity field types](resource-files.md#entity-field-types-and-constraints), including
@@ -719,10 +696,8 @@ the caller's id.
   - A `child-collection` field takes a `child-collection` input with the same
     target, by its name. The input's rows become the record's rows.
   - Fields that `values` leaves out are `null`, as in a record API create.
-- **Event**. `event` is optional. It names an event about `entity` and maps each
-  payload field to an expression over the input, as
-  [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md) agrees.
-  The compiler checks it. The call raises it for the new
+- **Event.** `event` is optional. It names an event about `entity` and maps each
+  payload field to an expression over the input. The call raises it for the new
   record in its transaction, see [the call](inbound-endpoints.md).
 
   ```json
@@ -783,8 +758,8 @@ a note, closes it and returns its status, in
 
 When the worker runs the `close` step within 10 seconds, the call answers
 `201` with `code` and `status`. Otherwise it answers `202` with a status
-location. The purchase request sample holds `SubmitPurchaseRequest`. The E2E
-fixture application does not hold `ImportClosedNote`.
+location. The purchase request sample holds `SubmitPurchaseRequest`, and the integration tests'
+`EndpointApp` fixture holds `ImportClosedNote`.
 
 A [data change trigger](#trigger-resource) on `create` of the same entity
 that starts the same process would start it inside the endpoint's record

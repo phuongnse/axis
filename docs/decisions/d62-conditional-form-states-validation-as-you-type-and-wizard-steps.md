@@ -2,61 +2,42 @@
 
 Status: **Agreed**
 
-A form can show, require and lock fields depending on the record, can check the draft as the
-user types, and can split its sections into wizard steps. The schema, the compile checks, the
-compiled model, the page and task metadata, the record and task form state endpoints and
-server-side validation as you type are built. Enforcing `requiredWhen` on write is built, in the record API
-and the task API. The form widget in the SPA follows the record form state endpoint: it hides,
-requires and locks fields as the answer says, and shows the messages under touched fields. The task page
-does the same through the task form state endpoint. Both show a form with `steps` as a wizard.
-Refusing a value for a hidden or `readOnlyWhen` field in the task API is built. The
-server evaluates every condition.
-NexKit autopilot confirmed these points for the owner on
-issue #934 on 2026-10-21. The reference text is in
-[Form conditions and steps](../reference/form-conditions.md#form-conditions-and-steps), the
-[form state endpoint](../reference/record-api.md#form-state) and the
-[task form state endpoint](../reference/task-api.md#form-state-of-a-task).
+## Context
 
-- **Conditions:**
-  - A form field may have `visibleWhen`, `requiredWhen` and `readOnlyWhen`. A form section may
-    have `visibleWhen`.
-  - Each is a boolean expression over the record, in the
-    [expression language](d16-expression-language.md). `null` and a run-time error count as
-    false.
-  - A condition reads only fields the form lists. A field that the entity marks `required`
-    cannot have `visibleWhen`.
-- **Where they are evaluated:**
-  - The server evaluates them, through the form state endpoint. There is no evaluator in the
-    SPA in M12.
-  - The endpoint takes the draft values and answers each field's state. It writes nothing and
-    does not run unique or reference-existence checks.
-  - The SPA calls it at once after a choice and 300 ms after typing stops. While an answer is
-    pending, it keeps the last answered states and drops answers that a newer call overtook.
-  - There are two endpoints. One is for a record form, with entity grants. The other is for a
-    task form, with the assignee check ([D20](d20-human-tasks-task-inbox-and-forms.md),
-    [D24](d24-roles-and-policies.md)).
-- **On write:**
-  - The record API enforces `requiredWhen` only when a create or update names the form in
-    `?form=`. A hidden field is not required.
-  - The record API never enforces `readOnlyWhen`. It follows `readOnly`: field write grants
-    stay the guard.
-  - The task API enforces both. A value for a hidden field or a `readOnlyWhen` field is
-    "Cannot be set.", and a visible `requiredWhen` field left `null` is "Required.".
-  - A rule that must always hold belongs in an entity validation
-    ([D17](d17-entity-logic-and-child-collections.md)), where a caller cannot skip it.
-- **Validation as you type:** the same endpoint runs the entity's validations on the draft and
-  returns messages only for the fields the user has touched.
-- **Wizard:**
-  - A form may declare `steps`, each a list of its named sections. Every section is in exactly
-    one step.
-  - Next checks the step's fields through the endpoint. Back never checks. Save and the
-    `startProcess` actions are on the last step. A task form may have steps too, and its
-    outcome buttons are on the last step.
-  - The current step stays out of the URL.
+A form must show, require and lock fields depending on the record, check the draft while the user
+types, and split a long form into steps. The conditions are expressions, and the decimal, date and
+time zone rules of the [expression language](d16-expression-language.md) must not drift between two
+interpreters.
 
-_Why:_ evaluating on the server keeps one interpreter, so decimal, date and time zone rules
-cannot drift ([D16](d16-expression-language.md)). A local evaluator for a small subset may come
-later, if the measured wait in #956 is too long. Naming the form in `?form=` lets the record
-API apply a form's rules without guessing which form a write came from. Leaving `readOnlyWhen`
-out of the record API keeps field write grants as the only guard there. The cost is that a
-caller who does not name the form skips `requiredWhen`.
+## Decision
+
+- **Conditions.** A form field may have `visibleWhen`, `requiredWhen` and `readOnlyWhen`, and a
+  section `visibleWhen`: boolean expressions over the fields the form lists, where `null` or an error
+  counts as false.
+- **The server evaluates them.** A form state endpoint takes the draft, answers each field's state
+  and the validation messages of the touched fields, and writes nothing. A record form and a task
+  form each have one, under their own access checks
+  ([D20](d20-human-tasks-task-inbox-and-forms.md), [D24](d24-roles-and-policies.md)). The SPA has no
+  evaluator.
+- **On write.** The record API enforces `requiredWhen` only when a write names its form in `?form=`,
+  and leaves `readOnlyWhen` to the field write grants. The task API enforces both. A rule that must
+  always hold is an entity validation ([D17](d17-entity-logic-and-child-collections.md)).
+- **Wizard steps.** A form may group its sections into `steps`. Next checks the step through the
+  endpoint, Back never checks, saving is on the last step, and the step stays out of the URL.
+
+The rules are in [form conditions](../reference/form-conditions.md#form-conditions-and-steps) and
+[form widget conditions](../reference/form-widget-conditions.md), and the endpoints in
+[form state](../reference/record-api.md#form-state) and
+[form state of a task](../reference/task-api.md#form-state-of-a-task).
+
+## Consequences
+
+- One interpreter evaluates every condition, and each change of state waits for the server.
+- A record API caller that does not name the form skips `requiredWhen`, so conditions are not a
+  security boundary.
+
+## Alternatives
+
+- **An evaluator in the SPA.** It would answer at once, but drift from the server's.
+- **Enforcing `readOnlyWhen` in the record API.** It would add a second guard beside the field write
+  grants.

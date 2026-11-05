@@ -203,6 +203,21 @@ describe('checkDocs', () => {
     assert.deepEqual(messages(), [])
   })
 
+  test('passes a decision superseded by two decisions in force', () => {
+    write('docs/decisions/d3-files-and-folders.md', '# D3. Files and folders\n\nStatus: **Agreed**\n')
+    rmSync(path.join(root, 'docs/decisions/d1-files-first.md'))
+    write(
+      'docs/decisions.md',
+      index(
+        `| D1 | Files first | Superseded by [D2](decisions/d2-typed-expressions.md) and [D3](decisions/d3-files-and-folders.md), ${lastText('d1-files-first.md')} |`,
+        '| [D2](decisions/d2-typed-expressions.md) | Typed expressions | **Proposed** |',
+        '| [D3](decisions/d3-files-and-folders.md) | Files and folders | **Agreed** |',
+      ),
+    )
+
+    assert.deepEqual(messages(), [])
+  })
+
   test('reports a superseded decision that keeps its file, links another last text or names no decision in force', () => {
     write(
       'docs/decisions.md',

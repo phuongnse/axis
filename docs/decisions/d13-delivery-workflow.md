@@ -2,24 +2,28 @@
 
 Status: **Agreed**
 
-- **Tooling:** NexKit runs one issue per agent session.
-- **Milestones:** milestones are vertical slices.
-- **Issue planning:** issues are created only for the current milestone
-  (rolling wave).
-  - [D68](d68-issues-of-several-milestones-run-at-once.md) replaces this line:
-    issues of several milestones run at once.
-- **Issue size:** each issue is one behaviour, aiming for 2–5 acceptance
-  criteria that a test or command can check. More than five is a signal to
-  check whether the issue holds more than one behaviour. If it does, split it.
-  If every criterion checks the same behaviour, more are fine. A plan is not
-  revised only to cut the number of criteria.
-- **Documentation:** these docs hold the product and architecture knowledge.
-  Issues link to them.
-- **Bootstrap:** the solution skeleton, CI and the tool setup are done
-  directly, not through NexKit, because NexKit needs working checks first.
+## Context
 
-_Why:_ a large up-front breakdown into layered issues delays anything
-runnable until the very end, and its issues are too big for one session.
+Axis is built mostly by AI agents, one session at a time. A large up-front breakdown into layered
+issues delays anything runnable until the very end, and its issues are too big for one session.
 
-See [delivery.md](../delivery.md) for the step-by-step workflow and who does each
-step.
+## Decision
+
+- **NexKit runs one issue per agent session.**
+- **Milestones are vertical slices.** Each ends with a running feature and an end-to-end journey.
+  When a milestone is broken into issues is
+  [D68](d68-issues-of-several-milestones-run-at-once.md)'s choice.
+- **One issue is one behaviour,** with 2 to 5 acceptance criteria that a test or a command checks.
+  More than five is a sign to check whether the issue holds more than one behaviour, and to split it
+  if it does. When every criterion checks the same behaviour, more are fine, and a plan is not
+  revised only to cut their number.
+- **The docs hold the product and architecture knowledge,** and issues link to them rather than
+  copy them.
+
+How the work runs, step by step, is in [delivery](../delivery.md).
+
+## Consequences
+
+- Every milestone leaves something that runs, so a wrong turn shows early.
+- Each issue fits one session, and its criteria tell the review what to check.
+- The docs must be complete before an issue can link them, so design work comes first.

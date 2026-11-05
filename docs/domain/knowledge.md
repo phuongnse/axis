@@ -1,13 +1,14 @@
 # Design knowledge
 
-This document explains what configured business applications need in practice
-and which design mistakes Axis must avoid. The [decisions](../decisions.md)
-and [concepts](concepts.md) build on it. Each rule gives its reason, so that it
-can be weighed against new requirements instead of being followed blindly.
+This page explains what configured business applications need in practice and which design
+mistakes Axis must avoid. The [decisions](../decisions.md) and [concepts](concepts.md) build on it.
+Each rule gives its reason, so that it can be weighed against a new requirement instead of being
+followed blindly.
 
 ## Typical application size
 
-A mid-sized production application contains roughly:
+Axis is designed for applications of this size, so authoring, compiling and running must stay fast
+at it. A mid-sized production application contains roughly:
 
 | Resource | Typical count |
 | --- | --- |
@@ -21,12 +22,11 @@ A mid-sized production application contains roughly:
 | Indexes | 100–400 |
 | Locales | 2–3 |
 
-Consequences:
+This size has consequences:
 
 - Authoring needs search, a dependency graph, "where is this used" and fast
-  incremental validation. Scrolling through lists does not work at this size.
-- Compiling a full release must stay fast (target: seconds) and give
-  diagnostics for all problems at once.
+  incremental validation, because scrolling through lists does not work at this size.
+- Compiling a full release must take seconds, and give diagnostics for all problems at once.
 - Many process definitions are small and composed from each other.
   Sub-processes and reusable rules are core features, not extras.
 - Applications typically have 2–3 locales. Translations drift unless missing
@@ -34,7 +34,7 @@ Consequences:
 
 ## What applications use most
 
-Listed from most to least used:
+These are the capabilities that application logic uses, from most to least used:
 
 1. **Data reads and writes from logic.** Load, search, create, update, count.
    This is the most frequent operation in application logic by far.
@@ -64,10 +64,11 @@ rebuilds them.
 
 ## Logic in configuration
 
-**Failure mode.** A platform lets authors embed general-purpose
-code in configuration: scripts in rules, process steps and computed fields.
-Within a few years an application contains 50,000–100,000+ lines of such code.
-The result is:
+Where logic lives decides whether the platform can test, secure and retry it.
+
+**Failure mode.** A platform lets authors embed general-purpose code in configuration: scripts in
+rules, process steps and computed fields. Within a few years an application contains 50,000–100,000+
+lines of such code. The result is:
 
 - **Duplication.** Dozens of identical blocks of 15+ lines appear across
   process definitions.
@@ -81,16 +82,19 @@ The result is:
 
 **Axis rules:**
 
-- Configuration uses a typed expression language with no side effects (D6).
-  Expressions cover validation, computed values, conditions, routing and
-  policy filters.
+- Configuration uses a typed expression language with no side effects, see
+  [D6](../decisions/d6-in-configuration-logic-uses-a-typed-expression-language.md). Expressions
+  cover validation, computed values, conditions, routing and policy filters.
 - Reusable logic is a named rule with typed parameters, not copied code.
 - Anything with side effects or real algorithmic content is an operation.
   Built-in operations cover common needs. Everything else is written in an
-  extension package as tested C# with declared capabilities (D7).
+  extension package as tested C# with declared capabilities, see
+  [D7](../decisions/d7-custom-code-lives-in-extension-packages.md).
 - Large seed data is a seed data resource, not code.
 
 ## Execution
+
+How the engine runs work decides whether work survives a crash, a new release and a retry.
 
 **Failure modes:**
 
@@ -127,24 +131,22 @@ The result is:
   per step and implemented once by the engine.
 - **Early events.** Events that arrive before a process waits for them are
   stored and matched later, not dropped.
-- **Restore**. A restore of a tenant backup returns
-  process instances, tasks, work items, connector and package calls, events,
-  schedule state, sequence counters and audit records to backup time. The worker
-  claims expired leases again once the tenant resumes. A call found `sending`
-  becomes `unknown` and is reconciled. A call that was staged before the backup
-  and sent after it is sent again with the same operation identity as its
-  idempotency key, so only a system that honours the key acts once. A call that
-  was staged after the backup is not in the archive. Its step runs again, and
-  stages a new call with a new operation identity, so a new idempotency key.
-  The system may already have acted on the first call, and even a system that
-  honours the key can act twice. A connector without `idempotency` sends no
-  key. Inbound requests accepted after the backup are lost, and numbers issued
-  after it can be issued again. Schedules that were missed run once, as after a
-  worker outage. See
-  [D45](../decisions/d45-tenant-backup-and-restore.md) and
-  [call outcomes](../reference/process-execution.md#call-outcomes).
+- **Restore.** A restore of a tenant backup returns process instances, tasks,
+  work items, connector and package calls, events, schedule state, sequence
+  counters and audit records to backup time, and the work goes on from there.
+  The worker claims expired leases again once the tenant resumes, a call found
+  `sending` becomes `unknown` and is reconciled, and schedules that were missed
+  run once, as after a worker outage. Calls keep their operation identity as
+  their idempotency key, so a system that honours the key acts once for a call
+  that was staged before the backup. A call staged after the backup is staged
+  again under a new identity, so the system may act twice. What a restore does
+  to each kind of work is in
+  [tenant backup and restore](../reference/tenant-backup-and-restore.md), and
+  the reasons in [D45](../decisions/d45-tenant-backup-and-restore.md).
 
 ## Human work
+
+Most business processes wait for people, so the platform must model their work.
 
 **Failure mode.** When the platform has no task concept, every
 application models assignment, queues and "my tasks" with ordinary records,
@@ -159,9 +161,11 @@ grids and forms. The result is inconsistent and hard to secure.
 - a guarantee of exactly one final decision
 - authorization checked at the moment of action
 
-The platform supplies a task inbox widget.
+The platform supplies a [task inbox widget](../reference/task-inbox-widget.md).
 
 ## Authorization
+
+Authorization in configured applications fails open in a few typical ways, which Axis rules out.
 
 **Failure modes:**
 
@@ -177,7 +181,8 @@ The platform supplies a task inbox widget.
 **Axis rules:**
 
 - **Default-deny.** No matching grant means no access. A failing or
-  undecidable policy also means no access (D12).
+  undecidable policy also means no access, see
+  [D12](../decisions/d12-authorization-is-server-side-and-default-deny.md).
 - **Explicit combination.** Combining several policies is specified exactly,
   and a test proves that a condition evaluating to false cannot widen access.
 - **Server enforcement.** Client-side conditions only shape the UI. The server
@@ -186,6 +191,9 @@ The platform supplies a task inbox widget.
   Sensitive field flags (masked, encrypted) are part of the entity definition.
 
 ## Authoring and packaging
+
+How configuration is edited and exported decides whether it can be reviewed, diffed and moved
+between installations safely.
 
 **Failure modes:**
 
@@ -222,6 +230,8 @@ The platform supplies a task inbox widget.
 
 ## User interface
 
+A form designer that lacks a capability pushes authors to hand-written front-end code.
+
 **Failure mode.** When the form designer lacks a capability, authors
 switch to raw HTML and JavaScript components. In practice the custom HTML
 component becomes the most-used form component, and custom widgets reach
@@ -232,7 +242,7 @@ and upgrades all break at those points.
 
 - **Shared widgets and tokens.** Pages are built only from shared widgets,
   styled through shared tokens in light and dark mode. A page has no template
-  of its own (D15).
+  of its own, see [D15](../decisions/d15-presentation-model.md).
 - **Strong standard forms.** Standard forms cover these needs from the start:
   - sections and wizard steps
   - conditional visibility, required and read-only states
@@ -241,10 +251,11 @@ and upgrades all break at those points.
   - lookups
   - file upload
   - read-only summaries
-- **Custom widgets later.** Custom widgets come later as packaged React
-  components (D8), planned for M22
-  ([D88](../decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md)).
-  Each one is reviewed as a sign of a missing standard capability.
+- **Custom widgets as packages** _(planned for M22)_. A custom widget is a
+  packaged React component, see
+  [D8](../decisions/d8-custom-ui-widgets-are-packaged-react-components.md) and
+  [custom widgets](../reference/custom-widgets.md). Each one is reviewed as a
+  sign of a missing standard capability.
 - **Display is formatting only.** The UI formats a value for the locale and
   never changes it. What the API returned is what is shown and what is sent
   back.
@@ -253,6 +264,8 @@ and upgrades all break at those points.
   Components change only their own parameters.
 
 ## Testing applications
+
+An application needs tests of its own configuration, which run in CI like code tests.
 
 **Common practice.** Authors write many configuration-level test processes,
 often over a hundred per application, to seed data and assert behaviour.
@@ -265,6 +278,8 @@ process outcomes, including denied actions.
 See [D32](../decisions/d32-test-scenarios.md).
 
 ## Operations
+
+Operators must be able to find, explain and fix failed work without reading the database.
 
 **Axis rules:**
 

@@ -2,39 +2,35 @@
 
 Status: **Agreed**
 
-M14 gives each application a time zone. The owner agreed this on 2026-10-25.
-The manifest key, `today()`, `toDate`, the local year of sequences and
-notification dates are built. See
-[application time zone](../reference/resource-files.md#application-time-zone).
-It settles the time zone rule that
-[D22](d22-current-time-and-time-zones.md) waits for.
+## Context
 
-- **Manifest key:** the `application` manifest gets an optional `timeZone`, an
-  IANA time zone id such as `Asia/Ho_Chi_Minh`. Without it, the time zone is
-  `UTC`, so applications that exist today behave as before. An unknown id is a
-  new diagnostic, `AXC0277`.
-- **What uses it:**
-  - `today()` gives the date in the application's time zone at the
-    transaction's time. `toDate(date-time)` takes the calendar date of an
-    instant in that time zone. Both are new expression functions. Neither is
-    allowed in a computed field, as `now()` is not.
-  - The `{yyyy}` of a sequence is the local year, and its yearly restart
-    follows the local year.
-  - Notifications show dates in it
-    ([D73](d73-in-app-and-email-notifications.md)).
-  - M15's date buckets of data sources use it.
-- **Still fixed durations:** calendar durations such as `P1M` and `P1Y` stay
-  `AXC0084` in `dueIn`, timers, deadlines and escalations. The owner chose
-  fixed durations for M14.
-- **Release:** the time zone is part of the release. A change applies to work
-  that runs on the new release.
-- **Unchanged:** `now()` stays an instant. A schedule trigger keeps its own
-  `timeZone`. The SPA still shows a `date-time` in the browser's time zone.
-- **Effect on earlier decisions:** D22 links here where its waiting points are
-  settled.
+A date such as "today", or the year in a sequence number, depends on where the business is.
+[D22](d22-current-time-and-time-zones.md) gives `now()` as an instant, which needs no time zone, and
+leaves every rule that does need one to a single time zone rule.
 
-_Why:_ a date such as "today" or a year in a number depends on where the
-business is, and one time zone per application gives every user of it the same
-answer. `UTC` as the default keeps existing applications unchanged. Calendar
-durations need business calendars to be useful, which the owner left out of
-M14.
+## Decision
+
+- **One time zone for each application.** The `application` manifest takes an optional IANA
+  `timeZone`, and without it the time zone is `UTC`. It is part of the release.
+- **It sets the local date.** `today()`, `toDate(date-time)`, the year of a sequence and its yearly
+  restart, the dates in notifications and the date buckets of data sources follow it.
+- **Instants and the browser stay as they are.** `now()` stays an instant, a schedule trigger keeps
+  its own `timeZone`, and the SPA shows a `date-time` in the browser's time zone.
+- **Durations stay fixed.** Calendar durations such as `P1M` and `P1Y` stay refused in `dueIn`,
+  timers, deadlines and escalations.
+
+The detail is in [application time zone](../reference/resource-files.md#application-time-zone) and
+the [expression functions](../reference/expressions.md#functions).
+
+## Consequences
+
+- Every user of an application gets the same answer for "today", wherever their browser is.
+- Applications that name no time zone keep their behaviour.
+- A business in several time zones has to pick one for each application.
+- A process cannot wait for "one month". Calendar durations are only useful with business calendars,
+  which are a choice of their own.
+
+## Alternatives
+
+- **The time zone of each user.** Two users of one application would get different dates for the same
+  instant, and a sequence's year would depend on who saved the record.
