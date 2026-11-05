@@ -6,7 +6,7 @@ band, its page headings, its Overview, its Releases list and a release's page. T
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
 [D129](../decisions/d129-rules-from-the-studio-editors-review.md) and
-[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace, Band, Problems panel, Page heading, Releases and Names sections are built, except where marked. The rest of this page is _(planned for M31)_.
+[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace, Band, Problems panel, Page heading, New resource, Releases and Names sections are built, except where marked. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
@@ -107,10 +107,10 @@ What Studio shows is a text, never an internal code, see [text](actions-and-cont
 
 - **On the band.** New resource…, on every page of an open application, asks for a kind, by its name for one
   resource, in the sidebar's groups and order, then for a name, or for a locale when the kind is text.
-- **On a kind's list.** A kind's list has its own button in its toolbar, named for the kind, such as New entity….
+- **On a kind's list.** A kind's list has its own button on the right of its heading, among the page's own actions, named for the kind, such as New entity….
   Its dialog, New entity, asks for the name alone, or the locale for a text resource.
 - **One list of kinds.** A kind an author may create is offered everywhere kinds are offered: the band's dialog, the
-  sidebar and More you can add. Migrations are offered too, as [D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md)
+  sidebar and More you can add _(planned for M31)_. Migrations are offered too, as [D54](../decisions/d54-the-entity-designer-and-the-policy-matrix.md)
   lets an author write one by hand, though the entity designer usually writes it.
 
 ## Overview
