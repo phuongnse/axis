@@ -27,9 +27,19 @@ These hold in every language.
   whose cause the screen does not know.
 - **Keep meaning, severity and security.** A rewrite keeps the business meaning, how serious the message is, and what it
   must not reveal. A destructive action says what is lost. A sign-in failure gives no reason, in any language.
-- **Do not translate names.** Product names (Axis, Studio), technical names (JSON, API, ID, URL, CSV, XLSX, webhook),
-  diagnostic codes (`AXC0035`), names an author gave (a field name, a resource name) and placeholders such as `{count}`
-  stay as they are. The glossary's `keep` list holds them.
+- **What stays in English is decided by group, never word by word.** Every word on a screen is in one of three groups:
+  - _Names and acronyms_ never change: product names (Axis, Studio), acronyms and formats (JSON, API, ID, URL, CSV),
+    diagnostic codes (`AXC0035`), names an author gave (a field or a resource name) and placeholders such as `{count}`.
+  - _Ordinary words_ are always in the locale's language: Save, Cancel, Search, Name, Description, Required.
+  - _Axis's concepts_, the terms of [concepts.md](../domain/concepts.md) such as entity, field, record, rule, process and
+    release, are always written in the locale's language, by the glossary. The only exceptions are a closed list of
+    integration and operations terms that the people who read them use in that form, such as webhook, endpoint, tenant
+    and token. They show only on integration and operator screens, so an author's or a user's screen reads wholly in
+    one language.
+
+  A word joins the closed list only by a change of the glossary. One sentence never names a concept twice, once in each
+  language.
+
 - **Plain, polite and neutral.** Axis is software for companies: no slang, no jokes, no exclamation marks, and no
   familiar tone. Polite does not mean wordy. How a text addresses the person is each language's own rule, below.
 - **Short.** A button is one to three words. A label is a noun phrase. A help text is one sentence, two at most. Leave
@@ -69,7 +79,8 @@ and the verbs of the common actions, with the term of each locale. A term has a 
 - `decide`: the owner chooses among the `options` before any text changes.
 
 `avoid` lists words that must not name the concept in that locale, such as a second translation or the English word.
-`keep` lists the names no locale translates.
+`keep` lists what no locale translates, by group: `names` for names and acronyms, and `integration` for the closed list
+of integration and operations terms.
 
 ## English
 

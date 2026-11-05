@@ -4,27 +4,34 @@
     "en",
     "vi"
   ],
-  "keep": [
-    "API",
-    "AXC codes such as AXC0035",
-    "Axis",
-    "CSV",
-    "endpoint",
-    "HTML",
-    "ID",
-    "JSON",
-    "names an author gave",
-    "PDF",
-    "PIN",
-    "placeholders such as {count}",
-    "Studio",
-    "tenant",
-    "TOTP",
-    "URL",
-    "webhook",
-    "XLSX",
-    "ZIP"
-  ],
+  "keep": {
+    "names": [
+      "API",
+      "AXC codes such as AXC0035",
+      "Axis",
+      "CSV",
+      "HTML",
+      "ID",
+      "JSON",
+      "names an author gave",
+      "PDF",
+      "PIN",
+      "placeholders such as {count}",
+      "Studio",
+      "TOTP",
+      "URL",
+      "XLSX",
+      "ZIP"
+    ],
+    "integration": [
+      "webhook",
+      "endpoint",
+      "tenant",
+      "token",
+      "API key"
+    ],
+    "$comment": "names never change in any locale. integration terms stay in English and show only on integration and operator screens."
+  },
   "terms": [
     {
       "concept": "Application",
