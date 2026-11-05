@@ -6,7 +6,7 @@ band, its page headings, its Overview, its Releases list and a release's page. T
 are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules come from
 [D128](../decisions/d128-rules-from-the-studio-review.md) and
 [D129](../decisions/d129-rules-from-the-studio-editors-review.md) and
-[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications section is built. The rest of this page is _(planned for M31)_.
+[D132](../decisions/d132-rules-from-the-studio-settings-review.md). The Applications, Workspace, Band, Problems panel, Page heading, Releases and Names sections are built, except where marked. The rest of this page is _(planned for M31)_.
 
 ## Applications
 
@@ -45,6 +45,9 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules c
   tooltip. Collapsed, a group's title gives way to a thin rule.
 - **A resource belongs to its kind.** A resource open in the editor marks its kind's entry, and the address keeps the
   view, as in `/studio?app=PurchaseRequests&resource=<id>`.
+- **A kind's entry opens its list.** The entry opens `&kind=<kind>`, with a level-4 heading of the kind's name and its
+  resources. For a kind that modules hold, the module group follows. An open resource shows alone, and the Overview
+  lists no resources.
 
 
 ## Band
@@ -58,8 +61,8 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md). The rules c
   `textMuted` and never a link: "Changes not live" when the folder differs from the live release, "Not published yet"
   when there is no live release, "Release 7 is live" when nothing needs attention, so a quiet band never reads as
   still loading, and "Releases did not load" in `warningText` when the history fails. A live release that is
-  off-standard reads "Release 3 is live, off-standard", as the Off-standard tag marks a release, never the folder, and
-  stays beside a release's number. No state has an icon, as its
+  off-standard reads "Release 3 is live, off-standard" _(planned for M31)_, as the Off-standard tag marks a release, never the folder, and
+  stays beside a release's number. Until then, the folder's Off-standard tag shows after the state. No state has an icon, as its
   words already say it. While the history loads, only the problems show.
 - **The actions.** New resource…, Validate, Preview and Run tests are text buttons with no icon, the same gap apart,
   and Publish… is the band's one solid button, see [buttons](actions-and-controls.md#buttons). New resource… heads
@@ -155,7 +158,7 @@ The Releases entry lists the application's releases from [`GET .../releases`](au
 
 - **One row per release,** the highest number first, as a publish gives a release its label and note and activating
   goes to the release one wants.
-- **Columns.** Release, the number, as the link that opens the [release page](#release-page), with the Live tag beside the one that runs, as the band says, and the
+- **Columns.** Release, the number, as the link that opens the [release page](#release-page) _(planned for M31)_, with the Live tag beside the one that runs, as the band says, and the
   Off-standard tag beside an [off-standard release](module-contracts.md#off-standard-releases); Label; Published, when
   it was published; Published by, who published it, see [names](#names); and Note. Label and Note show the dash when
   the publish gave none. There is no Status column: a release that is not live has no state of its own to name.
@@ -163,7 +166,7 @@ The Releases entry lists the application's releases from [`GET .../releases`](au
   publisher only. It activates the release either way, back to an older release or forward to a newer one, see
   [D130](../decisions/d130-activate-a-release-replaces-roll-back.md). Its dialog says which release replaces the live
   one. It checks first and, when the release [cannot replace the live one](#release-page), titles itself with the same
-  sentence as the page and offers Close alone.
+  sentence as the page and offers Close alone _(planned for M31)_. Until then it sends the existing rollback route.
 
 ## Release page
 

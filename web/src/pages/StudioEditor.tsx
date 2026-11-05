@@ -14,7 +14,9 @@ import {
   type MigrationChange,
 } from '../platform/entityMigrations'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
-import { seedColumns, seedProblems, type SeedField } from '../platform/seedValues'
+import { AxisButton } from '../platform/AxisButton'
+import { QuotaRefusedError } from '../platform/quota'
+import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
   fetchResourceReferences,
@@ -52,8 +54,6 @@ import { JsonEditor } from './JsonEditor'
 import { SchemaForm } from './SchemaForm'
 import { RemovedNoticeContext, StudioCatalogContext } from './schemaFormSections'
 import { SaveBar } from '../platform/SaveBar'
-import { AxisButton } from '../platform/AxisButton'
-import { QuotaRefusedError } from '../platform/quota'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
 import type { FormUse } from './StudioFormUsedOn'
@@ -81,15 +81,6 @@ const noProblems = new Map<string, string>()
 const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
 const LazyStudioPageDesign = lazy(() => import('./StudioPageDesign'))
 const LazyStudioFormDesign = lazy(() => import('./StudioFormDesign'))
-
-function seedFieldsOf(content: Content): SeedField[] | null {
-  if (!Array.isArray(content.fields)) {
-    return null
-  }
-  return content.fields.filter(
-    (field): field is SeedField => isContent(field) && typeof field.name === 'string' && typeof field.type === 'string',
-  )
-}
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

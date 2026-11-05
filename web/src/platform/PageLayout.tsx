@@ -2,7 +2,7 @@ import { Breadcrumb, Flex, Typography } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { sizeTokens } from './designTokens'
-import { ShellSidebarContext } from './shellSidebar'
+import { ShellSidebarContext } from './shellSidebarContext'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 

@@ -226,7 +226,7 @@ function Release({
                 return {
                   key: change.path,
                   name: item
-                    ? resourceTitle(item, locale)
+                    ? resourceTitle(item, locale, t)
                     : resourceTitle(
                         {
                           file: change.path,

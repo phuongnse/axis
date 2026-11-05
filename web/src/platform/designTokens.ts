@@ -54,19 +54,14 @@ export const spacingTokens = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 }
 export const radiusTokens = { base: 6 }
 
 /**
- * Proposed: the sizes every page shares. `bar` is the height of a bar, 48 px: the shell's header, a page's band,
- * Studio's application row, so their rules line up. `smallControl` is the height of a small control,
- * 24 px, such as a small icon button, and the line of text that sits beside one. `tableRow` is the height of a table's row and of its header, 40 px, a `smallControl` line with spacing-xs above and below. Like the
- * breakpoint, a page cannot change them.
- */
-export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40 }
-
-/**
  * Proposed: the three dialog widths, chosen by what a dialog holds: small for a confirmation or one question, medium
  * for a short form, large for content that needs the width, such as a list to choose from. No larger one: what needs
  * more is a page.
  */
 export const dialogSizeTokens = { small: 400, medium: 560, large: 800 }
+
+/** Fixed heights in px: the shell header (`bar`), a small control and the line a table row holds, and a table row. */
+export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40 }
 
 /** The one layout breakpoint (D96). Below it is narrow width. A page cannot change it: media queries read no CSS property. */
 export const breakpointTokens = { narrowWidth: 992 }
@@ -78,6 +73,7 @@ export interface DesignTokens {
   type: typeof typeTokens
   spacing: Record<keyof typeof spacingTokens, number>
   radius: Record<keyof typeof radiusTokens, number>
+  size: typeof sizeTokens
   shadow: Record<keyof typeof shadowTokens, string>
 }
 
@@ -164,6 +160,7 @@ export function designTokensFor(mode: ThemeMode, page: PageTokenValues = {}): De
     },
     spacing,
     radius: { base: usableLength(page[pageTokenProperties.radius.base]) ?? radiusTokens.base },
+    size: sizeTokens,
     shadow: { overlay: usableShadow(page[pageTokenProperties.shadow.overlay]) ?? shadowTokens.overlay[mode] },
   }
 }

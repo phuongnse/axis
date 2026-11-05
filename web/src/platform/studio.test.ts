@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { moduleKinds } from './moduleKinds'
 import { assignLocation } from './navigation'
 import {
   checkStudioExpression,
@@ -10,7 +12,9 @@ import {
   moduleResources,
   previewSiteUrl,
   putStudioTexts,
-  releaseRows,
+  releaseList,
+  releasePublisher,
+  resourceTitle,
   ServerUnreachableError,
   type StudioReleaseItem,
   type StudioReleases,
@@ -22,6 +26,9 @@ import {
 vi.mock('./navigation')
 
 afterEach(() => vi.unstubAllGlobals())
+
+const english = platformEnglish as Record<string, string>
+const t = (key: string) => english[key] ?? key
 
 function resource(id: string, kind: string, name: string | null, file: string): StudioResourceItem {
   return { id, kind, name, file, version: 'v', usedBy: 0 }
@@ -177,6 +184,38 @@ const items = [
   resource('dddd0004-0000-4000-8000-000000000000', 'application', null, 'application.json'),
 ]
 
+describe('resourceTitle', () => {
+  const entity = {
+    ...resource('1', 'entity', 'PurchaseRequest', 'entities/purchase-request.json'),
+    titles: { en: 'Purchase request', vi: 'Yêu cầu mua hàng' },
+  }
+
+  it('names a resource by its label in the UI locale', () => {
+    expect(resourceTitle(entity, 'vi', t)).toBe('Yêu cầu mua hàng')
+  })
+
+  it('falls back to the en label when the UI locale has no label', () => {
+    expect(resourceTitle(entity, 'fr', t)).toBe('Purchase request')
+  })
+
+  it('names a text resource by its language in the UI locale', () => {
+    const text = { ...resource('2', 'text', 'TextsVi', 'texts/vi.json'), locale: 'vi' }
+
+    expect(resourceTitle(text, 'en', t)).toBe('Vietnamese')
+  })
+
+  it('names a text resource by its tag when the browser cannot name the language', () => {
+    const text = { ...resource('2', 'text', 'TextsX', 'texts/x.json'), locale: 'not a tag' }
+
+    expect(resourceTitle(text, 'en', t)).toBe('not a tag')
+  })
+
+  it('names a resource without titles by its name, then by its kind, never by its file', () => {
+    expect(resourceTitle(resource('3', 'form', 'ReviewForm', 'forms/review.json'), 'en', t)).toBe('ReviewForm')
+    expect(resourceTitle(resource('4', 'form', null, 'forms/review.json'), 'en', t)).toBe('Form')
+  })
+})
+
 describe('filterResources', () => {
   it('keeps every resource for an empty or blank search', () => {
     expect(filterResources(items, '')).toEqual(items)
@@ -219,62 +258,71 @@ describe('groupByKind', () => {
     expect(groups[0].items.map((item) => item.id)).toEqual(['3', '1', '2'])
   })
 
+  it('sorts the items by the shown name when it is given', () => {
+    const groups = groupByKind(
+      [resource('1', 'entity', 'A', 'entities/a.json'), resource('2', 'entity', 'B', 'entities/b.json')],
+      (item) => (item.id === '1' ? 'Zeta' : 'Alpha'),
+    )
+
+    expect(groups[0].items.map((item) => item.id)).toEqual(['2', '1'])
+  })
+
   it('returns no group for no resources', () => {
     expect(groupByKind([])).toEqual([])
   })
 })
 
 describe('moduleResources', () => {
-  const names = {
-    entities: [
-      { id: 'own-entity', name: 'Request', module: null },
-      { id: 'checklists-entity', name: 'checklists/Checklist', module: 'checklists' },
-    ],
-    processes: [
-      { id: 'own-process', name: 'Approve', module: null },
-      { id: 'checklists-process', name: 'checklists/ChecklistReview', module: 'checklists' },
-    ],
-    policies: [
-      { id: 'own-policy', name: 'Access', module: null },
-      { id: 'checklists-policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
-    ],
-    contracts: [{ id: 'checklists-contract', name: 'checklists/ChecklistContract', module: 'checklists' }],
-    pages: [
-      { id: 'own-page', name: 'Home', module: null, parameters: [] },
-      { id: 'checklists-page', name: 'checklists/Checklists', module: 'checklists', parameters: [] },
-    ],
-  } as unknown as StudioNames
+  const lists = {
+    entity: 'entities',
+    dataSource: 'dataSources',
+    rule: 'rules',
+    sequence: 'sequences',
+    form: 'forms',
+    page: 'pages',
+    process: 'processes',
+    event: 'events',
+    text: 'textResources',
+    seed: 'seeds',
+    policy: 'policies',
+    trigger: 'triggers',
+    scenario: 'scenarios',
+    contract: 'contracts',
+  } as const
+  // One module item and one own item for each kind.
+  const names = Object.fromEntries(
+    moduleKinds.map((kind) => [
+      lists[kind],
+      [
+        { id: `own-${kind}`, name: `Own${kind}`, module: null },
+        { id: `checklists-${kind}`, name: `checklists/${kind}`, module: 'checklists' },
+      ],
+    ]),
+  ) as unknown as StudioNames
 
-  it('returns the entities, processes, policies, contracts and pages of modules with their module id', () => {
+  it('returns one group for each module kind, in the order of the kind list, with the module id', () => {
     const groups = moduleResources(names, '')
 
-    expect(groups.map((group) => group.kind)).toEqual(['entity', 'process', 'policy', 'contract', 'page'])
-    expect(groups.flatMap((group) => group.items)).toEqual([
-      { id: 'checklists-entity', kind: 'entity', name: 'checklists/Checklist', module: 'checklists' },
-      { id: 'checklists-process', kind: 'process', name: 'checklists/ChecklistReview', module: 'checklists' },
-      { id: 'checklists-policy', kind: 'policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
-      { id: 'checklists-contract', kind: 'contract', name: 'checklists/ChecklistContract', module: 'checklists' },
-      { id: 'checklists-page', kind: 'page', name: 'checklists/Checklists', module: 'checklists' },
-    ])
+    expect(groups.map((group) => group.kind)).toEqual([...moduleKinds])
+    expect(groups.flatMap((group) => group.items)).toEqual(
+      moduleKinds.map((kind) => ({ id: `checklists-${kind}`, kind, name: `checklists/${kind}`, module: 'checklists' })),
+    )
   })
 
   it('leaves out the application own resources', () => {
     const ids = moduleResources(names, '').flatMap((group) => group.items.map((item) => item.id))
 
-    expect(ids).not.toContain('own-entity')
-    expect(ids).not.toContain('own-process')
-    expect(ids).not.toContain('own-policy')
-    expect(ids).not.toContain('own-page')
-    expect(ids).toContain('checklists-contract')
+    expect(ids).toHaveLength(moduleKinds.length)
+    expect(ids.filter((id) => id.startsWith('own-'))).toEqual([])
   })
 
   it('applies the search to the name and the id, ignoring letter case and spaces, and drops empty groups', () => {
-    expect(moduleResources(names, '  REVIEW ').map((group) => group.items.map((item) => item.id))).toEqual([
+    expect(moduleResources(names, '  CHECKLISTS/PROCESS ').map((group) => group.items.map((item) => item.id))).toEqual([
       ['checklists-process'],
     ])
     expect(moduleResources(names, 'CHECKLISTS-POLICY').map((group) => group.kind)).toEqual(['policy'])
-    expect(moduleResources(names, 'checklistcontract').map((group) => group.kind)).toEqual(['contract'])
-    expect(moduleResources(names, ' CHECKLISTS-CONTRACT ').map((group) => group.kind)).toEqual(['contract'])
+    expect(moduleResources(names, ' CHECKLISTS-SEED ').map((group) => group.kind)).toEqual(['seed'])
+    expect(moduleResources(names, 'checklists/scenario').map((group) => group.kind)).toEqual(['scenario'])
     expect(moduleResources(names, 'nothing')).toEqual([])
   })
 
@@ -299,29 +347,65 @@ function release(releaseId: string, number: number, activatedAt: string): Studio
   }
 }
 
-describe('releaseRows', () => {
+describe('releaseList', () => {
   const items = [
     release('r2', 2, '2026-05-02T10:00:00Z'),
-    release('r1', 1, '2026-05-01T10:00:00Z'),
-    release('r2', 2, '2026-05-03T10:00:00Z'),
+    { ...release('r1', 1, '2026-05-01T10:00:00Z'), label: 'First', note: 'Initial', actorName: 'Author User' },
+    { ...release('r1', 1, '2026-05-03T10:00:00Z'), label: null, note: null, actor: 'operator' },
     release('r3', 3, '2026-05-03T10:00:00Z'),
   ]
 
-  it('sorts newest first, keeping the server order on equal times', () => {
-    const rows = releaseRows({ active: null, folderContentHash: null, items })
+  it('has one row for each release, the highest number first', () => {
+    const rows = releaseList({ active: null, folderContentHash: null, items })
 
-    expect(rows.map((row) => row.number)).toEqual([2, 3, 2, 1])
-    expect(rows.map((row) => row.active)).toEqual([false, false, false, false])
+    expect(rows.map((row) => row.number)).toEqual([3, 2, 1])
+    expect(rows.map((row) => row.live)).toEqual([false, false, false])
   })
 
-  it('marks only the newest row of the active release', () => {
-    const rows = releaseRows({
-      active: { releaseId: 'r2', number: 2, contentHash: 'hash-2' },
+  it('takes the details of a release from its first activation', () => {
+    const rows = releaseList({ active: null, folderContentHash: null, items })
+
+    expect(rows[2]).toMatchObject({
+      releaseId: 'r1',
+      label: 'First',
+      note: 'Initial',
+      publishedAt: '2026-05-01T10:00:00Z',
+      actor: 'author',
+      actorName: 'Author User',
+    })
+  })
+
+  it('marks the live release', () => {
+    const rows = releaseList({
+      active: { releaseId: 'r1', number: 1, contentHash: 'hash-1' },
       folderContentHash: null,
       items,
     })
 
-    expect(rows.map((row) => row.active)).toEqual([true, false, false, false])
+    expect(rows.map((row) => row.live)).toEqual([false, false, true])
+  })
+})
+
+describe('releasePublisher', () => {
+  const t = (key: string) => key
+  const row = (actor: string, actorName: string | null) => ({
+    ...releaseList({ active: null, folderContentHash: null, items: [release('r1', 1, '2026-05-01T10:00:00Z')] })[0],
+    actor,
+    actorName,
+  })
+
+  it('names the person when there is a name', () => {
+    expect(releasePublisher(row('user-1', 'Author User'), t)).toBe('Author User')
+  })
+
+  it('says System for a startup activation and the operator for an operator one', () => {
+    expect(releasePublisher(row('startup', null), t)).toBe('shell.studio.releases.system')
+    expect(releasePublisher(row('operator', null), t)).toBe('shell.studio.releases.operator')
+  })
+
+  it('never shows an id: an unknown actor and a user without a name are someone no longer known', () => {
+    expect(releasePublisher(row('unknown', null), t)).toBe('shell.studio.releases.unknown')
+    expect(releasePublisher(row('user-1', null), t)).toBe('shell.studio.releases.unknown')
   })
 })
 

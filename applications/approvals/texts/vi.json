@@ -1,0 +1,22 @@
+{
+  "id": "b1097e1c-e6ba-4c47-8809-c4061bc51a9f",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "application.title": "Phê duyệt",
+    "application.description": "Phòng ban, nhân viên, thời gian vắng mặt và yêu cầu phê duyệt.",
+    "site.title": "Phê duyệt",
+    "site.description": "Gửi yêu cầu, quyết định yêu cầu và quản lý tổ chức.",
+    "nav.myRequests": "Yêu cầu của tôi",
+    "nav.toDecide": "Cần quyết định",
+    "nav.outOfOffice": "Vắng mặt",
+    "nav.allRequests": "Tất cả yêu cầu",
+    "nav.requestTypes": "Loại yêu cầu",
+    "nav.departments": "Phòng ban",
+    "nav.employees": "Nhân viên",
+    "role.admin": "Quản trị viên",
+    "role.employee": "Nhân viên"
+  }
+}

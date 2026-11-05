@@ -101,8 +101,17 @@ describe('the Axis Helm chart', () => {
     assert.match(job, /backoffLimit: 0\n/)
   })
 
-  test('the publisher is one Recreate pod with no port, probe or Service and only its two secrets', () => {
-    const output = renderOk('--set', 'secrets.scenarioServerConnection.name=')
+  test('outside a cell the publisher is one Recreate pod with no port, probe or Service and only its two secrets', () => {
+    const output = renderOk(
+      '--set',
+      'secrets.scenarioServerConnection.name=',
+      '--set',
+      'cell.id=',
+      '--set',
+      'cell.certificate.enabled=false',
+      '--set',
+      'cell.pgbouncer.enabled=false',
+    )
     const publisher = find(output, 'Deployment', 'axis-publisher')
     assert.match(publisher, /replicas: 1\n/)
     assert.match(publisher, /type: Recreate\n/)
@@ -115,7 +124,9 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(publisher, /Probe:/)
     assert.doesNotMatch(publisher, /path: ConnectionStrings__Platform\n/)
     assert.doesNotMatch(publisher, /Admin__ConnectionString/)
-    assert.doesNotMatch(publisher, /\/studio|Studio__/)
+    assert.doesNotMatch(publisher, /\/studio|Studio__|mountPath: \/templates|Templates__/)
+    assert.doesNotMatch(publisher, /IdentityProvider__|axis-identity|- name: cell-backup-key|axis-cell-backup-key|axis-admin-db/)
+    assert.doesNotMatch(publisher, /- name: (studio|templates)\n/)
     for (const service of documents(output).filter((d) => /^kind: Service$/m.test(d))) {
       assert.doesNotMatch(service, /component: publisher/)
     }
@@ -224,7 +235,6 @@ describe('the Axis Helm chart', () => {
     assert.match(server, /- name: Studio__PublisherRole\n\s+value: "publisher"/)
     for (const [kind, name] of [
       ['Deployment', 'axis-worker'],
-      ['Deployment', 'axis-publisher'],
       ['Job', 'axis-migrate'],
     ]) {
       const document = find(output, kind, name)
@@ -242,6 +252,12 @@ describe('the Axis Helm chart', () => {
   test('without Studio folders the server mounts no Studio volume', () => {
     const output = renderOk(
       '--set',
+      'cell.id=',
+      '--set',
+      'cell.certificate.enabled=false',
+      '--set',
+      'cell.pgbouncer.enabled=false',
+      '--set',
       'studio.folders=null',
       '--set',
       'studio.persistence=null',
@@ -252,7 +268,9 @@ describe('the Axis Helm chart', () => {
       '--set',
       'studio.tests=false',
     )
-    assert.doesNotMatch(output, /\/studio|Studio__|- name: studio\n/)
+    // The restore-check CronJob always has a throwaway Studio folder, which is not the server's volume.
+    const rest = documents(output).filter((document) => !/^  name: axis-cell-restore-check$/m.test(document))
+    assert.doesNotMatch(rest.join('\n'), /\/studio|Studio__|- name: studio\n/)
   })
 
   test('the chart renders no Ingress and the server Service is ClusterIP', () => {
@@ -313,7 +331,7 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(service, /port: 9000|targetPort: management/)
   })
 
-  test('the identity secret files and certificate are mounted in the identity pod only, and in no env entry', () => {
+  test('the identity secret files and certificate are mounted in the identity pod, and the publisher and the restore-check CronJob get the client secret as a file', () => {
     const output = renderOk()
     const identity = find(output, 'Deployment', 'axis-identity')
     for (const file of ['KC_DB_URL', 'KC_DB_USERNAME', 'KC_DB_PASSWORD', 'IdentityProvider__AdminClientSecret']) {
@@ -327,10 +345,20 @@ describe('the Axis Helm chart', () => {
     for (const [kind, name] of [
       ['Deployment', 'axis-server'],
       ['Deployment', 'axis-worker'],
-      ['Deployment', 'axis-publisher'],
       ['Job', 'axis-migrate'],
     ]) {
       assert.doesNotMatch(find(output, kind, name), /identity-tls|axis-identity|KC_DB_|IdentityProvider__AdminClientSecret/)
+    }
+    // In a cell the publisher gets the client secret as a file, and nothing else of the identity provider's.
+    assert.doesNotMatch(find(output, 'Deployment', 'axis-publisher'), /identity-tls|KC_DB_/)
+    assert.doesNotMatch(find(output, 'CronJob', 'axis-cell-backup'), /identity-tls|axis-identity|KC_DB_|IdentityProvider__AdminClientSecret/)
+    const restoreCheck = find(output, 'CronJob', 'axis-cell-restore-check')
+    assert.match(restoreCheck, /- key: "IdentityProvider__AdminClientSecret"\n\s+path: IdentityProvider__AdminClientSecret\n/)
+    assert.doesNotMatch(restoreCheck, /identity-tls|KC_DB_/)
+    assert.doesNotMatch(output, /- name: IdentityProvider__AdminClientSecret\n/)
+    // The publisher alone runs the create job, so it alone gets the admin connection.
+    for (const document of documents(output).filter((d) => /^kind: (Deployment|Job)$/m.test(d) && !/^  name: axis-publisher$/m.test(d))) {
+      assert.doesNotMatch(document, /Admin__ConnectionString|axis-admin-db/)
     }
   })
 
@@ -459,6 +487,10 @@ describe('the Axis Helm chart', () => {
     ['secrets.backupStorageAccessKeyId.name', 'secrets.backupStorageAccessKeyId.name='],
     ['secrets.backupStorageSecretAccessKey.name', 'secrets.backupStorageSecretAccessKey.name='],
     ['secrets.cellBackupKey.name', 'secrets.cellBackupKey.name='],
+    ['secrets.adminConnection.name', 'secrets.adminConnection.name='],
+    ['templates.volume', 'templates.volume=null'],
+    ['studio.persistence', 'studio.persistence=null'],
+    ['cell.internalDomain', 'cell.internalDomain='],
   ]) {
     test(`a missing ${value} fails and names it`, () => {
       const result = render('--set', set)
@@ -466,6 +498,55 @@ describe('the Axis Helm chart', () => {
       assert.match(result.stderr, new RegExp(value.replaceAll('.', '\\.')))
     })
   }
+
+  test('in a cell the publisher gets what the create job reads', () => {
+    const publisher = find(renderOk(), 'Deployment', 'axis-publisher')
+    assert.match(publisher, /- secret:\n\s+name: "axis-admin-db"\n\s+items:\n\s+- key: "Admin__ConnectionString"\n\s+path: Admin__ConnectionString\n/)
+    assert.match(publisher, /- secret:\n\s+name: "axis-identity"\n\s+items:\n\s+- key: "IdentityProvider__AdminClientSecret"\n\s+path: IdentityProvider__AdminClientSecret\n/)
+    assert.doesNotMatch(publisher, /- name: (Admin__ConnectionString|IdentityProvider__AdminClientSecret)\n/)
+    assert.equal(publisher.match(/- name: Cell__BackupKeyFile\n/g).length, 1)
+    assert.match(publisher, /- name: Cell__BackupKeyFile\n\s+value: "\/cell-backup-key\/key"\n/)
+    assert.match(publisher, /- name: cell-backup-key\n\s+mountPath: \/cell-backup-key\n\s+readOnly: true\n/)
+    assert.match(publisher, /secretName: "axis-cell-backup-key"\n\s+defaultMode: 292\n\s+items:\n\s+- key: "cell-backup-key"\n\s+path: key\n/)
+    assert.match(publisher, /- name: IdentityProvider__Url\n\s+value: "https:\/\/id\.example\.com\/"\n/)
+    assert.match(publisher, /- name: IdentityProvider__AdminClientId\n\s+value: axis-admin\n/)
+    assert.match(publisher, /- name: Cell__TenantDomain\n\s+value: "vn\.example\.com"\n/)
+    assert.match(publisher, /- name: Studio__ApplicationsPath\n\s+value: \/studio\n/)
+    assert.match(publisher, /- name: studio\n\s+mountPath: \/studio\n(?!\s+readOnly)/)
+    assert.match(publisher, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/)
+    assert.match(publisher, /- name: Templates__Path\n\s+value: \/templates\n/)
+    assert.match(publisher, /- name: templates\n\s+mountPath: \/templates\n\s+readOnly: true\n/)
+    assert.match(publisher, /- name: templates\n\s+persistentVolumeClaim:\n\s+claimName: axis-templates\n/)
+  })
+
+  test('in a cell the server and the publisher mount the same Studio volume and use /studio as the applications folder', () => {
+    const output = renderOk('--set', 'studio.folders=null')
+    for (const name of ['axis-server', 'axis-publisher']) {
+      const host = find(output, 'Deployment', name)
+      assert.match(host, /- name: Studio__ApplicationsPath\n\s+value: \/studio\n/, name)
+      assert.match(host, /- name: studio\n\s+mountPath: \/studio\n(?!\s+readOnly)/, name)
+      assert.match(host, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/, name)
+    }
+    assert.doesNotMatch(find(output, 'Deployment', 'axis-server'), /Studio__Folders__/)
+  })
+
+  test('in a cell the worker and the migrate Job get none of the create job settings', () => {
+    const output = renderOk()
+    for (const [kind, name] of [
+      ['Deployment', 'axis-worker'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      assert.doesNotMatch(
+        find(output, kind, name),
+        /IdentityProvider__|Studio__ApplicationsPath|Templates__Path|mountPath: \/(studio|templates)|mountPath: \/cell-backup-key|axis-cell-backup-key|Admin__ConnectionString/,
+        name,
+      )
+    }
+  })
+
+  test('the server in a cell gets no templates volume', () => {
+    assert.doesNotMatch(find(renderOk(), 'Deployment', 'axis-server'), /Templates__Path|mountPath: \/templates|axis-templates/)
+  })
 
   test('with PgBouncer on, the server and the worker send runtime connections to its Service, and no other pod does', () => {
     const output = renderOk()
@@ -620,11 +701,59 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(output, /- name: Cell__BackupStorage__(AccessKeyId|SecretAccessKey)/)
   })
 
-  test('no other pod gets the backup storage or the cell backup key', () => {
+  test('in a cell with a bucket, a CronJob runs cell restore-check on Sundays at 03:00 in the time zone, one at a time and with no retry', () => {
     const output = renderOk()
-    for (const document of documents(output).filter((d) => /^kind: (Deployment|Job)$/m.test(d))) {
+    const job = find(output, 'CronJob', 'axis-cell-restore-check')
+    assert.match(job, /schedule: "0 3 \* \* 0"\n/)
+    assert.match(job, /timeZone: "Asia\/Ho_Chi_Minh"\n/)
+    assert.match(job, /concurrencyPolicy: Forbid\n/)
+    assert.match(job, /backoffLimit: 0\n/)
+    assert.match(job, /activeDeadlineSeconds: 21600\n/)
+    assert.match(job, /restartPolicy: Never\n/)
+    assert.match(job, /image: "axis-admin:[^"]+"/)
+    assert.match(job, /args:\n\s+- cell\n\s+- restore-check\n/)
+    assert.match(job, /- name: Cell__Id\n\s+value: "vn-1"\n/)
+    assert.match(job, /- name: Cell__InternalDomain\n\s+value: "internal\.example\.com"\n/)
+    assert.match(job, /- name: IdentityProvider__Url\n\s+value: "https:\/\/id\.example\.com\/"\n/)
+    assert.match(job, /- name: IdentityProvider__AdminClientId\n\s+value: axis-admin\n/)
+    assert.match(job, /- name: Studio__ApplicationsPath\n\s+value: \/studio\n/)
+    assert.match(job, /- name: studio\n\s+mountPath: \/studio\n/)
+    assert.match(job, /- name: studio\n\s+emptyDir: \{\}\n/)
+    assert.equal(job.match(/- name: tmp\n\s+emptyDir/g).length, 1)
+    assert.equal(job.match(/- name: Cell__BackupKeyFile\n/g).length, 1)
+    assert.match(job, /- name: Cell__BackupKeyFile\n\s+value: "\/cell-backup-key\/key"\n/)
+    assert.match(job, /- name: Cell__BackupStorage__Bucket\n\s+value: "axis-backups-vn"\n/)
+    assert.match(job, /- name: cell-backup-key\n\s+mountPath: \/cell-backup-key\n\s+readOnly: true\n/)
+    assert.match(job, /secretName: "axis-cell-backup-key"\n\s+defaultMode: 292\n\s+items:\n\s+- key: "cell-backup-key"\n\s+path: key\n/)
+  })
+
+  test('the restore-check CronJob gets the admin, client secret, storage and scenario secrets as files, and never env entries', () => {
+    const job = find(renderOk(), 'CronJob', 'axis-cell-restore-check')
+    for (const [secret, file] of [
+      ['axis-admin-db', 'Admin__ConnectionString'],
+      ['axis-identity', 'IdentityProvider__AdminClientSecret'],
+      ['axis-backup-storage', 'Cell__BackupStorage__AccessKeyId'],
+      ['axis-backup-storage', 'Cell__BackupStorage__SecretAccessKey'],
+      ['axis-platform', 'ConnectionStrings__PlatformSchema'],
+      ['axis-platform', 'Platform__SecretKey'],
+      ['axis-scenario', 'Scenarios__ServerConnectionString'],
+    ]) {
+      assert.match(job, new RegExp(`- secret:\\n\\s+name: "${secret}"\\n\\s+items:\\n\\s+- key: "${file}"\\n\\s+path: ${file}\\n`), file)
+      assert.doesNotMatch(job, new RegExp(`- name: ${file}\\n`), file)
+    }
+    assert.doesNotMatch(job, /path: ConnectionStrings__Platform\n/)
+
+    const without = find(renderOk('--set', 'secrets.scenarioServerConnection.name='), 'CronJob', 'axis-cell-restore-check')
+    assert.doesNotMatch(without, /Scenarios__|axis-scenario/)
+  })
+
+  test('no other pod gets the backup storage, and no pod but the publisher gets the cell backup key', () => {
+    const output = renderOk()
+    for (const document of documents(output).filter((d) => /^kind: (Deployment|Job)$/m.test(d) && !/^  name: axis-publisher$/m.test(d))) {
       assert.doesNotMatch(document, /Cell__BackupStorage__|axis-cell-backup-key|axis-backup-storage|\/cell-backup-key\//)
     }
+    // The publisher in a cell gets the cell backup key, but never the backup storage.
+    assert.doesNotMatch(find(output, 'Deployment', 'axis-publisher'), /Cell__BackupStorage__|axis-backup-storage/)
   })
 
   test('a value inside a backup storage Secret reference, or an unknown backup value, is rejected and never rendered', () => {
@@ -636,7 +765,9 @@ describe('the Axis Helm chart', () => {
   })
 
   test('outside a cell, or without a bucket, no CronJob renders', () => {
-    assert.doesNotMatch(renderOk('--set', 'backup.bucket='), /^kind: CronJob$/m)
+    const withoutBucket = renderOk('--set', 'backup.bucket=')
+    assert.doesNotMatch(withoutBucket, /^kind: CronJob$/m)
+    assert.doesNotMatch(withoutBucket, /axis-cell-restore-check/)
     const outside = renderOk(
       '--set',
       'cell.id=',
@@ -646,7 +777,7 @@ describe('the Axis Helm chart', () => {
       'cell.pgbouncer.enabled=false',
     )
     assert.doesNotMatch(outside, /^kind: CronJob$/m)
-    assert.doesNotMatch(outside, /Cell__BackupStorage__/)
+    assert.doesNotMatch(outside, /Cell__BackupStorage__|axis-cell-restore-check/)
   })
 
   test('in a cell with a bucket, an empty time zone fails and names the value', () => {

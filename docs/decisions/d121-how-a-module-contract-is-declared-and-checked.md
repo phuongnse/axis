@@ -5,7 +5,7 @@ Status: **Agreed**
 The owner agreed this on 2026-11-01. It sets the shapes that
 [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) left open for module
 contracts, so that M24 can be broken into issues. It adds to D102 and changes none of its points.
-Everything here is _(planned for M24)_. [Module contracts](../reference/module-contracts.md) holds
+It is built, except the labels of named points _(planned for M31)_. [Module contracts](../reference/module-contracts.md) holds
 the detail.
 
 - **A resource of its own:** a contract is a resource of the kind `contract`, one file for each

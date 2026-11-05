@@ -1,5 +1,5 @@
 import { Button, Typography } from 'antd'
-import { folderDiffers, releaseRows, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
+import { folderDiffers, releaseGroups, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 
@@ -31,14 +31,14 @@ export function StudioStatus({
   if (releases === 'failed') {
     state = t('shell.studio.status.releasesFailed')
   } else if (releases !== undefined) {
-    const live = releaseRows(releases).find((row) => row.active)
+    const live = releaseGroups(releases).find((row) => row.live)
     if (!live) {
       state = t('shell.studio.status.unpublished')
     } else if (folderDiffers(releases)) {
       state = t('shell.studio.status.changes')
     } else if (diagnostics.length === 0) {
       // Proposed: an off-standard live release says so in the band's words, as the band holds no tag or icon.
-      state = t(live.offStandard ? 'shell.studio.status.liveOffStandard' : 'shell.studio.status.live').replace(
+      state = t(live.relaxed.length > 0 ? 'shell.studio.status.liveOffStandard' : 'shell.studio.status.live').replace(
         '{number}',
         String(live.number),
       )

@@ -157,6 +157,10 @@
       "type": "object",
       "properties": { "volume": { "$ref": "#/definitions/volume" } }
     },
+    "templates": {
+      "type": "object",
+      "properties": { "volume": { "$ref": "#/definitions/volume" } }
+    },
     "studio": {
       "type": "object",
       "properties": {
@@ -208,6 +212,7 @@
         "platformSchemaConnection": { "$ref": "#/definitions/secretReference" },
         "platformSecretKey": { "$ref": "#/definitions/secretReference" },
         "serverCertificate": { "$ref": "#/definitions/tlsSecretReference" },
+        "adminConnection": { "$ref": "#/definitions/secretReference" },
         "scenarioServerConnection": { "$ref": "#/definitions/secretReference" },
         "identityDatabaseUrl": { "$ref": "#/definitions/secretReference" },
         "identityDatabaseUsername": { "$ref": "#/definitions/secretReference" },

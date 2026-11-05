@@ -13,12 +13,12 @@ import { formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
-import { markCurrentPage } from './pagination'
 import { newIdempotencyKey, startProcess } from './processes'
 import {
   deleteRecord,
   fetchRecords,
   isFileValue,
+  type FileValue,
   RecordQueryProblem,
   type RecordItem,
   type RecordPage,
@@ -69,8 +69,6 @@ interface LoadState {
 /** A table row: a record, a data source row, or a group of a grouped data source, which has no id. */
 type TableRow = Omit<RecordItem, 'id'> & { id: string | null }
 
-// Field names start with a letter, so this key never names a field column.
-
 function sameSort(a: TableSort | null, b: TableSort | null): boolean {
   return a?.field === b?.field && a?.descending === b?.descending
 }
@@ -89,9 +87,8 @@ interface TableSource {
   searchable: boolean
 }
 
-// A text, enum or reference cell is at most this wide, in px, and wraps.
-/** The types whose values are free text: as wide as their content up to 320 px, where they wrap. */
-const freeTextTypes: FieldMetadata['type'][] = ['text', 'reference', 'references', 'file']
+// The types whose values are free text. Every other column fits its content.
+const freeTextTypes: readonly string[] = ['text', 'reference', 'file']
 
 function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
   if (dataSource) {
@@ -149,7 +146,10 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
  * as a trash icon. Three or more configured ones, or any number below 992 px, fold into one "Actions" menu. The
  * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
- * Export and the toolbar actions, with the first toolbar action last. Text, enum and reference cells wrap at 320 px.
+ * Export and the toolbar actions, with the first toolbar action last. The table is drawn on `AxisTable`, which owns the
+ * toolbar order, the column widths, the 40 px rows, the folding of row actions, the paging and the em dash of an empty
+ * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at 320 px.
+ * Every other column, an enum too, fits its content.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
  * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
@@ -476,26 +476,22 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       key: field.name,
       dataIndex: ['values', field.name],
       title: field.labelKey ? t(field.labelKey) : field.name,
-      // Proposed: a value of a fixed form fits its content; text, a reference and a file are free text.
-      // Proposed: a value of a fixed form fits its content; text, a reference and a file are free text.
-      kind: freeTextTypes.includes(field.type) ? 'text' : 'fit',
-      numeric: isNumeric(field.type),
+      kind: freeTextTypes.includes(field.type) ? 'freeText' : 'fixed',
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',
       sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
-      render: (record: TableRow) => {
-        const value = record.values[field.name] as RecordValue
-        // A group row of a data source has no id and stays blank.
+      align: isNumeric(field.type) ? 'right' : undefined,
+      // Digits of equal width line up in a column.
+      onCell: () => (isNumeric(field.type) ? { style: { fontVariantNumeric: 'tabular-nums' } } : {}),
+      render: (value: unknown, record: TableRow) => {
+        // A group row of a data source has no id and stays blank. The table draws the dash of any other empty cell.
         if (value === null || value === undefined) {
-          if (record.id === null) {
-            return null
-          }
-          return column === 0 ? openLink(<EmptyDash />, '', record) : <EmptyDash />
+          return column === 0 && record.id !== null ? openLink(<EmptyDash />, '', record) : null
         }
-        if (field.type === 'file' && 'downloadPath' in field && isFileValue(value)) {
-          return <FileLink field={field} value={value} />
+        if (field.type === 'file' && 'downloadPath' in field && isFileValue(value as RecordValue)) {
+          return <FileLink field={field} value={value as FileValue} />
         }
-        const text = formatValue(field, value, record.labels, { locale, text: t }, record.values)
+        const text = formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
         return column === 0 ? openLink(text, text, record) : text
       },
     }))
@@ -504,9 +500,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen
   // is not plainly true is dropped. A group row has no id and no actions.
-  const actionsOf = (record: TableRow): AxisRowAction[] => {
+  const actionsOf = (record: TableRow): AxisRowAction[] | null => {
     if (record.id === null) {
-      return []
+      return null
     }
     const scope = { id: record.id, values: record.values }
     return otherIndexes.flatMap((index): AxisRowAction[] => {
@@ -516,7 +512,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         labelKey: action.labelKey,
         disabled: action.type !== 'navigate' && (starting || deleting),
         attributes: canvas.props(`rowActions/${index}`),
-        // Proposed: the platform knows what a delete means, so it is a red trash icon; a configured action keeps its text.
+        // The platform knows what a delete means, so it is a red trash icon. A configured action keeps its text.
         ...(action.type === 'delete' ? { icon: <DeleteOutlined />, destructive: true } : {}),
       }
       // The canvas draws every action, also one that the site would hide.
@@ -611,9 +607,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     <AxisTable<TableRow>
       // The group values are unique per group row.
       rowKey={(row) => row.id ?? JSON.stringify(row.values)}
-      rows={parameterErrors ? [] : state.page?.items}
       columns={columns}
-      rowActions={otherIndexes.length > 0 ? { count: otherIndexes.length, of: actionsOf } : undefined}
+      dataSource={parameterErrors ? [] : state.page?.items}
       loading={loading}
       emptyText={t('shell.table.empty')}
       pagination={{
@@ -621,10 +616,10 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         pageSize: query.pageSize,
         total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
         pageSizeOptions: sizes,
-        showSizeChanger: true,
-        itemRender: markCurrentPage(query.page),
       }}
       onChange={onChange}
+      rowActions={{ configured: otherIndexes.length, actions: actionsOf }}
+      blankRow={(row) => row.id === null}
       toolbar={{
         view: searchable ? (
           <Input.Search
@@ -638,7 +633,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             onSearch={onSearch}
           />
         ) : undefined,
-        refresh: () => {
+        onRefresh: () => {
           if (!canvas.active) {
             // The same URL is requested again, so the table shows busy meanwhile.
             setState((current) => ({ ...current, url: undefined }))
@@ -673,7 +668,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         ),
         main: toolbarButtons[0] ? toolbarButton(toolbarButtons[0]) : undefined,
       }}
-      above={
+      below={
         <>
           {parameters.length > 0 && (
             <FilterBar
@@ -717,7 +712,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           )}
         </>
       }
-      instead={
+      failure={
         failed ? <Alert data-testid="records-error" type="error" title={t('shell.table.loadFailed')} /> : undefined
       }
     />

@@ -1,6 +1,6 @@
 import { theme } from 'antd'
 import { describe, expect, it } from 'vitest'
-import { antThemeFor } from './antTheme'
+import { antConfigFor, antThemeFor, fieldRules, tableTheme } from './antTheme'
 import {
   colourTokens,
   designTokensFor,
@@ -93,6 +93,48 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
       primaryShadow: 'none',
       dangerShadow: 'none',
     })
+  })
+})
+
+describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (mode) => {
+  const { colour } = designTokensFor(mode)
+  const { theme: themeConfig, checkbox, radio } = antConfigFor(mode)
+
+  it('draws the border of an input, number input, select, date picker, mentions, cascader and tree select in dangerText on an error', () => {
+    for (const name of [
+      'Input',
+      'InputNumber',
+      'Select',
+      'DatePicker',
+      'Mentions',
+      'Cascader',
+      'TreeSelect',
+    ] as const) {
+      expect(themeConfig?.components?.[name]).toMatchObject({
+        colorError: colour.dangerText,
+        colorErrorBorderHover: colour.dangerText,
+      })
+    }
+  })
+
+  it('sits a checkbox and a radio box at the top, level with the first line of a label that wraps', () => {
+    const box = { styles: { icon: { alignSelf: 'flex-start', marginTop: expect.closeTo(3) } } }
+    expect(checkbox).toMatchObject(box)
+    expect(radio).toMatchObject(box)
+  })
+
+  it('gives a message a 4px gap and a 14/20 line, and leaves the item its own gap below it', () => {
+    const rules = fieldRules(mode)
+    expect(rules).toContain(
+      '.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: 14px; line-height: 20px; }',
+    )
+    expect(rules).toContain('.ant-form-item-margin-offset { display: none; }')
+  })
+
+  it('draws an unticked checkbox or radio in a field with an error in dangerText', () => {
+    expect(fieldRules(mode)).toContain(
+      `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
+    )
   })
 })
 
@@ -195,5 +237,15 @@ describe('theme values', () => {
         .map(([what]) => `${file}: ${what}`),
     )
     expect(found).toEqual([])
+  })
+})
+
+describe('the table theme', () => {
+  it('pads a cell by spacing-xs above and below and spacing-lg on each side', () => {
+    const { spacing } = designTokensFor('light')
+    expect(tableTheme(designTokensFor('light')).components?.Table).toEqual({
+      cellPaddingBlock: spacing.xs,
+      cellPaddingInline: spacing.lg,
+    })
   })
 })

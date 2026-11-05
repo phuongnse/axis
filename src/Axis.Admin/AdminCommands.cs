@@ -5,6 +5,7 @@ using Axis.Administration;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Templates;
 using Axis.Data;
 using Axis.Data.Records;
 using Axis.Tenancy;
@@ -205,7 +206,7 @@ internal static partial class AdminCommands
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
-        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
+        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
 
@@ -1261,6 +1262,7 @@ internal static partial class AdminCommands
     private static async Task<int> PublisherAsync(
         string[] args,
         IConfiguration configuration,
+        CellOptions cell,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1287,12 +1289,13 @@ internal static partial class AdminCommands
         }
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken)
+            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, cancellationToken)
             : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
     private static async Task<int> DirectoryPublisherAsync(
         IConfiguration configuration,
+        CellOptions cell,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1324,6 +1327,17 @@ internal static partial class AdminCommands
         }
 
         using var http = IdentityProviderClient(identityProviderHandler);
+        var jobs = ProvisioningJobs.Builtin(settings.Platform.PlatformConnectionString);
+
+        // The create job runs in a cell only: outside one, the provisioning API answers 404, so no create job is queued.
+        if (cell.IsCell)
+        {
+            jobs = new Dictionary<string, IReadOnlyList<JobStep>>(jobs)
+            {
+                ["create"] = CreateJob.Steps(ReadCreateJobSettings(configuration, cell, settings), http, output, error),
+            };
+        }
+
         return await new Publisher(
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit, settings.ActivationTimeout),
             scenarioServer,
@@ -1333,7 +1347,61 @@ internal static partial class AdminCommands
             testLimit,
             output,
             error,
-            cancellationToken).RunAsync();
+            cancellationToken,
+            new ProvisioningJobs(settings.Platform.PlatformConnectionString, jobs, lease)).RunAsync();
+    }
+
+    // Reads each part of the create job's settings without stopping, and keeps the first problem of each part. A part that is wrong
+    // fails the create job at the first step that needs it, and never keeps the publisher from starting.
+    internal static CreateJobSettings ReadCreateJobSettings(IConfiguration configuration, CellOptions cell, ActivateSettings activate) =>
+        new(
+            ReadCreateJobCreate(configuration, cell, activate),
+            ResolveFolder(configuration[StudioApplicationsPathSetting]) is { } applications
+                ? JobSetting<string>.Of(applications)
+                : JobSetting<string>.Missing($"The setting {StudioApplicationsPathSetting} is required."),
+            ReadCreateJobTemplates(configuration),
+            string.IsNullOrWhiteSpace(cell.TenantDomain)
+                ? JobSetting<string>.Missing("The setting Cell:TenantDomain is required.")
+                : JobSetting<string>.Of(cell.TenantDomain.Trim()),
+            activate);
+
+    private static JobSetting<CreateSettings> ReadCreateJobCreate(IConfiguration configuration, CellOptions cell, ActivateSettings activate)
+    {
+        var create = ReadCreateSettings(configuration, readClientSecret: false, out var problem);
+        if (create is null)
+        {
+            return JobSetting<CreateSettings>.Missing(problem);
+        }
+
+        var cellCipher = TenantBackupKeys.ReadCellCipher(cell, out problem);
+        if (cellCipher is null)
+        {
+            return JobSetting<CreateSettings>.Missing(problem);
+        }
+
+        var environment = new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production);
+        var identityProvider = ReadIdentityProvider(configuration, environment, out problem);
+        return identityProvider is null
+            ? JobSetting<CreateSettings>.Missing(problem)
+            : JobSetting<CreateSettings>.Of(create with { IdentityProvider = identityProvider, Mail = activate.Mail, CellBackupCipher = cellCipher });
+    }
+
+    private static JobSetting<TemplateCatalog> ReadCreateJobTemplates(IConfiguration configuration)
+    {
+        if (ResolveFolder(configuration[TemplateCatalog.PathSetting]) is not { } root)
+        {
+            return JobSetting<TemplateCatalog>.Missing($"The setting {TemplateCatalog.PathSetting} is required.");
+        }
+
+        try
+        {
+            return JobSetting<TemplateCatalog>.Of(TemplateCatalog.Load(root));
+        }
+        catch (InvalidOperationException)
+        {
+            // The exception's message holds the folder, so this says only which setting is wrong.
+            return JobSetting<TemplateCatalog>.Missing($"The folder set by {TemplateCatalog.PathSetting} does not exist.");
+        }
     }
 
     private static async Task<int> ConfigurationPublisherAsync(
@@ -1521,7 +1589,7 @@ internal static partial class AdminCommands
     /// Reads the settings of <c>activate</c>: the common ones, the extension package and module folders and the inline recompute limit.
     /// A package or module folder that is not set gives an empty catalog, as on the server. One that is set but missing is a problem.
     /// </summary>
-    private static ActivateSettings? ReadActivateSettings(IConfiguration configuration, TextWriter error, out string problem)
+    internal static ActivateSettings? ReadActivateSettings(IConfiguration configuration, TextWriter error, out string problem)
     {
         var platform = ReadPlatformSettings(configuration, out problem);
         if (platform is null)
@@ -1885,7 +1953,7 @@ internal static partial class AdminCommands
     }
 
     /// <summary>Returns the reason to refuse the command, or null. It checks the admin role and the input before any tenant work.</summary>
-    private static async Task<string?> ValidateAsync(CreateSettings settings, TenantCreateRequest request, CancellationToken cancellationToken)
+    internal static async Task<string?> ValidateAsync(CreateSettings settings, TenantCreateRequest request, CancellationToken cancellationToken)
     {
         var problem = await AdminRoleProblemAsync(settings, cancellationToken) ?? IdAndHostsProblem(request.Id, request.Hosts);
         if (problem is not null)
@@ -2097,7 +2165,8 @@ internal sealed record TenantCreateRequest(
     IReadOnlyList<string> Hosts,
     string? PreviewOf,
     IReadOnlyList<KeyValuePair<string, string>> Bindings,
-    string? Administrator = null);
+    string? Administrator = null,
+    bool StayProvisioning = false);
 
 /// <summary><c>tenant oidc set</c>. <paramref name="WithClientKey"/> says that the client key is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
 internal sealed record OidcSetRequest(string Id, bool WithClientKey, TenantSignInChange Change);

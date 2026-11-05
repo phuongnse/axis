@@ -90,6 +90,9 @@ if (string.Equals(readerRole, new NpgsqlConnectionStringBuilder(platformSchemaCo
         "Connection strings 'Platform' and 'PlatformSchema' name the same user. They must be different roles.");
 }
 
+// The provisioning API's writes that need no job open this role's connection for the write alone, see CellPlatformWriter.
+builder.Services.AddSingleton(new CellPlatformWriter(platformSchemaConnectionString));
+
 var cipher = TenantSecretCipher.Load(builder.Configuration);
 builder.Services.AddSingleton(cipher);
 var platformMigration = new PlatformMigrationOptions(platformSchemaConnectionString, readerRole);
@@ -210,7 +213,14 @@ builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
     .AddSession(plainHttpAllowed)
     .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed)
     .AddEndpointCallers(oidcTenants, allowHttp: plainHttpAllowed)
-    .AddCellOperator(operatorRealm, allowHttp: plainHttpAllowed);
+    .AddCellOperator(operatorRealm, allowHttp: plainHttpAllowed)
+    .AddCellOperatorSession(operatorRealm, plainHttpAllowed)
+    .AddCellConsoleSignIn(
+        operatorRealm,
+        cell,
+        builder.Configuration[CellConsoleSignIn.ClientSecretSetting],
+        sessionCookiePolicy,
+        allowHttp: plainHttpAllowed);
 builder.Services.AddRouteAuthorization(cell.OperatorRole);
 
 // Off unless folders are listed, which is the Production default.
@@ -323,6 +333,7 @@ sessions.MapProcessOperatorEndpoints();
 sessions.MapDeadLetterEndpoints();
 sessions.MapTaskEndpoints();
 sessions.MapNotificationEndpoints();
+sessions.MapTenantNoticeEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
 sessions.MapUserCommandEndpoints();

@@ -139,7 +139,7 @@ export function StudioResourceTable({
     const collator = nameCollator()
     const own = items.map((item): ResourceRow => ({
       id: item.id,
-      name: resourceTitle(item, locale),
+      name: resourceTitle(item, locale, t),
       description: resourceDescription(item, locale),
       module: null,
       status: activity?.get(item.id)?.status ?? null,
@@ -164,7 +164,7 @@ export function StudioResourceTable({
       sortKey === 'status' ? (a: ResourceRow, b: ResourceRow) => rank(a) - rank(b) || byName(a, b) : byName
     const sorted = [...own, ...fromModules].sort(compare)
     return descending ? sorted.reverse() : sorted
-  }, [items, extra, locale, activity, sortKey, descending])
+  }, [items, extra, locale, activity, sortKey, descending, t])
 
   const unavailable = (
     <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.list.unavailable')}</Typography.Text>
@@ -222,12 +222,12 @@ export function StudioResourceTable({
   const columns: AxisColumn<ResourceRow>[] = [
     {
       key: 'name',
-      kind: 'text',
+      kind: 'freeText',
       title: t('shell.studio.list.name'),
       searchText: (row) => row.name,
       sorter: true,
       sortOrder: sortOrderOf('name'),
-      render: (row) => (
+      render: (_, row) => (
         <>
           <Link
             to={addressOf(row.id)}
@@ -253,19 +253,19 @@ export function StudioResourceTable({
     },
     {
       key: 'description',
-      kind: 'text',
+      kind: 'freeText',
       title: t('shell.studio.list.description'),
       searchText: (row) => [row.description, moduleLabel(row)].filter(Boolean).join(' '),
-      render: (row) => row.description ?? <EmptyDash />,
+      render: (_, row) => row.description ?? <EmptyDash />,
     },
     {
       key: 'status',
-      kind: 'fit',
+      kind: 'fixed',
       title: t('shell.studio.list.status'),
       searchText: statusLabel,
       sorter: true,
       sortOrder: sortOrderOf('status'),
-      render: (row) => {
+      render: (_, row) => {
         if (activity === undefined) {
           return loading
         }
@@ -285,7 +285,7 @@ export function StudioResourceTable({
     // Nothing records who last changed a resource yet, so these two columns show the dash until that logic is built.
     {
       key: 'lastModifiedBy',
-      kind: 'fit',
+      kind: 'fixed',
       title: t('shell.studio.list.lastModifiedBy'),
       sorter: true,
       sortOrder: sortOrderOf('lastModifiedBy'),
@@ -293,7 +293,7 @@ export function StudioResourceTable({
     },
     {
       key: 'lastModifiedAt',
-      kind: 'fit',
+      kind: 'fixed',
       title: t('shell.studio.list.lastModifiedAt'),
       sorter: true,
       sortOrder: sortOrderOf('lastModifiedAt'),
@@ -312,7 +312,7 @@ export function StudioResourceTable({
   return (
     <AxisTable<ResourceRow>
       testId="studio-resource-table"
-      rows={shown}
+      dataSource={shown}
       rowKey={(row) => row.id}
       columns={chosenColumns(columns, columnChoice)}
       toolbar={{
@@ -342,9 +342,9 @@ export function StudioResourceTable({
             }
           />
         ),
-        refresh: onRefresh,
+        onRefresh: onRefresh,
       }}
-      above={
+      below={
         <>
           {activity === null && (
             <Alert

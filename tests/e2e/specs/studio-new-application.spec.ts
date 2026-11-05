@@ -8,6 +8,7 @@ import { startServer } from '../activate'
 import { waitForDialog } from '../dialogs'
 import { e2eApp, templatesPath } from '../server-settings'
 import { useSession } from '../sessions'
+import { openKind, openNewApplication } from '../studio-resources'
 import { chooseTheme } from '../shell'
 
 // A second server starts in beforeAll, which takes a few seconds.
@@ -46,7 +47,8 @@ test.describe('Studio creates an application', () => {
     }
   })
 
-  // The id sorts after request-approval, so only the built-in flag puts it first.
+  // The id sorts after request-approval, so only the built-in flag puts it before it. Among the built-in entries the
+  // order is by id, so the installed approvals application comes first.
   async function addBuiltInTemplate(root: string) {
     const folder = path.join(root, 'tracker-test', '1.0.0')
     await mkdir(path.join(folder, 'sites'), { recursive: true })
@@ -89,7 +91,7 @@ test.describe('Studio creates an application', () => {
   }
 
   async function createApplication(page: Page, name: string, template?: string) {
-    await page.getByRole('button', { name: 'New application…', exact: true }).click()
+    await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
     if (template !== undefined) {
@@ -105,9 +107,11 @@ test.describe('Studio creates an application', () => {
     await createApplication(page, 'Inventory')
 
     await expect(page).toHaveURL(/app=Inventory$/)
+    await openKind(page, 'site')
     await expect(page.getByTestId('studio-group-site')).toBeVisible()
+    await openKind(page, 'text')
     await expect(page.getByTestId('studio-group-text')).toBeVisible()
-    await expect(page.getByTestId('studio-diagnostics')).toContainText('No diagnostics')
+    await expect(page.getByTestId('studio-problems')).toHaveCount(0)
   })
 
   test('an author creates an application from the request-approval template', async ({ page }) => {
@@ -117,8 +121,11 @@ test.describe('Studio creates an application', () => {
     await createApplication(page, 'Onboarding', 'Request approval')
 
     await expect(page).toHaveURL(/app=Onboarding$/)
+    await openKind(page, 'entity')
     await expect(page.getByTestId('studio-group-entity')).toBeVisible()
+    await openKind(page, 'process')
     await expect(page.getByTestId('studio-group-process')).toBeVisible()
+    await openKind(page, 'site')
     await expect(page.getByTestId('studio-group-site')).toBeVisible()
   })
 
@@ -127,7 +134,7 @@ test.describe('Studio creates an application', () => {
     const before = await readdir(applications)
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await page.getByRole('button', { name: 'New application…', exact: true }).click()
+    await openNewApplication(page)
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('PurchaseRequests')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
@@ -150,11 +157,12 @@ test.describe('Studio creates an application', () => {
   })
 
   async function expectBuiltInTemplateFirst(page: Page) {
-    await page.getByRole('button', { name: 'New application…', exact: true }).click()
+    await openNewApplication(page)
     const dialog = await waitForDialog(page)
-    await expect(dialog.getByRole('radio').nth(1)).toHaveAccessibleName(/^Tracker test.*Built in/)
-    await expect(dialog.getByRole('radio').nth(2)).toHaveAccessibleName(/^Request approval/)
-    await expect(dialog.getByRole('radio').nth(2)).not.toHaveAccessibleName(/Built in/)
+    await expect(dialog.getByRole('radio').nth(1)).toHaveAccessibleName(/^Approvals.*Built in/)
+    await expect(dialog.getByRole('radio').nth(2)).toHaveAccessibleName(/^Tracker test.*Built in/)
+    await expect(dialog.getByRole('radio').nth(3)).toHaveAccessibleName(/^Request approval/)
+    await expect(dialog.getByRole('radio').nth(3)).not.toHaveAccessibleName(/Built in/)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   }
 
@@ -164,7 +172,7 @@ test.describe('Studio creates an application', () => {
     await page.goto('/studio?app=PurchaseRequests')
     await me
 
-    await expect(page.getByTestId('studio-diagnostics')).toBeVisible()
+    await expect(page.getByTestId('studio-band')).toBeVisible()
     await expect(page.getByRole('button', { name: /new application/i })).toHaveCount(0)
   })
 })

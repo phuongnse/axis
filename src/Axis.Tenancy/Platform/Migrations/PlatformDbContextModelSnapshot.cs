@@ -49,11 +49,142 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("data_protection_keys", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.JobRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("ClaimedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("claimed_by");
+
+                    b.Property<int>("Claims")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("claims");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("clock_timestamp()");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Input")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("input");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<string>("RequestHash")
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Steps")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("steps");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_jobs");
+
+                    b.HasIndex("IdempotencyKey")
+                        .HasDatabaseName("ix_jobs_idempotency_key");
+
+                    b.HasIndex("State", "CreatedAt")
+                        .HasDatabaseName("ix_jobs_state_created_at");
+
+                    b.ToTable("jobs", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create')");
+
+                            t.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.OperatorSessionRow", b =>
+                {
+                    b.Property<byte[]>("IdHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("id_hash");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<DateTimeOffset>("LastRequestAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_request_at");
+
+                    b.Property<string>("OperatorId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("operator_id");
+
+                    b.PrimitiveCollection<string[]>("Roles")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("roles");
+
+                    b.Property<DateTimeOffset>("SignedInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signed_in_at");
+
+                    b.HasKey("IdHash")
+                        .HasName("pk_operator_sessions");
+
+                    b.ToTable("operator_sessions", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.PlatformAuditRecordRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
 
                     b.PrimitiveCollection<string[]>("Changed")
                         .IsRequired()
@@ -208,6 +339,55 @@ namespace Axis.Tenancy.Platform.Migrations
                             t.HasCheckConstraint("ck_tenant_data_keys_kind", "kind IN ('data', 'lookup')");
 
                             t.HasCheckConstraint("ck_tenant_data_keys_number", "number >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRequestRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Host")
+                        .HasColumnType("text")
+                        .HasColumnName("host");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset?>("CheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.HasKey("TenantId", "Host", "RequestedAt")
+                        .HasName("pk_tenant_host_requests");
+
+                    b.HasIndex("Host")
+                        .HasDatabaseName("ix_tenant_host_requests_host");
+
+                    b.ToTable("tenant_host_requests", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_host_requests_state", "state IN ('pending', 'verified', 'expired')");
                         });
                 });
 
@@ -740,6 +920,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_data_keys_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRequestRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_host_requests_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRow", b =>

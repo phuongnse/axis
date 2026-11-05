@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Templates;
 using Json.Patch;
 
 namespace Axis.Server.Studio;
@@ -72,14 +72,6 @@ internal sealed record StudioTextVersion(string Id, string Locale, string Versio
 /// </summary>
 internal static class StudioWrites
 {
-    private static readonly JsonWriterOptions _writer = new()
-    {
-        Indented = true,
-        IndentSize = 2,
-        NewLine = "\n",
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
-
     /// <summary>
     /// The files of <paramref name="folder"/> as a publish request stores them. It holds the write lock, so the
     /// snapshot never sees a write half done and includes every write that finished before the call. It throws
@@ -172,14 +164,7 @@ internal static class StudioWrites
             return new StudioLayerOutcome(null, null, null);
         }
 
-        var bytes = Serialize(new JsonObject
-        {
-            ["id"] = (existing?.File.Id ?? Guid.NewGuid()).ToString("D"),
-            ["kind"] = "layer",
-            ["formatVersion"] = 1,
-            ["target"] = existing?.Target ?? $"{moduleId}/{name}",
-            ["changes"] = changes.DeepClone(),
-        });
+        var bytes = Serialize(LayerObject(existing?.File.Id ?? Guid.NewGuid(), existing?.Target ?? $"{moduleId}/{name}", changes));
         if (existing is not null)
         {
             await ReplaceAsync(target, bytes, cancellationToken);
@@ -192,11 +177,22 @@ internal static class StudioWrites
         return new StudioLayerOutcome(null, file, Version(bytes));
     }
 
+    // The content of a layer file, as a save writes it.
+    internal static JsonObject LayerObject(Guid id, string target, JsonObject changes) =>
+        new()
+        {
+            ["id"] = id.ToString("D"),
+            ["kind"] = "layer",
+            ["formatVersion"] = 1,
+            ["target"] = target,
+            ["changes"] = changes.DeepClone(),
+        };
+
     // A layer file with its target as written.
-    private sealed record ExistingLayer(StudioFile File, string Target);
+    internal sealed record ExistingLayer(StudioFile File, string Target);
 
     // The first layer in path order whose target names this module exactly and this resource ignoring letter case.
-    private static ExistingLayer? FindLayer(IReadOnlyList<StudioFile> files, string moduleId, string name)
+    internal static ExistingLayer? FindLayer(IReadOnlyList<StudioFile> files, string moduleId, string name)
     {
         foreach (var file in files.Where(file => file.Kind == "layer"))
         {
@@ -554,20 +550,10 @@ internal static class StudioWrites
         && string.Equals(oldValue, newValue, StringComparison.Ordinal);
 
     // The quoted ETag or the bare hex version. Anything else, such as * or a weak tag, matches no version.
-    private static string Unquote(string value) =>
+    internal static string Unquote(string value) =>
         value.Length >= 2 && value[0] == '"' && value[^1] == '"' ? value[1..^1] : value;
 
-    internal static byte[] Serialize(JsonObject content)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream, _writer))
-        {
-            content.WriteTo(writer);
-        }
-
-        stream.WriteByte((byte)'\n');
-        return stream.ToArray();
-    }
+    internal static byte[] Serialize(JsonObject content) => TemplateApplications.Serialize(content);
 
     // The full path of the file, or null when it is not a real *.json file inside the folder: it leaves the
     // folder, or the file or a folder on the way to it is a link.

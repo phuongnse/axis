@@ -148,3 +148,14 @@ Dn refers to [decisions.md](../decisions.md).
     entry opens the resource at its path. One edit changes every one of them.
     _Built:_ the list sits above the canvas, loads once when the form opens,
     and shows each entry's relation, name and path.
+  - **Module forms.** _(built)_ A form of a module opens on this design view
+    with the application's layer applied, per
+    [customization layers](customization-layers.md#in-studio). It has no Form
+    or JSON tab and no Used on list. The canvas asks the
+    [module form draft route](draft-page-metadata.md), so a moved or added
+    field shows before **Save**. The outline rows carry the layer marks: an
+    **Added** or **Changed** tag with **Reset to module** on a step or a
+    section, keyed by `name`, and on a field, keyed by `field`. A removed field
+    is a muted row inside its section's row, and a removed section or step is
+    at the end of the outline. **Reset to module** is off while the draft has
+    unsaved edits.

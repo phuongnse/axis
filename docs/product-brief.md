@@ -27,7 +27,7 @@ An author creates, configures, tests, publishes and runs an application
 through Studio, without editing JSON or code. Files stay the source of truth
 (D5). No domain gets platform code. See [D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
 
-_(planned for M24 to M26)_ Axis ships built-in modules: standard processes,
+_(planned for M26)_ Axis ships built-in modules: standard processes,
 such as approvals, that a business
 builds its application from instead of starting from scratch. A service desk and an asset register
 follow _(planned for M30)_. A business changes any part of a module in a layer of its own

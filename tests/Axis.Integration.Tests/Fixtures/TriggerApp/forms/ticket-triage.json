@@ -4,5 +4,5 @@
   "name": "TicketTriage",
   "formatVersion": 1,
   "entity": "Ticket",
-  "sections": [{ "title": { "textKey": "ticketTriage.main" }, "fields": [{ "field": "stage" }] }]
+  "sections": [{ "name": "main", "title": { "textKey": "ticketTriage.main" }, "fields": [{ "field": "stage" }] }]
 }

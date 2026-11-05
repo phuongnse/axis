@@ -9,7 +9,8 @@ foresee. A business must be able to add them anywhere, without writing its
 process from scratch, while the values at the core of the module and of the
 platform still hold. M24 builds the contracts, M25 the customization layers,
 and M26 the first built-in modules, see the [roadmap](../roadmap.md#milestones).
-Everything here is _(planned for M24 to M26)_, except module migrations,
+The contracts and the customization layers are built, except changing a module field _(planned for M26)_.
+Everything else here is _(planned for M26)_, except module migrations,
 the upgrade merge and eject, _(planned for M29)_, and the `service-desk` and
 `assets` modules, _(planned for M30)_, as
 [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves them.

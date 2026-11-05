@@ -257,7 +257,7 @@ permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies. Dependencies (the `modules` list with the slot maps), resolving the graph, one
-copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios are built. Module policy grants on the module's processes are _(planned for M24)_.
+copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios are built. Module policy grants on the module's processes are built.
 
 ```json
 {
@@ -474,8 +474,7 @@ An application that declares it maps both slots to roles of its own:
   application as compiled. A module's scenarios run after the application's own,
   in pin order and then by file path, in Studio and with `Axis.Scenarios`. A result
   is named `<module id>/<scenario name>`. The scenario files stay out of the
-  release and its content hash. A module marks some as contract scenarios
-  _(planned for M24)_, which run on every publish, see
+  release and its content hash. A module marks some as contract scenarios, which run on every publish, see
   [contract scenarios](module-contracts.md#contract-scenarios).
 - **Dependencies.** _(built)_ `module.json` has an optional `modules`, with the `id` and
   `version` entries of an application's `modules`. A bad entry is `AXC0203`,
@@ -529,9 +528,8 @@ An application that declares it maps both slots to roles of its own:
   unknown-name code.
 - **Studio.** The policy matrix lists a module policy's grants in the row of the
   role its slot maps to, read-only and tagged with the module, without an Open policy
-  link. Studio shows a module's processes, policies and pages read-only _(built)_, as it shows
-  module entities: a process as its graph, a policy as a table of its grants and a page
-  drawn on the page canvas. Studio never edits a module.
+  link. A module entity opens in
+  the entity designer, a module process in the process designer, a module policy in the module editor as its grants and a module page in the page designer, and an author's edit is saved as a customization layer. Studio never edits the module's own files.
 - **Upgrades.** A module upgrade must still be additive for its entities
   (`AXC0213`). Adding a process, page or policy is additive, and a version that adds a process
   file is accepted.
@@ -571,7 +569,7 @@ The manifest is `template.json` at the root of the folder:
 - **Installation.** Templates are installed per installation under
   `Templates:Path/<id>/<version>/`. The environment variable is
   `Templates__Path`, and relative paths are resolved against the server content
-  root. The server reads them. Without the setting no
+  root. The server reads them, and in a cell the publisher reads them for the create job. Without the setting no
   template is installed. A setting that names a missing folder stops the
   server. A template version with a bad manifest, with folder names that differ
   from its manifest, or without exactly one site is left out and logged as a

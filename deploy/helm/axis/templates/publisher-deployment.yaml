@@ -38,7 +38,22 @@ spec:
           args:
             - publisher
           env:
+            {{- if .Values.cell.id }}
+            {{- /* The create job runs in this pod, and it reads the cell's backup key from its own mount, not from cell.backupKeyFile. */}}
+            {{- $values := mergeOverwrite (deepCopy .Values) (dict "cell" (dict "backupKeyFile" "/cell-backup-key/key")) }}
+            {{- include "axis.hostEnv" (dict "Values" $values) | nindent 12 }}
+            - name: IdentityProvider__Url
+              value: {{ printf "https://%s/" (required "identity.hostname is required in a cell: the host name of the identity provider" .Values.identity.hostname) | quote }}
+            - name: IdentityProvider__AdminClientId
+              value: axis-admin
+            # The Studio volume of the server, so the applications that the create job writes are the ones Studio shows.
+            - name: Studio__ApplicationsPath
+              value: /studio
+            - name: Templates__Path
+              value: /templates
+            {{- else }}
             {{- include "axis.hostEnv" . | nindent 12 }}
+            {{- end }}
           securityContext:
             {{- include "axis.containerSecurityContext" . | nindent 12 }}
           {{- with .Values.publisher.resources }}
@@ -47,9 +62,35 @@ spec:
           {{- end }}
           volumeMounts:
             {{- include "axis.volumeMounts" . | nindent 12 }}
+            {{- if .Values.cell.id }}
+            - name: cell-backup-key
+              mountPath: /cell-backup-key
+              readOnly: true
+            - name: studio
+              mountPath: /studio
+            - name: templates
+              mountPath: /templates
+              readOnly: true
+            {{- end }}
       volumes:
         {{- $entries := list "platformSchemaConnection" "platformSecretKey" }}
+        {{- if .Values.cell.id }}
+        {{- $entries = concat $entries (list "adminConnection" "identityAdminClientSecret") }}
+        {{- end }}
         {{- if .Values.secrets.scenarioServerConnection.name }}
         {{- $entries = append $entries "scenarioServerConnection" }}
         {{- end }}
         {{- include "axis.volumes" (dict "root" . "entries" $entries) | nindent 8 }}
+        {{- if .Values.cell.id }}
+        - name: cell-backup-key
+          secret:
+            secretName: {{ required "secrets.cellBackupKey.name is required in a cell: the Kubernetes Secret that holds the cell's backup key" .Values.secrets.cellBackupKey.name | quote }}
+            defaultMode: 292
+            items:
+              - key: {{ .Values.secrets.cellBackupKey.key | default "cell-backup-key" | quote }}
+                path: key
+        - name: studio
+          {{- toYaml (required "studio.persistence is required in a cell: a ReadWriteMany volume source that the server and the publisher mount at /studio" .Values.studio.persistence) | nindent 10 }}
+        - name: templates
+          {{- toYaml (required "templates.volume is required in a cell: the installed templates, mounted read-only at /templates" .Values.templates.volume) | nindent 10 }}
+        {{- end }}

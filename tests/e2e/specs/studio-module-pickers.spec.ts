@@ -7,7 +7,7 @@ import { startServer } from "../activate";
 import { pickOption } from "../select";
 import { checklistsModule, e2eApp, moduleApp, modulesPath } from "../server-settings";
 import { useSession } from "../sessions";
-import { openFormTab } from "../studio-resources";
+import { openFormTab, openKind } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -53,9 +53,10 @@ test.describe("Studio's pickers offer the pages and processes of a module", () =
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
+    await openKind(page, "site");
     await page
       .getByTestId("studio-group-site")
-      .getByRole("button", { name: "ModuleSite", exact: true })
+      .getByRole("button", { name: "Module app", exact: true })
       .click();
     await openFormTab(page);
     await pickOption(
@@ -74,6 +75,7 @@ test.describe("Studio's pickers offer the pages and processes of a module", () =
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
+    await openKind(page, "page");
     await page.getByTestId("studio-group-page").getByRole("button", { name: "Items", exact: true }).click();
     await openFormTab(page);
     await pickOption(

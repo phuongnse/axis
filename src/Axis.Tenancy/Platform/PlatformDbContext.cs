@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
-/// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the data protection keys
+/// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts, the requests for hosts of their own,
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -17,6 +17,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantRow> Tenants => Set<TenantRow>();
 
     public DbSet<TenantHostRow> TenantHosts => Set<TenantHostRow>();
+
+    public DbSet<TenantHostRequestRow> TenantHostRequests => Set<TenantHostRequestRow>();
 
     public DbSet<TenantBindingRow> TenantBindings => Set<TenantBindingRow>();
 
@@ -32,6 +34,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<TenantSiteLegalRow> TenantSiteLegalLinks => Set<TenantSiteLegalRow>();
 
+    public DbSet<OperatorSessionRow> OperatorSessions => Set<OperatorSessionRow>();
+
     public DbSet<TenantUsageLatestRow> TenantUsageLatest => Set<TenantUsageLatestRow>();
 
     public DbSet<TenantUsageRow> TenantUsage => Set<TenantUsageRow>();
@@ -41,6 +45,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantDailyCounterRow> TenantDailyCounters => Set<TenantDailyCounterRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
+
+    public DbSet<JobRow> Jobs => Set<JobRow>();
 
     public DbSet<PlatformAuditRecordRow> AuditRecords => Set<PlatformAuditRecordRow>();
 
@@ -117,6 +123,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .HasForeignKey(host => host.TenantId)
                 .HasConstraintName("fk_tenant_hosts_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantHostRequestRow>()
+                .WithOne()
+                .HasForeignKey(request => request.TenantId)
+                .HasConstraintName("fk_tenant_host_requests_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
             tenant.HasMany<TenantBindingRow>()
                 .WithOne()
                 .HasForeignKey(binding => binding.TenantId)
@@ -182,6 +193,23 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             host.Property(h => h.Host).HasColumnName("host");
             host.Property(h => h.SitePath).HasColumnName("site_path");
             host.HasIndex(h => new { h.TenantId, h.SitePath }).IsUnique().HasDatabaseName("ix_tenant_hosts_tenant_id_site_path");
+        });
+
+        modelBuilder.Entity<TenantHostRequestRow>(request =>
+        {
+            request.ToTable("tenant_host_requests", table => table.HasCheckConstraint(
+                "ck_tenant_host_requests_state",
+                "state IN ('pending', 'verified', 'expired')"));
+            request.HasKey(r => new { r.TenantId, r.Host, r.RequestedAt }).HasName("pk_tenant_host_requests");
+            request.Property(r => r.TenantId).HasColumnName("tenant_id");
+            request.Property(r => r.Host).HasColumnName("host");
+            request.Property(r => r.Token).HasColumnName("token");
+            request.Property(r => r.State).HasColumnName("state");
+            request.Property(r => r.RequestedAt).HasColumnName("requested_at").HasColumnType("timestamp with time zone");
+            request.Property(r => r.ExpiresAt).HasColumnName("expires_at").HasColumnType("timestamp with time zone");
+            request.Property(r => r.CheckedAt).HasColumnName("checked_at").HasColumnType("timestamp with time zone");
+            request.Property(r => r.Actor).HasColumnName("actor");
+            request.HasIndex(r => r.Host).HasDatabaseName("ix_tenant_host_requests_host");
         });
 
         modelBuilder.Entity<TenantBindingRow>(binding =>
@@ -318,6 +346,18 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             lease.HasIndex(l => new { l.TenantId, l.Quota, l.ExpiresAt }).HasDatabaseName("ix_tenant_leases_tenant_id_quota_expires_at");
         });
 
+        modelBuilder.Entity<OperatorSessionRow>(session =>
+        {
+            session.ToTable("operator_sessions");
+            session.HasKey(s => s.IdHash).HasName("pk_operator_sessions");
+            session.Property(s => s.IdHash).HasColumnName("id_hash").HasColumnType("bytea").ValueGeneratedNever();
+            session.Property(s => s.OperatorId).HasColumnName("operator_id");
+            session.Property(s => s.DisplayName).HasColumnName("display_name");
+            session.Property(s => s.Roles).HasColumnName("roles").HasColumnType("text[]");
+            session.Property(s => s.SignedInAt).HasColumnName("signed_in_at").HasColumnType("timestamp with time zone");
+            session.Property(s => s.LastRequestAt).HasColumnName("last_request_at").HasColumnType("timestamp with time zone");
+        });
+
         modelBuilder.Entity<TenantDailyCounterRow>(counter =>
         {
             counter.ToTable("tenant_daily_counters", table => table.HasCheckConstraint("ck_tenant_daily_counters_value", "value >= 0"));
@@ -349,6 +389,35 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             record.Property(r => r.OsUser).HasColumnName("os_user");
             record.Property(r => r.Machine).HasColumnName("machine");
             record.Property(r => r.Changed).HasColumnName("changed").HasColumnType("text[]");
+            record.Property(r => r.Actor).HasColumnName("actor");
+        });
+
+        modelBuilder.Entity<JobRow>(job =>
+        {
+            job.ToTable("jobs", table =>
+            {
+                table.HasCheckConstraint("ck_jobs_kind", "kind IN ('suspend', 'resume', 'create')");
+                table.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
+            });
+            job.HasKey(j => j.Id).HasName("pk_jobs");
+            job.Property(j => j.Id).HasColumnName("id").ValueGeneratedNever();
+            job.Property(j => j.Kind).HasColumnName("kind");
+            job.Property(j => j.TenantId).HasColumnName("tenant_id");
+            job.Property(j => j.State).HasColumnName("state");
+            job.Property(j => j.Steps).HasColumnName("steps").HasColumnType("jsonb");
+            job.Property(j => j.Error).HasColumnName("error");
+            job.Property(j => j.Input).HasColumnName("input").HasColumnType("jsonb");
+            job.Property(j => j.IdempotencyKey).HasColumnName("idempotency_key");
+            job.Property(j => j.RequestHash).HasColumnName("request_hash");
+            job.Property(j => j.Actor).HasColumnName("actor");
+            job.Property(j => j.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("clock_timestamp()");
+            job.Property(j => j.StartedAt).HasColumnName("started_at").HasColumnType("timestamp with time zone");
+            job.Property(j => j.FinishedAt).HasColumnName("finished_at").HasColumnType("timestamp with time zone");
+            job.Property(j => j.ClaimedBy).HasColumnName("claimed_by");
+            job.Property(j => j.LeaseUntil).HasColumnName("lease_until").HasColumnType("timestamp with time zone");
+            job.Property(j => j.Claims).HasColumnName("claims").HasDefaultValue(0);
+            job.HasIndex(j => new { j.State, j.CreatedAt }).HasDatabaseName("ix_jobs_state_created_at");
+            job.HasIndex(j => j.IdempotencyKey).HasDatabaseName("ix_jobs_idempotency_key");
         });
     }
 }

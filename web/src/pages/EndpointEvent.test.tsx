@@ -13,6 +13,7 @@ const events: StudioNames['events'] = [
   {
     id: 'ev1',
     name: 'PaymentReceived',
+    module: null,
     entity: 'PurchaseRequest',
     fields: [
       { name: 'amount', type: 'decimal' },
@@ -20,7 +21,13 @@ const events: StudioNames['events'] = [
       { name: 'note', type: 'text' },
     ],
   },
-  { id: 'ev2', name: 'PaymentFailed', entity: 'PurchaseRequest', fields: [{ name: 'reason', type: 'text' }] },
+  {
+    id: 'ev2',
+    name: 'PaymentFailed',
+    module: null,
+    entity: 'PurchaseRequest',
+    fields: [{ name: 'reason', type: 'text' }],
+  },
 ]
 
 function renderEvent(data: unknown, { names = true, onChange = vi.fn() } = {}) {

@@ -154,7 +154,7 @@ and a JSON view, and shows the diagnostics.
   `Studio:Folders` is not empty or this setting is set. See
   [creating an application](authoring.md#creating-an-application) and
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
-- **In a cell.** When `Cell:Id` is set, each tenant's applications are under
+- **In a cell.** The publisher also reads this setting for the create job, which copies a template into the tenant's folder. When `Cell:Id` is set, each tenant's applications are under
   `<Studio:ApplicationsPath>/<tenant id>/`, and Studio on a tenant's host reads, writes and creates
   only there. Studio creates the folder the first time it uses it. Another tenant's application, by
   name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
@@ -270,8 +270,8 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
 | `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start. |
 | `Platform:PreviousSecretKey` | none | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key). |
-| `ConnectionStrings:Platform` | none | A role that reads the `platform` schema and writes only four things: rows it inserts into `platform.data_protection_keys`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. Both hosts need it under `directory`. Outside Development and Testing the server, and the worker under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
-| `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations, under both sources. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. Outside Development and Testing the server refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `ConnectionStrings:Platform` | none | A role that reads the `platform` schema and writes only these: rows it inserts into `platform.data_protection_keys` and `platform.jobs`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. Both hosts need it under `directory`. Outside Development and Testing the server, and the worker under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it at start for the platform migrations, under both sources, and for each `PUT /api/cell/tenants/{id}/quotas`, which opens an unpooled connection for that write alone. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. Outside Development and Testing the server refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 
 As environment variables they are `Tenancy__Source`,
 `Tenancy__RefreshInterval`, `Platform__SecretKey`,
@@ -524,11 +524,11 @@ for `tenant create` and `tenant restore`. `migrate`, `tenant suspend`, `tenant r
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`. Outside Development and Testing, every command refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `Admin:ConnectionString` | none | A database role with `CREATEDB` and `CREATEROLE` on the database server that holds the tenant databases. `Axis.Admin` needs it for `tenant create`, `tenant restore` and `tenant rotate-passwords`, and the publisher reads it in a cell for the create job. Outside Development and Testing, every command refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 
 As an environment variable it is `Admin__ConnectionString`.
 
-`tenant create` of a main tenant also reads three settings for the identity provider, see
+`tenant create` of a main tenant also reads three settings for the identity provider, and so does the publisher in a cell, for the create job. See
 [administration](administration.md#settings) and [Axis's identity provider](identity-provider.md#keeping-the-realm-in-step).
 A preview tenant reads none of them.
 
@@ -646,6 +646,8 @@ does not read `Quotas:Defaults` yet.
 | `Cell:InternalUrl` | Server | The internal listener of the [provisioning API](tenant-lifecycle.md#provisioning-api). |
 | `Cell:OperatorRealm` | Server, admin | The operator realm, `axis-operators` by default. |
 | `Cell:OperatorRole` | Server, admin | The role of the operator realm that the cell console and the API need, `cell-operator` by default. |
+| `Cell:ConsoleClientId` | Server | The client of the operator realm that the [cell console](cell-console.md#sign-in) signs operators in with, `axis-cell-console` by default. A blank value keeps the default. |
+| `Cell:ConsoleClientSecret` | Server | The secret of that client. Without it the server offers no console sign-in, and `GET /api/cell/auth/sign-in` answers `404`. The server reads it from configuration only, so it should come from a secret store or an environment variable (`Cell__ConsoleClientSecret`). |
 | `IdentityProvider:Url` | Server | In a cell with `Cell:ConsoleHost` or `Cell:InternalUrl` set, the server reads the identity provider's address, described in the [admin settings](#admin-settings), and finds the operator realm at `realms/<Cell:OperatorRealm>` under it. A missing or wrong value stops the start, and the message names the setting. |
 | `Cell:BackupKeyFile` | Admin, publisher | The file of the cell's backup key, which wraps each tenant's backup key. In a cell, `tenant create`, `tenant backup`, `tenant restore`, `cell backup` and `cell restore-check` need it and stop with exit code `2` without it. The other hosts and commands never read it. |
 | `Cell:BackupStorage:ServiceUrl` | Admin | The address of the S3-compatible service that `cell backup` uploads to. Only `cell backup` and `cell restore-check` read the five `Cell:BackupStorage` settings, and they stop with exit code `2` when one is blank, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |

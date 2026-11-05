@@ -31,6 +31,9 @@ worker:
 
 # The publisher runs "axis-admin publisher", which runs the publish requests that
 # Studio stores. It uses the image of migrate.repository and always runs one replica.
+# In a cell it also runs the create job of the provisioning API, so it gets the admin
+# connection, the axis-admin client secret, the cell backup key, studio.persistence at
+# /studio and templates.volume at /templates, and all of them are required there.
 publisher:
   resources: {}
   # Longer than the five-minute lease, so a stop lets the running request finish.
@@ -116,7 +119,9 @@ cell:
 
 # Backups in a cell. It is used in a cell only. Setting bucket renders a CronJob that runs
 # "axis-admin cell backup" every day at 01:00 in timeZone, an IANA time zone name such as
-# "Asia/Ho_Chi_Minh". timeZone, serviceUrl and region are required with a bucket. The storage
+# "Asia/Ho_Chi_Minh", and a second CronJob that runs "axis-admin cell restore-check" every Sunday at
+# 03:00 in timeZone. The second one also needs secrets.adminConnection and cell.internalDomain.
+# timeZone, serviceUrl and region are required with a bucket. The storage
 # credentials are the two Secret references secrets.backupStorageAccessKeyId and
 # secrets.backupStorageSecretAccessKey, and never values. The operator sets the bucket's object lock
 # in compliance mode for 30 days and a lifecycle rule that deletes an archive after 30 days. The chart
@@ -141,13 +146,20 @@ extensions:
 modules:
   volume: {}
 
-# Studio, on the server only. Setting folders turns Studio on. Each folder is a
-# path relative to the Studio volume, which is mounted read-write at /studio on
-# every server replica, so "purchase-requests" becomes /studio/purchase-requests.
+# The installed templates, mounted read-only at /templates on the publisher in a cell, where the
+# create job reads them. Required in a cell and unused outside one. Same form as extensions.volume.
+templates:
+  volume: {}
+
+# Studio, on the server. Setting folders turns Studio on. In a cell the server and the publisher
+# also mount persistence at /studio and use it as the applications folder, so the applications that
+# the create job writes are the ones Studio shows. Each folder is a path relative to the Studio
+# volume, which is mounted read-write at /studio on every server replica, so "purchase-requests"
+# becomes /studio/purchase-requests.
 # The roles are roles claim values. Without one, nobody may author or publish.
-# persistence is required when folders is set. It is any Kubernetes volume source,
-# and it needs a ReadWriteMany volume source when the server runs several
-# replicas. The chart creates no claim. For example:
+# persistence is required when folders is set and in a cell. It is any Kubernetes volume source,
+# and it needs a ReadWriteMany volume source when the server runs several replicas and in a cell,
+# where the publisher mounts it too. The chart creates no claim. For example:
 #   persistence:
 #     persistentVolumeClaim:
 #       claimName: axis-studio
@@ -226,9 +238,17 @@ secrets:
   # are fixed, so the reference holds only the name. Your Ingress must connect over HTTPS and verify it.
   serverCertificate:
     name: ""
+  # Admin:ConnectionString, the connection of the admin role. Used in a cell only, by the publisher,
+  # which runs the create job, and by the cell restore-check CronJob, which restores an archive into
+  # a scratch tenant. Required in a cell.
+  adminConnection:
+    name: ""
+    key: Admin__ConnectionString
   # Scenarios:ServerConnectionString, the connection of a role with CREATEDB that owns no
   # database, which the publisher uses to run test scenarios. Optional, and used by the
-  # publisher only. The Secret is mounted only when name is set. Set studio.tests with it.
+  # publisher and the cell restore-check CronJob only. The Secret is mounted only when name is set.
+  # A cell whose tenants have Studio applications needs it set for the weekly restore check to pass.
+  # Set studio.tests with it.
   scenarioServerConnection:
     name: ""
     key: Scenarios__ServerConnectionString
@@ -245,7 +265,8 @@ secrets:
     name: ""
     key: KC_DB_PASSWORD
   # IdentityProvider:AdminClientSecret, the secret of the axis-admin client, the bootstrap client of the
-  # master realm. Used by the identity provider only, which reads it as KC_BOOTSTRAP_ADMIN_CLIENT_SECRET.
+  # master realm. Used by the identity provider, which reads it as KC_BOOTSTRAP_ADMIN_CLIENT_SECRET, and
+  # in a cell by the publisher and the cell restore-check CronJob.
   identityAdminClientSecret:
     name: ""
     key: IdentityProvider__AdminClientSecret
@@ -264,18 +285,18 @@ secrets:
   pgbouncerCertificate:
     name: ""
   # Cell:BackupStorage:AccessKeyId, the access key id of the backup storage. Used by the cell backup
-  # CronJob only. Needed with backup.bucket.
+  # and cell restore-check CronJobs only. Needed with backup.bucket.
   backupStorageAccessKeyId:
     name: ""
     key: Cell__BackupStorage__AccessKeyId
   # Cell:BackupStorage:SecretAccessKey, the secret access key of the backup storage. Used by the cell
-  # backup CronJob only. Needed with backup.bucket.
+  # backup and cell restore-check CronJobs only. Needed with backup.bucket.
   backupStorageSecretAccessKey:
     name: ""
     key: Cell__BackupStorage__SecretAccessKey
-  # The cell's backup key, which unwraps the keys of the tenants. Used by the cell backup CronJob
-  # only, which mounts it read-only at /cell-backup-key/key and points Cell:BackupKeyFile there.
-  # Needed with backup.bucket.
+  # The cell's backup key, which unwraps the keys of the tenants. Used by the cell backup and cell
+  # restore-check CronJobs and the publisher in a cell, which mount it read-only at /cell-backup-key/key
+  # and point Cell:BackupKeyFile there. Required in a cell.
   cellBackupKey:
     name: ""
     key: cell-backup-key

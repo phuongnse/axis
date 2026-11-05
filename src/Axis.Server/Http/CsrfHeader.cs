@@ -1,4 +1,5 @@
 using Axis.Server.Authentication;
+using Axis.Server.CellApi;
 
 namespace Axis.Server.Http;
 
@@ -11,8 +12,8 @@ internal static class CsrfHeader
     /// Refuses a <c>POST</c>, <c>PUT</c>, <c>PATCH</c> or <c>DELETE</c> under <c>/api</c> with a
     /// <c>403</c> unless it carries exactly one <c>X-Axis-Csrf: 1</c> header. A cross-site page
     /// cannot set a custom header without a CORS preflight, and Axis allows no cross-origin requests.
-    /// Endpoint paths and service account requests are exempt: they take a bearer token and no cookie, and a
-    /// browser cannot attach a bearer token on its own.
+    /// Endpoint paths, service account requests and the bearer requests of a cell's machine callers are exempt: they take a
+    /// bearer token and no cookie, and a browser cannot attach a bearer token on its own.
     /// </summary>
     public static IApplicationBuilder UseCsrfHeader(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
@@ -21,6 +22,7 @@ internal static class CsrfHeader
             if (request.Path.StartsWithSegments("/api")
                 && !EndpointCaller.IsEndpointPath(request.Path)
                 && !ServiceAccount.Applies(context)
+                && !CellOperator.IsBearerCall(context)
                 && IsUnsafe(request.Method)
                 && !HasHeader(request))
             {

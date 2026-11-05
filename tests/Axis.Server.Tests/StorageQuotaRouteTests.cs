@@ -37,6 +37,7 @@ public sealed class StorageQuotaRouteTests
         "PATCH /api/studio/apps/{application}/resources/{id}",
         "POST /api/studio/apps",
         "POST /api/studio/apps/{application}/changes",
+        "POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset",
         "POST /api/studio/apps/{application}/publish",
         "POST /api/studio/apps/{application}/resources",
         "PUT /api/studio/apps/{application}/modules/{module}/resources/{id}",
@@ -59,12 +60,22 @@ public sealed class StorageQuotaRouteTests
         "DELETE /api/me/sessions",
         "DELETE /api/me/sessions/{id}",
         "POST /api/auth/sign-out",
+        "POST /api/cell/auth/sign-out",
+
+        // The provisioning API writes platform rows and no tenant data, so the storage quota does not count it.
+        "POST /api/cell/tenants",
+        "POST /api/cell/tenants/{id}/hosts",
+        "POST /api/cell/tenants/{id}/resume",
+        "POST /api/cell/tenants/{id}/suspend",
+        "PUT /api/cell/tenants/{id}/quotas",
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 
         // Notifications.
         "POST /api/apps/{app}/notifications/read-all",
         "POST /api/apps/{app}/notifications/{id}/read",
+        "POST /api/notifications/read-all",
+        "POST /api/notifications/{id}/read",
 
         // A process start writes its instance, and task and instance work goes on over the quota.
         "POST /api/apps/{app}/processes/{module}/{process}/instances",
@@ -106,6 +117,7 @@ public sealed class StorageQuotaRouteTests
 
         // The expression check and the page metadata compile in memory and write nothing.
         "POST /api/studio/apps/{application}/expressions/check",
+        "POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata",
         "POST /api/studio/apps/{application}/resources/{id}/page-metadata",
     };
 

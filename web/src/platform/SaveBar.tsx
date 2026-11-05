@@ -3,7 +3,7 @@ import { Button, Modal, Typography } from 'antd'
 import { useContext, useState } from 'react'
 import { AxisButton } from './AxisButton'
 import { dialogWidth } from './dialogButtons'
-import { ShellSidebarContext } from './shellSidebar'
+import { ShellSidebarContext } from './shellSidebarContext'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 

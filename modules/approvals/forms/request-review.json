@@ -6,6 +6,7 @@
   "entity": "Request",
   "sections": [
     {
+      "name": "request",
       "title": { "textKey": "approvals.requestReview.request" },
       "fields": [
         { "field": "number", "readOnly": true },
@@ -18,6 +19,7 @@
       ]
     },
     {
+      "name": "decision",
       "title": { "textKey": "approvals.requestReview.decision" },
       "fields": [{ "field": "decisionComment" }]
     }

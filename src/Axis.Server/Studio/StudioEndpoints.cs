@@ -51,6 +51,13 @@ namespace Axis.Server.Studio;
 /// 415 for another content type, 400 for a body that is not an object, a module scenario, an ambiguous name, an edit that
 /// cannot be a layer and a contract edit beyond added states and transitions, 409 for a stale version and 503 when the
 /// write lock cannot be taken.
+/// <c>POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset</c> takes <c>{ list, key }</c> and puts one
+/// element of the module resource back as the module has it, or drops it when the layer added it, and rewrites the layer as
+/// the difference that is left. It needs <c>If-Match</c> with the layer's version and answers like the save. After the lookup
+/// above it answers 428 without <c>If-Match</c>, 415 for another content type, 400 for a body that is not exactly two string
+/// properties <c>list</c> and <c>key</c>, a module scenario and an ambiguous name, 409 for a stale version or no layer, 400 for
+/// a layer that removes the whole resource or that cannot be read back, 404 for a list or key that names no element and 503 when
+/// the write lock cannot be taken. "Reset all" is the delete of the layer resource below.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -75,12 +82,14 @@ namespace Axis.Server.Studio;
 /// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
 /// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
-/// In a cell, the create, patch, <c>changes</c>, module resource save and text write routes check the tenant's storage
+/// In a cell, the create, patch, <c>changes</c>, module resource save, module resource reset and text write routes check the tenant's storage
 /// quota (403 <c>quota-exceeded</c>) right after the session, and a delete never does, see
 /// <c>docs/reference/tenant-quotas.md#refusals</c>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
-/// newest first, as <c>{ active, folderContentHash, items }</c>. <c>active</c> is the active release or null, and
-/// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. Each item has
+/// newest first, as <c>{ active, folderContentHash, changes, items }</c>. <c>active</c> is the active release or null, and
+/// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. <c>changes</c>
+/// lists the files that differ from the active release, see <see cref="StudioReleaseChanges"/>, and is null when nothing
+/// is active. Each item has
 /// <c>offStandard</c> and <c>relaxed: [{ module, point, reason }]</c>, read from the <c>application.json</c> stored with
 /// that release. It reads the tenant database and changes nothing.
 /// </summary>
@@ -94,6 +103,7 @@ internal static class StudioEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/resources/{id}", GetAsync);
         endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceAsync);
         endpoints.MapPut("/api/studio/apps/{application}/modules/{module}/resources/{id}", ModuleResourceSaveAsync).WithStorageQuota();
+        endpoints.MapPost("/api/studio/apps/{application}/modules/{module}/resources/{id}/reset", ModuleResourceResetAsync).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/resources", CreateAsync).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/changes", ChangesAsync).WithStorageQuota();
         endpoints.MapGet("/api/studio/apps/{application}/diagnostics", DiagnosticsAsync);
@@ -162,6 +172,7 @@ internal static class StudioEndpoints
             .ToDictionary(group => group.Key, group => group.Count());
         var files = StudioFolder.List(folder);
         var texts = TextsByLocale(files);
+        var titles = StudioResourceTitles.Read(files);
         var items = files
             .Select(file => new StudioResourceItem(
                 file.Id.ToString("D"),
@@ -170,8 +181,8 @@ internal static class StudioEndpoints
                 file.File,
                 file.Version,
                 usedBy.GetValueOrDefault(file.Id),
-                ResourceTitles(file, texts),
-                file.Kind == "text" ? TextLocale(file) : null,
+                titles[file.Id].Titles,
+                titles[file.Id].Locale,
                 ResourceDescriptions(file, texts)))
             .ToList();
         return Results.Ok(new StudioResourceListResponse(items));
@@ -272,11 +283,14 @@ internal static class StudioEndpoints
                 .ToListAsync(cancellationToken))
                 .ToHashSet(StringComparer.Ordinal);
         var compiled = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules);
-        var changed = active is null
-            ? []
-            : (await LiveChangesAsync(database, folder, compiled, active.ReleaseId, cancellationToken))
+        var activeStore = new ActiveReleaseStore(context);
+        var changed = active is not null && await activeStore.GetReleaseAsync(active.ReleaseId, cancellationToken) is { } liveRelease
+            ? StudioReleaseChanges.Compare(
+                    StudioFolder.Snapshot(folder),
+                    [.. liveRelease.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content))])
                 .Select(change => change.Path)
-                .ToHashSet(StringComparer.Ordinal);
+                .ToHashSet(StringComparer.Ordinal)
+            : [];
         string Status(string path) => !live.Contains(path) ? "new" : changed.Contains(path) ? "changed" : "published";
         return Results.Ok(new StudioResourceActivityResponse(
             [.. files.Select(file => new StudioResourceActivityItem(file.Id.ToString("D"), Status(file.File))),
@@ -602,22 +616,9 @@ internal static class StudioEndpoints
                 return Problem(StatusCodes.Status400BadRequest, "The edit cannot be saved as a layer.");
             }
 
-            if (found.Kind == ResourceKinds.Contract && difference.Changes is not null)
+            if (!LayerAllowed(found, module, difference.Changes))
             {
-                var layer = new LayerResource
-                {
-                    Id = Guid.Empty,
-                    Kind = "layer",
-                    FormatVersion = 1,
-                    Target = $"{module}/{found.Name}",
-                    Changes = JsonSerializer.SerializeToElement(difference.Changes),
-                };
-                var problems = new List<Diagnostic>();
-                ContractLayerChecker.CheckAdditions(found.Root, layer, problems);
-                if (problems.Any(problem => problem.Code == DiagnosticCodes.ContractLayerNotAddition))
-                {
-                    return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
-                }
+                return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
             }
 
             // A tag other than * in If-None-Match matches no state of the layer, so the save is stale.
@@ -635,24 +636,144 @@ internal static class StudioEndpoints
                 hasIfMatch ? request.Headers.IfMatch.ToString() : null,
                 hasIfNoneMatch,
                 httpContext.RequestAborted);
-            switch (outcome.Refusal)
-            {
-                case StudioWriteRefusal.Unavailable:
-                    return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
-                case StudioWriteRefusal.UnsafePath:
-                    return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
-                case not null:
-                    return Problem(StatusCodes.Status409Conflict, StaleLayer);
-            }
-
-            if (outcome.Version is not null)
-            {
-                httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
-            }
-
-            return Results.Ok(new StudioModuleSaveResponse(
-                outcome.File, outcome.Version, StudioDiagnostics.Compile(folder, packages, modules)));
+            return LayerAnswer(httpContext, folder, packages, modules, outcome);
         }
+    }
+
+    // A layer on a contract only adds states and transitions, so any other change is refused before it is written.
+    private static bool LayerAllowed(ModuleFile found, string module, JsonObject? changes)
+    {
+        if (found.Kind != ResourceKinds.Contract || changes is null)
+        {
+            return true;
+        }
+
+        var layer = new LayerResource
+        {
+            Id = Guid.Empty,
+            Kind = "layer",
+            FormatVersion = 1,
+            Target = $"{module}/{found.Name}",
+            Changes = JsonSerializer.SerializeToElement(changes),
+        };
+        var problems = new List<Diagnostic>();
+        ContractLayerChecker.CheckAdditions(found.Root, layer, problems);
+        return !problems.Any(problem => problem.Code == DiagnosticCodes.ContractLayerNotAddition);
+    }
+
+    // The answer of a layer write, a save or a reset: the refusal of the write, or the new file and version with the diagnostics.
+    private static IResult LayerAnswer(
+        HttpContext httpContext, string folder, PackageCatalog packages, ModuleCatalog modules, StudioLayerOutcome outcome)
+    {
+        switch (outcome.Refusal)
+        {
+            case StudioWriteRefusal.Unavailable:
+                return Problem(StatusCodes.Status503ServiceUnavailable, WriteLockUnavailable);
+            case StudioWriteRefusal.UnsafePath:
+                return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
+            case not null:
+                return Problem(StatusCodes.Status409Conflict, StaleLayer);
+        }
+
+        if (outcome.Version is not null)
+        {
+            httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+        }
+
+        return Results.Ok(new StudioModuleSaveResponse(
+            outcome.File, outcome.Version, StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    private static async Task<IResult> ModuleResourceResetAsync(
+        string application,
+        string module,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var (found, notFound) = FindModuleFile(
+            ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules), modules, module, id);
+        if (found is null)
+        {
+            return notFound!;
+        }
+
+        var request = httpContext.Request;
+        if (request.Headers.IfMatch.Count == 0)
+        {
+            return Problem(StatusCodes.Status428PreconditionRequired, "The reset needs the layer's version in If-Match.");
+        }
+
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        JsonNode? body;
+        try
+        {
+            body = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted);
+        }
+        catch (JsonException)
+        {
+            body = null;
+        }
+
+        if (body is not JsonObject { Count: 2 } fields
+            || fields["list"] is not JsonValue listValue || !listValue.TryGetValue<string>(out var list)
+            || fields["key"] is not JsonValue keyValue || !keyValue.TryGetValue<string>(out var key))
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The body must be { list, key } with two strings.");
+        }
+
+        if (found.Kind == ResourceKinds.Scenario || found.Name is null)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "A layer cannot change this resource.");
+        }
+
+        if (LayerChecker.KindsByName(found.Module)[found.Name].Distinct(StringComparer.Ordinal).Count() > 1)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The module has more than one resource with this name.");
+        }
+
+        var ifMatch = request.Headers.IfMatch.ToString();
+        var reset = StudioModuleLayers.Reset(folder, module, found, list, key, ifMatch);
+        switch (reset.Refusal)
+        {
+            case StudioModuleResetRefusal.Stale:
+                return Problem(StatusCodes.Status409Conflict, StaleLayer);
+            case StudioModuleResetRefusal.WholeResource:
+                return Problem(StatusCodes.Status400BadRequest, "The layer removes the whole resource. Use Reset all.");
+            case StudioModuleResetRefusal.Unreadable:
+                return Problem(StatusCodes.Status400BadRequest, "The layer cannot be read back as a difference. Use Reset all.");
+            case StudioModuleResetRefusal.NotFound:
+                return NotFound("The resource has no element with this key in this list.");
+        }
+
+        var difference = LayerDifference.Compare(found.Kind, found.Root, reset.Edited!.Value);
+        if (difference.Refusal is not null)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "The reset cannot be saved as a layer.");
+        }
+
+        if (!LayerAllowed(found, module, difference.Changes))
+        {
+            return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
+        }
+
+        var outcome = await StudioWrites.WriteLayerAsync(
+            writeLock, folder, module, found.Name, difference.Changes, ifMatch, ifNoneMatch: false, httpContext.RequestAborted);
+        return LayerAnswer(httpContext, folder, packages, modules, outcome);
     }
 
     private const string StaleLayer = "The layer has changed since this version, or it exists already. Read it again.";
@@ -727,13 +848,17 @@ internal static class StudioEndpoints
         var folderContentHash = compiled.ContentHash;
         if (applicationId is not { } id)
         {
-            return Results.Ok(new StudioReleaseHistoryResponse(null, folderContentHash, []));
+            return Results.Ok(new StudioReleaseHistoryResponse(null, folderContentHash, null, []));
         }
 
         var cancellationToken = httpContext.RequestAborted;
         var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
         var active = await store.FindByApplicationIdAsync(id, cancellationToken);
         var activations = await store.ListActivationsAsync(id, cancellationToken);
+        var changes = active is not null && await store.GetReleaseAsync(active.ReleaseId, cancellationToken) is { } live
+            ? StudioReleaseChanges.Compare(
+                StudioFolder.Snapshot(folder), [.. live.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content))])
+            : null;
 
         // A release can be in the history more than once, always with one number, so the first row of it has it.
         var activeRelease = active is null
@@ -772,51 +897,7 @@ internal static class StudioEndpoints
                     relaxed.Count > 0, relaxed);
             })
             .ToList();
-        var changes = activeRelease is null || activeRelease.ContentHash == folderContentHash
-            ? []
-            : await LiveChangesAsync(database, folder, compiled, activeRelease.ReleaseId, cancellationToken);
-        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, items, changes));
-    }
-
-    private static async Task<IReadOnlyList<StudioReleaseChange>> LiveChangesAsync(
-        TenantDatabase database, string folderPath, CompilationResult result, Guid releaseId, CancellationToken token)
-    {
-        // Proposed: the files that differ from the live release, as the Overview lists them. Both sides are the
-        // canonical JSON a release stores, so a file that only moved its spaces does not count. A folder with errors
-        // has no compiled files, so its own files are read and the modules' copies are left out on both sides.
-        var withModules = result.Resources.Count > 0;
-        var folderFiles = (withModules ? result.Resources : Axis.Configuration.Loading.ApplicationLoader.Load(folderPath).Resources)
-            .ToDictionary(resource => resource.Path, resource => resource.Content, StringComparer.Ordinal);
-        var context = await database.GetConfigurationAsync(token);
-        var releaseFiles = await context.ReleaseResources
-            .Where(resource => resource.ReleaseId == releaseId)
-            .Select(resource => new { resource.Path, resource.Content })
-            .ToListAsync(token);
-        var live = releaseFiles
-            .Where(file => withModules || !file.Path.StartsWith("modules/", StringComparison.Ordinal))
-            .ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
-        var list = new List<StudioReleaseChange>();
-        foreach (var (path, content) in folderFiles)
-        {
-            if (!live.TryGetValue(path, out var liveContent))
-            {
-                list.Add(new StudioReleaseChange(path, "added"));
-            }
-            else if (liveContent != content)
-            {
-                list.Add(new StudioReleaseChange(path, "changed"));
-            }
-        }
-
-        // Proposed: a removed file is no longer in the folder, so Studio names it from the live release: its kind, its
-        // name and its label in the release's own texts.
-        var removed = live.Where(file => !folderFiles.ContainsKey(file.Key)).ToList();
-        if (removed.Count > 0)
-        {
-            var releaseTexts = ReleaseTexts(live.Values);
-            list.AddRange(removed.Select(file => RemovedChange(file.Key, file.Value, releaseTexts)));
-        }
-        return [.. list.OrderBy(change => change.Path, StringComparer.Ordinal)];
+        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, changes, items));
     }
 
     /// <summary>
@@ -1545,8 +1626,9 @@ internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceIt
 
 /// <summary>
 /// One resource in the list. <c>Version</c> is the lower-case SHA-256 hex of the file's bytes, and <c>UsedBy</c>
-/// is the number of references that point at the resource. Proposed: <c>Titles</c> is its label in each locale, and
-/// <c>Locale</c> the locale a text resource holds, and <c>Descriptions</c> its description in each locale.
+/// is the number of references that point at the resource. <c>Titles</c> is the resource's label or title text by
+/// locale, empty when its kind has none or no text resource gives the key. <c>Locale</c> is the locale of a text
+/// resource, else null. Proposed: <c>Descriptions</c> is its description in each locale.
 /// </summary>
 internal sealed record StudioResourceItem(
     string Id,
@@ -1555,8 +1637,8 @@ internal sealed record StudioResourceItem(
     string File,
     string Version,
     int UsedBy,
-    IReadOnlyDictionary<string, string>? Titles = null,
-    string? Locale = null,
+    IReadOnlyDictionary<string, string> Titles,
+    string? Locale,
     IReadOnlyDictionary<string, string>? Descriptions = null);
 
 /// <summary>Proposed: the answer of the resource activity route.</summary>
@@ -1624,12 +1706,10 @@ internal sealed record StudioTextWriteResponse(IReadOnlyList<StudioTextVersion> 
 /// <summary>
 /// The release history of an application, newest first. <c>Active</c> is the active release, or null when there
 /// is none, and <c>FolderContentHash</c> is the hash the folder compiles to now, or null when it has errors.
+/// <c>Changes</c> lists the files that differ from the active release, or is null when none is active.
 /// </summary>
 internal sealed record StudioReleaseHistoryResponse(
-    StudioActiveRelease? Active,
-    string? FolderContentHash,
-    IReadOnlyList<StudioReleaseItem> Items,
-    IReadOnlyList<StudioReleaseChange>? Changes = null);
+    StudioActiveRelease? Active, string? FolderContentHash, IReadOnlyList<StudioReleaseChange>? Changes, IReadOnlyList<StudioReleaseItem> Items);
 
 /// <summary>
 /// Proposed: a file of the folder that differs from the live release: <c>added</c>, <c>changed</c> or <c>removed</c>.

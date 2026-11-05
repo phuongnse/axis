@@ -11,7 +11,8 @@ internal static partial class KeycloakSignIn
     /// Starts sign-in on the server and logs in at Keycloak's login form as a browser would. Returns the callback
     /// address that Keycloak sends the browser to, which has not been called. <paramref name="record"/> sees the
     /// response of the server to the sign-in request, for a test that checks its responses. A <paramref name="returnUrl"/>
-    /// goes to the sign-in request as a query value.
+    /// goes to the sign-in request as a query value. The defaults are a tenant's sign-in and callback paths and the user's
+    /// current code from the development realm. The cell console passes its own paths, and a <paramref name="code"/> for a user of another realm.
     /// </summary>
     public static async Task<Uri> LogInAsync(
         HttpClient client,
@@ -19,10 +20,13 @@ internal static partial class KeycloakSignIn
         string username,
         Uri expectedBase,
         Func<HttpResponseMessage, Task<HttpResponseMessage>>? record = null,
-        string? returnUrl = null)
+        string? returnUrl = null,
+        string signInPath = "/api/auth/sign-in",
+        string callbackPath = "/api/auth/callback",
+        string? code = null)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var path = returnUrl is null ? "/api/auth/sign-in" : $"/api/auth/sign-in?returnUrl={Uri.EscapeDataString(returnUrl)}";
+        var path = returnUrl is null ? signInPath : $"{signInPath}?returnUrl={Uri.EscapeDataString(returnUrl)}";
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
         using var challenge = record is null
             ? await client.SendAsync(request, cancellationToken)
@@ -30,17 +34,17 @@ internal static partial class KeycloakSignIn
         Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
         var authorize = challenge.Headers.Location!;
         Assert.StartsWith($"{authority}/protocol/openid-connect/auth?", authorize.AbsoluteUri, StringComparison.Ordinal);
-        Assert.Contains(Uri.EscapeDataString($"{expectedBase.GetLeftPart(UriPartial.Authority)}/api/auth/callback"), authorize.Query, StringComparison.Ordinal);
+        Assert.Contains(Uri.EscapeDataString($"{expectedBase.GetLeftPart(UriPartial.Authority)}{callbackPath}"), authorize.Query, StringComparison.Ordinal);
 
         // A separate client plays the browser at Keycloak. Keycloak marks its cookies Secure, which a
         // browser sends to http://localhost but a CookieContainer does not, so the client carries them itself.
         using var browserHandler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
         using var browser = new HttpClient(browserHandler);
         var (password, cookieHeader) = await SubmitPasswordAsync(browser, authorize, username);
-        var login = await SubmitCodeAsync(browser, password, cookieHeader, username);
+        var login = await SubmitCodeAsync(browser, password, cookieHeader, username, code);
         Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(cancellationToken));
         var callback = login.Headers.Location!;
-        Assert.Equal($"{expectedBase.GetLeftPart(UriPartial.Authority)}/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
+        Assert.Equal($"{expectedBase.GetLeftPart(UriPartial.Authority)}{callbackPath}", callback.GetLeftPart(UriPartial.Path));
         return callback;
     }
 

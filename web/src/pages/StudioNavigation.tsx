@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { selectedItemTint } from '../platform/antTheme'
 import { sizeTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
-import { useShellSidebar } from '../platform/shellSidebar'
+import { useClaimedShellSidebar } from '../platform/shellSidebarContext'
 import { SiteMark } from '../platform/SiteMark'
 import { studioApplicationTitle, type StudioApplication, type StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
@@ -54,7 +54,7 @@ export function StudioNavigation({
   onView: (view: StudioView) => void
 }) {
   const t = useText()
-  const { slot, collapsed } = useShellSidebar()
+  const { slot, collapsed } = useClaimedShellSidebar()
   const { colour, spacing } = useDesignTokens()
   const { mode } = useThemeMode()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'

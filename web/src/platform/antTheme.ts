@@ -1,5 +1,5 @@
-import { theme, type ThemeConfig } from 'antd'
-import { colourTokens, designTokensFor, type ColourName, type PageTokenValues } from './designTokens'
+import { theme, type ConfigProviderProps, type ThemeConfig } from 'antd'
+import { colourTokens, designTokensFor, type ColourName, type DesignTokens, type PageTokenValues } from './designTokens'
 import type { ThemeMode } from './themeMode'
 
 // The only file that names Ant Design tokens. It maps the Axis tokens to Ant Design's theme.
@@ -21,7 +21,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   // the mode keeps the light seed, as the dark value is already a shade. Any other colour is the seed itself.
   const seed = (name: ColourName) =>
     colour[name].toLowerCase() === colourTokens[name][mode] ? colourTokens[name].light : colour[name]
-  const inputError = { colorError: colour.dangerText, colorErrorBorderHover: colour.dangerText }
+  // A field with an error draws its border in the text colour, which meets 3:1 contrast in both modes.
+  const errorBorder = { colorError: colour.dangerText, colorErrorBorderHover: colour.dangerText }
   return {
     algorithm: [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink],
     token: {
@@ -75,16 +76,13 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
     },
     components: {
       Form: { colorError: colour.dangerText },
-      // Proposed: a field control with an error has its border in dangerText, as its message, so the border keeps 3:1 on
-      // surface in dark mode; Ant Design draws it in the danger fill, at 2.8:1 there. Fills, such as a danger button,
-      // keep the danger colour.
-      Input: inputError,
-      InputNumber: inputError,
-      Select: inputError,
-      DatePicker: inputError,
-      Mentions: inputError,
-      Cascader: inputError,
-      TreeSelect: inputError,
+      Input: errorBorder,
+      InputNumber: errorBorder,
+      Select: errorBorder,
+      DatePicker: errorBorder,
+      Mentions: errorBorder,
+      Cascader: errorBorder,
+      TreeSelect: errorBorder,
       // D114: every dropdown menu keeps spacing-xs round its items.
       Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
       Tabs: {
@@ -127,6 +125,41 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   }
 }
 
+/**
+ * The props every Axis `ConfigProvider` gets (D128): the theme; a Cancel of text type for every dialog, so it is a text
+ * button beside the solid OK; and checkboxes and radios that sit at the top of their box, level with the first line of
+ * a label that wraps.
+ */
+export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ConfigProviderProps {
+  const config = antThemeFor(mode, page, reducedMotion)
+  const token = theme.getDesignToken(config)
+  // Ant Design centres a box on the label's line. Half the gap between the line and the box puts its top on that line.
+  const firstLineOffset = (boxSize: number) => (token.fontSize * token.lineHeight - boxSize) / 2
+  return {
+    theme: config,
+    modal: { cancelButtonProps: { type: 'text' } },
+    checkbox: {
+      styles: { icon: { alignSelf: 'flex-start', marginTop: firstLineOffset(token.controlInteractiveSize) } },
+    },
+    radio: { styles: { icon: { alignSelf: 'flex-start', marginTop: firstLineOffset(token.fontSizeLG) } } },
+  }
+}
+
+/**
+ * The CSS every Axis form shares, rendered once beside each provider's ConfigProvider. Ant Design has no token for the
+ * gap under a message or for an unticked box's error border, so these rules carry them. The border takes the mode's
+ * text colour: a page with two modes would give them one colour.
+ */
+export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
+  const { colour, type } = designTokensFor(mode, page)
+  return [
+    // A message sits 4px under its control. The item keeps its own bottom margin under the message.
+    `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
+    '.ant-form-item-margin-offset { display: none; }',
+    `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
+  ].join('\n')
+}
+
 /** The tint Ant Design gives a selected item. Dropdown menus draw their selected item on it, so Axis reads it here. */
 export function selectedItemTint(mode: ThemeMode): string {
   return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
@@ -134,3 +167,12 @@ export function selectedItemTint(mode: ThemeMode): string {
 
 /** Table cells hold form items that need no space below them, as the table rows already space the inputs. */
 export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } }
+
+/**
+ * The cell padding of a table (D129). A row is `spacing-xs` above and below a line of the `smallControl` size, which a
+ * line of text and a small icon button both fill, and `spacing-lg` on each side keeps columns apart. A table applies it
+ * through a nested ConfigProvider, so tables that are not yet on `AxisTable` keep their look.
+ */
+export function tableTheme(tokens: DesignTokens): ThemeConfig {
+  return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }
+}

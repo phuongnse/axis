@@ -27,6 +27,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { LabelTexts } from './LabelTexts'
 import { ResourceDescription } from './ResourceDescription'
+import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTextsContext } from './labelTextsContext'
@@ -88,6 +89,8 @@ function JsonOnly() {
  * name an action of a widget, such as `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a KPI. The tree and the
  * panel are then those of the widget, and the panel marks the action's card with `aria-current`, scrolls it into view
  * and, when the action is new, selects it. Removing an action selects its widget.
+ *
+ * The editor does not mark a customization layer. A caller that shows one uses {@link PageWidgets}.
  */
 export function PageEditor({
   value,
@@ -141,17 +144,24 @@ export function PageEditor({
  * The widgets of a page as a tree, and the panel of the selected widget below it. The selection is a pointer that the
  * caller keeps, so that other views of the page can share it. A pointer that names nothing selects the first widget.
  * A pointer to an action of a widget selects the widget, and its panel marks the action.
+ *
+ * With `layer`, the tree shows a module page with the application's customization layer applied. A widget the layer
+ * added or changed is marked Added or Changed on its row, and so are the actions, row actions and toolbar actions on
+ * their cards and the columns and tabs on their rows in the panel, each with Reset to module. An element the layer
+ * removed is a muted row marked Removed under the list that held it, with Reset to module.
  */
 export function PageWidgets({
   value,
   selected: pointer,
   onSelect,
   onChange,
+  layer,
 }: {
   value: Content
   selected: string
   onSelect: (pointer: string) => void
   onChange: ChangeHandler
+  layer?: DesignerLayer
 }) {
   const t = useText()
   const widgets = Array.isArray(value.widgets) ? value.widgets : undefined
@@ -170,7 +180,7 @@ export function PageWidgets({
           <JsonOnly />
         ) : (
           <>
-            <WidgetList pointer="/widgets" widgets={widgets} tree={{ widgets, selected, onSelect, onChange }} />
+            <WidgetList pointer="/widgets" widgets={widgets} tree={{ widgets, selected, onSelect, onChange, layer }} />
             {widgets.length > 0 && (
               <WidgetPanel
                 key={selected}
@@ -178,6 +188,7 @@ export function PageWidgets({
                 widget={getAt(value, selected)}
                 parameters={value.parameters}
                 selectedAction={selectedAction}
+                layer={layer}
                 onSelect={onSelect}
                 onChange={onChange}
               />
@@ -311,6 +322,7 @@ interface Tree {
   selected: string
   onSelect: (pointer: string) => void
   onChange: ChangeHandler
+  layer?: DesignerLayer
 }
 
 /** The widgets of one list as rows, then the picker that adds a widget at the end of the list. */
@@ -324,6 +336,7 @@ function WidgetList({ pointer, widgets, tree }: { pointer: string; widgets: unkn
           <WidgetRow key={index} listPointer={pointer} index={index} widgets={widgets} widget={widget} tree={tree} />
         ))}
       </Flex>
+      <RemovedRows layer={tree.layer} list={pointer} />
       <div>
         <Select
           aria-label={t('shell.studio.page.addWidget')}
@@ -400,6 +413,9 @@ function WidgetRow({
           >
             {content !== undefined ? widgetSummary(content) : ''}
           </Button>
+          {tree.layer !== undefined && typeof content?.name === 'string' && (
+            <LayerMarkTag layer={tree.layer} list={listPointer} index={index} name={content.name} />
+          )}
           <Button disabled={index === 0} onClick={() => move(-1)}>
             {t('shell.studio.page.moveUp')}
           </Button>
@@ -516,6 +532,7 @@ function WidgetPanel({
   widget,
   parameters,
   selectedAction,
+  layer,
   onSelect,
   onChange,
 }: {
@@ -526,6 +543,8 @@ function WidgetPanel({
   parameters: unknown
   /** The pointer of the selected action of the widget, which its card marks. */
   selectedAction: string | undefined
+  /** The customization layer to mark, when the page is a module page. */
+  layer?: DesignerLayer
   onSelect: (pointer: string) => void
   onChange: ChangeHandler
 }) {
@@ -540,9 +559,11 @@ function WidgetPanel({
           <Typography.Text>{type}</Typography.Text>
         </div>
         {isContent(widget) && type === 'columns' && (
-          <ColumnsPanel base={base} columns={widget.columns} onChange={onChange} />
+          <ColumnsPanel base={base} columns={widget.columns} layer={layer} onChange={onChange} />
         )}
-        {isContent(widget) && type === 'tabs' && <TabsPanel base={base} tabs={widget.tabs} onChange={onChange} />}
+        {isContent(widget) && type === 'tabs' && (
+          <TabsPanel base={base} tabs={widget.tabs} layer={layer} onChange={onChange} />
+        )}
         {isContent(widget) && type === 'section' && <SectionPanel base={base} widget={widget} onChange={onChange} />}
       </Flex>
     )
@@ -607,6 +628,7 @@ function WidgetPanel({
             deleteAction
             widget={base}
             selected={selectedAction}
+            layer={layer}
             onSelect={onSelect}
             onChange={onChange}
           />
@@ -618,6 +640,7 @@ function WidgetPanel({
             deleteAction={false}
             widget={base}
             selected={selectedAction}
+            layer={layer}
             onSelect={onSelect}
             onChange={onChange}
           />
@@ -658,6 +681,7 @@ function WidgetPanel({
             deleteAction={false}
             widget={base}
             selected={selectedAction}
+            layer={layer}
             onSelect={onSelect}
             onChange={onChange}
           />
@@ -1120,7 +1144,17 @@ function RecordField({
 }
 
 /** The width of each column of a columns widget, and the buttons that add and remove columns. */
-function ColumnsPanel({ base, columns, onChange }: { base: string; columns: unknown; onChange: ChangeHandler }) {
+function ColumnsPanel({
+  base,
+  columns,
+  layer,
+  onChange,
+}: {
+  base: string
+  columns: unknown
+  layer?: DesignerLayer
+  onChange: ChangeHandler
+}) {
   const t = useText()
   if (!Array.isArray(columns)) {
     return <JsonOnly />
@@ -1132,6 +1166,9 @@ function ColumnsPanel({ base, columns, onChange }: { base: string; columns: unkn
         <Card size="small" key={index} data-testid={`studio-column-${index}`}>
           <Flex vertical gap="small">
             <Typography.Text>{`${t('shell.studio.page.column')} ${index + 1}`}</Typography.Text>
+            {layer !== undefined && isContent(column) && typeof column.name === 'string' && (
+              <LayerMarkTag layer={layer} list={`${base}/columns`} index={index} name={column.name} />
+            )}
             {isContent(column) ? (
               <div data-testid={`studio-field-${base}/columns/${index}/width`}>
                 <div>{t('shell.studio.page.width')}</div>
@@ -1168,6 +1205,7 @@ function ColumnsPanel({ base, columns, onChange }: { base: string; columns: unkn
           </Flex>
         </Card>
       ))}
+      <RemovedRows layer={layer} list={`${base}/columns`} />
       <div>
         <Button onClick={() => onChange(`${base}/columns`, [...columns, newColumn(columns)])}>
           {t('shell.studio.page.addColumn')}
@@ -1178,7 +1216,17 @@ function ColumnsPanel({ base, columns, onChange }: { base: string; columns: unkn
 }
 
 /** The label of each tab of a tabs widget, and the buttons that add and remove tabs. */
-function TabsPanel({ base, tabs, onChange }: { base: string; tabs: unknown; onChange: ChangeHandler }) {
+function TabsPanel({
+  base,
+  tabs,
+  layer,
+  onChange,
+}: {
+  base: string
+  tabs: unknown
+  layer?: DesignerLayer
+  onChange: ChangeHandler
+}) {
   const t = useText()
   if (!Array.isArray(tabs)) {
     return <JsonOnly />
@@ -1190,6 +1238,9 @@ function TabsPanel({ base, tabs, onChange }: { base: string; tabs: unknown; onCh
         <Card size="small" key={index} data-testid={`studio-tab-${index}`}>
           <Flex vertical gap="small">
             <Typography.Text>{`${t('shell.studio.page.tab')} ${index + 1}`}</Typography.Text>
+            {layer !== undefined && isContent(tab) && typeof tab.name === 'string' && (
+              <LayerMarkTag layer={layer} list={`${base}/tabs`} index={index} name={tab.name} />
+            )}
             {isContent(tab) ? (
               <div data-testid={`studio-field-${base}/tabs/${index}/label`}>
                 <div>{t('shell.studio.page.tabLabel')}</div>
@@ -1221,6 +1272,7 @@ function TabsPanel({ base, tabs, onChange }: { base: string; tabs: unknown; onCh
           </Flex>
         </Card>
       ))}
+      <RemovedRows layer={layer} list={`${base}/tabs`} />
       <div>
         <Button onClick={() => onChange(`${base}/tabs`, [...tabs, newTab(tabs)])}>
           {t('shell.studio.page.addTab')}
@@ -1472,7 +1524,8 @@ function ParameterExpressions({
  * Any other action is JSON only, and can be removed. The list always offers Add navigate action, offers Add action
  * for `startProcess` only when `startProcess` is set and offers Add delete action only when `deleteAction` is set.
  * The card of the action at `selected` has `aria-current` and a border in the primary colour, and scrolls into view.
- * An Add button selects the new action, and Remove selects the `widget`.
+ * An Add button selects the new action, and Remove selects the `widget`. With `layer`, a card of an action that the layer
+ * added or changed is marked, and a removed action is a muted row under the cards.
  */
 function Actions({
   pointer,
@@ -1482,6 +1535,7 @@ function Actions({
   deleteAction,
   widget,
   selected,
+  layer,
   onSelect,
   onChange,
 }: {
@@ -1494,6 +1548,7 @@ function Actions({
   widget: string
   /** The pointer of the selected action. */
   selected: string | undefined
+  layer?: DesignerLayer
   onSelect: (pointer: string) => void
   onChange: ChangeHandler
 }) {
@@ -1528,6 +1583,9 @@ function Actions({
                 <ActionCard key={position} position={position} selected={actionPointer === selected}>
                   <Flex vertical gap="small">
                     <Typography.Text>{text(action.type)}</Typography.Text>
+                    {layer !== undefined && typeof action.name === 'string' && (
+                      <LayerMarkTag layer={layer} list={pointer} index={position} name={action.name} />
+                    )}
                     {action.type === 'navigate' ? (
                       <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
                     ) : action.type === 'startProcess' ? (
@@ -1579,6 +1637,7 @@ function Actions({
                 </ActionCard>
               )
             })}
+            <RemovedRows layer={layer} list={pointer} />
             <Flex gap="small" wrap>
               {startProcess && (
                 <Button onClick={() => add({ type: 'startProcess', process: '', label: { textKey: '' } })}>

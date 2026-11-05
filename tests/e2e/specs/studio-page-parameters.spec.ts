@@ -9,7 +9,7 @@ import { confirmDialog, waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
-import { createResource, openFormTab } from "../studio-resources";
+import { createResource, openFormTab, openKind, openNewApplication } from "../studio-resources";
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it.
 test.setTimeout(240_000);
@@ -86,7 +86,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=PurchaseRequests`);
 
-    await page.getByRole("button", { name: "New application…", exact: true }).click();
+    await openNewApplication(page);
     const dialog = await waitForDialog(page);
     await dialog.getByRole("textbox", { name: "Name", exact: true }).fill(name);
     await dialog.getByRole("radio", { name: /^Request approval/ }).click();
@@ -125,9 +125,14 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await page.reload();
     const myRequests = page
       .getByTestId("studio-group-page")
-      .getByRole("button", { name: "MyRequests", exact: true });
+      .getByRole("button", { name: "My requests", exact: true });
+    await openKind(page, "page");
     await myRequests.click();
-    await expect(myRequests).toHaveAttribute("aria-current", "true");
+    await expect(
+      page
+        .getByRole("navigation", { name: "Menu", exact: true })
+        .getByRole("link", { name: "Pages", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
     await openFormTab(page);
     await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "MyRequests",

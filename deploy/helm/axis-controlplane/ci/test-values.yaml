@@ -1,0 +1,21 @@
+# Values for the lint, the schema check and the render tests. They set the region and the tenant domain, name the
+# connection string and certificate Secrets, run two replicas and set resources and one image pull Secret, so the
+# checks cover every branch of the templates.
+image:
+  pullSecrets:
+    - registry-credentials
+replicas: 2
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+controlPlane:
+  region: vn
+  tenantDomain: vn.example.com
+secrets:
+  connectionString:
+    name: axis-controlplane-db
+  certificate:
+    name: axis-controlplane-tls

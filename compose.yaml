@@ -92,7 +92,7 @@ services:
       Extensions__Path: /extensions
       # The built-in and sample modules, which the image holds.
       Modules__Path: /modules
-      # The sample templates, which the image holds.
+      # The sample templates and built-in applications, which the image holds.
       Templates__Path: /templates
       # The purchasing system stub on the Compose network. The client id and secret and the webhook secret are in appsettings.Development.json.
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080

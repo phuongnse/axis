@@ -77,7 +77,7 @@ public sealed class ModuleLayerUpgradeTests(DataDatabaseFixture database) : ICla
                 """)
             .With($"approvals/{version}/forms/ApprovalForm.json", """
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c24", "kind": "form", "name": "ApprovalForm", "formatVersion": 1, "entity": "Approval",
-                  "sections": [ { "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
+                  "sections": [ { "name": "approval", "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
                 """)
             .With($"approvals/{version}/processes/Review.json", $$"""
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "formatVersion": 1,

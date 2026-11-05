@@ -4,5 +4,5 @@
   "name": "NoteReview",
   "formatVersion": 1,
   "entity": "Note",
-  "sections": [{ "title": { "textKey": "noteReview.main" }, "fields": [{ "field": "title" }] }]
+  "sections": [{ "name": "main", "title": { "textKey": "noteReview.main" }, "fields": [{ "field": "title" }] }]
 }

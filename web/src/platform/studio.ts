@@ -1,7 +1,9 @@
 import { apiFetch } from './api'
 import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
+import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
+import { kindSingular } from './studioKinds'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
@@ -114,6 +116,11 @@ export interface StudioApplication {
 }
 
 /** Proposed: the application's title in `locale`, else in its first locale, else its name. */
+/** The name `main` gives it, for the files of `main` that still use it. */
+export function studioAppTitle(app: StudioApplication, locale: string): string {
+  return studioApplicationTitle(app, locale)
+}
+
 export function studioApplicationTitle(app: StudioApplication, locale: string): string {
   const titles = app.titles ?? {}
   return titles[locale] ?? Object.values(titles)[0] ?? app.name
@@ -152,9 +159,12 @@ export interface StudioResourceItem {
   file: string
   version: string
   usedBy: number
-  /** Proposed: the resource's label in each locale that holds its key, or null when it has none. */
-  titles?: Record<string, string> | null
-  /** Proposed: the locale a text resource holds, or null for every other kind. */
+  /**
+   * The resource's label or title text by locale. It is empty for a kind that has none, and absent on a resource that
+   * the client created, since the create route does not answer it.
+   */
+  titles?: Record<string, string>
+  /** The locale of a text resource, else `null`. Absent on a resource that the client created. */
   locale?: string | null
   /** Proposed: the resource's description in each locale that holds its key, or null when it has none. */
   descriptions?: Record<string, string> | null
@@ -222,7 +232,8 @@ export async function fetchStudioPageMetadata(
 }
 
 /**
- * Loads the metadata of a page of the module version that the application pins, so Studio can draw it read-only. `id` is
+ * Loads the metadata of a page of the module version that the application pins, so Studio can draw it on the page
+ * designer's canvas. `id` is
  * the id written in the module's file. Any status other than 200 throws, as does a server that does not answer.
  */
 export async function fetchStudioModulePageMetadata(
@@ -247,6 +258,30 @@ export async function fetchStudioFormMetadata(
   signal?: AbortSignal,
 ): Promise<StudioFormMetadataAnswer> {
   return (await postDraftMetadata(application, id, draft, signal)) as StudioFormMetadataAnswer
+}
+
+/**
+ * Asks for the form widget an unsaved form of a module would have, with the application's layer on it. The draft goes to
+ * the module's draft page metadata route. Any status other than 200 throws, as does a server that does not answer.
+ */
+export async function fetchStudioModuleFormMetadata(
+  application: string,
+  module: string,
+  id: string,
+  draft: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<StudioFormMetadataAnswer> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}/page-metadata`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+    signal,
+  })
+  if (response.status !== 200) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioFormMetadataAnswer
 }
 
 /** A compile diagnostic of a Studio folder. `resourceId` is `null` when it belongs to no resource. */
@@ -323,10 +358,20 @@ export interface StudioNameStep {
   outcomes: string[]
 }
 
-/** A named resource in `GET .../names`, such as a role, sequence or form. */
+/** A named resource in `GET .../names`, such as a role. */
 export interface StudioNameResource {
   id: string
   name: string
+}
+
+/**
+ * A resource in `GET .../names` that a module may hold: a sequence, form, seed, trigger, scenario or text resource.
+ * `module` is the module id, or `null` for the application's own. A module resource's `name` is `<module>/<name>`.
+ */
+export interface StudioNameModuleResource {
+  id: string
+  name: string
+  module: string | null
 }
 
 /** A page in `GET .../names`, with the parameters it declares. `module` is the module id, or `null` for the application's own. */
@@ -372,14 +417,24 @@ export interface StudioNames {
     resultType: string
   }[]
   connectors: { id: string; name: string; operations: { name: string }[] }[]
-  events: { id: string; name: string; entity: string; fields: { name: string; type: string }[] }[]
+  events: {
+    id: string
+    name: string
+    module: string | null
+    entity: string
+    fields: { name: string; type: string }[]
+  }[]
   roles: StudioNameResource[]
-  sequences: StudioNameResource[]
-  forms: StudioNameResource[]
+  sequences: StudioNameModuleResource[]
+  forms: StudioNameModuleResource[]
   pages: StudioNamePage[]
   policies: StudioNamePolicy[]
   contracts: { id: string; name: string; module: string }[]
   texts: StudioNameText[]
+  seeds: StudioNameModuleResource[]
+  triggers: StudioNameModuleResource[]
+  scenarios: StudioNameModuleResource[]
+  textResources: StudioNameModuleResource[]
 }
 
 /**
@@ -564,22 +619,132 @@ export async function fetchStudioResource(
   return (await response.json()) as StudioResource
 }
 
+/** The customization layer of a module resource: the layer file's resource id, its file and its version. */
+export interface StudioModuleLayer {
+  id: string
+  file: string
+  version: string
+}
+
+/** A module resource with the application's layer applied, as `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` answers. */
+export interface StudioModuleResource extends StudioResource {
+  layer: StudioModuleLayer | null
+  marks: { path: string; mark: 'added' | 'changed' }[]
+  removed: { list: string; key: string; content: unknown }[]
+}
+
 /**
- * Loads one file of the module version that the application pins, with its content. The file is read-only, and its
- * `file` is `modules/<module>/<path>`. A 401 shows the sign-in prompt and throws, as any other failure does.
+ * Loads one file of the module version that the application pins, with the application's layer applied and the layer
+ * itself, or `layer: null` when there is none. Its `file` is `modules/<module>/<path>`. A 401 shows the sign-in prompt
+ * and throws, as any other failure does.
  */
 export async function fetchStudioModuleResource(
   application: string,
   module: string,
   id: string,
   signal?: AbortSignal,
-): Promise<StudioResource> {
+): Promise<StudioModuleResource> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}`
   const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
-  return (await response.json()) as StudioResource
+  return (await response.json()) as StudioModuleResource
+}
+
+/**
+ * What a module resource save answers: the layer's file and version, both `null` when no layer is left, and the folder's
+ * diagnostics. `refused` carries the server's reason for an edit that a layer cannot express.
+ */
+export type ModuleSaveResult =
+  | { status: 'saved'; file: string | null; version: string | null; diagnostics: StudioDiagnostic[] }
+  | { status: 'conflict' }
+  | { status: 'refused'; title: string }
+
+/**
+ * Saves the whole edited module resource, which the server writes as a layer holding only the difference. The layer's
+ * version goes in `If-Match`, or `If-None-Match: *` when the resource has no layer. A 409 means the layer changed since,
+ * and a 400 means the edit cannot be a layer. Nothing is written for either. A quota refusal throws a
+ * {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function saveStudioModuleResource(
+  application: string,
+  module: string,
+  id: string,
+  layerVersion: string | null,
+  content: Record<string, unknown>,
+): Promise<ModuleSaveResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}`
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(layerVersion === null ? { 'If-None-Match': '*' } : { 'If-Match': `"${layerVersion}"` }),
+    },
+    body: JSON.stringify(content),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const quota = await quotaRefusalTitle(response)
+  if (quota !== null) {
+    throw new QuotaRefusedError(quota)
+  }
+  if (response.status === 400) {
+    const problem = (await response.json().catch(() => null)) as { title?: unknown } | null
+    return { status: 'refused', title: typeof problem?.title === 'string' ? problem.title : '' }
+  }
+  if (!response.ok) {
+    throw new Error(`Saving '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as {
+    file: string | null
+    version: string | null
+    diagnostics: StudioDiagnostic[]
+  }
+  return { status: 'saved', file: body.file, version: body.version, diagnostics: body.diagnostics }
+}
+
+/**
+ * Resets one element of a keyed list of a module resource to the module's version, and keeps the rest of the layer. The
+ * layer's version goes in `If-Match`. A 409 means the layer changed since, and a 400 or a 404 means the server refuses the
+ * reset. Nothing is written for either. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt
+ * and throws, as any other failure does.
+ */
+export async function resetStudioModuleElement(
+  application: string,
+  module: string,
+  id: string,
+  layerVersion: string,
+  list: string,
+  key: string,
+): Promise<ModuleSaveResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}/reset`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'If-Match': `"${layerVersion}"` },
+    body: JSON.stringify({ list, key }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const quota = await quotaRefusalTitle(response)
+  if (quota !== null) {
+    throw new QuotaRefusedError(quota)
+  }
+  if (response.status === 400 || response.status === 404) {
+    const problem = (await response.json().catch(() => null)) as { title?: unknown } | null
+    return { status: 'refused', title: typeof problem?.title === 'string' ? problem.title : '' }
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as {
+    file: string | null
+    version: string | null
+    diagnostics: StudioDiagnostic[]
+  }
+  return { status: 'saved', file: body.file, version: body.version, diagnostics: body.diagnostics }
 }
 
 /**
@@ -932,8 +1097,23 @@ export interface StudioReleases {
     | null
 }
 
-/** A row of the release list. `active` is set on one row only. */
-export type StudioReleaseRow = StudioReleaseItem & { active: boolean }
+/**
+ * A row of the release list: one release. Its `label`, `note`, `publishedAt`, `actor` and `actorName` are those of its
+ * first activation, which is the publish (or the startup or operator activation that gave it its number). `live` is set
+ * on the release that runs, and `offStandard` and `relaxed` are the release's own.
+ */
+export interface StudioReleaseListRow {
+  releaseId: string
+  number: number
+  label: string | null
+  note: string | null
+  publishedAt: string
+  actor: string
+  actorName: string | null
+  live: boolean
+  offStandard: boolean
+  relaxed: StudioRelaxedPoint[]
+}
 
 /** The optional label and note of a publish. */
 export interface PublishDetails {
@@ -1106,18 +1286,51 @@ export async function fetchStudioReleases(application: string, signal?: AbortSig
 }
 
 /**
- * The rows of the release list, newest activation first. Rows with the same time keep the server's order. A release
- * that was activated more than once has a row for each activation, and only its newest row is active.
+ * The rows of the release list: one for each release, the highest number first. A release that was activated more than
+ * once has one row, which takes its details from its first activation, the earliest `activatedAt`. On equal times the
+ * server's order decides.
  */
-export function releaseRows(history: StudioReleases): StudioReleaseRow[] {
-  const sorted = history.items.toSorted((left, right) => Date.parse(right.activatedAt) - Date.parse(left.activatedAt))
-  const activeId = history.active?.releaseId
-  let activeSeen = false
-  return sorted.map((item) => {
-    const active = !activeSeen && activeId !== undefined && item.releaseId === activeId
-    activeSeen ||= active
-    return { ...item, active }
-  })
+export function releaseList(history: StudioReleases): StudioReleaseListRow[] {
+  const first = new Map<string, StudioReleaseItem>()
+  for (const item of history.items) {
+    const known = first.get(item.releaseId)
+    if (!known || Date.parse(item.activatedAt) < Date.parse(known.activatedAt)) {
+      first.set(item.releaseId, item)
+    }
+  }
+  const liveId = history.active?.releaseId
+  return [...first.values()]
+    .map((item) => ({
+      releaseId: item.releaseId,
+      number: item.number,
+      label: item.label,
+      note: item.note,
+      publishedAt: item.activatedAt,
+      actor: item.actor,
+      actorName: item.actorName,
+      live: item.releaseId === liveId,
+      offStandard: item.offStandard,
+      relaxed: item.relaxed,
+    }))
+    .sort((left, right) => right.number - left.number)
+}
+
+/**
+ * Who published a release, in words: the person's name, "System" for a startup activation, "The platform operator" for
+ * an operator activation, and "Someone no longer known" for any other actor, so a raw id is never shown.
+ */
+export function releasePublisher(row: StudioReleaseListRow, t: (key: string) => string): string {
+  if (row.actorName) {
+    return row.actorName
+  }
+  switch (row.actor) {
+    case 'startup':
+      return t('shell.studio.releases.system')
+    case 'operator':
+      return t('shell.studio.releases.operator')
+    default:
+      return t('shell.studio.releases.unknown')
+  }
 }
 
 /**
@@ -1198,25 +1411,37 @@ export function filterResources(items: StudioResourceItem[], search: string, loc
 }
 
 /**
- * Proposed: the text Studio names a resource by: its label in the author's locale, then in English, for a resource that
- * has one. A text resource is named by its language, in the author's language. A resource with no label, which only
- * authors see, is named by the name its author gave, or its file.
+ * The text a resource shows: a text resource by its language in `locale`, such as "Vietnamese", else its label in
+ * `locale`, then in `en`, then the name its author gave, then its kind's singular name. A file name never shows.
  */
 export function resourceTitle(
-  item: Pick<StudioResourceItem, 'file' | 'name' | 'titles' | 'locale'>,
-  locale = 'en',
+  item: {
+    name: string | null
+    titles?: Record<string, string> | null
+    locale?: string | null
+    kind?: string
+    file?: string
+  },
+  locale: string,
+  t?: (key: string) => string,
 ): string {
-  if (item.locale) {
-    try {
-      const name = new Intl.DisplayNames([locale], { type: 'language' }).of(item.locale)
-      if (name && name !== item.locale) {
-        return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1)
-      }
-    } catch {
-      // An invalid tag has no name.
-    }
+  if (typeof item.locale === 'string' && item.locale !== '' && (item.kind === undefined || item.kind === 'text')) {
+    return languageName(item.locale, locale)
   }
-  return item.titles?.[locale] ?? item.titles?.en ?? item.name ?? item.file
+  const titles = item.titles ?? {}
+  // A file name shows only where the caller has no kind to name the resource by, such as a file the live release removed.
+  return titles[locale] ?? titles.en ?? item.name ?? (t && item.kind ? kindSingular(item.kind, t) : (item.file ?? ''))
+}
+
+function languageName(tag: string, locale: string): string {
+  try {
+    return new Intl.DisplayNames([locale], { type: 'language' }).of(tag) ?? tag
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return tag
+    }
+    throw error
+  }
 }
 
 /** Proposed: a resource's description in the author's locale, then in English, or null when it has none. */
@@ -1224,8 +1449,14 @@ export function resourceDescription(item: Pick<StudioResourceItem, 'descriptions
   return item.descriptions?.[locale] ?? item.descriptions?.en ?? null
 }
 
-/** Groups resources by kind. Kinds are sorted ordinally, and each group's items by name, or by file when a resource has no name. */
-export function groupByKind(items: StudioResourceItem[], locale = 'en'): ResourceGroup[] {
+/**
+ * Groups resources by kind. Kinds are sorted ordinally, and each group's items by the shown name, or by name, or by
+ * file when `title` is not given.
+ */
+export function groupByKind(
+  items: StudioResourceItem[],
+  title?: (item: StudioResourceItem) => string,
+): ResourceGroup[] {
   const groups = new Map<string, StudioResourceItem[]>()
   for (const item of items) {
     const group = groups.get(item.kind)
@@ -1235,20 +1466,19 @@ export function groupByKind(items: StudioResourceItem[], locale = 'en'): Resourc
       groups.set(item.kind, [item])
     }
   }
+  const compare = title
+    ? (left: StudioResourceItem, right: StudioResourceItem) => title(left).localeCompare(title(right))
+    : (left: StudioResourceItem, right: StudioResourceItem) =>
+        compareOrdinal(left.name ?? left.file, right.name ?? right.file)
   return [...groups.entries()]
     .sort(([left], [right]) => compareOrdinal(left, right))
-    .map(([kind, members]) => ({
-      kind,
-      items: members.toSorted((left, right) =>
-        compareOrdinal(resourceTitle(left, locale), resourceTitle(right, locale)),
-      ),
-    }))
+    .map(([kind, members]) => ({ kind, items: members.toSorted(compare) }))
 }
 
-/** The kind of a module resource that Studio lists and opens read-only. */
-export type ModuleResourceKind = 'entity' | 'process' | 'policy' | 'contract' | 'page'
+/** The kind of a module resource that Studio lists. Every kind a module may hold is one. */
+export type ModuleResourceKind = ModuleKind
 
-/** An entity, process, policy, contract or page of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
+/** A resource of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
 export interface ModuleResourceItem {
   id: string
   kind: ModuleResourceKind
@@ -1262,27 +1492,40 @@ export interface ModuleResourceGroup {
   items: ModuleResourceItem[]
 }
 
+type ModuleNameItem = { id: string; name: string; module: string | null }
+
+/** Where the names list the resources of each module kind. */
+const moduleNameLists: Record<ModuleKind, (names: StudioNames) => ModuleNameItem[]> = {
+  entity: (names) => names.entities,
+  dataSource: (names) => names.dataSources,
+  rule: (names) => names.rules,
+  sequence: (names) => names.sequences,
+  form: (names) => names.forms,
+  page: (names) => names.pages,
+  process: (names) => names.processes,
+  event: (names) => names.events,
+  text: (names) => names.textResources,
+  seed: (names) => names.seeds,
+  policy: (names) => names.policies,
+  trigger: (names) => names.triggers,
+  scenario: (names) => names.scenarios,
+  contract: (names) => names.contracts,
+}
+
 /**
- * The module entities, processes, policies, contracts and pages in the names, in that order, with the application's own left out.
- * An item stays when its name or id contains `search`, ignoring letter case and surrounding spaces. A kind with no
- * item has no group.
+ * The module resources in the names, one group for each kind that has some, in the order of `moduleKinds`, with the
+ * application's own left out. An item stays when its name or id contains `search`, ignoring letter case and
+ * surrounding spaces. A kind with no item has no group.
  */
 export function moduleResources(names: StudioNames | null, search: string): ModuleResourceGroup[] {
   if (names === null) {
     return []
   }
   const needle = search.trim().toLowerCase()
-  const sources: [ModuleResourceKind, { id: string; name: string; module: string | null }[]][] = [
-    ['entity', names.entities],
-    ['process', names.processes],
-    ['policy', names.policies],
-    ['contract', names.contracts],
-    ['page', names.pages],
-  ]
-  return sources
-    .map(([kind, source]) => ({
+  return moduleKinds
+    .map((kind) => ({
       kind,
-      items: source
+      items: moduleNameLists[kind](names)
         .filter(
           (item) =>
             item.module !== null &&

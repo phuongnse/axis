@@ -6,6 +6,7 @@
   "entity": "Employee",
   "sections": [
     {
+      "name": "title",
       "title": { "textKey": "organization.absence.title" },
       "fields": [{ "field": "delegate" }, { "field": "delegateFrom" }, { "field": "delegateUntil" }]
     }

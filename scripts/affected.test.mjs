@@ -216,7 +216,9 @@ describe("the unaffected_by lists in .nexkit/config.json", () => {
   // The suites each check runs. A check skips only when all of them would.
   const suitesOf = {
     smoke,
-    integration: ["integration"],
+    "integration-1": ["integration"],
+    "integration-2": ["integration"],
+    "integration-3": ["integration"],
     "e2e-1": ["playwright"],
     "e2e-2": ["playwright"],
     "e2e-3": ["playwright"],
@@ -440,7 +442,11 @@ exit 0
     const result = run("scripts/integration.sh", "web/src/x.ts");
 
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    const suites = ["Axis.Integration.Tests", ...scenarioSuites()];
+    const suites = [
+      "Axis.Integration.Tests",
+      "Axis.ControlPlane.Integration.Tests",
+      ...scenarioSuites(),
+    ];
     assert.ok(scenarioSuites().length > 0);
     for (const suite of suites) {
       assert.ok(
@@ -498,6 +504,66 @@ exit 0
     assert.ok(!call.includes("--filter-class"), call);
     // The dev script's smoke test runs in scripts/smoke.sh.
     assert.doesNotMatch(result.stdout, /dev-script/);
+  });
+
+  test("integration.sh runs one shard's classes, and only shard 1 runs the control plane suite", () => {
+    const shards = ["1/3", "2/3", "3/3"].map((shard) => {
+      const result = run("scripts/integration.sh", "src/Axis.Engine/Foo.cs", {
+        AXIS_INTEGRATION_SHARD: shard,
+      });
+      const calls = dotnetCalls();
+      return { result, calls, call: integrationCall(calls) };
+    });
+
+    assert.ok(shards[0].call.includes("--filter-class Axis.Integration.Tests."), shards[0].call);
+    assert.ok(!shards[0].call.includes("--filter-not-class"), shards[0].call);
+    assert.ok(shards[1].call.includes("--filter-class Axis.Integration.Tests."), shards[1].call);
+    assert.ok(shards[2].call.includes("--filter-not-class *PerformanceTests"), shards[2].call);
+    assert.ok(!shards[2].call.includes("--filter-class"), shards[2].call);
+    const controlPlane = shards.map(({ calls }) =>
+      calls.some((call) => call.includes("Axis.ControlPlane.Integration.Tests")),
+    );
+    assert.deepEqual(controlPlane, [true, false, false]);
+    // Each application's scenario suite is expected in exactly one shard.
+    for (const suite of scenarioSuites()) {
+      const expecting = shards.filter(({ result }) => result.stdout.includes(suite));
+      assert.equal(expecting.length, 1, suite);
+    }
+  });
+
+  test("integration.sh refuses a malformed shard and a shard with arguments", () => {
+    const malformed = run("scripts/integration.sh", "src/Axis.Engine/Foo.cs", {
+      AXIS_INTEGRATION_SHARD: "4/3",
+    });
+    assert.equal(malformed.status, 2);
+    assert.match(malformed.stderr, /AXIS_INTEGRATION_SHARD must be a shard such as 1\/3, not '4\/3'/);
+
+    const withArguments = spawnSync(
+      "bash",
+      ["scripts/integration.sh", "--filter-class", "*StudioTests"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 60_000,
+        env: { ...env, FAKE_CHANGED: "src/x.cs", AXIS_INTEGRATION_SHARD: "1/3" },
+      },
+    );
+    assert.equal(withArguments.status, 2);
+    assert.match(withArguments.stderr, /cannot be combined with arguments/);
+    assert.deepEqual(dotnetCalls(), []);
+  });
+
+  test("integration.sh skips only the suites of its own shard for a web/src change", () => {
+    const result = run("scripts/integration.sh", "web/src/x.ts", {
+      AXIS_INTEGRATION_SHARD: "2/3",
+    });
+
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(
+      result.stdout.includes("Axis.Integration.Tests (skipped: not affected by this change)"),
+      result.stdout,
+    );
+    assert.ok(!result.stdout.includes("Axis.ControlPlane.Integration.Tests"), result.stdout);
   });
 
   test("performance.sh runs only the performance tests and reports them", () => {

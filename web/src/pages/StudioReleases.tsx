@@ -151,7 +151,7 @@ export function StudioReleasesList({
       title={
         pendingBlocked
           ? cannotReplaceTitle(t, pendingDetail)
-          : t('shell.studio.activate.title').replace('{number}', String(pending?.number ?? ''))
+          : t('shell.studio.activate.title').replace('{release}', String(pending?.number ?? ''))
       }
       okText={t('shell.studio.activate.confirm')}
       cancelText={pendingBlocked ? t('shell.studio.release.close') : t('shell.studio.cancel')}
@@ -168,8 +168,8 @@ export function StudioReleasesList({
       {pending && !pendingBlocked && (
         <Flex vertical gap={4} data-testid="studio-rollback-release">
           <Typography.Text>
-            {(live === undefined ? t('shell.studio.activate.first') : t('shell.studio.activate.replaces'))
-              .replace('{number}', String(pending.number))
+            {(live === undefined ? t('shell.studio.activate.becomesLive') : t('shell.studio.activate.replaces'))
+              .replace('{release}', String(pending.number))
               .replace('{live}', String(live ?? ''))}
           </Typography.Text>
           {pending.label && <Typography.Text style={{ color: colour.textMuted }}>{pending.label}</Typography.Text>}
@@ -222,12 +222,14 @@ export function StudioReleasesList({
   return (
     <section data-testid="studio-releases">
       <AxisTable<StudioReleaseGroup>
-        rows={releaseGroups(history)}
+        dataSource={releaseGroups(history)}
+        loading={false}
+        toolbar={{}}
         rowKey={(release) => release.releaseId}
         emptyText={t('shell.studio.releases.empty')}
         // Proposed: a long history pages as every table does, twenty releases a page, with no paging below that.
         pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
-        onRow={(release) =>
+        rowAttributes={(release) =>
           ({
             'data-testid': 'studio-release-row',
             'data-number': release.number,
@@ -242,8 +244,8 @@ export function StudioReleasesList({
             // has no state of its own to name, and its relaxed points are on its page, as they can be many.
             key: 'number',
             title: t('shell.studio.releases.number'),
-            kind: 'fit',
-            render: (release) => (
+            kind: 'fixed',
+            render: (_, release) => (
               <Flex align="center" gap="small">
                 {releaseAddress ? (
                   <Link
@@ -263,37 +265,37 @@ export function StudioReleasesList({
           {
             key: 'label',
             title: t('shell.studio.releases.label'),
-            kind: 'text',
-            render: (release) => release.label ?? <EmptyDash />,
+            kind: 'freeText',
+            render: (_, release) => release.label ?? <EmptyDash />,
           },
           {
             // Proposed: when and by whom a release was published are two columns, as facts of different kinds are.
             key: 'published',
             title: t('shell.studio.releases.published'),
-            kind: 'fit',
-            render: (release) => time.format(new Date(release.published.activatedAt)),
+            kind: 'fixed',
+            render: (_, release) => time.format(new Date(release.published.activatedAt)),
           },
           {
             key: 'publishedBy',
             title: t('shell.studio.releases.publishedBy'),
-            kind: 'text',
-            render: (release) => releaseActorName(release.published, t),
+            kind: 'freeText',
+            render: (_, release) => releaseActorName(release.published, t),
           },
           {
             // Proposed: the note, the longest text and the most often missing, comes last.
             key: 'note',
             title: t('shell.studio.releases.note'),
-            kind: 'text',
-            render: (release) => release.note ?? <EmptyDash />,
+            kind: 'freeText',
+            render: (_, release) => release.note ?? <EmptyDash />,
           },
         ]}
         rowActions={
           canActivate
             ? {
-                count: 1,
-                of: (release) =>
+                configured: 1,
+                actions: (release) =>
                   release.live
-                    ? []
+                    ? null
                     : [
                         {
                           key: 'activate',
@@ -456,24 +458,24 @@ function StudioReleaseDetail({
           {
             <AxisTable<StudioRelaxedPoint>
               // Proposed: relaxed points are a set, so they sort by module, then by point, by their words.
-              rows={sortRelaxed(release.relaxed, locale, t)}
+              dataSource={sortRelaxed(release.relaxed, locale, t)}
               rowKey={(point) => `${point.module}/${point.point}`}
               emptyText={t('shell.studio.release.relaxed.none')}
               pagination={false}
-              onRow={() => ({ 'data-testid': 'release-relaxed-point' }) as HTMLAttributes<HTMLElement>}
+              rowAttributes={() => ({ 'data-testid': 'release-relaxed-point' }) as HTMLAttributes<HTMLElement>}
               columns={[
                 {
                   key: 'module',
                   title: t('shell.studio.relaxed.module'),
-                  kind: 'text',
-                  render: (point) => relaxedPointWords(point, locale, t).module,
+                  kind: 'freeText',
+                  render: (_, point) => relaxedPointWords(point, locale, t).module,
                 },
                 {
                   // Proposed: the point by its label, with what kind of point it is and its entity on a muted line.
                   key: 'point',
                   title: t('shell.studio.relaxed.point'),
-                  kind: 'text',
-                  render: (point) => {
+                  kind: 'freeText',
+                  render: (_, point) => {
                     const words = relaxedPointWords(point, locale, t)
                     return (
                       <Flex vertical>
@@ -486,8 +488,8 @@ function StudioReleaseDetail({
                 {
                   key: 'reason',
                   title: t('shell.studio.relaxed.reason'),
-                  kind: 'text',
-                  render: (point) => point.reason,
+                  kind: 'freeText',
+                  render: (_, point) => point.reason,
                 },
               ]}
             />
@@ -534,7 +536,7 @@ function StudioReleaseDetail({
           </ReleaseSection>
           <ReleaseSection title={t('shell.studio.release.parts')} testId="studio-release-parts">
             <AxisTable<StudioReleasePartRow>
-              rows={parts}
+              dataSource={parts}
               rowKey={(part) => `${part.type}/${part.id}`}
               emptyText=""
               pagination={false}
@@ -542,20 +544,20 @@ function StudioReleaseDetail({
                 {
                   key: 'name',
                   title: t('shell.studio.release.part.name'),
-                  kind: 'text',
-                  render: (part) => part.label ?? part.id,
+                  kind: 'freeText',
+                  render: (_, part) => part.label ?? part.id,
                 },
                 {
                   key: 'type',
                   title: t('shell.studio.release.part.type'),
-                  kind: 'fit',
-                  render: (part) => t(`shell.studio.release.part.${part.type}`),
+                  kind: 'fixed',
+                  render: (_, part) => t(`shell.studio.release.part.${part.type}`),
                 },
                 {
                   key: 'version',
                   title: t('shell.studio.release.part.version'),
-                  kind: 'fit',
-                  render: (part) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{part.version}</span>,
+                  kind: 'fixed',
+                  render: (_, part) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{part.version}</span>,
                 },
               ]}
             />
@@ -564,7 +566,7 @@ function StudioReleaseDetail({
       )}
       <ReleaseSection title={t('shell.studio.release.activations')} testId="studio-release-activations">
         <AxisTable<ReleaseActivationRow>
-          rows={activations}
+          dataSource={activations}
           rowKey={(row) => row.key}
           emptyText=""
           pagination={false}
@@ -572,20 +574,20 @@ function StudioReleaseDetail({
             {
               key: 'activatedAt',
               title: t('shell.studio.release.activatedAt'),
-              kind: 'fit',
-              render: (row) => at(row.activatedAt),
+              kind: 'fixed',
+              render: (_, row) => at(row.activatedAt),
             },
             {
               key: 'by',
               title: t('shell.studio.release.activatedBy'),
-              kind: 'text',
-              render: (row) => releaseActorName(row.actor, t),
+              kind: 'freeText',
+              render: (_, row) => releaseActorName(row.actor, t),
             },
             {
               key: 'replaced',
               title: t('shell.studio.release.replaced'),
-              kind: 'fit',
-              render: (row) =>
+              kind: 'fixed',
+              render: (_, row) =>
                 row.replaced === null ? (
                   <EmptyDash />
                 ) : (
@@ -595,8 +597,8 @@ function StudioReleaseDetail({
             {
               key: 'until',
               title: t('shell.studio.release.liveUntil'),
-              kind: 'fit',
-              render: (row) => (row.until ? at(row.until) : t('shell.studio.release.now')),
+              kind: 'fixed',
+              render: (_, row) => (row.until ? at(row.until) : t('shell.studio.release.now')),
             },
           ]}
         />

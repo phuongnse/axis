@@ -14,11 +14,23 @@ public static class PlatformAuditRecords
     /// changed and must never hold a secret value. <paramref name="tenantId"/> is <see langword="null"/> when the command
     /// acts on no single tenant.
     /// </summary>
+    public static Task WriteAsync(
+        PlatformDbContext platform,
+        string command,
+        string? tenantId,
+        IReadOnlyList<string> changed,
+        CancellationToken cancellationToken = default) =>
+        WriteAsync(platform, command, tenantId, changed, actor: null, cancellationToken);
+
+    /// <summary>
+    /// The same, for a record that names the operator or machine caller of a job in <paramref name="actor"/>.
+    /// </summary>
     public static async Task WriteAsync(
         PlatformDbContext platform,
         string command,
         string? tenantId,
         IReadOnlyList<string> changed,
+        string? actor,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(platform);
@@ -34,6 +46,7 @@ public static class PlatformAuditRecords
             OsUser = Environment.UserName,
             Machine = Environment.MachineName,
             Changed = [.. changed],
+            Actor = actor,
         });
         await platform.SaveChangesAsync(cancellationToken);
     }

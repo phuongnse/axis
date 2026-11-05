@@ -13,10 +13,13 @@ notice. This decision proposes that it is an in-app notification of the platform
 - **The recipient.** Its recipient kind is `platformRole` and its recipient is a platform role kind. The first kind is
   `administrator`, which the server resolves to `Users:AdministratorRole` when someone reads the notice. The row never
   holds the configured role name, so a change of that setting needs no rewrite.
+- **The routes.** `GET /api/notifications`, `POST /api/notifications/{id}/read` and
+  `POST /api/notifications/read-all` list and mark read the notices for the administrators, see the
+  [reference](../reference/notifications.md#in-app-notifications).
 - **The bell.** The platform site gets a bell that lists these notices, as an application site's bell lists the
   notifications of that application.
 
-Until it is agreed, the docs mark the routes and the bell for tenant notices as planned.
+The row, the routes and the bell are built, while the decision is still proposed.
 
 _Why:_ one table, one retention and one read-mark model serve every in-app notice, and a notice for the tenant needs no
 fake application.

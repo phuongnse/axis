@@ -40,6 +40,7 @@ import { expressionScope } from './expressionScope'
 import { SectionPanel } from './FormSection'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
@@ -168,6 +169,8 @@ interface EntityParts {
   origins?: FieldOrigin[]
   warnings?: Map<number, FieldWarning>
   onOriginsChange?: (next: FieldOrigin[], touched?: string) => void
+  /** The module entity's customization layer: its marks and Reset to module, which main built. */
+  layer?: DesignerLayer
 }
 
 /**
@@ -223,16 +226,29 @@ export function EntityDesigner(props: EntityParts) {
           origins={props.origins}
           warnings={props.warnings}
           onOriginsChange={props.onOriginsChange}
+          layer={props.layer}
           onChange={onChange}
           openIndex={openField}
           onOpen={setOpenField}
         />
       </SectionPanel>
       <SectionPanel {...section('validations')}>
-        <Validations validations={value.validations} fieldNames={fieldNames} readOnly={readOnly} onChange={onChange} />
+        <Validations
+          validations={value.validations}
+          fieldNames={fieldNames}
+          readOnly={readOnly}
+          layer={props.layer}
+          onChange={onChange}
+        />
       </SectionPanel>
       <SectionPanel {...section('indexes')}>
-        <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} onChange={onChange} />
+        <Indexes
+          indexes={value.indexes}
+          fields={fields ?? []}
+          readOnly={readOnly}
+          layer={props.layer}
+          onChange={onChange}
+        />
       </SectionPanel>
     </Flex>
   )
@@ -392,6 +408,7 @@ function EntityFields({
   origins,
   warnings,
   onOriginsChange,
+  layer,
   onChange,
   openIndex,
   onOpen,
@@ -402,6 +419,7 @@ function EntityFields({
   origins: FieldOrigin[] | undefined
   warnings: Map<number, FieldWarning> | undefined
   onOriginsChange: ((next: FieldOrigin[], touched?: string) => void) | undefined
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
   /** The field whose drawer is open, or none. */
   openIndex: number | null
@@ -451,10 +469,10 @@ function EntityFields({
   const columns: AxisColumn<Row>[] = [
     {
       key: 'name',
-      kind: 'fit',
+      kind: 'fixed',
       title: t('shell.studio.entity.fieldName'),
       searchText: (row) => text(row.field.name),
-      render: (row) => (
+      render: (_, row) => (
         <Flex gap={spacing.xs} align="center">
           {/* A button, not a link, as a field has no address of its own; it takes focus, so the drawer gives it back. */}
           <Button
@@ -465,6 +483,7 @@ function EntityFields({
           >
             {text(row.field.name) || t('shell.studio.entity.unnamedField')}
           </Button>
+          {layer && <LayerMarkTag layer={layer} list="/fields" index={row.index} name={text(row.field.name)} />}
           {warnings?.get(row.index) && (
             <Tooltip title={t('shell.studio.entity.migration.rowWarning')}>
               <WarningOutlined
@@ -478,35 +497,36 @@ function EntityFields({
     },
     {
       key: 'label',
-      kind: 'text',
+      kind: 'freeText',
       title: t('shell.studio.entity.fieldLabel'),
       searchText: (row) => labelText(row.field.label) ?? '',
-      render: (row) => labelText(row.field.label) ?? <EmptyDash />,
+      render: (_, row) => labelText(row.field.label) ?? <EmptyDash />,
     },
     {
       key: 'type',
-      kind: 'fit',
+      kind: 'fixed',
       title: t('shell.studio.entity.fieldType'),
-      render: (row) => <TypeCell field={row.field} />,
+      render: (_, row) => <TypeCell field={row.field} />,
     },
     {
       key: 'required',
-      kind: 'fit',
+      kind: 'fixed',
       title: t('shell.studio.entity.required'),
-      render: (row) => (row.field.required === true ? <Yes name={t('shell.studio.entity.required')} /> : <EmptyDash />),
+      render: (_, row) =>
+        row.field.required === true ? <Yes name={t('shell.studio.entity.required')} /> : <EmptyDash />,
     },
     {
       key: 'unique',
-      kind: 'fit',
+      kind: 'fixed',
       title: t('shell.studio.entity.unique'),
-      render: (row) => (row.field.unique === true ? <Yes name={t('shell.studio.entity.unique')} /> : <EmptyDash />),
+      render: (_, row) => (row.field.unique === true ? <Yes name={t('shell.studio.entity.unique')} /> : <EmptyDash />),
     },
     {
       key: 'properties',
-      kind: 'text',
+      kind: 'freeText',
       priority: 'low',
       title: t('shell.studio.entity.properties'),
-      render: (row) => {
+      render: (_, row) => {
         const traits = fieldTraits(row.field)
         return traits.length === 0 ? (
           <EmptyDash />
@@ -530,16 +550,16 @@ function EntityFields({
     <div data-testid="studio-field-/fields">
       <AxisTable<Row>
         testId="studio-entity-fields"
-        rows={shown}
+        dataSource={shown}
         rowKey={(row) => row.index}
         columns={columns}
-        onRow={(row) => ({ 'data-testid': `studio-field-/fields/${row.index}` }) as HTMLAttributes<HTMLElement>}
+        rowAttributes={(row) => ({ 'data-testid': `studio-field-/fields/${row.index}` }) as HTMLAttributes<HTMLElement>}
         rowActions={
           readOnly
             ? undefined
             : {
-                count: 3,
-                of: (row) => [
+                configured: 3,
+                actions: (row) => [
                   {
                     key: 'up',
                     labelKey: 'shell.studio.entity.moveUp',
@@ -579,6 +599,7 @@ function EntityFields({
         emptyText={t('shell.studio.entity.noFields')}
         pagination={false}
       />
+      <RemovedRows layer={layer} list="/fields" />
       <FieldDrawer
         index={open}
         fields={fields}
@@ -1354,11 +1375,13 @@ function Indexes({
   indexes,
   fields,
   readOnly,
+  layer,
   onChange,
 }: {
   indexes: unknown
   fields: unknown[]
   readOnly: boolean
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -1402,6 +1425,7 @@ function Indexes({
               <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
                 {text(content.name)}
               </Typography.Text>
+              {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{t('shell.studio.entity.indexFields')}</div>
                 <Select
@@ -1446,6 +1470,7 @@ function Indexes({
             </Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/indexes" />
       </Flex>
     </div>
   )
@@ -1456,11 +1481,13 @@ function Validations({
   validations,
   fieldNames,
   readOnly,
+  layer,
   onChange,
 }: {
   validations: unknown
   fieldNames: string[]
   readOnly: boolean
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -1486,6 +1513,7 @@ function Validations({
               <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
                 {text(content.name)}
               </Typography.Text>
+              {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/expression`} style={{ flex: 1, minWidth: 240 }}>
                 <div>{name}</div>
                 <Expression
@@ -1535,6 +1563,7 @@ function Validations({
             </Button>
           </div>
         )}
+        <RemovedRows layer={layer} list="/validations" />
       </Flex>
     </div>
   )

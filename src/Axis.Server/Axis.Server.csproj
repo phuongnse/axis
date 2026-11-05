@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Administration\Axis.Administration.csproj" />
     <ProjectReference Include="..\Axis.Data\Axis.Data.csproj" />
     <ProjectReference Include="..\Axis.Policy\Axis.Policy.csproj" />
     <ProjectReference Include="..\Axis.Presentation\Axis.Presentation.csproj" />

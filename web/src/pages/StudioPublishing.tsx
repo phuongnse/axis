@@ -37,23 +37,28 @@ export interface StudioPublishingHandle {
 }
 
 /**
- * The Validate, Preview, Run tests and Publish buttons of the open application, with the status of the request they
- * send, and its release history. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
+ * The band of the open application, with the status of the request its buttons send and its release history. The
+ * band holds the `newResource` button, Validate, Preview, Run tests and Publish. On its left it shows the application's
+ * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the `problems`
+ * panel beside the page, then the release state, and `bandState` after it. The request status, test results and
+ * preview links show at the top of the content, under the band, then `children`, then the release list. The release
+ * list keeps its own title unless `releasesView`, where the page's heading names it. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
- * sends a publish request. A Roll back button in the history sends a rollback request.
+ * sends a publish request. A publish refused by a tenant quota shows the server's title in the error alert.
+ * An Activate… button in the history sends a rollback request.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
  * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
  * stored under the status line, when it stored any.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
- * status meanwhile. When it ends, its diagnostics go to the diagnostics panel. A succeeded publish or rollback
- * shows its release number, found in the release history by the request's `releaseId`. Publish and Roll back show
+ * status meanwhile. When it ends, its diagnostics go to the Problems panel. A succeeded publish or rollback
+ * shows its release number, found in the release history by the request's `releaseId`. Publish and Activate… show
  * only when `canPublish`. They and Validate are off while a request runs and while the reconnect message shows. The
  * history loads when the application is picked, and again after a request ends, after the reconnect, and when
- * `folderRevision` changes, which the page does after a save or a delete. A warning shows when the folder differs
- * from the active release. When the server
+ * `folderRevision` changes, which the page does after a save or a delete. The band says "Changes not live" when the
+ * folder differs from the active release. When the server
  * does not answer, the checking starts again after the reconnect. `onDiagnostics` runs while the page may have
  * changed, so it must not depend on a stale copy of the page's state. `onBusyChange` runs when a request is sent,
  * checked or finished, or the reconnect starts or ends.

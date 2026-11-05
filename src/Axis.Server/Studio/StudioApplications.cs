@@ -1,7 +1,4 @@
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using Axis.Configuration.Resources;
 using Axis.Configuration.Templates;
 
 namespace Axis.Server.Studio;
@@ -43,14 +40,14 @@ internal static class StudioApplications
         [
             ("application.json", StudioWrites.Serialize(new JsonObject
             {
-                ["id"] = NewId(),
+                ["id"] = TemplateApplications.NewId(),
                 ["kind"] = "application",
                 ["name"] = name,
                 ["formatVersion"] = 1,
             })),
             ($"sites/{kebab}.json", StudioWrites.Serialize(new JsonObject
             {
-                ["id"] = NewId(),
+                ["id"] = TemplateApplications.NewId(),
                 ["kind"] = "site",
                 ["name"] = name,
                 ["formatVersion"] = 1,
@@ -70,7 +67,7 @@ internal static class StudioApplications
             })),
             ("identity-providers/accounts.json", StudioWrites.Serialize(new JsonObject
             {
-                ["id"] = NewId(),
+                ["id"] = TemplateApplications.NewId(),
                 ["kind"] = "identityProvider",
                 ["name"] = "accounts",
                 ["formatVersion"] = 1,
@@ -78,7 +75,7 @@ internal static class StudioApplications
             })),
             ("pages/home.json", StudioWrites.Serialize(new JsonObject
             {
-                ["id"] = NewId(),
+                ["id"] = TemplateApplications.NewId(),
                 ["kind"] = "page",
                 ["name"] = "Home",
                 ["formatVersion"] = 1,
@@ -87,7 +84,7 @@ internal static class StudioApplications
             })),
             ("texts/en.json", StudioWrites.Serialize(new JsonObject
             {
-                ["id"] = NewId(),
+                ["id"] = TemplateApplications.NewId(),
                 ["kind"] = "text",
                 ["name"] = "TextsEn",
                 ["formatVersion"] = 1,
@@ -100,58 +97,6 @@ internal static class StudioApplications
                 },
             })),
         ];
-    }
-
-    /// <summary>
-    /// The files of a copy of <paramref name="template"/> named <paramref name="name"/>. A file that is a JSON object
-    /// with a UUID <c>id</c> gets a new id, the manifest gets the new name and the site gets the new path. Any other
-    /// file is copied byte for byte, so the copy has the template's diagnostics.
-    /// </summary>
-    public static IReadOnlyList<(string File, byte[] Bytes)> FromTemplate(InstalledTemplate template, string name)
-    {
-        var files = new List<(string File, byte[] Bytes)>(template.Files.Count);
-        foreach (var file in template.Files)
-        {
-            var original = Encoding.UTF8.GetBytes(file.Content);
-            files.Add((file.Path, Copy(file.Content, name) ?? original));
-        }
-
-        return files;
-    }
-
-    private static byte[]? Copy(string content, string name)
-    {
-        JsonObject? resource;
-        try
-        {
-            resource = JsonNode.Parse(content) as JsonObject;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-
-        if (resource is null
-            || resource["id"] is not JsonValue id
-            || !id.TryGetValue<string>(out var text)
-            || text.Length != 36
-            || !Guid.TryParseExact(text, "D", out _))
-        {
-            return null;
-        }
-
-        resource["id"] = NewId();
-        var kind = resource["kind"] is JsonValue value && value.TryGetValue<string>(out var kindText) ? kindText : null;
-        if (kind == ResourceKinds.Application)
-        {
-            resource["name"] = name;
-        }
-        else if (kind == ResourceKinds.Site)
-        {
-            resource["path"] = StudioFileNames.Kebab(name);
-        }
-
-        return StudioWrites.Serialize(resource);
     }
 
     /// <summary>
@@ -217,6 +162,4 @@ internal static class StudioApplications
 
         return StudioCreateOutcome.Created;
     }
-
-    private static string NewId() => Guid.NewGuid().ToString("D");
 }

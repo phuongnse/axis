@@ -18,7 +18,7 @@ _(planned for M31)_.
 ## Layout
 
 - **Header.** One row, 48 px high, on `surface` with a `borderSubtle` rule below it. From the left: the button that
-  collapses the sidebar, the site's mark, the site's title, then on the right the notification bell, the app switcher,
+  collapses the sidebar, the site's mark, the site's title, then on the right the notification bell (on an application site, and on the platform site for an administrator), the app switcher,
   the language and theme menu and the account button. The account button is the person's avatar, the initials of
   their name on a `primary` circle, then their name and a caret: a circle is a person, as a rounded square
   is an application or a site. The mark is the first letter of the site's title on a
@@ -34,10 +34,10 @@ _(planned for M31)_.
   `primaryText` on a `primary` tint and marked `aria-current`.
 - **A page's own sidebar.** A page with its own navigation, such as Studio, claims the sidebar by rendering
   `ShellSidebar`, and draws its navigation there in place of the site's. Such a page is a workspace: `spacing-md`
-  round its content and 32 px sidebar entries, and a compact band _(planned for M31)_, see
+  round its content and 32 px sidebar entries, and a compact band, see
   [Studio workspace](studio-workspace.md#workspace). The sidebar and its collapse button show even on a one-page site.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a strip 64 px wide of the entries' icons, each
-  named by a tooltip, and opens it again. Each icon is centred, and a group's title gives way to a thin rule _(planned for M31)_. The button names what it does, "Collapse navigation" or "Expand
+  named by a tooltip, and opens it again. Each icon is centred, and a group's title gives way to a thin rule. The button names what it does, "Collapse navigation" or "Expand
   navigation", and has `aria-expanded`. The sidebar stays open or collapsed while the person moves between pages.
 - **One-page sites.** A site with one navigation entry, such as the platform site, has no sidebar and no button to
   collapse it, unless a page claims the sidebar. The page takes the whole width.
@@ -47,14 +47,14 @@ _(planned for M31)_.
   document behind it is `canvas` in both modes, so no white shows at its edges or when the page scrolls past its
   end.
 - **Scrolling.** The page keeps the browser's own scroll. The header stays at the top, a compact band
-  _(planned for M31)_ stays under it, and the sidebar's background runs the page's height while its navigation stays
+  stays under it, and the sidebar's background runs the page's height while its navigation stays
   under the header with a scroll of its own. A regular band and the footer scroll with the page. The page declares its colour scheme, so every
   scrollbar, the page's and the sidebar's, follows the mode.
 - **Page area.** Pages draw on `canvas` with `spacing-lg` padding. A wide table scrolls inside its widget, so the
   page never scrolls sideways.
-- **Footer.** A slim footer runs the full width under the sidebar and the page, as the header does above them, on
-  `surface` with a `borderSubtle` rule above it. _(planned for M31)_: beside a sidebar it sits under the content
-  column only, so the sidebar runs to the bottom of the window and is never pushed up by it, see
+- **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it. Without a sidebar it runs the full
+  width under the page. Beside a sidebar it sits under the content column only, so the sidebar runs to the bottom of
+  the window and is never pushed up by it, see
   [D129](../decisions/d129-rules-from-the-studio-editors-review.md). On the left it reads "© <year> Axis", then " · v<version>" for a
   signed-in person only, as in "© 2026 Axis · v0.1.0". It shows no server status, and a page that cannot reach the
   server says so where it fails. The legal links take the right,
@@ -81,9 +81,9 @@ _(planned for M31)_.
 
 - Every page of a site starts with a header band on `surface` across the page area, with a `borderSubtle` rule below
   it, over the page's widgets on `canvas`.
-- **Compact band** _(planned for M31)_. A workspace page, such as every page of Studio, draws its band as one row 48 px high:
-  the breadcrumb, whose last step is the page's title as its heading, then the page's own actions. It stays under the
-  header while the page scrolls, see [band](studio-workspace.md#band).
+- **Compact band.** A workspace page, such as every page of Studio, draws its band as one row 48 px high: the
+  page's state first, then its own actions. It has no breadcrumb. It stays under the header while the page scrolls,
+  see [band](studio-workspace.md#band).
 - The band holds the breadcrumb, then the page title in `heading4`. It has `spacing-lg` padding
   above and at its sides, `spacing-md` below the title, and `spacing-xs` between the breadcrumb and the title. The breadcrumb starts at the site and ends at the
   page: "Purchase requests › Requests". A form page opened from a table names that table's navigation page between

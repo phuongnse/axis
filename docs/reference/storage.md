@@ -214,20 +214,18 @@ and creates no tables. See
 - **The `platform` schema.** Its EF Core migrations ship with Axis, with their
   history in `platform.__platform_migrations`. The server applies them at
   start over `ConnectionStrings:PlatformSchema` under both tenant sources, and
-  uses that setting for nothing else. `Axis.Admin migrate` applies them too, before it migrates the tenants, so an
+  otherwise only for the quotas write of the provisioning API. `Axis.Admin migrate` applies them too, before it migrates the tenants, so an
   upgrade that runs `migrate` first has every new platform table before the new
   server starts. `migrate` does not run the reader role's grants. The server does that at its next start.
-- **Read-only hosts.** The server reads the directory over
-  `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
-  and `SELECT` on its tables, and nothing else. The server sets this in one
-  transaction after the migrations, and revokes any wider right the role had
-  there. The step holds an advisory lock until it ends, so servers that start
-  together run it one after the other. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
-  It does not yet check whether the role is a superuser, owns the schema or
-  inherits rights through membership. The `platform.audit_records` table is
-  the one exception: the role gets no right on it at all. The same step revokes
-  the right that the default privileges would give it on that table.
-- **Write grants.** The same role also gets `INSERT` on `platform.data_protection_keys`, `INSERT`, `UPDATE` and `DELETE` on the [usage](tenant-quotas.md#usage) tables and on `platform.tenant_leases`, and `INSERT` and `UPDATE` on `platform.tenant_daily_counters`, and on no other table. Key rotation happens while the server runs, so the server must add keys. It never updates or deletes one. `platform rekey` is the one writer that updates these rows. It
+- **Read-only hosts.** The server reads the directory over `ConnectionStrings:Platform`. Its role
+  has `USAGE` on the `platform` schema and `SELECT` on its tables, and nothing else. The server sets
+  this in one transaction after the migrations, and revokes any wider right the role had there. The
+  step holds an advisory lock until it ends, so servers that start together run it one after the
+  other. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`. It does not yet
+  check whether the role is a superuser, owns the schema or inherits rights through membership. The
+  `platform.audit_records` table is the one exception: the role gets no right on it at all. The same
+  step revokes the right that the default privileges would give it on that table.
+- **Write grants.** The same role also gets `INSERT` on `platform.data_protection_keys`, `INSERT`, `UPDATE` and `DELETE` on the [usage](tenant-quotas.md#usage) tables, on `platform.tenant_leases` and on `platform.operator_sessions`, `INSERT` on `platform.jobs`, where the provisioning API queues its jobs, `INSERT` on `platform.tenant_host_requests`, where it stores the requests for hosts of a tenant's own, and `INSERT` and `UPDATE` on `platform.tenant_daily_counters`, and on no other table. Key rotation happens while the server runs, so the server must add keys. It never updates or deletes one. `platform rekey` is the one writer that updates these rows. It
   re-encrypts them with a new installation key, over the schema role, see
   [installation key](tenant-setting-commands.md#installation-key). At start the
   server decrypts every stored key, with `Platform:SecretKey` and then with
@@ -236,10 +234,10 @@ and creates no tables. See
   replica with another `Platform:SecretKey`, and no previous key that matches,
   fails this way. The Studio write lock is a PostgreSQL advisory lock. It needs
   no grant, see [authoring API](authoring.md#versions).
-- **The writer.** `Axis.Admin` writes the directory over
-  `ConnectionStrings:PlatformSchema`, see
+- **The writer.** `Axis.Admin` writes the directory over `ConnectionStrings:PlatformSchema`, see
   [administration](administration.md) and
   [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md).
+  The server also writes `PUT /api/cell/tenants/{id}/quotas` over it, on an unpooled connection for that write alone.
 
 The tables:
 
@@ -254,12 +252,13 @@ The tables:
 | `platform.tenant_backup_keys`        | The tenant id, the primary key, and the tenant's backup key, wrapped by the cell's backup key. A cell's `tenant create` and `tenant restore` write a row and `tenant backup` and `tenant restore` read it. A row goes with its tenant. `platform rekey` does not touch it. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
 | `platform.tenant_backups` | The tenant id, the primary key, and `last_success_at` (`timestamp with time zone`), when the last `cell backup` upload of the tenant succeeded. A tenant that never succeeded has no row, and a failed backup keeps the time it had. A row goes with its tenant. See [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). |
 | `platform.tenant_leases` | The `lease_id`, the primary key, the tenant id, the `quota` key, the `holder` (the host and process) and `expires_at` (`timestamp with time zone`). One row is one piece of work that runs under a concurrency quota, see [work at once](tenant-quotas.md#work-at-once). A lease lasts 60 seconds and its holder renews it every 20. The reader role inserts, updates and deletes rows. A row goes with its tenant. |
+| `platform.operator_sessions` | The `id_hash`, the primary key (`bytea`, the SHA-256 hash of the random session id that the operator's cookie holds), the operator's id (`operator_id`, the `sub` of the operator realm), `display_name`, the `roles` of the access token at sign-in (`text[]`), and `signed_in_at` and `last_request_at` (`timestamp with time zone`). One row is the session of a platform operator who signed in to the [cell console](cell-console.md#sign-in). It belongs to no tenant. The row never holds the session id or a token. The reader role inserts, updates and deletes rows. A new sign-in deletes the rows that are past the 15-minute idle limit or the 8-hour absolute limit. |
 | `platform.tenant_daily_counters` | The tenant id, the UTC `day`, the `counter` name and the `value` (`bigint`, at least 0), the primary key being the first three. A cell's worker counts the emails it sends in the counter `emails`, see [emails a day](tenant-quotas.md#emails-a-day). A row goes with its tenant. The reader role inserts and updates rows and never deletes one. |
-| `platform.tenant_quotas` | The tenant id and the `quota` key, the primary key together, the `value` (`bigint`, null means no limit) and `updated_at`. One row is one quota the tenant overrides, and a quota with no row takes the cell's default. The value is null or at least 0, and a row goes with its tenant. Hosts read the rows with the directory, see [tenant quotas](tenant-quotas.md#quotas). |
+| `platform.tenant_quotas` | The tenant id and the `quota` key, the primary key together, the `value` (`bigint`, null means no limit) and `updated_at`. One row is one quota the tenant overrides, and a quota with no row takes the cell's default. The value is null or at least 0, and a row goes with its tenant. Hosts read the rows with the directory, see [tenant quotas](tenant-quotas.md#quotas). The provisioning API writes them over the schema role. |
 | `platform.tenant_site_legal_links` | The tenant id and the lower case `site_path`, the primary key together, and the `privacy_url` and `terms_url` of that site, of which at least one is set. A site does not need to exist, and a row goes with its tenant. See [legal links](tenant-setting-commands.md#legal-links). |
-| `platform.audit_records`             | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `platform.audit_records`             | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine`, `changed` (`text[]`), the names of what changed, and `actor`, which can be empty and names the operator or machine caller of a job. Triggers reject every update, delete and truncate with SQLSTATE `23001`. `Axis.Admin` writes it, and so does the quotas route of the provisioning API, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-The tenant `version` grows on every change to the tenant, its hosts, its bindings or its platform providers.
+The tenant `version` grows on every change to the tenant, its hosts, its bindings or its platform providers. `platform.jobs` holds the provisioning jobs: the `id`, the `kind` (`suspend`, `resume` or `create`), the `tenant_id`, which has no foreign key, so a job outlives its tenant, the `state` (`queued`, `running`, `succeeded` or `failed`), the `steps` (`jsonb`, an array of `{ name, state, error }`), the `error`, the `input` (`jsonb`, null for a suspend or resume, a create's `{ application, administrator }`, and never returned by the job read), the `idempotency_key`, the `request_hash` (`text`, the hex SHA-256), the `actor`, `created_at`, `started_at` and `finished_at`, and the lease: `claimed_by`, `lease_until` and `claims`. The [publisher](administration.md#publisher) claims and runs the jobs under the directory source, see [provisioning API](tenant-lifecycle.md#provisioning-api). `platform.tenant_host_requests` holds the requests for a host of a tenant's own: the tenant id, the `host` (lower case) and `requested_at` (`timestamp with time zone`), the primary key together, the `token` (32 random bytes as base64url), the `state` (`pending`, `verified` or `expired`), `expires_at` (7 days after `requested_at`), `checked_at` (null until a DNS check runs) and the `actor`, the operator's id. A pending row does not hold the host, only `platform.tenant_hosts` does, and a request that finds none pending inserts a new row. The reader role inserts rows and never updates or deletes one. A row goes with its tenant. See [hosts](tenant-lifecycle.md#hosts).
 
 The `schema_version` is text. It is the id of the newest EF Core migration across the configuration, data and
 processes contexts that `Axis.Admin` applied to the tenant database, and it is empty until the first migration. A host
@@ -462,7 +461,7 @@ host with one database role:
 | Directory writes                                                                                    | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
 | Platform migrations, at start, under both tenant sources                                            | Server                          | `ConnectionStrings:PlatformSchema` |
 | Platform migrations, before the tenants are migrated                                                | `Axis.Admin migrate`            | `ConnectionStrings:PlatformSchema` |
-| Platform audit records                                                                              | `Axis.Admin`                    | `ConnectionStrings:PlatformSchema` |
+| Platform audit records                                                                              | `Axis.Admin`, server (quotas)   | `ConnectionStrings:PlatformSchema` |
 | Grants, EF Core migrations, compile, store and activate                                             | `Axis.Admin`                    | The tenant's schema role           |
 | Seeding and schedule trigger state                                                                  | `Axis.Admin`                    | The tenant's runtime role          |
 | Claim, run and finish a publish request: compile, store, activate, release history and audit record | `axis-admin publisher`          | The tenant's schema role           |
@@ -485,8 +484,8 @@ publisher` runs it with the tenant's schema role.
   server and give it no inbound network. It has no HTTP endpoint, see
   [publisher](administration.md#publisher).
 - **Platform schema.** The server still holds `ConnectionStrings:PlatformSchema`
-  at start, for the platform migrations. So "no schema connection" means no
-  tenant schema connection.
+  at start for the platform migrations, and for the quotas write of the provisioning API. So "no
+  schema connection" means no tenant schema connection.
 - **Tenant schema version.** Each tenant database migrates on its own, with
   `Axis.Admin migrate`, which records the version in the directory. A host
   serves a tenant only when the tenant's schema version is the host's own, see

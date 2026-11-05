@@ -3,10 +3,11 @@
 # endpoints, the publisher stage runs `axis-admin publisher`, and the purchasing stage runs the purchasing
 # system stub from tests/Axis.PurchasingStub.
 # The development images hold the built-in modules under modules and the sample modules under samples/modules
-# in /modules, each at the id and version of its module.json.
+# in /modules, each at the id and version of its module.json. They hold the sample templates and the built-in
+# applications under applications in /templates, each at the id and version of its template.json.
 # For local use: the Development environment and the sample credentials are not for production.
 #
-# The targets axis-server, axis-worker and axis-admin are the production images. They run the
+# The targets axis-server, axis-worker, axis-admin and axis-controlplane are the production images. They run the
 # Production environment and hold no sample, sample package, sample module, development realm or
 # credential. Build one with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.
 # AXIS_VERSION is the Axis version, which the images carry as the OCI label
@@ -36,6 +37,15 @@ COPY scripts/lib/install-modules.sh scripts/lib/
 COPY samples/modules/ samples/modules/
 COPY modules/ modules/
 RUN bash scripts/lib/install-modules.sh
+
+# The sample templates and the built-in applications, installed in /src/artifacts/templates/<id>/<version> by the
+# script that scripts/build.sh runs. The id and the version come from each template.json.
+FROM node:24-slim AS templates
+WORKDIR /src
+COPY scripts/lib/install-sample-templates.sh scripts/lib/
+COPY samples/templates/ samples/templates/
+COPY applications/ applications/
+RUN bash scripts/lib/install-sample-templates.sh
 
 # The server, published with the SPA in its web root, the worker, the admin tool and the sample extension package.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
@@ -92,11 +102,13 @@ ARG AXIS_VERSION
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/ src/
+COPY controlplane/src/ controlplane/src/
 COPY --from=web /src/src/Axis.Server/wwwroot src/Axis.Server/wwwroot
 RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/server \
     && test -f /out/server/wwwroot/index.html
 RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/worker
 RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/admin
+RUN dotnet publish controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane
 RUN rm -f /out/*/appsettings.Development.json
 
 # Production server. It runs as the non-root user of the base image and can run on a read-only root file
@@ -140,6 +152,19 @@ RUN mkdir /extensions /modules
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
+# Production control plane, which a region runs on a cluster of its own. It runs as the non-root user of the base
+# image and can run on a read-only root file system. Settings come from environment variables and files in
+# /run/secrets. The image has no curl and holds no extension package or module.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS axis-controlplane
+ARG AXIS_VERSION
+LABEL org.opencontainers.image.version=$AXIS_VERSION
+ENV DOTNET_ENVIRONMENT=Production ASPNETCORE_ENVIRONMENT=Production
+WORKDIR /app
+COPY --from=production-build /out/controlplane .
+USER $APP_UID
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Axis.ControlPlane.dll"]
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # The runtime image has no HTTP client, and Compose uses curl for the server health check.
 RUN apt-get update \
@@ -150,7 +175,7 @@ COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY --from=modules /src/artifacts/modules /modules
 COPY samples/ /samples/
-COPY samples/templates/request-approval/ /templates/request-approval/1.0.0/
+COPY --from=templates /src/artifacts/templates /templates
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Axis.Server.dll"]

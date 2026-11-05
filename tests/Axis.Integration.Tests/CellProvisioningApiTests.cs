@@ -2,14 +2,11 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Axis.Processes.Storage;
+using Axis.Admin;
 using Axis.Server.Tests;
-using Axis.Tenancy;
-using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -32,12 +29,10 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     private static readonly Uri _console = new("http://console.test/");
     private static readonly Uri _tenantHost = new("http://localhost/");
 
-    private static readonly TenantSecretCipher _cipher = TenantSecretCipher.Load(
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestPlatform.SecretKey }).Build());
-
     private readonly HttpClient _http = new();
     private readonly string _realm = $"ops-{Guid.NewGuid():N}"[..16];
     private Uri _baseAddress = null!;
+    private string _platform = null!;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -208,6 +203,710 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
 
+    [Fact]
+    public async Task An_operator_sets_and_clears_quotas_and_the_tenant_read_and_an_audit_record_show_them()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var set = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["users"] = 100, ["storage"] = null } });
+        using var afterSet = await GetAsync(client, "/api/cell/tenants/b", token);
+        using var remove = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { remove = new List<string> { "users" } });
+        using var afterRemove = await GetAsync(client, "/api/cell/tenants/b", token);
+
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        var setQuotas = (await set.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas");
+        AssertQuota(setQuotas, "users", 100, true);
+        AssertQuota(setQuotas, "storage", null, true);
+        AssertQuota(setQuotas, "applications", 10, false);
+        var readQuotas = (await afterSet.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas");
+        AssertQuota(readQuotas, "users", 100, true);
+        AssertQuota(readQuotas, "storage", null, true);
+        AssertQuota(readQuotas, "applications", 10, false);
+        AssertQuota(readQuotas, "authoringRequests", null, false);
+
+        Assert.Equal(HttpStatusCode.OK, remove.StatusCode);
+        AssertQuota((await remove.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas"), "users", 50, false);
+        var removedQuotas = (await afterRemove.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("quotas");
+        AssertQuota(removedQuotas, "users", 50, false);
+        AssertQuota(removedQuotas, "storage", null, true);
+
+        var records = await AuditRecordsAsync();
+        Assert.Equal(
+            [("tenant quotas set", "b", "storage,users"), ("tenant quotas set", "b", "users")],
+            records);
+    }
+
+    [Fact]
+    public async Task An_unknown_key_or_a_negative_value_answers_400_and_writes_nothing()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var unknown = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["nope"] = 1 } });
+        using var negative = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["users"] = -1 } });
+        using var unknownRemoved = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { remove = new List<string> { "nope" } });
+        using var both = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { set = new Dictionary<string, long?> { ["users"] = 1 }, remove = new List<string> { "users" } });
+        using var empty = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token, new { });
+
+        foreach (var response in new[] { unknown, negative, unknownRemoved, both, empty })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+
+        Assert.Equal(0, await CountAsync("platform.tenant_quotas"));
+        Assert.Equal(0, await CountAsync("platform.audit_records"));
+    }
+
+    [Fact]
+    public async Task Setting_quotas_without_the_role_answers_403_and_an_unknown_or_preview_tenant_answers_404()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        var body = new { set = new Dictionary<string, long?> { ["users"] = 1 } };
+
+        using var noRole = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", noRoleToken, body);
+        using var none = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/b/quotas", token: null, body);
+        using var unknown = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/nobody/quotas", operatorToken, body);
+        using var preview = await SendAsync(client, HttpMethod.Put, "/api/cell/tenants/a-preview/quotas", operatorToken, body);
+
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.tenant_quotas"));
+        Assert.Equal(0, await CountAsync("platform.audit_records"));
+    }
+
+    [Fact]
+    public async Task A_host_request_answers_201_with_the_token_the_txt_record_and_the_cname_and_stores_a_pending_row()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var response = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = " Shop.Acme.Test " });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var requestToken = body.GetProperty("token").GetString()!;
+        Assert.Equal(43, requestToken.Length);
+        Assert.Equal("shop.acme.test", body.GetProperty("host").GetString());
+        Assert.Equal("pending", body.GetProperty("state").GetString());
+        Assert.InRange(body.GetProperty("expiresAt").GetDateTimeOffset(), DateTimeOffset.UtcNow.AddDays(7).AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(7).AddMinutes(5));
+        Assert.Equal("_axis-verify.shop.acme.test", body.GetProperty("txt").GetProperty("name").GetString());
+        Assert.Equal(requestToken, body.GetProperty("txt").GetProperty("value").GetString());
+        Assert.Equal("shop.acme.test", body.GetProperty("cname").GetProperty("name").GetString());
+        Assert.Equal("b.vn.example.test", body.GetProperty("cname").GetProperty("target").GetString());
+
+        Assert.Equal(1, await CountAsync("platform.tenant_host_requests"));
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT tenant_id, host, token, state, actor, checked_at IS NULL FROM platform.tenant_host_requests", connection);
+        await using var rows = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await rows.ReadAsync(CancellationToken));
+        Assert.Equal(
+            ("b", "shop.acme.test", requestToken, "pending", new JsonWebToken(token).Subject, true),
+            (rows.GetString(0), rows.GetString(1), rows.GetString(2), rows.GetString(3), rows.GetString(4), rows.GetBoolean(5)));
+    }
+
+    [Fact]
+    public async Task A_repeat_request_of_the_same_tenant_answers_200_with_the_same_token_and_another_tenant_may_request_the_host()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+        using var again = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "SHOP.acme.test" });
+        using var other = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/c/hosts", token, new { host = "shop.acme.test" });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, other.StatusCode);
+        var firstToken = (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("token").GetString();
+        var againBody = await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var otherBody = await other.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(firstToken, againBody.GetProperty("token").GetString());
+        Assert.NotEqual(firstToken, otherBody.GetProperty("token").GetString());
+        Assert.Equal("c.vn.example.test", otherBody.GetProperty("cname").GetProperty("target").GetString());
+        Assert.Equal(2, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_request_after_the_pending_one_expired_stores_a_new_row_with_a_new_token()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+        await ExecuteAsync("UPDATE platform.tenant_host_requests SET expires_at = now() - interval '1 minute'");
+        using var second = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        Assert.NotEqual(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("token").GetString(),
+            (await second.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("token").GetString());
+        Assert.Equal(2, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_host_that_another_tenant_holds_answers_409_without_naming_the_tenant()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var response = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/c/hosts", token, new { host = "B2.vn.example.test" });
+        using var own = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "b2.vn.example.test" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.DoesNotContain("\"b\"", body);
+        Assert.Equal(HttpStatusCode.Conflict, own.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_requested_host_that_is_not_verified_still_answers_404_on_a_tenant_route()
+    {
+        await using var factory = await StartAsync();
+        using var console = CreateClient(factory, _console);
+        using var requested = CreateClient(factory, new Uri("http://shop.acme.test/"));
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var request = await SendAsync(console, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host = "shop.acme.test" });
+        using var root = await GetAsync(requested, "/", token: null);
+        using var me = await GetAsync(requested, "/api/me", token: null);
+
+        Assert.Equal(HttpStatusCode.Created, request.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, root.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, me.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_host_request_without_the_role_answers_403_without_a_token_401_and_stores_nothing()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        var body = new { host = "shop.acme.test" };
+
+        using var noRole = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", noRoleToken, body);
+        using var none = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token: null, body);
+
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.tenant_host_requests"));
+    }
+
+    [Fact]
+    public async Task A_blank_or_malformed_host_answers_400_and_an_unknown_or_preview_tenant_answers_404()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        var bad = new List<HttpResponseMessage>();
+        try
+        {
+            foreach (var host in new[] { "", "  ", "not a host", "localhost", "1.2.3.4", "shop.acme.test.", "-a.acme.test", "a_b.acme.test", "a..acme.test", new string('a', 64) + ".test" })
+            {
+                bad.Add(await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { host }));
+            }
+
+            bad.Add(await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/b/hosts", token, new { }));
+            using var unknown = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/nobody/hosts", token, new { host = "shop.acme.test" });
+            using var preview = await SendAsync(client, HttpMethod.Post, "/api/cell/tenants/a-preview/hosts", token, new { host = "shop.acme.test" });
+
+            Assert.All(bad, response =>
+            {
+                Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+                Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+            });
+            Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+            Assert.Equal(0, await CountAsync("platform.tenant_host_requests"));
+        }
+        finally
+        {
+            foreach (var response in bad)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Suspend_and_resume_queue_jobs_that_the_runner_finishes_with_one_audit_record_naming_the_operator()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var suspend = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "suspend-b");
+        Assert.Equal(HttpStatusCode.Accepted, suspend.StatusCode);
+        var suspendJob = await suspend.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("suspend", suspendJob.GetProperty("kind").GetString());
+        Assert.Equal("b", suspendJob.GetProperty("tenantId").GetString());
+        Assert.Equal("queued", suspendJob.GetProperty("state").GetString());
+        var suspendId = suspendJob.GetProperty("id").GetGuid();
+        Assert.Equal($"/api/cell/jobs/{suspendId:D}", suspend.Headers.Location?.OriginalString);
+        Assert.True(await RunJobAsync());
+
+        using var resume = await PostJobAsync(client, "/api/cell/tenants/c/resume", token, "resume-c");
+        Assert.Equal(HttpStatusCode.Accepted, resume.StatusCode);
+        var resumeId = (await resume.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid();
+        Assert.True(await RunJobAsync());
+
+        using var tenantB = await GetAsync(client, "/api/cell/tenants/b", token);
+        using var tenantC = await GetAsync(client, "/api/cell/tenants/c", token);
+        Assert.Equal("suspended", (await tenantB.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+        Assert.Equal("active", (await tenantC.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+
+        var operatorId = new JsonWebToken(token).Subject;
+        foreach (var (id, kind, tenant) in new[] { (suspendId, "suspend", "b"), (resumeId, "resume", "c") })
+        {
+            using var read = await GetAsync(client, $"/api/cell/jobs/{id:D}", token);
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+            var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal(kind, job.GetProperty("kind").GetString());
+            Assert.Equal(tenant, job.GetProperty("tenantId").GetString());
+            Assert.Equal("succeeded", job.GetProperty("state").GetString());
+            Assert.Equal(JsonValueKind.Null, job.GetProperty("error").ValueKind);
+            var step = Assert.Single(job.GetProperty("steps").EnumerateArray());
+            Assert.Equal("status", step.GetProperty("name").GetString());
+            Assert.Equal("succeeded", step.GetProperty("state").GetString());
+            Assert.Equal(JsonValueKind.Null, step.GetProperty("error").ValueKind);
+
+            await using var connection = new NpgsqlConnection(_platform);
+            await connection.OpenAsync(CancellationToken);
+            await using var command = new NpgsqlCommand(
+                "SELECT command, tenant_id, actor FROM platform.audit_records WHERE changed = ARRAY[@changed]", connection);
+            command.Parameters.AddWithValue("changed", $"job:{id:D}");
+            await using var records = await command.ExecuteReaderAsync(CancellationToken);
+            Assert.True(await records.ReadAsync(CancellationToken));
+            Assert.Equal(($"tenant {kind}", tenant, operatorId), (records.GetString(0), records.GetString(1), records.GetString(2)));
+            Assert.False(await records.ReadAsync(CancellationToken));
+        }
+    }
+
+    [Fact]
+    public async Task The_same_key_and_body_answer_the_first_job_and_any_other_request_with_that_key_answers_422()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "key-1", "{}");
+        using var again = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "key-1", "{}");
+        using var otherBody = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "key-1", "{\"x\":1}");
+        using var otherKind = await PostJobAsync(client, "/api/cell/tenants/b/resume", token, "key-1", "{}");
+        using var otherTenant = await PostJobAsync(client, "/api/cell/tenants/c/suspend", token, "key-1", "{}");
+        using var noKey = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, key: null);
+        using var longKey = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, new string('k', 256));
+        using var blankKey = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, " ");
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid(),
+            (await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        foreach (var response in new[] { otherBody, otherKind, otherTenant })
+        {
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+
+        foreach (var response in new[] { noKey, longKey, blankKey })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task Parallel_retries_with_one_key_queue_one_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8)
+            .Select(_ => PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "parallel")));
+
+        try
+        {
+            Assert.All(responses, response => Assert.Equal(HttpStatusCode.Accepted, response.StatusCode));
+            Assert.Equal(1, await CountAsync("platform.jobs"));
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_key_whose_job_is_older_than_24_hours_queues_a_new_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "old-key", "{}");
+        await using (var connection = new NpgsqlConnection(_platform))
+        {
+            await connection.OpenAsync(CancellationToken);
+            await using var age = new NpgsqlCommand("UPDATE platform.jobs SET created_at = now() - interval '25 hours'", connection);
+            await age.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        using var second = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token, "old-key", "{}");
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
+        Assert.NotEqual(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid(),
+            (await second.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        Assert.Equal(2, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task The_job_routes_answer_401_without_a_token_403_without_the_role_and_404_for_an_unknown_tenant_job_or_tenant_host()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        using var tenantHostClient = CreateClient(factory, _tenantHost);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        foreach (var kind in new[] { "suspend", "resume" })
+        {
+            using var none = await PostJobAsync(client, $"/api/cell/tenants/b/{kind}", token: null, "k");
+            using var noRole = await PostJobAsync(client, $"/api/cell/tenants/b/{kind}", noRoleToken, "k");
+            using var unknown = await PostJobAsync(client, $"/api/cell/tenants/nobody/{kind}", operatorToken, "k");
+            using var preview = await PostJobAsync(client, $"/api/cell/tenants/a-preview/{kind}", operatorToken, "k");
+            using var tenantHost = await PostJobAsync(tenantHostClient, $"/api/cell/tenants/b/{kind}", operatorToken, "k");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, tenantHost.StatusCode);
+        }
+
+        var jobId = Guid.NewGuid();
+        using var noJob = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", operatorToken);
+        using var noToken = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", token: null);
+        using var noRoleJob = await GetAsync(client, $"/api/cell/jobs/{jobId:D}", noRoleToken);
+        using var tenantHostJob = await GetAsync(tenantHostClient, $"/api/cell/jobs/{jobId:D}", operatorToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, noJob.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, noToken.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRoleJob.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, tenantHostJob.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task An_operator_queues_a_create_job_with_five_pending_steps_and_the_job_read_hides_its_input()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var create = await PostJobAsync(client, "/api/cell/tenants", token, "create-d", CreateBody("d"));
+
+        Assert.Equal(HttpStatusCode.Accepted, create.StatusCode);
+        var queued = await create.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("create", queued.GetProperty("kind").GetString());
+        Assert.Equal("d", queued.GetProperty("tenantId").GetString());
+        Assert.Equal("queued", queued.GetProperty("state").GetString());
+        var id = queued.GetProperty("id").GetGuid();
+        Assert.Equal($"/api/cell/jobs/{id:D}", create.Headers.Location?.OriginalString);
+
+        using var read = await GetAsync(client, $"/api/cell/jobs/{id:D}", token);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var job = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(
+            ["tenant", "application", "activate", "invite", "resume"],
+            job.GetProperty("steps").EnumerateArray().Select(step => step.GetProperty("name").GetString()));
+        Assert.All(job.GetProperty("steps").EnumerateArray(), step => Assert.Equal("pending", step.GetProperty("state").GetString()));
+        Assert.False(job.TryGetProperty("input", out _));
+        Assert.Equal(
+            """{"application":"request-approval","administrator":"admin@example.test"}""",
+            await ScalarAsync("SELECT input::text FROM platform.jobs") is string input ? Compact(input) : null);
+    }
+
+    [Fact]
+    public async Task A_create_from_the_built_in_approvals_application_answers_202_when_it_is_installed_and_400_when_it_is_not()
+    {
+        await using (var without = await StartAsync())
+        {
+            using var client = CreateClient(without, _console);
+            var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+            using var response = await PostJobAsync(client, "/api/cell/tenants", token, "approvals-missing", CreateBody("d", application: "approvals"));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal(0, await CountAsync("platform.jobs"));
+        }
+
+        await using var with = await StartAsync(templates: BuiltInApplications.Path);
+        using var installedClient = CreateClient(with, _console);
+        var installedToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var created = await PostJobAsync(installedClient, "/api/cell/tenants", installedToken, "approvals-installed", CreateBody("d", application: "approvals"));
+
+        Assert.Equal(HttpStatusCode.Accepted, created.StatusCode);
+        Assert.Equal("create", (await created.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("kind").GetString());
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task An_id_of_an_existing_tenant_or_an_unfinished_create_job_answers_409()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var existing = await PostJobAsync(client, "/api/cell/tenants", token, "k-b", CreateBody("b"));
+        using var preview = await PostJobAsync(client, "/api/cell/tenants", token, "k-preview", CreateBody("a-preview"));
+        using var first = await PostJobAsync(client, "/api/cell/tenants", token, "k-d", CreateBody("d"));
+        using var queued = await PostJobAsync(client, "/api/cell/tenants", token, "k-d-again", CreateBody("d"));
+
+        Assert.Equal(HttpStatusCode.Conflict, existing.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, queued.StatusCode);
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task A_cell_at_its_tenant_cap_answers_409_this_cell_is_full_and_counts_unfinished_create_jobs()
+    {
+        // The fixture holds the directory rows a, b, c and a-preview, so a cap of 4 is reached.
+        await using (var full = await StartAsync(tenantCap: 4))
+        {
+            using var client = CreateClient(full, _console);
+            var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+            using var response = await PostJobAsync(client, "/api/cell/tenants", token, "full-d", CreateBody("d"));
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var problem = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal("This cell is full.", problem.GetProperty("title").GetString());
+            Assert.Equal(0, await CountAsync("platform.jobs"));
+        }
+
+        await using var room = await StartAsync(tenantCap: 5);
+        using var roomClient = CreateClient(room, _console);
+        var roomToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var last = await PostJobAsync(roomClient, "/api/cell/tenants", roomToken, "room-d", CreateBody("d"));
+        using var over = await PostJobAsync(roomClient, "/api/cell/tenants", roomToken, "room-e", CreateBody("e"));
+
+        Assert.Equal(HttpStatusCode.Accepted, last.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, over.StatusCode);
+        Assert.Equal("This cell is full.", (await over.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("title").GetString());
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task Creating_without_the_role_answers_403_and_a_bad_request_answers_400_with_no_job_queued()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        using var noRole = await PostJobAsync(client, "/api/cell/tenants", noRoleToken, "k-1", CreateBody("d"));
+        using var noKey = await PostJobAsync(client, "/api/cell/tenants", operatorToken, key: null, CreateBody("d"));
+        using var unknownTemplate = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-2", CreateBody("d", application: "nothing"));
+        using var upperCase = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-3", CreateBody("Upper"));
+        using var reserved = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-4", CreateBody("master"));
+        using var tooLong = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-5", CreateBody(new string('a', 51)));
+        using var badEmail = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-6", CreateBody("d", administrator: "not-an-email"));
+        using var notJson = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-7", "{");
+        using var noBody = await PostJobAsync(client, "/api/cell/tenants", operatorToken, "k-8");
+
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noKey.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, unknownTemplate.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, upperCase.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, reserved.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, badEmail.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, notJson.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noBody.StatusCode);
+        Assert.Equal(0, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task The_same_key_and_body_sent_after_the_tenant_exists_answer_the_first_job_and_another_body_answers_422()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var first = await PostJobAsync(client, "/api/cell/tenants", token, "create-once", CreateBody("d"));
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenants (
+                id, status, database_host, database_port, database_name, runtime_user, schema_user,
+                runtime_password, schema_password, oidc_authority, oidc_client_id, oidc_client_secret)
+            VALUES ('d', 'provisioning', 'localhost', 5432, 'db', 'r', 's', '\x00', '\x00', 'http://idp.test', 'axis', '\x00')
+            """);
+        using var again = await PostJobAsync(client, "/api/cell/tenants", token, "create-once", CreateBody("d"));
+        using var other = await PostJobAsync(client, "/api/cell/tenants", token, "create-once", CreateBody("e"));
+        using var withoutKey = await PostJobAsync(client, "/api/cell/tenants", token, "create-twice", CreateBody("d"));
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid(),
+            (await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, other.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, withoutKey.StatusCode);
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task Parallel_creates_of_one_id_with_different_keys_queue_one_job()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6)
+            .Select(index => PostJobAsync(client, "/api/cell/tenants", token, $"race-{index}", CreateBody("d"))));
+        try
+        {
+            Assert.Equal(1, responses.Count(response => response.StatusCode == HttpStatusCode.Accepted));
+            Assert.Equal(5, responses.Count(response => response.StatusCode == HttpStatusCode.Conflict));
+            Assert.Equal(1, await CountAsync("platform.jobs"));
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    private async Task<bool> RunJobAsync() =>
+        await new ProvisioningJobs(_platform, ProvisioningJobs.Builtin(_platform), TimeSpan.FromMinutes(5))
+            .RunNextAsync(TextWriter.Null, CancellationToken);
+
+    // A bearer call needs no CSRF header, so a request with a token never sets it.
+    private static async Task<HttpResponseMessage> PostJobAsync(HttpClient client, string path, string? token, string? key, string? body = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+        if (body is not null)
+        {
+            request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        }
+
+        if (key is not null)
+        {
+            request.Headers.Add("Idempotency-Key", key);
+        }
+
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        else
+        {
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private static void AssertQuota(JsonElement quotas, string key, long? value, bool overridden)
+    {
+        var quota = quotas.GetProperty(key);
+        Assert.Equal(value, quota.GetProperty("value").ValueKind == JsonValueKind.Null ? null : quota.GetProperty("value").GetInt64());
+        Assert.Equal(overridden, quota.GetProperty("overridden").GetBoolean());
+    }
+
+    private static string CreateBody(string id, string application = "request-approval", string administrator = "admin@example.test") =>
+        JsonSerializer.Serialize(new { id, application, administrator });
+
+    private static string Compact(string json) => JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>(json));
+
+    private async Task<object?> ScalarAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        return await command.ExecuteScalarAsync(CancellationToken);
+    }
+
+    private async Task ExecuteAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+    }
+
+    private async Task<long> CountAsync(string table)
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand($"SELECT count(*) FROM {table}", connection);
+        return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
+    private async Task<List<(string Command, string Tenant, string Changed)>> AuditRecordsAsync()
+    {
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT command, tenant_id, array_to_string(changed, ',') FROM platform.audit_records ORDER BY occurred_at, id", connection);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var records = new List<(string, string, string)>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            records.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+        }
+
+        return records;
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, string? token, object body)
+    {
+        using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative)) { Content = JsonContent.Create(body) };
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        else
+        {
+            // A write without a bearer token is a session write, which needs the CSRF header, so the answer comes from authentication.
+            request.Headers.Add("X-Axis-Csrf", "1");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
     private static string[] Hosts(JsonElement tenant) =>
         [.. tenant.GetProperty("hosts").EnumerateArray().Select(host => host.GetString()!)];
 
@@ -240,47 +939,11 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<WebApplicationFactory<Program>> StartAsync()
+    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null, string? templates = null)
     {
         var authority = await keycloak.StartAsync();
-        var platform = await database.CreateDatabaseAsync("cell_api_platform", CancellationToken);
-        var tenantDatabase = await database.CreateDatabaseAsync("cell_api_a", CancellationToken);
-        await using (var connection = new NpgsqlConnection(tenantDatabase))
-        {
-            await connection.OpenAsync(CancellationToken);
-            await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
-            await using var data = DataDatabaseFixture.CreateContext(connection);
-            await configuration.Database.MigrateAsync(CancellationToken);
-            await data.Database.MigrateAsync(CancellationToken);
-        }
-
-        await PostgreSqlServer.GrantRuntimeRoleAsync(tenantDatabase, CancellationToken);
-        var served = new NpgsqlConnectionStringBuilder(tenantDatabase);
-
-        await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
-        {
-            await context.Database.MigrateAsync(CancellationToken);
-
-            // Tenant b has no recorded schema version, so the server withholds it and opens no database for it.
-            context.Tenants.AddRange(
-                Tenant("a", "active", TenantSchemaVersion.Current, served, authority),
-                Tenant("b", "active", string.Empty, served, authority),
-                Tenant("c", "suspended", string.Empty, served, authority),
-                Tenant("a-preview", "suspended", string.Empty, served, authority, previewOf: "a"));
-            context.TenantHosts.AddRange(
-                new TenantHostRow { TenantId = "a", Host = "localhost" },
-                new TenantHostRow { TenantId = "b", Host = "b2.vn.example.test" },
-                new TenantHostRow { TenantId = "b", Host = "b.vn.example.test" },
-                new TenantHostRow { TenantId = "c", Host = "c.vn.example.test" },
-                new TenantHostRow { TenantId = "a-preview", Host = "a-preview.vn.example.test" });
-            await context.SaveChangesAsync(CancellationToken);
-        }
-
-        await using (var connection = new NpgsqlConnection(platform))
-        {
-            await connection.OpenAsync(CancellationToken);
-            await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, CancellationToken);
-        }
+        var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
+        _platform = platform;
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -294,31 +957,11 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             builder.UseSetting("Cell:OperatorRealm", _realm);
             builder.UseSetting("Cell:OperatorRole", OperatorRole);
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());
+            builder.UseSetting("Templates:Path", templates ?? SampleTemplates.Path);
+            if (tenantCap is { } cap)
+            {
+                builder.UseSetting("Cell:TenantCap", cap.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
         });
     }
-
-    private static TenantRow Tenant(
-        string id,
-        string status,
-        string schemaVersion,
-        NpgsqlConnectionStringBuilder databaseAddress,
-        Uri authority,
-        string? previewOf = null) =>
-        new()
-        {
-            Id = id,
-            Status = status,
-            SchemaVersion = schemaVersion,
-            PreviewOf = previewOf,
-            DatabaseHost = databaseAddress.Host!,
-            DatabasePort = databaseAddress.Port,
-            DatabaseName = databaseAddress.Database!,
-            RuntimeUser = PostgreSqlServer.RuntimeRole,
-            SchemaUser = PostgreSqlServer.SchemaRole,
-            RuntimePassword = _cipher.Encrypt(id, TenantSecretFields.RuntimePassword, PostgreSqlServer.RolePassword),
-            SchemaPassword = _cipher.Encrypt(id, TenantSecretFields.SchemaPassword, PostgreSqlServer.RolePassword),
-            OidcAuthority = authority.ToString(),
-            OidcClientId = KeycloakFixture.ClientId,
-            OidcClientSecret = _cipher.Encrypt(id, TenantSecretFields.OidcClientSecret, KeycloakFixture.ClientSecret),
-        };
 }

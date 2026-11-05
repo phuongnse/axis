@@ -16,6 +16,13 @@
     <Project Path="src/Axis.Tenancy/Axis.Tenancy.csproj" />
     <Project Path="src/Axis.Worker/Axis.Worker.csproj" />
   </Folder>
+  <Folder Name="/controlplane/src/">
+    <Project Path="controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj" />
+  </Folder>
+  <Folder Name="/controlplane/tests/">
+    <Project Path="controlplane/tests/Axis.ControlPlane.Integration.Tests/Axis.ControlPlane.Integration.Tests.csproj" />
+    <Project Path="controlplane/tests/Axis.ControlPlane.Tests/Axis.ControlPlane.Tests.csproj" />
+  </Folder>
   <Folder Name="/samples/packages/">
     <Project Path="samples/packages/PaymentReferences/PaymentReferences.csproj" />
     <Project Path="samples/packages/PaymentReferences.Tests/PaymentReferences.Tests.csproj" />

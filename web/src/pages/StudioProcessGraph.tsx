@@ -32,6 +32,7 @@ type StepNodeData = {
   current: boolean
   marked: boolean
   connectable: boolean
+  layerMark?: 'added' | 'changed'
 }
 
 type StepNode = Node<StepNodeData, 'step'>
@@ -56,7 +57,8 @@ function placeSteps(graph: ProcessGraph): (index: number) => { x: number; y: num
 function StepNodeView({ data }: NodeProps<StepNode>) {
   const t = useText()
   const { colour, radius } = useDesignTokens()
-  const label = `${data.name} · ${data.type}`
+  const mark = data.layerMark === undefined ? undefined : t(`shell.studio.module.${data.layerMark}`)
+  const label = `${data.name} · ${data.type}${mark === undefined ? '' : ` · ${mark}`}`
   return (
     <>
       <Handle type="target" position={Position.Top} isConnectable={false} />
@@ -83,6 +85,12 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
         }}
       >
         <strong>{data.name}</strong> <span>{data.type}</span>
+        {mark !== undefined && (
+          <>
+            {' '}
+            <span data-layer-mark={data.layerMark}>{mark}</span>
+          </>
+        )}
       </button>
       <Handle
         type="source"
@@ -184,7 +192,8 @@ const edgeTestIdPrefix = 'rf__edge-'
  * it and releasing on a step, anywhere on the node, calls `onConnect` with the two step numbers and the release point,
  * relative to the canvas. The graph sets no transition itself. It has no keyboard way to connect, which the step
  * panel's pickers give. With `readOnly` no step has a handle, a connect does nothing and Delete or Backspace calls
- * nothing, so the graph only shows the process.
+ * nothing, so the graph only shows the process. `layerMarks` names the steps, by number, that a customization layer added
+ * or changed. Such a node says so in its label and in a visible mark.
  */
 export default function StudioProcessGraph({
   graph,
@@ -195,6 +204,7 @@ export default function StudioProcessGraph({
   onRemove,
   onConnect,
   readOnly = false,
+  layerMarks,
 }: {
   graph: ProcessGraph
   selected: number | null
@@ -204,6 +214,7 @@ export default function StudioProcessGraph({
   onRemove: () => void
   onConnect: (source: number, target: number, point: { x: number; y: number }) => void
   readOnly?: boolean
+  layerMarks?: ReadonlyMap<number, 'added' | 'changed'>
 }) {
   const t = useText()
   const { mode } = useThemeMode()
@@ -240,6 +251,7 @@ export default function StudioProcessGraph({
           current: selected === step.index,
           marked: step.marked,
           connectable: !readOnly && step.type !== 'end',
+          layerMark: layerMarks?.get(step.index),
         },
       })),
       edges: graph.transitions.map((transition): Edge => {
@@ -261,7 +273,7 @@ export default function StudioProcessGraph({
         }
       }),
     }
-  }, [graph, selected, selectedEdge, colour, to, readOnly])
+  }, [graph, selected, selectedEdge, colour, to, readOnly, layerMarks])
 
   // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node
   // under the pointer is the target. `onConnect` is not set, or React Flow would report a snapped drag twice.
@@ -323,6 +335,7 @@ export default function StudioProcessGraph({
         edgeTypes={edgeTypes}
         colorMode={mode}
         fitView
+        minZoom={0.1}
         nodesDraggable={false}
         nodesConnectable={!readOnly}
         nodesFocusable={false}

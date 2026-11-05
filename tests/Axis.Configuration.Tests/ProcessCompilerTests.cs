@@ -2414,11 +2414,11 @@ public sealed class ProcessCompilerTests
                 """)
             .With("forms/order-review.json", $$"""
                 { "id": "{{OrderReviewFormId}}", "kind": "form", "name": "OrderReview", "formatVersion": 1, "entity": "Order",
-                  "sections": [ { "title": { "textKey": "order.review" }, "fields": [ { "field": "amount" } ] } ] }
+                  "sections": [ { "name": "review", "title": { "textKey": "order.review" }, "fields": [ { "field": "amount" } ] } ] }
                 """)
             .With("forms/customer-card.json", """
                 { "id": "99999999-9999-4999-8999-999999999902", "kind": "form", "name": "CustomerCard", "formatVersion": 1, "entity": "Customer",
-                  "sections": [ { "title": { "textKey": "order.review" }, "fields": [ { "field": "name" } ] } ] }
+                  "sections": [ { "name": "review", "title": { "textKey": "order.review" }, "fields": [ { "field": "name" } ] } ] }
                 """)
             .With("events/order-placed.json", OrderPlaced)
             .With("events/customer-joined.json", """

@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "axis-controlplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controlplane
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "axis-controlplane.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "axis-controlplane.labels" . | nindent 8 }}
+        app.kubernetes.io/component: controlplane
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: controlplane
+          image: {{ include "axis-controlplane.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ControlPlane__Region
+              value: {{ required "controlPlane.region is required: the region code, such as vn" .Values.controlPlane.region | quote }}
+            - name: ControlPlane__TenantDomain
+              value: {{ required "controlPlane.tenantDomain is required: the domain of the tenant subdomains of the region, such as vn.example.com" .Values.controlPlane.tenantDomain | quote }}
+            # HTTPS only: a Kestrel endpoint list replaces the plain HTTP port of the image.
+            - name: Kestrel__Endpoints__Https__Url
+              value: https://+:8443
+            - name: Kestrel__Endpoints__Https__Certificate__Path
+              value: /controlplane-tls/tls.crt
+            - name: Kestrel__Endpoints__Https__Certificate__KeyPath
+              value: /controlplane-tls/tls.key
+          ports:
+            - name: https
+              containerPort: 8443
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: https
+              scheme: HTTPS
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: controlplane-tls
+              mountPath: /controlplane-tls
+              readOnly: true
+      volumes:
+        - name: secrets
+          projected:
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            sources:
+              - secret:
+                  name: {{ required "secrets.connectionString.name is required: the Kubernetes Secret that holds the control plane connection string (ControlPlane__ConnectionString)" .Values.secrets.connectionString.name | quote }}
+                  items:
+                    - key: {{ .Values.secrets.connectionString.key | default "ControlPlane__ConnectionString" | quote }}
+                      path: ControlPlane__ConnectionString
+        - name: tmp
+          emptyDir: {}
+        - name: controlplane-tls
+          secret:
+            secretName: {{ required "secrets.certificate.name is required: the Kubernetes TLS Secret (tls.crt, tls.key) of the control plane's HTTPS endpoint" .Values.secrets.certificate.name | quote }}
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key

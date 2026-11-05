@@ -16,12 +16,9 @@ A guard, a core validation and an effect value read `accountableUser()` and `dec
 values of the write they check. The shared record update runs the effects of the transition it makes, in its own transaction.
 The record API, a task completion, a process step, a connector or package output and a call
 resolution answer a failing effect, audit the effect records and fire the data change triggers for
-them. The same steps are still _(planned for M24)_ for an inbound endpoint call, which only creates
-records. Each of them fails as it already fails for a lifecycle refusal and logs the named point and
-the record id. The
-filters of a role's grant ceiling narrow its grants at run time. Studio's read-only contract view, Relax,
-Undo relax, the off-standard mark beside the application picker and the mark in the release history are built, see
-[in Studio](#in-studio). The rest of this page is _(planned for M24)_.
+them. Each of them fails as it already fails for a lifecycle refusal and logs the named point and the record id. An inbound endpoint call only creates records, so it makes no transition and runs no effect. The filters of a role's grant ceiling narrow its grants at run time. Studio's contract view, its added states and transitions, Relax,
+Undo relax, the off-standard mark beside Validate and Publish and the mark in the release history are built, see
+[in Studio](#in-studio). The rest of this page is built, except the parts marked _(planned for M29)_ or _(planned for M31)_.
 
 The conventions of [architecture.md](../architecture.md) apply. Diagnostic codes come with the
 issues that build each check, as new rows of the [diagnostic codes](diagnostic-codes.md) table.
@@ -30,7 +27,7 @@ issues that build each check, as new rows of the [diagnostic codes](diagnostic-c
 
 A contract is a resource of the kind `contract`, one file for each module entity it covers. Only a
 module holds contracts: a `contract` file in an application folder is a diagnostic. A
-[customization layer](customization-layers.md) _(planned for M25)_ only adds states and transitions
+[customization layer](customization-layers.md) only adds states and transitions
 to a contract, so the contract stays apart from the parts of the module that an application
 changes.
 
@@ -124,7 +121,7 @@ module's `Decision` entity:
   as an entity validation does. A child entity has no contract of its own.
 - **Names.** Transitions, states, validations and effects each have a `name`, unique in its list
   ignoring letter case. The name is the element's API name and never changes meaning, see
-  [named points](#named-points). Labels and messages are texts whose keys start with
+  [named points](#named-points). A [customization layer](customization-layers.md#list-keys) finds a state or a transition by its `name`. Labels and messages are texts whose keys start with
   `<module id>.`.
 - **Expressions.** A guard, a core validation and an effect's values use the
   [expression language](expressions.md). They read the record's own fields and its child rows
@@ -194,7 +191,7 @@ record from referring to itself. A field named `id` is hidden by it.
 
 An effect creates one record when a transition happens, in the transaction of the write that made
 the transition. The compile checks of effects are built, and the compiled contract holds each effect
-with its compiled values. The shared record update runs them. The record API answers a failing effect, audits the effect records and fires the data change triggers for them. A task completion, a process step, a connector or package output and a call resolution do the same. The answer, the audit entries and the triggers on an inbound endpoint call are _(planned for M24)_. A name that repeats an earlier one,
+with its compiled values. The shared record update runs them. The record API answers a failing effect, audits the effect records and fires the data change triggers for them. A task completion, a process step, a connector or package output and a call resolution do the same. An inbound endpoint call only creates records, so it makes no transition and runs no effect. A name that repeats an earlier one,
 ignoring letter case, is `AXC0328`. An `on` that names no transition of the contract, with the same
 letter case, is `AXC0344`. A `create.entity` that is not the plain name of a root entity of the module
 is `AXC0345`. A `values` key that names no writable field, or an expression that does not fit its
@@ -480,8 +477,16 @@ some of them as contract scenarios.
 
 - **Contracts** _(built)_. A **Module contracts** group, below the module policies, lists the contracts of the
   modules the application uses, by `<module id>/<name>`, as the other module groups do. A contract
-  opens read-only, with its read-only notice: the lifecycle as a state diagram, then the core
-  validations, the effects and the ceilings, each with its named point.
+  opens with a notice that only added states and transitions can be edited, not the read-only notice: the
+  lifecycle as a state diagram, then the core validations, the effects and the ceilings, each with its
+  named point. **Add state** and **Add transition** open a dialog. A state takes a name, **Initial** and
+  **Deletable**. A transition takes a name, its from-states, its to-state and an optional guard. A state
+  or transition the application added shows an **Added** tag and a **Remove** button, and has no named
+  point, because a relax entry cannot name it. The module's own states and transitions show neither and
+  stay read-only. **Remove** takes the row out of the unsaved draft, and **Save** writes the contract's
+  layer, or deletes the layer file when no added row is left. The diagnostics of the contract's layer,
+  such as `AXC0370` for a transition into a protected state, show in a list in the editor after a save
+  and when the contract is opened again.
 - **Relax** _(built)_. Each point has a **Relax** action, which asks for the reason and writes the `relax`
   entry on the module's entry in `application.json`. A relaxed point shows its reason and an
   **Undo relax** action, which removes the entry. Relax shows only for a module that
@@ -491,7 +496,7 @@ some of them as contract scenarios.
   `application.json` changed since Studio loaded it, and Studio loads it again.
 - **Mark.** The application's header and its release history show the off-standard mark while any
   entry is present. _(planned for M31)_: the band says it in words, see [band](studio-workspace.md#band), and the tag
-  stays beside a release's number. The mark beside the application picker is _(built)_. The mark in the release
+  stays beside a release's number. The mark beside Validate and Publish is _(built)_. The mark in the release
   history is _(built)_: the Off-standard tag, then the module, point and reason of each relaxed entry.
 - **Diagnostics.** A grant past a ceiling, a relax entry for an unknown point and a failing contract
   scenario show where Studio shows other diagnostics and publish results. The contract scenarios of a publish or validate,

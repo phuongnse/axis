@@ -6,6 +6,7 @@
   "entity": "Ticket",
   "sections": [
     {
+      "name": "main",
       "title": { "textKey": "ticketReview.main" },
       "fields": [{ "field": "topic", "readOnly": true }]
     }

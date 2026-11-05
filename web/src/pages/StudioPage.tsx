@@ -9,7 +9,6 @@ import {
   fetchStudioNames,
   fetchStudioResource,
   fetchStudioResources,
-  type ModuleResourceItem,
   moduleResources,
   resourceTitle,
   studioApplicationDescription,
@@ -28,17 +27,13 @@ import { StudioConnectionContext, useStudioConnection } from '../platform/studio
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
-import { StudioModuleContract } from './StudioModuleContract'
-import { StudioModuleEntity } from './StudioModuleEntity'
 import { StudioResourceTable } from './StudioResourceTable'
-import { StudioModulePage } from './StudioModulePage'
-import { StudioModulePolicy } from './StudioModulePolicy'
-import { StudioModuleProcess } from './StudioModuleProcess'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioOverview } from './StudioOverview'
 import { StudioProblemsPanel } from './StudioProblems'
 import { StudioStatus } from './StudioStatus'
+import { ModuleResourceView } from './StudioModuleView'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { ReleaseTags } from './StudioReleases'
@@ -51,43 +46,6 @@ import { HomeTile } from '../platform/HomeTile'
 import { SiteMark } from '../platform/SiteMark'
 import { PlatformContext } from './context'
 import { useDesignTokens } from '../platform/themeMode'
-
-/** The read-only view of a module resource, by its kind. */
-function ModuleResourceView({
-  application,
-  item,
-  manifest,
-  onManifestSaved,
-  onManifestStale,
-}: {
-  application: string
-  item: ModuleResourceItem
-  manifest?: StudioResource
-  onManifestSaved: (manifest: StudioResource, diagnostics: StudioDiagnostic[]) => void
-  onManifestStale: () => void
-}) {
-  switch (item.kind) {
-    case 'entity':
-      return <StudioModuleEntity application={application} module={item.module} id={item.id} />
-    case 'process':
-      return <StudioModuleProcess application={application} module={item.module} id={item.id} />
-    case 'policy':
-      return <StudioModulePolicy application={application} module={item.module} id={item.id} />
-    case 'contract':
-      return (
-        <StudioModuleContract
-          application={application}
-          module={item.module}
-          id={item.id}
-          manifest={manifest}
-          onManifestSaved={onManifestSaved}
-          onManifestStale={onManifestStale}
-        />
-      )
-    case 'page':
-      return <StudioModulePage application={application} module={item.module} id={item.id} />
-  }
-}
 
 /** The applications Studio may edit, or why they could not be listed. */
 type AppsState = StudioApplication[] | typeof forbidden | 'failed'
@@ -106,37 +64,49 @@ type ManifestState = { application: string; resource: StudioResource | null }
 /**
  * Studio, the authoring page. The address holds the picked application and the selected resource, as
  * `/studio?app=PurchaseRequests&resource=<id>`. A person without the author role sees a forbidden page.
- * With one application, it is picked at once. The resources are grouped by kind, and a search narrows them
- * by name or id. The diagnostics panel lists the folder's diagnostics, loaded when the application is
- * picked. A diagnostic that names a resource selects it, clears the search, and opens it at the diagnostic's path,
- * as a Used by entry does. A selected resource opens in an editor below its details, with its Uses and Used by
+ * With an application open, the shell's sidebar holds an application row, which lists the applications, and the
+ * application's entries under it.
+ * With no application open, it lists the applications as tiles in up to three columns, each with its mark, its title
+ * and its description in the UI locale (`en` as the fallback, then the name), under the page heading "Studio", with a
+ * solid New application… button on its right. A tile opens its application, and a single application is not opened by itself.
+ * Every page of an open application heads its content with one level-4 `StudioPageHeading`, and no page has a
+ * breadcrumb. The Overview's heading is the application's title, with its description under it, and it shows no
+ * resources. A kind's sidebar entry, as `&kind=<kind>`, shows that kind's list under a heading with its name, then the module group of that kind when modules hold one.
+ * A resource opens alone in the content, under a heading with its name and, for a scenario, Run scenario on its right:
+ * its details, its editor, and its Uses and Used by lists. The band under the header holds the application's state and
+ * its actions. Its errors and warnings are one button that opens the Problems panel beside the page, which lists
+ * the folder's diagnostics, loaded when the application is picked. A diagnostic that names a resource selects it,
+ * and opens it at the diagnostic's path, as a Used by entry does, and the panel stays open. A selected resource opens in an editor below its details, with its Uses and Used by
  * lists under the editor. A Used by entry opens its resource at the path of the reference, as `&path=`. After a
- * save, the diagnostics panel shows the diagnostics that the save answered. After a delete, the resource leaves the
- * list. A New resource button above the search box creates a resource of any kind from its starter. The new resource
- * joins the list, the diagnostics panel shows the diagnostics of the create, and the editor opens the resource.
- * A New application button sits beside the application picker, and also shows when Studio lists no application. It shows
- * only when `GET /api/me` answers `studioCreate: true`. A created application joins the picker and is picked at once.
- * Validate and Publish sit under the application picker, and Publish shows only when `GET /api/me` answers
- * `studioPublisher: true`. Under them, the release list shows the application's releases, with a Roll back button
+ * save, the Problems panel shows the diagnostics that the save answered. After a delete, the resource leaves the
+ * folder, and Studio shows the Overview. A New resource… button in the band creates a resource of any kind from its starter. The new resource
+ * joins its kind's list, the Problems panel shows the diagnostics of the create, and the editor opens the resource.
+ * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
+ * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
+ * Validate and Publish sit in the band, and Publish shows only when `GET /api/me` answers
+ * `studioPublisher: true`. Under the content, the release list shows the application's releases, with an Activate… button
  * for a publisher. A save, a text write or a delete loads the release list again, because the folder may now differ from the
- * active release. The diagnostics panel shows the diagnostics of a request that ended. When the server does not
+ * active release. The Problems panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen. The names that the reference pickers
  * and expression completion offer load with the application too, and again after a save, a text write, a delete and a
- * reconnect. A text write, which a label's Write texts button sends, updates the diagnostics panel and loads the names
- * and the release list again, as a save does. A Resources / Policy matrix switch under the application picker picks the view, kept
- * in the address as `&view=policies`. The policy matrix shows in place of the resource list and the details, and
- * its Open policy link opens the policy in the Resources view. The diagnostics panel shows in both views.
+ * reconnect. A text write, which a label's Write texts button sends, updates the Problems panel and loads the names
+ * and the release list again, as a save does. The sidebar's Policy matrix entry shows the policy matrix, kept in the address
+ * as `&view=policies`. The matrix shows in place of the content under a Policy matrix heading, and
+ * its Open policy link opens the policy in the Resources view. The band and the Problems panel show in every view.
+ * `&view=releases` shows only the Releases heading and the release list.
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
- * A kind's list also holds the entities, processes, policies, contracts or pages of the modules the application uses, from the
- * names, by their `<module>/<name>`, with the module beside each. One opens read-only, with no editor, no Uses and no Used by lists: an
- * entity in the entity designer, a process as its graph alone, a policy as a table of its grants, a contract as its lifecycle in a state diagram with tables of its named points and a page on the page
- * canvas with no palette, data panel, widget tree or moves, each under a read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
+ * A kind's list shows the module resources of that kind that the application uses, from the names, by their `<module>/<name>`. A module resource of every kind but a contract and a scenario opens in its editor with the application's layer applied
+ * and every input on, with no JSON tab, Delete, migration questions, Uses or Used by lists: an entity in the entity
+ * designer, a process in the process designer, and a data source, rule, trigger, sequence and event in the schema
+ * form, and a seed in the seed grid. Save writes the layer, and a Customized tag with Reset all, which deletes
+ * the layer, shows while it has one. A contract opens in its lifecycle view, and a scenario opens
+ * read-only as JSON under a notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
  * entry open it too, when the id is not one of the folder's. The folder's `application.json` loads with the
- * application and again after a write. An Off-standard tag shows beside the application picker while it has a relax
+ * application and again after a write. An Off-standard tag shows in the band after the state while it has a relax
  * entry. A module contract, which the application declares directly, has Relax and Undo relax, which write it.
  */
 export function StudioPage() {
@@ -171,6 +141,7 @@ export function StudioPage() {
 
 function StudioWorkspace() {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { generation, reconnecting, lost } = useStudioConnection()
   const [params, setParams] = useSearchParams()
   const application = params.get('app')
@@ -182,7 +153,6 @@ function StudioWorkspace() {
   // Proposed: the right side of a release page's heading, where its Activate… shows.
   const [headingSlot, setHeadingSlot] = useState<HTMLDivElement | null>(null)
   const { spacing } = useDesignTokens()
-  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   // Proposed: a kind's list keeps its search in the address, as its sort and page, so a reload and a shared link keep them.
@@ -347,9 +317,7 @@ function StudioWorkspace() {
   const selectedModuleItem =
     resourceId === null || selected !== undefined
       ? undefined
-      : moduleResources(names, '')
-          .flatMap((group) => group.items)
-          .find((item) => item.id.toLowerCase() === resourceId.toLowerCase())
+      : moduleGroups.flatMap((group) => group.items).find((item) => item.id.toLowerCase() === resourceId.toLowerCase())
 
   function pickApplication(name: string) {
     setParams({ app: name })
@@ -373,6 +341,23 @@ function StudioWorkspace() {
     setFolder((current) =>
       current && current.application === application && 'resources' in current
         ? { ...current, resources: created ? [...current.resources, created] : current.resources, diagnostics }
+        : current,
+    )
+    setFolderRevision((value) => value + 1)
+  }
+
+  /** A save or Reset all of a module resource: the layer file joins the folder's list or leaves it. */
+  function onModuleWritten(diagnostics: StudioDiagnostic[], layer: { added?: StudioResourceItem; removedId?: string }) {
+    setFolder((current) =>
+      current && current.application === application && 'resources' in current
+        ? {
+            ...current,
+            resources: [
+              ...current.resources.filter((resource) => resource.id !== layer.removedId),
+              ...(layer.added ? [layer.added] : []),
+            ],
+            diagnostics,
+          }
         : current,
     )
     setFolderRevision((value) => value + 1)
@@ -441,7 +426,7 @@ function StudioWorkspace() {
   if (selected?.kind === 'application') {
     title = t('shell.studio.nav.settings')
   } else if (selected) {
-    title = resourceTitle(selected, locale)
+    title = resourceTitle(selected, locale, t)
   } else if (selectedModuleItem) {
     title = selectedModuleItem.name
   } else if (view.name === 'kind') {
@@ -478,7 +463,7 @@ function StudioWorkspace() {
   // Proposed: every place in the workspace names a resource by its label, through this lookup.
   const titleOf = (id: string) => {
     const item = resources.find((resource) => resource.id === id)
-    return item ? resourceTitle(item, locale) : undefined
+    return item ? resourceTitle(item, locale, t) : undefined
   }
 
   return (
@@ -639,6 +624,8 @@ function StudioWorkspace() {
                     application={application}
                     item={selectedModuleItem}
                     manifest={manifest}
+                    diagnostics={loaded.diagnostics}
+                    onModuleWritten={onModuleWritten}
                     onManifestSaved={onManifestSaved}
                     onManifestStale={() => setManifestReload((value) => value + 1)}
                   />

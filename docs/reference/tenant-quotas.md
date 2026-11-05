@@ -7,7 +7,8 @@ Everything in this file is _(planned for M31)_, except what the next paragraph s
 self-hosted installation has no quotas: they are on only when `Cell:Id` is set.
 
 In place: the `platform.tenant_quotas` table, the cell's defaults and the reading of both with the
-directory. The server and the worker answer a tenant's effective quota from them, and answer no limit
+directory. `PUT /api/cell/tenants/{id}/quotas` of the provisioning API writes the rows, and `GET /api/cell/tenants/{id}` answers the
+effective quotas. The server and the worker answer a tenant's effective quota from them, and answer no limit
 outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
 [usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
 `emailsPerDay` until 00:00 UTC, and stores one in-app notice a day for the tenant's administrators when it
@@ -43,7 +44,8 @@ what one tenant uses in total or at once. A rate limit limits how fast one calle
 tenant's rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
 - **Who sets them.** The operator sets a tenant's quotas through the
   [provisioning API](tenant-lifecycle.md#provisioning-api). Each change writes a platform audit
-  record. The hosts read the quotas with the directory, at each `Tenancy:RefreshInterval`.
+  record that names the keys of the request. It carries no operator or machine caller yet: the
+  `actor` column of `platform.audit_records` exists, but the route does not pass one _(planned for M31)_. The hosts read the quotas with the directory, at each `Tenancy:RefreshInterval`.
 - **Lowering a quota below use.** It refuses new use and removes nothing. A tenant over its storage
   quota keeps its data and can still delete.
 
@@ -78,7 +80,7 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
 
 - **`storage`.** Once the last sample is at or over the quota, these are refused: a record create
   or update through the record API, an import, an inbound endpoint call that writes, a file upload,
-  a save in Studio and a publish. A delete is never refused. Process steps, task completions,
+  a save or reset in Studio and a publish. A delete is never refused. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
   tenant writes in one sampling interval. A tenant with no sample yet is not refused, and neither is a
   write when the platform database cannot be read: the server logs a warning and the write goes on, because a quota
@@ -91,6 +93,9 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
   worker's next directory refresh.
 - **`applications`.** Creating an application in Studio is refused when the count would pass the
   quota. Existing applications keep working.
+- **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never refused over
+  the `storage` quota. It writes platform rows and no tenant data, so the operator can raise a quota that a
+  tenant has reached.
 
 ## Work at once
 
@@ -154,7 +159,8 @@ D118 agrees that work past a concurrency quota waits its turn instead of failing
   warning for the tenant. The notice is a row with no application and no release, whose texts are the
   platform texts `notices.emailsHeld.subject` and `notices.emailsHeld.body` with the value `limit`,
   the tenant's `emailsPerDay`. A tenant with no limit, and a worker outside a cell, store none. The
-  routes that read the notice and the bell are _(planned for M31)_.
+  administrators read the notice on the [notification routes](notifications.md#in-app-notifications). The bell of the
+  [platform site](notifications.md#in-app-notifications) shows it.
 
 ## Usage
 

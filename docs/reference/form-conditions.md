@@ -44,8 +44,8 @@ hidden or `readOnlyWhen` field.
   [the task API](task-api.md#task-api-errors).
 - **Steps.** `steps` is an optional list on the form. Each step has a `name`,
   unique in the form ignoring letter case, a `title`
-  label and `sections`, a list of section names. When `steps` is present,
-  every section has a `name` and is in exactly one step. The steps show in
+  label and `sections`, a list of section names. A [customization layer](customization-layers.md#list-keys) finds a step by its `name`. When `steps` is present,
+  every section is in exactly one step. The steps show in
   the order listed. A step whose sections are all hidden is skipped. Keep to
   about six steps: from seven the steps bar shows only numbers. Studio warns
   above six, and never blocks.
@@ -72,8 +72,8 @@ hidden or `readOnlyWhen` field.
     `/steps/{s}/sections/{k}`.
   - `AXC0229`: a step names a section that is already in a step, at the same
     path.
-  - `AXC0230`: the form has `steps` and a section has no name or is in no
-    step, at `/sections/{i}`.
+  - `AXC0230`: the form has `steps` and a section is in no step, at
+    `/sections/{i}`.
 
   Each step `title` is a text key and joins the `AXC0028` check, at
   `/steps/{s}/title/textKey`.

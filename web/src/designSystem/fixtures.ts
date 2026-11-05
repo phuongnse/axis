@@ -807,6 +807,7 @@ const listedSites: SiteListItem[] = [
 ]
 
 const notificationPage: NotificationPage = { items: [], page: 1, pageSize: 10, totalCount: 0, unreadCount: 2 }
+const tenantNoticePage: NotificationPage = { items: [], page: 1, pageSize: 10, totalCount: 0, unreadCount: 0 }
 
 /** The texts of the identity provider's sign-in page, in English. */
 export const identitySignInTexts: SignInTexts = {
@@ -1122,6 +1123,7 @@ export const fixtureScopes = [
   '/api/sites',
   '/api/me',
   '/api/about',
+  '/api/notifications',
   '/health/ready',
   '/api/studio',
 ] as const
@@ -1309,4 +1311,5 @@ export const routes: Record<string, () => unknown> = {
   }),
   ...studioFolder('LeaveRequests', leaveResources, leaveDiagnostics, leaveReleases),
   ...studioFolder('Inventory', blankResources, [], { active: null, folderContentHash: 'b1', items: [] }),
+  '/api/notifications': () => tenantNoticePage,
 }

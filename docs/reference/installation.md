@@ -48,6 +48,7 @@ image, `axis-package-host`, runs the
 `package-host` container beside the worker. Compose and the Helm chart give
 that container no tenant settings, a read-only root file system, CPU and
 memory limits, and a network that reaches only the worker.
+`axis-controlplane` is the Axis SaaS control plane image, not part of an installation, see [control-plane.md](control-plane.md#image-and-chart).
 
 Build one from the repository root with
 `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.
@@ -88,22 +89,22 @@ file.
 | `Tenancy:Source` | `Tenancy__Source` | server, worker | no | Set to `directory`. The default `configuration` reads a `Tenants` section, which is for development. |
 | `Tenancy:RefreshInterval` | `Tenancy__RefreshInterval` | server, worker | no | Optional. It defaults to 30 seconds. |
 | `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server, the usage tables, the leases and the daily counters. |
-| `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it only at start. The worker never gets it. |
+| `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it at start for the platform migrations, and for the unpooled connection that `PUT /api/cell/tenants/{id}/quotas` opens for each write. Revoking or blocking this role stops that route. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | no | Secret. Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value. Add the variable or a secret file yourself. |
 | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](several-server-replicas.md). |
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
-| `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | admin | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https`. |
-| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | admin | no | The client of the identity provider's `master` realm that `tenant create` signs in as. |
-| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin | yes | The secret of that client. Only `tenant create` of a main tenant and `tenant restore` read it. |
+| `Admin:ConnectionString` | `Admin__ConnectionString` | admin, publisher (in a cell) | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | admin, publisher (in a cell) | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https`. |
+| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | admin, publisher (in a cell) | no | The client of the identity provider's `master` realm that `tenant create` signs in as. |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin, publisher (in a cell) | yes | The secret of that client. Only `tenant create` of a main tenant and `tenant restore` read it. |
 | `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | admin | yes | Optional. A read-only role of the identity provider's database, with `SELECT` on Keycloak's `credential` table only. With it, `tenant backup` writes the realm's users and credentials into the archive as `realm.json`, which a `tenant restore` into a new realm imports. Without it, no archive holds `realm.json`. Outside `Development` and `Testing` it must set `SSL Mode=VerifyFull`. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` reads it. `tenant create` does not. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher, `cell restore-check` | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests and the contract scenarios of `publish` and `validate` requests, and `cell restore-check` run the scenarios of a restored application. Empty by default, and a `test` request, or a `publish` or `validate` with contract scenarios, then fails with `AXC0217`, which names the setting. See [On premises](#on-premises). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
-| `Templates:Path` | `Templates__Path` | server | no | Optional. Unset in production, so Studio lists no application templates. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
+| `Templates:Path` | `Templates__Path` | server, publisher | no | Optional. Unset in production, so Studio lists no application templates. In a cell the publisher reads it for the create job, which then fails without it. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
 | `Health:Urls` | `Health__Urls` | worker | no | The image keeps `http://127.0.0.1:5208`. The Helm chart sets it to all interfaces so the kubelet can probe it. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | server | no | The image default is 8080, plain HTTP. The Compose example and the Helm chart replace it with the Kestrel endpoint below, so nothing listens on 8080. |
 | `Kestrel:Endpoints:Https:Url` | `Kestrel__Endpoints__Https__Url` | server | no | The Compose example and the Helm chart set `https://+:8443`. A Kestrel endpoint replaces `ASPNETCORE_HTTP_PORTS`, so the server serves HTTPS only. |
@@ -162,7 +163,7 @@ CREATE DATABASE axis_identity OWNER axis_identity;
 | Database role | Used for |
 | --- | --- |
 | `axis_platform_schema` | `ConnectionStrings:PlatformSchema`. It owns the `platform` schema. |
-| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, write access to the two usage tables `platform.tenant_usage` and `platform.tenant_usage_latest` and to `platform.tenant_leases`, and insert and update on `platform.tenant_daily_counters`. It has no access to `platform.audit_records`. |
+| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, write access to the two usage tables `platform.tenant_usage` and `platform.tenant_usage_latest`, to `platform.tenant_leases` and to `platform.operator_sessions`, insert on `platform.jobs`, and insert and update on `platform.tenant_daily_counters`. It has no access to `platform.audit_records`. |
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 | `axis_identity` | The identity provider's own database, `axis_identity`. It owns that database and nothing else. |
 
@@ -471,16 +472,16 @@ replica, that runs the `axis-admin` image with the command `publisher`. The
 Deployment uses the `Recreate` strategy, so a rollout never runs two
 publishers. It has no Service, no container port and no probe, because the
 publisher has no HTTP endpoint. Its termination grace period is 360 seconds,
-longer than the five-minute lease. It mounts the same secrets as the migrate
-Job. It has no Ingress. The server and worker Deployments each have a startup,
-liveness and readiness probe, see
-[health checks](../architecture.md#health-checks). The server's probes use
-HTTPS, and the worker's use plain HTTP. The chart sets
-`Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
-reach it. The server alone mounts the Studio volume and gets the Studio
-settings. The server and the identity provider get the forwarded headers
-settings. The pods run as a non-root user with a read-only root file system,
-except the identity provider, see below.
+longer than the five-minute lease. Outside a cell it mounts the same secrets as the migrate Job, and in a
+cell it also gets what the `create` job reads, see below. It has no Ingress. The server and worker
+Deployments each have a startup, liveness and readiness probe, see
+[health checks](../architecture.md#health-checks). The server's probes use HTTPS, and the worker's use
+plain HTTP. The chart sets `Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
+reach it. The server mounts the Studio volume and gets the Studio settings, and so does the publisher in a
+cell. The server and the identity provider get the forwarded headers settings. The pods run as a non-root
+user with a read-only root file system, except the identity provider, see below.
+
+**The publisher in a cell.** With `cell.id` set, the publisher gets what the `create` job reads: the `adminConnection` and `identityAdminClientSecret` Secrets as files in `/run/secrets`, `IdentityProvider:Url` as `https://<identity.hostname>/`, `IdentityProvider:AdminClientId` as `axis-admin`, and the `cellBackupKey` Secret read-only at `/cell-backup-key/key`, which `Cell:BackupKeyFile` names whatever `cell.backupKeyFile` says. It mounts `studio.persistence` read-write at `/studio` and `templates.volume` read-only at `/templates`, and sets `Studio:ApplicationsPath` and `Templates:Path` to them. The server also mounts `studio.persistence` at `/studio` and sets `Studio:ApplicationsPath`, so the applications that the job writes are the ones that Studio shows, and a cell needs a `ReadWriteMany` volume source even with one server replica. The server gets no `Templates:Path`, so Studio lists no templates there. Rendering fails with a message that names the value when `secrets.adminConnection`, `secrets.cellBackupKey`, `studio.persistence` or `templates.volume` is missing. Outside a cell the publisher gets none of these.
 
 **The identity provider.** The chart also has a Deployment and a Service named
 `<release>-identity`. There is no switch to turn them off, as `docker compose up`
@@ -628,14 +629,16 @@ Each pod mounts only the secrets it needs as files in `/run/secrets`. The
 server gets the first three, the worker gets the first and the third, and the migrate
 Job and the publisher get the second and the third. The publisher also gets
 `Scenarios__ServerConnectionString` when `secrets.scenarioServerConnection` is
-set. Neither has an `Admin:ConnectionString`. The identity provider gets the four
-`axis-identity` files and no other secret, and no other pod gets them.
+set. Neither has an `Admin:ConnectionString` outside a cell. The identity provider gets the four `axis-identity` files and no other secret.
+Only the cell restore-check CronJob and, in a cell, the publisher also get `IdentityProvider__AdminClientSecret`, and no other pod gets the four.
 The server also mounts the `serverCertificate` Secret read-only at `/server-tls`, and no
 other pod does. The identity provider mounts the `identityCertificate` Secret
 read-only at `/identity-tls` in the same way. Only the PgBouncer pod mounts the
-`pgbouncerAuth` and `pgbouncerCertificate` Secrets. The cell backup CronJob alone gets
-`backupStorageAccessKeyId` and `backupStorageSecretAccessKey` as files in `/run/secrets`, and mounts the
-`cellBackupKey` Secret read-only at `/cell-backup-key/key`, outside `/run/secrets`.
+`pgbouncerAuth` and `pgbouncerCertificate` Secrets. The cell backup CronJob and the cell restore-check
+CronJob alone get `backupStorageAccessKeyId` and `backupStorageSecretAccessKey` as files in `/run/secrets`.
+They and, in a cell, the publisher mount the `cellBackupKey` Secret read-only at `/cell-backup-key/key`, outside `/run/secrets`.
+The cell restore-check CronJob and, in a cell, the publisher alone get `Admin__ConnectionString` from
+`secrets.adminConnection`, so they are the only pods of the chart with the admin role.
 Rendering fails with a message that names the value when a `name` is missing.
 The values schema rejects any field in a reference other than `name` and `key`.
 
@@ -650,7 +653,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `worker.replicas` | 1 | Worker replicas. |
 | `studio.folders` | none | Server only. The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>`. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
-| `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. It is required when `studio.folders` is set, and rendering fails with a message that names it when it is missing. On its own it does nothing. The chart creates no claim. With several replicas it needs a `ReadWriteMany` storage class. |
+| `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. In a cell the publisher mounts it at `/studio` too, and the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |
 | `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server and identity provider. IP addresses and CIDR ranges of your proxies, rendered on the server as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`, and on the identity provider as one `KC_PROXY_TRUSTED_ADDRESSES` list with `KC_PROXY_HEADERS=xforwarded`. Empty trusts no proxy, and the identity provider sets no proxy headers. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
@@ -663,23 +666,24 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `identity.passwordBlacklists.volume` | none, required | A Kubernetes volume source with the breached-password list of `deploy/keycloak/password-blacklists`, mounted read-only at `/opt/keycloak/data/password-blacklists`. Without it `tenant create` fails at its realm step. Rendering fails with a message that names the value when it is missing. |
 | `identity.databaseAuthority.volume` | empty | Optional. A volume source with `root.crt`, the authority certificate of the PostgreSQL server, mounted read-only at `/db-ca`. A database with a public certificate can use `sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory` in the JDBC URL instead. |
 | `secrets.identityDatabaseUrl`, `secrets.identityDatabaseUsername`, `secrets.identityDatabasePassword` | keys `KC_DB_URL`, `KC_DB_USERNAME`, `KC_DB_PASSWORD` | Identity provider only. Secret `name` and `key` of Keycloak's database settings. All three names are required. |
-| `secrets.identityAdminClientSecret` | key `IdentityProvider__AdminClientSecret` | Identity provider only. Secret `name` and `key` of the `axis-admin` client secret. Required. |
+| `secrets.identityAdminClientSecret` | key `IdentityProvider__AdminClientSecret` | Identity provider, the cell restore-check CronJob and, in a cell, the publisher. Secret `name` and `key` of the `axis-admin` client secret. Required. |
 | `secrets.identityCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the identity Service. It has no `key`. Rendering fails with a message that names `secrets.identityCertificate.name` when it is missing. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
-| `secrets.scenarioServerConnection` | empty | Publisher only. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
+| `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [On premises](#on-premises). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
-| `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain`, `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. The `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort` pair comes from `cell.pgbouncer` and goes to the server and the worker only. |
-| `backup.bucket` | empty | In a cell, setting it renders the cell backup CronJob, see the cell backup CronJob below. It is `Cell__BackupStorage__Bucket`. Empty, or outside a cell, renders no CronJob. |
+| `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain` (required with `backup.bucket`, because the scratch tenant of the restore check lives under it), `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. The `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort` pair comes from `cell.pgbouncer` and goes to the server and the worker only. |
+| `backup.bucket` | empty | In a cell, setting it renders the cell backup CronJob and the cell restore-check CronJob, see the two CronJobs below. It is `Cell__BackupStorage__Bucket`. Empty, or outside a cell, renders neither. |
 | `backup.serviceUrl` | empty | `Cell__BackupStorage__ServiceUrl`, the endpoint of the object storage. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
 | `backup.region` | empty | `Cell__BackupStorage__Region`, the region of the object storage. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
-| `backup.timeZone` | empty | The IANA time zone of the region, such as `Asia/Ho_Chi_Minh`, in which the CronJob runs at 01:00. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
-| `backup.resources` | none | Kubernetes resource requests and limits of the CronJob's container. |
-| `secrets.backupStorageAccessKeyId` | key `Cell__BackupStorage__AccessKeyId` | Secret `name` and `key` of the access key id of the backup storage. The cell backup CronJob alone mounts it. Required with `backup.bucket`. |
-| `secrets.backupStorageSecretAccessKey` | key `Cell__BackupStorage__SecretAccessKey` | Secret `name` and `key` of the secret access key of the backup storage. The cell backup CronJob alone mounts it. Required with `backup.bucket`. |
-| `secrets.cellBackupKey` | key `cell-backup-key` | Secret `name` and `key` of the cell's backup key. The cell backup CronJob alone mounts it, at `/cell-backup-key/key`, and sets `Cell__BackupKeyFile` to that path. Required with `backup.bucket`. |
+| `backup.timeZone` | empty | The IANA time zone of the region, such as `Asia/Ho_Chi_Minh`, in which the backup CronJob runs at 01:00 and the restore-check CronJob runs on Sundays at 03:00. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
+| `backup.resources` | none | Kubernetes resource requests and limits of the container of both CronJobs. |
+| `secrets.backupStorageAccessKeyId` | key `Cell__BackupStorage__AccessKeyId` | Secret `name` and `key` of the access key id of the backup storage. The cell backup and cell restore-check CronJobs alone mount it. Required with `backup.bucket`. |
+| `secrets.backupStorageSecretAccessKey` | key `Cell__BackupStorage__SecretAccessKey` | Secret `name` and `key` of the secret access key of the backup storage. The cell backup and cell restore-check CronJobs alone mount it. Required with `backup.bucket`. |
+| `secrets.cellBackupKey` | key `cell-backup-key` | Secret `name` and `key` of the cell's backup key. The cell backup and cell restore-check CronJobs and, in a cell, the publisher alone mount it, at `/cell-backup-key/key`, and set `Cell__BackupKeyFile` to that path. Required in a cell: rendering fails with a message that names it when the `name` is empty. |
+| `secrets.adminConnection` | key `Admin__ConnectionString` | Secret `name` and `key` of `Admin:ConnectionString`, the connection of the admin role. The publisher in a cell and the cell restore-check CronJob alone mount it. Required in a cell: rendering fails with a message that names it when the `name` is empty. |
 | `cell.pgbouncer.enabled` | `false` | `true` renders PgBouncer, see [PgBouncer](#in-the-cloud). Rendering then fails with a message that names the value when `cell.id`, `cell.pgbouncer.databaseHost`, `cell.pgbouncer.authUser`, `secrets.pgbouncerAuth.name` or `secrets.pgbouncerCertificate.name` is empty. The schema rejects any field under `cell.pgbouncer` that this table does not list. |
 | `cell.pgbouncer.image` | `edoburu/pgbouncer:v1.24.1-p1` | The whole image reference of PgBouncer. `image.registry` and `image.tag` do not apply to it. The pod runs as user 70 of that image, with a read-only root file system, and one replica. |
 | `cell.pgbouncer.databaseHost`, `cell.pgbouncer.databasePort` | none, required, and 5432 | The address of PostgreSQL, the target of the wildcard `* = host=... port=...` database line. |
@@ -694,6 +698,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `cell.certificate.issuer.server`, `cell.certificate.issuer.email` | Let's Encrypt production directory, empty | The ACME directory URL of the `Issuer`, and the optional contact email. The email renders only when set. cert-manager creates the ACME account key in the Secret `<release>-tenant-subdomains-acme-account`. |
 | `cell.certificate.issuer.dns01` | `provider: cloudflare`, `tokenSecret.key: api-token` | The one DNS-01 solver. `provider` is `cloudflare` or `digitalocean`. `tokenSecret` is the Secret `name` and `key` of the provider's API token. The name is required. The token is never a value. |
 | `extensions.volume`, `modules.volume` | empty | Any Kubernetes volume source, mounted read-only at `/extensions` and `/modules`. Empty uses the empty folders of the image. |
+| `templates.volume` | empty | Any Kubernetes volume source that holds the installed templates, mounted read-only at `/templates` on the publisher in a cell, with `Templates__Path` set to it. Required in a cell: rendering fails with a message that names it when it is empty. Unused outside a cell, and the server never gets it. |
 | `secrets.platformConnection` | key `ConnectionStrings__Platform` | Secret `name` and `key` of `ConnectionStrings:Platform`. |
 | `secrets.platformSchemaConnection` | key `ConnectionStrings__PlatformSchema` | Secret `name` and `key` of `ConnectionStrings:PlatformSchema`. |
 | `secrets.platformSecretKey` | key `Platform__SecretKey` | Secret `name` and `key` of the installation key. |
@@ -719,6 +724,19 @@ five `Cell__BackupStorage__*` settings, so the chart requires the service URL an
 The job has no
 Studio volume, so its archives hold no Studio files.
 
+**The cell restore-check CronJob.** In a cell with `backup.bucket` set, the chart also renders a CronJob
+named `<release>-cell-restore-check` that runs `axis-admin cell restore-check` every Sunday at 03:00 in
+`backup.timeZone`, see [the cell restore check](administration.md#cell-restore-check). It never runs two
+checks at once and never retries, and Kubernetes stops it after 6 hours, so a hung run does not block the
+next week. It gets the storage settings, credentials, cell backup key and `backup.resources` of the backup job.
+It also gets `secrets.adminConnection`, `secrets.identityAdminClientSecret`, `IdentityProvider:Url` as
+`https://<identity.hostname>/`, `IdentityProvider:AdminClientId` as `axis-admin`, `Cell:InternalDomain`, and
+`secrets.scenarioServerConnection` when set. A cell whose tenants have Studio applications needs that Secret set for
+the weekly check to pass, because the scenario step fails with `AXC0217` without a scenario server.
+`Studio:ApplicationsPath` is `/studio` on an `emptyDir`, so the scratch tenant's Studio files never touch the server's Studio volume. The admin
+connection and the client secret are the widest credentials of the chart. The chart passes no OTLP settings, so
+the metric `axis.backup.restore_check` goes only to the job's output until you set an OTLP endpoint.
+
 **Tenants and releases.** Run `tenant create` and `activate` from a Job or a pod
 that uses the admin image, with the settings of the
 [settings table](#settings-and-secrets) and the application folder mounted.
@@ -727,7 +745,7 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas and the pinned cert-manager schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks that the identity secret files and certificate are mounted in the identity pod only and in no env entry, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume or the password-list volume. It checks the cert-manager `Certificate` and `Issuer` of the tenant subdomains: the wildcard name, the Secret name, the DNS-01 solver with a Secret reference for its token, that an inline token is rejected and never rendered, that nothing renders with the certificate off, and that rendering fails, naming the value, without the tenant domain, the Secret name, the ACME server or the token Secret name. It checks the PgBouncer objects: that only the server and the worker get the runtime database settings, the transaction pool mode, the pool sizes, the wildcard database line and the TLS modes in the ConfigMap, the non-root pod with a read-only root file system, the Service port 6432, that nothing renders with PgBouncer off, that rendering fails, naming the value, without `cell.id`, the database host, the auth user or either Secret name, and that a `value` in either Secret reference is rejected. No test runs PgBouncer from the chart on a live cluster. It checks the cell backup CronJob: the schedule, the time zone, `Forbid`, no retry, the deadline, the storage values, that both storage credentials and the cell backup key come from Secret references and only the CronJob gets them, that a `value` in either storage reference or an unknown field under `backup` is rejected and never rendered, that nothing renders outside a cell or without a bucket, and that rendering fails, naming the value, without `backup.timeZone`, `backup.serviceUrl`, `backup.region` or any of the three Secret names. `scripts/setup.sh` installs the pinned Helm,
+Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks the cell restore-check CronJob: the Sunday 03:00 schedule in the time zone, one run at a time with no retry, its settings, and that its secrets are files and never env entries. It checks that no CronJob renders outside a cell or without a bucket, and that, outside a cell, the publisher gets none of the create job's settings, that in a cell the publisher gets the admin connection, the client secret, the cell backup key, the Studio volume and the templates, and that no other Deployment or Job gets the admin connection. It checks that the identity secret files and certificate are mounted in the identity pod and in no env entry, and that only the publisher in a cell and the restore-check CronJob also get the client secret, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume, the password-list volume, the admin connection Secret, the cell backup key Secret, `studio.persistence`, `templates.volume` or the internal domain. It checks the cert-manager `Certificate` and `Issuer` of the tenant subdomains: the wildcard name, the Secret name, the DNS-01 solver with a Secret reference for its token, that an inline token is rejected and never rendered, that nothing renders with the certificate off, and that rendering fails, naming the value, without the tenant domain, the Secret name, the ACME server or the token Secret name. It checks the PgBouncer objects: that only the server and the worker get the runtime database settings, the transaction pool mode, the pool sizes, the wildcard database line and the TLS modes in the ConfigMap, the non-root pod with a read-only root file system, the Service port 6432, that nothing renders with PgBouncer off, that rendering fails, naming the value, without `cell.id`, the database host, the auth user or either Secret name, and that a `value` in either Secret reference is rejected. No test runs PgBouncer from the chart on a live cluster. It checks the cell backup CronJob: the schedule, the time zone, `Forbid`, no retry, the deadline, the storage values, that both storage credentials and the cell backup key come from Secret references and only the CronJob gets them, that a `value` in either storage reference or an unknown field under `backup` is rejected and never rendered, that nothing renders outside a cell or without a bucket, and that rendering fails, naming the value, without `backup.timeZone`, `backup.serviceUrl`, `backup.region` or any of the three Secret names. `scripts/setup.sh` installs the pinned Helm,
 kubeconform, Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`, and downloads any schema file that a cached folder lacks. Axis has no test
 against a live cluster.
 

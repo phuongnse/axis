@@ -9,11 +9,10 @@ of [architecture.md](../architecture.md) apply: sections marked
 The authoring API edits the resource files of an
 application folder on the server's disk. They are the same files that are kept
 in git. The application list, application create, resource list, read, patch, create, delete, changes, text write, diagnostics,
-references, names, policy matrix, module resource, module resource save, expression check and draft page metadata routes are built. It is agreed in
+references, names, policy matrix, module resource, module resource save, module resource reset, expression check, draft page metadata and module page metadata routes are built. It is agreed in
 [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md). Its edit routes never activate a release.
 Under `scripts/dev.sh`, a saved file restarts the server, which activates the folder, as a hand edit does today.
-A write takes a lock in the platform database, see [Versions](#versions). Reads
-and diagnostics touch no database. Going live from Studio is
+A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch no database. Going live from Studio is
 [Publishing](#publishing). `validate`, `publish`, `preview`, `rollback` and the release history are built. It asks for an activation: the
 server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
@@ -63,10 +62,11 @@ in the application. File names and names can change.
 | `GET /api/studio/apps` | `200` with `{ "items": [{ "name" }] }`, one item for each application in `Studio:Folders`, in list order. Each item also gives `titles` and `descriptions`, always present and keyed by locale, from the manifest's `label` and `description` text keys looked up in each text resource, see [Studio workspace](studio-workspace.md#applications). Both are empty when nothing resolves, and a locale whose text resource lacks the key is left out. The folder is read as JSON and not compiled, so a folder that does not compile still gives what it can. A folder without a readable manifest `name` is left out, and a name repeated ignoring letter case appears once, as the first folder wins in the routes below. After the `Studio:Folders` entries come the direct subfolders of `Studio:ApplicationsPath` that hold an `application.json`, sorted by folder name ordinally, and the same first-match rule by name applies. A folder whose name starts with `.`, and a link, is skipped |
 | `POST /api/studio/apps` | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application) |
 | `GET /api/studio/templates` | `200` with `{ "items": [{ id, version, builtIn, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template. Built-in templates come first, then the others, each group sorted by `id`. See [application templates](modules-and-templates.md#application-templates) |
-| `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version` and `usedBy`, see [References](#references) |
+| `GET /api/studio/apps/{application}/resources` | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`. Each item has `id`, `kind`, `name`, `file`, `version`, `usedBy`, `titles` and `locale`, see [References](#references). `titles` is the resource's label text by locale: the `label` of an entity, role, identity provider or the manifest, or the `title` of a page or site, read from the text resources. A locale whose text resource has no text for the key is left out, and `titles` is empty for any other kind. `locale` is the locale of a text resource, else `null` |
 | `GET /api/studio/apps/{application}/resources/{id}` | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ id, kind, name, file, version, content, layer, marks, removed }` for one file of the module version that the application pins, other than `module.json`. The pinned version is the highest installed version in the application's range. `file` is `modules/<id>/<path>`, and there is no `ETag`, because the file cannot be patched. A change to it is saved by the route below. `version` is the hash of the module file. `content` has the application's [customization layer](customization-layers.md) applied, when the file `customizations/<module>/<name>.json` exists. `layer` is `{ id, file, version }`, with the SHA-256 of the layer file as `version`, or `null` when the resource has no layer. `marks` are `{ path, mark }`, a JSON Pointer into `content` with `added` or `changed`, the added ones first. `removed` are `{ list, key, content }`, a module element that the layer removed: the pointer of its list, its key and the module's element. Without a layer, `marks` and `removed` are empty. A module scenario is answered as the module wrote it, with `layer: null` |
 | `PUT /api/studio/apps/{application}/modules/{module}/resources/{id}` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when the save writes a layer. The body is the edited module resource whole, as `application/json`. It needs `If-Match` with the layer's version, or `If-None-Match: *` when the resource has no layer. `file` and `version` are null, and there is no `ETag`, when no layer is left. See [Module resource saves](module-resource-saves.md) |
+| `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset` | `200` with `{ file, version, diagnostics }` and an `ETag` header, when a layer is left. The body is `{ list, key }` as `application/json`: the pointer of a keyed list, or `/texts` of a text resource, and an element's key. It needs `If-Match` with the layer's version. It puts the module's element back, or drops an added one, and rewrites the layer as the difference. `file` and `version` are null, and there is no `ETag`, when no layer is left. *Reset all* is the `DELETE` of the layer resource. See [Element reset](module-resource-saves.md#element-reset) |
 | `POST /api/studio/apps/{application}/resources` | `201` with the new resource's `{ id, kind, name, file, version, diagnostics }`, a `Location` header and an `ETag` header. The body is the full resource as `application/json` |
 | `PATCH /api/studio/apps/{application}/resources/{id}` | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `application/json-patch+json`, as RFC 6902 describes |
 | `POST /api/studio/apps/{application}/changes` | `200` with `{ items: [{ id, version }], diagnostics }`. The body is `application/json`, see [Changes](#changes) |
@@ -80,6 +80,7 @@ in the application. File names and names can change.
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [Draft page metadata](draft-page-metadata.md) |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [Draft page metadata](draft-page-metadata.md) |
+| `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ widget, diagnostics }` for a draft form of the module version that the application pins. The body is the whole edited form as `application/json`, see [Draft page metadata](draft-page-metadata.md) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -157,13 +158,12 @@ Check 6 is built for a request and for a release:
 9. A stale version, `409`.
 10. A create whose `id` or whose target file already exists, `409`.
 
-The names route, the module resource route, the module resource save, the text write and the expression check are built.
-The five routes use these checks. None of them has check 6 or a later numbered check, except where a line says so:
+The names route, the module resource route, the module resource save and reset, the text write and the expression check are built. The six routes use these checks. None of them has check 6 or a later numbered check, except where a line says so:
 
 - **Names.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body.
 - **Module resource.** Checks 2, 3 and 5. It is a `GET`, so there is no CSRF check and no body. Then `404` for a
   module that the application does not pin, and then `404` for a resource that the pinned module version has no file for.
-- **Module resource save.** Checks 1, 2, 3 and 5, then those of [Module resource saves](module-resource-saves.md#order-of-checks).
+- **Module resource save and reset.** Checks 1, 2, 3 and 5, then those of [Module resource saves](module-resource-saves.md#order-of-checks) and of [Element reset](module-resource-saves.md#element-reset).
 - **Text write.** Checks 1, 2, 3 and 5, then `415` for a body that is not
   `application/json`, then `400` for a bad body, then `503` when the
   [write lock](#versions) cannot be taken. Under the lock, it answers `400` when a
@@ -224,7 +224,7 @@ requests or releases exist.
 
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
-from the request. The rows for List applications, List resources, Read, Module resource, Module resource save, Create, Patch, Delete, Changes, Diagnostics, Names,
+from the request. The rows for List applications, List resources, Read, Module resource, Module resource save, Module resource reset, Create, Patch, Delete, Changes, Diagnostics, Names,
 Text write, Expression check, Draft page metadata, Module page metadata, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
@@ -233,7 +233,7 @@ Text write, Expression check, Draft page metadata, Module page metadata, Resourc
 | List resources | No session | No author role, or no `Studio:Folders` | Unknown application | Not used |
 | Read | No session | No author role, or no `Studio:Folders` | Unknown application or resource | Not used |
 | Module resource | No session | No author role, or no `Studio:Folders` | Unknown application, module or resource | Not used |
-| Module resource save | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, module or resource | A stale `If-Match` version, or `If-None-Match` over an existing layer |
+| Module resource save, Module resource reset | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, module or resource, or for a reset a list or key that names no element | A stale `If-Match` version, `If-None-Match` over an existing layer, or a reset with no layer |
 | Create | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The `id` or the target file already exists |
 | Patch | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
 | Delete | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application or resource | Stale `If-Match` version |
@@ -316,9 +316,9 @@ agrees it. The answer is:
   dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
   processes: [{ id, name, module, entity, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
-  connectors: [{ id, name, operations: [{ name }] }],
-  events: [{ id, name, entity, fields: [{ name, type }] }],
-  roles, sequences, forms: [{ id, name }],
+  connectors: [{ id, name, operations: [{ name }] }], roles: [{ id, name }],
+  events: [{ id, name, module, entity, fields: [{ name, type }] }],
+  sequences, forms, seeds, triggers, scenarios, textResources: [{ id, name, module }],
   pages: [{ id, name, module, parameters: [{ name, type, required }] }],
   policies: [{ id, name, module }], contracts: [{ id, name, module }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
@@ -327,9 +327,8 @@ agrees it. The answer is:
 - **`name`.** It is written as a reference writes it. A module entity, data
   source, process, page or policy is `<module id>/<name>`, and a module rule
   is `<module id>:<name>`. `module` is the module id, or null for the application's own.
-- **Module names.** Events, sequences and forms of a module are listed under
-  `<module id>/<name>` too. Only entities, data sources, rules, processes, pages
-  and policies carry `module`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
+- **Module names.** Events, sequences, forms, seeds and triggers of a module are listed under `<module id>/<name>` too. Every list carries `module` except `roles`, `connectors` and `texts`. Contracts are module-only, so each of `contracts` is `<module id>/<name>` with its module id. A module resource's `id` is the id in its module file.
+- **Module texts and scenarios.** A module's text files are in `textResources` and its scenarios in `scenarios`, each as `<module id>/<name>` with its module id, though the files keep the plain name. The application's own are listed too, with `module` null. `texts` stays the list of text keys.
 - **Event `entity`.** It is the entity the event is about, written as a process
   writes its `entity`. A module event that names its own module's entity without
   a slash is listed with the entity qualified, as `<module id>/<name>`. Studio's
@@ -871,16 +870,16 @@ stateDiagram-v2
 This route is built. The publisher writes the rows of a publish and a rollback. _(planned for M31)_: `GET .../releases/{number}` gives one release's page, see [release page](studio-workspace.md#release-page), and `GET .../relaxed`, `GET /api/studio/catalog` and `GET /api/studio/bindings` are in [Studio API](studio-resource-form.md#studio-api).
 
 `GET .../releases` answers
-`{ active: { releaseId, number, contentHash }, folderContentHash, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`,
+`{ active: { releaseId, number, contentHash }, folderContentHash, changes, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`,
 newest first.
 
 - `active` is the application's active release in this tenant, or null when there is none.
 - `folderContentHash` is the content hash that the folder would compile to now, so Studio can show that the live release
   and the folder differ. It is null when the folder has errors.
-- `changes` _(planned for M31,_ [_D129_](../decisions/d129-rules-from-the-studio-editors-review.md)_)_: the
-  files that differ from the active release as canonical JSON, by path, `[{ path, change, kind, name, titles, locale }]`
-  with `change` `added`, `changed` or `removed`; a removed file's other fields come from the active release and its
-  texts, null for the rest. A folder with errors is read file by file, without the modules' copies on either side.
+- `changes` ([D129](../decisions/d129-rules-from-the-studio-editors-review.md)): the files that differ from the active
+  release as canonical JSON, sorted by path, `[{ path, change, kind, name, titles, locale }]`, `change` being `added`,
+  `changed` or `removed`. Only a removed file has the rest, from the active release and its texts: `titles` is null
+  without a label text key. Files are read one by one, without scenarios and modules' copies. Null with no active release.
 - Each item is one activation: a startup, an `axis-admin activate`, a publish or a rollback. `actor` is a user id,
   `startup` or `operator`. A row that a migration added for a release that was live before the history existed has the
   actor `unknown`. `actorName` is the actor's name from their [user profile](notifications.md#user-profiles), else the
@@ -893,7 +892,7 @@ newest first.
 - Activating the release that is already active adds no row and keeps the number. Otherwise every restart under
   `scripts/dev.sh` would fill the history with copies.
 - `GET /api/me` gains a boolean `studioPublisher`, true when the user holds both the author role and the publisher role
-  and Studio is on. It is built. Studio uses it to hide Publish and the rollback button.
+  and Studio is on. It is built. Studio uses it to hide Publish and Activate….
 - `GET /api/me` gains a boolean `studioTest`, true when `studio` is true and `Studio:Tests` is true. Studio uses it to
   hide **Run tests** and the **Run** action of a scenario.
 - `GET /api/me` gains a boolean `studioCreate`, true when `studio` is true and `Studio:ApplicationsPath` is set. It is

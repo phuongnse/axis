@@ -1,5 +1,6 @@
-import { Button, Form, Input, Modal, Select } from 'antd'
+import { Form, Input, Modal, Select } from 'antd'
 import { useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import {
   createStudioResource,
   fetchStudioResource,
@@ -86,7 +87,7 @@ export function StudioNewResource({
       const result = await createStudioResource(application, body)
       if (result.status === 'created') {
         setOpen(false)
-        onCreated(result.item, result.diagnostics)
+        onCreated({ ...result.item, titles: {}, locale: kind === 'text' ? entered : null }, result.diagnostics)
       } else {
         setProblem(result.status === 'conflict' ? 'exists' : 'invalid')
       }
@@ -104,11 +105,11 @@ export function StudioNewResource({
 
   return (
     <>
-      <Button type={inBand ? 'text' : 'default'} onClick={show}>
+      <AxisButton role={inBand ? 'secondary' : 'main'} onClick={show}>
         {fixedName
           ? t('shell.studio.newResource.buttonOf').replace('{kind}', fixedName)
           : t('shell.studio.newResource.button')}
-      </Button>
+      </AxisButton>
       <Modal
         width={dialogWidth('medium')}
         open={open}

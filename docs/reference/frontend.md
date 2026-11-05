@@ -37,7 +37,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   every control. Every text colour reaches 4.5:1 and every border and focus ring reaches 3:1 on surface and canvas, in
   both modes. The shadow group holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast it, and
   widgets, cards, sections and buttons cast none. Type has the body and code fonts and the font size, spacing runs from
-  xs to xl, and radius has the base radius. _(planned for M31)_: the size group holds `bar`, 48 px, the height of the
+  xs to xl, and radius has the base radius. The size group holds `bar`, 48 px, the height of the
   shell's header, a page's band and Studio's application row, `smallControl`, 24 px, a small icon button and the line of
   text beside it, and `tableRow`, 40 px, a table's row and header. _(planned for M31)_: the dialog sizes `small`, `medium` and `large`, see [dialogs](actions-and-controls.md#dialogs). No size, space, type, radius or colour is a number of
   its own in a component; a layout technique, such as a column's 1 % width, takes its size from a token, see
@@ -517,8 +517,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     The page header, app switcher and language and theme menu work as they do on the platform site, see
     [page header](shell.md#page-header) and [app switcher and preferences](shell.md#app-switcher-and-preferences).
 - **Table widget.** A page whose widget is a `table` lists the records of its entity through the record API, or the rows
-  of its data source, in the shared Ant Design table. _(planned for M31)_: it draws on the platform's one shared table,
-  which every table of the platform uses, see [tables](actions-and-controls.md#tables).
+  of its data source. It draws on the platform's one shared table, `AxisTable`, which every table of the platform will
+  use, see [tables](actions-and-controls.md#tables).
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
     child collection and a `references` field have no column.
@@ -526,11 +526,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       entity's `displayField` when the table shows it, and otherwise the first
       column. For a data source it is the first column. It comes first. With a
       `navigate` row action it is the link that opens the row, see **Links**.
-    - **Layout**. Text, enum and reference columns are at most 320 px wide, and their text wraps. _(planned for M31)_: a
-      text, reference or file column is free text and the free text columns share the width left in equal parts; every
-      other column fits its content; rows are 40 px, see [tables](actions-and-controls.md#tables). Every cell and the
-      actions column line up at the top, so a row with wrapped text reads along its first line. Number columns sit on
-      the right in tabular figures, see **Shown values**.
+    - **Layout**. Text, reference and file columns are free text: they share the width left in equal parts and their
+      text wraps at 320 px. Every other column, an enum too, fits its content and does not wrap. Rows and the header are
+      40 px high, see [tables](actions-and-controls.md#tables). Every cell and the actions column line up at the top, so
+      a row with wrapped text reads along its first line. Number columns sit on the right in tabular figures, see
+      **Shown values**.
   - **URL state.** Paging, sorting and search live in the URL as the record
     API's own `page`, `pageSize`, `sort` (`-` and the field name for
     descending) and `search`, so reload, sharing and the back button keep

@@ -6,16 +6,18 @@ no test changes on this branch, and logic left to the review's issue.
 Topic: Studio's Entities page.
 
 The prototype starts from the tag `design-review/2026-11-03-studio-settings`, so the owner keeps seeing the workspace and
-the resource form that `main` has not built yet, with `main` (624ab6e1) merged in. Its own diff starts at that merge.
+the resource form that `main` has not built yet, with `main` merged in, first at 624ab6e1 and again at fd1bf541 (2026-11-05). Its own diff starts at the first merge.
 Each entry is one agreed change: what the owner asked, in English, and what was built, for the docs change at the end
 of the review.
 
-In a merge of `main`, a conflict keeps the prototype. `main` is still the standard for behaviour, so its logic is never
-changed to suit the prototype, and any of it that keeping the prototype loses is brought into the prototype's files.
+In a merge of `main`, `main` is the standard for behaviour and the prototype for look. Where both built the same thing,
+`main`'s API, data shape and logic are kept and the prototype's look and agreed additions are put back on them. A conflict
+never keeps the prototype's logic over `main`'s. What the prototype's files lose is brought back (see "Lost in merges").
+After a merge, run the type check, lint, and the tests of the shared widgets, and write the merge down below.
 
 ## State and how to continue
 
-Last updated 2026-11-04. The review is open; the owner is reviewing it one step at a time.
+Last updated 2026-11-05 (merged `main` at fd1bf541). The review is open; the owner is reviewing it one step at a time.
 
 - **Done:** the kind lists (one table, standard table steps 1 to 3, a table with too little room); the entity designer's
   sections, `AxisField` with required help, the required mark, the Publish dialog's fields, the relaxed points in the Modules
@@ -182,6 +184,29 @@ Last updated 2026-11-04. The review is open; the owner is reviewing it one step 
   editors that draw their own labels, such as ConnectorEditor, ProcessEditor, PageEditor and FormSteps, move to `AxisField`.
 - **For the issue:** a diagnostic inside a field opens at its row; it is to open the drawer at the setting. Reordering by drag
   is still to come.
+
+### Merge of `main` at fd1bf541, 2026-11-05
+
+`main` built, since the first merge: the size tokens and `AxisTable` (D129), the kind lists, the Releases list, the band, the
+Problems panel, Studio's sidebar entries, and the layer editors for module resources. How each conflict went:
+
+- **`main`'s kept as the base:** `AxisTable` and its API (`fixed` and `freeText` kinds, `dataSource`, `onRefresh`, `below`,
+  `failure`, `rowActions` with `configured` and `actions`, `rowAttributes`), `TableWidget`, `Shell` and the sidebar claim
+  (`ShellSidebar`, `shellSidebarContext`), `antTheme`, `designTokens`, `AxisButton` (`AxisActionRow`, `plain`, `caret`),
+  `resourceTitle` (a file name never shows where the resource has a kind), `StudioResourceTitles` and `StudioReleaseChanges` on
+  the server, the history answer's shape, and the texts where both gave a key a value.
+- **The prototype's put back on it:** `AxisTable`'s `priority`, `searchText`, `columns` slot, move-under-row, `testId`, the
+  range text and the empty state; `dialogSizeTokens`; the Tabs, Modal and expanded-row theme; `ActionRow` and
+  `NamedIconButton`; `contentPadding` in the sidebar context; the descriptions and the activity route.
+- **The prototype's workspace kept:** `StudioPage` with `PageLayout`, `StudioNavigation`, `StudioStatus`, the Overview, the kind
+  tables and the release pages, with `main`'s module editors, layers (`onModuleWritten`, `diagnostics`) and manifest handling
+  wired in, and the entity designer with `main`'s layer marks and Reset to module.
+- **On the branch and not used by the prototype page:** `main`'s `StudioBand`, `StudioSidebar`, `studioNavigation` and
+  `StudioProblems`. The issue replaces the prototype's parts with them or the other way round; it decides.
+- **Texts:** `main`'s wording wins where a key has both, such as `shell.studio.activate` (now "Activate release") and the
+  `{release}` placeholder of its dialog.
+- **Known differences from `main`'s tests:** a tooltip on an icon button opens on keyboard focus only when the browser says
+  `:focus-visible`, which jsdom does not, so the two tests that focus such a button by keyboard fail.
 
 ### Lost in merges
 
