@@ -1417,7 +1417,8 @@ internal static partial class AdminCommands
                 http,
                 dnsResolver ?? new DnsClientTxtResolver(),
                 hostCheckInterval,
-                certificates)).RunAsync();
+                certificates),
+            storage is null ? null : new TenantExportSweep(storage)).RunAsync();
     }
 
     // A blank setting is the default. A setting's own value is never echoed, so the message says only which setting is wrong.

@@ -445,7 +445,9 @@ In a fourth loop it checks the pending [host requests](tenant-lifecycle.md#hosts
 `00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set. The record of that add is named `tenant host verify` and names
 the operator who asked for the host. The publisher writes no other record of its own, except the `tenant purge` record of the purge job it queues itself: the audit
 of a publish is the release's own record in the tenant database. A value of `Cell:HostCheckInterval` that is not a positive
-time span exits with code `2`. It has no HTTP endpoint and listens on no port, so nothing
+time span exits with code `2`. In a fifth loop it sweeps the `Cell:ExportStorage` bucket every hour and deletes each ZIP under `exports/` that was stored
+more than 7 days ago, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant). It writes one line for each deletion and runs only when the
+`Cell:ExportStorage` settings are set. A failed round writes one line, and the next round tries again. It has no HTTP endpoint and listens on no port, so nothing
 can call it. The `axis-admin` image runs it. Both production installs start
 one, see [installation](installation.md). `scripts/dev.sh`, the Docker Compose
 file in the repository root and the E2E script each start one too.
@@ -748,6 +750,7 @@ queues it. The job has one step, `export`. It reads the tenant's active releases
 missing `Cell:ExportStorage` setting does the same and names the setting. In a cell the job takes a `concurrentImports` lease of the tenant
 before it reads anything and holds it until the ZIP is stored. When none is free it waits and runs in a later round, without using one of its
 three claims, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant). An upload that fails ends the claim, and the job runs again.
+The publisher deletes the ZIP 7 days after it was stored, see [publisher](#publisher).
 
 ### Purge job
 
