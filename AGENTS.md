@@ -34,12 +34,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - Build in vertical slices. Every behaviour change needs a test: real PostgreSQL through
   Testcontainers for storage and engine behaviour, Playwright for UI journeys. Test denied access as
   well as allowed access.
-- One concern has one mechanism. Before you add a prop, a context, a helper or a local variant, search for what
-  already does the job, in `web/src/platform/`, `web/src/designSystem/` and the server, and extend that one. Never
-  copy a component or its logic, fork it with a second way to the same result, or work round it in the caller. A
-  caller that must build what its shared component should know, such as the label of an option, means the shared
-  component or its data is incomplete: fix it there, so every caller gets it. If a second mechanism already exists,
-  merge the two in the same change. [Shared widgets](docs/reference/shared-widgets.md) says which widget does which job.
+- One concern has one mechanism. Search for what already does the job and extend it. Never copy, fork or work round a
+  shared widget, see [shared widgets](docs/reference/shared-widgets.md).
 - No application-specific code in the platform. Sample applications live under `samples/apps/`,
   extension packages under `samples/packages/`, modules under `samples/modules/` and templates
   under `samples/templates/`.

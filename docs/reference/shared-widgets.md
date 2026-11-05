@@ -1,10 +1,17 @@
 # Shared widgets
 
-Which shared widget does which job in the SPA. Before a page, a designer or a widget draws something, it looks here and
-extends the widget that does the job, as the [working rule](../../AGENTS.md#working-rules) "One concern has one mechanism"
-says. A thing that a shared widget lacks is added to the widget, so every caller has it, and a second way to the same
-result is merged into the first. The tokens are in [design tokens and previews](frontend.md), the buttons in
-[actions and controls](actions-and-controls.md#buttons).
+Which shared widget does which job in the SPA, and the working rule behind it. The tokens are in
+[design tokens and previews](frontend.md), the buttons in [actions and controls](actions-and-controls.md#buttons).
+
+## The rule
+
+One concern has one mechanism. Before you add a prop, a context, a helper or a local variant, search for what already does
+the job, in `web/src/platform/`, `web/src/designSystem/` and the server, and extend that one.
+
+- Never copy a component or its logic, fork it with a second way to the same result, or work round it in the caller.
+- A caller that must build what its shared widget should know, such as the label of an option, shows that the widget or
+  its data is incomplete. Fix it there, so every caller gets it.
+- If a second mechanism already exists, merge the two in the same change.
 
 ## Which widget
 
