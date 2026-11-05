@@ -2,18 +2,26 @@
 
 Status: **Agreed**
 
-- **Database per tenant:** each tenant has its own PostgreSQL database.
-- **Request scope:** every request and every background job runs inside a
-  resolved `TenantContext`. All database connections, cache keys, file paths,
-  jobs and log scopes carry the tenant.
-- **First milestones:** tenants come from a configuration file. A test with
-  two tenant databases proves that no data leaks between them.
-- **Later milestone:** the tenant directory, provisioning, migrations across
-  many databases and hosting profiles. The tenant directory is in
-  [D42](d42-tenant-directory-in-the-platform-database.md). Provisioning
-  and migrations across tenant databases are in
-  [D43](d43-tenant-provisioning-and-migrations-across-tenant-databases.md).
+## Context
 
-_Why:_ adding tenant context afterwards touches every query and job, which is
-expensive. Building full tenant management before there is a second customer
+Axis serves several organizations from one installation. Adding tenant context afterwards touches
+every query and job, which is expensive, while full tenant management before a second customer
 delivers nothing.
+
+## Decision
+
+- **A database per tenant.** Each tenant has its own PostgreSQL database.
+- **Every request and every job runs inside a resolved `TenantContext`,** and every database
+  connection, cache key, file path, job and log scope carries the tenant.
+- **Tenant management comes in its own decisions:** the tenant directory in
+  [D42](d42-tenant-directory-in-the-platform-database.md), provisioning and migrations in
+  [D43](d43-tenant-provisioning-and-migrations-across-tenant-databases.md), and cells in
+  [D123](d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
+
+The detail is in [tenancy](../architecture.md#tenancy-d10).
+
+## Consequences
+
+- A test with two tenant databases proves that no data leaks between them.
+- One tenant must not take the others offline, which
+  [D37](d37-health-checks-for-the-server-and-the-worker.md) follows.
