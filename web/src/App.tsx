@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { AccountPage } from './pages/AccountPage'
+import { CellConsoleRoute } from './pages/CellConsoleRoute'
+import { CellJobsPage } from './pages/CellJobsPage'
+import { CellPage } from './pages/CellPage'
 import { ConsoleInstancePage } from './pages/ConsoleInstancePage'
 import { ConsolePage } from './pages/ConsolePage'
 import { HomePage } from './pages/HomePage'
@@ -86,10 +89,21 @@ function PlatformRoot({ development }: { development: boolean }) {
 /**
  * The routes of the platform. On the host of a site the SPA serves that site at `/` and its pages at `/{page}`, and
  * nothing else, as the server serves nothing else there. Elsewhere it serves the platform's own routes and every site
- * under `/{site}`.
+ * under `/{site}`. On the cell console's host it serves the console's two pages, Cell at `/` and Jobs at `/jobs`.
  */
 function PlatformRoutes() {
-  const { hostSite } = usePlatform().site
+  const { hostSite, cellConsole } = usePlatform().site
+  if (cellConsole) {
+    return (
+      <Routes>
+        <Route element={<CellConsoleRoute />}>
+          <Route index element={<CellPage />} />
+          <Route path="jobs" element={<CellJobsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    )
+  }
   if (hostSite) {
     return (
       <Routes>

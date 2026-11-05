@@ -36,6 +36,8 @@ interface ShellProps {
   notifications?: { path: string; sitePath: string }
   /** The privacy and terms links the footer shows, from the site the shell shows. */
   legal?: SiteLegal | null
+  /** What the header shows in place of the app switcher and the account button, such as the cell console's operator name. `null` shows nothing there. */
+  account?: ReactNode
   children: ReactNode
 }
 
@@ -68,8 +70,9 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
  * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
- * there is no sidebar. The app switcher stays in the header. While the tenant is read-only, a banner tops the content
- * column on every page, see `ReadOnlyBanner`.
+ * there is no sidebar. The app switcher stays in the header. A shell given `account` shows it in place of the app switcher
+ * and the account button. While the tenant is read-only, a banner tops the content
+ * column on every page, see `ReadOnlyBanner`. A shell given `account` has no tenant and shows no banner.
  */
 export function Shell({
   titleKey,
@@ -79,6 +82,7 @@ export function Shell({
   onLocaleChange,
   notifications,
   legal,
+  account,
   children,
 }: ShellProps) {
   const t = useText()
@@ -116,6 +120,7 @@ export function Shell({
     ) : (
       <ShellNavigation entries={entries} activeKey={activeKey} collapsed={iconsOnly} />
     )
+  const hasAccount = account !== undefined
   const preferences = <PreferencesMenu locales={locales} locale={locale} onLocaleChange={onLocaleChange} />
 
   const bell = notifications && (
@@ -177,8 +182,8 @@ export function Shell({
             {narrow ? (
               <>
                 {bell}
-                <AppSwitcher locale={locale} />
-                <UserMenu />
+                {hasAccount ? account : <AppSwitcher locale={locale} />}
+                {!hasAccount && <UserMenu />}
                 <Button
                   ref={toggle}
                   type="text"
@@ -193,9 +198,9 @@ export function Shell({
             ) : (
               <Flex align="center" gap={spacing.sm}>
                 {bell}
-                <AppSwitcher locale={locale} />
+                {!hasAccount && <AppSwitcher locale={locale} />}
                 {preferences}
-                <UserMenu />
+                {hasAccount ? account : <UserMenu />}
               </Flex>
             )}
           </Layout.Header>
@@ -240,7 +245,7 @@ export function Shell({
               </Layout.Sider>
             )}
             <Layout>
-              <ReadOnlyBanner />
+              {!hasAccount && <ReadOnlyBanner />}
               <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
                 <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
               </Layout.Content>
