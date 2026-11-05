@@ -796,6 +796,129 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task An_operator_reads_the_cell_with_its_tenants_without_previews_and_its_cap()
+    {
+        await using (var factory = await StartAsync())
+        {
+            using var client = CreateClient(factory, _console);
+            var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+            using var read = await GetAsync(client, "/api/cell", token);
+
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+            var cell = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal("vn-1", cell.GetProperty("id").GetString());
+            Assert.Equal("vn", cell.GetProperty("region").GetString());
+            Assert.Equal(3, cell.GetProperty("tenants").GetInt32());
+            Assert.Equal(JsonValueKind.Null, cell.GetProperty("cap").ValueKind);
+        }
+
+        await using (var capped = await StartAsync(tenantCap: 10))
+        {
+            using var client = CreateClient(capped, _console);
+            var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+            using var read = await GetAsync(client, "/api/cell", token);
+
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+            var cell = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal(3, cell.GetProperty("tenants").GetInt32());
+            Assert.Equal(10, cell.GetProperty("cap").GetInt32());
+        }
+    }
+
+    [Fact]
+    public async Task An_operator_lists_the_jobs_newest_first_filtered_by_tenant_and_limited_without_the_actor()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var ids = new List<Guid>();
+        foreach (var (path, key) in new[]
+        {
+            ("/api/cell/tenants/b/suspend", "list-1"),
+            ("/api/cell/tenants/b/resume", "list-2"),
+            ("/api/cell/tenants/c/suspend", "list-3"),
+        })
+        {
+            using var queued = await PostJobAsync(client, path, token, key);
+            Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+            ids.Add((await queued.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        }
+
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = now() - interval '3 hours' WHERE id = '{ids[0]:D}'");
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = now() - interval '2 hours' WHERE id = '{ids[1]:D}'");
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = now() - interval '1 hour' WHERE id = '{ids[2]:D}'");
+        await ExecuteAsync(
+            $$"""
+            UPDATE platform.jobs SET state = 'failed', error = 'The tenant is still provisioning.',
+                steps = '[{"name":"status","state":"failed","error":"The tenant is still provisioning."}]'::jsonb
+            WHERE id = '{{ids[1]:D}}'
+            """);
+
+        using var all = await GetAsync(client, "/api/cell/jobs", token);
+        using var ofB = await GetAsync(client, "/api/cell/jobs?tenant=b", token);
+        using var ofNobody = await GetAsync(client, "/api/cell/jobs?tenant=nobody", token);
+        using var newest = await GetAsync(client, "/api/cell/jobs?limit=1", token);
+
+        Assert.Equal(HttpStatusCode.OK, all.StatusCode);
+        var items = (await all.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.Equal(
+            [ids[2], ids[1], ids[0]],
+            items.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
+        Assert.All(items.EnumerateArray(), item =>
+        {
+            Assert.Equal(JsonValueKind.Array, item.GetProperty("steps").ValueKind);
+            Assert.True(item.TryGetProperty("error", out _));
+            Assert.False(item.TryGetProperty("actor", out _));
+            Assert.False(item.TryGetProperty("input", out _));
+        });
+        Assert.Equal("status", items[0].GetProperty("steps")[0].GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("error").ValueKind);
+        Assert.Equal("failed", items[1].GetProperty("state").GetString());
+        Assert.Equal("The tenant is still provisioning.", items[1].GetProperty("error").GetString());
+        Assert.Equal("failed", items[1].GetProperty("steps")[0].GetProperty("state").GetString());
+
+        var ofBItems = (await ofB.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.Equal(
+            [ids[1], ids[0]],
+            ofBItems.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
+        Assert.Equal(HttpStatusCode.OK, ofNobody.StatusCode);
+        Assert.Equal(0, (await ofNobody.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items").GetArrayLength());
+        var newestItems = (await newest.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.Equal([ids[2]], newestItems.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
+
+        foreach (var limit in new[] { "0", "201", "-1", "abc", "" })
+        {
+            using var bad = await GetAsync(client, $"/api/cell/jobs?limit={limit}", token);
+
+            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+            Assert.Equal("application/problem+json", bad.Content.Headers.ContentType?.MediaType);
+        }
+    }
+
+    [Fact]
+    public async Task The_cell_and_job_list_routes_answer_401_without_a_token_403_without_the_role_and_404_for_a_tenant_host()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        using var tenantHostClient = CreateClient(factory, _tenantHost);
+        var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        foreach (var path in new[] { "/api/cell", "/api/cell/jobs" })
+        {
+            using var none = await GetAsync(client, path, token: null);
+            using var noRole = await GetAsync(client, path, noRoleToken);
+            using var tenantHost = await GetAsync(tenantHostClient, path, operatorToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, tenantHost.StatusCode);
+        }
+    }
+
+    [Fact]
     public async Task The_job_routes_answer_401_without_a_token_403_without_the_role_and_404_for_an_unknown_tenant_job_or_tenant_host()
     {
         await using var factory = await StartAsync();

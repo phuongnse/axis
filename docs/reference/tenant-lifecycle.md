@@ -44,7 +44,7 @@ implementation.
   already succeeded is skipped, and a refusal, such as for a tenant that is still `provisioning`, fails the job at once.
   A step may take a lease of the tenant first, as the `export` step does. A wait for a lease uses no claim: it adds to the
   job's `waits` count, and the limit of three is `claims` minus `waits`.
-  The `suspend`, `resume`, `DELETE` and `deletion/cancel` routes and the job read are built: the server only queues the job, over the platform reader role,
+  The `suspend`, `resume`, `DELETE` and `deletion/cancel` routes, the job read and the job list are built: the server only queues the job, over the platform reader role,
   which may insert into `platform.jobs` and nothing else there, and answers `202` with a `Location` header of `/api/cell/jobs/{id}`.
   The job's actor is the operator's id, the subject of the token or the session. The create route is built too: it queues a `create` job with the five steps of
   [creating a tenant](#creating-a-tenant), all `pending`, and keeps the request's `application` and `administrator` in the job's
@@ -63,6 +63,7 @@ implementation.
 
 | Route | What it does |
 | --- | --- |
+| `GET /api/cell` | Answers the cell as `{ "id", "region", "tenants", "cap" }`. `tenants` counts the cell's tenants whatever their status and leaves out preview tenants. `cap` is `Cell:TenantCap`, see [cell size](cells.md#cell-size), or `null` when it is not set. |
 | `GET /api/cell/auth/sign-in` | Sends the operator to the operator realm's login page, see [sign-in](cell-console.md#sign-in). It needs no session and answers `404` on any host but the console host, and when the console offers no sign-in. |
 | `POST /api/cell/auth/sign-out` | Deletes the operator's session and answers `204`. It needs the CSRF header. |
 | `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application` and `hosts`, read from the platform tables. `status` is `deleting` while a deletion is scheduled, though the stored status stays `suspended`. A preview tenant is left out. `application` is `null` until the create job records it _(planned for M31)_. Usage, quotas and failed work counts, see [views](cell-console.md#views), are _(planned for M31)_ on the list. |
@@ -78,6 +79,7 @@ implementation.
 | `GET /api/cell/tenants/{id}/exports/{exportId}` | Answers the [tenant export](#exporting-a-tenant) as JSON: `id`, `tenantId`, `state`, `createdAt` and `expiresAt`, which is 7 days after the job finished and `null` until it succeeded. The same route streams the ZIP when the request sends `Accept: application/zip`, and answers the JSON to every other request. The server streams the ZIP from the export storage itself and never redirects to a storage address. A download before the job succeeded answers `409`. An export past its `expiresAt`, or whose ZIP the storage no longer holds, answers `410` on both forms. An unknown tenant, a preview tenant or an id that is not an export of that tenant answers `404`. A download on a server without the five `Cell:ExportStorage` settings answers `503`, and the JSON read still works there. Each download writes the platform audit record `tenant export download`, see [platform audit records](tenant-setting-commands.md#platform-audit-records). |
 | `DELETE /api/cell/tenants/{id}` | Schedules the deletion through a `delete` job, see [deleting a tenant](#deleting-a-tenant). It answers `202` as `suspend` does. |
 | `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window through a `cancel-deletion` job. It answers as `suspend` does. |
+| `GET /api/cell/jobs` | Lists the cell's jobs as `{ "items": [...] }`, newest first by `createdAt`, then by id. Each item is a job as the job read answers it, with its `steps` and `error`. The `actor` and the `input` of a job are never returned. `tenant` keeps one tenant's jobs, and an unknown tenant answers an empty list. `limit` is a whole number from 1 to 200 and is 50 when missing. Any other value answers `400`. There is no paging past `limit`. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
 ## Creating a tenant

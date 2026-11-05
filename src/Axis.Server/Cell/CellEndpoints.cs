@@ -1,5 +1,6 @@
 using System.Buffers.Text;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net;
 using System.Net.Mail;
 using System.Security.Cryptography;
@@ -30,6 +31,14 @@ namespace Axis.Server.CellApi;
 /// <see cref="CellConsoleSignIn"/>, and answers <c>404</c> when the console offers no sign-in or the host is not
 /// <see cref="CellOptions.ConsoleHost"/>. <c>POST /api/cell/auth/sign-out</c> deletes the session and answers <c>204</c>.
 /// The two skip the operator policy, as they must work for a caller who has no session. Writes need the CSRF header.
+/// </para>
+/// <para>
+/// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap }</c>: <c>tenants</c> counts the rows of the cell's tenant directory
+/// whatever their status and leaves out preview tenants, and <c>cap</c> is <see cref="CellOptions.TenantCap"/> or
+/// <see langword="null"/>. <c>GET /api/cell/jobs?tenant&amp;limit</c> answers <c>{ "items": [...] }</c>, the jobs newest first, each as
+/// the job read answers it, and never with the job's <c>actor</c> or <c>input</c>. <c>tenant</c> keeps one tenant's jobs and an
+/// unknown tenant answers an empty list. <c>limit</c> is a whole number from 1 to 200, 50 when missing, and any other value
+/// answers <c>400</c>.
 /// </para>
 /// <para>
 /// <c>GET /api/cell/tenants</c> answers <c>{ "items": [...] }</c>, ordered by id, with each tenant's <c>id</c>,
@@ -99,6 +108,10 @@ internal static class CellEndpoints
 
     private const int MaxIdempotencyKeyLength = 255;
 
+    private const int DefaultJobListLimit = 50;
+
+    private const int MaxJobListLimit = 200;
+
     private static readonly TimeSpan _idempotencyWindow = TimeSpan.FromHours(24);
 
     // The steps of each kind, as the publisher's job runner defines them, see ProvisioningJobs.Builtin.
@@ -125,6 +138,7 @@ internal static class CellEndpoints
         var cell = endpoints.MapGroup("/api/cell")
             .WithMetadata(CellOperatorRoute.Instance)
             .RequireAuthorization(CellOperator.Policy);
+        cell.MapGet("", GetCellAsync);
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
@@ -141,6 +155,7 @@ internal static class CellEndpoints
             QueueJobAsync("export", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/hosts", RequestHostAsync);
         cell.MapGet("/tenants/{id}/exports/{exportId:guid}", GetExportAsync);
+        cell.MapGet("/jobs", ListJobsAsync);
         cell.MapGet("/jobs/{id:guid}", GetJobAsync);
 
         // Sign-in and sign-out are the only routes that skip the operator policy. They keep the route marker, so the console
@@ -181,6 +196,13 @@ internal static class CellEndpoints
     {
         await httpContext.SignOutAsync(CellOperatorSession.Scheme);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetCellAsync(NpgsqlDataSource dataSource, CellOptions cell, CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        var tenants = await platform.Tenants.AsNoTracking().CountAsync(tenant => tenant.PreviewOf == null, cancellationToken);
+        return Results.Ok(new CellResponse(cell.Id!, cell.Region!, tenants, cell.TenantCap));
     }
 
     private static async Task<IResult> ListTenantsAsync(NpgsqlDataSource dataSource, CancellationToken cancellationToken)
@@ -665,8 +687,40 @@ internal static class CellEndpoints
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No job has this id.");
         }
 
+        return Results.Ok(JobDetail(job));
+    }
+
+    // Job ids are time-ordered, so the id settles jobs created in the same instant.
+    private static async Task<IResult> ListJobsAsync(string? tenant, string? limit, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    {
+        var take = DefaultJobListLimit;
+        if (limit is not null
+            && (!int.TryParse(limit, NumberStyles.None, CultureInfo.InvariantCulture, out take) || take is < 1 or > MaxJobListLimit))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: $"The limit must be a whole number from 1 to {MaxJobListLimit}.");
+        }
+
+        await using var platform = Open(dataSource);
+        var jobs = platform.Jobs.AsNoTracking();
+        if (!string.IsNullOrEmpty(tenant))
+        {
+            jobs = jobs.Where(job => job.TenantId == tenant);
+        }
+
+        var rows = await jobs
+            .OrderByDescending(job => job.CreatedAt)
+            .ThenByDescending(job => job.Id)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+        return Results.Ok(new CellJobListResponse([.. rows.Select(JobDetail)]));
+    }
+
+    private static CellJobDetailResponse JobDetail(JobRow job)
+    {
         var steps = JsonSerializer.Deserialize<List<CellJobStepResponse>>(job.Steps, JsonSerializerOptions.Web) ?? [];
-        return Results.Ok(new CellJobDetailResponse(job.Id, job.Kind, job.TenantId, job.State, job.CreatedAt, steps, job.Error));
+        return new CellJobDetailResponse(job.Id, job.Kind, job.TenantId, job.State, job.CreatedAt, steps, job.Error);
     }
 
     private static string? ValidateQuotas(CellQuotasRequest? request, Dictionary<string, long?> set, List<string> remove)
@@ -726,6 +780,9 @@ internal static class CellEndpoints
         [.. hosts[tenantId].Order(StringComparer.Ordinal)];
 }
 
+/// <summary>The cell: its id and region, the number of its tenants without preview tenants, and its tenant cap or null.</summary>
+internal sealed record CellResponse(string Id, string Region, int Tenants, int? Cap);
+
 /// <summary>One tenant of the cell. <c>Application</c> is null until the create job records it.</summary>
 internal sealed record CellTenantResponse(string Id, string Status, string? Application, IReadOnlyList<string> Hosts);
 
@@ -782,6 +839,9 @@ internal sealed record CellJobDetailResponse(
     DateTimeOffset CreatedAt,
     IReadOnlyList<CellJobStepResponse> Steps,
     string? Error);
+
+/// <summary>The jobs of the cell, newest first.</summary>
+internal sealed record CellJobListResponse(IReadOnlyList<CellJobDetailResponse> Items);
 
 /// <summary>One step of a job. <c>Error</c> is the refusal of a failed step.</summary>
 internal sealed record CellJobStepResponse(string Name, string State, string? Error);
