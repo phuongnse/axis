@@ -1,0 +1,632 @@
+{
+  "$comment": "The terms Axis's own screens use for each concept, by locale. See docs/reference/ui-writing.md. status: approved, proposed or decide.",
+  "locales": [
+    "en",
+    "vi"
+  ],
+  "keep": [
+    "Axis",
+    "Studio",
+    "JSON",
+    "API",
+    "ID",
+    "URL",
+    "CSV",
+    "XLSX",
+    "ZIP",
+    "PDF",
+    "webhook",
+    "AXC codes such as AXC0035",
+    "placeholders such as {count}",
+    "names an author gave"
+  ],
+  "terms": [
+    {
+      "concept": "Application",
+      "en": "application",
+      "vi": "ứng dụng",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "app"
+        ]
+      }
+    },
+    {
+      "concept": "Resource",
+      "en": "resource",
+      "vi": "tài nguyên",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "resource"
+        ]
+      }
+    },
+    {
+      "concept": "Module",
+      "en": "module",
+      "vi": "mô-đun",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "module",
+          "môđun"
+        ]
+      }
+    },
+    {
+      "concept": "Built-in module",
+      "en": "built-in module",
+      "vi": "mô-đun có sẵn",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "mô-đun tích hợp"
+        ]
+      }
+    },
+    {
+      "concept": "Module contract",
+      "en": "contract",
+      "vi": "cam kết",
+      "status": "decide",
+      "avoid": {
+        "vi": [
+          "contract"
+        ]
+      },
+      "options": {
+        "vi": [
+          "cam kết",
+          "hợp đồng",
+          "giao kèo"
+        ]
+      },
+      "note": "\"Hợp đồng\", used today, reads as a legal contract; a module's contract is what it promises the application."
+    },
+    {
+      "concept": "Customization layer",
+      "en": "layer",
+      "vi": "lớp tùy biến",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "layer"
+        ]
+      }
+    },
+    {
+      "concept": "Release",
+      "en": "release",
+      "vi": "phiên bản",
+      "status": "decide",
+      "avoid": {
+        "vi": [
+          "release"
+        ]
+      },
+      "options": {
+        "vi": [
+          "phiên bản",
+          "bản phát hành"
+        ]
+      },
+      "note": "Today three words name it: \"phiên bản\", \"bản phát hành\" and \"phát hành\"."
+    },
+    {
+      "concept": "Publish (action)",
+      "en": "Publish",
+      "vi": "Xuất bản",
+      "status": "decide",
+      "options": {
+        "vi": [
+          "Xuất bản",
+          "Phát hành"
+        ]
+      },
+      "note": "The verb that makes a release. It pairs with the release's term: \"Phát hành\" with \"bản phát hành\", \"Xuất bản\" with \"phiên bản\"."
+    },
+    {
+      "concept": "Activate (a release)",
+      "en": "Activate",
+      "vi": "Kích hoạt",
+      "status": "proposed"
+    },
+    {
+      "concept": "Live (release)",
+      "en": "Live",
+      "vi": "Đang chạy",
+      "status": "proposed"
+    },
+    {
+      "concept": "Diagnostic",
+      "en": "problem",
+      "vi": "vấn đề",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "chẩn đoán",
+          "diagnostic"
+        ]
+      },
+      "note": "A diagnostic is an error or a warning: \"lỗi\" and \"cảnh báo\"."
+    },
+    {
+      "concept": "Studio",
+      "en": "Studio",
+      "vi": "Studio",
+      "status": "proposed",
+      "note": "A product name, kept."
+    },
+    {
+      "concept": "Entity",
+      "en": "entity",
+      "vi": "thực thể",
+      "status": "decide",
+      "avoid": {
+        "vi": [
+          "entity"
+        ]
+      },
+      "options": {
+        "vi": [
+          "thực thể",
+          "đối tượng",
+          "bảng dữ liệu",
+          "entity"
+        ]
+      },
+      "note": "Today \"thực thể\" and \"entity\" are mixed, 25 to 20. \"Đối tượng\" is Salesforce's Vietnamese; \"bảng\" is Dataverse's."
+    },
+    {
+      "concept": "Field",
+      "en": "field",
+      "vi": "trường",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "field"
+        ]
+      }
+    },
+    {
+      "concept": "Record",
+      "en": "record",
+      "vi": "bản ghi",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "record"
+        ]
+      }
+    },
+    {
+      "concept": "Display field",
+      "en": "display field",
+      "vi": "trường hiển thị",
+      "status": "proposed"
+    },
+    {
+      "concept": "Data source",
+      "en": "data source",
+      "vi": "nguồn dữ liệu",
+      "status": "proposed"
+    },
+    {
+      "concept": "Sequence",
+      "en": "sequence",
+      "vi": "dãy số",
+      "status": "proposed"
+    },
+    {
+      "concept": "Seed data",
+      "en": "seed data",
+      "vi": "dữ liệu ban đầu",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "dữ liệu mẫu"
+        ]
+      },
+      "note": "Seed data is the data an application starts with, not sample data."
+    },
+    {
+      "concept": "Migration",
+      "en": "migration",
+      "vi": "di chuyển dữ liệu",
+      "status": "proposed"
+    },
+    {
+      "concept": "Enum (field type)",
+      "en": "Enum",
+      "vi": "Danh sách chọn",
+      "status": "decide",
+      "avoid": {
+        "vi": [
+          "enum"
+        ]
+      },
+      "options": {
+        "vi": [
+          "Danh sách chọn",
+          "Lựa chọn",
+          "Enum"
+        ]
+      }
+    },
+    {
+      "concept": "Reference (field type)",
+      "en": "Reference",
+      "vi": "Tham chiếu",
+      "status": "proposed"
+    },
+    {
+      "concept": "Child collection (field type)",
+      "en": "Child collection",
+      "vi": "Bảng con",
+      "status": "proposed"
+    },
+    {
+      "concept": "Required",
+      "en": "Required",
+      "vi": "Bắt buộc",
+      "status": "proposed"
+    },
+    {
+      "concept": "Unique",
+      "en": "Unique",
+      "vi": "Không trùng",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "unique",
+          "duy nhất"
+        ]
+      }
+    },
+    {
+      "concept": "Sensitive",
+      "en": "Sensitive",
+      "vi": "Nhạy cảm",
+      "status": "proposed"
+    },
+    {
+      "concept": "Computed",
+      "en": "Computed",
+      "vi": "Tính toán",
+      "status": "proposed"
+    },
+    {
+      "concept": "Label",
+      "en": "label",
+      "vi": "nhãn",
+      "status": "proposed"
+    },
+    {
+      "concept": "Help text",
+      "en": "help text",
+      "vi": "hướng dẫn",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "văn bản trợ giúp"
+        ]
+      }
+    },
+    {
+      "concept": "Expression",
+      "en": "expression",
+      "vi": "biểu thức",
+      "status": "proposed"
+    },
+    {
+      "concept": "Rule",
+      "en": "rule",
+      "vi": "quy tắc",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "rule"
+        ]
+      }
+    },
+    {
+      "concept": "Validation",
+      "en": "validation",
+      "vi": "điều kiện lưu",
+      "status": "decide",
+      "options": {
+        "vi": [
+          "điều kiện lưu",
+          "kiểm tra hợp lệ",
+          "ràng buộc"
+        ]
+      },
+      "note": "A validation is a condition a record must meet to be saved."
+    },
+    {
+      "concept": "Process",
+      "en": "process",
+      "vi": "quy trình",
+      "status": "proposed"
+    },
+    {
+      "concept": "Step",
+      "en": "step",
+      "vi": "bước",
+      "status": "proposed"
+    },
+    {
+      "concept": "Human task",
+      "en": "task",
+      "vi": "công việc",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "nhiệm vụ",
+          "task"
+        ]
+      }
+    },
+    {
+      "concept": "Trigger",
+      "en": "trigger",
+      "vi": "bộ kích hoạt",
+      "status": "proposed"
+    },
+    {
+      "concept": "Event",
+      "en": "event",
+      "vi": "sự kiện",
+      "status": "proposed"
+    },
+    {
+      "concept": "Connector",
+      "en": "connector",
+      "vi": "bộ kết nối",
+      "status": "proposed"
+    },
+    {
+      "concept": "Endpoint",
+      "en": "endpoint",
+      "vi": "endpoint",
+      "status": "decide",
+      "options": {
+        "vi": [
+          "endpoint",
+          "điểm cuối",
+          "điểm nhận"
+        ]
+      },
+      "note": "\"Điểm cuối\", used today, is a word-for-word rendering few readers know."
+    },
+    {
+      "concept": "Webhook",
+      "en": "webhook",
+      "vi": "webhook",
+      "status": "proposed"
+    },
+    {
+      "concept": "Test scenario",
+      "en": "test scenario",
+      "vi": "kịch bản kiểm thử",
+      "status": "proposed"
+    },
+    {
+      "concept": "Site",
+      "en": "site",
+      "vi": "trang web",
+      "status": "proposed"
+    },
+    {
+      "concept": "Page",
+      "en": "page",
+      "vi": "trang",
+      "status": "proposed"
+    },
+    {
+      "concept": "Form",
+      "en": "form",
+      "vi": "biểu mẫu",
+      "status": "proposed"
+    },
+    {
+      "concept": "Widget",
+      "en": "widget",
+      "vi": "thành phần",
+      "status": "decide",
+      "options": {
+        "vi": [
+          "thành phần",
+          "widget"
+        ]
+      }
+    },
+    {
+      "concept": "Text resource",
+      "en": "text resource",
+      "vi": "bản văn bản",
+      "status": "decide",
+      "options": {
+        "vi": [
+          "bản văn bản",
+          "tài nguyên văn bản",
+          "bản dịch"
+        ]
+      },
+      "note": "A text resource holds an application's texts in one language."
+    },
+    {
+      "concept": "Role",
+      "en": "role",
+      "vi": "vai trò",
+      "status": "proposed"
+    },
+    {
+      "concept": "Policy",
+      "en": "policy",
+      "vi": "chính sách",
+      "status": "proposed"
+    },
+    {
+      "concept": "Identity provider",
+      "en": "identity provider",
+      "vi": "nhà cung cấp danh tính",
+      "status": "proposed"
+    },
+    {
+      "concept": "Tenant",
+      "en": "tenant",
+      "vi": "tenant",
+      "status": "decide",
+      "options": {
+        "vi": [
+          "tenant",
+          "đơn vị thuê",
+          "không gian"
+        ]
+      },
+      "note": "Today \"tenant\" is kept, in 13 texts."
+    },
+    {
+      "concept": "Operator console",
+      "en": "operator console",
+      "vi": "bảng điều khiển vận hành",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Save",
+      "en": "Save",
+      "vi": "Lưu",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Cancel",
+      "en": "Cancel",
+      "vi": "Hủy",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "Huỷ"
+        ]
+      }
+    },
+    {
+      "concept": "Action: Delete",
+      "en": "Delete",
+      "vi": "Xóa",
+      "status": "proposed",
+      "avoid": {
+        "vi": [
+          "Xoá",
+          "Loại bỏ"
+        ]
+      },
+      "note": "Destroys a thing. \"Remove\" takes it out of a list and destroys nothing."
+    },
+    {
+      "concept": "Action: Remove",
+      "en": "Remove",
+      "vi": "Bỏ",
+      "status": "proposed",
+      "note": "Takes a thing out of a list or a setting; the thing itself stays."
+    },
+    {
+      "concept": "Action: Add",
+      "en": "Add",
+      "vi": "Thêm",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Create",
+      "en": "Create",
+      "vi": "Tạo",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Edit",
+      "en": "Edit",
+      "vi": "Sửa",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Discard",
+      "en": "Discard",
+      "vi": "Bỏ thay đổi",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Undo",
+      "en": "Undo",
+      "vi": "Hoàn tác",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Redo",
+      "en": "Redo",
+      "vi": "Làm lại",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Refresh",
+      "en": "Refresh",
+      "vi": "Làm mới",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Search",
+      "en": "Search",
+      "vi": "Tìm",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Filter",
+      "en": "Filter",
+      "vi": "Lọc",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Validate",
+      "en": "Validate",
+      "vi": "Kiểm tra",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Preview",
+      "en": "Preview",
+      "vi": "Xem trước",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Run tests",
+      "en": "Run tests",
+      "vi": "Chạy kiểm thử",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Export",
+      "en": "Export",
+      "vi": "Xuất",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Import",
+      "en": "Import",
+      "vi": "Nhập",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Restore",
+      "en": "Restore",
+      "vi": "Khôi phục",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Done",
+      "en": "Done",
+      "vi": "Xong",
+      "status": "proposed"
+    }
+  ]
+}

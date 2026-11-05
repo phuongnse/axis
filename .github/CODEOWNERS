@@ -12,3 +12,7 @@
 /scripts/check-shared-widgets.mjs @phuongnse
 /scripts/shared-widgets-baseline.json @phuongnse
 /scripts/check-prototype-pollution.mjs @phuongnse
+
+# The approved terms of Axis's screens. A pull request that changes one needs the owner's review, see
+# docs/reference/ui-writing.md#the-glossary.
+/docs/reference/ui-glossary.json @phuongnse
