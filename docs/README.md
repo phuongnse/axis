@@ -87,6 +87,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
 | [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
 | [Shared widgets](reference/shared-widgets.md)                          | Which shared widget does which job, and what the build checks                         |
+| [UI writing](reference/ui-writing.md)                                  | How the words of Axis's screens are written in every locale, and the glossary of terms |
 | [Actions and controls](reference/actions-and-controls.md)              | Button levels and places, menus, and how every form draws field errors and choices    |
 | [Shell and home page](reference/shell.md)                             | The shell around every page, navigation icons, the page header, the platform home page and the sign-in cards      |
 | [Platform pages](reference/platform-pages.md)                        | The sessions screen and account page at `/account` and the users page at `/users`     |
