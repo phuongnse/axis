@@ -16,7 +16,7 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - [Development](docs/development.md) covers running Axis locally, ports and test data: the four
   samples (purchase requests, leave requests, the service desk and asset management), the realm users for each
   sample's roles in the [development users table](docs/reference/security.md#development-users),
-  the sample templates in `artifacts/templates`, the `Studio:ApplicationsPath` folder where Studio
+  the built-in applications in `artifacts/templates`, the `Studio:ApplicationsPath` folder where Studio
   creates applications, and the `axis_scenario` role that runs Studio's test scenarios.
 
 ## Working rules

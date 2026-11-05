@@ -3,8 +3,8 @@
 # endpoints, the publisher stage runs `axis-admin publisher`, and the purchasing stage runs the purchasing
 # system stub from tests/Axis.PurchasingStub.
 # The development images hold the built-in modules under modules and the sample modules under samples/modules
-# in /modules, each at the id and version of its module.json. They hold the sample templates and the built-in
-# applications under applications in /templates, each at the id and version of its template.json.
+# in /modules, each at the id and version of its module.json. They hold the built-in applications under
+# applications in /templates, each at the id and version of its template.json.
 # For local use: the Development environment and the sample credentials are not for production.
 #
 # The targets axis-server, axis-worker, axis-admin and axis-controlplane are the production images. They run the
@@ -38,12 +38,11 @@ COPY samples/modules/ samples/modules/
 COPY modules/ modules/
 RUN bash scripts/lib/install-modules.sh
 
-# The sample templates and the built-in applications, installed in /src/artifacts/templates/<id>/<version> by the
-# script that scripts/build.sh runs. The id and the version come from each template.json.
+# The built-in applications, installed in /src/artifacts/templates/<id>/<version> by the script that
+# scripts/build.sh runs. The id and the version come from each template.json.
 FROM node:24-slim AS templates
 WORKDIR /src
 COPY scripts/lib/install-sample-templates.sh scripts/lib/
-COPY samples/templates/ samples/templates/
 COPY applications/ applications/
 RUN bash scripts/lib/install-sample-templates.sh
 

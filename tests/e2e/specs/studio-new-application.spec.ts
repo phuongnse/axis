@@ -47,8 +47,8 @@ test.describe('Studio creates an application', () => {
     }
   })
 
-  // The id sorts after request-approval, so only the built-in flag puts it before it. Among the built-in entries the
-  // order is by id, so the installed approvals application comes first.
+  // The built-in templates come before the others, in order of id, so the installed approvals application comes
+  // first and this one second.
   async function addBuiltInTemplate(root: string) {
     const folder = path.join(root, 'tracker-test', '1.0.0')
     await mkdir(path.join(folder, 'sites'), { recursive: true })
@@ -114,19 +114,21 @@ test.describe('Studio creates an application', () => {
     await expect(page.getByTestId('studio-problems')).toHaveCount(0)
   })
 
-  test('an author creates an application from the request-approval template', async ({ page }) => {
+  test('an author creates an application from the built-in Approvals application', async ({ page }) => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await createApplication(page, 'Onboarding', 'Request approval')
+    await createApplication(page, 'Onboarding', 'Approvals')
 
     await expect(page).toHaveURL(/app=Onboarding$/)
-    await openKind(page, 'entity')
-    await expect(page.getByTestId('studio-group-entity')).toBeVisible()
-    await openKind(page, 'process')
-    await expect(page.getByTestId('studio-group-process')).toBeVisible()
+    await openKind(page, 'role')
+    await expect(page.getByTestId('studio-group-role')).toBeVisible()
     await openKind(page, 'site')
     await expect(page.getByTestId('studio-group-site')).toBeVisible()
+    const response = await page.request.get(`${server.url}/api/studio/apps/Onboarding/diagnostics`)
+    expect(response.status()).toBe(200)
+    const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }
+    expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([])
   })
 
   test('a taken name shows the conflict, and the folder and the picked application do not change', async ({ page }) => {
@@ -159,10 +161,10 @@ test.describe('Studio creates an application', () => {
   async function expectBuiltInTemplateFirst(page: Page) {
     await openNewApplication(page)
     const dialog = await waitForDialog(page)
+    await expect(dialog.getByRole('radio')).toHaveCount(3)
+    await expect(dialog.getByRole('radio').nth(0)).toHaveAccessibleName(/^Blank/)
     await expect(dialog.getByRole('radio').nth(1)).toHaveAccessibleName(/^Approvals.*Built in/)
     await expect(dialog.getByRole('radio').nth(2)).toHaveAccessibleName(/^Tracker test.*Built in/)
-    await expect(dialog.getByRole('radio').nth(3)).toHaveAccessibleName(/^Request approval/)
-    await expect(dialog.getByRole('radio').nth(3)).not.toHaveAccessibleName(/Built in/)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   }
 
