@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts, the requests for hosts of their own,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the tombstones of purged tenants, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -47,6 +47,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
     public DbSet<JobRow> Jobs => Set<JobRow>();
+
+    public DbSet<DeletedTenantRow> DeletedTenants => Set<DeletedTenantRow>();
 
     public DbSet<PlatformAuditRecordRow> AuditRecords => Set<PlatformAuditRecordRow>();
 
@@ -377,6 +379,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             key.Property(k => k.FriendlyName).HasColumnName("friendly_name");
             key.HasIndex(k => k.FriendlyName).IsUnique().HasDatabaseName("ix_data_protection_keys_friendly_name");
             key.Property(k => k.Xml).HasColumnName("xml").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<DeletedTenantRow>(deleted =>
+        {
+            deleted.ToTable("deleted_tenants");
+            deleted.HasKey(d => d.Id).HasName("pk_deleted_tenants");
+            deleted.Property(d => d.Id).HasColumnName("id").ValueGeneratedNever();
+            deleted.Property(d => d.DeletedAt).HasColumnName("deleted_at").HasColumnType("timestamp with time zone");
+            deleted.Property(d => d.Actor).HasColumnName("actor");
+            deleted.Property(d => d.Hosts).HasColumnName("hosts").HasColumnType("text[]");
         });
 
         modelBuilder.Entity<PlatformAuditRecordRow>(record =>

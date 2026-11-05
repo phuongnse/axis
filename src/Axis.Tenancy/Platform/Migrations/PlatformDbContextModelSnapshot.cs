@@ -49,6 +49,32 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("data_protection_keys", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.DeletedTenantRow", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.PrimitiveCollection<string[]>("Hosts")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("hosts");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deleted_tenants");
+
+                    b.ToTable("deleted_tenants", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.JobRow", b =>
                 {
                     b.Property<Guid>("Id")
