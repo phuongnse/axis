@@ -6,131 +6,131 @@ which doc, how to write it and how the docs stay correct is in [writing the docs
 
 ## Product and design
 
-| Doc                               | What it holds                                                    | Read it when                                                |
-| --------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
-| [Product brief](product-brief.md) | What Axis is, who uses it, the proving samples                   | You do product or architecture work                         |
-| [Roadmap](roadmap.md)             | Milestones in their phases, what each delivers and its status    | You need the current milestone or a milestone's scope       |
-| [Decisions](decisions.md)         | The index of decisions, each in its own file under `decisions/`  | A change touches a design choice; read only those decisions |
-| [Concepts](domain/concepts.md)    | The vocabulary and what each resource does                       | You name anything in code, APIs, UI or issues               |
-| [Knowledge](domain/knowledge.md)  | What business applications need and the pitfalls to avoid        | You change configuration, execution, storage or security    |
-| [Architecture](architecture.md)   | Modules, hosts, tenancy, security, execution, telemetry, testing | You add a module or host, or change how they fit together   |
-| [Repository layout](repository-layout.md) | The folders of the repository and the rules that modules follow | You add a project, a folder or a module |
+| Doc                                       | What it holds                                                    | Read it when                                                |
+| ----------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+| [Product brief](product-brief.md)         | What Axis is, who uses it, the proving samples                   | You do product or architecture work                         |
+| [Roadmap](roadmap.md)                     | Milestones in their phases, what each delivers and its status    | You need the current milestone or a milestone's scope       |
+| [Decisions](decisions.md)                 | The index of decisions, each in its own file under `decisions/`  | A change touches a design choice; read only those decisions |
+| [Concepts](domain/concepts.md)            | The vocabulary and what each resource does                       | You name anything in code, APIs, UI or issues               |
+| [Knowledge](domain/knowledge.md)          | What business applications need and the pitfalls to avoid        | You change configuration, execution, storage or security    |
+| [Architecture](architecture.md)           | Modules, hosts, tenancy, security, execution, telemetry, testing | You add a module or host, or change how they fit together   |
+| [Repository layout](repository-layout.md) | The folders of the repository and the rules that modules follow  | You add a project, a folder or a module                     |
 
 ## Reference
 
 Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are not built yet.
 
-| Doc                                                                    | What it holds                                                                         |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| [Configuration pipeline](reference/configuration.md)                   | Load, resolve, check, release and activate an application folder; the reference index |
-| [Diagnostic codes](reference/diagnostic-codes.md)                      | The shape of a diagnostic and the table of every `AXCnnnn` code                       |
-| [Resource files](reference/resource-files.md)                          | The resource file shape, schema keywords, entity fields, entity logic, sequences      |
-| [Form conditions](reference/form-conditions.md)                        | The conditions and wizard steps of a `form` resource                                  |
-| [Roles and policies](reference/roles-and-policies.md)                  | The `role` and `policy` resources, the record creator, sensitive fields               |
-| [Connectors, events and endpoints](reference/integration-resources.md) | Connectors and deployment bindings, the `event`, `trigger` and `endpoint` resources |
-| [Outbound webhooks](reference/outbound-webhooks.md)                    | The `webhook` resource, its compile checks, and the signed delivery of an event       |
-| [Modules and templates](reference/modules-and-templates.md)            | Reusable modules and application templates                                            |
-| [Module contracts](reference/module-contracts.md)                      | The `contract` resource: lifecycles, core validations, effects, grant ceilings, relax entries and contract scenarios |
-| [Customization layers](reference/customization-layers.md)              | The `layer` resource: changes to a module by keys, list keys, extending a lifecycle, and Studio writing the layer |
-| [Built-in modules](reference/built-in-modules.md)                      | The `organization` and `approvals` modules, the `approvals` application, request types, delegation and the approval contract |
-| [MCP server](reference/mcp-server.md)                                  | The MCP server for agents: route, sign-in, client registration, tools, limits and audit |
-| [Authoring requests](reference/authoring-requests.md)                  | The agent host and the request loop: states, plans, checks, review, budgets and accepting |
-| [Revisions and drafts](reference/revisions-and-drafts.md)              | The git repository of each application folder: revisions, drafts, accepts and undo |
-| [Model bindings](reference/model-bindings.md)                          | The `Ai` settings, model bindings, a tenant's own key and the authoring eval |
-| [AI authoring in Studio](reference/ai-authoring-in-studio.md)          | The request panel, plan approval, the diff, accept and drop, auto-accept and the history |
-| [Extension packages](reference/extension-packages.md)                  | Custom C# code: manifest, contracts, installation, loading, capabilities              |
-| [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
-| [Expressions](reference/expressions.md)                                | The expression language, its functions and its SQL translation                        |
-| [Data sources](reference/data-sources.md)                              | The `dataSource` resource and its endpoint                                            |
-| [Record API](reference/record-api.md)                                  | Record routes, values, paging, errors, child rows                                     |
-| [Record audit](reference/record-audit.md)                              | The audit records every record write leaves, and the history endpoint                 |
-| [File fields](reference/file-fields.md)                                | The `file` field type: values, upload, download, storage and clean-up                |
-| [Import and export](reference/import-export.md)                        | Exporting records to CSV and spreadsheets, and importing them under policies          |
-| [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency          |
-| [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, releases and running work |
-| [Process tables](reference/process-tables.md)                          | The tables that `Axis.Processes` owns                                                 |
-| [Process states](reference/process-states.md)                          | The states of a process instance and of a task                                        |
-| [Task API](reference/task-api.md)                                      | Listing, reading and completing tasks                                                 |
-| [Process execution](reference/process-execution.md)                    | How the worker runs steps, connector calls, package operations, worker settings       |
-| [Process events and triggers](reference/process-events.md)             | Events, triggers, delivery, schedules, scheduled jobs, delete triggers, dead letters  |
-| [Process flow](reference/process-flow.md)                              | Timer, wait for event and sub-process steps, loops, create record, no-subject processes |
-| [Task deadlines and claims](reference/task-deadlines.md)               | Task escalations and deadlines, overdue tasks, claim, release and reassign            |
-| [Notifications](reference/notifications.md)                            | The `notify` operation, in-app and email notifications, user profiles, mail settings  |
-| [Process inspection](reference/process-inspection.md)                  | Inspecting instances and the operator commands retry, cancel and resolve              |
-| [Operator console](reference/operator-console.md)                      | The web page where the platform operator sees and fixes failed work in a tenant       |
-| [Process inspector widget](reference/process-inspector-widget.md)      | The SPA widget that lists and shows the instances of one process                      |
-| [Task inbox widget](reference/task-inbox-widget.md)                    | The SPA widget that lists the user's open tasks, and the task page                    |
-| [Form resource and form widget](reference/form-widget.md)              | The form resource and the SPA widget that creates and edits one record                |
-| [Form widget conditions and steps](reference/form-widget-conditions.md) | How the SPA form widget follows the form state endpoint, and its wizard steps          |
-| [Container widgets](reference/container-widgets.md)                    | How the SPA draws the columns, tabs and section widgets, and keeps the selected tab   |
-| [Detail, chart and KPI widgets](reference/detail-chart-kpi-widgets.md) | The SPA widgets that show one record, a chart and a KPI tile                          |
-| [Custom widgets](reference/custom-widgets.md)                          | Widgets from extension packages: manifest, page shape, loading, the SDK, the palette  |
-| [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
-| [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                              |
-| [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
-| [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, authorization, development users |
-| [FAPI 2.0 profile](reference/fapi2-profile.md)                         | The FAPI 2.0 Security Profile per tenant: PAR, `private_key_jwt`, DPoP and the client key |
-| [Axis's identity provider](reference/identity-provider.md)           | The identity provider Axis ships: realms, the `identityProvider` resource, sign-in per site, platform sign-in, the Axis theme, installation |
-| [User administration](reference/user-administration.md)              | The administrator role, the users page, accounts and their MFA, disabled users, and the roles an administrator gives |
-| [Security headers and rate limits](reference/headers-and-rate-limits.md) | The headers the server sets on every response, and the rate limits per partition      |
-| [Keys and data protection](reference/keys-and-data-protection.md) | The key policy, the cryptographic inventory and crypto agility, and the data protection levels |
-| [Data encryption](reference/data-encryption.md) | Encrypted `sensitive` field values, exact lookup, tenant data keys and their rotation, encrypted backups |
-| [ASVS](reference/asvs.md)                                              | The ASVS 5.0 Level 2 tracking: each requirement, its status and its evidence          |
-| [Fuzz tests](reference/fuzz-tests.md)                                  | The parsers that get fuzz tests, how they are fuzzed and how to replay a failure      |
-| [Threat model](reference/threat-model.md)                              | What can go wrong in Axis's own design, and each threat's status                      |
-| [Threat model: the product](reference/threat-model-product.md) | The server, worker, SPA, Studio, packages, connectors, identity provider and personal data threats |
-| [Threat model: the installation](reference/threat-model-installation.md) | The images, hosts, databases, backups, secrets and the cell console threats of an install |
-| [Threat model: the way Axis is built](reference/threat-model-build.md) | The NexKit, CI and AI agent threats of how Axis is built |
-| [Threat model: the control plane](reference/threat-model-control-plane.md) | The sign-up, cell call, DNS, payment webhook, e-invoice and billing portal threats of Axis SaaS |
-| [Threat model method](reference/threat-model-method.md)                | How the threat model is filled: the methods, the rows, the ratings and the statuses    |
-| [Log inventory](reference/log-inventory.md)                            | Every log Axis writes: events, format, destination, readers, retention and the security events |
-| [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
-| [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
-| [Shared widgets](reference/shared-widgets.md)                          | Which shared widget does which job, and what the build checks                         |
-| [UI writing](reference/ui-writing.md)                                  | How the words of Axis's screens are written in every locale, and the glossary of terms |
-| [Actions and controls](reference/actions-and-controls.md)              | Button levels and places, menus, and how every form draws field errors and choices    |
-| [Shell and home page](reference/shell.md)                             | The shell around every page, navigation icons, the page header, the platform home page and the sign-in cards      |
-| [Platform pages](reference/platform-pages.md)                        | The sessions screen and account page at `/account` and the users page at `/users`     |
-| [Legal links and terms](reference/legal.md)                            | Privacy and terms links per tenant and site, the legal line, `/licences` and accepting the terms |
-| [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
-| [Studio workspace](reference/studio-workspace.md)                      | Studio's list of applications, an open application's sidebar, band and Overview       |
-| [Studio resource form](reference/studio-resource-form.md)              | The form that edits a resource, its save bar, its references and its JSON view        |
-| [Entity designer](reference/entity-designer.md)                        | The Form tab of the entity editor: fields, settings, indexes, validations, migrations     |
-| [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |
-| [Process designer](reference/process-designer.md)                      | The Design tab of the process editor: palette, transitions, removes, keyboard         |
-| [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
-| [Revisions in the authoring API](reference/authoring-revisions.md)     | The routes that list a folder's revisions, show one and undo it                       |
-| [Draft page metadata](reference/draft-page-metadata.md)               | The routes that answer the page metadata of a draft page or form, of a module page and of a draft module form |
-| [Module resource saves](reference/module-resource-saves.md)           | The routes that save an edited module resource as a customization layer with only the difference, and reset one element of it |
-| [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |
-| [Administration](reference/administration.md)                          | The `Axis.Admin` commands: create a tenant, migrate, activate, publisher |
-| [Tenant backup and restore](reference/tenant-backup-and-restore.md)    | `tenant backup` and `tenant restore`: the encrypted archive, the backup key, the manifest, the checks and the steps, and daily backups in a cell |
-| [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings, mail settings and hosts, rotate keys and passwords, end sessions, and the platform audit records |
-| [Tenant status commands](reference/tenant-status-commands.md)           | The `Axis.Admin` commands that suspend and resume a tenant and list the tenants       |
-| [Cells](reference/cells.md)                                            | Axis SaaS cells and regions, tenant hosts and certificates, PgBouncer connections, cell size |
-| [Tenant quotas and usage](reference/tenant-quotas.md)                  | The quotas of a tenant in a cell, their refusals, work at once and the measured usage  |
-| [Worker scheduling](reference/worker-scheduling.md)                    | How the worker shares its time between tenants, and wakes an idle tenant               |
-| [Tenant lifecycle in a cell](reference/tenant-lifecycle.md)            | The cell's provisioning API: create a tenant, hosts, the export ZIP, deletion          |
-| [Cell console](reference/cell-console.md)                              | The page where the platform operator sees and provisions every tenant of a cell, and its operator realm |
-| [Control plane](reference/control-plane.md) | The service apart from the cells that runs sign-up, trials, plans and billing, and how it reaches the cells |
-| [Region directory](reference/region-directory.md) | Which cell holds each tenant and host, picking a cell, DNS routing and reserved names |
-| [Sign-up](reference/sign-up.md) | The public sign-up page, the subdomain, bot checks, email verification, provisioning and terms acceptance |
-| [Subscriptions](reference/subscriptions.md) | A tenant's trial and paid states, the read-only tenant, the dunning timeline and the control plane's emails |
-| [Plans](reference/plans.md) | The plan catalogue, versions, quotas from a plan, user packs and changing a plan |
-| [Payments](reference/payments.md) | Billing invoices, PayOS and VietQR, Paddle, webhooks, the daily reconciliation and the ledger |
-| [E-invoices](reference/e-invoices.md) | Vietnamese e-invoices issued on payment through a provider adapter |
-| [Billing portal](reference/billing-portal.md) | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices |
-| [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
-| [Outbound connections](reference/outbound-connections.md) | Every connection the server and the worker open, the setting that names its address and the allowlist |
-| [Several server replicas](reference/several-server-replicas.md)        | Running the server as several replicas behind a TLS proxy: key ring, forwarded headers, Studio volume |
-| [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
+| Doc                                                                            | What it holds                                                                                                                                                      |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Configuration pipeline](reference/configuration.md)                           | Load, resolve, check, release and activate an application folder; the reference index                                                                              |
+| [Diagnostic codes](reference/diagnostic-codes.md)                              | The shape of a diagnostic and the table of every `AXCnnnn` code                                                                                                    |
+| [Resource files](reference/resource-files.md)                                  | The resource file shape, schema keywords, entity fields, entity logic, sequences                                                                                   |
+| [Form conditions](reference/form-conditions.md)                                | The conditions and wizard steps of a `form` resource                                                                                                               |
+| [Roles and policies](reference/roles-and-policies.md)                          | The `role` and `policy` resources, the record creator, sensitive fields                                                                                            |
+| [Connectors, events and endpoints](reference/integration-resources.md)         | Connectors and deployment bindings, the `event`, `trigger` and `endpoint` resources                                                                                |
+| [Outbound webhooks](reference/outbound-webhooks.md)                            | The `webhook` resource, its compile checks, and the signed delivery of an event                                                                                    |
+| [Modules and templates](reference/modules-and-templates.md)                    | Reusable modules and application templates                                                                                                                         |
+| [Module contracts](reference/module-contracts.md)                              | The `contract` resource: lifecycles, core validations, effects, grant ceilings, relax entries and contract scenarios                                               |
+| [Customization layers](reference/customization-layers.md)                      | The `layer` resource: changes to a module by keys, list keys, extending a lifecycle, and Studio writing the layer                                                  |
+| [Built-in modules](reference/built-in-modules.md)                              | The `organization` and `approvals` modules, the `approvals` application, request types, delegation and the approval contract                                       |
+| [MCP server](reference/mcp-server.md)                                          | The MCP server for agents: route, sign-in, client registration, tools, limits and audit                                                                            |
+| [Authoring requests](reference/authoring-requests.md)                          | The agent host and the request loop: states, plans, checks, review, budgets and accepting                                                                          |
+| [Revisions and drafts](reference/revisions-and-drafts.md)                      | The git repository of each application folder: revisions, drafts, accepts and undo                                                                                 |
+| [Model bindings](reference/model-bindings.md)                                  | The `Ai` settings, model bindings, a tenant's own key and the authoring eval                                                                                       |
+| [AI authoring in Studio](reference/ai-authoring-in-studio.md)                  | The request panel, plan approval, the diff, accept and drop, auto-accept and the history                                                                           |
+| [Extension packages](reference/extension-packages.md)                          | Custom C# code: manifest, contracts, installation, loading, capabilities                                                                                           |
+| [Test scenarios](reference/test-scenarios.md)                                  | The `scenario` resource and how scenarios run                                                                                                                      |
+| [Expressions](reference/expressions.md)                                        | The expression language, its functions and its SQL translation                                                                                                     |
+| [Data sources](reference/data-sources.md)                                      | The `dataSource` resource and its endpoint                                                                                                                         |
+| [Record API](reference/record-api.md)                                          | Record routes, values, paging, errors, child rows                                                                                                                  |
+| [Record audit](reference/record-audit.md)                                      | The audit records every record write leaves, and the history endpoint                                                                                              |
+| [File fields](reference/file-fields.md)                                        | The `file` field type: values, upload, download, storage and clean-up                                                                                              |
+| [Import and export](reference/import-export.md)                                | Exporting records to CSV and spreadsheets, and importing them under policies                                                                                       |
+| [Inbound endpoint calls](reference/inbound-endpoints.md)                       | How another system calls an inbound endpoint: checks, responses, idempotency                                                                                       |
+| [Processes](reference/processes.md)                                            | The `process` resource, steps, compile checks, start endpoint, releases and running work                                                                           |
+| [Process tables](reference/process-tables.md)                                  | The tables that `Axis.Processes` owns                                                                                                                              |
+| [Process states](reference/process-states.md)                                  | The states of a process instance and of a task                                                                                                                     |
+| [Task API](reference/task-api.md)                                              | Listing, reading and completing tasks                                                                                                                              |
+| [Process execution](reference/process-execution.md)                            | How the worker runs steps, connector calls, package operations, worker settings                                                                                    |
+| [Process events and triggers](reference/process-events.md)                     | Events, triggers, delivery, schedules, scheduled jobs, delete triggers, dead letters                                                                               |
+| [Process flow](reference/process-flow.md)                                      | Timer, wait for event and sub-process steps, loops, create record, no-subject processes                                                                            |
+| [Task deadlines and claims](reference/task-deadlines.md)                       | Task escalations and deadlines, overdue tasks, claim, release and reassign                                                                                         |
+| [Notifications](reference/notifications.md)                                    | The `notify` operation, in-app and email notifications, user profiles, mail settings                                                                               |
+| [Process inspection](reference/process-inspection.md)                          | Inspecting instances and the operator commands retry, cancel and resolve                                                                                           |
+| [Operator console](reference/operator-console.md)                              | The web page where the platform operator sees and fixes failed work in a tenant                                                                                    |
+| [Process inspector widget](reference/process-inspector-widget.md)              | The SPA widget that lists and shows the instances of one process                                                                                                   |
+| [Task inbox widget](reference/task-inbox-widget.md)                            | The SPA widget that lists the user's open tasks, and the task page                                                                                                 |
+| [Form resource and form widget](reference/form-widget.md)                      | The form resource and the SPA widget that creates and edits one record                                                                                             |
+| [Form widget conditions and steps](reference/form-widget-conditions.md)        | How the SPA form widget follows the form state endpoint, and its wizard steps                                                                                      |
+| [Container widgets](reference/container-widgets.md)                            | How the SPA draws the columns, tabs and section widgets, and keeps the selected tab                                                                                |
+| [Detail, chart and KPI widgets](reference/detail-chart-kpi-widgets.md)         | The SPA widgets that show one record, a chart and a KPI tile                                                                                                       |
+| [Custom widgets](reference/custom-widgets.md)                                  | Widgets from extension packages: manifest, page shape, loading, the SDK, the palette                                                                               |
+| [Storage](reference/storage.md)                                                | Physical names, column types, database roles, schema planning, audit, release history                                                                              |
+| [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                                                                                                                   |
+| [Migrations](reference/migrations.md)                                          | `migration` resources and recomputing stored computed fields                                                                                                       |
+| [Security](reference/security.md)                                              | Sign-in and the session, machine callers, service accounts, authorization, development users                                                                       |
+| [FAPI 2.0 profile](reference/fapi2-profile.md)                                 | The FAPI 2.0 Security Profile per tenant: PAR, `private_key_jwt`, DPoP and the client key                                                                          |
+| [Axis's identity provider](reference/identity-provider.md)                     | The identity provider Axis ships: realms, the `identityProvider` resource, sign-in per site, platform sign-in, the Axis theme, installation                        |
+| [User administration](reference/user-administration.md)                        | The administrator role, the users page, accounts and their MFA, disabled users, and the roles an administrator gives                                               |
+| [Security headers and rate limits](reference/headers-and-rate-limits.md)       | The headers the server sets on every response, and the rate limits per partition                                                                                   |
+| [Keys and data protection](reference/keys-and-data-protection.md)              | The key policy, the cryptographic inventory and crypto agility, and the data protection levels                                                                     |
+| [Data encryption](reference/data-encryption.md)                                | Encrypted `sensitive` field values, exact lookup, tenant data keys and their rotation, encrypted backups                                                           |
+| [ASVS](reference/asvs.md)                                                      | The ASVS 5.0 Level 2 tracking: each requirement, its status and its evidence                                                                                       |
+| [Fuzz tests](reference/fuzz-tests.md)                                          | The parsers that get fuzz tests, how they are fuzzed and how to replay a failure                                                                                   |
+| [Threat model](reference/threat-model.md)                                      | What can go wrong in Axis's own design, and each threat's status                                                                                                   |
+| [Threat model: the product](reference/threat-model-product.md)                 | The server, worker, SPA, Studio, packages, connectors, identity provider and personal data threats                                                                 |
+| [Threat model: the installation](reference/threat-model-installation.md)       | The images, hosts, databases, backups, secrets and the cell console threats of an install                                                                          |
+| [Threat model: the way Axis is built](reference/threat-model-build.md)         | The NexKit, CI and AI agent threats of how Axis is built                                                                                                           |
+| [Threat model: the control plane](reference/threat-model-control-plane.md)     | The sign-up, cell call, DNS, payment webhook, e-invoice and billing portal threats of Axis SaaS                                                                    |
+| [Threat model method](reference/threat-model-method.md)                        | How the threat model is filled: the methods, the rows, the ratings and the statuses                                                                                |
+| [Log inventory](reference/log-inventory.md)                                    | Every log Axis writes: events, format, destination, readers, retention and the security events                                                                     |
+| [Performance](reference/performance.md)                                        | The service level objectives, the reference environment and the load test                                                                                          |
+| [Frontend](reference/frontend.md)                                              | The SPA, sites, pages and widgets                                                                                                                                  |
+| [Shared widgets](reference/shared-widgets.md)                                  | Which shared widget does which job, and what the build checks                                                                                                      |
+| [UI writing](reference/ui-writing.md)                                          | How the words of Axis's screens are written in every locale, and the glossary of terms                                                                             |
+| [Actions and controls](reference/actions-and-controls.md)                      | Button levels and places, menus, and how every form draws field errors and choices                                                                                 |
+| [Shell and home page](reference/shell.md)                                      | The shell around every page, navigation icons, the page header, the platform home page and the sign-in cards                                                       |
+| [Platform pages](reference/platform-pages.md)                                  | The sessions screen and account page at `/account` and the users page at `/users`                                                                                  |
+| [Legal links and terms](reference/legal.md)                                    | Privacy and terms links per tenant and site, the legal line, `/licences` and accepting the terms                                                                   |
+| [Studio](reference/studio.md)                                                  | The Studio page: editors, designers, publishing, tests                                                                                                             |
+| [Studio workspace](reference/studio-workspace.md)                              | Studio's list of applications, an open application's sidebar, band and Overview                                                                                    |
+| [Studio resource form](reference/studio-resource-form.md)                      | The form that edits a resource, its save bar, its references and its JSON view                                                                                     |
+| [Entity designer](reference/entity-designer.md)                                | The Form tab of the entity editor: fields, settings, indexes, validations, migrations                                                                              |
+| [Form designer](reference/form-designer.md)                                    | The Design tab of the form editor: canvas, field palette, layout outline, moves                                                                                    |
+| [Process designer](reference/process-designer.md)                              | The Design tab of the process editor: palette, transitions, removes, keyboard                                                                                      |
+| [Authoring API](reference/authoring.md)                                        | The API that Studio uses to read, write and publish application folders                                                                                            |
+| [Revisions and drafts in the authoring API](reference/authoring-revisions.md)  | The routes that list a folder's revisions, show one, undo it and show a draft's diff                                                                               |
+| [Draft page metadata](reference/draft-page-metadata.md)                        | The routes that answer the page metadata of a draft page or form, of a module page and of a draft module form                                                      |
+| [Module resource saves](reference/module-resource-saves.md)                    | The routes that save an edited module resource as a customization layer with only the difference, and reset one element of it                                      |
+| [Host settings](reference/host-settings.md)                                    | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings                                                        |
+| [Administration](reference/administration.md)                                  | The `Axis.Admin` commands: create a tenant, migrate, activate, publisher                                                                                           |
+| [Tenant backup and restore](reference/tenant-backup-and-restore.md)            | `tenant backup` and `tenant restore`: the encrypted archive, the backup key, the manifest, the checks and the steps, and daily backups in a cell                   |
+| [Tenant setting commands](reference/tenant-setting-commands.md)                | The `Axis.Admin` commands that change bindings, sign-in settings, mail settings and hosts, rotate keys and passwords, end sessions, and the platform audit records |
+| [Tenant status commands](reference/tenant-status-commands.md)                  | The `Axis.Admin` commands that suspend and resume a tenant and list the tenants                                                                                    |
+| [Cells](reference/cells.md)                                                    | Axis SaaS cells and regions, tenant hosts and certificates, PgBouncer connections, cell size                                                                       |
+| [Tenant quotas and usage](reference/tenant-quotas.md)                          | The quotas of a tenant in a cell, their refusals, work at once and the measured usage                                                                              |
+| [Worker scheduling](reference/worker-scheduling.md)                            | How the worker shares its time between tenants, and wakes an idle tenant                                                                                           |
+| [Tenant lifecycle in a cell](reference/tenant-lifecycle.md)                    | The cell's provisioning API: create a tenant, hosts, the export ZIP, deletion                                                                                      |
+| [Cell console](reference/cell-console.md)                                      | The page where the platform operator sees and provisions every tenant of a cell, and its operator realm                                                            |
+| [Control plane](reference/control-plane.md)                                    | The service apart from the cells that runs sign-up, trials, plans and billing, and how it reaches the cells                                                        |
+| [Region directory](reference/region-directory.md)                              | Which cell holds each tenant and host, picking a cell, DNS routing and reserved names                                                                              |
+| [Sign-up](reference/sign-up.md)                                                | The public sign-up page, the subdomain, bot checks, email verification, provisioning and terms acceptance                                                          |
+| [Subscriptions](reference/subscriptions.md)                                    | A tenant's trial and paid states, the read-only tenant, the dunning timeline and the control plane's emails                                                        |
+| [Plans](reference/plans.md)                                                    | The plan catalogue, versions, quotas from a plan, user packs and changing a plan                                                                                   |
+| [Payments](reference/payments.md)                                              | Billing invoices, PayOS and VietQR, Paddle, webhooks, the daily reconciliation and the ledger                                                                      |
+| [E-invoices](reference/e-invoices.md)                                          | Vietnamese e-invoices issued on payment through a provider adapter                                                                                                 |
+| [Billing portal](reference/billing-portal.md)                                  | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices                                                                         |
+| [Installation](reference/installation.md)                                      | Production images and installs on premises and in the cloud                                                                                                        |
+| [Outbound connections](reference/outbound-connections.md)                      | Every connection the server and the worker open, the setting that names its address and the allowlist                                                              |
+| [Several server replicas](reference/several-server-replicas.md)                | Running the server as several replicas behind a TLS proxy: key ring, forwarded headers, Studio volume                                                              |
+| [Health checks](reference/health-checks.md)                                    | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds                                                                |
 | [Telemetry](reference/telemetry.md)                                            | Correlated logs, metrics and traces, the OTLP export, the Axis spans and what telemetry never holds                                                                |
 
 ## Working on Axis
 
-| Doc                           | What it holds                                                                |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| [AGENTS.md](../AGENTS.md)     | The working rules and the commands, for people and agents                    |
-| [Development](development.md) | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users |
-| [Delivery](delivery.md)       | How work flows through NexKit                                                |
-| [Writing the docs](writing-docs.md) | What goes in which doc, how to write it, and how the docs stay correct |
+| Doc                                 | What it holds                                                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [AGENTS.md](../AGENTS.md)           | The working rules and the commands, for people and agents                                                  |
+| [Development](development.md)       | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users |
+| [Delivery](delivery.md)             | How work flows through NexKit                                                                              |
+| [Writing the docs](writing-docs.md) | What goes in which doc, how to write it, and how the docs stay correct                                     |

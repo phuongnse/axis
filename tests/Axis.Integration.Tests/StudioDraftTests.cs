@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
@@ -191,6 +192,128 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
         Assert.Equal(theirs.Id, (await owner.Drafts.FindAsync(theirs.Id, CancellationToken)).Value!.Id);
         Assert.Equal(rule.Version, (await owner.Drafts.ReadAsync(theirs.Id, rule.Id, CancellationToken)).Value!.Version);
     }
+
+    [Fact]
+    public async Task The_diff_of_a_draft_lists_each_added_changed_and_removed_file_with_its_json_before_and_after()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var layerFile = "customizations/approvals/RequestApproval.json";
+        Directory.CreateDirectory(Path.Combine(folder.Path, "customizations", "approvals"));
+        var layerText = Layer("20000");
+        await File.WriteAllTextAsync(Path.Combine(folder.Path, layerFile), layerText, CancellationToken);
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+
+        var fresh = (await author.Drafts.DiffAsync(draft.Id, null, CancellationToken)).Value!;
+        Assert.Empty(fresh.Resources);
+        Assert.Null(fresh.Cursor);
+        Assert.Equal(draft.Start, fresh.Start);
+        Assert.Equal(draft.Start, fresh.Tip);
+
+        var main = StudioFolder.List(folder.Path);
+        var rule = main.Single(file => file.Id == Guid.Parse(RuleId));
+        var removed = main.First(file => file.Kind == "entity");
+        var layer = main.Single(file => file.File == layerFile);
+        var changedRule = (JsonObject)JsonNode.Parse(rule.Bytes)!;
+        changedRule["expression"] = "20000";
+        var changedLayer = (JsonObject)JsonNode.Parse(layer.Bytes)!;
+        changedLayer["changes"]!["note"] = "changed";
+        var policy = Guid.NewGuid();
+        Assert.Null((await author.Drafts.WriteAsync(draft.Id, changedRule, CancellationToken)).Refusal);
+        Assert.Null((await author.Drafts.WriteAsync(draft.Id, changedLayer, CancellationToken)).Refusal);
+        Assert.Null((await author.Drafts.WriteAsync(draft.Id, Policy(policy), CancellationToken)).Refusal);
+        Assert.True((await author.Drafts.DeleteAsync(draft.Id, removed.Id, CancellationToken)).Value);
+
+        var diff = (await author.Drafts.DiffAsync(draft.Id, null, CancellationToken)).Value!;
+        var inDraft = (await author.Drafts.ListAsync(draft.Id, CancellationToken)).Value!;
+        Assert.Null(diff.Cursor);
+        Assert.Equal(draft.Start, diff.Start);
+        Assert.NotEqual(draft.Start, diff.Tip);
+        Assert.Equal([layerFile, removed.File, "policies/fresh.json", rule.File], diff.Resources.Select(entry => entry.File));
+        Assert.Equal(["changed", "removed", "added", "changed"], diff.Resources.Select(entry => entry.Change));
+
+        var layerEntry = diff.Resources[0];
+        Assert.Equal("approvals/RequestApproval", layerEntry.Target);
+        Assert.Equal(layer.Id.ToString("D"), layerEntry.Id);
+        Assert.Equal("layer", layerEntry.Kind);
+        Assert.Equal(Encoding.UTF8.GetString(layer.Bytes), layerEntry.Before);
+        Assert.Equal(Encoding.UTF8.GetString(inDraft.Single(file => file.Id == layer.Id).Bytes), layerEntry.After);
+        Assert.NotEqual(layerEntry.Before, layerEntry.After);
+
+        var removedEntry = diff.Resources[1];
+        Assert.Equal(Encoding.UTF8.GetString(removed.Bytes), removedEntry.Before);
+        Assert.Null(removedEntry.After);
+        Assert.Equal((removed.Id.ToString("D"), removed.Kind, removed.Name), (removedEntry.Id, removedEntry.Kind, removedEntry.Name));
+        Assert.Null(removedEntry.Target);
+
+        var addedEntry = diff.Resources[2];
+        Assert.Null(addedEntry.Before);
+        Assert.Equal(Encoding.UTF8.GetString(inDraft.Single(file => file.Id == policy).Bytes), addedEntry.After);
+        Assert.Equal((policy.ToString("D"), "policy", "Fresh"), (addedEntry.Id, addedEntry.Kind, addedEntry.Name));
+
+        var ruleEntry = diff.Resources[3];
+        Assert.Equal(Encoding.UTF8.GetString(rule.Bytes), ruleEntry.Before);
+        Assert.Equal(Encoding.UTF8.GetString(inDraft.Single(file => file.Id == rule.Id).Bytes), ruleEntry.After);
+        Assert.Contains("20000", ruleEntry.After, StringComparison.Ordinal);
+        Assert.Null(ruleEntry.Target);
+    }
+
+    [Fact]
+    public async Task A_diff_over_one_mebibyte_comes_in_pages_that_a_later_write_does_not_shift()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+        var expected = new List<string>();
+        for (var number = 1; number <= 6; number++)
+        {
+            var big = Policy(Guid.NewGuid());
+            big["name"] = "Big" + number;
+            big["description"] = new string('x', 300_000);
+            Assert.Null((await author.Drafts.WriteAsync(draft.Id, big, CancellationToken)).Refusal);
+            expected.Add($"policies/big{number}.json");
+        }
+
+        var pages = new List<StudioDraftDiff> { (await author.Drafts.DiffAsync(draft.Id, null, CancellationToken)).Value! };
+        var late = Policy(Guid.NewGuid());
+        late["name"] = "Late";
+        Assert.Null((await author.Drafts.WriteAsync(draft.Id, late, CancellationToken)).Refusal);
+        while (pages[^1].Cursor is { } cursor)
+        {
+            pages.Add((await author.Drafts.DiffAsync(draft.Id, cursor, CancellationToken)).Value!);
+            Assert.True(pages.Count < 10);
+        }
+
+        Assert.True(pages.Count > 1);
+        Assert.All(pages, page => Assert.True(JsonSerializer.SerializeToUtf8Bytes(page, JsonSerializerOptions.Web).Length <= StudioDrafts.DiffPageBytes));
+        Assert.All(pages, page => Assert.Equal(pages[0].Tip, page.Tip));
+        Assert.Equal(expected, pages.SelectMany(page => page.Resources).Select(entry => entry.File));
+
+        var current = (await author.Drafts.DiffAsync(draft.Id, null, CancellationToken)).Value!;
+        Assert.NotEqual(pages[0].Tip, current.Tip);
+
+        var mainTip = pages[0].Start;
+        Assert.Equal(StudioWriteRefusal.DoesNotApply, (await author.Drafts.DiffAsync(draft.Id, "garbage", CancellationToken)).Refusal);
+        Assert.Equal(StudioWriteRefusal.DoesNotApply, (await author.Drafts.DiffAsync(draft.Id, Cursor(mainTip, 1), CancellationToken)).Refusal);
+        Assert.Equal(StudioWriteRefusal.DoesNotApply, (await author.Drafts.DiffAsync(draft.Id, Cursor(pages[0].Tip, 99), CancellationToken)).Refusal);
+        Assert.Equal(StudioWriteRefusal.DoesNotApply, (await author.Drafts.DiffAsync(draft.Id, Cursor(pages[0].Tip, 0), CancellationToken)).Refusal);
+        Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.DiffAsync(Guid.NewGuid().ToString("D"), null, CancellationToken)).Refusal);
+    }
+
+    private static string Cursor(string sha, int index) =>
+        Convert.ToBase64String(Encoding.UTF8.GetBytes($"{sha}:{index}")).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static string Layer(string threshold) => $$"""
+        {
+          "id": "{{Guid.NewGuid():D}}",
+          "kind": "layer",
+          "formatVersion": 1,
+          "target": "approvals/RequestApproval",
+          "changes": { "threshold": "{{threshold}}" }
+        }
+        """;
 
     private async Task<Author> NewAuthorAsync(string folder, string revisionsPath, string userId)
     {

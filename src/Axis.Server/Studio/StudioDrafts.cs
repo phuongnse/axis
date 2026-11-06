@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using LibGit2Sharp;
 
@@ -19,6 +20,12 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     private const string Main = "refs/heads/main";
 
     private const string ManifestFile = "application.json";
+
+    /// <summary>The most bytes a page of a diff holds, as the server serializes it. A single resource larger than this fills a page alone.</summary>
+    internal const int DiffPageBytes = 1024 * 1024;
+
+    // Room in a page for the start, the tip, the cursor and the braces around the resources.
+    private const int PageEnvelopeBytes = 1024;
 
     /// <summary>The drafts of the user on <paramref name="folder"/>, or null when <paramref name="revisionsPath"/> is null.</summary>
     public static StudioDrafts? For(string? revisionsPath, string folder, string userId, string displayName, IStudioWriteLock writeLock) =>
@@ -59,6 +66,53 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     /// <summary>The resources of the draft as its branch holds them. Records no version.</summary>
     public Task<StudioDraftOutcome<IReadOnlyList<StudioFile>>> ListAsync(string id, CancellationToken ct) =>
         InDraftAsync(id, (_, _, tip) => StudioDraftOutcome<IReadOnlyList<StudioFile>>.Of(Resources(tip)), ct);
+
+    /// <summary>
+    /// The files the draft added, changed or removed since the <c>main</c> commit it started at, as a page of whole entries
+    /// that serializes to at most <see cref="DiffPageBytes"/>, or one larger entry alone. Without a <paramref name="cursor"/>
+    /// the page starts at the first entry and reads the branch tip. A cursor names the commit the first page was read at and
+    /// the next entry, so later writes to the draft do not shift later pages. A cursor this draft did not give is refused as
+    /// <see cref="StudioWriteRefusal.DoesNotApply"/>. Records no version.
+    /// </summary>
+    public Task<StudioDraftOutcome<StudioDraftDiff>> DiffAsync(string id, string? cursor, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            var at = tip;
+            var from = 0;
+            if (cursor is not null)
+            {
+                if (ReadCursor(cursor) is not var (sha, index) || OnBranch(draft, tip, sha) is not { } pinned)
+                {
+                    return StudioDraftOutcome<StudioDraftDiff>.Refused(StudioWriteRefusal.DoesNotApply);
+                }
+
+                at = pinned;
+                from = index;
+            }
+
+            var start = git.Lookup<Commit>(draft.Start);
+            var entries = StudioRevisions.Compare(git, start?.Tree, at.Tree);
+            if (cursor is not null && from >= entries.Count)
+            {
+                return StudioDraftOutcome<StudioDraftDiff>.Refused(StudioWriteRefusal.DoesNotApply);
+            }
+
+            var size = PageEnvelopeBytes;
+            var next = from;
+            while (next < entries.Count)
+            {
+                size += JsonSerializer.SerializeToUtf8Bytes(entries[next], JsonSerializerOptions.Web).Length + 1;
+                if (next > from && size > DiffPageBytes)
+                {
+                    break;
+                }
+
+                next++;
+            }
+
+            var after = next < entries.Count ? WriteCursor(at.Sha, next) : null;
+            return StudioDraftOutcome<StudioDraftDiff>.Of(new StudioDraftDiff(draft.Start, at.Sha, entries.GetRange(from, next - from), after));
+        }, ct);
 
     /// <summary>The resource as the draft holds it. The draft records the version the resource has on <c>main</c> on its first use.</summary>
     public Task<StudioDraftOutcome<StudioFile>> ReadAsync(string id, Guid resource, CancellationToken ct) =>
@@ -147,6 +201,49 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             git.Refs.Remove(RecordName(draft.Id));
             return StudioDraftOutcome<bool>.Of(true);
         }, ct);
+
+    // A cursor is the base64url of "<commit id>:<index of the next entry>". Null when it is not that, or the index is below 1.
+    private static (string Sha, int Index)? ReadCursor(string cursor)
+    {
+        try
+        {
+            var text = Encoding.UTF8.GetString(System.Buffers.Text.Base64Url.DecodeFromChars(cursor));
+            var parts = text.Split(':');
+            return parts.Length == 2
+                && parts[0].Length == 40
+                && parts[0].All(char.IsAsciiHexDigitLower)
+                && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var index)
+                && index >= 1
+                    ? (parts[0], index)
+                    : null;
+        }
+        catch (Exception exception) when (exception is FormatException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static string WriteCursor(string sha, int index) =>
+        System.Buffers.Text.Base64Url.EncodeToString(Encoding.UTF8.GetBytes(FormattableString.Invariant($"{sha}:{index}")));
+
+    // The commit with this id on the draft's own branch, from the tip back to the start, or null.
+    private static Commit? OnBranch(StudioDraft draft, Commit tip, string sha)
+    {
+        for (var commit = tip; commit is not null; commit = commit.Parents.FirstOrDefault())
+        {
+            if (commit.Sha == sha)
+            {
+                return commit;
+            }
+
+            if (commit.Sha == draft.Start)
+            {
+                break;
+            }
+        }
+
+        return null;
+    }
 
     private static string BranchName(string id) => $"refs/heads/drafts/{id}";
 
@@ -343,3 +440,9 @@ internal sealed record StudioDraftOutcome<T>(StudioWriteRefusal? Refusal, T? Val
 /// version each resource it used had on <c>main</c> at first use, null for a resource <c>main</c> lacked.
 /// </summary>
 internal sealed record StudioDraft(string Id, string UserId, string Start, DateTimeOffset Created, IReadOnlyDictionary<Guid, string?> Versions);
+
+/// <summary>
+/// One page of a draft's diff: the commit it started at, the commit the page was read at, the files in this page sorted by
+/// file, and the cursor of the next page, null on the last page.
+/// </summary>
+internal sealed record StudioDraftDiff(string Start, string Tip, IReadOnlyList<StudioRevisionChange> Resources, string? Cursor);
