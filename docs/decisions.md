@@ -149,3 +149,4 @@ the files agree, title and status included.
 | [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) | Docs stay true, and an audit reads them every hundred merges | **Agreed** |
 | [D136](decisions/d136-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges-started-by-nexkit-alone.md) | CI, CodeQL and the performance tests run on main every few merges, started by NexKit alone | **Agreed** |
 | [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md) | Authentication by default, and the owner guards the security checks alone | **Agreed** |
+| [D138](decisions/d138-the-docs-follow-arc42-c4-diagrams-in-mermaid-and-four-kinds-of-page.md) | The docs follow arc42, C4 diagrams in Mermaid and four kinds of page | **Agreed** |
