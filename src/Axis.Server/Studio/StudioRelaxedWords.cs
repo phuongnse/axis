@@ -29,7 +29,7 @@ internal static class StudioRelaxedWords
         ActiveReleaseStore store, IReadOnlyCollection<Guid> releaseIds, CancellationToken cancellationToken)
     {
         var manifests = await store.GetManifestsAsync(releaseIds, cancellationToken);
-        var relaxing = manifests.Where(manifest => Read(manifest.Value, []).Count > 0).Select(manifest => manifest.Key).ToList();
+        var relaxing = manifests.Where(manifest => Entries(manifest.Value).Count > 0).Select(manifest => manifest.Key).ToList();
         IReadOnlyDictionary<Guid, IReadOnlyList<ResourceContent>> copies =
             relaxing.Count == 0 ? new Dictionary<Guid, IReadOnlyList<ResourceContent>>() : await store.GetModuleCopiesAsync(relaxing, cancellationToken);
         return relaxing.ToDictionary(id => id, id => Read(manifests[id], copies.GetValueOrDefault(id) ?? []));
@@ -41,20 +41,45 @@ internal static class StudioRelaxedWords
     /// </summary>
     public static List<StudioRelaxedPoint> Read(string? manifest, IReadOnlyList<ResourceContent> moduleCopies)
     {
-        if (manifest is null || ApplicationLoader.Load([new ResourceContent("application.json", manifest)]).Application?.Modules is not { } declared)
-        {
-            return [];
-        }
+        var entries = Entries(manifest);
+        return entries.Count == 0 ? [] : ReadInstalled(manifest, ApplicationCompiler.ReadModuleCopies(moduleCopies, []));
+    }
 
-        var entries = declared.SelectMany(module => module.Relax.Select(entry => (Module: module.Id, entry.Point, Reason: entry.Reason ?? ""))).ToList();
-        var modules = entries.Count == 0 ? [] : ApplicationCompiler.ReadModuleCopies(moduleCopies, []);
-        return
+    /// <summary>
+    /// The relax entries of an <c>application.json</c>, in manifest order, with the words that <paramref name="modules"/> give
+    /// them. A module that is not among them leaves its entries without words.
+    /// </summary>
+    public static List<StudioRelaxedPoint> ReadInstalled(string? manifest, IReadOnlyList<InstalledModule> modules) =>
         [
-            .. entries.Select(entry => modules.Find(module => module.Manifest.Id == entry.Module) is { } installed
+            .. Entries(manifest).Select(entry => modules.FirstOrDefault(module => module.Manifest.Id == entry.Module) is { } installed
                 ? Describe(entry.Module, entry.Point, entry.Reason, installed)
                 : new StudioRelaxedPoint(entry.Module, entry.Point, entry.Reason, null, null, null, null)),
         ];
+
+    /// <summary>
+    /// The <c>id</c> written in the module's contract file for the entity that <paramref name="point"/> names, in the hyphenated
+    /// lower-case form, or null when the module is not among <paramref name="modules"/> or has no contract for that entity.
+    /// </summary>
+    public static string? ContractId(IReadOnlyList<InstalledModule> modules, string module, string point)
+    {
+        if (modules.FirstOrDefault(item => item.Manifest.Id == module) is not { } installed
+            || FindContract(installed, point.Split('/')[0]) is not { } contract)
+        {
+            return null;
+        }
+
+        using (contract)
+        {
+            return StudioReleaseChanges.StringProperty(contract.RootElement, "id") is { } id && Guid.TryParseExact(id, "D", out var guid)
+                ? guid.ToString("D")
+                : null;
+        }
     }
+
+    private static List<(string Module, string Point, string Reason)> Entries(string? manifest) =>
+        manifest is not null && ApplicationLoader.Load([new ResourceContent("application.json", manifest)]).Application?.Modules is { } declared
+            ? [.. declared.SelectMany(module => module.Relax.Select(entry => (Module: module.Id, entry.Point, Reason: entry.Reason ?? "")))]
+            : [];
 
     private static StudioRelaxedPoint Describe(string moduleId, string point, string reason, InstalledModule module)
     {

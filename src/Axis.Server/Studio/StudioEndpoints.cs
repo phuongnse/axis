@@ -123,6 +123,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioExpressionEndpoints();
         endpoints.MapStudioPageMetadataEndpoints();
         endpoints.MapStudioTemplateEndpoints();
+        endpoints.MapStudioCatalogEndpoints();
         endpoints.MapStudioApplicationEndpoints();
         endpoints.MapStudioSettingsEndpoints();
     }

@@ -1,7 +1,5 @@
 # Studio resource form
 
-_(planned for M31)_
-
 This page describes the form that edits one Studio resource: its sections and fields, its labels and
 lists, the controls that choose what Axis knows, its references, its Danger zone, its save bar and its
 JSON view. The form is the standard for every resource without a designer of its own: the
@@ -11,6 +9,8 @@ is in [Studio workspace](studio-workspace.md), and what each editor and designer
 [Studio](studio.md).
 
 ## Sections
+
+_(planned for M31)_
 
 The form puts a resource's root properties in sections, so that an author reads them in groups that
 each say what they hold. Each section is a panel on `surface`, as the Overview's blocks are, with a
@@ -26,6 +26,8 @@ section names goes to a last section with no heading.
 
 ## Fields
 
+_(planned for M31)_
+
 Every field is named in words. Its label and its optional help are the texts
 `shell.studio.field.<kind>.<path>` and `shell.studio.field.<kind>.<path>.help`, drawn as the form
 widget draws them: the label in medium `textMuted`, and the help in small `textMuted` between the label
@@ -36,6 +38,8 @@ its help. A group's fields sit in from the group's label, behind a rule in `bord
 as its fields and not as its peers.
 
 ## Labels
+
+_(planned for M31)_
 
 A label is one text box in the author's language, or in the application's first language when the
 label lacks that one. A box for each language would grow with every language, so the others are a step
@@ -50,6 +54,8 @@ away instead.
   a resource never names a key with no text. There is no Write texts button.
 
 ## Lists of objects
+
+_(planned for M31)_
 
 A list of objects is a table with one column per property, named by its field text. A value of a known
 kind shows its label, such as a module or a package by the label of its manifest.
@@ -73,6 +79,8 @@ kind shows its label, such as a module or a package by the label of its manifest
 
 ## Controls that know what they hold
 
+_(planned for M31)_
+
 A field whose values Axis knows is chosen, never typed, so an author cannot name what does not exist.
 
 | Field             | Control                                                                                                                                                                                                                                                                                                            |
@@ -90,12 +98,16 @@ activation will refuse it.
 
 ## Relaxed points in Settings
 
+_(planned for M31)_
+
 Settings lists a module's relaxed points read-only, in words, from
 [`GET .../relaxed`](#studio-api). Each links to its contract page and shows its reason and a line that
 says where to relax or undo it. A relax is a decision that needs the point's context, which the
 [contract page](module-contracts.md#in-studio) shows, and each thing is edited in one place.
 
 ## References
+
+_(planned for M31)_
 
 Uses and Used by are two panels after the form and before the Danger zone, so an author sees what the
 resource depends on and what depends on it. Each has [the change list's](studio-workspace.md#change-list)
@@ -119,11 +131,15 @@ No file, path or relation code shows, and modules and packages show by their lab
 
 ## Danger zone
 
+_(planned for M31)_
+
 Delete… is the last section of a resource's page, framed in `dangerText`, with a line that says what
 deleting does, so the one destructive action stands apart from every edit. Its dialog still asks. The
 application has no Danger zone.
 
 ## Save bar
+
+_(planned for M31)_
 
 The save bar holds what acts on the whole draft. While there is something to save, it stays at the foot
 of the window across the content, drawn over the footer: "Unsaved changes" on the left, Undo and Redo as
@@ -139,12 +155,16 @@ icons, then Discard and Save on the right. With nothing to save it is not drawn.
 
 ## Form and JSON
 
+_(planned for M31)_
+
 Form and JSON are two tabs of one draft, so a change in either shows in the other at once, and Undo,
 Redo, Discard and Save act on both. While the JSON has an error, the form is read-only: it shows the
 last valid version under a warning that says so, with Go to JSON, and its inputs and its lists' actions
 are off, so no edit in the form overwrites the JSON being typed.
 
 ## JSON view
+
+_(planned for M31)_
 
 The JSON view is a CodeMirror editor with JSON highlighting and line numbers. Two checks run as an
 author types, each marked in the gutter and underlined where it is: a syntax error, "This is not valid
@@ -181,6 +201,6 @@ release routes are in [release page](studio-workspace.md#release-page).
 - `GET /api/studio/bindings` answers the names of the request tenant's deployment bindings by kind,
   `{ url, secret, storage }`, sorted by name. It never answers a value, because a release names bindings
   and never holds them, and an author needs only their names.
-- `GET /api/studio/apps/{application}/relaxed` answers the relax entries of the application's folder,
-  each as in the [release history](authoring.md#release-history), with the id of its contract,
-  `contractId`.
+- `GET /api/studio/apps/{application}/relaxed` answers `{ items }`, the relax entries of the
+  application's folder, each as in the [release history](authoring.md#release-history), with the id of
+  its contract, `contractId`. Its words come from the installed module version that the folder pins.
