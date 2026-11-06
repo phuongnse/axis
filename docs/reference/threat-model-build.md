@@ -69,7 +69,7 @@ The check workflows run with read access and no secret, and the docs audit gives
 ```mermaid
 flowchart LR
     subgraph pushes [Pushes]
-        Push[Push to a hand-made branch, or NexKit's start on main]
+        Push[A hand-made pull request, or NexKit's start on main]
     end
     subgraph checks [Check workflows]
         Ci[CI, CodeQL, Performance and Docs audit with read access]

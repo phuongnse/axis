@@ -93,8 +93,8 @@ that holds it.
   and CI on `main` finds it. `conflicts.max_rounds` is raised above NexKit's default, so a pull
   request that conflicts with several merges in a row still merges by itself.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks, no approval from a
-  person and no branch that is up to date. They do not require the CI workflow, which runs on pushes
-  to hand-made branches but not on NexKit's branches, where NexKit's checks run the same scripts.
+  person and no branch that is up to date. They do not require the CI workflow, which runs on `main`
+  alone, because NexKit's checks run the same scripts on every pull request.
 - **The owner guards the security checks.** A hand-made `.github/CODEOWNERS` and a rule the owner sets
   make a pull request that touches a security check, its exceptions or the authentication default
   need the owner's review, as
@@ -119,11 +119,12 @@ that holds it.
 
 - **NexKit starts CI, CodeQL, the performance workflow and the docs audit on `main` every few
   merges,** with its `merge.after_workflows` setting, which holds how many merges each waits, as
-  [D136](decisions/d136-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges-started-by-nexkit-alone.md) and
+  [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) and
   [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agree.
   None of them runs on a push to `main` or has a schedule of its own for this, so a merge does not
-  start them too, and without the setting nothing would test `main`. CI also runs on a person's push
-  to another branch and on demand.
+  start them too, and without the setting nothing would test `main`. CI also runs on demand, and on a
+  pull request that changes its own workflow file. No push to another branch starts it, because
+  NexKit's checks run on every pull request.
 - **A failure on `main` is noticed when its run ends.** The `workflow_run` trigger of NexKit's
   workflow names each of these workflows, so the end of a run on `main` starts a NexKit sweep.
 - **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to

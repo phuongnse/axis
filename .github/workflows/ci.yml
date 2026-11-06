@@ -1,15 +1,15 @@
 name: CI
 
-# A push to a branch runs CI, so hand-made pull requests show its result. NexKit's branches are
-# left out, because NexKit runs the same scripts as its own checks. A design review's prototype
-# branches are left out too: a prototype changes the widgets without their tests and is never
-# merged, so CI could only fail on it. On main, NexKit starts CI once every 5 of its merges rather
-# than a push starting it after each one (D136). It also runs on demand. Once a week the schedule
-# runs the dependency and image scans alone, so a new advisory fails CI on main even when nothing
-# merged (D107).
+# CI runs on main alone (D139). NexKit checks every branch with the same scripts: its own pull
+# requests in each round, and a person's at /nexkit review, so a push to a branch starts no CI. A
+# pull request that changes this file runs it, so the change is tried before it merges. On main,
+# NexKit starts CI once every 5 of its merges rather than a push starting it after each one. It also
+# runs on demand. Once a week the schedule runs the dependency and image scans alone, so a new
+# advisory fails CI on main even when nothing merged (D107).
 on:
-  push:
-    branches-ignore: [main, 'nexkit/**', 'design/**']
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/ci.yml']
   workflow_dispatch:
   schedule:
     - cron: '17 5 * * 1'
@@ -17,7 +17,7 @@ on:
 permissions:
   contents: read
 
-# A newer push stops an older run on any branch but main. On main a run always finishes: a newer
+# A newer run stops an older one on any ref but main. On main a run always finishes: a newer
 # run only replaces one that is still waiting to start.
 concurrency:
   group: ci-${{ github.ref }}
