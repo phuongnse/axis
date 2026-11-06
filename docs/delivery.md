@@ -105,9 +105,11 @@ that holds it.
   check or loosens one, so NexKit mentions the owner only when a change does.
 - **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist] setting holds the
   rules of [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) that a review can
-  check in the diff, and the rule that a change adds no exception to a check and loosens none. An item
-  not met requests changes like a blocking finding, so a pull request that leaves a doc false or
-  loosens a check does not merge.
+  check in the diff, the rule that an Agreed [decision](writing-docs.md#decisions) changes only by a
+  new one, the rule that a change adds no exception to a check and loosens none, and the rule that no
+  test names something that was removed. Each item checks one thing. An item not met requests changes
+  like a blocking finding, so a pull request that leaves a doc false or loosens a check does not
+  merge.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
   App for every repository that uses NexKit and installs it on this one, and its id and private key
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
