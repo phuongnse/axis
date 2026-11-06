@@ -17,6 +17,8 @@ const texts = {
   'test.quantity': 'Quantity',
   'shell.form.addRow': 'Add row',
   'shell.form.removeRow': 'Remove row',
+  'shell.table.empty': 'No records yet.',
+  'shell.table.rowActions': 'Actions',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -53,7 +55,15 @@ const lines = field('lines', 'child-collection', 'test.lines', [
 ])
 
 // Holds the rows and their labels, as the form does, so an added row is rendered.
-function Harness({ initial = [], errors = {} }: { initial?: RecordRow[]; errors?: Record<string, string[]> }) {
+function Harness({
+  initial = [],
+  errors = {},
+  readOnly = false,
+}: {
+  initial?: RecordRow[]
+  errors?: Record<string, string[]>
+  readOnly?: boolean
+}) {
   const [rows, setRows] = useState<RecordRow[]>(initial)
   const [labels, setLabels] = useState<RowLabels[]>([])
   return (
@@ -63,6 +73,7 @@ function Harness({ initial = [], errors = {} }: { initial?: RecordRow[]; errors?
       labels={labels}
       errors={errors}
       locale="en"
+      readOnly={readOnly}
       onChange={(nextRows, nextLabels) => {
         setRows(nextRows)
         setLabels(nextLabels)
@@ -133,5 +144,12 @@ describe('the cells of a child collection', () => {
     expect(screen.getByRole('textbox', { name: 'Description 1' }).closest('td')).toHaveStyle({
       verticalAlign: 'top',
     })
+  })
+
+  it('shows the em dash in an empty cell of a read-only collection', () => {
+    renderIn('light', <Harness readOnly initial={[{ description: null, quantity: '1' }]} />)
+
+    expect(screen.getByTestId('cell-lines-0-description')).toHaveTextContent('—')
+    expect(screen.queryByRole('button', { name: 'Remove row' })).not.toBeInTheDocument()
   })
 })

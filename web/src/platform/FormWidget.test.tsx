@@ -859,6 +859,20 @@ describe('FormWidget', () => {
     })
   })
 
+  it('picks a lookup row with Enter', async () => {
+    stubFetch({ status: 200, body: categoryPageJson })
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
+    const dialog = await screen.findByRole('dialog')
+    const row = await within(dialog).findByRole('row', { name: /Office/ })
+    act(() => row.focus())
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Category')).toHaveValue('Office')
+  })
+
   it('leaves a reference out when the record already set is picked again', async () => {
     const requests = stubFetch(
       { status: 200, body: noteJson('Buy paper', 1) },

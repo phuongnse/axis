@@ -1,7 +1,8 @@
 import { CloseOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons'
-import { ConfigProvider, Flex, Form, Input, Space, Table, type TableColumnsType } from 'antd'
+import { ConfigProvider, Form, Input, Space } from 'antd'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { AxisButton } from './AxisButton'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { compactFormTheme } from './antTheme'
 import { EmptyDash } from './EmptyValue'
 import { FieldInput } from './FieldInput'
@@ -35,8 +36,8 @@ interface ChildCollectionTableProps {
   readOnly?: boolean
 }
 
-// Field names start with a letter, so this key never names a field column.
-const removeColumnKey = '$remove'
+// The types whose column is free text, as in a table widget. Every other type is a value of a fixed form.
+const freeTextTypes = ['text', 'reference', 'file']
 
 // Digits of equal width, on the right.
 const numberStyle: CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
@@ -53,9 +54,9 @@ interface OpenLookup {
 }
 
 /**
- * Edits the rows of a child collection as a table: one column per child field, each editable cell the
- * same input the form uses for that field type, a remove button per row and an add button above the
- * table on the right. The first input of an added row takes focus. A reference cell shows the label of
+ * Edits the rows of a child collection as a table drawn on `AxisTable`: one column per child field, each
+ * editable cell the same input the form uses for that field type. Add row is the toolbar's main action,
+ * above the table on the right, and Remove row is an icon row action. The first input of an added row takes focus. A reference cell shows the label of
  * the record it points to, with a search icon button that opens the reference lookup. A computed cell
  * and every cell of a read-only collection show their value as plain text, with no input. A read-only
  * collection has no add or remove buttons.
@@ -128,23 +129,22 @@ export function ChildCollectionTable({
     setLookup(null)
   }
 
-  const columns: TableColumnsType<RecordRow> = [
+  const columns: AxisColumn<RecordRow>[] = [
     ...childFields.map((child) => {
       const label = child.labelKey ? t(child.labelKey) : child.name
       return {
         key: child.name,
         title: label,
-        // The inputs keep a usable width when the table scrolls sideways. A reference cell has two buttons.
-        width: child.type === 'reference' ? 240 : 160,
+        kind: freeTextTypes.includes(child.type) ? ('freeText' as const) : ('fixed' as const),
         // Numbers sit on the right, in the header and the cells.
         align: isNumeric(child.type) ? ('right' as const) : undefined,
-        // Cells line up at the top, so a message under one cell never moves the other inputs of its row.
-        onCell: () => ({ style: { verticalAlign: 'top' as const } }),
         render: (_value: unknown, row: RecordRow, index: number) => {
           const cellErrors = errors[`${index}/${child.name}`]
           const shown = formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)
           return (
             <Form.Item
+              // The inputs keep a usable width when the table scrolls sideways. A reference cell has two buttons.
+              style={{ minWidth: child.type === 'reference' ? 240 : 160 }}
               validateStatus={cellErrors ? 'error' : undefined}
               help={
                 cellErrors && (
@@ -211,50 +211,59 @@ export function ChildCollectionTable({
       }
     }),
   ]
-  if (!readOnly) {
-    columns.push({
-      key: removeColumnKey,
-      onCell: () => ({ style: { verticalAlign: 'top' as const } }),
-      render: (_value: unknown, _row: RecordRow, index: number) => (
-        <AxisButton
-          role="icon"
-          destructive
-          nameKey="shell.form.removeRow"
-          icon={<DeleteOutlined />}
-          onClick={() => remove(index)}
-        />
-      ),
-    })
-  }
 
   return (
-    <Flex vertical gap="small" ref={container}>
-      {!readOnly && (
-        <Flex justify="end">
-          <AxisButton role="main" onClick={add}>
-            {t('shell.form.addRow')}
-          </AxisButton>
-        </Flex>
-      )}
+    <div ref={container}>
       {/* A cell's item needs no space below it, as the table rows already space the inputs. */}
       <ConfigProvider theme={compactFormTheme}>
-        <Table<RecordRow>
-          rowKey={keyOf}
+        <AxisTable<RecordRow>
+          rowKey={(row) => String(keyOf(row))}
           columns={columns}
-          scroll={{ x: 'max-content' }}
           dataSource={rows}
-          pagination={false}
+          emptyText={t('shell.table.empty')}
+          toolbar={
+            readOnly
+              ? undefined
+              : {
+                  main: (
+                    <AxisButton role="main" onClick={add}>
+                      {t('shell.form.addRow')}
+                    </AxisButton>
+                  ),
+                }
+          }
+          rowActions={
+            readOnly
+              ? undefined
+              : {
+                  configured: 1,
+                  actions: (row) => {
+                    const index = rows.indexOf(row)
+                    return [
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.form.removeRow',
+                        icon: <DeleteOutlined />,
+                        destructive: true,
+                        onClick: () => remove(index),
+                      },
+                    ]
+                  },
+                }
+          }
+          below={
+            lookup?.field.target && (
+              <ReferenceLookup
+                field={lookup.field}
+                title={lookup.field.labelKey ? t(lookup.field.labelKey) : lookup.field.name}
+                open
+                onPick={(record) => pick(lookup, record)}
+                onClose={() => setLookup(null)}
+              />
+            )
+          }
         />
       </ConfigProvider>
-      {lookup?.field.target && (
-        <ReferenceLookup
-          field={lookup.field}
-          title={lookup.field.labelKey ? t(lookup.field.labelKey) : lookup.field.name}
-          open
-          onPick={(record) => pick(lookup, record)}
-          onClose={() => setLookup(null)}
-        />
-      )}
-    </Flex>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
-import { Alert, Input, Modal, Table, type TableColumnsType } from 'antd'
+import { Alert, Input, Modal } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
-import { markCurrentPage } from './pagination'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
 import { recordQuery } from './tableQuery'
@@ -90,60 +90,60 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
     return () => controller.abort()
   }, [recordsPath, target.entity, requestQuery])
 
-  const columns = useMemo<TableColumnsType<RecordItem>>(
+  const columns = useMemo<AxisColumn<RecordItem>[]>(
     () => [
       {
         key: displayField ?? 'id',
         dataIndex: displayField ? ['values', displayField] : 'id',
+        kind: 'freeText',
         title: field.labelKey ? t(field.labelKey) : field.name,
-        render: (value: RecordValue) => (value === null ? '' : String(value)),
+        render: (value) =>
+          value === null || value === undefined || value === '' ? null : String(value as RecordValue),
       },
     ],
     [displayField, field.labelKey, field.name, t],
   )
 
   return (
-    <div data-testid="reference-lookup" aria-busy={loading}>
-      <Input
-        allowClear
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        aria-label={t('shell.lookup.search')}
-        placeholder={t('shell.lookup.search')}
-        data-testid="reference-lookup-search"
-        style={{ marginBottom: 12 }}
-      />
-      {failed ? (
-        <Alert data-testid="reference-lookup-error" type="error" title={t('shell.table.loadFailed')} />
-      ) : (
-        <Table<RecordItem>
-          rowKey="id"
-          columns={columns}
-          scroll={{ x: 'max-content' }}
-          dataSource={state.page?.items}
-          loading={loading}
-          locale={{ emptyText: t('shell.table.empty') }}
-          pagination={{
-            current: page,
-            pageSize,
-            total: state.page?.totalCount ?? 0,
-            showSizeChanger: false,
-            itemRender: markCurrentPage(page),
-            onChange: setPage,
-          }}
-          onRow={(record) => ({
-            onClick: () => onPick(record),
-            // A row can be reached with Tab and picked with Enter, as with a click.
-            tabIndex: 0,
-            onKeyDown: (event) => {
-              if (event.key === 'Enter') {
-                onPick(record)
-              }
-            },
-            style: { cursor: 'pointer' },
-          })}
-        />
-      )}
-    </div>
+    <AxisTable<RecordItem>
+      testId="reference-lookup"
+      rowKey={(record) => record.id}
+      columns={columns}
+      dataSource={state.page?.items}
+      loading={loading}
+      emptyText={t('shell.table.empty')}
+      pagination={{ current: page, pageSize, total: state.page?.totalCount ?? 0 }}
+      onChange={(next) => setPage(next.current ?? 1)}
+      toolbar={{
+        view: (
+          <Input
+            allowClear
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            aria-label={t('shell.lookup.search')}
+            placeholder={t('shell.lookup.search')}
+            data-testid="reference-lookup-search"
+          />
+        ),
+      }}
+      failure={
+        failed ? (
+          <Alert data-testid="reference-lookup-error" type="error" title={t('shell.table.loadFailed')} />
+        ) : undefined
+      }
+      rowAttributes={(record) => ({
+        onClick: () => onPick(record),
+        // A row can be reached with Tab and picked with Enter, as with a click.
+        tabIndex: 0,
+        onKeyDown: (event) => {
+          if (event.key === 'Enter') {
+            // Focus returns to the Choose button as the dialog closes, and the Enter must not press it again.
+            event.preventDefault()
+            onPick(record)
+          }
+        },
+        style: { cursor: 'pointer' },
+      })}
+    />
   )
 }

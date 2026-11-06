@@ -158,10 +158,12 @@ open one lookup dialog, which lists the records a person may pick.
 
 - **List.** The dialog is titled with the field's label. It lists the target entity's records through
   their record API, sorted ascending by the target's display field, in one column for that field. The
-  record API lists only the target records that match the user's read filters. It pages 20 records at
-  a time and keeps nothing in the URL. Loading, empty and error states use the table's texts.
+  shared table draws it, with the search in its toolbar, and the pager hides when one page holds every
+  record. The record API lists only the target records that match the user's read filters. It pages 20
+  records at a time and keeps nothing in the URL. Loading, empty and error states use the table's
+  texts.
 - **Picking.** Clicking a row or pressing Enter on it picks the record and closes the dialog.
-- **Search.** A search box above the list filters the records to those whose display field contains
+- **Search.** A search box in the table's toolbar filters the records to those whose display field contains
   the typed text, ignoring letter case. The search applies 300 ms after typing stops, so typing does
   not request records for every key. The SPA trims the text and sends it as the record API's `search`
   parameter, and leaves `search` out when the text is empty. A new search starts again at page 1. Like
@@ -207,9 +209,12 @@ A child collection field shows its rows as a table under the field's label.
   the row's value as plain text, not an input, formatted as a table cell shows it. It keeps an input's
   height, so it lines up with the inputs beside it. An empty read-only or computed cell shows a muted
   italic "—". A read-only file cell shows its download link, or a dash when it has no file.
-- **Rows.** Each row has a remove row button: a trash icon button in `dangerText`, with its name as a
-  tooltip on hover and on focus. Add row sits above the table on the right, outlined at the main level
-  of [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
+- **Table.** The table is the shared table, see [tables](actions-and-controls.md#tables). A reference
+  cell's input keeps at least 240px and the other inputs at least 160px.
+- **Rows.** Remove row is the row's icon action: a trash icon button in `dangerText`, with its name as
+  a tooltip on hover and on focus. Below 992px it folds into the row's "…" menu. Add row is the table
+  toolbar's main action, above the table on the right, outlined at the main level of
+  [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
   focus moves to the row's first input. Rows cannot be reordered.
 - **Sending.** When rows were added, removed or edited, the form sends the whole row list, as
   [child rows](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
