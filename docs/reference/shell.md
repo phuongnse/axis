@@ -17,18 +17,20 @@ their own controls where they expect them.
   administrator, then the app switcher, the language and theme menu and the account button. The
   header's items are centred by its flex row, never by its line height. The header has `spacing-md`
   padding at its sides, and the items on its right are `spacing-sm` apart.
+  On the cell console's host the operator's name takes the place of the app switcher and the account
+  button, see [the console's views](cell-console.md#views).
 - **Read-only banner.** While the tenant is [read-only](subscriptions.md#the-read-only-tenant), a
   warning banner with the alert role sits at the top of the content, under the header and beside the
   sidebar, on every page of every site. It says that the workspace is read-only and why. An
   administrator in a cell also gets a link to the billing portal, the `billingUrl` of
-  `GET /api/me`.
+  `GET /api/me`. The cell console's host has no tenant, so it shows no banner.
 - **Mark and title.** The mark is the first letter of the site's title on a `primary` tile with
   `radius-base` corners, and the mark and the title are one link to the site's first navigation page.
   The platform site's title and mark name Axis, because the tenant has no name yet, as the
   [sign-in card](#the-sign-in-card) does.
 - **Account button.** The account button is the person's avatar, the initials of their name on a
   `primary` circle, then their name and a caret. A circle is a person, as a rounded square is an
-  application or a site.
+  application or a site. What it does is in [account button](#account-button).
 - **Header buttons.** The collapse button, the app switcher and the language and theme button are
   icon-only buttons, so each shows its name as a tooltip on hover and on keyboard focus, see
   [buttons](actions-and-controls.md#buttons).
@@ -47,8 +49,11 @@ their own controls where they expect them.
   `aria-expanded`. The sidebar stays open or collapsed while the person moves between pages.
 - **One-page sites.** A site with one navigation entry, such as the platform site, has no sidebar and
   no button to collapse it, unless a page claims the sidebar, and the page takes the whole width.
-- **Narrow width.** At narrow width the sidebar gives way to a panel under the header, which a Menu
-  button opens and closes.
+- **Narrow width.** At narrow width the sidebar gives way to a panel under the header. The header
+  keeps the site title, the account button, the app switcher and a Menu button
+  (`shell.navigation.menu`) with `aria-expanded`, which opens and closes the panel. The panel holds the
+  navigation and the language and theme menu. Escape or following a link closes it, and Escape returns
+  focus to the button. The breakpoint is in [narrow width](frontend.md#narrow-width).
 - **Window.** The shell fills the browser window: the page has no margin round it, and the document
   behind it is `canvas` in both modes, so no white shows at its edges or when the page scrolls past its
   end.
@@ -129,11 +134,31 @@ theme.
   menu with the site's languages and the themes, for signed-in people and for nobody signed in alike. A
   divider separates the languages from the themes. The current language and theme are drawn selected,
   in `primaryText` on a `primary` tint, not only marked for assistive technology. At narrow width the
-  button sits in the Menu panel, while the app switcher stays in the header.
+  button sits in the Menu panel, see [layout](#layout).
 - **Themes.** The themes are System, Light and Dark. System is the default when the browser holds no
   choice, and follows the operating system's light or dark setting, changing at once when it changes.
-  Light and Dark keep their mode. The choice is kept in the browser under `axis.themeMode`, as
-  `system`, `light` or `dark`.
+  Light and Dark keep their mode. The choice is kept in `localStorage` under `axis.themeMode`, as
+  `system`, `light` or `dark`, see [browser storage](frontend.md#locale).
+
+## Account button
+
+The account button is the last of the header's controls on every site, see [layout](#layout).
+Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-session).
+
+- **Loading.** The account button loads `GET /api/me` each time a shell mounts, and shows nothing while
+  it loads or when the load fails. The [app switcher](#app-switcher-and-preferences) reads `studio`,
+  `console` and `users` from it.
+- **Signed out.** With nobody signed in, it is a Sign in button, except on the home page `/`, which
+  starts sign-in or shows a [card](#the-sign-in-card). It sends the browser to `/api/auth/sign-in` with
+  the current path and query string as `returnUrl`, so the person comes back there, but to `/` from the
+  card addresses.
+- **Signed in.** With someone signed in, it shows their display name, with their avatar before it and a
+  caret after it. Its menu holds Sessions, which opens the
+  [account page](platform-pages.md#account-page), and Sign out, which ends the session. The server ends
+  the identity provider's session itself and the browser goes to `/?signedOut`. Only when that fails
+  does the browser go to the identity provider's sign-out page.
+- **Texts.** The platform texts are `shell.account.signIn`, `shell.account.signOut` and
+  `shell.account.label`, the menu's label.
 
 ## Platform home page
 
@@ -145,13 +170,14 @@ person with no session.
 The page has two parts, each under a `heading5` title with no count beside it: "Applications", then
 "Tools", as people use the applications most.
 
-- **An application** is one tile across the page, in title order. It shows its mark, the first letter
-  of its title on a `primary` tile, then its title, the `label` of its `application.json` or its name
-  when it has none, and its `description` in `textMuted`, what the application is for as a whole.
+- **An application** is one tile across the page, in title order. A site's title is in the current
+  locale, or in the site's first locale when it lacks the current one. It shows its mark, the first
+  letter of its title on a `primary` tile, then its title, the `label` of its `application.json` or its
+  name when it has none, and its `description` in `textMuted`, what the application is for as a whole.
   Under a `divider` rule follow all its sites, even a lone one, in title order: each a link with the
   site's mark, its title in `primaryText` and, under it in `textMuted`, the site's own `description`,
-  what that site does, see [descriptions](#application-and-site-descriptions). An application with
-  many sites does not push the others down, because it has the whole row to itself.
+  what that site does, see [descriptions](#application-and-site-descriptions). An application with many
+  sites does not push the others down, because it has the whole row to itself.
 - **The tools** of the person's roles follow as tiles: Studio for an author ("Build and publish
   applications."), the operator console for an operator ("See what failed and run the commands that
   fix it.") and Users for an administrator ("Invite people and give them roles."). Each tile is its
@@ -173,7 +199,8 @@ The page has two parts, each under a `heading5` title with no count beside it: "
 
 A person who opens Axis without a session goes straight to the sign-in page of
 [Axis's identity provider](identity-provider.md#theme), and Axis draws no screen of its own in front of
-it. The page starts sign-in when `GET /api/me` or `GET /api/sites` answers `401`.
+it. The page starts sign-in when `GET /api/me` or `GET /api/sites` answers `401`, except at the
+addresses of [the sign-in card](#the-sign-in-card).
 
 ### The sign-in card
 
@@ -182,7 +209,8 @@ provider's frame: the organization's mark and name above one card in the middle 
 while the organization is not known, see [theme](identity-provider.md#theme). A tenant has no name until
 `tenant create` takes one, see [realms](identity-provider.md#realms). The card is on `surface` with a
 `borderSubtle` border, `radius-base` corners and `spacing-xl` padding. The header shows no second Sign in
-button there, and nothing starts sign-in until the person clicks the card's button.
+button there, and nothing starts sign-in until the person clicks the card's button. A signed-in person
+who opens any of these addresses sees the launcher.
 
 | Address             | When                                                                                                                                                             | The card shows                                                                                                              |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -191,7 +219,9 @@ button there, and nothing starts sign-in until the person clicks the card's butt
 | `/?signedOut`       | After sign-out: the server sends the browser there itself, once it has ended the identity provider's session                                                     | "You have signed out", "You can close this page, or sign in again." in `textMuted`, and a full-width "Sign in again" button |
 
 Starting sign-in at once after a failure would loop, as the identity provider's session is still open.
-The card's button returns to `/` after sign-in, never to any of these addresses.
+The warning is an alert that screen readers announce, with the platform text `shell.home.signInFailed` or
+`shell.home.signInDeclined`. The card's button returns to `/` after sign-in, never to any of these
+addresses.
 
 ### Endpoints
 
@@ -253,10 +283,24 @@ The `application` manifest and each `site` may have a `description`, one line of
 
 ## Session ended
 
-When a request answers `401` after sign-in, such as once the session has ended at the
-re-authentication that Axis asks for every 8 hours, the sign-in dialog is titled "Your session has
-ended" and reads "Sign in again to continue." It cannot be dismissed, and only its Sign in button starts
-sign-in.
+A `401` from any API call shows the sign-in prompt, a dialog titled "Your session has ended" that reads
+"Sign in again to continue.", with a Sign in button. It shows when a signed-out person opens an
+application page, and over the current page when a session ends during use, such as at the
+re-authentication that Axis asks for every 8 hours.
+
+- **Only the click.** The button starts the same sign-in as the [account button](#account-button), with
+  the current path and query string as `returnUrl`. Only the click starts it, so a live session at the
+  identity provider never signs the person in without their action.
+- **It stays.** The prompt cannot be dismissed, and once shown it stays until the browser leaves the
+  page. It sits at the root of the platform, above every route, so it shows even when the site itself
+  fails to load with a `401`, and then nothing shows behind it, in place of the error that the site
+  could not be loaded.
+- **Exempt calls.** Four calls never show the prompt. `GET /api/me` answers `401` when nobody is signed
+  in, so the header shows the Sign in button and no app switcher. The home page's `GET /api/sites`
+  answers `401` too, and the home page then starts sign-in, see [signed out](#signed-out). The
+  notification bell's calls and Studio's readiness checks stay quiet as well.
+- **Texts.** The platform texts are `shell.signInPrompt.title` and `shell.signInPrompt.message`. The
+  button reuses `shell.account.signIn`.
 
 ## Design system previews
 

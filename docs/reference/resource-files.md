@@ -518,7 +518,7 @@ rather than when the table is created, and a value outside the range is `AXC0013
   [sensitive fields](roles-and-policies.md#sensitive-fields) and
   [exact lookup](data-encryption.md#exact-lookup).
 
-### Types and properties added in M15
+### More field types and properties
 
 The types and properties below complete the table above. Each check that they add is a compile
 diagnostic.

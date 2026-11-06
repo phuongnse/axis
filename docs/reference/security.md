@@ -377,29 +377,17 @@ a shortcut that only test hosts have.
 
 ### Development realm
 
-Docker Compose, `scripts/dev.sh` and the E2E run start Keycloak with an imported development realm,
-`axis`, from `samples/keycloak/axis-realm.json`. Under `scripts/dev.sh` and in the E2E run, the server
-signs people in through it. Under Docker Compose it does not, because the server in its container
-cannot reach Keycloak at the address the browser uses. So under Compose the site endpoints, the record
-API and the data source endpoint answer `401`, and an application page shows the sign-in prompt, whose
-button starts a sign-in that cannot complete.
-
-- The realm holds the [development users](#development-users), with fixed ids that seed data and E2E
-  journeys name, and every user has the same development-only password.
-- The roles are client roles of the confidential client `axis`. A client-role mapper writes them to
-  the `roles` claim, so the claim holds only the sample roles.
-- The confidential client `purchasing-system` stands in for the purchasing system as a
-  [machine caller](#machine-callers), and `reporting-system` is a
-  [service account](#service-accounts). Their service accounts get tokens through the client
-  credentials grant.
+Docker Compose, `scripts/dev.sh` and the E2E run start Keycloak with the development realm `axis`. Its
+users, clients and roles, and why a sign-in under Docker Compose cannot complete, are in
+[development realm and users](../development.md#development-realm-and-users).
 
 ### Development users
 
 These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
 `scripts/lint.sh` checks this table against `samples/keycloak/axis-realm.json`.
-Every user signs in with the password `axis` and a 6-digit code. Each user's TOTP secret is the `otp` credential in that
-file, and the realm accepts a code more than once. See [development realm and users](../development.md#development-realm-and-users).
+How a user signs in, with the development password and a code, is in
+[the axis realm](../development.md#the-axis-realm).
 
 | User                | Roles                   | Used by                                                                                                                                       |
 | ------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |

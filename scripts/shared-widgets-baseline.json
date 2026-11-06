@@ -30,8 +30,7 @@
     "button": 1
   },
   "web/src/pages/AccountPage.tsx": {
-    "button": 4,
-    "table": 2
+    "button": 4
   },
   "web/src/pages/ConnectorEditor.tsx": {
     "button": 6
@@ -60,9 +59,6 @@
   },
   "web/src/pages/LabelTexts.tsx": {
     "button": 1
-  },
-  "web/src/pages/LicencesPage.tsx": {
-    "table": 1
   },
   "web/src/pages/MappingRows.tsx": {
     "button": 2
@@ -152,9 +148,6 @@
   },
   "web/src/pages/UserRolesDrawer.tsx": {
     "tag": 2
-  },
-  "web/src/pages/UsersPage.tsx": {
-    "table": 1
   },
   "web/src/platform/ChildCollectionTable.tsx": {
     "table": 1

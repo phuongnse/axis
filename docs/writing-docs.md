@@ -94,9 +94,9 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
 ### Planned work
 
 Work that is agreed but not built yet is marked `_(planned for Mx)_`, where Mx is the milestone that
-builds it, in one of two places: on a line of its own under the title of a page or the heading of a
-section that is planned as a whole, so that no anchor ever changes, or right after the bold lead-in of
-a single planned rule in a list. A marker never sits in the middle of a sentence, and nothing else on a page
+builds it, in one of three places: on a line of its own under the title of a page or the heading of a
+section that is planned as a whole, so that no anchor ever changes; right after the bold lead-in of a
+single planned rule in a list; or in the row of a table whose rows are items of their own. A marker never sits in the middle of a sentence, and nothing else on a page
 says what is built.
 
 A planned rule describes the agreed result. It does not also describe what Axis does until then: the
@@ -175,7 +175,7 @@ each of them.
      the repository.
    - [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that `docs/README.md` lists every
      doc, that the decisions index matches the decision files and that a superseded row names a live
-     decision, that no planned marker names a milestone the roadmap calls Done, the size limits, the
+     decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size limits, the
      [ASVS](reference/asvs.md#requirements) and threat model tables, and the
      [development users](reference/security.md#development-users) table against the development
      realm.

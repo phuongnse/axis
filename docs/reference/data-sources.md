@@ -170,7 +170,7 @@ group.
 - **Empty `groupBy`.** The data source has one total row, even when no row passes the filter. Then
   `count` and `countDistinct` are 0 and the other measures are `null`.
 
-### Added in M15
+### Enum labels, files and export
 
 Data sources handle enum labels and file fields, and can be exported:
 
@@ -186,15 +186,20 @@ release is produced. Every code is in the [diagnostic codes](diagnostic-codes.md
 
 The root entity, the projection and the default order:
 
-- `entity` names a loaded entity (`AXC0042`).
-- `entity` is not a child entity (`AXC0064`), because a child entity's rows are read only through
-  its owner's child collection.
+- `entity` names a loaded entity, ignoring letter case (`AXC0042` at `/entity`). With an unknown
+  entity nothing else of the data source is checked.
+- `entity` is not a child entity (`AXC0064` at `/entity`, naming the owner), because a child entity's
+  rows are read only through its owner's child collection. The rest of the data source is still
+  checked against that entity.
 - Each `path` names a field of the root entity, or goes through `reference` fields only, takes at
   most 3 hops, and does not end at a `child-collection` or a `references` field. A path through a
   field that is not a `reference`, an unknown field and more than 3 hops are each `AXC0043` at
   `/fields/{i}/path`, with a message that says which.
-- Field names are unique, compared exactly (`AXC0044`).
-- `sort` names a projected field whose path does not end at a `reference` (`AXC0045`).
+- Field names are unique, compared exactly: a name that an earlier entry of `fields` already uses is
+  `AXC0044` at `/fields/{i}/name`.
+- `sort`, without its leading `-`, names a projected field exactly, whose path does not end at a
+  `reference` (`AXC0045` at `/sort`). A sort naming an entry whose path is already `AXC0043` is not
+  reported again.
 - `pageSize` is from 1 to 100, which the JSON Schema checks (`AXC0004`).
 - A data source with `"search": true` projects at least one searched field: a field whose path ends
   at a `searchable` text field, or the root's display field projected directly. Otherwise it is

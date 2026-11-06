@@ -967,6 +967,8 @@ describe('StudioEditor for a process', () => {
         expect(node).toHaveAttribute('aria-current', 'true')
       }
     },
+    // This walks every edge and node with real key presses, which takes longer than 15 s when the suite runs in parallel.
+    30_000,
   )
 
   it('shows a hint in the panel until a step is selected', async () => {

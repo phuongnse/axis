@@ -32,6 +32,8 @@ The directory sends a new tenant to the least full cell of its region that has r
   [cap](cells.md#cell-size). Of those, it goes to the least full.
 - **A full cell.** A cell that answers `409` "This cell is full." is marked full, and the next one is
   tried.
+- **Written on acceptance.** When the cell accepts the create, the tenant row is written and the
+  cell's count goes up by one, in one transaction.
 - **No cell left.** The sign-up waits as `queued`, the operator is alerted to open a cell, and the
   person is told by email when their tenant is ready.
 - **Counts stay true.** Every 5 minutes the directory reads each cell's tenant list through the

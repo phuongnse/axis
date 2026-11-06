@@ -35,7 +35,7 @@ It is a step of the [process resource](processes.md), and it looks like this:
 - **Recipient expressions.** `user` and `email` are `text` expressions with the scope of a `when`. A
   problem is reported with its expression code at `/steps/{i}/to/{j}/user` or
   `/steps/{i}/to/{j}/email`.
-- **`channels`** is a non-empty list of `inApp` and `email` (`AXC0269` at `/steps/{i}/channels`). A
+- **`channels`** lists `inApp`, `email` or both. Any other channel is `AXC0004`, and an empty list is `AXC0269` at `/steps/{i}/channels`. A
   channel named twice is a schema violation (`AXC0004`).
 - **No role by email.** A `role` recipient with the `email` channel is `AXC0270` at
   `/steps/{i}/to/{j}/role`, because Axis has no directory to expand a role into addresses.

@@ -25,6 +25,8 @@ export interface SiteMetadata {
   navigation: NavigationItem[]
   /** The lower-case path of the site whose own host serves the SPA, or `null` or missing when the host belongs to no site. */
   hostSite?: string | null
+  /** Whether the host is the cell console's, which the SPA serves with the console's own routes, or `false` or missing elsewhere. */
+  cellConsole?: boolean
   /** The tenant's privacy and terms links, or `null` or missing when it sets neither. */
   legal?: SiteLegal | null
 }

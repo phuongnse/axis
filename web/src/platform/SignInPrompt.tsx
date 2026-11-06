@@ -19,7 +19,7 @@ export function SignInPromptDialog({ open }: { open: boolean }) {
       keyboard={false}
       mask={{ closable: false }}
       footer={
-        <Button type="primary" onClick={startSignIn}>
+        <Button type="primary" onClick={() => startSignIn()}>
           {t('shell.account.signIn')}
         </Button>
       }

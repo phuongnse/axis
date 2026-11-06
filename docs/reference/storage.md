@@ -563,8 +563,8 @@ blocking a large table.
 - **The builder.** It runs without a transaction, holds the schema lock that activation takes, and
   uses the schema role. The worker cannot build, because its runtime role cannot create indexes, see
   [database roles](#database-roles). Every host that activates calls the builder after activation
-  commits: `Axis.Admin activate`, the publisher's publish and rollback, and the server's startup
-  activation. A publisher validate builds nothing.
+  commits: `Axis.Admin activate`, the publisher's publish and activation of a stored release, and the
+  server's startup activation. A publisher validate builds nothing.
 - **Automatic indexes.** Every `reference` column and every child table's `owner_id` gets an `ix_`
   index without being declared, and a junction table's `target_id` index is created with the table.
   Every `searchable` field and every entity's display field gets a `pg_trgm` GIN `ix_` index on
@@ -739,10 +739,11 @@ the first number of the period creates.
 ## Publish requests and release history
 
 Studio publishes by storing a request that the [publisher](administration.md#publisher) runs, and
-every activation adds a row to the release history that rollback chooses from. `Axis.Configuration`
-owns both tables, in the `axis` schema of each tenant database. The server inserts `validate`,
-`publish`, `rollback` and `test` requests through the [authoring API](authoring.md#publishing), and a
-preview is a `publish` request with the target `preview`.
+every activation adds a row to the release history, from which a release can be activated again.
+`Axis.Configuration` owns both tables, in the `axis` schema of each tenant database. The server
+inserts `validate`, `publish`, `rollback` and `test` requests through the
+[authoring API](authoring.md#publishing), and a preview is a `publish` request with the target
+`preview`.
 
 ### Publish requests
 
@@ -754,7 +755,7 @@ and only the publisher changes a row, over the schema role. An index on
 | ------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `application_id`    | `uuid`              | The application `id`                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `kind`              | `text`              | `validate`, `publish`, `rollback` or `test`                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `kind`              | `text`              | `validate`, `publish`, `rollback` or `test`, see [publishing](authoring.md#publishing) for `rollback`                                                                                                                                                                                                                                                                                                                                                    |
 | `target`            | `text`              | `tenant` or `preview`, by default `tenant`. See the preview target below                                                                                                                                                                                                                                                                                                                                                                                 |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `snapshot`          | `jsonb`, null       | For `validate`, `publish` and `test`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback`                                                                                                                                                                                                                                                                                                           |
@@ -826,22 +827,23 @@ and only the publisher changes a row, over the schema role. An index on
   different numbers in two tenants.
 - **No copies.** Activating the release that is already active adds no row and keeps the number, so
   a restart under `scripts/dev.sh` and a request that runs again add nothing.
-- **Every path.** Startup activation, `axis-admin activate`, a publish and a rollback each add a row.
-  The actor is the user for a publish and a rollback, `startup` for a startup and `operator` for
-  `axis-admin activate`. A publish passes its user, label, note and request to the activation, which
-  stores them as given. A rollback passes its user and its request, and no label and no note, and
-  the release keeps the number it got the first time.
+- **Every path.** Startup activation, `axis-admin activate`, a publish and a `rollback` request each
+  add a row. The actor is the user for a publish and a `rollback`, `startup` for a startup and
+  `operator` for `axis-admin activate`. A publish passes its user, label, note and request to the
+  activation, which stores them as given. A `rollback` passes its user and its request, and no label
+  and no note, and the release keeps the number it got the first time.
 - **Backfill.** The migration that creates the table adds one row for each application's active
   release, with number 1, the actor `unknown`, the activation time of `axis.active_releases` and no
-  request, so the live release has a number and a row to roll back to. Releases that were not
-  active then are not in the history, so no rollback can name them.
+  request, so the live release has a number and a row to activate again. Releases that were not
+  active then are not in the history, so no request can name them for activation.
 
-### Rollback refusals
+### Refusals to activate a stored release
 
-A `rollback` activates the stored release as it is and never compiles it again. The publisher refuses
-it with one of these diagnostics, the request ends `failed`, and nothing is changed. Every other
-refusal of activation applies too, such as `AXC0015` for a field that the release lacks and the
-tables hold.
+A `rollback` request activates the stored release as it is and never compiles it again. The publisher
+refuses it with one of these diagnostics, the request ends `failed`, and nothing is changed. Every
+other refusal of activation applies too, such as `AXC0015` for a field that the release lacks and
+the tables hold, because those checks protect stored data. So a stored release can be activated only
+across releases that did not change the storage.
 
 | Case                                                                                                                               | Code      |
 | ---------------------------------------------------------------------------------------------------------------------------------- | --------- |
@@ -849,7 +851,8 @@ tables hold.
 | An extension package version that the release pins is not installed under `Extensions:Path`                                        | `AXC0146` |
 
 The second check is the start check of [extension packages](extension-packages.md). Both codes have
-the meaning they have at activation. See also [rollback](authoring.md#rollback).
+the meaning they have at activation. See also
+[activating a release](authoring.md#activating-a-release).
 
 ### Audit records of publishing
 

@@ -32,8 +32,8 @@ const pageSize = 20
  */
 export function ConsolePage() {
   const t = useText()
-  const { colour } = useDesignTokens()
   const platform = usePlatform()
+  const { colour } = useDesignTokens()
   const { locale } = platform.current
   const [tenant, setTenant] = useState<ConsoleTenant>()
   const [forbidden, setForbidden] = useState(false)

@@ -232,23 +232,31 @@ and operations, and where each is described:
 
 ## Compile checks
 
-The compiler reports each of these problems as a diagnostic, and it reports every problem of a
-process in one pass. The details of the pass are in
-[the Resolve step](configuration.md#configuration-pipeline), and each code is in the
-[diagnostic code table](diagnostic-codes.md).
+The compiler reports each of these problems as a diagnostic in
+[the Resolve step](configuration.md#resolve), and it reports every problem of a process in one pass.
+Each code is in the [diagnostic code table](diagnostic-codes.md).
 
-- `entity` names a loaded entity (`AXC0067`) that is not a child entity (`AXC0068`).
+- `entity` names a loaded entity, ignoring letter case (`AXC0067` at `/entity`), that is not a child
+  entity (`AXC0068` at `/entity`, naming the owner). With an unknown entity the conditions are not
+  checked.
 - A process has `entity` or `parameters`, not both and not neither (`AXC0244`). The other checks of a
   process without a subject, `AXC0245` to `AXC0247`, are in
   [Processes without a subject](process-flow.md#processes-without-a-subject).
-- Step names are unique within the process, ignoring letter case (`AXC0069`).
+- Step names are unique within the process, ignoring letter case: a later step with a name already
+  used is `AXC0069` at `/steps/{i}/name`, naming the first step.
 - `start`, every `next`, `otherwise`, outcome `next`, `deadline.next` and `timeout.next` name a step
-  of the process, ignoring letter case (`AXC0070`).
-- Every step is reachable from `start` (`AXC0071`), and every step has a path to an `end` step
-  (`AXC0072`).
-- The steps form no cycle that has no waiting step (`AXC0073`), because such a cycle would run for
-  ever. A cycle through a `task`, a `timer` or a `waitEvent` step is allowed, see
-  [Loops](process-flow.md#loops).
+  of the process, ignoring letter case (`AXC0070` at that property). A transition goes to the first
+  step with its name.
+- Every step is reachable from `start` (`AXC0071` at `/steps/{i}`), which is not checked when `start`
+  is unknown. Every step has a path to an `end` step (`AXC0072` at `/steps/{i}`), and a step with a
+  transition to an unknown step is not also `AXC0072`.
+- The steps form no cycle that has no waiting step, because such a cycle would run for ever. A
+  transition that closes one is `AXC0073` at that transition, naming the steps in the cycle. The
+  transitions out of a `task`, a `timer` or a `waitEvent` step are not followed, so a cycle through
+  one is allowed, see [Loops](process-flow.md#loops). The steps are walked in file order, with the
+  branches, then `otherwise`, then `next`, then the outcomes, then the `deadline` and `timeout`
+  `next`.
+- A step whose name is already `AXC0069` is left out of `AXC0071`, `AXC0072` and `AXC0073`.
 - A decision has at least one branch (`AXC0004`). Each branch has a `name` (`AXC0004` when it is
   missing), and a later branch with a name already used in the decision, ignoring letter case, is
   `AXC0359` at `/steps/{i}/branches/{j}/name`.
@@ -256,10 +264,13 @@ process in one pass. The details of the pass are in
   fields, computed ones included, `id`, the subject record's id, its child collections through
   aggregates, the named rules, and paths through reference fields such as `department.manager.name`.
   A path takes at most 3 hops (`AXC0058`), and a `.` after a field that is not a reference is
-  `AXC0047`. See [Scope in a process expression](expressions.md#names-and-references).
+  `AXC0047`. A problem is reported at `/startCondition/expression` or
+  `/steps/{i}/branches/{j}/when` with its expression code. See
+  [Scope in a process expression](expressions.md#names-and-references).
 - An operation names `updateRecord`, `callConnector`, `raiseEvent`, `createRecord`, `notify` or a
   package operation written `<package>/<operation>`, matched exactly as a step `type` is (`AXC0078`
-  at `/steps/{i}/operation`).
+  at `/steps/{i}/operation`). The other properties of a step with an unknown operation are not
+  checked.
 - Each key of an `updateRecord` `set` names a field of the subject entity, ignoring letter case, that
   no earlier key of the step names (`AXC0079`). The field is not computed, not numbered by a sequence
   and not a child collection (`AXC0080`). Each is reported at `/steps/{i}/set/{field}`.
@@ -278,8 +289,9 @@ process in one pass. The details of the pass are in
   [Sub-process step](process-flow.md#sub-process-step), and a task's `deadline` and `escalations` in
   [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
 - A step has the properties of its type and no others, as the table below says (`AXC0004`). `to`,
-  `channels`, `message` and `open` are on a `notify` step only, and the task properties are `label`,
-  `assignee`, `form`, `dueIn` and `outcomes`.
+  `channels`, `message` and `open` are on a `notify` step only, `process`, `subject` and `parameters`
+  on a `subProcess` step only, and the task properties are `label`, `assignee`, `form`, `dueIn` and
+  `outcomes`.
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at `/steps/{i}/assignee`). A
   `role` is a non-empty name (`AXC0004`) that names a declared [role](roles-and-policies.md),
   compared exactly, otherwise it is `AXC0089` at `/steps/{i}/assignee/role`. A name whose role file
@@ -288,8 +300,9 @@ process in one pass. The details of the pass are in
   role slot instead, otherwise it is `AXC0307`.
 - A `user` expression gives `text`, with the same scope as a `when`. A problem is reported at
   `/steps/{i}/assignee/user` with its expression code, such as `AXC0048` for a number.
-- A task's `form` names a loaded form (`AXC0082`) whose entity is the subject entity (`AXC0083`).
-  Each is reported at `/steps/{i}/form`.
+- A task's `form` names a loaded form, ignoring letter case (`AXC0082`), whose entity is the subject
+  entity (`AXC0083`), which is not checked when either entity is unknown. Each is reported at
+  `/steps/{i}/form`.
 - A task's `dueIn`, when set, is a positive ISO 8601 duration in whole numbers: either weeks, such as
   `P2W`, or days with an optional time part of hours, minutes and seconds, such as `P3D`, `PT4H` or
   `P1DT12H` (`AXC0084` at `/steps/{i}/dueIn`). Years and months are refused, because they have no
@@ -314,6 +327,7 @@ process in one pass. The details of the pass are in
 | `end`                       | Nothing more                                     | `next`, `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `wait`, `until` and the task properties |
 | `timer`                     | `next`                                           | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
 | `waitEvent`                 | `event` and `next`                               | Any property but `when` and `timeout`                                                                                                    |
+| `subProcess`                | `process` and `next`                             | Any property but `subject` and `parameters`                                                                                              |
 
 ## Start endpoint
 
@@ -474,8 +488,8 @@ texts, and **Both** means different parts use different releases.
 | Server and worker start check | Both | Rebuilds every active release and every release with a running or waiting instance. A missing pinned package version is `AXC0146` and stops the start. |
 
 - **Starts from old work.** A data change or event trigger set off by old-release work starts a new
-  instance on the active release. For writes, the record is read again with the active model before
-  its triggers run. See [Starts from triggers](process-events.md#starts-from-triggers).
+  instance on the active release, as [Starts from triggers](process-events.md#starts-from-triggers)
+  says.
 - **Authorization.** Roles and policies always come from the active release, older tasks included,
   and the assignee check is the same on every release. The subject's display field comes from the
   task's release, but the active policies decide whether it is readable. Removing or renaming a
@@ -529,7 +543,7 @@ raises `FinanceThreshold()` to 15000.
 6. After the R1 instance ends, `?release=<R1>` still answers with R1's texts, because R1 is still a
    stored release of the site's application.
 
-## Limits in M3
+## Limits
 
 Two limits apply to every process, and an author should know them when writing one.
 

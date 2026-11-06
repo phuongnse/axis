@@ -34,8 +34,11 @@ function cardOfAddress(pathname: string, search: string): SignInCardState | null
   return signIn === 'failed' ? 'refused' : signIn === 'declined' ? 'declined' : 'signedOut'
 }
 
-/** The card on `/` that replaces the page when nobody is signed in: after a refused sign-in, a declined terms step or sign-out. */
-export function SignInCard({ state }: { state: SignInCardState }) {
+/**
+ * The card on `/` that replaces the page when nobody is signed in: after a refused sign-in, a declined terms step or
+ * sign-out. Its button runs `onSignIn`, which starts the tenant's sign-in by default.
+ */
+export function SignInCard({ state, onSignIn = startSignIn }: { state: SignInCardState; onSignIn?: () => void }) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const declined = state === 'declined'
@@ -71,7 +74,7 @@ export function SignInCard({ state }: { state: SignInCardState }) {
               {t('shell.home.signedOut.message')}
             </Typography.Paragraph>
           )}
-          <Button type="primary" block onClick={startSignIn}>
+          <Button type="primary" block onClick={() => onSignIn()}>
             {t(refused ? 'shell.account.signIn' : 'shell.home.signedOut.signIn')}
           </Button>
         </Flex>

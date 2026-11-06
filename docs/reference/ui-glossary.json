@@ -387,6 +387,30 @@
       "status": "approved"
     },
     {
+      "concept": "Cell",
+      "en": "cell",
+      "vi": "cụm",
+      "status": "proposed"
+    },
+    {
+      "concept": "Job",
+      "en": "job",
+      "vi": "tác vụ",
+      "status": "proposed"
+    },
+    {
+      "concept": "Platform operator",
+      "en": "platform operator",
+      "vi": "người vận hành nền tảng",
+      "status": "proposed"
+    },
+    {
+      "concept": "Cell console",
+      "en": "cell console",
+      "vi": "bảng điều khiển cụm",
+      "status": "proposed"
+    },
+    {
       "concept": "Action: Save",
       "en": "Save",
       "vi": "Lưu",

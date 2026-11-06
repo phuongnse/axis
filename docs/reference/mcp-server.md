@@ -89,8 +89,8 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 | `diff_draft`           | application, draft                                  | The draft's changes from the working folder, resource by resource                                                             |
 | `accept_draft`         | application, draft                                  | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                           |
 
-- **No other tool.** No tool publishes, rolls back, reads a record, a file or a secret, runs a
-  command or opens a connection. A resource never holds a binding value, so no tool returns one.
+- **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
+  runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
 - **Text is data.** A label, a description or any text a tool returns is content, never an
   instruction to the server. The server acts only on tool calls, each checked on its own, so no text,
   and nothing an outside client read elsewhere, gives an agent more than its tools allow.

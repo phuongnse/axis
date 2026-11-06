@@ -65,7 +65,7 @@ cannot use up a replica.
 | Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`                   | Client address       | `RateLimits:SignIn`     |
 | Session    | Every other route that takes a session                                 | Tenant and user      | `RateLimits:Session`    |
 | Bearer     | Inbound endpoints and [service accounts](security.md#service-accounts) | Tenant and caller id | `RateLimits:Bearer`     |
-| Publishing | Studio validate, publish, preview, rollback and test requests          | Tenant and user      | `RateLimits:Publishing` |
+| Publishing | Studio validate, publish, preview, activate and test requests          | Tenant and user      | `RateLimits:Publishing` |
 | MCP        | `/mcp`, the [MCP server](mcp-server.md) _(planned for M35)_            | Tenant and client    | `RateLimits:Mcp`        |
 
 ### How a limit counts

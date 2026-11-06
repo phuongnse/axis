@@ -1,6 +1,6 @@
-import { Alert, Button, Flex, Input, Modal, Result, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Flex, Input, Modal, Result, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
-import { EmptyDash } from '../platform/EmptyValue'
+import { AxisTable } from '../platform/AxisTable'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
 import {
@@ -12,6 +12,7 @@ import {
   type UserListItem,
   type UserListResult,
 } from '../platform/users'
+import { visuallyHidden } from '../platform/visuallyHidden'
 import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
@@ -139,64 +140,76 @@ export function UsersPage() {
       {loadFailed && <Alert data-testid="users-error" type="error" title={t('shell.users.loadFailed')} />}
       {list && !refusal && (
         <>
-          <Flex gap="small">
-            <Input.Search
-              allowClear
-              maxLength={200}
-              aria-label={t('shell.users.search')}
-              placeholder={t('shell.users.search')}
-              style={{ maxWidth: 400 }}
-              onSearch={(value) => {
-                setSearch(value.trim())
-                setPage(1)
-              }}
-            />
-            <Button
-              type="primary"
-              onClick={() => {
-                setDone(undefined)
-                setProblem(undefined)
-                setInviting(true)
-              }}
-            >
-              {t('shell.users.invite')}
-            </Button>
-          </Flex>
-          {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
-          {problem && <Alert data-testid="users-command-problem" type="error" title={t(problem)} />}
-          <Table<UserListItem>
-            style={{ width: '100%' }}
-            rowKey="id"
+          <AxisTable<UserListItem>
+            rowKey={(row) => row.id}
             dataSource={list.items}
-            onRow={(row) => ({ onClick: () => setSelected(row), style: { cursor: 'pointer' } })}
-            pagination={{ current: page, pageSize, total: list.totalCount, showSizeChanger: false, onChange: setPage }}
+            emptyText={t('shell.users.empty')}
+            pagination={{ current: page, pageSize, total: list.totalCount }}
+            onChange={(pagination) => setPage(pagination.current ?? 1)}
+            rowAttributes={(row) => ({ onClick: () => setSelected(row), style: { cursor: 'pointer' } })}
+            toolbar={{
+              view: (
+                <Input.Search
+                  allowClear
+                  maxLength={200}
+                  aria-label={t('shell.users.search')}
+                  placeholder={t('shell.users.search')}
+                  style={{ maxWidth: 400 }}
+                  onSearch={(value) => {
+                    setSearch(value.trim())
+                    setPage(1)
+                  }}
+                />
+              ),
+              main: (
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    setDone(undefined)
+                    setProblem(undefined)
+                    setInviting(true)
+                  }}
+                >
+                  {t('shell.users.invite')}
+                </Button>
+              ),
+            }}
+            below={
+              <>
+                {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
+                {problem && <Alert data-testid="users-command-problem" type="error" title={t(problem)} />}
+              </>
+            }
             columns={[
-              { title: t('shell.users.displayName'), dataIndex: 'displayName' },
+              { key: 'displayName', kind: 'freeText', title: t('shell.users.displayName'), dataIndex: 'displayName' },
+              { key: 'email', kind: 'freeText', title: t('shell.users.email'), render: (_value, row) => row.email },
               {
-                title: t('shell.users.email'),
-                dataIndex: 'email',
-                render: (value: string | null) => value ?? <EmptyDash />,
-              },
-              {
+                key: 'provider',
+                kind: 'fixed',
                 title: t('shell.users.signIn'),
-                dataIndex: 'provider',
-                render: (value: string | null) => value ?? t('shell.users.account'),
+                render: (_value, row) => row.provider ?? t('shell.users.account'),
               },
               {
+                key: 'status',
+                kind: 'fixed',
                 title: t('shell.users.status'),
-                dataIndex: 'status',
-                render: (value: UserListItem['status']) => (
-                  <Tag color={statusColors[value]}>{t(`shell.users.status.${value}`)}</Tag>
+                render: (_value, row) => (
+                  <Tag color={statusColors[row.status]}>{t(`shell.users.status.${row.status}`)}</Tag>
                 ),
               },
               {
+                key: 'lastSignedInAt',
+                kind: 'fixed',
                 title: t('shell.users.lastSignedInAt'),
-                dataIndex: 'lastSignedInAt',
-                render: (value: string | null) => (value ? new Date(value).toLocaleString(locale) : <EmptyDash />),
+                render: (_value, row) =>
+                  row.lastSignedInAt ? new Date(row.lastSignedInAt).toLocaleString(locale) : null,
               },
               {
-                // Brokered users get no Resend and no Reset: those routes answer 409 for them.
-                render: (_: unknown, row: UserListItem) => {
+                key: 'commands',
+                kind: 'fixed',
+                title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
+                render: (_value, row) => {
+                  // Brokered users get no Resend and no Reset: those routes answer 409 for them.
                   const buttons: Command[] = []
                   if (row.status === 'invited' && row.provider === null) {
                     buttons.push('resend')

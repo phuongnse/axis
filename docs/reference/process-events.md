@@ -254,10 +254,10 @@ instances reaches the instances of a record by an index and never reads the whol
 ## Webhook delivery
 
 A `webhook.deliver` work item sends one occurrence to one
-[webhook](outbound-webhooks.md#webhook-delivery). The step that raised the event staged a row in
-`axis.webhook_deliveries` and the item, in the step's transaction. The row holds no body: each attempt
-builds the body again from the stored occurrence in `axis.events`, so every attempt sends the same
-bytes.
+[webhook](outbound-webhooks.md#webhook-delivery), whose page gives the body, the headers and the
+outcomes a receiver sees. The step that raised the event staged a row in `axis.webhook_deliveries` and
+the item, in the step's transaction. The row holds no body: each attempt builds the body again from the
+stored occurrence in `axis.events`, so every attempt sends the same bytes.
 
 1. A transaction loads the row. An item with no row, or with a row that is already `delivered`, is
    deleted and sends nothing. It reads the release the row names, finds the webhook and its event
@@ -266,15 +266,14 @@ bytes.
    binding, or an `http` URL outside Development, fails the attempt. The worker sends a `POST` with the
    body, the three Standard Webhooks headers and the content type `application/json`. It follows no
    redirect and cancels the request after the webhook's `timeout`.
-3. A `2xx` answer runs one transaction. It deletes the item, sets the row `delivered` with the status
-   code and the time, and writes the audit record `webhook.delivered`, see
+3. An answer that delivers runs one transaction. It deletes the item, sets the row `delivered` with
+   the status code and the time, and writes the audit record `webhook.delivered`, see
    [storage](storage.md#audit-records-and-sequence-counters). A worker that crashes after the send
    sends the request again, with the same `webhook-id`.
-4. Any other answer, a `3xx`, a timeout or a network error runs one transaction that counts the
-   failure, adds one to the row's `attempts`, stores the status code of the answer, or null when there
-   was none, and makes the item due after the [backoff](#dead-letters) of the count. At
-   `Worker:DeliveryAttempts` failures it writes a dead letter and deletes the item instead, while the
-   other webhooks of the occurrence still deliver. The last error is a fixed text such as `HTTP 500`,
+4. A failed attempt runs one transaction that counts the failure, adds one to the row's `attempts`,
+   stores the status code of the answer, or null when there was none, and makes the item due after the
+   [backoff](#dead-letters) of the count. At `Worker:DeliveryAttempts` failures it writes a dead letter
+   and deletes the item instead. The last error is a fixed text such as `HTTP 500`,
    `HTTP 302 (redirects are not followed)` or the exception type, and never holds a body, a URL or a
    secret.
 

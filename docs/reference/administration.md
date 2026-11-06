@@ -410,9 +410,9 @@ runs until it is stopped. It has no HTTP endpoint and listens on no port, so not
 
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
-and the E2E script each start one too. It runs `publish`, `validate`, `rollback` and `test` requests
-under both tenancy sources, and `publish` requests with the target `preview`, see
-[preview requests](#preview-requests).
+and the E2E script each start one too. It runs `publish`, `validate`,
+[`rollback`](authoring.md#publishing) and `test` requests under both tenancy sources, and `publish`
+requests with the target `preview`, see [preview requests](#preview-requests).
 
 One process runs these loops:
 
@@ -493,7 +493,7 @@ way.
   claimed, and stays `queued`. A preview request that is not claimed does not block the later
   requests of its application.
 - **One at a time.** For one tenant and application it runs one request at a time, oldest first, so
-  when two publishes are queued the newer one ends up live, and a rollback that is queued after a
+  when two publishes are queued the newer one ends up live, and a `rollback` that is queued after a
   publish runs after it. A `validate` waits behind a running `publish` of the same application. A
   claim skips an application that already has a `running` request. Requests of other applications
   and tenants can run at the same time. Each claim takes a lock of the tenant database before it
@@ -562,12 +562,13 @@ tenant's schema role unless it says otherwise.
      another application, fails the step too.
    - The `activate` step then runs every activation check, so a migration that was applied after the
      release and is missing from it is `AXC0174`, and a field that the release lacks but the tables
-     hold is `AXC0015`. A refused rollback changes nothing. The activation adds a row to the
+     hold is `AXC0015`. A refused `rollback` changes nothing. The activation adds a row to the
      [release history](storage.md#release-history) with the requesting user and the request id, no
      label and no note, unless the release is already active. The step then updates the tenant's
-     realm to match the rolled back release.
+     realm to match the activated release.
    - `seed` then sets the schedule triggers and the seed records of that release, and `indexes`
-     builds the indexes of that release that its tables lack. See [rollback](authoring.md#rollback).
+     builds the indexes of that release that its tables lack. See
+     [activating a release](authoring.md#activating-a-release).
 7. For `test`: `version`, then the step `test`. It checks, in this order, that the setting is set
    (`AXC0217`), that the snapshot can be read, that it compiles, and that every name in the request
    is a scenario of the application (`AXC0218`, once for each unknown name). The first check that
@@ -744,8 +745,7 @@ A tenant archive is not a backup of the installation. The operator also keeps th
   installed extension packages and modules. A restore needs the package versions that the archive
   marks `required`.
 
-Point-in-time recovery and restoring into another installation are out of scope, see
-[not built yet](#not-built-yet).
+Point-in-time recovery of one tenant is out of scope, see [out of scope](#out-of-scope).
 
 ## Platform rekey
 
@@ -812,53 +812,38 @@ command makes neither the realm nor the role.
 
 ## Cell backup
 
-`cell backup` is the daily backup of a cell: it backs up every `active` and `suspended` tenant, four
-at a time, and uploads each archive to object storage as `<tenant id>/<yyyy-mm-dd>.axisbak`. It runs
-only in a cell, where `Cell:Id` is set. The behaviour is in
-[backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+`cell backup` is the daily backup of a cell: it backs up every tenant once and uploads each archive to
+object storage. It takes no argument and runs only in a cell, where `Cell:Id` is set. What it backs
+up, its output, its audit records and its metric are in
+[daily backup](tenant-backup-and-restore.md#daily-backup).
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Cell:BackupKeyFile`, the
   five `Cell:BackupStorage` settings and `PATH`, to find `pg_dump`. It needs no
   `Admin:ConnectionString`.
-- **Output.** Each line starts with the tenant id, then the step and `ok` or `failed: <message>`. A
-  tenant that fails is tried once more, so its failed line comes twice.
-- **Exit codes.** `0` when every tenant succeeded, `1` when a tenant failed or the run reached its
-  6-hour limit, and `2` outside a cell, for a missing setting or `pg_dump`, or for an OTLP endpoint
-  setting that is not an `https` URL outside Development, with nothing uploaded.
-- **Last success.** After an upload, the tenant's time goes to `platform.tenant_backups`. At the end
-  of the run the command records the gauge `axis.backup.last_success` and, when an OTLP endpoint is
-  set, exports it, see [telemetry export](host-settings.md#telemetry-export).
-- **Audit.** One platform audit record for each tenant, written before its first try. A retry writes
-  no second record.
+- **Exit codes.** `0` when every tenant succeeded. `1` when a tenant failed, the run reached its
+  6-hour limit or the gauge could not be recorded. `2`, before anything is uploaded or audited,
+  outside a cell, with an argument, for a missing setting or `pg_dump`, or for an OTLP endpoint
+  setting that is not an absolute `https` URL outside Development.
 
 ## Cell restore check
 
 `cell restore-check` checks once that a recent archive restores: it restores the newest archive of a
-random tenant into a scratch tenant, compares its row counts and users with the archive, runs the test
-scenarios of its Studio applications, removes the scratch tenant and records the result. It runs only
-in a cell, where `Cell:Id` is set. The behaviour is in
-[the weekly restore check](tenant-backup-and-restore.md#backups-in-a-cell), and the weekly job is the
+random tenant into a scratch tenant, checks it and removes it. It takes no argument and runs only in
+a cell, where `Cell:Id` is set. Its steps, output, audit record and metric are in
+[weekly restore check](tenant-backup-and-restore.md#weekly-restore-check), and the weekly job is the
 chart's [cell restore-check CronJob](installation.md#settings-and-secrets).
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Admin:ConnectionString`,
   `Cell:BackupKeyFile`, `Cell:InternalDomain`, the five `Cell:BackupStorage` settings, the
-  `IdentityProvider` settings, `Studio:ApplicationsPath` when an archive holds Studio files,
-  `Scenarios:ServerConnectionString`, which a tenant with a Studio application needs,
-  `Extensions:Path` and `Modules:Path`, and `PATH`, to find `pg_restore`.
-- **Output.** Each line starts with a tenant id, then the step and `ok` or `failed: <message>`. The
-  last line is `<source tenant> restore-check passed` or `failed`. A table or a number is named, never
-  a row or a username.
+  `IdentityProvider` settings, `IdentityProvider:Url` included, `Studio:ApplicationsPath` when an
+  archive holds Studio files, `Scenarios:ServerConnectionString`, which a tenant with a Studio
+  application needs, `Extensions:Path` and `Modules:Path`, and `PATH`, to find `pg_restore`.
 - **Exit codes.** `0` when the check passed. `1` when any step after the pick failed or no tenant has
-  an archive of today or yesterday. `2`, with nothing changed, outside a cell, with an argument, for a
-  missing setting or `pg_restore`, for a `Scenarios:ServerConnectionString` that is not a connection
-  string or an `Extensions:Path` or `Modules:Path` folder that does not exist, or for an OTLP endpoint
-  setting that is not an `https` URL outside Development.
-- **Metric.** The gauge `axis.backup.restore_check` is `1` for a pass and `0` for a failure, tagged
-  with the source tenant. When an OTLP endpoint is set the command exports it, see
-  [telemetry export](host-settings.md#telemetry-export).
-- **Audit.** One platform audit record, for the source tenant, written before the first change. It
-  lists `tenant: <scratch tenant id>`. It does not hold the result, which goes to the metric and the
-  output. A run that picks no tenant, or exits `2`, writes none.
+  an archive of today or yesterday. `2`, with nothing changed and no audit record written, outside a
+  cell, with an argument, for a missing setting or `pg_restore`, for a
+  `Scenarios:ServerConnectionString` that is not a connection string or an `Extensions:Path` or
+  `Modules:Path` folder that does not exist, or for an OTLP endpoint setting that is not an absolute
+  `https` URL outside Development.
 
 ## Version
 
@@ -866,13 +851,14 @@ chart's [cell restore-check CronJob](installation.md#settings-and-secrets).
 `0`. The production image of the admin host carries the same version in its OCI label, see
 [installation](installation.md#images).
 
-## Not built yet
+## Out of scope
 
 These operations are outside what `Axis.Admin` does. An operator who needs one uses the database
 server's own tools.
 
 - Moving a tenant to another database server. Axis supports a single database server.
-- Point-in-time recovery of one tenant, and restoring a tenant into another installation. A cell
-  keeps point-in-time recovery of its whole cluster, see
-  [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
+- Point-in-time recovery of one tenant. A cell keeps point-in-time recovery of its whole cluster, see
+  [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). An archive does restore into
+  another installation, where the tenant gets a new realm, see
+  [the new realm](tenant-backup-and-restore.md#the-new-realm).
 - Overwriting a tenant in place with a restore.

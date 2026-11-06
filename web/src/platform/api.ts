@@ -29,6 +29,11 @@ export function signInUrl(returnUrl: string): string {
   return `/api/auth/sign-in?returnUrl=${encodeURIComponent(returnUrl)}`
 }
 
+/** The cell console's sign-in address, which brings the browser back to the local path `returnUrl`. */
+export function cellSignInUrl(returnUrl: string): string {
+  return `/api/cell/auth/sign-in?returnUrl=${encodeURIComponent(returnUrl)}`
+}
+
 /** The server's sign-in address that makes the identity provider ask for credentials again, then returns to `returnUrl`. */
 export function reauthenticateUrl(returnUrl: string): string {
   return `${signInUrl(returnUrl)}&reauthenticate=true`
@@ -63,11 +68,12 @@ export function isSignInCardAddress(pathname: string, search: string): boolean {
 
 /**
  * Sends the browser to sign in, and back to the current page with its query string after. On either
- * card of `/` the return address is `/`, so a retry does not land on the card again.
+ * card of `/` the return address is `/`, so a retry does not land on the card again. `urlOf` gives the
+ * sign-in address of the realm, the tenant's by default.
  */
-export function startSignIn(): void {
+export function startSignIn(urlOf: (returnUrl: string) => string = signInUrl): void {
   const { pathname, search } = window.location
-  assignLocation(signInUrl(isSignInCardAddress(pathname, search) ? '/' : pathname + search))
+  assignLocation(urlOf(isSignInCardAddress(pathname, search) ? '/' : pathname + search))
 }
 
 /**
