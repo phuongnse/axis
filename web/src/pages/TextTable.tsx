@@ -1,6 +1,7 @@
-import { Button, Flex, Input, Table, Tag, Typography } from 'antd'
+import { Button, Flex, Input, Tag, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useState } from 'react'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { useText } from '../platform/texts'
 import { LayerMarkTag, type DesignerLayer } from './LayerMarkViews'
@@ -89,64 +90,71 @@ export function TextTable({
 
   return (
     <Flex vertical gap="small">
-      <Input.Search
-        aria-label={t('shell.studio.texts.search')}
-        placeholder={t('shell.studio.texts.search')}
-        allowClear
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
-      <div data-testid="studio-text-table">
-        <Table<Row>
-          size="small"
-          pagination={false}
-          scroll={{ x: 'max-content' }}
-          dataSource={rows}
-          rowKey="key"
-          onRow={(row) => ({ 'data-testid': 'studio-text-row', 'data-key': row.key }) as HTMLAttributes<HTMLElement>}
-          columns={[
-            {
-              key: 'key',
-              title: t('shell.studio.texts.key'),
-              render: (_, row) => <Typography.Text code>{row.key}</Typography.Text>,
-            },
-            ...(layer
-              ? [
-                  {
-                    key: 'layer',
-                    render: (_: unknown, row: Row, index: number) => (
-                      <LayerMarkTag layer={layer} list="/texts" index={index} name={row.key} />
-                    ),
-                  },
-                ]
-              : []),
-            ...columns.map((column) => ({
-              key: column.id,
-              title: column.locale,
-              render: (_: unknown, row: Row) => {
-                const missing = !Object.hasOwn(column.texts, row.key)
-                if (!column.editable) {
-                  return missing ? (
-                    <Tag>{t('shell.studio.texts.missing')}</Tag>
-                  ) : (
-                    <Typography.Text>{textOf(column, row.key)}</Typography.Text>
-                  )
-                }
-                return (
-                  <Flex gap="small" align="center">
-                    <Input
-                      aria-label={column.locale}
-                      value={textOf(column, row.key)}
-                      onChange={(event) => onChange(`/texts/${escapePointerSegment(row.key)}`, event.target.value)}
-                    />
-                    {missing && <Tag>{t('shell.studio.texts.missing')}</Tag>}
-                  </Flex>
+      <AxisTable<Row>
+        testId="studio-text-table"
+        rowKey={(row) => row.key}
+        dataSource={rows}
+        emptyText={t('shell.table.empty')}
+        toolbar={{
+          view: (
+            <Input.Search
+              aria-label={t('shell.studio.texts.search')}
+              placeholder={t('shell.studio.texts.search')}
+              allowClear
+              style={{ maxWidth: 320 }}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          ),
+        }}
+        rowAttributes={(row) =>
+          ({ 'data-testid': 'studio-text-row', 'data-key': row.key }) as HTMLAttributes<HTMLElement>
+        }
+        columns={[
+          {
+            key: 'key',
+            kind: 'fixed',
+            title: t('shell.studio.texts.key'),
+            render: (_, row) => <Typography.Text code>{row.key}</Typography.Text>,
+          },
+          ...(layer
+            ? [
+                {
+                  key: 'layer',
+                  kind: 'fixed' as const,
+                  render: (_: unknown, row: Row, index: number) => (
+                    <LayerMarkTag layer={layer} list="/texts" index={index} name={row.key} />
+                  ),
+                },
+              ]
+            : []),
+          ...columns.map((column): AxisColumn<Row> => ({
+            key: column.id,
+            kind: 'freeText',
+            title: column.locale,
+            render: (_, row) => {
+              const missing = !Object.hasOwn(column.texts, row.key)
+              if (!column.editable) {
+                return missing ? (
+                  <Tag>{t('shell.studio.texts.missing')}</Tag>
+                ) : (
+                  <Typography.Text>{textOf(column, row.key)}</Typography.Text>
                 )
-              },
-            })),
-          ]}
-        />
-      </div>
+              }
+              return (
+                <Flex gap="small" align="center">
+                  <Input
+                    aria-label={column.locale}
+                    value={textOf(column, row.key)}
+                    onChange={(event) => onChange(`/texts/${escapePointerSegment(row.key)}`, event.target.value)}
+                  />
+                  {missing && <Tag>{t('shell.studio.texts.missing')}</Tag>}
+                </Flex>
+              )
+            },
+          })),
+        ]}
+      />
       <Flex gap="small" align="center" wrap data-testid="studio-text-add">
         <Input
           aria-label={t('shell.studio.texts.newKey')}

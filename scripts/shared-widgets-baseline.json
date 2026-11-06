@@ -42,7 +42,6 @@
     "button": 2
   },
   "web/src/pages/EntityDesigner.tsx": {
-    "table": 1,
     "button": 9
   },
   "web/src/pages/FormPalette.tsx": {
@@ -91,7 +90,6 @@
     "button": 3
   },
   "web/src/pages/SeedGrid.tsx": {
-    "table": 1,
     "button": 2
   },
   "web/src/pages/SiteSignIn.tsx": {
@@ -104,8 +102,7 @@
     "button": 1
   },
   "web/src/pages/StudioModuleContract.tsx": {
-    "button": 3,
-    "table": 1
+    "button": 3
   },
   "web/src/pages/StudioModuleEditor.tsx": {
     "button": 1
@@ -123,7 +120,6 @@
     "button": 1
   },
   "web/src/pages/StudioPolicyMatrix.tsx": {
-    "table": 1,
     "tag": 3,
     "button": 5
   },
@@ -143,7 +139,6 @@
     "tag": 1
   },
   "web/src/pages/TextTable.tsx": {
-    "table": 1,
     "button": 1
   },
   "web/src/pages/UserRolesDrawer.tsx": {

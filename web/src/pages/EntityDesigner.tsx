@@ -9,12 +9,12 @@ import {
   Radio,
   Select,
   Switch,
-  Table,
   Typography,
   DatePicker,
 } from 'antd'
 import dayjs from 'dayjs'
 import { lazy, Suspense, useContext } from 'react'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import {
   changeFieldType,
   editableSettings,
@@ -269,6 +269,11 @@ export function EntityDesigner({
   return readOnly ? <ConfigProvider componentDisabled>{designer}</ConfigProvider> : designer
 }
 
+interface FieldRow {
+  index: number
+  field: unknown
+}
+
 /** The fields of the entity as a table, with Add field below it. */
 function Fields({
   fields,
@@ -329,132 +334,146 @@ function Fields({
     )
   }
 
+  const columns: AxisColumn<FieldRow>[] = [
+    {
+      key: 'name',
+      kind: 'freeText',
+      title: t('shell.studio.entity.fieldName'),
+      render: (_, { field, index }) => {
+        const name = text(isContent(field) ? field.name : undefined)
+        return (
+          <Flex vertical gap="small">
+            <div data-testid={`studio-field-/fields/${index}/name`}>
+              <Input
+                aria-label={t('shell.studio.entity.fieldName')}
+                value={name}
+                onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
+              />
+            </div>
+            {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
+          </Flex>
+        )
+      },
+    },
+    {
+      key: 'label',
+      kind: 'freeText',
+      title: t('shell.studio.entity.fieldLabel'),
+      render: (_, { field, index }) => (
+        <FieldLabel
+          name={t('shell.studio.entity.fieldLabel')}
+          pointer={`/fields/${index}/label`}
+          value={isContent(field) ? field.label : undefined}
+          onChange={onChange}
+        />
+      ),
+    },
+    {
+      key: 'type',
+      kind: 'fixed',
+      title: t('shell.studio.entity.fieldType'),
+      render: (_, { field, index }) => {
+        const content = isContent(field) ? field : {}
+        return (
+          <div data-testid={`studio-field-/fields/${index}/type`}>
+            <Select
+              aria-label={t('shell.studio.entity.fieldType')}
+              showSearch
+              optionFilterProp="label"
+              virtual={false}
+              style={{ minWidth: 160 }}
+              value={typeof content.type === 'string' ? content.type : undefined}
+              options={fieldTypes.map((option) => ({ value: option, label: option }))}
+              onChange={(next: string) => onChange(`/fields/${index}`, changeFieldType(content, next))}
+            />
+          </div>
+        )
+      },
+    },
+    {
+      key: 'required',
+      kind: 'fixed',
+      title: t('shell.studio.entity.required'),
+      render: (_, { field, index }) => (
+        <Flag field={field} setting="required" pointer={`/fields/${index}/required`} onChange={onChange} />
+      ),
+    },
+    {
+      key: 'unique',
+      kind: 'fixed',
+      title: t('shell.studio.entity.unique'),
+      render: (_, { field, index }) => (
+        <Flag field={field} setting="unique" pointer={`/fields/${index}/unique`} onChange={onChange} />
+      ),
+    },
+    {
+      key: 'settings',
+      kind: 'freeText',
+      title: t('shell.studio.entity.settings'),
+      render: (_, { field, index }) => (
+        <Flex vertical gap="small">
+          <FieldLabel
+            name={t('shell.studio.entity.help')}
+            pointer={`/fields/${index}/help`}
+            value={isContent(field) ? field.help : undefined}
+            onChange={onChange}
+          />
+          <Settings
+            index={index}
+            field={isContent(field) ? field : {}}
+            fields={fields}
+            readOnly={readOnly}
+            onChange={onChange}
+          />
+          {warnings?.get(index) && (
+            <Alert
+              type="warning"
+              data-testid={`studio-migration-warning-/fields/${index}`}
+              title={t(
+                warnings.get(index) === 'enum'
+                  ? 'shell.studio.entity.migration.enumWarning'
+                  : 'shell.studio.entity.migration.uniqueWarning',
+              )}
+            />
+          )}
+        </Flex>
+      ),
+    },
+    ...(readOnly
+      ? []
+      : [
+          {
+            key: 'actions',
+            kind: 'fixed' as const,
+            render: (_: unknown, { index }: FieldRow) => (
+              <Flex gap="small">
+                <Button disabled={index === 0} onClick={() => move(index, -1)}>
+                  {t('shell.studio.entity.moveUp')}
+                </Button>
+                <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
+                  {t('shell.studio.entity.moveDown')}
+                </Button>
+                <Button danger onClick={() => removeField(index)}>
+                  {t('shell.studio.entity.removeField')}
+                </Button>
+              </Flex>
+            ),
+          },
+        ]),
+  ]
+
   return (
     <div data-testid="studio-field-/fields">
       <Flex vertical gap="small">
         <Typography.Text strong>{t('shell.studio.entity.fields')}</Typography.Text>
-        <Table<unknown>
-          size="small"
-          pagination={false}
-          scroll={{ x: 'max-content' }}
-          dataSource={fields}
-          rowKey={(row) => fields!.indexOf(row)}
-          onRow={(_, index) =>
-            ({ 'data-testid': `studio-field-/fields/${index}` }) as React.HTMLAttributes<HTMLElement>
+        <AxisTable<FieldRow>
+          dataSource={fields.map((field, index) => ({ field, index }))}
+          rowKey={(row) => String(row.index)}
+          emptyText={t('shell.table.empty')}
+          rowAttributes={(row) =>
+            ({ 'data-testid': `studio-field-/fields/${row.index}` }) as React.HTMLAttributes<HTMLElement>
           }
-          columns={[
-            {
-              title: t('shell.studio.entity.fieldName'),
-              render: (_, field, index) => {
-                const name = text(isContent(field) ? field.name : undefined)
-                return (
-                  <Flex vertical gap="small">
-                    <div data-testid={`studio-field-/fields/${index}/name`}>
-                      <Input
-                        aria-label={t('shell.studio.entity.fieldName')}
-                        value={name}
-                        onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
-                      />
-                    </div>
-                    {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
-                  </Flex>
-                )
-              },
-            },
-            {
-              title: t('shell.studio.entity.fieldLabel'),
-              render: (_, field, index) => (
-                <FieldLabel
-                  name={t('shell.studio.entity.fieldLabel')}
-                  pointer={`/fields/${index}/label`}
-                  value={isContent(field) ? field.label : undefined}
-                  onChange={onChange}
-                />
-              ),
-            },
-            {
-              title: t('shell.studio.entity.fieldType'),
-              render: (_, field, index) => {
-                const content = isContent(field) ? field : {}
-                return (
-                  <div data-testid={`studio-field-/fields/${index}/type`}>
-                    <Select
-                      aria-label={t('shell.studio.entity.fieldType')}
-                      showSearch
-                      optionFilterProp="label"
-                      virtual={false}
-                      style={{ minWidth: 160 }}
-                      value={typeof content.type === 'string' ? content.type : undefined}
-                      options={fieldTypes.map((option) => ({ value: option, label: option }))}
-                      onChange={(next: string) => onChange(`/fields/${index}`, changeFieldType(content, next))}
-                    />
-                  </div>
-                )
-              },
-            },
-            {
-              title: t('shell.studio.entity.required'),
-              render: (_, field, index) => (
-                <Flag field={field} setting="required" pointer={`/fields/${index}/required`} onChange={onChange} />
-              ),
-            },
-            {
-              title: t('shell.studio.entity.unique'),
-              render: (_, field, index) => (
-                <Flag field={field} setting="unique" pointer={`/fields/${index}/unique`} onChange={onChange} />
-              ),
-            },
-            {
-              title: t('shell.studio.entity.settings'),
-              render: (_, field, index) => (
-                <Flex vertical gap="small">
-                  <FieldLabel
-                    name={t('shell.studio.entity.help')}
-                    pointer={`/fields/${index}/help`}
-                    value={isContent(field) ? field.help : undefined}
-                    onChange={onChange}
-                  />
-                  <Settings
-                    index={index}
-                    field={isContent(field) ? field : {}}
-                    fields={fields}
-                    readOnly={readOnly}
-                    onChange={onChange}
-                  />
-                  {warnings?.get(index) && (
-                    <Alert
-                      type="warning"
-                      data-testid={`studio-migration-warning-/fields/${index}`}
-                      title={t(
-                        warnings.get(index) === 'enum'
-                          ? 'shell.studio.entity.migration.enumWarning'
-                          : 'shell.studio.entity.migration.uniqueWarning',
-                      )}
-                    />
-                  )}
-                </Flex>
-              ),
-            },
-            ...(readOnly
-              ? []
-              : [
-                  {
-                    render: (_: unknown, __: unknown, index: number) => (
-                      <Flex gap="small">
-                        <Button disabled={index === 0} onClick={() => move(index, -1)}>
-                          {t('shell.studio.entity.moveUp')}
-                        </Button>
-                        <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
-                          {t('shell.studio.entity.moveDown')}
-                        </Button>
-                        <Button danger onClick={() => removeField(index)}>
-                          {t('shell.studio.entity.removeField')}
-                        </Button>
-                      </Flex>
-                    ),
-                  },
-                ]),
-          ]}
+          columns={columns}
         />
         {readOnly ? null : (
           <div>

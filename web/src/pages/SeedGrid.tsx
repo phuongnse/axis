@@ -1,6 +1,7 @@
-import { Button, Flex, Input, Select, Table, Typography } from 'antd'
+import { Button, Flex, Input, Select, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useEffect, useState } from 'react'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { parseNumberText, seedColumns, seedValuePointer, type SeedField } from '../platform/seedValues'
 import { useText } from '../platform/texts'
 import { newUuid } from '../platform/uuid'
@@ -66,6 +67,11 @@ function NumberCell({ field, value, problem, onChange }: CellProps) {
       }}
     />
   )
+}
+
+/** Whether the cell of the field is the plain text input, which `FieldCell` draws for every type it has no input for. */
+function isTextLike(field: SeedField): boolean {
+  return !['integer', 'decimal', 'money', 'boolean', 'enum'].includes(field.type)
 }
 
 export function FieldCell(props: CellProps) {
@@ -155,18 +161,17 @@ export function SeedGrid({
     <div data-testid="studio-field-/records">
       <Flex vertical gap="small" data-testid="studio-seed-grid">
         <Typography.Text strong>{t('shell.studio.seed.records')}</Typography.Text>
-        <Table<Row>
-          size="small"
-          pagination={false}
-          scroll={{ x: 'max-content' }}
+        <AxisTable<Row>
+          rowKey={(row) => String(row.index)}
           dataSource={rows}
-          rowKey="index"
-          onRow={(row) =>
+          emptyText={t('shell.table.empty')}
+          rowAttributes={(row) =>
             ({ 'data-testid': 'studio-seed-row', 'data-record-id': display(row.id) }) as HTMLAttributes<HTMLElement>
           }
           columns={[
             {
               key: 'id',
+              kind: 'fixed',
               title: t('shell.studio.seed.recordId'),
               render: (_, row) => <Typography.Text code>{display(row.id)}</Typography.Text>,
             },
@@ -175,15 +180,17 @@ export function SeedGrid({
               : [
                   {
                     key: 'layer',
+                    kind: 'fixed' as const,
                     render: (_: unknown, row: Row) => (
                       <LayerMarkTag layer={layer} list="/records" index={row.index} name={display(row.id)} />
                     ),
                   },
                 ]),
-            ...seedColumns(fields).map((field) => ({
+            ...seedColumns(fields).map((field): AxisColumn<Row> => ({
               key: field.name,
+              kind: isTextLike(field) ? 'freeText' : 'fixed',
               title: field.name,
-              render: (_: unknown, row: Row) => {
+              render: (_, row) => {
                 const pointer = seedValuePointer(row.index, field.name)
                 const problem = problems.get(pointer)
                 return (
@@ -205,6 +212,7 @@ export function SeedGrid({
             })),
             {
               key: 'remove',
+              kind: 'fixed',
               render: (_, row) => (
                 <Button onClick={() => onChange(`/records/${row.index}`, undefined)}>
                   {t('shell.studio.seed.removeRecord')}

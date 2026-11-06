@@ -4,14 +4,15 @@
 //
 // It refuses three ways round a shared widget, read from the source as text:
 //   button  An Ant Design `<Button` outside AxisButton.tsx. Use `AxisButton` with a role.
-//   table   An Ant Design `<Table` outside AxisTable.tsx. Use `AxisTable`.
+//   table   An import of `Table` from `antd` outside AxisTable.tsx. Use `AxisTable`. The baseline cannot allow it.
 //   tag     A `<Tag` whose colour is an Ant Design preset: a colour name such as `blue` or `blue-inverse`, or a status
 //           preset such as `success`. It counts as a string or inside a `color={…}` expression, even on a later line.
 //           Use the colour tokens.
 // The code that broke a rule before the check existed is counted in scripts/shared-widgets-baseline.json, by file and
-// rule. A file may not use a rule more often than its baseline, and a file that uses one less must lower its baseline,
-// so the count only goes down. `--write-baseline` writes the baseline from the code as it is now. Prints one line per
-// problem on stderr and exits 1 when there is any.
+// rule, for the rules that have a baseline. A file may not use such a rule more often than its baseline, and a file
+// that uses one less must lower its baseline, so the count only goes down. A strict rule has no baseline: any use is a
+// problem. `--write-baseline` writes the baseline from the code as it is now. Prints one line per problem on stderr
+// and exits 1 when there is any.
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,8 +27,11 @@ const presetColours =
 const statusPresets = 'success|processing|error|warning|default'
 const preset = `(?:(?:${presetColours})(?:-inverse)?|${statusPresets})`
 
-// button and table do not match across a line break, so a tag whose name ends its line is not counted yet.
-/** Each rule: its name, the pattern, the files that are the shared widget itself, and what to say. */
+// button does not match across a line break, so a tag whose name ends its line is not counted yet.
+/**
+ * Each rule: its name, the pattern, the files that are the shared widget itself, what to say and, for a strict rule,
+ * that the baseline cannot allow a use.
+ */
 export const rules = [
   {
     name: 'button',
@@ -37,9 +41,11 @@ export const rules = [
   },
   {
     name: 'table',
-    pattern: /<Table(?=[^\S\n]|[<>/])/g,
+    // The `Table` specifier of an import from antd, also when the import spans lines. The line is the specifier's.
+    pattern: /(?<=\bimport\s*\{[^}]*)\bTable\b(?=[^}]*\}\s*from\s*['"]antd['"])/g,
     owner: 'web/src/platform/AxisTable.tsx',
-    advice: 'Use AxisTable.',
+    strict: true,
+    advice: 'Import Table from antd only in AxisTable.tsx. Use AxisTable.',
   },
   {
     name: 'tag',
@@ -94,11 +100,12 @@ export function countUses(root) {
 export function compare(counts, baseline) {
   const problems = []
   const advice = Object.fromEntries(rules.map((rule) => [rule.name, rule.advice]))
+  const strict = new Set(rules.filter((rule) => rule.strict).map((rule) => rule.name))
   const files = new Set([...Object.keys(counts), ...Object.keys(baseline)])
   for (const file of [...files].sort()) {
     for (const rule of rules.map((entry) => entry.name)) {
       const now = counts[file]?.[rule] ?? 0
-      const allowed = baseline[file]?.[rule] ?? 0
+      const allowed = strict.has(rule) ? 0 : (baseline[file]?.[rule] ?? 0)
       if (now > allowed) {
         problems.push({ file, rule, message: `${now} use(s) of the ${rule} rule, ${allowed} allowed. ${advice[rule]}` })
       } else if (now < allowed) {
@@ -118,7 +125,13 @@ function main(args) {
   const root = rootIndex >= 0 ? path.resolve(args[rootIndex + 1]) : scriptRoot
   const counts = countUses(root)
   if (args.includes('--write-baseline')) {
-    writeFileSync(path.join(root, baselineFile), `${JSON.stringify(counts, null, 2)}\n`)
+    const strict = new Set(rules.filter((rule) => rule.strict).map((rule) => rule.name))
+    const allowed = {}
+    for (const [file, fileCounts] of Object.entries(counts)) {
+      const entries = Object.entries(fileCounts).filter(([rule]) => !strict.has(rule))
+      if (entries.length > 0) allowed[file] = Object.fromEntries(entries)
+    }
+    writeFileSync(path.join(root, baselineFile), `${JSON.stringify(allowed, null, 2)}\n`)
     console.log(`Wrote ${baselineFile}.`)
     return 0
   }
