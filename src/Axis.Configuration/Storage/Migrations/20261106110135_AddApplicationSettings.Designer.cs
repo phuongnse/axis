@@ -94,6 +94,152 @@ namespace Axis.Configuration.Storage.Migrations
                     b.ToTable("application_settings", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.AuthoringRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<string>("Author")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("author");
+
+                    b.Property<bool>("AutoAccept")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("auto_accept");
+
+                    b.Property<string>("Binding")
+                        .HasColumnType("text")
+                        .HasColumnName("binding");
+
+                    b.Property<string>("ClaimedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("claimed_by");
+
+                    b.Property<DateTimeOffset?>("ClaimedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_until");
+
+                    b.Property<Guid?>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Plan")
+                        .HasColumnType("text")
+                        .HasColumnName("plan");
+
+                    b.Property<int>("Round")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("round");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<long>("Tokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("tokens");
+
+                    b.HasKey("Id")
+                        .HasName("pk_authoring_requests");
+
+                    b.HasIndex("SentAt")
+                        .HasDatabaseName("ix_authoring_requests_sent_at");
+
+                    b.HasIndex("ApplicationId", "SentAt", "Id")
+                        .HasDatabaseName("ix_authoring_requests_application_id_sent_at_id");
+
+                    b.ToTable("authoring_requests", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Configuration.Storage.AuthoringRequestStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("InputSummary")
+                        .HasColumnType("text")
+                        .HasColumnName("input_summary");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Messages")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("messages");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("Outcome")
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("Tokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("tokens");
+
+                    b.HasKey("Id")
+                        .HasName("pk_authoring_request_steps");
+
+                    b.HasIndex("RequestId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ux_authoring_request_steps_request_id_ordinal");
+
+                    b.ToTable("authoring_request_steps", "axis");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.PublishRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -373,6 +519,16 @@ namespace Axis.Configuration.Storage.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_active_sites_active_releases_application_id");
+                });
+
+            modelBuilder.Entity("Axis.Configuration.Storage.AuthoringRequestStep", b =>
+                {
+                    b.HasOne("Axis.Configuration.Storage.AuthoringRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_authoring_request_steps_authoring_requests_request_id");
                 });
 
             modelBuilder.Entity("Axis.Configuration.Storage.ReleaseActivationRow", b =>

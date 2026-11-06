@@ -48,6 +48,10 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 
     public DbSet<ApplicationSettingsRow> ApplicationSettings => Set<ApplicationSettingsRow>();
 
+    public DbSet<AuthoringRequest> AuthoringRequests => Set<AuthoringRequest>();
+
+    public DbSet<AuthoringRequestStep> AuthoringRequestSteps => Set<AuthoringRequestStep>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardImmutability();
@@ -210,6 +214,56 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             settings.HasKey(s => s.ApplicationId).HasName("pk_application_settings");
             settings.Property(s => s.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
             settings.Property(s => s.AutoAccept).HasColumnName("auto_accept").HasDefaultValue(false);
+        });
+
+        modelBuilder.Entity<AuthoringRequest>(request =>
+        {
+            request.ToTable("authoring_requests");
+            request.HasKey(r => r.Id).HasName("pk_authoring_requests");
+            request.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
+            request.Property(r => r.ApplicationId).HasColumnName("application_id");
+            request.Property(r => r.Author).HasColumnName("author");
+            request.Property(r => r.Text).HasColumnName("text");
+            request.Property(r => r.Binding).HasColumnName("binding");
+            request.Property(r => r.State).HasColumnName("state");
+            request.Property(r => r.DraftId).HasColumnName("draft_id");
+            request.Property(r => r.Plan).HasColumnName("plan");
+            request.Property(r => r.Round).HasColumnName("round").HasDefaultValue(0);
+            request.Property(r => r.Tokens).HasColumnName("tokens").HasDefaultValue(0L);
+            request.Property(r => r.AutoAccept).HasColumnName("auto_accept").HasDefaultValue(false);
+            request.Property(r => r.SentAt).HasColumnName("sent_at").HasDefaultValueSql("now()");
+            request.Property(r => r.ApprovedAt).HasColumnName("approved_at");
+            request.Property(r => r.FinishedAt).HasColumnName("finished_at");
+            request.Property(r => r.ClaimedBy).HasColumnName("claimed_by");
+            request.Property(r => r.ClaimedUntil).HasColumnName("claimed_until");
+            // Serves the list of an application's newest requests.
+            request.HasIndex(r => new { r.ApplicationId, r.SentAt, r.Id })
+                .HasDatabaseName("ix_authoring_requests_application_id_sent_at_id");
+            // Serves the count of the requests sent this month.
+            request.HasIndex(r => r.SentAt).HasDatabaseName("ix_authoring_requests_sent_at");
+        });
+
+        modelBuilder.Entity<AuthoringRequestStep>(step =>
+        {
+            step.ToTable("authoring_request_steps");
+            step.HasKey(s => s.Id).HasName("pk_authoring_request_steps");
+            step.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
+            step.Property(s => s.RequestId).HasColumnName("request_id");
+            step.Property(s => s.Ordinal).HasColumnName("ordinal");
+            step.Property(s => s.Kind).HasColumnName("kind");
+            step.Property(s => s.InputSummary).HasColumnName("input_summary");
+            step.Property(s => s.Outcome).HasColumnName("outcome");
+            step.Property(s => s.Tokens).HasColumnName("tokens").HasDefaultValue(0L);
+            step.Property(s => s.Messages).HasColumnName("messages").HasColumnType("jsonb");
+            step.Property(s => s.StartedAt).HasColumnName("started_at").HasDefaultValueSql("now()");
+            step.Property(s => s.FinishedAt).HasColumnName("finished_at");
+            step.HasIndex(s => new { s.RequestId, s.Ordinal }).IsUnique()
+                .HasDatabaseName("ux_authoring_request_steps_request_id_ordinal");
+            step.HasOne<AuthoringRequest>()
+                .WithMany()
+                .HasForeignKey(s => s.RequestId)
+                .HasConstraintName("fk_authoring_request_steps_authoring_requests_request_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

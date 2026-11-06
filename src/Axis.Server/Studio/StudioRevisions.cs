@@ -28,15 +28,15 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
 
     /// <summary>The revisions of <paramref name="folder"/>, or null when <paramref name="revisionsPath"/> is null.</summary>
     public static StudioRevisions? For(string? revisionsPath, string folder, string userId, string displayName, ILogger<StudioRevisions> logger) =>
+        RepositoryPath(revisionsPath, folder) is { } repository
+            ? new StudioRevisions(repository, folder, userId, displayName, StudioClient, logger)
+            : null;
+
+    /// <summary>The path of the bare repository of <paramref name="folder"/>, or null when <paramref name="revisionsPath"/> is null.</summary>
+    public static string? RepositoryPath(string? revisionsPath, string folder) =>
         revisionsPath is null
             ? null
-            : new StudioRevisions(
-                Path.Combine(revisionsPath, Path.GetFileName(Path.TrimEndingDirectorySeparator(folder)) + ".git"),
-                folder,
-                userId,
-                displayName,
-                StudioClient,
-                logger);
+            : Path.Combine(revisionsPath, Path.GetFileName(Path.TrimEndingDirectorySeparator(folder)) + ".git");
 
     /// <summary>
     /// Records the folder as it is. Without a repository this creates it with the revision "Start of history".
@@ -80,9 +80,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         try
         {
             using var git = new Repository(repository);
-            var name = Clean(string.IsNullOrWhiteSpace(displayName) ? userId : displayName);
-            var author = new Signature(name, Clean(userId), DateTimeOffset.UtcNow);
-            WriteCommit(git, author, $"{summary}\n\nAxis-User-Id: {userId}\nAxis-Client: {client}\n", onlyWhenChanged: true);
+            WriteCommit(git, Author(userId, displayName), $"{summary}\n\nAxis-User-Id: {userId}\nAxis-Client: {client}\n", onlyWhenChanged: true);
         }
         catch (Exception exception) when (exception is LibGit2SharpException or IOException or UnauthorizedAccessException)
         {
@@ -275,6 +273,10 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
             signature, signature, message, tree, tip is null ? [] : [tip], prettifyMessage: false);
         git.Refs.Add(Branch, commit.Id, allowOverwrite: true);
     }
+
+    /// <summary>The git signature of a commit by the user, named by the display name or else the user id.</summary>
+    internal static Signature Author(string userId, string displayName) =>
+        new(Clean(string.IsNullOrWhiteSpace(displayName) ? userId : displayName), Clean(userId), DateTimeOffset.UtcNow);
 
     // A git signature cannot hold angle brackets or a line break.
     private static string Clean(string value)

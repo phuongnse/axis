@@ -27,6 +27,7 @@ public sealed class QuotaRefusalTests
     [InlineData(QuotaKeys.Storage, "storage")]
     [InlineData(QuotaKeys.Users, "users")]
     [InlineData(QuotaKeys.Applications, "applications")]
+    [InlineData(QuotaKeys.AuthoringRequests, "authoring requests")]
     public void The_title_names_the_quota_in_words_and_no_tenant(string quota, string words)
     {
         var problem = Assert.IsAssignableFrom<ProblemDetails>(

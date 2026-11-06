@@ -54,6 +54,8 @@ public static class RuntimeRoleGrants
         "files",
         "file_contents",
         "record_imports",
+        "authoring_requests",
+        "authoring_request_steps",
     };
 
     /// <summary>

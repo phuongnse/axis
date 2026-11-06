@@ -1,0 +1,345 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json.Nodes;
+using LibGit2Sharp;
+
+namespace Axis.Server.Studio;
+
+/// <summary>
+/// The drafts of one person on one application folder. A draft is the branch <c>refs/heads/drafts/&lt;id&gt;</c> in the
+/// repository <see cref="StudioRevisions"/> keeps, and its record is a JSON blob under <c>refs/axis/drafts/&lt;id&gt;</c> in
+/// the same repository: the owner, the commit it started at, its creation time and, for each resource it first read or
+/// changed, the version that resource had on <c>main</c>, or null when <c>main</c> lacked it. A write or delete commits
+/// to the branch from memory, so the working folder, <c>main</c> and other drafts never change. Every operation holds
+/// the folder's write lock. A draft that is not this person's answers <see cref="StudioWriteRefusal.NotFound"/>, as an
+/// unknown id does.
+/// </summary>
+internal sealed class StudioDrafts(string repository, string userId, string displayName, IStudioWriteLock writeLock, string folder)
+{
+    private const string Main = "refs/heads/main";
+
+    private const string ManifestFile = "application.json";
+
+    /// <summary>The drafts of the user on <paramref name="folder"/>, or null when <paramref name="revisionsPath"/> is null.</summary>
+    public static StudioDrafts? For(string? revisionsPath, string folder, string userId, string displayName, IStudioWriteLock writeLock) =>
+        StudioRevisions.RepositoryPath(revisionsPath, folder) is { } repository
+            ? new StudioDrafts(repository, userId, displayName, writeLock, folder)
+            : null;
+
+    /// <summary>
+    /// Makes a draft at the tip of <c>main</c>, after <paramref name="revisions"/> records any outside change in the
+    /// folder. Answers <see cref="StudioWriteRefusal.NotFound"/> and makes nothing when <c>main</c> has no commit.
+    /// </summary>
+    public Task<StudioDraftOutcome<StudioDraft>> CreateAsync(StudioRevisions revisions, CancellationToken ct) =>
+        RunAsync(() =>
+        {
+            revisions.RecordOutside();
+            if (!Repository.IsValid(repository))
+            {
+                return StudioDraftOutcome<StudioDraft>.Refused(StudioWriteRefusal.NotFound);
+            }
+
+            using var git = new Repository(repository);
+            if (git.Refs[Main]?.ResolveToDirectReference().Target is not Commit tip)
+            {
+                return StudioDraftOutcome<StudioDraft>.Refused(StudioWriteRefusal.NotFound);
+            }
+
+            var id = Guid.NewGuid().ToString("D");
+            git.Refs.Add(BranchName(id), tip.Id);
+            var draft = new StudioDraft(id, userId, tip.Sha, DateTimeOffset.UtcNow, new Dictionary<Guid, string?>());
+            Save(git, draft);
+            return StudioDraftOutcome<StudioDraft>.Of(draft);
+        }, ct);
+
+    /// <summary>The record of the draft <paramref name="id"/>.</summary>
+    public Task<StudioDraftOutcome<StudioDraft>> FindAsync(string id, CancellationToken ct) =>
+        InDraftAsync(id, (_, draft, _) => StudioDraftOutcome<StudioDraft>.Of(draft), ct);
+
+    /// <summary>The resources of the draft as its branch holds them. Records no version.</summary>
+    public Task<StudioDraftOutcome<IReadOnlyList<StudioFile>>> ListAsync(string id, CancellationToken ct) =>
+        InDraftAsync(id, (_, _, tip) => StudioDraftOutcome<IReadOnlyList<StudioFile>>.Of(Resources(tip)), ct);
+
+    /// <summary>The resource as the draft holds it. The draft records the version the resource has on <c>main</c> on its first use.</summary>
+    public Task<StudioDraftOutcome<StudioFile>> ReadAsync(string id, Guid resource, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            if (Resources(tip).FirstOrDefault(file => file.Id == resource) is not { } current)
+            {
+                return StudioDraftOutcome<StudioFile>.Refused(StudioWriteRefusal.NotFound);
+            }
+
+            Remember(git, draft, resource);
+            return StudioDraftOutcome<StudioFile>.Of(current);
+        }, ct);
+
+    /// <summary>
+    /// Commits the full <paramref name="content"/> of a resource to the draft. It replaces the file when the draft has
+    /// the content's id, and otherwise puts it at the path a create would use.
+    /// </summary>
+    public Task<StudioDraftOutcome<StudioFile>> WriteAsync(string id, JsonObject content, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            if (!IsResource(content, out var resource))
+            {
+                return StudioDraftOutcome<StudioFile>.Refused(StudioWriteRefusal.DoesNotApply);
+            }
+
+            var files = Resources(tip);
+            var existing = files.FirstOrDefault(file => file.Id == resource);
+            string path;
+            string summary;
+            if (existing is not null)
+            {
+                path = existing.File;
+                summary = StudioWrites.ResourceSummary("Change", existing);
+            }
+            else
+            {
+                if (StudioFileNames.NewFile(content, out _, out _) is not { } created)
+                {
+                    return StudioDraftOutcome<StudioFile>.Refused(StudioWriteRefusal.UnsafePath);
+                }
+
+                if (tip.Tree[created] is not null)
+                {
+                    return StudioDraftOutcome<StudioFile>.Refused(StudioWriteRefusal.Exists);
+                }
+
+                path = created;
+                summary = StudioWrites.CreateSummary(content, created);
+            }
+
+            Remember(git, draft, resource);
+            var bytes = StudioWrites.Serialize(content);
+            var definition = TreeDefinition.From(tip.Tree);
+            definition.Add(path, CreateBlob(git, bytes), Mode.NonExecutableFile);
+            Commit(git, draft, tip, definition, summary);
+            return StudioDraftOutcome<StudioFile>.Of(StudioFolder.Resources([(path, bytes)]).Single());
+        }, ct);
+
+    /// <summary>Commits the removal of a resource's file to the draft. The manifest cannot be deleted.</summary>
+    public Task<StudioDraftOutcome<bool>> DeleteAsync(string id, Guid resource, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            if (Resources(tip).FirstOrDefault(file => file.Id == resource) is not { } current)
+            {
+                return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.NotFound);
+            }
+
+            if (current.File == ManifestFile)
+            {
+                return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.Manifest);
+            }
+
+            Remember(git, draft, resource);
+            var definition = TreeDefinition.From(tip.Tree);
+            definition.Remove(current.File);
+            Commit(git, draft, tip, definition, StudioWrites.ResourceSummary("Delete", current));
+            return StudioDraftOutcome<bool>.Of(true);
+        }, ct);
+
+    /// <summary>Deletes the draft's branch and its record.</summary>
+    public Task<StudioDraftOutcome<bool>> DropAsync(string id, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, _) =>
+        {
+            git.Refs.Remove(BranchName(draft.Id));
+            git.Refs.Remove(RecordName(draft.Id));
+            return StudioDraftOutcome<bool>.Of(true);
+        }, ct);
+
+    private static string BranchName(string id) => $"refs/heads/drafts/{id}";
+
+    private static string RecordName(string id) => $"refs/axis/drafts/{id}";
+
+    // Takes the write lock, then runs the action, which is refused as Unavailable when the lock cannot be taken.
+    private async Task<StudioDraftOutcome<T>> RunAsync<T>(Func<StudioDraftOutcome<T>> action, CancellationToken ct)
+    {
+        if (await StudioWrites.TryTakeAsync(writeLock, folder, ct) is not { } held)
+        {
+            return StudioDraftOutcome<T>.Refused(StudioWriteRefusal.Unavailable);
+        }
+
+        await using var _ = held;
+        return action();
+    }
+
+    // Runs the action on a draft of this user. An id that is no draft of this user is NotFound, so another person's draft is never touched.
+    private Task<StudioDraftOutcome<T>> InDraftAsync<T>(
+        string id, Func<Repository, StudioDraft, Commit, StudioDraftOutcome<T>> action, CancellationToken ct) =>
+        RunAsync(() =>
+        {
+            if (!Repository.IsValid(repository))
+            {
+                return StudioDraftOutcome<T>.Refused(StudioWriteRefusal.NotFound);
+            }
+
+            using var git = new Repository(repository);
+            return Load(git, id) is var (draft, tip)
+                ? action(git, draft, tip)
+                : StudioDraftOutcome<T>.Refused(StudioWriteRefusal.NotFound);
+        }, ct);
+
+    // The record and the branch tip of this user's draft, or null.
+    private (StudioDraft Draft, Commit Tip)? Load(Repository git, string id)
+    {
+        if (!Guid.TryParseExact(id, "D", out var parsed))
+        {
+            return null;
+        }
+
+        var name = parsed.ToString("D");
+        if (git.Refs[RecordName(name)]?.ResolveToDirectReference().Target is not Blob blob
+            || Parse(blob.GetContentText()) is not { } draft
+            || !string.Equals(draft.UserId, userId, StringComparison.Ordinal)
+            || git.Refs[BranchName(name)]?.ResolveToDirectReference().Target is not Commit tip)
+        {
+            return null;
+        }
+
+        return (draft, tip);
+    }
+
+    private static StudioDraft? Parse(string text)
+    {
+        try
+        {
+            if (JsonNode.Parse(text) is not JsonObject record
+                || record["id"] is not JsonValue idValue || !idValue.TryGetValue<string>(out var id)
+                || record["userId"] is not JsonValue userValue || !userValue.TryGetValue<string>(out var user)
+                || record["start"] is not JsonValue startValue || !startValue.TryGetValue<string>(out var start)
+                || record["created"] is not JsonValue createdValue || !createdValue.TryGetValue<string>(out var created)
+                || !DateTimeOffset.TryParse(created, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var time)
+                || record["versions"] is not JsonObject versions)
+            {
+                return null;
+            }
+
+            var read = new Dictionary<Guid, string?>();
+            foreach (var (key, value) in versions)
+            {
+                if (!Guid.TryParseExact(key, "D", out var resource))
+                {
+                    return null;
+                }
+
+                read[resource] = value is JsonValue version && version.TryGetValue<string>(out var hex) ? hex : null;
+            }
+
+            return new StudioDraft(id, user, start, time, read);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static void Save(Repository git, StudioDraft draft)
+    {
+        var versions = new JsonObject();
+        foreach (var (resource, version) in draft.Versions.OrderBy(entry => entry.Key))
+        {
+            versions[resource.ToString("D")] = version;
+        }
+
+        var record = new JsonObject
+        {
+            ["id"] = draft.Id,
+            ["userId"] = draft.UserId,
+            ["start"] = draft.Start,
+            ["created"] = draft.Created.ToString("O", CultureInfo.InvariantCulture),
+            ["versions"] = versions,
+        };
+        git.Refs.Add(RecordName(draft.Id), CreateBlob(git, Encoding.UTF8.GetBytes(record.ToJsonString())).Id, allowOverwrite: true);
+    }
+
+    // Records the version of the resource on main when the draft has none for it. An existing entry is never changed.
+    private static void Remember(Repository git, StudioDraft draft, Guid resource)
+    {
+        if (draft.Versions.ContainsKey(resource))
+        {
+            return;
+        }
+
+        var main = git.Refs[Main]?.ResolveToDirectReference().Target as Commit;
+        var version = main is null ? null : Resources(main).FirstOrDefault(file => file.Id == resource)?.Version;
+        Save(git, draft with { Versions = new Dictionary<Guid, string?>(draft.Versions) { [resource] = version } });
+    }
+
+    // Adds a commit to the branch, unless the tree is the tip's.
+    private void Commit(Repository git, StudioDraft draft, Commit tip, TreeDefinition definition, string summary)
+    {
+        var tree = git.ObjectDatabase.CreateTree(definition);
+        if (tree.Sha == tip.Tree.Sha)
+        {
+            return;
+        }
+
+        var author = StudioRevisions.Author(userId, displayName);
+        var message = $"{summary}\n\nAxis-User-Id: {userId}\nAxis-Client: {StudioRevisions.StudioClient}\n";
+        var commit = git.ObjectDatabase.CreateCommit(author, author, message, tree, [tip], prettifyMessage: false);
+        git.Refs.Add(BranchName(draft.Id), commit.Id, allowOverwrite: true);
+    }
+
+    private static Blob CreateBlob(Repository git, byte[] bytes)
+    {
+        using var content = new MemoryStream(bytes);
+        return git.ObjectDatabase.CreateBlob(content);
+    }
+
+    private static IReadOnlyList<StudioFile> Resources(Commit commit)
+    {
+        var files = new List<(string File, byte[] Bytes)>();
+        Walk(commit.Tree, "", files);
+        return StudioFolder.Resources(files);
+    }
+
+    // The *.json files of a tree, as a folder lists them.
+    private static void Walk(Tree tree, string prefix, List<(string File, byte[] Bytes)> files)
+    {
+        foreach (var entry in tree)
+        {
+            var path = prefix + entry.Name;
+            switch (entry.Target)
+            {
+                case Tree subtree:
+                    Walk(subtree, path + "/", files);
+                    break;
+                case Blob blob when path.EndsWith(".json", StringComparison.Ordinal):
+                    using (var stream = blob.GetContentStream())
+                    using (var buffer = new MemoryStream())
+                    {
+                        stream.CopyTo(buffer);
+                        files.Add((path, buffer.ToArray()));
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    // Whether the content has a UUID id and a string kind, as a resource file does.
+    private static bool IsResource(JsonObject content, out Guid id)
+    {
+        id = Guid.Empty;
+        return content["id"] is JsonValue idValue
+            && idValue.TryGetValue<string>(out var text)
+            && Guid.TryParseExact(text, "D", out id)
+            && content["kind"] is JsonValue kind
+            && kind.TryGetValue<string>(out _);
+    }
+}
+
+/// <summary>What a draft operation did: the refusal, or the value.</summary>
+internal sealed record StudioDraftOutcome<T>(StudioWriteRefusal? Refusal, T? Value)
+{
+    public static StudioDraftOutcome<T> Of(T value) => new(null, value);
+
+    public static StudioDraftOutcome<T> Refused(StudioWriteRefusal refusal) => new(refusal, default);
+}
+
+/// <summary>
+/// A draft's record: its id, the user id of its owner, the commit of <c>main</c> it started at, its creation time and the
+/// version each resource it used had on <c>main</c> at first use, null for a resource <c>main</c> lacked.
+/// </summary>
+internal sealed record StudioDraft(string Id, string UserId, string Start, DateTimeOffset Created, IReadOnlyDictionary<Guid, string?> Versions);

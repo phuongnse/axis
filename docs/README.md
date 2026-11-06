@@ -67,6 +67,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Custom widgets](reference/custom-widgets.md)                          | Widgets from extension packages: manifest, page shape, loading, the SDK, the palette  |
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
 | [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                              |
+| [Authoring request storage](reference/authoring-request-storage.md)    | The tables of authoring requests and their steps                                      |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
 | [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, authorization, development users |
 | [FAPI 2.0 profile](reference/fapi2-profile.md)                         | The FAPI 2.0 Security Profile per tenant: PAR, `private_key_jwt`, DPoP and the client key |
