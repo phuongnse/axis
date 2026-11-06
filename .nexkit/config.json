@@ -318,7 +318,8 @@
       "No setting, route, command, code or other name that the change renames or removes is still named under docs/, in AGENTS.md or under .claude/skills/",
       "Each rule the docs diff touches is stated in one place, and the docs diff adds no progress, history, dates or issue numbers",
       "A doc list of what the code defines that the change adds or extends has a unit test that reads the list from the doc and from the code and compares them",
-      "A change that adds a new kind of route, host, caller, stored secret or integration updates docs/reference/threat-model.md"
+      "A change that adds a new kind of route, host, caller, stored secret or integration updates docs/reference/threat-model.md",
+      "The change adds no exception to a check and loosens none: no new entry in an accepted list or rise of a baseline count, and no rule removed, narrowed or skipped in a check script under scripts/ or its test"
     ]
   },
   "github_app": {
