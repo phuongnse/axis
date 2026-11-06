@@ -21,6 +21,8 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
 
     private const string Branch = "refs/heads/main";
 
+    private const string Customizations = "customizations/";
+
     /// <summary>Loads the native git library, so a server without it fails at start, not on the first save.</summary>
     public static void Start() =>
         // A shared Studio volume may be owned by another user id than the server's. The call loads the library.
@@ -126,23 +128,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
             return null;
         }
 
-        var resources = new List<StudioRevisionChange>();
-        foreach (var change in Changes(git, commit))
-        {
-            var before = Text(commit.Parents.FirstOrDefault()?.Tree, change.Path);
-            var after = Text(commit.Tree, change.Path);
-            var (resourceId, kind, name) = Identity(after ?? before);
-            resources.Add(new StudioRevisionChange(
-                change.Path,
-                change.Status switch { ChangeKind.Added => "added", ChangeKind.Deleted => "removed", _ => "changed" },
-                resourceId,
-                kind,
-                name,
-                before,
-                after));
-        }
-
-        return new StudioRevisionDiff(Describe(commit), [.. resources.OrderBy(resource => resource.File, StringComparer.Ordinal)]);
+        return new StudioRevisionDiff(Describe(commit), Compare(git, commit.Parents.FirstOrDefault()?.Tree, commit.Tree));
     }
 
     /// <summary>
@@ -201,6 +187,39 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
     // Rename detection is off, so a moved file is one removed and one added.
     private static TreeChanges Changes(Repository git, Commit commit) =>
         git.Diff.Compare<TreeChanges>(commit.Parents.FirstOrDefault()?.Tree, commit.Tree, new CompareOptions { Similarity = SimilarityOptions.None });
+
+    /// <summary>
+    /// The files that differ between two trees, sorted by file. A tree of null is empty. A moved file is one removed and
+    /// one added. A draft's diff uses it too.
+    /// </summary>
+    internal static List<StudioRevisionChange> Compare(Repository git, Tree? before, Tree after)
+    {
+        var resources = new List<StudioRevisionChange>();
+        foreach (var change in git.Diff.Compare<TreeChanges>(before, after, new CompareOptions { Similarity = SimilarityOptions.None }))
+        {
+            var was = Text(before, change.Path);
+            var now = Text(after, change.Path);
+            var (resourceId, kind, name) = Identity(now ?? was);
+            resources.Add(new StudioRevisionChange(
+                change.Path,
+                change.Status switch { ChangeKind.Added => "added", ChangeKind.Deleted => "removed", _ => "changed" },
+                resourceId,
+                kind,
+                name,
+                was,
+                now,
+                Target(change.Path)));
+        }
+
+        resources.Sort((left, right) => string.CompareOrdinal(left.File, right.File));
+        return resources;
+    }
+
+    // The module resource a layer file changes, <module id>/<name>, named by its path under customizations/.
+    private static string? Target(string file) =>
+        file.StartsWith(Customizations, StringComparison.Ordinal) && file.EndsWith(".json", StringComparison.Ordinal) && file.Length > Customizations.Length + ".json".Length
+            ? file[Customizations.Length..^".json".Length]
+            : null;
 
     private static StudioRevision Describe(Commit commit)
     {
@@ -304,8 +323,9 @@ internal sealed record StudioRevision(string Id, string Summary, string Author, 
 /// <summary>
 /// One file a revision changed. <c>Change</c> is <c>added</c>, <c>changed</c> or <c>removed</c>. <c>Before</c> and <c>After</c>
 /// are the file's text, null on the side where it does not exist. <c>Id</c>, <c>Kind</c> and <c>Name</c> are read from the file.
+/// <c>Target</c> is the module resource a layer file changes, <c>&lt;module id&gt;/&lt;name&gt;</c>, and null for any other file.
 /// </summary>
-internal sealed record StudioRevisionChange(string File, string Change, string? Id, string? Kind, string? Name, string? Before, string? After);
+internal sealed record StudioRevisionChange(string File, string Change, string? Id, string? Kind, string? Name, string? Before, string? After, string? Target);
 
 /// <summary>A revision and the files it changed, sorted by file.</summary>
 internal sealed record StudioRevisionDiff(StudioRevision Revision, IReadOnlyList<StudioRevisionChange> Resources);

@@ -77,8 +77,12 @@ from every other draft.
   the recorded versions. It is kept in the same repository as the branch, under `refs/axis/drafts/<draft id>`.
 - **The owner.** A draft belongs to the person who made it. For anyone else it does not exist and
   answers "not found", as an unknown id does.
-- **Diff.** _(planned for M35)_ The diff of a draft is the difference between its branch and the `main` commit it started
-  from, resource by resource, see `diff_draft` in [the MCP server](mcp-server.md#tools).
+- **Diff.** The diff of a draft is the difference between its branch and the `main` commit it started
+  from, resource by resource, see `diff_draft` in [the MCP server](mcp-server.md#tools). It lists each
+  changed file as `added`, `changed` or `removed` with its JSON before and after, and a layer file names the
+  module resource it changes. A diff over 1 MiB comes in pages of whole entries. Each page ends with a
+  cursor that keeps the draft commit the first page was read at, so a later write does not shift the
+  pages. The route is in [the authoring API](authoring-revisions.md#draft-diff).
 - **Dropping.** Dropping a draft deletes its branch and its record.
 - **Ending by accept.** _(planned for M35)_ An accepted draft's branch is deleted, and its accept stays
   as a revision.

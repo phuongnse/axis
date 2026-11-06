@@ -4,10 +4,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Configuration.Tests;
+using Axis.Server.Studio;
 using Axis.Server.Tests;
 using LibGit2Sharp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axis.Integration.Tests;
 
@@ -328,6 +331,51 @@ public sealed class StudioRevisionTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(HttpStatusCode.Forbidden, undo.StatusCode);
         Assert.Equal(before, CommitShas(path));
         Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(folder.Path, "rules", "finance-threshold.json")));
+    }
+
+    [Fact]
+    public async Task The_diff_route_of_a_draft_answers_its_owner_and_refuses_everyone_else()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        var writeLock = factory.Services.GetRequiredService<IStudioWriteLock>();
+        var mine = StudioDrafts.For(revisions.Path, folder.Path, "author", "Author User", writeLock)!;
+        var theirs = StudioDrafts.For(revisions.Path, folder.Path, "other", "Other User", writeLock)!;
+        var recorder = StudioRevisions.For(revisions.Path, folder.Path, "author", "Author User", NullLogger<StudioRevisions>.Instance)!;
+        var own = (await mine.CreateAsync(recorder, CancellationToken)).Value!;
+        var foreign = (await theirs.CreateAsync(recorder, CancellationToken)).Value!;
+        var policy = Guid.NewGuid();
+        Assert.Null((await mine.WriteAsync(own.Id, new System.Text.Json.Nodes.JsonObject { ["id"] = policy.ToString("D"), ["kind"] = "policy", ["name"] = "Fresh" }, CancellationToken)).Refusal);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var anonymous = factory.CreateClient();
+        string DiffUrl(string draft) => $"{Url}/drafts/{draft}/diff";
+
+        using var ok = await SendAsync(author, HttpMethod.Get, DiffUrl(own.Id), null);
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        var body = await ReadAsync(ok);
+        Assert.Equal(own.Start, body.GetProperty("start").GetString());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("cursor").ValueKind);
+        var entry = Assert.Single(body.GetProperty("resources").EnumerateArray());
+        Assert.Equal("policies/fresh.json", entry.GetProperty("file").GetString());
+        Assert.Equal("added", entry.GetProperty("change").GetString());
+        Assert.Equal(JsonValueKind.Null, entry.GetProperty("before").ValueKind);
+        Assert.Equal(JsonValueKind.Null, entry.GetProperty("target").ValueKind);
+        Assert.Equal(policy.ToString("D"), entry.GetProperty("id").GetString());
+
+        using var missing = await SendAsync(anonymous, HttpMethod.Get, DiffUrl(own.Id), null);
+        using var forbidden = await SendAsync(requester, HttpMethod.Get, DiffUrl(own.Id), null);
+        using var someoneElses = await SendAsync(author, HttpMethod.Get, DiffUrl(foreign.Id), null);
+        using var unknown = await SendAsync(author, HttpMethod.Get, DiffUrl(Guid.NewGuid().ToString("D")), null);
+        using var badCursor = await SendAsync(author, HttpMethod.Get, DiffUrl(own.Id) + "?cursor=garbage", null);
+        using var unknownApplication = await SendAsync(author, HttpMethod.Get, "/api/studio/apps/Nothing/drafts/" + own.Id + "/diff", null);
+        Assert.Equal(HttpStatusCode.Unauthorized, missing.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, someoneElses.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, badCursor.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
     }
 
     private static async Task<JsonElement> ReadAsync(HttpResponseMessage response)
