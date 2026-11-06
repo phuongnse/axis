@@ -212,6 +212,26 @@ internal static class StudioFolder
     }
 
     /// <summary>
+    /// The resources among <paramref name="files"/>, such as the files of a git tree, as <see cref="List"/> lists
+    /// them: sorted by file, a file that is not a resource left out, and the first file by path kept for an id.
+    /// </summary>
+    public static IReadOnlyList<StudioFile> Resources(IEnumerable<(string File, byte[] Bytes)> files)
+    {
+        var resources = new List<StudioFile>();
+        foreach (var (file, bytes) in files)
+        {
+            if (Read(bytes, file) is { } resource)
+            {
+                resources.Add(resource);
+            }
+        }
+
+        resources.Sort((left, right) => string.CompareOrdinal(left.File, right.File));
+        var seen = new HashSet<Guid>();
+        return [.. resources.Where(resource => seen.Add(resource.Id))];
+    }
+
+    /// <summary>
     /// The resources of <paramref name="folder"/>, as <see cref="List"/> lists them, and every <c>*.json</c> file as
     /// <see cref="Snapshot"/> reads it, from one walk of the folder. Both lists are sorted by file.
     /// </summary>
