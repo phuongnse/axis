@@ -26,7 +26,7 @@ module or template.
   under `artifacts/modules/`, next to the sample modules, and the built-in applications under
   `artifacts/templates/`. The development images hold the modules in `/modules` and the built-in
   applications in `/templates`.
-- **In every installation** _(planned for M26)_. Every installation of Axis holds the built-in modules
+- **In every installation** _(planned for M30)_. Every installation of Axis holds the built-in modules
   and applications.
 - **Creating an application from one.** Studio's new application dialog lists the built-in
   applications first, marked as built in, then the templates. Creating one copies the thin folder, as
