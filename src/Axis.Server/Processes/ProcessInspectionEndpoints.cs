@@ -418,7 +418,8 @@ internal static class ProcessInspectionEndpoints
                     entry.FinishedAt.UtcDateTime,
                     entry.Decision,
                     entry.Output is null ? null : JsonNode.Parse(entry.Output),
-                    entry.Error))
+                    entry.Error,
+                    entry.TraceId))
                 .ToList(),
             tasks
                 .Select(task => new ProcessInstanceTask(
@@ -463,7 +464,8 @@ internal static class ProcessInspectionEndpoints
                                 attempt.FinishedAt.UtcDateTime,
                                 attempt.Outcome,
                                 attempt.HttpStatus,
-                                attempt.Error))
+                                attempt.Error,
+                                attempt.TraceId))
                             .ToList(),
                         call.Input is null || hidden ? null : JsonNode.Parse(call.Input),
                         hidden,
@@ -727,8 +729,11 @@ internal sealed record ProcessGraphStep(string Name, string Type, string? LabelK
 /// <summary>A transition to the step <paramref name="Next"/>, taken on a decision branch or a task outcome, or null for an operation.</summary>
 internal sealed record ProcessGraphTransition(string Next, string? On);
 
-/// <summary>One occurrence of a step in the instance's history. A failed step has an error and no output.</summary>
-internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error);
+/// <summary>
+/// One occurrence of a step in the instance's history. A failed step has an error and no output.
+/// <paramref name="TraceId"/> is the trace id of the run that wrote the entry, or null when it stored none.
+/// </summary>
+internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error, string? TraceId);
 
 /// <summary>A task of the instance, with who it is assigned to and how it ended.</summary>
 internal sealed record ProcessInstanceTask(
@@ -771,7 +776,10 @@ internal sealed record ProcessInstanceCall(
 /// <summary>An output that a call's operation declares, with its field type and whether a resolve must give it.</summary>
 internal sealed record ProcessCallOutput(string Name, string Type, bool Required);
 
-/// <summary>An attempt or reconciliation lookup of a call. <c>Kind</c> is <c>attempt</c> or <c>lookup</c>.</summary>
+/// <summary>
+/// An attempt or reconciliation lookup of a call. <c>Kind</c> is <c>attempt</c> or <c>lookup</c>.
+/// <paramref name="TraceId"/> is the trace id of the run that wrote the row, or null when it stored none.
+/// </summary>
 internal sealed record ProcessCallAttemptEntry(
     string Kind,
     int Number,
@@ -779,4 +787,5 @@ internal sealed record ProcessCallAttemptEntry(
     DateTime FinishedAt,
     string Outcome,
     int? HttpStatus,
-    string? Error);
+    string? Error,
+    string? TraceId);

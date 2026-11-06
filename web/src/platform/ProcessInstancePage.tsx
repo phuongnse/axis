@@ -189,6 +189,18 @@ export function InstanceDetailView({
   const due = timerDueAt(instance)
   const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
+  const traceIdColumn = {
+    key: 'traceId',
+    title: t('shell.inspector.traceId'),
+    render: (_v: unknown, row: { traceId: string | null }) =>
+      row.traceId === null ? (
+        ''
+      ) : (
+        <Typography.Text code copyable>
+          {row.traceId}
+        </Typography.Text>
+      ),
+  }
   const historyColumns: TableColumnsType<PathEntry> = [
     { key: 'step', title: t('shell.inspector.step'), render: (_v: unknown, row) => stepLabel(row.step) },
     {
@@ -203,6 +215,7 @@ export function InstanceDetailView({
     },
     { key: 'decision', title: t('shell.inspector.decision'), render: (_v: unknown, row) => row.decision ?? '' },
     { key: 'error', title: t('shell.inspector.error'), render: (_v: unknown, row) => row.error ?? '' },
+    traceIdColumn,
   ]
   const taskColumns: TableColumnsType<InstanceTask> = [
     { key: 'step', title: t('shell.inspector.step'), render: (_v: unknown, row) => stepLabel(row.step) },
@@ -245,6 +258,7 @@ export function InstanceDetailView({
     { key: 'outcome', title: t('shell.inspector.outcome'), render: (_v: unknown, row) => row.outcome },
     { key: 'httpStatus', title: t('shell.inspector.httpStatus'), render: (_v: unknown, row) => row.httpStatus ?? '' },
     { key: 'error', title: t('shell.inspector.error'), render: (_v: unknown, row) => row.error ?? '' },
+    traceIdColumn,
   ]
 
   const subProcessColumns: TableColumnsType<SubProcess> = [

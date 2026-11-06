@@ -32,7 +32,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(DateTimeKind.Utc, root.GetProperty("createdAt").GetDateTime().Kind);
         var path = Assert.Single(root.GetProperty("path").EnumerateArray());
         Assert.Equal(
-            ["step", "startedAt", "finishedAt", "decision", "output", "error"],
+            ["step", "startedAt", "finishedAt", "decision", "output", "error", "traceId"],
             path.EnumerateObject().Select(property => property.Name));
         Assert.Equal("lower", path.GetProperty("step").GetString());
         Assert.Equal("The record update was rejected: /values/amount: request.amountNegative", path.GetProperty("error").GetString());
@@ -306,9 +306,10 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
                 attempt.GetProperty("outcome").GetString()!,
                 attempt.GetProperty("httpStatus").GetInt32())));
         Assert.Equal(
-            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error"],
+            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId"],
             attempts[0].EnumerateObject().Select(property => property.Name));
         Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("error").ValueKind);
+        Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("traceId").ValueKind);
         Assert.Equal(DateTimeKind.Utc, attempts[0].GetProperty("startedAt").GetDateTime().Kind);
         Assert.True(attempts[0].GetProperty("startedAt").GetDateTime() < attempts[1].GetProperty("startedAt").GetDateTime());
     }

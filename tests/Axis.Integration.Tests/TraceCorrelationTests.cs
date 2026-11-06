@@ -66,6 +66,46 @@ public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixt
     }
 
     [Fact]
+    public async Task The_instance_detail_answers_the_trace_id_of_each_steps_run_and_each_call_attempt()
+    {
+        using var collector = new SpanCollector();
+        var (requestTrace, instance, _) = await StartTracedAsync();
+        var run = Assert.Single(
+            collector.Spans,
+            span => span.OperationName == "axis.work_item.run"
+                && span.Links.Any(link => link.Context.TraceId.ToHexString() == requestTrace));
+        using (var manager2 = fixture.CreateClient().SignedInAs("manager-2"))
+        {
+            await ApproveAsync(manager2, instance, "managerApproval");
+        }
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+        Assert.Equal("completed", await fixture.ScalarAsync("SELECT state FROM axis.process_instances WHERE id = @instance", ("instance", instance)));
+        var path = $"{App}/processes/PurchaseRequestApproval/instances/{instance:D}";
+
+        using var operatorClient = fixture.CreateClient().SignedInAs("operator");
+        using var request = RecordApiFixture.Request(path, Host);
+        using var response = await operatorClient.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var first = body.RootElement.GetProperty("path").EnumerateArray().First();
+        Assert.Equal(run.TraceId.ToHexString(), first.GetProperty("traceId").GetString());
+        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray(), item => item.GetProperty("kind").GetString() == "connector");
+        var attempt = call.GetProperty("attempts").EnumerateArray().First(item => item.GetProperty("kind").GetString() == "attempt");
+        var attemptTrace = attempt.GetProperty("traceId").GetString();
+        Assert.NotNull(attemptTrace);
+        Assert.Contains(
+            collector.Spans,
+            span => span.OperationName == "axis.connector.attempt" && span.TraceId.ToHexString() == attemptTrace);
+
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        using var denied = RecordApiFixture.Request(path, Host);
+        using var deniedResponse = await requester.SendAsync(denied, CancellationToken);
+        using var problem = await RecordApiFixture.ReadProblemAsync(deniedResponse, HttpStatusCode.Forbidden);
+        Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task No_span_of_the_purchase_request_journey_holds_a_field_value_a_secret_a_user_id_or_a_bound_address()
     {
         using var collector = new SpanCollector();
