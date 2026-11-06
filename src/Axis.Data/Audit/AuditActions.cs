@@ -74,4 +74,10 @@ public static class AuditActions
     public const string UserRoleGiven = "user.roleGiven";
 
     public const string UserRoleRemoved = "user.roleRemoved";
+
+    public const string AuthoringRequestSent = "authoringRequest.sent";
+
+    public const string AuthoringRequestApproved = "authoringRequest.approved";
+
+    public const string AuthoringRequestDropped = "authoringRequest.dropped";
 }

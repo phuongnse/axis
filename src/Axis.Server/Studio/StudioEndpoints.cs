@@ -115,6 +115,7 @@ internal static class StudioEndpoints
         endpoints.MapDelete("/api/studio/apps/{application}/resources/{id}", DeleteAsync);
         endpoints.MapPut("/api/studio/apps/{application}/texts/{key}", TextWriteAsync).WithStorageQuota();
         endpoints.MapStudioPublishEndpoints();
+        endpoints.MapStudioAuthoringRequestEndpoints();
         endpoints.MapStudioRevisionEndpoints();
         endpoints.MapStudioExpressionEndpoints();
         endpoints.MapStudioPageMetadataEndpoints();

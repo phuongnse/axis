@@ -24,7 +24,7 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
 | `concurrentConnectorCalls` | Connector and package calls in flight at once | 10 | Lease |
 | `concurrentQueries` | Data source queries and record list reads that run at once | 10 | Lease |
 | `workerWeight` | The tenant's share of the worker, see [worker scheduling](worker-scheduling.md) | 1 | Weight |
-| `authoringRequests` | AI authoring requests a month, see [budgets](authoring-requests.md#budgets) | None | Exact |
+| `authoringRequests` | AI authoring requests sent in a calendar month in UTC, see [budgets](authoring-requests.md#budgets) | None | Exact |
 
 - **Where they live.** `platform.tenant_quotas` holds one row for each quota that a tenant overrides:
   `tenant_id`, `quota`, `value` and `updated_at`. A quota with no row takes the cell's default,
@@ -39,8 +39,9 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
   or the machine caller in its `actor` column.
 - **From a plan** _(planned for M34)_. The [control plane](control-plane.md) writes a SaaS tenant's
   rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
-- **Authoring requests** _(planned for M35)_. `authoringRequests` is counted when the author sends a
-  request, and its default is no limit.
+- **Authoring requests.** `authoringRequests` counts the requests sent since 00:00 UTC on the first
+  day of the month, once each, when the author sends it. A dropped or failed request still counts,
+  and a change of plan does not count again. Its default is no limit.
 - **Lowering a quota below use.** It refuses new use and removes nothing. A tenant over its storage
   quota keeps its data and can still delete.
 
@@ -96,6 +97,11 @@ nothing:
   refresh. A failed call is logged and never fails the command or the sign-in.
 - **`applications`.** Creating an application in Studio is refused when the count would pass the
   quota. Existing applications keep working.
+- **`authoringRequests`.** Sending an [authoring request](authoring-requests.md#routes) is refused
+  once the month's count is at the quota. The check comes after the author role and before the
+  application and the body, and the server counts again under a lock just before it stores the
+  request, so sends at the same time cannot pass it. Requests already sent go on, and the author can
+  still change their plans and drop them.
 - **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never
   refused over the `storage` quota. It writes platform rows and no tenant data, so the operator can
   raise a quota that a tenant has reached.

@@ -1,7 +1,5 @@
 # Authoring requests
 
-_(planned for M35)_
-
 An authoring request is a change that an author describes in words. The agent host plans it, makes it
 on a draft, checks it, has it reviewed and fixes what fails, and then the draft is accepted or
 dropped. This page gives the agent host, how it acts for the author, how a request is stored and
@@ -10,6 +8,8 @@ author works with a request in Studio is in [AI authoring in Studio](ai-authorin
 the reasons are in [D119](../decisions/d119-ai-authoring-in-studio.md).
 
 ## The agent host
+
+_(planned for M35)_
 
 The agent host is the process that runs authoring requests. It is one client of the MCP server, with
 no shortcut of its own.
@@ -26,6 +26,8 @@ no shortcut of its own.
   [model bindings](model-bindings.md).
 
 ## Acting for the author
+
+_(planned for M35)_
 
 The agent host acts with exactly the grants of the author who sent the request.
 
@@ -47,16 +49,47 @@ loses no work.
   request text, binding, state, draft, plan, round, token use, the auto-accept flag and its times.
   `axis.authoring_request_steps` holds one row per step of the loop, in order: its kind, input
   summary, outcome, tokens and times. A step's full model messages are kept for 30 days for the author
-  and the audit, then deleted.
-- **Claimed with a lease.** The agent host claims a request whose state needs work, as the publisher
+  and the audit, then deleted. The columns are in [storage](storage.md#authoring-requests).
+- **Claimed with a lease** _(planned for M35)_. The agent host claims a request whose state needs work, as the publisher
   claims [publish requests](authoring.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
   the lease while it works, and lets it lapse when it stops. A host that dies leaves the request
   claimable after the lease.
-- **Resuming.** Each finished step is committed before the next starts, and after a restart the next
+- **Resuming** _(planned for M35)_. Each finished step is committed before the next starts, and after a restart the next
   host resumes at the last finished step. A model call that was in flight is made again, and its
   tokens count again.
-- **Fair use.** The agent host takes the requests of the tenants of a cell in turn, as the worker
+- **Fair use** _(planned for M35)_. The agent host takes the requests of the tenants of a cell in turn, as the worker
   shares its time, so one tenant's long request does not hold back another's.
+
+## Routes
+
+An author sends, lists, reads, approves, changes and drops requests through the session routes under
+`/api/studio/apps/{application}/authoring-requests`, with the CSRF header of the other authoring
+routes. The shared answers are in [responses](authoring.md#responses). The routes never accept a
+request, which belongs to [accepting](#accepting).
+
+| Route                                       | What it does                                                                                            |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `POST /authoring-requests`                  | Stores a request in `planning` and answers `202` with it and a `Location` for the read route            |
+| `GET /authoring-requests`                   | Lists the newest 100 requests of the application, newest first                                          |
+| `GET /authoring-requests/{id}`              | Reads one request with its steps in order                                                               |
+| `POST /authoring-requests/{id}/approve`     | Moves a request from `awaitingApproval` to `working`                                                    |
+| `POST /authoring-requests/{id}/change-plan` | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step |
+| `POST /authoring-requests/{id}/drop`        | Moves a request to `dropped` from any state but `accepted` and `dropped`                                |
+
+- **Order of checks.** A send checks the session (`401`), the author role (`403`), in a cell the
+  tenant's [`authoringRequests` quota](tenant-quotas.md#refusals) (`403`), the application (`404`),
+  its manifest `id` (`409`), the content type (`415`) and the body (`400`). Just before the insert it
+  counts again under a lock, so sends at the same time cannot pass the quota together. The other
+  routes check the session, the author role and the application, then answer `404` for an `id` that is
+  not a UUID of this application. Approve, change plan and drop then answer `403` to anyone but the
+  author of the request, and last answer `409` for a request in a state the action does not accept.
+- **Who.** Any author lists and reads the requests of an application. Only the author of a request
+  approves its plan, changes it or drops it.
+- **Body.** A send takes `{ text, autoAccept? }` with a `text` of 1 to 4,000 characters. A change of
+  plan takes `{ comment }` of 1 to 2,000 characters. The other routes take no body.
+- **Answer.** A request has its `id`, `application`, `author`, `authorName`, `text`, `state`, `plan`,
+  `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. The read route adds `steps`,
+  each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt` and `finishedAt`.
 
 ## States
 
@@ -79,25 +112,27 @@ the checks, an independent review and fix rounds.
 - **Built-in modules first.** When a request matches a built-in module, the plan declares the module
   and writes a [customization layer](customization-layers.md) over it instead of new resources, so the
   application keeps the module's upgrades and its contract. It adds scenarios for what it adds.
-- **Plans need approval.** No request leaves `awaitingApproval` without the author, also when the
+- **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
   application allows auto-accept.
 
 ## Budgets
 
 Each request has limits on its rounds, tokens and time, so the cost of one request is bounded.
 
-- **Fix rounds.** At most `Ai:FixRounds` rounds, 3 by default. A request still failing after the last
+- **Fix rounds** _(planned for M35)_. At most `Ai:FixRounds` rounds, 3 by default. A request still failing after the last
   round stops as `failed`.
-- **Tokens.** At most `Ai:RequestTokenBudget` tokens, input and output together, across every model
+- **Tokens** _(planned for M35)_. At most `Ai:RequestTokenBudget` tokens, input and output together, across every model
   call of the request, review included, 2,000,000 by default. A call that would pass the budget is not
   made, and the request stops as `failed`.
-- **Time.** At most `Ai:RequestTimeout` from the plan's approval, 30 minutes by default.
+- **Time** _(planned for M35)_. At most `Ai:RequestTimeout` from the plan's approval, 30 minutes by default.
 - **Quota.** The request counts toward the tenant's `authoringRequests` quota once, when the author
   sends it. A request past the quota is refused with the quota's `403`, see
   [tenant quotas](tenant-quotas.md#refusals). A request that asks for a new plan or a new fix round
-  does not count again.
+  does not count again. [Tenant quotas](tenant-quotas.md#quotas) says how the month is counted.
 
 ## Accepting
+
+_(planned for M35)_
 
 Accepting moves a draft's changes into the working folder as one revision. It never puts them live:
 only [publishing](authoring.md#publishing) does.
@@ -128,11 +163,16 @@ A request keeps the whole story of the change, and its milestones write audit re
 
 - **The request.** Each request keeps who asked, the client, the binding and model, the plan, the diff,
   each check, the review, the tokens and who accepted or dropped it.
-- **Audit records.** Sending a request, approving a plan, accepting and dropping each write an audit
-  record with the author, the request id and the application.
-- **Usage.** The tokens of each request and model join the tenant's [usage](tenant-quotas.md#usage).
+- **Audit records.** Sending a request, approving a plan and dropping it each write an audit record
+  with the author, the request id and the application, see
+  [audit actions](storage.md#audit-actions).
+- **Accepting's record** _(planned for M35)_. Accepting a draft writes an audit record too, with the
+  same fields.
+- **Usage** _(planned for M35)_. The tokens of each request and model join the tenant's [usage](tenant-quotas.md#usage).
 
 ## What reaches the model
+
+_(planned for M35)_
 
 The model sees the application's configuration and the results of its checks, never the tenant's
 data.
