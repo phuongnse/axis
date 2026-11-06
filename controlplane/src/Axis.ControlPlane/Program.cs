@@ -5,6 +5,7 @@ using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
+using Axis.ControlPlane.SignUp;
 using Axis.ControlPlane.Storage;
 using Axis.ControlPlane.Telemetry;
 using Axis.Server.Http;
@@ -53,6 +54,7 @@ else if (string.Equals(options.Dns.Provider, DnsProviders.Rfc2136, StringCompari
 if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 {
     builder.Services.AddKeyedSingleton("directory", (_, _) => NpgsqlDataSource.Create(options.DirectoryConnectionString));
+    builder.Services.AddSingleton(sp => new SubdomainCheck(sp.GetRequiredKeyedService<NpgsqlDataSource>("directory"), options));
 }
 
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
@@ -81,6 +83,7 @@ app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment()
 app.UseExceptionHandler();
 
 app.MapHealthEndpoints();
+app.MapSignUpEndpoints();
 
 app.Run();
 

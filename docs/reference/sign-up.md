@@ -1,7 +1,5 @@
 # Sign-up
 
-_(planned for M33)_
-
 A person signs up for Axis SaaS on a page of the regional [control plane](control-plane.md) and gets
 a tenant of their own, with a working application, a subdomain and a trial. This page covers the
 sign-up page, the choice of a subdomain, the defences against bots, the email check, the provisioning
@@ -9,6 +7,8 @@ of the tenant and the record of the terms the person accepts. The operator can a
 through the [provisioning API](tenant-lifecycle.md#creating-a-tenant).
 
 ## The page
+
+_(planned for M33)_
 
 The sign-up page asks for who the person is, the business, its subdomain and its application, and
 sends nothing outside the region.
@@ -34,17 +34,21 @@ sends nothing outside the region.
 
 The person chooses the subdomain, which becomes the tenant's id, and the page checks it as they type.
 
-- **The person chooses.** The page suggests one from the business's name, in lower-case letters,
+- **The person chooses.** _(planned for M33)_ The page suggests one from the business's name, in lower-case letters,
   digits and `-`, and the person may change it.
-- **Checked as they type.** `GET /api/sign-up/subdomains/{name}` answers whether it is free. It is
-  not when a tenant has it, when it is [reserved](region-directory.md#routing-a-host), when it is held
-  after a deletion, or when a pending sign-up holds it. The answer never says which tenant has it.
-- **Held while pending.** A sign-up holds its subdomain for 24 hours, until it is verified or
-  expires.
+- **Checked as they type.** `GET /api/sign-up/subdomains/{name}` answers `{ free, reason }`. The name
+  is not free when it breaks the rule below (`invalid`), when it is
+  [reserved](region-directory.md#routing-a-host) (`reserved`), when a tenant has it or its host is in
+  use (`taken`), or when it is held after a deletion (`held`). `reason` is null when the name is free.
+  The answer never says which tenant has it. Without the region directory the route answers `503`.
+- **Held while pending.** _(planned for M33)_ A sign-up holds its subdomain for 24 hours, until it is
+  verified or expires. The hold makes the name not free.
 - **The rule.** The rule of a tenant id of [`tenant create`](administration.md#tenant-create), at
   most 40 characters.
 
 ## Bots and abuse
+
+_(planned for M33)_
 
 Sign-up is open to anyone, so a proof of work, rate limits and email checks make each abusive try
 cost something.
@@ -63,6 +67,8 @@ cost something.
 
 ## Verifying the email first
 
+_(planned for M33)_
+
 No tenant exists until the person proves the email is theirs.
 
 1. **Pending.** `POST /api/sign-up` checks the form, the challenge and the limits, stores a pending
@@ -78,6 +84,8 @@ No tenant exists until the person proves the email is theirs.
 An unverified sign-up expires after 24 hours with nothing created, and its subdomain is free again.
 
 ## Provisioning
+
+_(planned for M33)_
 
 The control plane provisions the tenant as one job, with the sign-up's id as the idempotency key.
 
@@ -100,6 +108,8 @@ The control plane provisions the tenant as one job, with the sign-up's id as the
   `Users:AdministratorRole`, see [the administrator role](user-administration.md#the-administrator-role).
 
 ## Terms acceptance
+
+_(planned for M33)_
 
 Each acceptance of the terms of service and the data processing agreement is recorded and never
 changed.
