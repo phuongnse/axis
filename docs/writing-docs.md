@@ -85,8 +85,9 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
 - **Give the reason** when a reader would ask why, in a sentence next to the rule. A longer argument
   is a decision, which the page links.
 - **Leave values to the code.** Name the token (`bar`), not its value (48 px), and name the file that
-  holds a list rather than copying it. When a page must list what the code defines, such as the
-  [diagnostic codes](reference/diagnostic-codes.md), a test compares the two.
+  holds a list rather than copying it. A page that lists what the code defines, such as the
+  [diagnostic codes](reference/diagnostic-codes.md), has a test that compares the two, see
+  [how the docs stay correct](#how-the-docs-stay-correct).
 - **Describe screens by what a person sees and does:** what shows, in what order, what each action
   does and what is refused. Sizes, spacing and colours are the design tokens' and the
   [shared widgets](reference/shared-widgets.md)'.
@@ -145,14 +146,19 @@ pull requests rarely edit the same lines.
 
 ## How the docs stay correct
 
-Docs drift in three ways: a change adds a rule and leaves the old one beside it, progress is written
-into the text and goes stale, and one fact lives in two places that later disagree. These rules close
-each of them.
+Docs drift when a change adds a rule and leaves the old one beside it, when progress is written into
+the text, when one fact lives in two places, when work is built and its page still says planned, and
+when a list of what the code defines misses an entry. These rules close each of them, in three layers:
+every pull request, the tests, and a weekly audit, as
+[D134](decisions/d134-docs-stay-true-while-work-merges.md) agrees.
 
-1. **Every change updates the home of its rules.** A pull request that changes behaviour rewrites the
-   section that describes it and deletes what it replaces. A pull request that makes any doc statement
-   false fixes it. The review of every pull request checks that each rule it touches has one home,
-   that nothing of an old rule is left, and that no progress or history entered the text.
+1. **Every pull request states its docs.** Its plan and its description have a line `Docs:` that names
+   the doc sections it changes, or says why it changes none. It rewrites the section that describes
+   what it changes and deletes what it replaces, removes the planned marker of what it builds, and
+   searches the docs for every name it renames or removes, such as a setting, a route, a command or a
+   code. A pull request that makes any doc statement false fixes it. The review checks the docs diff
+   against the code diff: each rule it touches has one home, nothing of an old rule is left, nothing
+   it built is still marked planned, and no progress or history entered the text.
 2. **A changed decision is a new decision,** which replaces the old one as
    [Decisions](#decisions) says.
 3. **A design review writes reference pages.** The docs change that ends a
@@ -169,7 +175,18 @@ each of them.
    sweep reads the sections that the milestone's pull requests changed, merges what is said twice,
    deletes what a later rule replaced, and checks that the decisions they link still hold only live
    choices. Its checklist is in [the life of a milestone](delivery.md#the-life-of-a-milestone).
-7. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
+7. **A list of what the code defines has a test, or is not written.** A doc that lists settings,
+   routes, commands, codes, kinds, environment variables, metrics or anything else the code defines
+   has a unit test that reads the list from the doc and from the code each time it runs and compares
+   them, so the test holds no copy that could go stale. It finds the table under `docs/` by its
+   header, wherever it moves. Without such a test, the doc names the file that holds the list rather
+   than copying it. The review refuses a new list without its test.
+8. **A weekly audit reads the docs against the code.** The audit routine reads a share of the pages
+   each week, in turn, so every page is read about once a month, as the
+   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. It changes nothing
+   itself: it opens a NexKit issue to fix a statement the code contradicts, and one to fix the code
+   where it does not follow an agreed rule.
+9. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
    added only once the whole tree passes it: there are no baselines and no lists of exceptions.
    - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in
      the repository.
@@ -179,5 +196,4 @@ each of them.
      [ASVS](reference/asvs.md#requirements) and threat model tables, and the
      [development users](reference/security.md#development-users) table against the development
      realm.
-   - A doc fact that code can check, such as the diagnostic code table, has a unit test that compares
-     the two and finds the table under `docs/` by its header, wherever it moves.
+   - The unit tests of rule 7 compare each list with the code, such as the diagnostic code table.
