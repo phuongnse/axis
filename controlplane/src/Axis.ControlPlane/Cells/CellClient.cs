@@ -15,6 +15,7 @@ namespace Axis.ControlPlane.Cells;
 /// <see cref="CellOperation"/>. A failure throws <see cref="CellCallException"/> with a fixed text: it never holds a
 /// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
 /// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
+/// <see cref="ListTenantsAsync"/> reads the cell's tenant list with the same token and the same failures.
 /// </summary>
 internal sealed class CellClient : IDisposable
 {
@@ -63,12 +64,23 @@ internal sealed class CellClient : IDisposable
         ArgumentNullException.ThrowIfNull(operation);
 
         var content = body is null ? null : JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerOptions.Web);
-        return await SendForJobAsync(HttpMethod.Post, path, operation.IdempotencyKey, content, cancellationToken);
+        return await CallAsync(
+            HttpMethod.Post, path, operation.IdempotencyKey, content,
+            (response, call, token) => ReadJobAsync(response, HttpMethod.Post, call, token), cancellationToken);
     }
 
     /// <summary>Reads a job with its steps and its error.</summary>
     public Task<CellJob> GetJobAsync(Guid id, CancellationToken cancellationToken) =>
-        SendForJobAsync(HttpMethod.Get, $"/api/cell/jobs/{id:D}", null, null, cancellationToken);
+        CallAsync(
+            HttpMethod.Get, $"/api/cell/jobs/{id:D}", null, null,
+            (response, call, token) => ReadJobAsync(response, HttpMethod.Get, call, token), cancellationToken);
+
+    /// <summary>
+    /// Reads the cell's tenant list, <c>GET /api/cell/tenants</c>, as each tenant's id and hosts. The status, the application
+    /// and the failed work that the cell also sends are left out.
+    /// </summary>
+    public Task<IReadOnlyList<CellTenant>> ListTenantsAsync(CancellationToken cancellationToken) =>
+        CallAsync(HttpMethod.Get, "/api/cell/tenants", null, null, ReadTenantsAsync, cancellationToken);
 
     /// <summary>
     /// Polls a job until it is <c>succeeded</c> or <c>failed</c>, and returns it with its steps and error. The wait starts at
@@ -102,7 +114,13 @@ internal sealed class CellClient : IDisposable
         }
     }
 
-    private async Task<CellJob> SendForJobAsync(HttpMethod method, string path, string? idempotencyKey, byte[]? content, CancellationToken cancellationToken)
+    private async Task<T> CallAsync<T>(
+        HttpMethod method,
+        string path,
+        string? idempotencyKey,
+        byte[]? content,
+        Func<HttpResponseMessage, string, CancellationToken, Task<T>> read,
+        CancellationToken cancellationToken)
     {
         var uri = new Uri(_baseUri, path);
         var call = $"{method.Method} {uri.AbsolutePath}";
@@ -123,7 +141,7 @@ internal sealed class CellClient : IDisposable
                 response = await SendAsync(method, uri, call, token, idempotencyKey, content, cancellationToken);
             }
 
-            return await ReadJobAsync(response, method, call, cancellationToken);
+            return await read(response, call, cancellationToken);
         }
         finally
         {
@@ -189,6 +207,30 @@ internal sealed class CellClient : IDisposable
         }
 
         throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not a job.", status);
+    }
+
+    private async Task<IReadOnlyList<CellTenant>> ReadTenantsAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
+    {
+        var status = (int)response.StatusCode;
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            throw new CellCallException($"The call {call} to the cell '{CellId}' answered with the status {status.ToString(CultureInfo.InvariantCulture)}.", status);
+        }
+
+        try
+        {
+            var list = await response.Content.ReadFromJsonAsync<CellTenantList>(JsonSerializerOptions.Web, cancellationToken);
+            if (list?.Items is { } items && items.All(item => !string.IsNullOrEmpty(item?.Id)))
+            {
+                return [.. items.Select(item => new CellTenant(item!.Id!, item.Hosts ?? []))];
+            }
+        }
+        catch (JsonException)
+        {
+            // The body is not a tenant list, which the fixed text below says without quoting it.
+        }
+
+        throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not a tenant list.", status);
     }
 
     private static async Task<bool> IsFullAnswerAsync(HttpResponseMessage response, CancellationToken cancellationToken)

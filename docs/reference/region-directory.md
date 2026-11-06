@@ -38,7 +38,15 @@ The directory sends a new tenant to the least full cell of its region that has r
   person is told by email when their tenant is ready.
 - **Counts stay true.** Every 5 minutes the directory reads each cell's tenant list through the
   provisioning API and corrects its counts and its rows, so a tenant created or deleted from a cell
-  console is found.
+  console is found. The control plane queues one durable job every 5 minutes. The job reads every
+  cell of the region and corrects each one in one transaction: it adds the tenants and hosts the
+  directory lacks, removes those the cell no longer lists and sets the cell's count to the length of
+  its list. A cell that cannot be reached or answers an error keeps its rows, a warning log names it,
+  and the other cells are still corrected. A tenant or host that the directory holds under another
+  cell stays where it is, and a warning log counts it. Removing a tenant writes nothing to the held
+  ids and hosts. The job runs only when the directory's connection string is set and a cell is
+  listed. A tenant that the correction added before the picker wrote it is not written or counted
+  twice.
 
 ## Routing a host
 

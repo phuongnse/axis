@@ -95,6 +95,20 @@ public sealed class CellPickerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_tenant_that_the_correction_already_added_is_placed_without_a_second_row_or_count()
+    {
+        await SeedAsync(("vn-1", 100, 1, true));
+        await ControlPlaneDatabase.ExecuteAsync(
+            _dataSource, "INSERT INTO directory.tenants (id, region_code, cell_id) VALUES ('acme', 'vn', 'vn-1')", TestContext.Current.CancellationToken);
+
+        var placement = await _picker.PlaceAsync("vn", "acme", Accept([]), TestContext.Current.CancellationToken);
+
+        Assert.Equal(new CellPlacement(CellPlacement.Placed, "vn-1"), placement);
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT count(*) FROM directory.tenants WHERE id = 'acme'"));
+        Assert.Equal(1, await ScalarAsync<int>("SELECT tenant_count FROM directory.cells WHERE id = 'vn-1'"));
+    }
+
+    [Fact]
     public async Task A_full_answer_marks_the_cell_and_the_next_cell_gets_the_tenant()
     {
         await SeedAsync(("vn-1", 100, 10, true), ("vn-2", 100, 20, true));

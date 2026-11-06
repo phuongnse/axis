@@ -8,7 +8,8 @@ namespace Axis.ControlPlane.RegionDirectory;
 /// (tenant count ÷ cap) of the region that takes new tenants and is under 80% of its cap, and the lower cell id breaks a tie.
 /// The caller's create call asks that cell to create the tenant. When the cell answers that it is full, the picker marks it as not
 /// taking new tenants and tries the next one. When the cell accepts, one transaction writes the tenant row and raises the cell's
-/// count by one. With no cell left it logs an error and returns <see cref="CellPlacement.Queued"/>.
+/// count by one. The <see cref="DirectoryCorrection"/> may have added the row already, as the cell has the tenant once it
+/// accepts. Then the write keeps that row and leaves the count, which the correction has set. With no cell left it logs an error and returns <see cref="CellPlacement.Queued"/>.
 /// </summary>
 internal sealed partial class CellPicker(NpgsqlDataSource directory, ILogger<CellPicker> logger)
 {
@@ -74,18 +75,20 @@ internal sealed partial class CellPicker(NpgsqlDataSource directory, ILogger<Cel
         await using var connection = await directory.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
+        int inserted;
         await using (var insert = new NpgsqlCommand(
-            "INSERT INTO directory.tenants (id, region_code, cell_id) VALUES (@id, @region, @cell)", connection, transaction))
+            "INSERT INTO directory.tenants (id, region_code, cell_id) VALUES (@id, @region, @cell) ON CONFLICT (id) DO NOTHING", connection, transaction))
         {
             insert.Parameters.AddWithValue("id", tenantId);
             insert.Parameters.AddWithValue("region", regionCode);
             insert.Parameters.AddWithValue("cell", cellId);
-            await insert.ExecuteNonQueryAsync(cancellationToken);
+            inserted = await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await using (var count = new NpgsqlCommand(
-            "UPDATE directory.cells SET tenant_count = tenant_count + 1 WHERE id = @id", connection, transaction))
+        if (inserted == 1)
         {
+            await using var count = new NpgsqlCommand(
+            "UPDATE directory.cells SET tenant_count = tenant_count + 1 WHERE id = @id", connection, transaction);
             count.Parameters.AddWithValue("id", cellId);
             await count.ExecuteNonQueryAsync(cancellationToken);
         }
