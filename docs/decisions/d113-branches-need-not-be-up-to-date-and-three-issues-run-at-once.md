@@ -26,7 +26,7 @@ The settings are in [delivery](../delivery.md#decisions).
   wait for runners.
 - The tree that NexKit merges is not the tree its checks passed, so two pull requests that pass alone
   can break `main` together. CI on `main`, as
-  [D136](d136-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges-started-by-nexkit-alone.md) runs it, finds such
+  [D139](d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) runs it, finds such
   a break, and a failure that repeats opens a `bug` issue.
 
 ## Alternatives
